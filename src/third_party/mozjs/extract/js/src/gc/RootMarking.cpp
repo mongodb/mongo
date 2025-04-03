@@ -379,8 +379,9 @@ void GCRuntime::traceEmbeddingBlackRoots(JSTracer* trc) {
   // The analysis doesn't like the function pointer below.
   JS::AutoSuppressGCAnalysis nogc;
 
-  for (const auto& callback : blackRootTracers.ref()) {
-    (*callback.op)(trc, callback.data);
+  for (size_t i = 0; i < blackRootTracers.ref().length(); i++) {
+    const Callback<JSTraceDataOp>& e = blackRootTracers.ref()[i];
+    (*e.op)(trc, e.data);
   }
 }
 

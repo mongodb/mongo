@@ -38,17 +38,13 @@ MIRGenerator::MIRGenerator(CompileRealm* realm,
                                    : false),
       bigIntsCanBeInNursery_(realm ? realm->zone()->canNurseryAllocateBigInts()
                                    : false),
-      minWasmMemory0Length_(0),
+      minWasmHeapLength_(0),
       options(options),
       gs_(alloc) {}
 
 bool MIRGenerator::licmEnabled() const {
   return optimizationInfo().licmEnabled() && !disableLICM_ &&
          !outerInfo().hadLICMInvalidation();
-}
-
-bool MIRGenerator::branchHintingEnabled() const {
-  return outerInfo().branchHintingEnabled();
 }
 
 mozilla::GenericErrorResult<AbortReason> MIRGenerator::abort(AbortReason r) {
@@ -579,7 +575,9 @@ MBasicBlock::MBasicBlock(MIRGraph& graph, const CompileInfo& info,
       mark_(false),
       immediatelyDominated_(graph.alloc()),
       immediateDominator_(nullptr),
-      trackedSite_(site) {
+      trackedSite_(site),
+      lineno_(0u),
+      columnIndex_(0u) {
   MOZ_ASSERT(trackedSite_, "trackedSite_ is non-nullptr");
 }
 

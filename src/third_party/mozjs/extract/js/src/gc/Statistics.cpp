@@ -154,11 +154,11 @@ struct PhaseInfo {
 };
 
 // A table of PhaseInfo indexed by Phase.
-using PhaseTable = EnumeratedArray<Phase, PhaseInfo, size_t(Phase::LIMIT)>;
+using PhaseTable = EnumeratedArray<Phase, Phase::LIMIT, PhaseInfo>;
 
 // A table of PhaseKindInfo indexed by PhaseKind.
 using PhaseKindTable =
-    EnumeratedArray<PhaseKind, PhaseKindInfo, size_t(PhaseKind::LIMIT)>;
+    EnumeratedArray<PhaseKind, PhaseKind::LIMIT, PhaseKindInfo>;
 
 #include "gc/StatsPhasesGenerated.inc"
 
@@ -175,18 +175,6 @@ class PhaseIter {
 };
 
 static double t(TimeDuration duration) { return duration.ToMilliseconds(); }
-
-static TimeDuration TimeBetween(TimeStamp start, TimeStamp end) {
-#ifndef XP_WIN
-  MOZ_ASSERT(end >= start);
-#else
-  // Sadly this happens sometimes.
-  if (end < start) {
-    return TimeDuration::Zero();
-  }
-#endif
-  return end - start;
-}
 
 inline JSContext* Statistics::context() {
   return gc->rt->mainContextFromOwnThread();
@@ -255,8 +243,8 @@ inline auto AllPhases() {
 }
 
 void Statistics::gcDuration(TimeDuration* total, TimeDuration* maxPause) const {
-  *total = *maxPause = TimeDuration::Zero();
-  for (const auto& slice : slices_) {
+  *total = *maxPause = 0;
+  for (auto& slice : slices_) {
     *total += slice.duration();
     if (slice.duration() > *maxPause) {
       *maxPause = slice.duration();
@@ -269,14 +257,14 @@ void Statistics::gcDuration(TimeDuration* total, TimeDuration* maxPause) const {
 
 void Statistics::sccDurations(TimeDuration* total,
                               TimeDuration* maxPause) const {
-  *total = *maxPause = TimeDuration::Zero();
-  for (const auto& duration : sccTimes) {
-    *total += duration;
-    *maxPause = std::max(*maxPause, duration);
+  *total = *maxPause = 0;
+  for (size_t i = 0; i < sccTimes.length(); i++) {
+    *total += sccTimes[i];
+    *maxPause = std::max(*maxPause, sccTimes[i]);
   }
 }
 
-using FragmentVector = Vector<UniqueChars, 8, SystemAllocPolicy>;
+typedef Vector<UniqueChars, 8, SystemAllocPolicy> FragmentVector;
 
 static UniqueChars Join(const FragmentVector& fragments,
                         const char* separator = "") {
@@ -314,7 +302,7 @@ static UniqueChars Join(const FragmentVector& fragments,
 
 static TimeDuration SumChildTimes(Phase phase,
                                   const Statistics::PhaseTimes& phaseTimes) {
-  TimeDuration total;
+  TimeDuration total = 0;
   for (phase = phases[phase].firstChild; phase != Phase::NONE;
        phase = phases[phase].nextSibling) {
     total += phaseTimes[phase];
@@ -380,7 +368,7 @@ UniqueChars Statistics::formatCompactSummaryMessage() const {
   }
 
   SprintfLiteral(buffer,
-                 "Zones: %zu of %zu (-%zu); Compartments: %zu of %zu (-%zu); "
+                 "Zones: %d of %d (-%d); Compartments: %d of %d (-%d); "
                  "HeapSize: %.3f MiB; "
                  "HeapChange (abs): %+d (%u); ",
                  zoneStats.collectedZoneCount, zoneStats.zoneCount,
@@ -595,7 +583,7 @@ UniqueChars Statistics::formatDetailedTotals() const {
 void Statistics::formatJsonSlice(size_t sliceNum, JSONPrinter& json) const {
   /*
    * We number each of the slice properties to keep the code in
-   * GCTelemetry.sys.mjs in sync.  See MAX_SLICE_KEYS.
+   * GCTelemetry.jsm in sync.  See MAX_SLICE_KEYS.
    */
   json.beginObject();
   formatJsonSliceDescription(sliceNum, slices_[sliceNum], json);  // # 1-11
@@ -633,8 +621,7 @@ void Statistics::log(const char* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   if (gcDebugFile) {
-    TimeDuration sinceStart =
-        TimeBetween(TimeStamp::FirstTimeStamp(), TimeStamp::Now());
+    TimeDuration sinceStart = TimeStamp::Now() - TimeStamp::FirstTimeStamp();
     fprintf(gcDebugFile, "%12.3f: ", sinceStart.ToMicroseconds());
     vfprintf(gcDebugFile, fmt, args);
     fprintf(gcDebugFile, "\n");
@@ -752,12 +739,11 @@ void Statistics::formatJsonSliceDescription(unsigned i, const SliceData& slice,
     json.property("trigger_amount", trigger.amount);
     json.property("trigger_threshold", trigger.threshold);
   }
-  MOZ_ASSERT(slice.endFaults >= slice.startFaults);
-  size_t numFaults = slice.endFaults - slice.startFaults;
+  int64_t numFaults = slice.endFaults - slice.startFaults;
   if (numFaults != 0) {
     json.property("page_faults", numFaults);
   }
-  json.property("start_timestamp", TimeBetween(originTime, slice.start),
+  json.property("start_timestamp", slice.start - originTime,
                 JSONPrinter::SECONDS);
 }
 
@@ -784,7 +770,9 @@ Statistics::Statistics(GCRuntime* gc)
       startingMinorGCNumber(0),
       startingMajorGCNumber(0),
       startingSliceNumber(0),
+      maxPauseInInterval(0),
       sliceCallback(nullptr),
+      nurseryCollectionCallback(nullptr),
       aborted(false),
       enableProfiling_(false),
       sliceCount_(0) {
@@ -875,9 +863,16 @@ JS::GCSliceCallback Statistics::setSliceCallback(
   return oldCallback;
 }
 
+JS::GCNurseryCollectionCallback Statistics::setNurseryCollectionCallback(
+    JS::GCNurseryCollectionCallback newCallback) {
+  auto oldCallback = nurseryCollectionCallback;
+  nurseryCollectionCallback = newCallback;
+  return oldCallback;
+}
+
 TimeDuration Statistics::clearMaxGCPauseAccumulator() {
   TimeDuration prior = maxPauseInInterval;
-  maxPauseInInterval = TimeDuration::Zero();
+  maxPauseInInterval = 0;
   return prior;
 }
 
@@ -972,8 +967,7 @@ void Statistics::printStats() {
     UniqueChars msg = formatDetailedMessage();
     if (msg) {
       double secSinceStart =
-          TimeBetween(TimeStamp::ProcessCreation(), slices_[0].start)
-              .ToSeconds();
+          (slices_[0].start - TimeStamp::ProcessCreation()).ToSeconds();
       fprintf(gcTimerFile, "GC(T+%.3fs) %s\n", secSinceStart, msg.get());
     }
   }
@@ -994,10 +988,10 @@ void Statistics::beginGC(JS::GCOptions options, const TimeStamp& currentTime) {
   startingSliceNumber = gc->gcNumber();
 
   if (gc->lastGCEndTime()) {
-    timeSinceLastGC = TimeBetween(gc->lastGCEndTime(), currentTime);
+    timeSinceLastGC = currentTime - gc->lastGCEndTime();
   }
 
-  totalGCTime_ = TimeDuration::Zero();
+  totalGCTime_ = TimeDuration();
 }
 
 void Statistics::measureInitialHeapSize() {
@@ -1043,7 +1037,7 @@ void Statistics::sendGCTelemetry() {
   TimeDuration markGrayTotal = markGrayNotWeak + markGrayWeak;
   TimeDuration markNotGrayOrWeak = markTotal - markGrayNotWeak - markWeakTotal;
   if (markNotGrayOrWeak < TimeDuration::FromMilliseconds(0)) {
-    markNotGrayOrWeak = TimeDuration::Zero();
+    markNotGrayOrWeak = TimeDuration();
   }
 
   size_t markCount = getCount(COUNT_CELLS_MARKED);
@@ -1086,7 +1080,7 @@ void Statistics::sendGCTelemetry() {
   runtime->metrics().GC_MAX_PAUSE_MS_2(longest);
 
   const double mmu50 = computeMMU(TimeDuration::FromMilliseconds(50));
-  runtime->metrics().GC_MMU_50(mmu50 * 100.0);
+  runtime->metrics().GC_MMU_50(mmu50 * 100);
 
   // Record scheduling telemetry for the main runtime but not for workers, which
   // are scheduled differently.
@@ -1108,7 +1102,7 @@ void Statistics::sendGCTelemetry() {
     MOZ_ASSERT(preCollectedHeapBytes >= bytesSurvived);
     double survivalRate =
         100.0 * double(bytesSurvived) / double(preCollectedHeapBytes);
-    runtime->metrics().GC_TENURED_SURVIVAL_RATE(survivalRate);
+    runtime->metrics().GC_TENURED_SURVIVAL_RATE(uint32_t(survivalRate));
 
     // Calculate 'effectiveness' in MB / second, on main thread only for now.
     if (!runtime->parentRuntime) {
@@ -1122,34 +1116,43 @@ void Statistics::sendGCTelemetry() {
   }
 
   // Parallel marking stats.
-  bool usedParallelMarking = false;
   if (gc->isParallelMarkingEnabled()) {
     TimeDuration wallTime = SumPhase(PhaseKind::PARALLEL_MARK, phaseTimes);
+    TimeDuration parallelRunTime =
+        sumTotalParallelTime(PhaseKind::PARALLEL_MARK) -
+        sumTotalParallelTime(PhaseKind::PARALLEL_MARK_WAIT);
     TimeDuration parallelMarkTime =
         sumTotalParallelTime(PhaseKind::PARALLEL_MARK_MARK);
-    TimeDuration parallelRunTime =
-        parallelMarkTime + sumTotalParallelTime(PhaseKind::PARALLEL_MARK_OTHER);
-    usedParallelMarking = wallTime && parallelMarkTime;
-    if (usedParallelMarking) {
+    if (wallTime && parallelMarkTime) {
       uint32_t threadCount = gc->markers.length();
       double speedup = parallelMarkTime / wallTime;
       double utilization = parallelRunTime / (wallTime * threadCount);
       runtime->metrics().GC_PARALLEL_MARK_SPEEDUP(uint32_t(speedup * 100.0));
       runtime->metrics().GC_PARALLEL_MARK_UTILIZATION(
-          std::clamp(utilization * 100.0, 0.0, 100.0));
+          std::clamp<uint32_t>(utilization * 100.0, 0, 100));
       runtime->metrics().GC_PARALLEL_MARK_INTERRUPTIONS(
           getCount(COUNT_PARALLEL_MARK_INTERRUPTIONS));
     }
   }
-  runtime->metrics().GC_PARALLEL_MARK(usedParallelMarking);
 }
 
-void Statistics::beginNurseryCollection() {
+void Statistics::beginNurseryCollection(JS::GCReason reason) {
   count(COUNT_MINOR_GC);
   startingMinorGCNumber = gc->minorGCCount();
+  if (nurseryCollectionCallback) {
+    (*nurseryCollectionCallback)(
+        context(), JS::GCNurseryProgress::GC_NURSERY_COLLECTION_START, reason);
+  }
 }
 
-void Statistics::endNurseryCollection() { tenuredAllocsSinceMinorGC = 0; }
+void Statistics::endNurseryCollection(JS::GCReason reason) {
+  if (nurseryCollectionCallback) {
+    (*nurseryCollectionCallback)(
+        context(), JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END, reason);
+  }
+
+  tenuredAllocsSinceMinorGC = 0;
+}
 
 Statistics::SliceData::SliceData(const SliceBudget& budget,
                                  Maybe<Trigger> trigger, JS::GCReason reason,
@@ -1161,10 +1164,6 @@ Statistics::SliceData::SliceData(const SliceBudget& budget,
       initialState(initialState),
       start(start),
       startFaults(startFaults) {}
-
-TimeDuration Statistics::SliceData::duration() const {
-  return TimeBetween(start, end);
-}
 
 void Statistics::beginSlice(const ZoneGCStats& zoneStats, JS::GCOptions options,
                             const SliceBudget& budget, JS::GCReason reason,
@@ -1183,8 +1182,7 @@ void Statistics::beginSlice(const ZoneGCStats& zoneStats, JS::GCOptions options,
 
   JSRuntime* runtime = gc->rt;
   if (!runtime->parentRuntime && !slices_.empty()) {
-    TimeDuration timeSinceLastSlice =
-        TimeBetween(slices_.back().end, currentTime);
+    TimeDuration timeSinceLastSlice = currentTime - slices_.back().end;
     runtime->metrics().GC_TIME_BETWEEN_SLICES_MS(timeSinceLastSlice);
   }
 
@@ -1230,7 +1228,7 @@ void Statistics::endSlice() {
 
     sliceCount_++;
 
-    totalGCTime_ += slice.duration();
+    totalGCTime_ += slice.end - slice.start;
   }
 
   bool last = !gc->isIncrementalGCInProgress();
@@ -1289,7 +1287,7 @@ void Statistics::endSlice() {
 
 void Statistics::sendSliceTelemetry(const SliceData& slice) {
   JSRuntime* runtime = gc->rt;
-  TimeDuration sliceTime = slice.duration();
+  TimeDuration sliceTime = slice.end - slice.start;
   runtime->metrics().GC_SLICE_MS(sliceTime);
 
   if (slice.budget.isTimeBudget()) {
@@ -1352,9 +1350,9 @@ bool Statistics::startTimingMutator() {
 
   MOZ_ASSERT(suspendedPhases.empty());
 
-  timedGCTime = TimeDuration::Zero();
+  timedGCTime = 0;
   phaseStartTimes[Phase::MUTATOR] = TimeStamp();
-  phaseTimes[Phase::MUTATOR] = TimeDuration::Zero();
+  phaseTimes[Phase::MUTATOR] = 0;
   timedGCStart = TimeStamp();
 
   beginPhase(PhaseKind::MUTATOR);
@@ -1396,7 +1394,7 @@ void Statistics::resumePhases() {
          suspendedPhases.back() != Phase::IMPLICIT_SUSPENSION) {
     Phase resumePhase = suspendedPhases.popCopy();
     if (resumePhase == Phase::MUTATOR) {
-      timedGCTime += TimeBetween(timedGCStart, TimeStamp::Now());
+      timedGCTime += TimeStamp::Now() - timedGCStart;
     }
     recordPhaseBegin(resumePhase);
   }
@@ -1465,10 +1463,9 @@ void Statistics::recordPhaseEnd(Phase phase) {
     if (phaseEndTimes[kid] > now) {
       fprintf(stderr,
               "Parent %s ended at %.3fms, before child %s ended at %.3fms?\n",
-              phases[phase].name,
-              t(TimeBetween(TimeStamp::FirstTimeStamp(), now)),
+              phases[phase].name, t(now - TimeStamp::FirstTimeStamp()),
               phases[kid].name,
-              t(TimeBetween(TimeStamp::FirstTimeStamp(), phaseEndTimes[kid])));
+              t(phaseEndTimes[kid] - TimeStamp::FirstTimeStamp()));
     }
     MOZ_ASSERT(phaseEndTimes[kid] <= now,
                "Inconsistent time data; see bug 1400153");
@@ -1486,7 +1483,7 @@ void Statistics::recordPhaseEnd(Phase phase) {
 
   phaseStack.popBack();
 
-  TimeDuration t = TimeBetween(phaseStartTimes[phase], now);
+  TimeDuration t = now - phaseStartTimes[phase];
   if (!slices_.empty()) {
     slices_.back().phaseTimes[phase] += t;
   }
@@ -1537,12 +1534,10 @@ void Statistics::endSCC(unsigned scc, TimeStamp start) {
     return;
   }
 
-  sccTimes[scc] += TimeBetween(start, TimeStamp::Now());
+  sccTimes[scc] += TimeStamp::Now() - start;
 }
 
 /*
- * Calculate minimum mutator utilization for previous incremental GC.
- *
  * MMU (minimum mutator utilization) is a measure of how much garbage collection
  * is affecting the responsiveness of the system. MMU measurements are given
  * with respect to a certain window size. If we report MMU(50ms) = 80%, then
@@ -1552,56 +1547,36 @@ void Statistics::endSCC(unsigned scc, TimeStamp start) {
  * as long as the total time it spends is at most 10ms.
  */
 double Statistics::computeMMU(TimeDuration window) const {
-  MOZ_ASSERT(window > TimeDuration::Zero());
-  MOZ_ASSERT(!slices().empty());
+  MOZ_ASSERT(!slices_.empty());
 
-  // Examine all ranges of slices from |startIndex| to |endIndex| inclusive
-  // whose timestamps span less than the window duration. The time spent in GC
-  // in each range is stored in |gcInRange| by maintaining a running total. The
-  // maximum value of this after adjustment to the window size is recorded in
-  // |maxGCInWindow|.
+  TimeDuration gc = slices_[0].end - slices_[0].start;
+  TimeDuration gcMax = gc;
 
-  size_t startIndex = 0;
-  const SliceData* startSlice = &sliceAt(startIndex);
-  TimeDuration gcInRange = startSlice->duration();
-  if (gcInRange >= window) {
+  if (gc >= window) {
     return 0.0;
   }
 
-  TimeDuration maxGCInWindow = gcInRange;
+  int startIndex = 0;
+  for (size_t endIndex = 1; endIndex < slices_.length(); endIndex++) {
+    auto* startSlice = &slices_[startIndex];
+    auto& endSlice = slices_[endIndex];
+    gc += endSlice.end - endSlice.start;
 
-  for (size_t endIndex = 1; endIndex < slices().length(); endIndex++) {
-    const SliceData* endSlice = &sliceAt(endIndex);
-    if (endSlice->duration() >= window) {
-      return 0.0;
+    while (endSlice.end - startSlice->end >= window) {
+      gc -= startSlice->end - startSlice->start;
+      startSlice = &slices_[++startIndex];
     }
 
-    gcInRange += endSlice->duration();
-
-    while (TimeBetween(startSlice->end, endSlice->end) >= window) {
-      gcInRange -= startSlice->duration();
-      ++startIndex;
-      MOZ_ASSERT(startIndex <= endIndex);
-      startSlice = &sliceAt(startIndex);
+    TimeDuration cur = gc;
+    if (endSlice.end - startSlice->start > window) {
+      cur -= (endSlice.end - startSlice->start - window);
     }
-
-    TimeDuration totalInRange = TimeBetween(startSlice->start, endSlice->end);
-    MOZ_ASSERT(gcInRange <= totalInRange);
-
-    TimeDuration gcInWindow = gcInRange;
-    if (totalInRange > window) {
-      gcInWindow -= (totalInRange - window);
-    }
-    MOZ_ASSERT(gcInWindow <= window);
-
-    if (gcInWindow > maxGCInWindow) {
-      maxGCInWindow = gcInWindow;
+    if (cur > gcMax) {
+      gcMax = cur;
     }
   }
 
-  MOZ_ASSERT(maxGCInWindow >= TimeDuration::Zero());
-  MOZ_ASSERT(maxGCInWindow <= window);
-  return (window - maxGCInWindow) / window;
+  return double((window - gcMax) / window);
 }
 
 void Statistics::maybePrintProfileHeaders() {
@@ -1627,9 +1602,6 @@ void Statistics::maybePrintProfileHeaders() {
   _("States", 6, "%6s", formatGCStates(slice))        \
   _("FSNR", 4, "%4s", formatGCFlags(slice))           \
   _("SizeKB", 8, "%8zu", sizeKB)                      \
-  _("Zs", 3, "%3zu", zoneCount)                       \
-  _("Cs", 3, "%3zu", compartmentCount)                \
-  _("Rs", 3, "%3zu", realmCount)                      \
   _("Budget", 6, "%6s", formatBudget(slice))
 
 #define FOR_EACH_GC_PROFILE_METADATA(_)  \
@@ -1642,29 +1614,29 @@ void Statistics::printProfileHeader() {
   }
 
   Sprinter sprinter;
-  if (!sprinter.init()) {
+  if (!sprinter.init() || !sprinter.put(MajorGCProfilePrefix)) {
     return;
   }
-  sprinter.put(MajorGCProfilePrefix);
 
-#define PRINT_METADATA_NAME(name, width, _1, _2) \
-  sprinter.printf(" %-*s", width, name);
-
+#define PRINT_METADATA_NAME(name, width, _1, _2)  \
+  if (!sprinter.jsprintf(" %-*s", width, name)) { \
+    return;                                       \
+  }
   FOR_EACH_GC_PROFILE_METADATA(PRINT_METADATA_NAME)
 #undef PRINT_METADATA_NAME
 
-#define PRINT_PROFILE_NAME(_1, text, _2) sprinter.printf(" %-6.6s", text);
-
+#define PRINT_PROFILE_NAME(_1, text, _2)     \
+  if (!sprinter.jsprintf(" %-6.6s", text)) { \
+    return;                                  \
+  }
   FOR_EACH_GC_PROFILE_TIME(PRINT_PROFILE_NAME)
 #undef PRINT_PROFILE_NAME
 
-  sprinter.put("\n");
-
-  JS::UniqueChars str = sprinter.release();
-  if (!str) {
+  if (!sprinter.put("\n")) {
     return;
   }
-  fputs(str.get(), profileFile());
+
+  fputs(sprinter.string(), profileFile());
 }
 
 static TimeDuration SumAllPhaseKinds(const Statistics::PhaseKindTimes& times) {
@@ -1683,33 +1655,28 @@ void Statistics::printSliceProfile() {
   updateTotalProfileTimes(times);
 
   Sprinter sprinter;
-  if (!sprinter.init()) {
+  if (!sprinter.init() || !sprinter.put(MajorGCProfilePrefix)) {
     return;
   }
-  sprinter.put(MajorGCProfilePrefix);
 
   size_t pid = getpid();
   JSRuntime* runtime = gc->rt;
-  TimeDuration timestamp = TimeBetween(creationTime(), slice.end);
+  TimeDuration timestamp = slice.end - creationTime();
   const char* reason = ExplainGCReason(slice.reason);
   size_t sizeKB = gc->heapSize.bytes() / 1024;
-  size_t zoneCount = zoneStats.zoneCount;
-  size_t compartmentCount = zoneStats.compartmentCount;
-  size_t realmCount = zoneStats.realmCount;
 
 #define PRINT_FIELD_VALUE(_1, _2, format, value) \
-  sprinter.printf(" " format, value);
-
+  if (!sprinter.jsprintf(" " format, value)) {   \
+    return;                                      \
+  }
   FOR_EACH_GC_PROFILE_METADATA(PRINT_FIELD_VALUE)
 #undef PRINT_FIELD_VALUE
 
-  printProfileTimes(times, sprinter);
-
-  JS::UniqueChars str = sprinter.release();
-  if (!str) {
+  if (!printProfileTimes(times, sprinter)) {
     return;
   }
-  fputs(str.get(), profileFile());
+
+  fputs(sprinter.string(), profileFile());
 }
 
 Statistics::ProfileDurations Statistics::getProfileTimes(
@@ -1768,20 +1735,22 @@ const char* Statistics::formatBudget(const SliceData& slice) {
   }
 
   DebugOnly<int> r =
-      SprintfLiteral(formatBuffer_, "%6" PRIi64, slice.budget.timeBudget());
+      SprintfLiteral(formatBuffer_, " %6" PRIi64, slice.budget.timeBudget());
   MOZ_ASSERT(r > 0 && r < FormatBufferLength);
   return formatBuffer_;
 }
 
 /* static */
-void Statistics::printProfileTimes(const ProfileDurations& times,
+bool Statistics::printProfileTimes(const ProfileDurations& times,
                                    Sprinter& sprinter) {
   for (auto time : times) {
     int64_t millis = int64_t(time.ToMilliseconds());
-    sprinter.printf(" %6" PRIi64, millis);
+    if (!sprinter.jsprintf(" %6" PRIi64, millis)) {
+      return false;
+    }
   }
 
-  sprinter.put("\n");
+  return sprinter.put("\n");
 }
 
 constexpr size_t SliceMetadataFormatWidth() {
@@ -1806,31 +1775,32 @@ void Statistics::printTotalProfileTimes() {
   }
 
   Sprinter sprinter;
-  if (!sprinter.init()) {
+  if (!sprinter.init() || !sprinter.put(MajorGCProfilePrefix)) {
     return;
   }
-  sprinter.put(MajorGCProfilePrefix);
 
   size_t pid = getpid();
   JSRuntime* runtime = gc->rt;
 
 #define PRINT_FIELD_VALUE(_1, _2, format, value) \
-  sprinter.printf(" " format, value);
-
+  if (!sprinter.jsprintf(" " format, value)) {   \
+    return;                                      \
+  }
   FOR_EACH_GC_PROFILE_COMMON_METADATA(PRINT_FIELD_VALUE)
 #undef PRINT_FIELD_VALUE
 
   // Use whole width of per-slice metadata to print total slices so the profile
   // totals that follow line up.
   size_t width = SliceMetadataFormatWidth();
-  sprinter.printf(" %-*s", int(width), formatTotalSlices());
-  printProfileTimes(totalTimes_, sprinter);
-
-  JS::UniqueChars str = sprinter.release();
-  if (!str) {
+  if (!sprinter.jsprintf(" %-*s", int(width), formatTotalSlices())) {
     return;
   }
-  fputs(str.get(), profileFile());
+
+  if (!printProfileTimes(totalTimes_, sprinter)) {
+    return;
+  }
+
+  fputs(sprinter.string(), profileFile());
 }
 
 const char* Statistics::formatTotalSlices() {

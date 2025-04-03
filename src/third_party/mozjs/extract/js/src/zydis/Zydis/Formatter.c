@@ -55,7 +55,7 @@ static const ZydisFormatter* const FORMATTER_PRESETS[ZYDIS_FORMATTER_STYLE_MAX_V
 /* Helper functions                                                                               */
 /* ---------------------------------------------------------------------------------------------- */
 
-static void ZydisFormatterBufferInit(ZydisFormatterBuffer* buffer, char* user_buffer,
+void ZydisFormatterBufferInit(ZydisFormatterBuffer* buffer, char* user_buffer,
     ZyanUSize length)
 {
     ZYAN_ASSERT(buffer);
@@ -77,7 +77,7 @@ static void ZydisFormatterBufferInit(ZydisFormatterBuffer* buffer, char* user_bu
     *user_buffer = '\0';
 }
 
-static void ZydisFormatterBufferInitTokenized(ZydisFormatterBuffer* buffer,
+void ZydisFormatterBufferInitTokenized(ZydisFormatterBuffer* buffer,
     ZydisFormatterToken** first_token, void* user_buffer, ZyanUSize length)
 {
     ZYAN_ASSERT(buffer);
@@ -329,11 +329,6 @@ ZyanStatus ZydisFormatterSetProperty(ZydisFormatter* formatter, ZydisFormatterPr
     case ZYDIS_FORMATTER_PROP_HEX_UPPERCASE:
     {
         formatter->hex_uppercase = (value) ? ZYAN_TRUE : ZYAN_FALSE;
-        break;
-    }
-    case ZYDIS_FORMATTER_PROP_HEX_FORCE_LEADING_NUMBER:
-    {
-        formatter->hex_force_leading_number = (value) ? ZYAN_TRUE : ZYAN_FALSE;
         break;
     }
     case ZYDIS_FORMATTER_PROP_HEX_PREFIX:

@@ -17,12 +17,12 @@
 #include "jstypes.h"  // JS_PUBLIC_API
 
 #include "debugger/DebugAPI.h"
-#include "frontend/BytecodeCompiler.h"  // frontend::{CompileGlobalScript, CompileStandaloneFunction, CompileStandaloneFunctionInNonSyntacticScope}
+#include "frontend/BytecodeCompilation.h"  // frontend::CompileGlobalScript
+#include "frontend/BytecodeCompiler.h"     // frontend::IsIdentifier
 #include "frontend/CompilationStencil.h"  // for frontened::{CompilationStencil, BorrowingCompilationStencil, CompilationGCOutput}
 #include "frontend/FrontendContext.h"     // js::AutoReportFrontendContext
-#include "frontend/Parser.h"  // frontend::Parser, frontend::ParseGoal
-#include "js/CharacterEncoding.h"  // JS::UTF8Chars, JS::ConstUTF8CharsZ, JS::UTF8CharsToNewTwoByteCharsZ
-#include "js/ColumnNumber.h"            // JS::ColumnNumberOneOrigin
+#include "frontend/Parser.h"       // frontend::Parser, frontend::ParseGoal
+#include "js/CharacterEncoding.h"  // JS::UTF8Chars, JS::UTF8CharsToNewTwoByteCharsZ
 #include "js/experimental/JSStencil.h"  // JS::Stencil
 #include "js/friend/ErrorMessages.h"    // js::GetErrorMessage, JSMSG_*
 #include "js/RootingAPI.h"              // JS::Rooted
@@ -31,7 +31,6 @@
 #include "js/Utility.h"            // js::MallocArena, JS::UniqueTwoByteChars
 #include "js/Value.h"              // JS::Value
 #include "util/CompleteFile.h"     // js::FileContents, js::ReadCompleteFile
-#include "util/Identifier.h"       // js::IsIdentifier
 #include "util/StringBuffer.h"     // js::StringBuffer
 #include "vm/EnvironmentObject.h"  // js::CreateNonSyntacticEnvironmentChain
 #include "vm/ErrorReporting.h"  // js::ErrorMetadata, js::ReportCompileErrorLatin1
@@ -63,15 +62,15 @@ static void ReportSourceTooLongImpl(JS::FrontendContext* fc, ...) {
   va_start(args, fc);
 
   js::ErrorMetadata metadata;
-  metadata.filename = JS::ConstUTF8CharsZ("<unknown>");
+  metadata.filename = "<unknown>";
   metadata.lineNumber = 0;
-  metadata.columnNumber = JS::ColumnNumberOneOrigin();
+  metadata.columnNumber = 0;
   metadata.lineLength = 0;
   metadata.tokenOffset = 0;
   metadata.isMuted = false;
 
-  js::ReportCompileErrorLatin1VA(fc, std::move(metadata), nullptr,
-                                 JSMSG_SOURCE_TOO_LONG, &args);
+  js::ReportCompileErrorLatin1(fc, std::move(metadata), nullptr,
+                               JSMSG_SOURCE_TOO_LONG, &args);
 
   va_end(args);
 }
@@ -184,6 +183,10 @@ JS_PUBLIC_API bool JS_Utf8BufferIsCompilableUnit(JSContext* cx,
     return true;
   }
 
+  // Return true on any out-of-memory error or non-EOF-related syntax error, so
+  // our caller doesn't try to collect more buffered source.
+  bool result = true;
+
   using frontend::FullParseHandler;
   using frontend::ParseGoal;
   using frontend::Parser;
@@ -204,25 +207,22 @@ JS_PUBLIC_API bool JS_Utf8BufferIsCompilableUnit(JSContext* cx,
     return false;
   }
 
-  // Warnings and errors during parsing shouldn't be reported.
-  fc.clearAutoReport();
-
   Parser<FullParseHandler, char16_t> parser(&fc, options, chars.get(), length,
                                             /* foldConstants = */ true,
                                             compilationState,
                                             /* syntaxParser = */ nullptr);
-  if (!parser.checkOptions() || parser.parse().isErr()) {
+  if (!parser.checkOptions() || !parser.parse()) {
     // We ran into an error. If it was because we ran out of source, we
     // return false so our caller knows to try to collect more buffered
     // source.
     if (parser.isUnexpectedEOF()) {
-      return false;
+      result = false;
     }
+
+    cx->clearPendingException();
   }
 
-  // Return true on any out-of-memory error or non-EOF-related syntax error, so
-  // our caller doesn't try to collect more buffered source.
-  return true;
+  return result;
 }
 
 class FunctionCompiler {
@@ -261,8 +261,8 @@ class FunctionCompiler {
 
       // If the name is an identifier, we can just add it to source text.
       // Otherwise we'll have to set it manually later.
-      nameIsIdentifier_ =
-          IsIdentifier(reinterpret_cast<const Latin1Char*>(name), nameLen);
+      nameIsIdentifier_ = js::frontend::IsIdentifier(
+          reinterpret_cast<const Latin1Char*>(name), nameLen);
       if (nameIsIdentifier_) {
         if (!funStr_.append(nameAtom_)) {
           return false;

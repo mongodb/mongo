@@ -55,10 +55,6 @@ namespace js {
 class HelperThread {
   Thread thread;
 
-  ConditionVariable wakeup;
-
-  HelperThreadLockData<HelperThreadTask*> nextTask;
-
   /*
    * The profiling thread for this helper thread, which can be used to push
    * and pop label frames.
@@ -68,9 +64,7 @@ class HelperThread {
   ProfilingStack* profilingStack = nullptr;
 
  public:
-  const uint32_t id;
-
-  explicit HelperThread(uint32_t id);
+  HelperThread();
   [[nodiscard]] bool init(InternalThreadPool* pool);
 
   ThreadId threadId() { return thread.get_id(); }
@@ -82,9 +76,6 @@ class HelperThread {
 
   void ensureRegisteredWithProfiler();
   void unregisterWithProfilerIfNeeded();
-
-  void dispatchTask(HelperThreadTask* task);
-  void notify();
 
  private:
   struct AutoProfilerLabel {
@@ -131,30 +122,19 @@ bool InternalThreadPool::Initialize(size_t threadCount,
 
 bool InternalThreadPool::ensureThreadCount(size_t threadCount,
                                            AutoLockHelperThreadState& lock) {
-  // Ensure space in freeThreadSet.
-  threadCount = std::min(threadCount, sizeof(uint32_t) * CHAR_BIT);
-
-  MOZ_ASSERT(threads(lock).length() <= threadCount);
+  MOZ_ASSERT(threads(lock).length() < threadCount);
 
   if (!threads(lock).reserve(threadCount)) {
     return false;
   }
 
   while (threads(lock).length() < threadCount) {
-    uint32_t id = threads(lock).length();
-
-    auto thread = js::MakeUnique<HelperThread>(id);
+    auto thread = js::MakeUnique<HelperThread>();
     if (!thread || !thread->init(this)) {
       return false;
     }
 
     threads(lock).infallibleEmplaceBack(std::move(thread));
-
-    setThreadFree(id);
-  }
-
-  for (size_t i = 0; i < threads(lock).length(); i++) {
-    MOZ_ASSERT(threads(lock)[i]->id == i);
   }
 
   return true;
@@ -177,9 +157,7 @@ void InternalThreadPool::shutDown(AutoLockHelperThreadState& lock) {
   MOZ_ASSERT(!terminating);
   terminating = true;
 
-  for (auto& thread : threads(lock)) {
-    thread->notify();
-  }
+  notifyAll(lock);
 
   for (auto& thread : threads(lock)) {
     AutoUnlockHelperThreadState unlock(lock);
@@ -204,38 +182,34 @@ size_t InternalThreadPool::sizeOfIncludingThis(
 }
 
 /* static */
-void InternalThreadPool::DispatchTask(HelperThreadTask* task) {
-  Get().dispatchOrQueueTask(task);
+void InternalThreadPool::DispatchTask(JS::DispatchReason reason) {
+  Get().dispatchTask(reason);
 }
 
-void InternalThreadPool::dispatchOrQueueTask(HelperThreadTask* task) {
-  // This could now use a separate mutex like TaskController, but continues to
-  // use the helper thread state lock for convenience.
-  AutoLockHelperThreadState lock;
-  MOZ_ASSERT(!terminating);
-  MOZ_ASSERT(freeThreadSet != 0);
-
-  uint32_t id = mozilla::CountTrailingZeroes32(freeThreadSet);
-  clearThreadFree(id);
-
-  HelperThread* thread = threads_.ref()[id].get();
-  thread->dispatchTask(task);
+void InternalThreadPool::dispatchTask(JS::DispatchReason reason) {
+  gHelperThreadLock.assertOwnedByCurrentThread();
+  queuedTasks++;
+  if (reason == JS::DispatchReason::NewTask) {
+    wakeup.notify_one();
+  } else {
+    // We're called from a helper thread right before returning to
+    // HelperThread::threadLoop. There we will check queuedTasks so there's no
+    // need to wake up any threads.
+    MOZ_ASSERT(reason == JS::DispatchReason::FinishedTask);
+    MOZ_ASSERT(!TlsContext.get(), "we should be on a helper thread");
+  }
 }
 
-void InternalThreadPool::setThreadFree(uint32_t threadId) {
-  uint32_t idMask = 1 << threadId;
-  MOZ_ASSERT((freeThreadSet & idMask) == 0);
-  freeThreadSet |= idMask;
+void InternalThreadPool::notifyAll(const AutoLockHelperThreadState& lock) {
+  wakeup.notify_all();
 }
 
-void InternalThreadPool::clearThreadFree(uint32_t threadId) {
-  uint32_t idMask = 1 << threadId;
-  MOZ_ASSERT((freeThreadSet & idMask) != 0);
-  freeThreadSet &= ~idMask;
+void InternalThreadPool::wait(AutoLockHelperThreadState& lock) {
+  wakeup.wait_for(lock, mozilla::TimeDuration::Forever());
 }
 
-HelperThread::HelperThread(uint32_t id)
-    : thread(Thread::Options().setStackSize(HELPER_STACK_SIZE)), id(id) {}
+HelperThread::HelperThread()
+    : thread(Thread::Options().setStackSize(HELPER_STACK_SIZE)) {}
 
 bool HelperThread::init(InternalThreadPool* pool) {
   return thread.init(HelperThread::ThreadMain, pool, this);
@@ -297,36 +271,19 @@ HelperThread::AutoProfilerLabel::~AutoProfilerLabel() {
   }
 }
 
-void HelperThread::dispatchTask(HelperThreadTask* task) {
-  MOZ_ASSERT(!nextTask);
-  nextTask = task;
-  notify();
-}
-
-void HelperThread::notify() { wakeup.notify_one(); }
-
 void HelperThread::threadLoop(InternalThreadPool* pool) {
   MOZ_ASSERT(CanUseExtraThreads());
 
   AutoLockHelperThreadState lock;
 
   while (!pool->terminating) {
-    if (!nextTask) {
-      AUTO_PROFILER_LABEL("HelperThread::threadLoop::wait", IDLE);
-      wakeup.wait(lock);
+    if (pool->queuedTasks != 0) {
+      pool->queuedTasks--;
+      HelperThreadState().runOneTask(lock);
       continue;
     }
 
-    // JS::RunHelperThreadTask calls runOneTask and then dispatch. Here we split
-    // this up so we can mark the current thread as free in between and allow
-    // dispatch to pick this thread for the next task.
-
-    HelperThreadState().runOneTask(nextTask, lock);
-
-    nextTask = nullptr;
-    pool->setThreadFree(id);
-
-    HelperThreadState().dispatch(lock);
-    AutoUnlockHelperThreadState unlock(lock);
+    AUTO_PROFILER_LABEL("HelperThread::threadLoop::wait", IDLE);
+    pool->wait(lock);
   }
 }

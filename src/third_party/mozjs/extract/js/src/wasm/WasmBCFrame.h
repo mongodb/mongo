@@ -469,15 +469,17 @@ class BaseStackFrameAllocator {
   // consumed by the call.
 
   void freeArgAreaAndPopBytes(size_t argSize, size_t dropSize) {
-    // The method is called to re-initialize SP after the call. Note that
-    // this operation shall not be optimized for argSize + dropSize == 0.
 #ifdef RABALDR_CHUNKY_STACK
     // Freeing the outgoing arguments and freeing the consumed values have
     // different semantics here, which is why the operation is split.
-    masm.freeStackTo(masm.framePushed() - argSize);
+    if (argSize) {
+      masm.freeStack(argSize);
+    }
     popChunkyBytes(dropSize);
 #else
-    masm.freeStackTo(masm.framePushed() - (argSize + dropSize));
+    if (argSize + dropSize) {
+      masm.freeStack(argSize + dropSize);
+    }
 #endif
   }
 };
@@ -725,9 +727,7 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
   }
 
   void loadInstancePtr(Register dst) {
-    // Sometimes loadInstancePtr is used in context when SP is not sync is FP,
-    // e.g. just after tail calls returns.
-    masm.loadPtr(Address(FramePointer, -instancePointerOffset_), dst);
+    masm.loadPtr(Address(sp_, stackOffset(instancePointerOffset_)), dst);
   }
 
   void storeInstancePtr(Register instance) {
@@ -943,24 +943,21 @@ class BaseStackFrame final : public BaseStackFrameAllocator {
                                    uint32_t bytes, Register temp) {
     MOZ_ASSERT(destHeight < srcHeight);
     MOZ_ASSERT(bytes % sizeof(uint32_t) == 0);
-    // The shuffleStackResultsTowardFP is used when SP/framePushed is not
-    // tracked by the compiler, e.g. after possible return call -- use
-    // FramePointer instead of sp_.
-    int32_t destOffset = int32_t(-destHeight + bytes);
-    int32_t srcOffset = int32_t(-srcHeight + bytes);
+    uint32_t destOffset = stackOffset(destHeight) + bytes;
+    uint32_t srcOffset = stackOffset(srcHeight) + bytes;
     while (bytes >= sizeof(intptr_t)) {
       destOffset -= sizeof(intptr_t);
       srcOffset -= sizeof(intptr_t);
       bytes -= sizeof(intptr_t);
-      masm.loadPtr(Address(FramePointer, srcOffset), temp);
-      masm.storePtr(temp, Address(FramePointer, destOffset));
+      masm.loadPtr(Address(sp_, srcOffset), temp);
+      masm.storePtr(temp, Address(sp_, destOffset));
     }
     if (bytes) {
       MOZ_ASSERT(bytes == sizeof(uint32_t));
       destOffset -= sizeof(uint32_t);
       srcOffset -= sizeof(uint32_t);
-      masm.load32(Address(FramePointer, srcOffset), temp);
-      masm.store32(temp, Address(FramePointer, destOffset));
+      masm.load32(Address(sp_, srcOffset), temp);
+      masm.store32(temp, Address(sp_, destOffset));
     }
   }
 
@@ -1318,8 +1315,8 @@ struct StackMapGenerator {
  public:
   // --- These are constant once we've completed beginFunction() ---
 
-  // The number of bytes of arguments passed to this function in memory.
-  size_t numStackArgBytes;
+  // The number of words of arguments passed to this function in memory.
+  size_t numStackArgWords;
 
   MachineStackTracker machineStackTracker;  // tracks machine stack pointerness
 
@@ -1336,14 +1333,14 @@ struct StackMapGenerator {
   // memory.  That is, for an upcoming function call, this will hold
   //
   //   masm.framePushed() at the call instruction -
-  //      StackArgAreaSizeAligned(argumentTypes)
+  //      StackArgAreaSizeUnaligned(argumentTypes)
   //
   // This value denotes the lowest-addressed stack word covered by the current
   // function's stackmap.  Words below this point form the highest-addressed
   // area of the callee's stackmap.  Note that all alignment padding above the
-  // arguments-in-memory themselves belongs to the callee's stackmap, as return
-  // calls will replace the function arguments with a new set of arguments which
-  // may have different alignment.
+  // arguments-in-memory themselves belongs to the caller's stackmap, which
+  // is why this is defined in terms of StackArgAreaSizeUnaligned() rather than
+  // StackArgAreaSizeAligned().
   //
   // When not inside a function call setup/teardown sequence, it is Nothing.
   // It can make Nothing-to/from-Some transitions arbitrarily as we progress
@@ -1366,7 +1363,7 @@ struct StackMapGenerator {
         trapExitLayoutNumWords_(trapExitLayoutNumWords),
         stackMaps_(stackMaps),
         masm_(masm),
-        numStackArgBytes(0),
+        numStackArgWords(0),
         memRefsOnStk(0) {}
 
   // At the beginning of a function, we may have live roots in registers (as

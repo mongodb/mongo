@@ -23,7 +23,6 @@ import mozhttpd
 from mach.base import FailedCommandError, MachError
 from mach.decorators import Command, CommandArgument, SubCommand
 from mach.registrar import Registrar
-from mozbuild.base import BuildEnvironmentNotFoundException
 from mozbuild.mozconfig import MozconfigLoader
 
 

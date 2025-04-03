@@ -4,14 +4,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Linux kernels since 5.17 have a feature for assigning names to
-// ranges of anonymous memory (i.e., memory that doesn't have a "name"
-// in the form of an underlying mapped file).  These names are
-// reported in /proc/<pid>/smaps alongside system-level memory usage
-// information such as Proportional Set Size (memory usage adjusted
-// for sharing between processes), which allows reporting this
-// information at a finer granularity than would otherwise be possible
-// (e.g., separating malloc() heap from JS heap).
+// Some Linux kernels -- specifically, newer versions of Android and
+// some B2G devices -- have a feature for assigning names to ranges of
+// anonymous memory (i.e., memory that doesn't have a "name" in the
+// form of an underlying mapped file).  These names are reported in
+// /proc/<pid>/smaps alongside system-level memory usage information
+// such as Proportional Set Size (memory usage adjusted for sharing
+// between processes), which allows reporting this information at a
+// finer granularity than would otherwise be possible (e.g.,
+// separating malloc() heap from JS heap).
 //
 // Existing memory can be tagged with MozTagAnonymousMemory(); it will
 // tag the range of complete pages containing the given interval, so
@@ -42,7 +43,7 @@
 
 #  include "mozilla/Types.h"
 
-#  ifdef XP_LINUX
+#  ifdef ANDROID
 
 #    ifdef __cplusplus
 extern "C" {
@@ -55,11 +56,13 @@ MFBT_API void* MozTaggedAnonymousMmap(void* aAddr, size_t aLength, int aProt,
                                       int aFlags, int aFd, off_t aOffset,
                                       const char* aTag);
 
+MFBT_API int MozTaggedMemoryIsSupported(void);
+
 #    ifdef __cplusplus
 }  // extern "C"
 #    endif
 
-#  else  // XP_LINUX
+#  else  // ANDROID
 
 static inline void MozTagAnonymousMemory(const void* aPtr, size_t aLength,
                                          const char* aTag) {}
@@ -75,7 +78,9 @@ static inline void* MozTaggedAnonymousMmap(void* aAddr, size_t aLength,
 #    endif
 }
 
-#  endif  // XP_LINUX
+static inline int MozTaggedMemoryIsSupported(void) { return 0; }
+
+#  endif  // ANDROID
 
 #endif  // !XP_WIN
 

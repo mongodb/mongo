@@ -24,13 +24,12 @@
 #include "js/Printf.h"
 #include "js/Value.h"
 
-#include "vm/JSAtomUtils.h"  // Atomize
+#include "vm/JSAtom.h"
 #include "vm/JSObject.h"
 #include "vm/StringType.h"
-#include "wasm/WasmFeatures.h"
 #include "wasm/WasmJS.h"
 
-#include "vm/JSAtomUtils-inl.h"  // AtomToId
+#include "vm/JSAtom-inl.h"
 #include "vm/JSObject-inl.h"
 
 using namespace js;
@@ -40,7 +39,6 @@ RefType RefType::topType() const {
   switch (kind()) {
     case RefType::Any:
     case RefType::Eq:
-    case RefType::I31:
     case RefType::Array:
     case RefType::Struct:
     case RefType::None:
@@ -51,9 +49,6 @@ RefType RefType::topType() const {
     case RefType::Extern:
     case RefType::NoExtern:
       return RefType::extern_();
-    case RefType::Exn:
-    case RefType::NoExn:
-      return RefType::exn();
     case RefType::TypeRef:
       switch (typeDef()->kind()) {
         case TypeDefKind::Array:
@@ -95,12 +90,6 @@ static bool ToRefType(JSContext* cx, JSLinearString* typeLinearStr,
     *out = RefType::extern_();
     return true;
   }
-  if (ExnRefAvailable(cx)) {
-    if (StringEqualsLiteral(typeLinearStr, "exnref")) {
-      *out = RefType::exn();
-      return true;
-    }
-  }
 #ifdef ENABLE_WASM_GC
   if (GcAvailable(cx)) {
     if (StringEqualsLiteral(typeLinearStr, "anyref")) {
@@ -109,10 +98,6 @@ static bool ToRefType(JSContext* cx, JSLinearString* typeLinearStr,
     }
     if (StringEqualsLiteral(typeLinearStr, "eqref")) {
       *out = RefType::eq();
-      return true;
-    }
-    if (StringEqualsLiteral(typeLinearStr, "i31ref")) {
-      *out = RefType::i31();
       return true;
     }
     if (StringEqualsLiteral(typeLinearStr, "structref")) {
@@ -129,10 +114,6 @@ static bool ToRefType(JSContext* cx, JSLinearString* typeLinearStr,
     }
     if (StringEqualsLiteral(typeLinearStr, "nullexternref")) {
       *out = RefType::noextern();
-      return true;
-    }
-    if (StringEqualsLiteral(typeLinearStr, "nullexnref")) {
-      *out = RefType::noexn();
       return true;
     }
     if (StringEqualsLiteral(typeLinearStr, "nullref")) {
@@ -153,7 +134,88 @@ enum class RefTypeResult {
   Unparsed,
 };
 
+static RefTypeResult MaybeToRefType(JSContext* cx, HandleObject obj,
+                                    RefType* out) {
+#ifdef ENABLE_WASM_FUNCTION_REFERENCES
+  if (!wasm::FunctionReferencesAvailable(cx)) {
+    return RefTypeResult::Unparsed;
+  }
+
+  JSAtom* refAtom = Atomize(cx, "ref", strlen("ref"));
+  if (!refAtom) {
+    return RefTypeResult::Failure;
+  }
+  RootedId refId(cx, AtomToId(refAtom));
+
+  RootedValue refVal(cx);
+  if (!GetProperty(cx, obj, obj, refId, &refVal)) {
+    return RefTypeResult::Failure;
+  }
+
+  RootedString typeStr(cx, ToString(cx, refVal));
+  if (!typeStr) {
+    return RefTypeResult::Failure;
+  }
+
+  Rooted<JSLinearString*> typeLinearStr(cx, typeStr->ensureLinear(cx));
+  if (!typeLinearStr) {
+    return RefTypeResult::Failure;
+  }
+
+  if (StringEqualsLiteral(typeLinearStr, "func")) {
+    *out = RefType::func();
+  } else if (StringEqualsLiteral(typeLinearStr, "extern")) {
+    *out = RefType::extern_();
+#  ifdef ENABLE_WASM_GC
+  } else if (GcAvailable(cx) && StringEqualsLiteral(typeLinearStr, "any")) {
+    *out = RefType::any();
+  } else if (GcAvailable(cx) && StringEqualsLiteral(typeLinearStr, "eq")) {
+    *out = RefType::eq();
+  } else if (GcAvailable(cx) && StringEqualsLiteral(typeLinearStr, "struct")) {
+    *out = RefType::struct_();
+  } else if (GcAvailable(cx) && StringEqualsLiteral(typeLinearStr, "array")) {
+    *out = RefType::array();
+#  endif
+  } else {
+    return RefTypeResult::Unparsed;
+  }
+
+  JSAtom* nullableAtom = Atomize(cx, "nullable", strlen("nullable"));
+  if (!nullableAtom) {
+    return RefTypeResult::Failure;
+  }
+  RootedId nullableId(cx, AtomToId(nullableAtom));
+  RootedValue nullableVal(cx);
+  if (!GetProperty(cx, obj, obj, nullableId, &nullableVal)) {
+    return RefTypeResult::Failure;
+  }
+
+  bool nullable = ToBoolean(nullableVal);
+  if (!nullable) {
+    *out = out->asNonNullable();
+  }
+  MOZ_ASSERT(out->isNullable() == nullable);
+  return RefTypeResult::Parsed;
+#else
+  return RefTypeResult::Unparsed;
+#endif
+}
+
 bool wasm::ToValType(JSContext* cx, HandleValue v, ValType* out) {
+  if (v.isObject()) {
+    RootedObject obj(cx, &v.toObject());
+    RefType refType;
+    switch (MaybeToRefType(cx, obj, &refType)) {
+      case RefTypeResult::Failure:
+        return false;
+      case RefTypeResult::Parsed:
+        *out = ValType(refType);
+        return true;
+      case RefTypeResult::Unparsed:
+        break;
+    }
+  }
+
   RootedString typeStr(cx, ToString(cx, v));
   if (!typeStr) {
     return false;
@@ -190,6 +252,18 @@ bool wasm::ToValType(JSContext* cx, HandleValue v, ValType* out) {
 }
 
 bool wasm::ToRefType(JSContext* cx, HandleValue v, RefType* out) {
+  if (v.isObject()) {
+    RootedObject obj(cx, &v.toObject());
+    switch (MaybeToRefType(cx, obj, out)) {
+      case RefTypeResult::Failure:
+        return false;
+      case RefTypeResult::Parsed:
+        return true;
+      case RefTypeResult::Unparsed:
+        break;
+    }
+  }
+
   RootedString typeStr(cx, ToString(cx, v));
   if (!typeStr) {
     return false;
@@ -214,17 +288,11 @@ UniqueChars wasm::ToString(RefType type, const TypeContext* types) {
       case RefType::Extern:
         literal = "externref";
         break;
-      case RefType::Exn:
-        literal = "exnref";
-        break;
       case RefType::Any:
         literal = "anyref";
         break;
       case RefType::NoFunc:
         literal = "nullfuncref";
-        break;
-      case RefType::NoExn:
-        literal = "nullexnref";
         break;
       case RefType::NoExtern:
         literal = "nullexternref";
@@ -234,9 +302,6 @@ UniqueChars wasm::ToString(RefType type, const TypeContext* types) {
         break;
       case RefType::Eq:
         literal = "eqref";
-        break;
-      case RefType::I31:
-        literal = "i31ref";
         break;
       case RefType::Struct:
         literal = "structref";
@@ -260,17 +325,11 @@ UniqueChars wasm::ToString(RefType type, const TypeContext* types) {
     case RefType::Extern:
       heapType = "extern";
       break;
-    case RefType::Exn:
-      heapType = "exn";
-      break;
     case RefType::Any:
       heapType = "any";
       break;
     case RefType::NoFunc:
       heapType = "nofunc";
-      break;
-    case RefType::NoExn:
-      heapType = "noexn";
       break;
     case RefType::NoExtern:
       heapType = "noextern";
@@ -280,9 +339,6 @@ UniqueChars wasm::ToString(RefType type, const TypeContext* types) {
       break;
     case RefType::Eq:
       heapType = "eq";
-      break;
-    case RefType::I31:
-      heapType = "i31";
       break;
     case RefType::Struct:
       heapType = "struct";
@@ -303,34 +359,34 @@ UniqueChars wasm::ToString(RefType type, const TypeContext* types) {
 }
 
 UniqueChars wasm::ToString(ValType type, const TypeContext* types) {
-  return ToString(type.storageType(), types);
+  return ToString(type.fieldType(), types);
 }
 
-UniqueChars wasm::ToString(StorageType type, const TypeContext* types) {
+UniqueChars wasm::ToString(FieldType type, const TypeContext* types) {
   const char* literal = nullptr;
   switch (type.kind()) {
-    case StorageType::I8:
+    case FieldType::I8:
       literal = "i8";
       break;
-    case StorageType::I16:
+    case FieldType::I16:
       literal = "i16";
       break;
-    case StorageType::I32:
+    case FieldType::I32:
       literal = "i32";
       break;
-    case StorageType::I64:
+    case FieldType::I64:
       literal = "i64";
       break;
-    case StorageType::V128:
+    case FieldType::V128:
       literal = "v128";
       break;
-    case StorageType::F32:
+    case FieldType::F32:
       literal = "f32";
       break;
-    case StorageType::F64:
+    case FieldType::F64:
       literal = "f64";
       break;
-    case StorageType::Ref:
+    case FieldType::Ref:
       return ToString(type.refType(), types);
   }
   return DuplicateString(literal);

@@ -309,13 +309,13 @@ static MethodStatus CanEnterBaselineJIT(JSContext* cx, HandleScript script,
     }
   }
 
-  // Check this before calling ensureJitZoneExists, so we're less
+  // Check this before calling ensureJitRealmExists, so we're less
   // likely to report OOM in JSRuntime::createJitRuntime.
   if (!CanLikelyAllocateMoreExecutableMemory()) {
     return Method_Skipped;
   }
 
-  if (!cx->zone()->ensureJitZoneExists(cx)) {
+  if (!cx->realm()->ensureJitRealmExists(cx)) {
     return Method_Error;
   }
 
@@ -400,7 +400,7 @@ static MethodStatus CanEnterBaselineInterpreter(JSContext* cx,
     return Method_Skipped;
   }
 
-  if (!cx->zone()->ensureJitZoneExists(cx)) {
+  if (!cx->realm()->ensureJitRealmExists(cx)) {
     return Method_Error;
   }
 
@@ -425,7 +425,7 @@ MethodStatus jit::CanEnterBaselineInterpreterAtBranch(JSContext* cx,
 
   // JITs do not respect the debugger's OnNativeCall hook, so JIT execution is
   // disabled if this hook might need to be called.
-  if (cx->realm()->debuggerObservesNativeCall()) {
+  if (cx->insideDebuggerEvaluationWithOnNativeCallHook) {
     return Method_CantCompile;
   }
 
@@ -921,7 +921,7 @@ void BaselineInterpreter::toggleCodeCoverageInstrumentation(bool enable) {
 
 void jit::FinishDiscardBaselineScript(JS::GCContext* gcx, JSScript* script) {
   MOZ_ASSERT(script->hasBaselineScript());
-  MOZ_ASSERT(!script->jitScript()->icScript()->active());
+  MOZ_ASSERT(!script->jitScript()->active());
 
   BaselineScript* baseline =
       script->jitScript()->clearBaselineScript(gcx, script);
@@ -945,19 +945,20 @@ void jit::ToggleBaselineProfiling(JSContext* cx, bool enable) {
   jrt->baselineInterpreter().toggleProfilerInstrumentation(enable);
 
   for (ZonesIter zone(cx->runtime(), SkipAtoms); !zone.done(); zone.next()) {
-    if (!zone->jitZone()) {
-      continue;
-    }
-    zone->jitZone()->forEachJitScript([&](jit::JitScript* jitScript) {
-      JSScript* script = jitScript->owningScript();
+    for (auto base = zone->cellIter<BaseScript>(); !base.done(); base.next()) {
+      if (!base->hasJitScript()) {
+        continue;
+      }
+      JSScript* script = base->asJSScript();
       if (enable) {
-        jitScript->ensureProfileString(cx, script);
+        script->jitScript()->ensureProfileString(cx, script);
       }
-      if (script->hasBaselineScript()) {
-        AutoWritableJitCode awjc(script->baselineScript()->method());
-        script->baselineScript()->toggleProfilerInstrumentation(enable);
+      if (!script->hasBaselineScript()) {
+        continue;
       }
-    });
+      AutoWritableJitCode awjc(script->baselineScript()->method());
+      script->baselineScript()->toggleProfilerInstrumentation(enable);
+    }
   }
 }
 

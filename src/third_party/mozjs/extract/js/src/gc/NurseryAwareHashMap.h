@@ -11,8 +11,7 @@
 #include "gc/Tracer.h"
 #include "js/GCHashTable.h"
 #include "js/GCPolicyAPI.h"
-#include "js/GCVector.h"
-#include "js/Utility.h"
+#include "js/HashTable.h"
 
 namespace js {
 
@@ -82,8 +81,7 @@ class NurseryAwareHashMap {
   // Keep a list of all keys for which key->isTenured() is false. This lets us
   // avoid a full traversal of the map on each minor GC, keeping the minor GC
   // times proportional to the nursery heap size.
-  using KeyVector = GCVector<Key, 0, AllocPolicy>;
-  KeyVector nurseryEntries;
+  Vector<Key, 0, AllocPolicy> nurseryEntries;
 
  public:
   using Lookup = typename MapType::Lookup;
@@ -129,16 +127,16 @@ class NurseryAwareHashMap {
   }
 
   void sweepAfterMinorGC(JSTracer* trc) {
-    nurseryEntries.mutableEraseIf([this, trc](Key& key) {
+    for (auto& key : nurseryEntries) {
       auto p = map.lookup(key);
       if (!p) {
-        return true;
+        continue;
       }
 
       // Drop the entry if the value is not marked.
       if (!JS::GCPolicy<MapValue>::traceWeak(trc, &p->value())) {
         map.remove(p);
-        return true;
+        continue;
       }
 
       // Update and relocate the key, if the value is still needed.
@@ -149,65 +147,33 @@ class NurseryAwareHashMap {
       // wrappee, as they are just copies. The wrapper map entry is merely used
       // as a cache to avoid re-copying the string, and currently that entire
       // cache is flushed on major GC.
-      //
-      // Since |key| is a reference, this updates the content of the
-      // nurseryEntries vector.
-      Key prior = key;
-      if (!TraceManuallyBarrieredWeakEdge(trc, &key,
-                                          "NurseryAwareHashMap key")) {
+      MapKey copy(key);
+      if (!JS::GCPolicy<MapKey>::traceWeak(trc, &copy)) {
         map.remove(p);
-        return true;
+        continue;
       }
 
-      bool valueIsTenured = p->value().unbarrieredGet()->isTenured();
-
-      if constexpr (AllowDuplicates) {
+      if (AllowDuplicates) {
         // Drop duplicated keys.
         //
         // A key can be forwarded to another place. In this case, rekey the
         // item. If two or more different keys are forwarded to the same new
         // key, simply drop the later ones.
-        if (key == prior) {
+        if (key == copy) {
           // No rekey needed.
-        } else if (map.has(key)) {
+        } else if (map.has(copy)) {
           // Key was forwarded to the same place that another key was already
           // forwarded to.
           map.remove(p);
-          return true;
         } else {
-          map.rekeyAs(prior, key, key);
+          map.rekeyAs(key, copy, copy);
         }
       } else {
-        MOZ_ASSERT(key == prior || !map.has(key));
-        map.rekeyIfMoved(prior, key);
-      }
-
-      return key->isTenured() && valueIsTenured;
-    });
-
-    checkNurseryEntries();
-  }
-
-  void checkNurseryEntries() const {
-#ifdef DEBUG
-    AutoEnterOOMUnsafeRegion oomUnsafe;
-    HashSet<Key, DefaultHasher<Key>, SystemAllocPolicy> set;
-    for (const auto& key : nurseryEntries) {
-      if (!set.put(key)) {
-        oomUnsafe.crash("NurseryAwareHashMap::checkNurseryEntries");
+        MOZ_ASSERT(key == copy || !map.has(copy));
+        map.rekeyIfMoved(key, copy);
       }
     }
-
-    for (auto i = map.iter(); !i.done(); i.next()) {
-      Key key = i.get().key().get();
-      MOZ_ASSERT(gc::IsCellPointerValid(key));
-      MOZ_ASSERT_IF(IsInsideNursery(key), set.has(key));
-
-      Value value = i.get().value().unbarrieredGet();
-      MOZ_ASSERT(gc::IsCellPointerValid(value));
-      MOZ_ASSERT_IF(IsInsideNursery(value), set.has(key));
-    }
-#endif
+    nurseryEntries.clear();
   }
 
   void traceWeak(JSTracer* trc) { map.traceWeak(trc); }

@@ -30,10 +30,6 @@ JSErrNum js::ThrowMsgKindToErrNum(ThrowMsgKind kind) {
       return JSMSG_ASSIGN_TO_PRIVATE_METHOD;
     case ThrowMsgKind::DecoratorInvalidReturnType:
       return JSMSG_DECORATOR_INVALID_RETURN_TYPE;
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-    case ThrowMsgKind::UsingWithoutDispose:
-      return JSMSG_NO_DISPOSE_IN_USING;
-#endif
   }
 
   MOZ_CRASH("Unexpected message kind");

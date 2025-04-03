@@ -90,8 +90,7 @@ bool StringBuffer::append(const frontend::ParserAtomsTable& parserAtoms,
 }
 
 template <typename CharT>
-JSLinearString* StringBuffer::finishStringInternal(JSContext* cx,
-                                                   gc::Heap heap) {
+JSLinearString* StringBuffer::finishStringInternal(JSContext* cx) {
   size_t len = length();
 
   if (JSAtom* staticStr = cx->staticStrings().lookup(begin<CharT>(), len)) {
@@ -110,8 +109,7 @@ JSLinearString* StringBuffer::finishStringInternal(JSContext* cx,
     return nullptr;
   }
 
-  JSLinearString* str =
-      NewStringDontDeflate<CanGC>(cx, std::move(buf), len, heap);
+  JSLinearString* str = NewStringDontDeflate<CanGC>(cx, std::move(buf), len);
   if (!str) {
     return nullptr;
   }
@@ -119,12 +117,12 @@ JSLinearString* StringBuffer::finishStringInternal(JSContext* cx,
   return str;
 }
 
-JSLinearString* JSStringBuilder::finishString(gc::Heap heap) {
+JSLinearString* JSStringBuilder::finishString() {
   MOZ_ASSERT(maybeCx_);
 
   size_t len = length();
   if (len == 0) {
-    return maybeCx_->names().empty_;
+    return maybeCx_->names().empty;
   }
 
   if (MOZ_UNLIKELY(!JSString::validateLength(maybeCx_, len))) {
@@ -136,8 +134,8 @@ JSLinearString* JSStringBuilder::finishString(gc::Heap heap) {
   static_assert(JSFatInlineString::MAX_LENGTH_LATIN1 <
                 Latin1CharBuffer::InlineLength);
 
-  return isLatin1() ? finishStringInternal<Latin1Char>(maybeCx_, heap)
-                    : finishStringInternal<char16_t>(maybeCx_, heap);
+  return isLatin1() ? finishStringInternal<Latin1Char>(maybeCx_)
+                    : finishStringInternal<char16_t>(maybeCx_);
 }
 
 JSAtom* StringBuffer::finishAtom() {
@@ -145,7 +143,7 @@ JSAtom* StringBuffer::finishAtom() {
 
   size_t len = length();
   if (len == 0) {
-    return maybeCx_->names().empty_;
+    return maybeCx_->names().empty;
   }
 
   if (isLatin1()) {

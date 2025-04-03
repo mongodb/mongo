@@ -28,9 +28,12 @@ class ParserAtomsTable;
 // the same node (unchanged or modified in place) or a new node.
 //
 // Usage:
-//    MOZ_TRY_VAR(pn, parser->statement());
+//    pn = parser->statement();
+//    if (!pn) {
+//        return false;
+//    }
 //    if (!FoldConstants(fc, parserAtoms, &pn, parser)) {
-//        return errorResult();
+//        return false;
 //    }
 [[nodiscard]] extern bool FoldConstants(FrontendContext* fc,
                                         ParserAtomsTable& parserAtoms,

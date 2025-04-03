@@ -20,17 +20,17 @@ namespace js::jit {
 
 static inline MIRType ToMIRType(MIRType t) { return t; }
 
-static inline MIRType ToMIRType(ABIType argType) {
+static inline MIRType ToMIRType(ABIArgType argType) {
   switch (argType) {
-    case ABIType::General:
+    case ArgType_General:
       return MIRType::Pointer;
-    case ABIType::Float64:
+    case ArgType_Float64:
       return MIRType::Double;
-    case ABIType::Float32:
+    case ArgType_Float32:
       return MIRType::Float32;
-    case ABIType::Int32:
+    case ArgType_Int32:
       return MIRType::Int32;
-    case ABIType::Int64:
+    case ArgType_Int64:
       return MIRType::Int64;
     default:
       break;

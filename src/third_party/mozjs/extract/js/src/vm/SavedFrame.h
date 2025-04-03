@@ -10,7 +10,6 @@
 #include "mozilla/Attributes.h"
 
 #include "gc/Policy.h"
-#include "js/ColumnNumber.h"  // JS::TaggedColumnNumberOneOrigin
 #include "js/GCHashTable.h"
 #include "js/Principals.h"
 #include "js/UbiNode.h"
@@ -49,10 +48,8 @@ class SavedFrame : public NativeObject {
   // Convenient getters for SavedFrame's reserved slots for use from C++.
   JSAtom* getSource();
   uint32_t getSourceId();
-  // Line number (1-origin).
   uint32_t getLine();
-  // Column number in UTF-16 code units.
-  JS::TaggedColumnNumberOneOrigin getColumn();
+  uint32_t getColumn();
   JSAtom* getFunctionDisplayName();
   JSAtom* getAsyncCause();
   SavedFrame* getParent() const;
@@ -124,7 +121,7 @@ class SavedFrame : public NativeObject {
   void initSource(JSAtom* source);
   void initSourceId(uint32_t id);
   void initLine(uint32_t line);
-  void initColumn(JS::TaggedColumnNumberOneOrigin column);
+  void initColumn(uint32_t column);
   void initFunctionDisplayName(JSAtom* maybeName);
   void initAsyncCause(JSAtom* maybeCause);
   void initParent(SavedFrame* maybeParent);
@@ -199,7 +196,7 @@ inline void AssertObjectIsSavedFrameOrWrapper(JSContext* cx,
 // to the subsumes callback, and should be special cased with a shortcut before
 // that.
 struct ReconstructedSavedFramePrincipals : public JSPrincipals {
-  explicit ReconstructedSavedFramePrincipals() {
+  explicit ReconstructedSavedFramePrincipals() : JSPrincipals() {
     MOZ_ASSERT(is(this));
     this->refcount = 1;
   }
@@ -261,9 +258,7 @@ class ConcreteStackFrame<SavedFrame> : public BaseStackFrame {
 
   StackFrame parent() const override { return get().getParent(); }
   uint32_t line() const override { return get().getLine(); }
-  JS::TaggedColumnNumberOneOrigin column() const override {
-    return get().getColumn();
-  }
+  uint32_t column() const override { return get().getColumn(); }
 
   AtomOrTwoByteChars source() const override {
     auto source = get().getSource();

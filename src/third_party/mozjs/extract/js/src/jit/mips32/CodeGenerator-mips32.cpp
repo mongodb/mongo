@@ -411,7 +411,7 @@ void CodeGenerator::visitWasmTruncateToInt64(LWasmTruncateToInt64* lir) {
     masm.Push(input);
 
     masm.setupWasmABICall();
-    masm.passABIArg(arg, ABIType::Float64);
+    masm.passABIArg(arg, MoveOp::DOUBLE);
 
     if (lir->mir()->isUnsigned()) {
       masm.callWithABI(mir->bytecodeOffset(),
@@ -430,7 +430,7 @@ void CodeGenerator::visitWasmTruncateToInt64(LWasmTruncateToInt64* lir) {
     masm.bind(ool->rejoin());
   } else {
     masm.setupWasmABICall();
-    masm.passABIArg(arg, ABIType::Float64);
+    masm.passABIArg(arg, MoveOp::DOUBLE);
     if (lir->mir()->isUnsigned()) {
       masm.callWithABI(mir->bytecodeOffset(),
                        wasm::SymbolicAddress::SaturatingTruncateDoubleToUint64);
@@ -457,19 +457,18 @@ void CodeGenerator::visitInt64ToFloatingPoint(LInt64ToFloatingPoint* lir) {
   if (lir->mir()->isUnsigned()) {
     if (toType == MIRType::Double) {
       masm.callWithABI(mir->bytecodeOffset(),
-                       wasm::SymbolicAddress::Uint64ToDouble, ABIType::Float64);
+                       wasm::SymbolicAddress::Uint64ToDouble, MoveOp::DOUBLE);
     } else {
       masm.callWithABI(mir->bytecodeOffset(),
-                       wasm::SymbolicAddress::Uint64ToFloat32,
-                       ABIType::Float32);
+                       wasm::SymbolicAddress::Uint64ToFloat32, MoveOp::FLOAT32);
     }
   } else {
     if (toType == MIRType::Double) {
       masm.callWithABI(mir->bytecodeOffset(),
-                       wasm::SymbolicAddress::Int64ToDouble, ABIType::Float64);
+                       wasm::SymbolicAddress::Int64ToDouble, MoveOp::DOUBLE);
     } else {
       masm.callWithABI(mir->bytecodeOffset(),
-                       wasm::SymbolicAddress::Int64ToFloat32, ABIType::Float32);
+                       wasm::SymbolicAddress::Int64ToFloat32, MoveOp::FLOAT32);
     }
   }
 

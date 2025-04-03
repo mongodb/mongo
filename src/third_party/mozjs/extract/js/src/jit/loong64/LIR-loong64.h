@@ -234,20 +234,18 @@ class LUDivOrMod : public LBinaryMath<0> {
 };
 
 class LWasmCompareExchangeI64
-    : public LInstructionHelper<INT64_PIECES, 2 + INT64_PIECES + INT64_PIECES,
+    : public LInstructionHelper<INT64_PIECES, 1 + INT64_PIECES + INT64_PIECES,
                                 0> {
  public:
   LIR_HEADER(WasmCompareExchangeI64);
 
   LWasmCompareExchangeI64(const LAllocation& ptr,
                           const LInt64Allocation& oldValue,
-                          const LInt64Allocation& newValue,
-                          const LAllocation& memoryBase)
+                          const LInt64Allocation& newValue)
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setInt64Operand(1, oldValue);
     setInt64Operand(1 + INT64_PIECES, newValue);
-    setOperand(1 + 2 * INT64_PIECES, memoryBase);
   }
 
   const LAllocation* ptr() { return getOperand(0); }
@@ -255,49 +253,42 @@ class LWasmCompareExchangeI64
   const LInt64Allocation newValue() {
     return getInt64Operand(1 + INT64_PIECES);
   }
-  const LAllocation* memoryBase() { return getOperand(1 + 2 * INT64_PIECES); }
   const MWasmCompareExchangeHeap* mir() const {
     return mir_->toWasmCompareExchangeHeap();
   }
 };
 
 class LWasmAtomicExchangeI64
-    : public LInstructionHelper<INT64_PIECES, 2 + INT64_PIECES, 0> {
+    : public LInstructionHelper<INT64_PIECES, 1 + INT64_PIECES, 0> {
  public:
   LIR_HEADER(WasmAtomicExchangeI64);
 
-  LWasmAtomicExchangeI64(const LAllocation& ptr, const LInt64Allocation& value,
-                         const LAllocation& memoryBase)
+  LWasmAtomicExchangeI64(const LAllocation& ptr, const LInt64Allocation& value)
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setInt64Operand(1, value);
-    setOperand(1 + INT64_PIECES, memoryBase);
   }
 
   const LAllocation* ptr() { return getOperand(0); }
   const LInt64Allocation value() { return getInt64Operand(1); }
-  const LAllocation* memoryBase() { return getOperand(1 + INT64_PIECES); }
   const MWasmAtomicExchangeHeap* mir() const {
     return mir_->toWasmAtomicExchangeHeap();
   }
 };
 
 class LWasmAtomicBinopI64
-    : public LInstructionHelper<INT64_PIECES, 2 + INT64_PIECES, 2> {
+    : public LInstructionHelper<INT64_PIECES, 1 + INT64_PIECES, 2> {
  public:
   LIR_HEADER(WasmAtomicBinopI64);
 
-  LWasmAtomicBinopI64(const LAllocation& ptr, const LInt64Allocation& value,
-                      const LAllocation& memoryBase)
+  LWasmAtomicBinopI64(const LAllocation& ptr, const LInt64Allocation& value)
       : LInstructionHelper(classOpcode) {
     setOperand(0, ptr);
     setInt64Operand(1, value);
-    setOperand(1 + INT64_PIECES, memoryBase);
   }
 
   const LAllocation* ptr() { return getOperand(0); }
   const LInt64Allocation value() { return getInt64Operand(1); }
-  const LAllocation* memoryBase() { return getOperand(1 + INT64_PIECES); }
   const MWasmAtomicBinopHeap* mir() const {
     return mir_->toWasmAtomicBinopHeap();
   }

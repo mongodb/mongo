@@ -38,6 +38,7 @@ namespace jit {
 class BaselineFrame;
 
 bool CanIonCompileScript(JSContext* cx, JSScript* script);
+bool CanIonInlineScript(JSScript* script);
 
 [[nodiscard]] bool IonCompileScriptForBaselineAtEntry(JSContext* cx,
                                                       BaselineFrame* frame);

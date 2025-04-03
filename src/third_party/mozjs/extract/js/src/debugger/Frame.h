@@ -287,7 +287,6 @@ class DebuggerFrame : public NativeObject {
   FrameIter getFrameIter(JSContext* cx);
 
   void terminate(JS::GCContext* gcx, AbstractFramePtr frame);
-  void onGeneratorClosed(JS::GCContext* gcx);
   void suspend(JS::GCContext* gcx);
 
   [[nodiscard]] bool replaceFrameIterData(JSContext* cx, const FrameIter&);

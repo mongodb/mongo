@@ -35,7 +35,7 @@ bool PrivateOpEmitter::emitLoad(TaggedParserAtomIndex name,
 }
 
 bool PrivateOpEmitter::emitLoadPrivateBrand() {
-  return emitLoad(TaggedParserAtomIndex::WellKnown::dot_privateBrand_(),
+  return emitLoad(TaggedParserAtomIndex::WellKnown::dotPrivateBrand(),
                   *brandLoc_);
 }
 

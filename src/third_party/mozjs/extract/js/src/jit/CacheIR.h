@@ -182,12 +182,10 @@ class TypedOperandId : public OperandId {
   _(HasOwn)               \
   _(CheckPrivateField)    \
   _(TypeOf)               \
-  _(TypeOfEq)             \
   _(ToPropertyKey)        \
   _(InstanceOf)           \
   _(GetIterator)          \
   _(CloseIter)            \
-  _(OptimizeGetIterator)  \
   _(OptimizeSpreadCall)   \
   _(Compare)              \
   _(ToBool)               \
@@ -207,11 +205,10 @@ extern const char* const CacheKindNames[];
 
 extern size_t NumInputsForCacheKind(CacheKind kind);
 
-enum class CacheOp : uint16_t {
+enum class CacheOp {
 #define DEFINE_OP(op, ...) op,
   CACHE_IR_OPS(DEFINE_OP)
 #undef DEFINE_OP
-      NumOpcodes,
 };
 
 // CacheIR opcode info that's read in performance-sensitive code. Stored as a
@@ -238,13 +235,11 @@ class StubField {
     RawInt32,
     RawPointer,
     Shape,
-    WeakShape,
-    WeakGetterSetter,
+    GetterSetter,
     JSObject,
-    WeakObject,
     Symbol,
     String,
-    WeakBaseScript,
+    BaseScript,
     JitCode,
 
     Id,
@@ -322,12 +317,6 @@ class CallFlags {
 
   CallFlags() = default;
   explicit CallFlags(ArgFormat format) : argFormat_(format) {}
-  CallFlags(ArgFormat format, bool isConstructing, bool isSameRealm,
-            bool needsUninitializedThis)
-      : argFormat_(format),
-        isConstructing_(isConstructing),
-        isSameRealm_(isSameRealm),
-        needsUninitializedThis_(needsUninitializedThis) {}
   CallFlags(bool isConstructing, bool isSpread, bool isSameRealm = false,
             bool needsUninitializedThis = false)
       : argFormat_(isSpread ? Spread : Standard),
@@ -521,12 +510,9 @@ inline int32_t GetIndexOfArgument(ArgumentKind kind, CallFlags flags,
 enum class GuardClassKind : uint8_t {
   Array,
   PlainObject,
-  FixedLengthArrayBuffer,
-  ResizableArrayBuffer,
-  FixedLengthSharedArrayBuffer,
-  GrowableSharedArrayBuffer,
-  FixedLengthDataView,
-  ResizableDataView,
+  ArrayBuffer,
+  SharedArrayBuffer,
+  DataView,
   MappedArguments,
   UnmappedArguments,
   WindowProxy,
@@ -534,13 +520,6 @@ enum class GuardClassKind : uint8_t {
   BoundFunction,
   Set,
   Map,
-};
-
-const JSClass* ClassFor(GuardClassKind kind);
-
-enum class ArrayBufferViewKind : uint8_t {
-  FixedLength,
-  Resizable,
 };
 
 }  // namespace jit

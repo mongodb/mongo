@@ -32,7 +32,7 @@ function resolveRelativeTimeFormatInternals(lazyRelativeTimeFormatData) {
   var RelativeTimeFormat = relativeTimeFormatInternalProperties;
 
   // Steps 10-11.
-  var r = ResolveLocale(
+  const r = ResolveLocale(
     "RelativeTimeFormat",
     lazyRelativeTimeFormatData.requestedLocales,
     lazyRelativeTimeFormatData.opt,
@@ -125,10 +125,10 @@ function InitializeRelativeTimeFormat(relativeTimeFormat, locales, options) {
   // Note that lazy data is only installed as a final step of initialization,
   // so every RelativeTimeFormat lazy data object has *all* these properties, never a
   // subset of them.
-  var lazyRelativeTimeFormatData = std_Object_create(null);
+  const lazyRelativeTimeFormatData = std_Object_create(null);
 
   // Step 1.
-  var requestedLocales = CanonicalizeLocaleList(locales);
+  let requestedLocales = CanonicalizeLocaleList(locales);
   lazyRelativeTimeFormatData.requestedLocales = requestedLocales;
 
   // Steps 2-3.
@@ -139,10 +139,10 @@ function InitializeRelativeTimeFormat(relativeTimeFormat, locales, options) {
   }
 
   // Step 4.
-  var opt = new_Record();
+  let opt = new_Record();
 
   // Steps 5-6.
-  var matcher = GetOption(
+  let matcher = GetOption(
     options,
     "localeMatcher",
     "string",
@@ -152,7 +152,7 @@ function InitializeRelativeTimeFormat(relativeTimeFormat, locales, options) {
   opt.localeMatcher = matcher;
 
   // Steps 7-9.
-  var numberingSystem = GetOption(
+  let numberingSystem = GetOption(
     options,
     "numberingSystem",
     "string",
@@ -171,7 +171,7 @@ function InitializeRelativeTimeFormat(relativeTimeFormat, locales, options) {
   lazyRelativeTimeFormatData.opt = opt;
 
   // Steps 16-17.
-  var style = GetOption(
+  const style = GetOption(
     options,
     "style",
     "string",
@@ -181,7 +181,7 @@ function InitializeRelativeTimeFormat(relativeTimeFormat, locales, options) {
   lazyRelativeTimeFormatData.style = style;
 
   // Steps 18-19.
-  var numeric = GetOption(
+  const numeric = GetOption(
     options,
     "numeric",
     "string",
@@ -211,7 +211,7 @@ function Intl_RelativeTimeFormat_supportedLocalesOf(locales /*, options*/) {
   var availableLocales = "RelativeTimeFormat";
 
   // Step 2.
-  var requestedLocales = CanonicalizeLocaleList(locales);
+  let requestedLocales = CanonicalizeLocaleList(locales);
 
   // Step 3.
   return SupportedLocales(availableLocales, requestedLocales, options);
@@ -226,7 +226,7 @@ function Intl_RelativeTimeFormat_supportedLocalesOf(locales /*, options*/) {
  */
 function Intl_RelativeTimeFormat_format(value, unit) {
   // Step 1.
-  var relativeTimeFormat = this;
+  let relativeTimeFormat = this;
 
   // Step 2.
   if (
@@ -245,10 +245,10 @@ function Intl_RelativeTimeFormat_format(value, unit) {
   }
 
   // Step 3.
-  var t = ToNumber(value);
+  let t = ToNumber(value);
 
   // Step 4.
-  var u = ToString(unit);
+  let u = ToString(unit);
 
   // Step 5.
   return intl_FormatRelativeTime(relativeTimeFormat, t, u, false);
@@ -263,7 +263,7 @@ function Intl_RelativeTimeFormat_format(value, unit) {
  */
 function Intl_RelativeTimeFormat_formatToParts(value, unit) {
   // Step 1.
-  var relativeTimeFormat = this;
+  let relativeTimeFormat = this;
 
   // Step 2.
   if (
@@ -282,10 +282,10 @@ function Intl_RelativeTimeFormat_formatToParts(value, unit) {
   }
 
   // Step 3.
-  var t = ToNumber(value);
+  let t = ToNumber(value);
 
   // Step 4.
-  var u = ToString(unit);
+  let u = ToString(unit);
 
   // Step 5.
   return intl_FormatRelativeTime(relativeTimeFormat, t, u, true);

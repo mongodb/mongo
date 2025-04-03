@@ -14,13 +14,6 @@ namespace js {
 /* Derived class for all scripted proxy handlers. */
 class ScriptedProxyHandler : public BaseProxyHandler {
  public:
-  enum class GetTrapValidationResult {
-    OK,
-    MustReportSameValue,
-    MustReportUndefined,
-    Exception,
-  };
-
   constexpr ScriptedProxyHandler() : BaseProxyHandler(&family) {}
 
   /* Standard internal methods. */
@@ -95,14 +88,6 @@ class ScriptedProxyHandler : public BaseProxyHandler {
   virtual bool isConstructor(JSObject* obj) const override;
 
   virtual bool isScripted() const override { return true; }
-
-  static GetTrapValidationResult checkGetTrapResult(JSContext* cx,
-                                                    JS::HandleObject target,
-                                                    JS::HandleId id,
-                                                    JS::HandleValue trapResult);
-
-  static void reportGetTrapValidationError(JSContext* cx, JS::HandleId id,
-                                           GetTrapValidationResult validation);
 
   static const char family;
   static const ScriptedProxyHandler singleton;

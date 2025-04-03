@@ -308,7 +308,7 @@ class SharedImmutableStringsCache {
 
     Set set;
 
-    Inner() = default;
+    Inner() : set() {}
 
     Inner(const Inner&) = delete;
     Inner& operator=(const Inner&) = delete;

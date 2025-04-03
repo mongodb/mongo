@@ -95,10 +95,10 @@ using EnableFunctionTag = std::enable_if_t<
  * FunctionRef.
  */
 template <typename Fn>
-class MOZ_TEMPORARY_CLASS FunctionRef;
+class FunctionRef;
 
 template <typename Ret, typename... Params>
-class MOZ_TEMPORARY_CLASS FunctionRef<Ret(Params...)> {
+class FunctionRef<Ret(Params...)> {
   union Payload;
 
   // |FunctionRef| stores an adaptor function pointer, determined by the
@@ -166,19 +166,25 @@ class MOZ_TEMPORARY_CLASS FunctionRef<Ret(Params...)> {
    * state).  For example:
    *
    *   int x = 5;
-   *   DoSomething([&x] { x++; });
+   *   auto doSideEffect = [&x]{ x++; }; // state is captured reference to |x|
+   *   FunctionRef<void()> f(doSideEffect);
    */
-  template <typename Callable,
-            typename = detail::EnableFunctionTag<detail::MatchingFunctorTag,
-                                                 Callable, Ret, Params...>,
-            typename std::enable_if_t<!std::is_same_v<
-                std::remove_cv_t<std::remove_reference_t<Callable>>,
-                FunctionRef>>* = nullptr>
-  MOZ_IMPLICIT FunctionRef(Callable&& aCallable MOZ_LIFETIME_BOUND) noexcept
+  template <
+      typename Callable,
+      typename = detail::EnableFunctionTag<detail::MatchingFunctorTag, Callable,
+                                           Ret, Params...>,
+      typename std::enable_if_t<!std::is_same_v<
+          typename std::remove_reference_t<typename std::remove_cv_t<Callable>>,
+          FunctionRef>>* = nullptr>
+  MOZ_IMPLICIT FunctionRef(Callable& aCallable) noexcept
       : mAdaptor([](const Payload& aPayload, Params... aParams) {
-          auto& func = *static_cast<std::remove_reference_t<Callable>*>(
-              aPayload.mObject);
-          return static_cast<Ret>(func(std::forward<Params>(aParams)...));
+          auto& func = *static_cast<Callable*>(aPayload.mObject);
+          // Unable to use std::forward here due to llvm windows bug
+          // https://bugs.llvm.org/show_bug.cgi?id=28299
+          //
+          // This prevents use of move-only arguments for functors and lambdas.
+          // Move only arguments can be used when using function pointers
+          return static_cast<Ret>(func(static_cast<Params>(aParams)...));
         }) {
     ::new (KnownNotNull, &mPayload.mObject) void*(&aCallable);
   }

@@ -72,7 +72,7 @@ void PlainObject::assertHasNoNonWritableOrAccessorPropExclProto() const {
   static constexpr size_t MaxCount = 8;
 
   size_t count = 0;
-  PropertyName* protoName = runtimeFromMainThread()->commonNames->proto_;
+  PropertyName* protoName = runtimeFromMainThread()->commonNames->proto;
 
   for (ShapePropertyIter<NoGC> iter(shape()); !iter.done(); iter++) {
     // __proto__ is always allowed.
@@ -207,15 +207,16 @@ void js::NewPlainObjectWithPropsCache::add(SharedShape* shape) {
   entries_[0] = shape;
 }
 
-static bool ShapeMatches(Handle<IdValueVector> properties, SharedShape* shape) {
-  if (shape->slotSpan() != properties.length()) {
+static bool ShapeMatches(IdValuePair* properties, size_t nproperties,
+                         SharedShape* shape) {
+  if (shape->slotSpan() != nproperties) {
     return false;
   }
   SharedShapePropertyIter<NoGC> iter(shape);
-  for (size_t i = properties.length(); i > 0; i--) {
+  for (size_t i = nproperties; i > 0; i--) {
     MOZ_ASSERT(iter->isDataProperty());
     MOZ_ASSERT(iter->flags() == PropertyFlags::defaultDataPropFlags);
-    if (properties[i - 1].get().id != iter->key()) {
+    if (properties[i - 1].id != iter->key()) {
       return false;
     }
     iter++;
@@ -225,10 +226,10 @@ static bool ShapeMatches(Handle<IdValueVector> properties, SharedShape* shape) {
 }
 
 SharedShape* js::NewPlainObjectWithPropsCache::lookup(
-    Handle<IdValueVector> properties) const {
+    IdValuePair* properties, size_t nproperties) const {
   for (size_t i = 0; i < NumEntries; i++) {
     SharedShape* shape = entries_[i];
-    if (shape && ShapeMatches(properties, shape)) {
+    if (shape && ShapeMatches(properties, nproperties, shape)) {
       return shape;
     }
   }
@@ -238,33 +239,33 @@ SharedShape* js::NewPlainObjectWithPropsCache::lookup(
 enum class KeysKind { UniqueNames, Unknown };
 
 template <KeysKind Kind>
-static PlainObject* NewPlainObjectWithProperties(
-    JSContext* cx, Handle<IdValueVector> properties, NewObjectKind newKind) {
+static PlainObject* NewPlainObjectWithProperties(JSContext* cx,
+                                                 IdValuePair* properties,
+                                                 size_t nproperties) {
   auto& cache = cx->realm()->newPlainObjectWithPropsCache;
 
   // If we recently created an object with these properties, we can use that
   // Shape directly.
-  if (SharedShape* shape = cache.lookup(properties)) {
+  if (SharedShape* shape = cache.lookup(properties, nproperties)) {
     Rooted<SharedShape*> shapeRoot(cx, shape);
-    PlainObject* obj = PlainObject::createWithShape(cx, shapeRoot, newKind);
+    PlainObject* obj = PlainObject::createWithShape(cx, shapeRoot);
     if (!obj) {
       return nullptr;
     }
-    MOZ_ASSERT(obj->slotSpan() == properties.length());
-    for (size_t i = 0; i < properties.length(); i++) {
-      obj->initSlot(i, properties[i].get().value);
+    MOZ_ASSERT(obj->slotSpan() == nproperties);
+    for (size_t i = 0; i < nproperties; i++) {
+      obj->initSlot(i, properties[i].value);
     }
     return obj;
   }
 
-  gc::AllocKind allocKind = gc::GetGCObjectKind(properties.length());
-  Rooted<PlainObject*> obj(cx,
-                           NewPlainObjectWithAllocKind(cx, allocKind, newKind));
+  gc::AllocKind allocKind = gc::GetGCObjectKind(nproperties);
+  Rooted<PlainObject*> obj(cx, NewPlainObjectWithAllocKind(cx, allocKind));
   if (!obj) {
     return nullptr;
   }
 
-  if (properties.empty()) {
+  if (nproperties == 0) {
     return obj;
   }
 
@@ -272,9 +273,9 @@ static PlainObject* NewPlainObjectWithProperties(
   Rooted<Value> value(cx);
   bool canCache = true;
 
-  for (const auto& prop : properties) {
-    key = prop.id;
-    value = prop.value;
+  for (size_t i = 0; i < nproperties; i++) {
+    key = properties[i].id;
+    value = properties[i].value;
 
     // Integer keys may need to be stored in dense elements. This is uncommon so
     // just fall back to NativeDefineDataProperty.
@@ -311,7 +312,7 @@ static PlainObject* NewPlainObjectWithProperties(
 
   if (canCache && !obj->inDictionaryMode()) {
     MOZ_ASSERT(obj->getDenseInitializedLength() == 0);
-    MOZ_ASSERT(obj->slotSpan() == properties.length());
+    MOZ_ASSERT(obj->slotSpan() == nproperties);
     cache.add(obj->sharedShape());
   }
 
@@ -319,14 +320,15 @@ static PlainObject* NewPlainObjectWithProperties(
 }
 
 PlainObject* js::NewPlainObjectWithUniqueNames(JSContext* cx,
-                                               Handle<IdValueVector> properties,
-                                               NewObjectKind newKind) {
+                                               IdValuePair* properties,
+                                               size_t nproperties) {
   return NewPlainObjectWithProperties<KeysKind::UniqueNames>(cx, properties,
-                                                             newKind);
+                                                             nproperties);
 }
 
-PlainObject* js::NewPlainObjectWithMaybeDuplicateKeys(
-    JSContext* cx, Handle<IdValueVector> properties, NewObjectKind newKind) {
+PlainObject* js::NewPlainObjectWithMaybeDuplicateKeys(JSContext* cx,
+                                                      IdValuePair* properties,
+                                                      size_t nproperties) {
   return NewPlainObjectWithProperties<KeysKind::Unknown>(cx, properties,
-                                                         newKind);
+                                                         nproperties);
 }

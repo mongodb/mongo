@@ -29,10 +29,6 @@ class NurseryDecommitTask;
 
 JS_PUBLIC_API bool CurrentThreadCanAccessZone(JS::Zone* zone);
 
-// To prevent false sharing, some data structures are aligned to a typical cache
-// line size.
-static constexpr size_t TypicalCacheLineSize = 64;
-
 namespace gc {
 
 class Arena;
@@ -45,7 +41,7 @@ const size_t ArenaShift = 12;
 const size_t ArenaSize = size_t(1) << ArenaShift;
 const size_t ArenaMask = ArenaSize - 1;
 
-#if defined(XP_DARWIN) && defined(__aarch64__)
+#if defined(XP_MACOSX) && defined(__aarch64__)
 const size_t PageShift = 14;
 #else
 const size_t PageShift = 12;
@@ -55,7 +51,11 @@ const size_t PageShift = 12;
 const size_t PageSize = size_t(1) << PageShift;
 constexpr size_t ArenasPerPage = PageSize / ArenaSize;
 
+#ifdef JS_GC_SMALL_CHUNK_SIZE
+const size_t ChunkShift = 18;
+#else
 const size_t ChunkShift = 20;
+#endif
 const size_t ChunkSize = size_t(1) << ChunkShift;
 const size_t ChunkMask = ChunkSize - 1;
 
@@ -67,13 +67,6 @@ const size_t CellBytesPerMarkBit = CellAlignBytes;
 const size_t MarkBitsPerCell = 2;
 
 /*
- * The minimum cell size ends up as twice the cell alignment because the mark
- * bitmap contains one bit per CellBytesPerMarkBit bytes (which is equal to
- * CellAlignBytes) and we need two mark bits per cell.
- */
-const size_t MinCellSize = CellBytesPerMarkBit * MarkBitsPerCell;
-
-/*
  * The mark bitmap has one bit per each possible cell start position. This
  * wastes some space for larger GC things but allows us to avoid division by the
  * cell's size when accessing the bitmap.
@@ -82,61 +75,28 @@ const size_t ArenaBitmapBits = ArenaSize / CellBytesPerMarkBit;
 const size_t ArenaBitmapBytes = HowMany(ArenaBitmapBits, 8);
 const size_t ArenaBitmapWords = HowMany(ArenaBitmapBits, JS_BITS_PER_WORD);
 
-enum class ChunkKind : uint8_t {
-  Invalid = 0,
-  TenuredHeap,
-  NurseryToSpace,
-  NurseryFromSpace
-};
-
 // The base class for all GC chunks, either in the nursery or in the tenured
 // heap memory. This structure is locatable from any GC pointer by aligning to
 // the chunk size.
-class ChunkBase {
+class alignas(CellAlignBytes) ChunkBase {
  protected:
-  // Initialize a tenured heap chunk.
-  explicit ChunkBase(JSRuntime* rt) {
+  ChunkBase(JSRuntime* rt, StoreBuffer* sb) {
     MOZ_ASSERT((uintptr_t(this) & ChunkMask) == 0);
-    initBaseForTenuredChunk(rt);
+    initBase(rt, sb);
   }
 
-  void initBaseForTenuredChunk(JSRuntime* rt) {
+  void initBase(JSRuntime* rt, StoreBuffer* sb) {
     runtime = rt;
-    storeBuffer = nullptr;
-    kind = ChunkKind::TenuredHeap;
-    nurseryChunkIndex = UINT8_MAX;
-  }
-
-  // Initialize a nursery chunk.
-  ChunkBase(JSRuntime* rt, StoreBuffer* sb, ChunkKind kind, uint8_t chunkIndex)
-      : storeBuffer(sb),
-        runtime(rt),
-        kind(kind),
-        nurseryChunkIndex(chunkIndex) {
-    MOZ_ASSERT(kind == ChunkKind::NurseryFromSpace ||
-               kind == ChunkKind::NurseryToSpace);
-    MOZ_ASSERT((uintptr_t(this) & ChunkMask) == 0);
-    MOZ_ASSERT(storeBuffer);
+    storeBuffer = sb;
   }
 
  public:
-  ChunkKind getKind() const {
-    MOZ_ASSERT_IF(storeBuffer, kind == ChunkKind::NurseryToSpace ||
-                                   kind == ChunkKind::NurseryFromSpace);
-    MOZ_ASSERT_IF(!storeBuffer, kind == ChunkKind::TenuredHeap);
-    return kind;
-  }
-
   // The store buffer for pointers from tenured things to things in this
   // chunk. Will be non-null if and only if this is a nursery chunk.
   StoreBuffer* storeBuffer;
 
   // Provide quick access to the runtime from absolutely anywhere.
   JSRuntime* runtime;
-
-  ChunkKind kind;
-
-  uint8_t nurseryChunkIndex;
 };
 
 // Information about tenured heap chunks.
@@ -202,8 +162,16 @@ const size_t CalculatedChunkPadSize = ChunkSize - CalculatedChunkSizeRequired;
 static_assert(CalculatedChunkPadSize * CHAR_BIT < BitsPerArenaWithHeaders,
               "Calculated ArenasPerChunk is too small");
 
-static_assert(ArenasPerChunk == 252,
+// Define a macro for the expected number of arenas so its value appears in the
+// error message if the assertion fails.
+#ifdef JS_GC_SMALL_CHUNK_SIZE
+#  define EXPECTED_ARENA_COUNT 63
+#else
+#  define EXPECTED_ARENA_COUNT 252
+#endif
+static_assert(ArenasPerChunk == EXPECTED_ARENA_COUNT,
               "Do not accidentally change our heap's density.");
+#undef EXPECTED_ARENA_COUNT
 
 // Mark bitmaps are atomic because they can be written by gray unmarking on the
 // main thread while read by sweeping on a background thread. The former does
@@ -227,7 +195,7 @@ enum class ColorBit : uint32_t { BlackBit = 0, GrayOrBlackBit = 1 };
 enum class MarkColor : uint8_t { Gray = 1, Black = 2 };
 
 // Mark bitmap for a tenured heap chunk.
-struct alignas(TypicalCacheLineSize) MarkBitmap {
+struct MarkBitmap {
   static constexpr size_t WordCount = ArenaBitmapWords * ArenasPerChunk;
   MarkBitmapWord bitmap[WordCount];
 
@@ -267,7 +235,7 @@ class TenuredChunkBase : public ChunkBase {
   ChunkPageBitmap decommittedPages;
 
  protected:
-  explicit TenuredChunkBase(JSRuntime* runtime) : ChunkBase(runtime) {
+  explicit TenuredChunkBase(JSRuntime* runtime) : ChunkBase(runtime, nullptr) {
     info.numArenasFree = ArenasPerChunk;
   }
 
@@ -380,7 +348,7 @@ enum StackKind {
  * initial value. In the browser this configured by the
  * javascript.options.mem.nursery.max_kb pref.
  */
-const uint32_t DefaultNurseryMaxBytes = 64 * js::gc::ChunkSize;
+const uint32_t DefaultNurseryMaxBytes = 16 * js::gc::ChunkSize;
 
 /* Default maximum heap size in bytes to pass to JS_NewContext(). */
 const uint32_t DefaultHeapMaxBytes = 32 * 1024 * 1024;
@@ -554,27 +522,18 @@ namespace detail {
 
 static MOZ_ALWAYS_INLINE ChunkBase* GetCellChunkBase(const Cell* cell) {
   MOZ_ASSERT(cell);
-  auto* chunk = reinterpret_cast<ChunkBase*>(uintptr_t(cell) & ~ChunkMask);
-  MOZ_ASSERT(chunk->runtime);
-  MOZ_ASSERT(chunk->kind != ChunkKind::Invalid);
-  return chunk;
+  return reinterpret_cast<ChunkBase*>(uintptr_t(cell) & ~ChunkMask);
 }
 
 static MOZ_ALWAYS_INLINE TenuredChunkBase* GetCellChunkBase(
     const TenuredCell* cell) {
   MOZ_ASSERT(cell);
-  auto* chunk =
-      reinterpret_cast<TenuredChunkBase*>(uintptr_t(cell) & ~ChunkMask);
-  MOZ_ASSERT(chunk->runtime);
-  MOZ_ASSERT(chunk->kind == ChunkKind::TenuredHeap);
-  return chunk;
+  return reinterpret_cast<TenuredChunkBase*>(uintptr_t(cell) & ~ChunkMask);
 }
 
-static MOZ_ALWAYS_INLINE JS::Zone* GetTenuredGCThingZone(const void* ptr) {
-  // This takes a void* because the compiler can't see type relationships in
-  // this header. |ptr| must be a pointer to a tenured GC thing.
-  MOZ_ASSERT(ptr);
-  const uintptr_t zone_addr = (uintptr_t(ptr) & ~ArenaMask) | ArenaZoneOffset;
+static MOZ_ALWAYS_INLINE JS::Zone* GetTenuredGCThingZone(const uintptr_t addr) {
+  MOZ_ASSERT(addr);
+  const uintptr_t zone_addr = (addr & ~ArenaMask) | ArenaZoneOffset;
   return *reinterpret_cast<JS::Zone**>(zone_addr);
 }
 
@@ -648,14 +607,6 @@ MOZ_ALWAYS_INLINE bool IsInsideNursery(const TenuredCell* cell) {
   return false;
 }
 
-// Return whether |cell| is in the region of the nursery currently being
-// collected.
-MOZ_ALWAYS_INLINE bool InCollectedNurseryRegion(const Cell* cell) {
-  MOZ_ASSERT(cell);
-  return detail::GetCellChunkBase(cell)->getKind() ==
-         ChunkKind::NurseryFromSpace;
-}
-
 // Allow use before the compiler knows the derivation of JSObject, JSString, and
 // JS::BigInt.
 MOZ_ALWAYS_INLINE bool IsInsideNursery(const JSObject* obj) {
@@ -667,9 +618,6 @@ MOZ_ALWAYS_INLINE bool IsInsideNursery(const JSString* str) {
 MOZ_ALWAYS_INLINE bool IsInsideNursery(const JS::BigInt* bi) {
   return IsInsideNursery(reinterpret_cast<const Cell*>(bi));
 }
-MOZ_ALWAYS_INLINE bool InCollectedNurseryRegion(const JSObject* obj) {
-  return InCollectedNurseryRegion(reinterpret_cast<const Cell*>(obj));
-}
 
 MOZ_ALWAYS_INLINE bool IsCellPointerValid(const void* ptr) {
   auto addr = uintptr_t(ptr);
@@ -679,7 +627,7 @@ MOZ_ALWAYS_INLINE bool IsCellPointerValid(const void* ptr) {
 
   auto* cell = reinterpret_cast<const Cell*>(ptr);
   if (!IsInsideNursery(cell)) {
-    return detail::GetTenuredGCThingZone(cell) != nullptr;
+    return detail::GetTenuredGCThingZone(addr) != nullptr;
   }
 
   return true;
@@ -697,13 +645,16 @@ MOZ_ALWAYS_INLINE bool IsCellPointerValidOrNull(const void* cell) {
 
 namespace JS {
 
-extern JS_PUBLIC_API Zone* GetTenuredGCThingZone(GCCellPtr thing);
+static MOZ_ALWAYS_INLINE Zone* GetTenuredGCThingZone(GCCellPtr thing) {
+  MOZ_ASSERT(!js::gc::IsInsideNursery(thing.asCell()));
+  return js::gc::detail::GetTenuredGCThingZone(thing.unsafeAsUIntPtr());
+}
 
 extern JS_PUBLIC_API Zone* GetNurseryCellZone(js::gc::Cell* cell);
 
 static MOZ_ALWAYS_INLINE Zone* GetGCThingZone(GCCellPtr thing) {
   if (!js::gc::IsInsideNursery(thing.asCell())) {
-    return js::gc::detail::GetTenuredGCThingZone(thing.asCell());
+    return js::gc::detail::GetTenuredGCThingZone(thing.unsafeAsUIntPtr());
   }
 
   return GetNurseryCellZone(thing.asCell());
@@ -711,9 +662,9 @@ static MOZ_ALWAYS_INLINE Zone* GetGCThingZone(GCCellPtr thing) {
 
 static MOZ_ALWAYS_INLINE Zone* GetStringZone(JSString* str) {
   if (!js::gc::IsInsideNursery(str)) {
-    return js::gc::detail::GetTenuredGCThingZone(str);
+    return js::gc::detail::GetTenuredGCThingZone(
+        reinterpret_cast<uintptr_t>(str));
   }
-
   return GetNurseryCellZone(reinterpret_cast<js::gc::Cell*>(str));
 }
 
@@ -812,7 +763,7 @@ static MOZ_ALWAYS_INLINE void ExposeGCThingToActiveJS(JS::GCCellPtr thing) {
   // GC things owned by other runtimes are always black.
   MOZ_ASSERT(!thing.mayBeOwnedByOtherRuntime());
 
-  auto* zone = JS::shadow::Zone::from(detail::GetTenuredGCThingZone(cell));
+  auto* zone = JS::shadow::Zone::from(JS::GetTenuredGCThingZone(thing));
   if (zone->needsIncrementalBarrier()) {
     PerformIncrementalReadBarrier(thing);
   } else if (!zone->isGCPreparing() && detail::NonBlackCellIsMarkedGray(cell)) {
@@ -830,8 +781,8 @@ static MOZ_ALWAYS_INLINE void IncrementalReadBarrier(JS::GCCellPtr thing) {
     return;
   }
 
+  auto* zone = JS::shadow::Zone::from(JS::GetTenuredGCThingZone(thing));
   auto* cell = reinterpret_cast<TenuredCell*>(thing.asCell());
-  auto* zone = JS::shadow::Zone::from(detail::GetTenuredGCThingZone(cell));
   if (zone->needsIncrementalBarrier() &&
       !detail::TenuredCellIsMarkedBlack(cell)) {
     // GC things owned by other runtimes are always black.
@@ -852,7 +803,8 @@ static MOZ_ALWAYS_INLINE bool EdgeNeedsSweepUnbarriered(JSObject** objp) {
     return false;
   }
 
-  auto zone = JS::shadow::Zone::from(detail::GetTenuredGCThingZone(*objp));
+  auto zone =
+      JS::shadow::Zone::from(detail::GetTenuredGCThingZone(uintptr_t(*objp)));
   if (!zone->isGCSweepingOrCompacting()) {
     return false;
   }

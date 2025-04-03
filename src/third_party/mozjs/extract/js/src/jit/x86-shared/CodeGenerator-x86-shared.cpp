@@ -124,7 +124,7 @@ void CodeGeneratorX86Shared::emitCompare(MCompare::CompareType type,
 #ifdef JS_CODEGEN_X64
   if (type == MCompare::Compare_Object || type == MCompare::Compare_Symbol ||
       type == MCompare::Compare_UIntPtr ||
-      type == MCompare::Compare_WasmAnyRef) {
+      type == MCompare::Compare_RefOrNull) {
     if (right->isConstant()) {
       MOZ_ASSERT(type == MCompare::Compare_UIntPtr);
       masm.cmpPtr(ToRegister(left), Imm32(ToInt32(right)));
@@ -304,7 +304,7 @@ void CodeGenerator::visitWasmSelect(LWasmSelect* ins) {
 
   masm.test32(cond, cond);
 
-  if (mirType == MIRType::Int32 || mirType == MIRType::WasmAnyRef) {
+  if (mirType == MIRType::Int32 || mirType == MIRType::RefOrNull) {
     Register out = ToRegister(ins->output());
     MOZ_ASSERT(ToRegister(ins->trueExpr()) == out,
                "true expr input is reused for output");
@@ -408,8 +408,6 @@ void CodeGeneratorX86Shared::visitOutOfLineLoadTypedArrayOutOfBounds(
     case Scalar::BigInt64:
     case Scalar::BigUint64:
     case Scalar::Simd128:
-    // TODO: See Bug 1835034 for JIT support for Float16Array
-    case Scalar::Float16:
     case Scalar::MaxTypedArrayViewType:
       MOZ_CRASH("unexpected array type");
     case Scalar::Float32:
@@ -2080,6 +2078,12 @@ void CodeGenerator::visitAtomicTypedArrayElementBinopForEffect(
   }
 }
 
+void CodeGenerator::visitMemoryBarrier(LMemoryBarrier* ins) {
+  if (ins->type() & MembarStoreLoad) {
+    masm.storeLoadFence();
+  }
+}
+
 void CodeGeneratorX86Shared::visitOutOfLineWasmTruncateCheck(
     OutOfLineWasmTruncateCheck* ool) {
   FloatRegister input = ool->input();
@@ -2246,19 +2250,19 @@ void CodeGenerator::visitWasmTernarySimd128(LWasmTernarySimd128* ins) {
       masm.bitwiseSelectSimd128(control, lhsDest, rhs, lhsDest, temp);
       break;
     }
-    case wasm::SimdOp::F32x4RelaxedMadd:
+    case wasm::SimdOp::F32x4RelaxedFma:
       masm.fmaFloat32x4(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
                         ToFloatRegister(ins->v2()));
       break;
-    case wasm::SimdOp::F32x4RelaxedNmadd:
+    case wasm::SimdOp::F32x4RelaxedFnma:
       masm.fnmaFloat32x4(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
                          ToFloatRegister(ins->v2()));
       break;
-    case wasm::SimdOp::F64x2RelaxedMadd:
+    case wasm::SimdOp::F64x2RelaxedFma:
       masm.fmaFloat64x2(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
                         ToFloatRegister(ins->v2()));
       break;
-    case wasm::SimdOp::F64x2RelaxedNmadd:
+    case wasm::SimdOp::F64x2RelaxedFnma:
       masm.fnmaFloat64x2(ToFloatRegister(ins->v0()), ToFloatRegister(ins->v1()),
                          ToFloatRegister(ins->v2()));
       break;
@@ -3343,24 +3347,6 @@ void CodeGenerator::visitWasmPermuteSimd128(LWasmPermuteSimd128* ins) {
       masm.rightShiftSimd128(Imm32(count), src, dest);
       break;
     }
-    case SimdPermuteOp::ZERO_EXTEND_8x16_TO_16x8:
-      masm.zeroExtend8x16To16x8(src, dest);
-      break;
-    case SimdPermuteOp::ZERO_EXTEND_8x16_TO_32x4:
-      masm.zeroExtend8x16To32x4(src, dest);
-      break;
-    case SimdPermuteOp::ZERO_EXTEND_8x16_TO_64x2:
-      masm.zeroExtend8x16To64x2(src, dest);
-      break;
-    case SimdPermuteOp::ZERO_EXTEND_16x8_TO_32x4:
-      masm.zeroExtend16x8To32x4(src, dest);
-      break;
-    case SimdPermuteOp::ZERO_EXTEND_16x8_TO_64x2:
-      masm.zeroExtend16x8To64x2(src, dest);
-      break;
-    case SimdPermuteOp::ZERO_EXTEND_32x4_TO_64x2:
-      masm.zeroExtend32x4To64x2(src, dest);
-      break;
     case SimdPermuteOp::REVERSE_16x8:
       masm.reverseInt16x8(src, dest);
       break;
@@ -3808,37 +3794,30 @@ void CodeGenerator::visitWasmLoadLaneSimd128(LWasmLoadLaneSimd128* ins) {
   const MWasmLoadLaneSimd128* mir = ins->mir();
   const wasm::MemoryAccessDesc& access = mir->access();
 
-  access.assertOffsetInGuardPages();
   uint32_t offset = access.offset();
+  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* value = ins->src();
   Operand srcAddr = toMemoryAccessOperand(ins, offset);
 
+  masm.append(access, masm.size());
   switch (ins->laneSize()) {
     case 1: {
-      masm.append(access, wasm::TrapMachineInsn::Load8,
-                  FaultingCodeOffset(masm.currentOffset()));
       masm.vpinsrb(ins->laneIndex(), srcAddr, ToFloatRegister(value),
                    ToFloatRegister(value));
       break;
     }
     case 2: {
-      masm.append(access, wasm::TrapMachineInsn::Load16,
-                  FaultingCodeOffset(masm.currentOffset()));
       masm.vpinsrw(ins->laneIndex(), srcAddr, ToFloatRegister(value),
                    ToFloatRegister(value));
       break;
     }
     case 4: {
-      masm.append(access, wasm::TrapMachineInsn::Load32,
-                  FaultingCodeOffset(masm.currentOffset()));
       masm.vinsertps(ins->laneIndex() << 4, srcAddr, ToFloatRegister(value),
                      ToFloatRegister(value));
       break;
     }
     case 8: {
-      masm.append(access, wasm::TrapMachineInsn::Load64,
-                  FaultingCodeOffset(masm.currentOffset()));
       if (ins->laneIndex() == 0) {
         masm.vmovlps(srcAddr, ToFloatRegister(value), ToFloatRegister(value));
       } else {
@@ -3859,28 +3838,23 @@ void CodeGenerator::visitWasmStoreLaneSimd128(LWasmStoreLaneSimd128* ins) {
   const MWasmStoreLaneSimd128* mir = ins->mir();
   const wasm::MemoryAccessDesc& access = mir->access();
 
-  access.assertOffsetInGuardPages();
   uint32_t offset = access.offset();
+  MOZ_ASSERT(offset < masm.wasmMaxOffsetGuardLimit());
 
   const LAllocation* src = ins->src();
   Operand destAddr = toMemoryAccessOperand(ins, offset);
 
+  masm.append(access, masm.size());
   switch (ins->laneSize()) {
     case 1: {
-      masm.append(access, wasm::TrapMachineInsn::Store8,
-                  FaultingCodeOffset(masm.currentOffset()));
       masm.vpextrb(ins->laneIndex(), ToFloatRegister(src), destAddr);
       break;
     }
     case 2: {
-      masm.append(access, wasm::TrapMachineInsn::Store16,
-                  FaultingCodeOffset(masm.currentOffset()));
       masm.vpextrw(ins->laneIndex(), ToFloatRegister(src), destAddr);
       break;
     }
     case 4: {
-      masm.append(access, wasm::TrapMachineInsn::Store32,
-                  FaultingCodeOffset(masm.currentOffset()));
       unsigned lane = ins->laneIndex();
       if (lane == 0) {
         masm.vmovss(ToFloatRegister(src), destAddr);
@@ -3890,8 +3864,6 @@ void CodeGenerator::visitWasmStoreLaneSimd128(LWasmStoreLaneSimd128* ins) {
       break;
     }
     case 8: {
-      masm.append(access, wasm::TrapMachineInsn::Store64,
-                  FaultingCodeOffset(masm.currentOffset()));
       if (ins->laneIndex() == 0) {
         masm.vmovlps(ToFloatRegister(src), destAddr);
       } else {

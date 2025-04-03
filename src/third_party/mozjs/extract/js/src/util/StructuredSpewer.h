@@ -73,6 +73,7 @@ namespace js {
 
 #  define STRUCTURED_CHANNEL_LIST(_) \
     _(BaselineICStats)               \
+    _(ScriptStats)                   \
     _(CacheIRHealthReport)
 
 // Structured spew channels
@@ -186,8 +187,8 @@ class StructuredSpewer {
   // Globally selected channel.
   StructuredSpewFilter selectedChannel_;
 
-  using NameArray = mozilla::EnumeratedArray<SpewChannel, const char*,
-                                             size_t(SpewChannel::Count)>;
+  using NameArray =
+      mozilla::EnumeratedArray<SpewChannel, SpewChannel::Count, const char*>;
   // Channel Names
   static NameArray const names_;
 

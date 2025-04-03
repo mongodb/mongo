@@ -18,6 +18,7 @@
 #include "vm/PromiseObject.h"  // js::PromiseObject
 #include "vm/Realm.h"
 #include "vm/SelfHosting.h"
+#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/JSObject-inl.h"
 #include "vm/List-inl.h"
@@ -966,7 +967,7 @@ bool js::AsyncGeneratorThrow(JSContext* cx, unsigned argc, Value* vp) {
   if (!CallSelfHostedFunction(cx, funName, thisOrRval, args, &thisOrRval)) {
     // 25.5.3.2, steps 5.f, 5.g.
     if (!generator->isClosed()) {
-      generator->setClosed(cx);
+      generator->setClosed();
     }
     return AsyncGeneratorThrown(cx, generator);
   }
@@ -1115,30 +1116,20 @@ const JSClass AsyncFromSyncIteratorObject::class_ = {
     "AsyncFromSyncIteratorObject",
     JSCLASS_HAS_RESERVED_SLOTS(AsyncFromSyncIteratorObject::Slots)};
 
-/*
- * ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
- *
- * CreateAsyncFromSyncIterator ( syncIteratorRecord )
- * https://tc39.es/ecma262/#sec-createasyncfromsynciterator
- */
+// ES2019 draft rev c012f9c70847559a1d9dc0d35d35b27fec42911e
+// 25.1.4.1 CreateAsyncFromSyncIterator
 JSObject* js::CreateAsyncFromSyncIterator(JSContext* cx, HandleObject iter,
                                           HandleValue nextMethod) {
-  // Steps 1-5.
+  // Steps 1-3.
   return AsyncFromSyncIteratorObject::create(cx, iter, nextMethod);
 }
 
-/*
- * ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
- *
- * CreateAsyncFromSyncIterator ( syncIteratorRecord )
- * https://tc39.es/ecma262/#sec-createasyncfromsynciterator
- */
+// ES2019 draft rev c012f9c70847559a1d9dc0d35d35b27fec42911e
+// 25.1.4.1 CreateAsyncFromSyncIterator
 /* static */
 JSObject* AsyncFromSyncIteratorObject::create(JSContext* cx, HandleObject iter,
                                               HandleValue nextMethod) {
-  // Step 1. Let asyncIterator be
-  //         OrdinaryObjectCreate(%AsyncFromSyncIteratorPrototype%, «
-  //         [[SyncIteratorRecord]] »).
+  // Step 1.
   RootedObject proto(cx,
                      GlobalObject::getOrCreateAsyncFromSyncIteratorPrototype(
                          cx, cx->global()));
@@ -1152,47 +1143,34 @@ JSObject* AsyncFromSyncIteratorObject::create(JSContext* cx, HandleObject iter,
     return nullptr;
   }
 
-  // Step 3. Let nextMethod be ! Get(asyncIterator, "next").
-  // (done in caller)
-
-  // Step 2. Set asyncIterator.[[SyncIteratorRecord]] to syncIteratorRecord.
-  // Step 4. Let iteratorRecord be the Iterator Record { [[Iterator]]:
-  //         asyncIterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
+  // Step 2.
   asyncIter->init(iter, nextMethod);
 
-  // Step 5. Return iteratorRecord.
+  // Step 3 (Call to 7.4.1 GetIterator).
+  // 7.4.1 GetIterator, steps 1-5 are a no-op (*).
+  // 7.4.1 GetIterator, steps 6-8 are implemented in bytecode.
+  //
+  // (*) With <https://github.com/tc39/ecma262/issues/1172> fixed.
   return asyncIter;
 }
 
-/**
- * ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
- *
- * %AsyncFromSyncIteratorPrototype%.next ( [ value ] )
- * https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.next
- */
+// ES2019 draft rev c012f9c70847559a1d9dc0d35d35b27fec42911e
+// 25.1.4.2.1 %AsyncFromSyncIteratorPrototype%.next
 static bool AsyncFromSyncIteratorNext(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return AsyncFromSyncIteratorMethod(cx, args, CompletionKind::Normal);
 }
 
-/**
- * ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
- *
- * %AsyncFromSyncIteratorPrototype%.return ( [ value ] )
- * https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.return
- */
+// ES2019 draft rev c012f9c70847559a1d9dc0d35d35b27fec42911e
+// 25.1.4.2.2 %AsyncFromSyncIteratorPrototype%.return
 static bool AsyncFromSyncIteratorReturn(JSContext* cx, unsigned argc,
                                         Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   return AsyncFromSyncIteratorMethod(cx, args, CompletionKind::Return);
 }
 
-/**
- * ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
- *
- * %AsyncFromSyncIteratorPrototype%.throw ( [ value ] )
- * https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.throw
- */
+// ES2019 draft rev c012f9c70847559a1d9dc0d35d35b27fec42911e
+// 25.1.4.2.3 %AsyncFromSyncIteratorPrototype%.throw
 static bool AsyncFromSyncIteratorThrow(JSContext* cx, unsigned argc,
                                        Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -1216,10 +1194,7 @@ bool GlobalObject::initAsyncFromSyncIteratorProto(
     return false;
   }
 
-  // ES2024 draft rev 53454a9a596d90473d2152ef04656d605162cd4c
-  //
-  // The %AsyncFromSyncIteratorPrototype% Object
-  // https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
+  // 25.1.4.2 The %AsyncFromSyncIteratorPrototype% Object
   RootedObject asyncFromSyncIterProto(
       cx, GlobalObject::createBlankPrototypeInheriting(cx, &PlainObject::class_,
                                                        asyncIterProto));
@@ -1229,7 +1204,7 @@ bool GlobalObject::initAsyncFromSyncIteratorProto(
   if (!DefinePropertiesAndFunctions(cx, asyncFromSyncIterProto, nullptr,
                                     async_from_sync_iter_methods) ||
       !DefineToStringTag(cx, asyncFromSyncIterProto,
-                         cx->names().Async_from_Sync_Iterator_)) {
+                         cx->names().AsyncFromSyncIterator)) {
     return false;
   }
 
@@ -1289,14 +1264,14 @@ static bool AsyncIteratorConstructor(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
   // Step 1.
-  if (!ThrowIfNotConstructing(cx, args, "AsyncIterator")) {
+  if (!ThrowIfNotConstructing(cx, args, js_AsyncIterator_str)) {
     return false;
   }
   // Throw TypeError if NewTarget is the active function object, preventing the
   // Iterator constructor from being used directly.
   if (args.callee() == args.newTarget().toObject()) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_BOGUS_CONSTRUCTOR, "AsyncIterator");
+                              JSMSG_BOGUS_CONSTRUCTOR, js_AsyncIterator_str);
     return false;
   }
 
@@ -1328,7 +1303,7 @@ static const ClassSpec AsyncIteratorObjectClassSpec = {
 };
 
 const JSClass AsyncIteratorObject::class_ = {
-    "AsyncIterator",
+    js_AsyncIterator_str,
     JSCLASS_HAS_CACHED_PROTO(JSProto_AsyncIterator),
     JS_NULL_CLASS_OPS,
     &AsyncIteratorObjectClassSpec,

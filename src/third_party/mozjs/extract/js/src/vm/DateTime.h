@@ -113,25 +113,25 @@ extern void ResetTimeZoneInternal(ResetTimeZoneMode mode);
  */
 class DateTimeInfo {
  public:
-  // For realms that force the UTC time zone (for fingerprinting protection) a
-  // separate DateTimeInfo instance is used that is always in the UTC time zone.
-  enum class ForceUTC { No, Yes };
+  // Whether we should resist fingerprinting. For realms in RFP mode a separate
+  // DateTimeInfo instance is used that is always in the UTC time zone.
+  enum class ShouldRFP { No, Yes };
 
  private:
   static ExclusiveData<DateTimeInfo>* instance;
-  static ExclusiveData<DateTimeInfo>* instanceUTC;
+  static ExclusiveData<DateTimeInfo>* instanceRFP;
 
   friend class ExclusiveData<DateTimeInfo>;
 
   friend bool InitDateTimeState();
   friend void FinishDateTimeState();
 
-  explicit DateTimeInfo(bool forceUTC);
+  explicit DateTimeInfo(bool shouldResistFingerprinting);
   ~DateTimeInfo();
 
-  static auto acquireLockWithValidTimeZone(ForceUTC forceUTC) {
+  static auto acquireLockWithValidTimeZone(ShouldRFP shouldRFP) {
     auto guard =
-        forceUTC == ForceUTC::Yes ? instanceUTC->lock() : instance->lock();
+        shouldRFP == ShouldRFP::Yes ? instanceRFP->lock() : instance->lock();
     if (guard->timeZoneStatus_ != TimeZoneStatus::Valid) {
       guard->updateTimeZone();
     }
@@ -139,7 +139,7 @@ class DateTimeInfo {
   }
 
  public:
-  static ForceUTC forceUTC(JS::Realm* realm);
+  static ShouldRFP shouldRFP(JS::Realm* realm);
 
   // The spec implicitly assumes DST and time zone adjustment information
   // never change in the course of a function -- sometimes even across
@@ -151,9 +151,9 @@ class DateTimeInfo {
    * zone (Lord Howe Island, Australia) has a fractional-hour offset, just to
    * keep things interesting.
    */
-  static int32_t getDSTOffsetMilliseconds(ForceUTC forceUTC,
+  static int32_t getDSTOffsetMilliseconds(ShouldRFP shouldRFP,
                                           int64_t utcMilliseconds) {
-    auto guard = acquireLockWithValidTimeZone(forceUTC);
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->internalGetDSTOffsetMilliseconds(utcMilliseconds);
   }
 
@@ -162,8 +162,8 @@ class DateTimeInfo {
    * standard time (i.e. not including any offset due to DST) as computed by the
    * operating system.
    */
-  static int32_t utcToLocalStandardOffsetSeconds(ForceUTC forceUTC) {
-    auto guard = acquireLockWithValidTimeZone(forceUTC);
+  static int32_t utcToLocalStandardOffsetSeconds(ShouldRFP shouldRFP) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->utcToLocalStandardOffsetSeconds_;
   }
 
@@ -174,9 +174,10 @@ class DateTimeInfo {
    * Return the time zone offset, including DST, in milliseconds at the
    * given time. The input time can be either at UTC or at local time.
    */
-  static int32_t getOffsetMilliseconds(ForceUTC forceUTC, int64_t milliseconds,
+  static int32_t getOffsetMilliseconds(ShouldRFP shouldRFP,
+                                       int64_t milliseconds,
                                        TimeZoneOffset offset) {
-    auto guard = acquireLockWithValidTimeZone(forceUTC);
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->internalGetOffsetMilliseconds(milliseconds, offset);
   }
 
@@ -186,10 +187,10 @@ class DateTimeInfo {
    * buffer is too small, an empty string is stored. The stored display name
    * is null-terminated in any case.
    */
-  static bool timeZoneDisplayName(ForceUTC forceUTC, char16_t* buf,
+  static bool timeZoneDisplayName(ShouldRFP shouldRFP, char16_t* buf,
                                   size_t buflen, int64_t utcMilliseconds,
                                   const char* locale) {
-    auto guard = acquireLockWithValidTimeZone(forceUTC);
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->internalTimeZoneDisplayName(buf, buflen, utcMilliseconds,
                                               locale);
   }
@@ -199,8 +200,8 @@ class DateTimeInfo {
    * buffer.
    */
   template <typename B>
-  static mozilla::intl::ICUResult timeZoneId(ForceUTC forceUTC, B& buffer) {
-    auto guard = acquireLockWithValidTimeZone(forceUTC);
+  static mozilla::intl::ICUResult timeZoneId(ShouldRFP shouldRFP, B& buffer) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->timeZone()->GetId(buffer);
   }
 
@@ -208,8 +209,8 @@ class DateTimeInfo {
    * A number indicating the raw offset from GMT in milliseconds.
    */
   static mozilla::Result<int32_t, mozilla::intl::ICUError> getRawOffsetMs(
-      ForceUTC forceUTC) {
-    auto guard = acquireLockWithValidTimeZone(forceUTC);
+      ShouldRFP shouldRFP) {
+    auto guard = acquireLockWithValidTimeZone(shouldRFP);
     return guard->timeZone()->GetRawOffsetMs();
   }
 #else
@@ -217,8 +218,8 @@ class DateTimeInfo {
    * Return the local time zone adjustment (ES2019 20.3.1.7) as computed by
    * the operating system.
    */
-  static int32_t localTZA(ForceUTC forceUTC) {
-    return utcToLocalStandardOffsetSeconds(forceUTC) * msPerSecond;
+  static int32_t localTZA(ShouldRFP shouldRFP) {
+    return utcToLocalStandardOffsetSeconds(shouldRFP) * msPerSecond;
   }
 #endif /* JS_HAS_INTL_API */
 
@@ -234,7 +235,7 @@ class DateTimeInfo {
     {
       // Only needed to initialize the default state and any later call will
       // perform an unnecessary reset.
-      auto guard = instanceUTC->lock();
+      auto guard = instanceRFP->lock();
       guard->internalResetTimeZone(mode);
     }
   }
@@ -254,7 +255,7 @@ class DateTimeInfo {
     void sanityCheck();
   };
 
-  bool forceUTC_;
+  bool shouldResistFingerprinting_;
 
   enum class TimeZoneStatus : uint8_t { Valid, NeedsUpdate, UpdateIfChanged };
 

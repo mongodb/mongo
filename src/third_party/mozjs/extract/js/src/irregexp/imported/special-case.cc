@@ -82,6 +82,29 @@ const icu::UnicodeSet& RegExpCaseFolding::SpecialAddSet() {
   return set.Pointer()->set;
 }
 
+icu::UnicodeSet BuildUnicodeNonSimpleCloseOverSet() {
+  icu::UnicodeSet set;
+  set.add(0x390);
+  set.add(0x3b0);
+  set.add(0x1fd3);
+  set.add(0x1fe3);
+  set.add(0xfb05, 0xfb06);
+  set.freeze();
+  return set;
+}
+
+struct UnicodeNonSimpleCloseOverSetData {
+  UnicodeNonSimpleCloseOverSetData() : set(BuildUnicodeNonSimpleCloseOverSet()) {}
+  const icu::UnicodeSet set;
+};
+
+//static
+const icu::UnicodeSet& RegExpCaseFolding::UnicodeNonSimpleCloseOverSet() {
+  static base::LazyInstance<UnicodeNonSimpleCloseOverSetData>::type set =
+      LAZY_INSTANCE_INITIALIZER;
+  return set.Pointer()->set;
+}
+
 
 }  // namespace internal
 }  // namespace v8

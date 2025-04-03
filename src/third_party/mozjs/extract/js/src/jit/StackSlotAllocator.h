@@ -86,7 +86,6 @@ class StackSlotAllocator {
       case LDefinition::GENERAL:
       case LDefinition::OBJECT:
       case LDefinition::SLOTS:
-      case LDefinition::WASM_ANYREF:
 #endif
 #ifdef JS_NUNBOX32
       case LDefinition::TYPE:
@@ -99,7 +98,6 @@ class StackSlotAllocator {
       case LDefinition::GENERAL:
       case LDefinition::OBJECT:
       case LDefinition::SLOTS:
-      case LDefinition::WASM_ANYREF:
 #endif
 #ifdef JS_PUNBOX64
       case LDefinition::BOX:

@@ -86,16 +86,11 @@ ZyanU32 ZydisFormatterHelperGetExplicitSize(const ZydisFormatter* formatter,
 
     ZYAN_ASSERT(operand->type == ZYDIS_OPERAND_TYPE_MEMORY);
     ZYAN_ASSERT((operand->mem.type == ZYDIS_MEMOP_TYPE_MEM) ||
-                (operand->mem.type == ZYDIS_MEMOP_TYPE_AGEN) ||
                 (operand->mem.type == ZYDIS_MEMOP_TYPE_VSIB));
 
     if (formatter->force_memory_size)
     {
         return operand->size;
-    }
-    else if (operand->mem.type == ZYDIS_MEMOP_TYPE_AGEN)
-    {
-        return 0;
     }
 
     if (!context->operands)
@@ -235,7 +230,7 @@ ZyanStatus ZydisFormatterBasePrintAddressABS(const ZydisFormatter* formatter,
     if ((formatter->addr_padding_absolute == ZYDIS_PADDING_AUTO) &&
         (formatter->addr_base == ZYDIS_NUMERIC_BASE_HEX))
     {
-        switch (context->instruction->address_width)
+        switch (context->instruction->stack_width)
         {
         case 16:
             padding =  4;
@@ -275,7 +270,7 @@ ZyanStatus ZydisFormatterBasePrintAddressREL(const ZydisFormatter* formatter,
     if ((formatter->addr_padding_relative == ZYDIS_PADDING_AUTO) &&
         (formatter->addr_base == ZYDIS_NUMERIC_BASE_HEX))
     {
-        switch (context->instruction->address_width)
+        switch (context->instruction->stack_width)
         {
         case 16:
             padding =  4;

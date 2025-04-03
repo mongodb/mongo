@@ -30,13 +30,11 @@
 
 #include "jsnum.h"
 
+#include "frontend/BytecodeCompiler.h"
 #include "frontend/FrontendContext.h"
 #include "frontend/Parser.h"
 #include "frontend/ParserAtom.h"
 #include "frontend/ReservedWords.h"
-#include "js/CharacterEncoding.h"  // JS::ConstUTF8CharsZ
-#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin, JS::ColumnNumberOneOrigin, JS::TaggedColumnNumberOneOrigin
-#include "js/ErrorReport.h"   // JSErrorBase
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/Printf.h"                // JS_smprintf
 #include "js/RegExpFlags.h"           // JS::RegExpFlags
@@ -46,6 +44,7 @@
 #include "vm/FrameIter.h"  // js::{,NonBuiltin}FrameIter
 #include "vm/JSContext.h"
 #include "vm/Realm.h"
+#include "vm/WellKnownAtom.h"  // js_*_str
 
 using mozilla::AsciiAlphanumericToNumber;
 using mozilla::AssertedCast;
@@ -71,7 +70,8 @@ struct ReservedWordInfo {
 };
 
 static const ReservedWordInfo reservedWords[] = {
-#define RESERVED_WORD_INFO(word, name, type) {#word, js::frontend::type},
+#define RESERVED_WORD_INFO(word, name, type) \
+  {js_##word##_str, js::frontend::type},
     FOR_EACH_JAVASCRIPT_RESERVED_WORD(RESERVED_WORD_INFO)
 #undef RESERVED_WORD_INFO
 };
@@ -144,6 +144,23 @@ static const ReservedWordInfo* FindReservedWord(
   return nullptr;
 }
 
+static char32_t GetSingleCodePoint(const char16_t** p, const char16_t* end) {
+  using namespace js;
+
+  if (MOZ_UNLIKELY(unicode::IsLeadSurrogate(**p)) && *p + 1 < end) {
+    char16_t lead = **p;
+    char16_t maybeTrail = *(*p + 1);
+    if (unicode::IsTrailSurrogate(maybeTrail)) {
+      *p += 2;
+      return unicode::UTF16Decode(lead, maybeTrail);
+    }
+  }
+
+  char32_t codePoint = **p;
+  (*p)++;
+  return codePoint;
+}
+
 template <typename CharT>
 static constexpr bool IsAsciiBinary(CharT c) {
   using UnsignedCharT = std::make_unsigned_t<CharT>;
@@ -168,6 +185,123 @@ static constexpr uint8_t AsciiOctalToNumber(CharT c) {
 namespace js {
 
 namespace frontend {
+
+bool IsIdentifier(JSLinearString* str) {
+  JS::AutoCheckCannotGC nogc;
+  MOZ_ASSERT(str);
+  if (str->hasLatin1Chars()) {
+    return IsIdentifier(str->latin1Chars(nogc), str->length());
+  }
+  return IsIdentifier(str->twoByteChars(nogc), str->length());
+}
+
+bool IsIdentifierNameOrPrivateName(JSLinearString* str) {
+  JS::AutoCheckCannotGC nogc;
+  MOZ_ASSERT(str);
+  if (str->hasLatin1Chars()) {
+    return IsIdentifierNameOrPrivateName(str->latin1Chars(nogc), str->length());
+  }
+  return IsIdentifierNameOrPrivateName(str->twoByteChars(nogc), str->length());
+}
+
+bool IsIdentifier(const Latin1Char* chars, size_t length) {
+  if (length == 0) {
+    return false;
+  }
+
+  if (!unicode::IsIdentifierStart(char16_t(*chars))) {
+    return false;
+  }
+
+  const Latin1Char* end = chars + length;
+  while (++chars != end) {
+    if (!unicode::IsIdentifierPart(char16_t(*chars))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool IsIdentifierASCII(char c) { return unicode::IsIdentifierStartASCII(c); }
+
+bool IsIdentifierASCII(char c1, char c2) {
+  return unicode::IsIdentifierStartASCII(c1) &&
+         unicode::IsIdentifierPartASCII(c2);
+}
+
+bool IsIdentifierNameOrPrivateName(const Latin1Char* chars, size_t length) {
+  if (length == 0) {
+    return false;
+  }
+
+  // Skip over any private name marker.
+  if (*chars == '#') {
+    ++chars;
+    --length;
+  }
+
+  return IsIdentifier(chars, length);
+}
+
+bool IsIdentifier(const char16_t* chars, size_t length) {
+  if (length == 0) {
+    return false;
+  }
+
+  const char16_t* p = chars;
+  const char16_t* end = chars + length;
+  char32_t codePoint;
+
+  codePoint = GetSingleCodePoint(&p, end);
+  if (!unicode::IsIdentifierStart(codePoint)) {
+    return false;
+  }
+
+  while (p < end) {
+    codePoint = GetSingleCodePoint(&p, end);
+    if (!unicode::IsIdentifierPart(codePoint)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool IsIdentifierNameOrPrivateName(const char16_t* chars, size_t length) {
+  if (length == 0) {
+    return false;
+  }
+
+  const char16_t* p = chars;
+  const char16_t* end = chars + length;
+  char32_t codePoint;
+
+  codePoint = GetSingleCodePoint(&p, end);
+
+  // Skip over any private name marker.
+  if (codePoint == '#') {
+    // The identifier part of a private name mustn't be empty.
+    if (length == 1) {
+      return false;
+    }
+
+    codePoint = GetSingleCodePoint(&p, end);
+  }
+
+  if (!unicode::IsIdentifierStart(codePoint)) {
+    return false;
+  }
+
+  while (p < end) {
+    codePoint = GetSingleCodePoint(&p, end);
+    if (!unicode::IsIdentifierPart(codePoint)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 bool IsKeyword(TaggedParserAtomIndex atom) {
   if (const ReservedWordInfo* rw = FindReservedWord(atom)) {
@@ -198,7 +332,7 @@ const char* ReservedWordToCharZ(TokenKind tt) {
   switch (tt) {
 #define EMIT_CASE(word, name, type) \
   case type:                        \
-    return #word;
+    return js_##word##_str;
     FOR_EACH_JAVASCRIPT_RESERVED_WORD(EMIT_CASE)
 #undef EMIT_CASE
     default:
@@ -454,8 +588,7 @@ TokenStreamSpecific<Unit, AnyCharsAccess>::TokenStreamSpecific(
 
 bool TokenStreamAnyChars::checkOptions() {
   // Constrain starting columns to where they will saturate.
-  if (options().column.oneOriginValue() >
-      JS::LimitedColumnNumberOneOrigin::Limit) {
+  if (options().column > ColumnLimit) {
     reportErrorNoOffset(JSMSG_BAD_COLUMN_NUMBER);
     return false;
   }
@@ -477,8 +610,7 @@ void TokenStreamAnyChars::reportErrorNoOffsetVA(unsigned errorNumber,
   ErrorMetadata metadata;
   computeErrorMetadataNoOffset(&metadata);
 
-  ReportCompileErrorLatin1VA(fc, std::move(metadata), nullptr, errorNumber,
-                             args);
+  ReportCompileErrorLatin1(fc, std::move(metadata), nullptr, errorNumber, args);
 }
 
 [[nodiscard]] MOZ_ALWAYS_INLINE bool
@@ -592,76 +724,59 @@ static MOZ_ALWAYS_INLINE void RetractPointerToCodePointBoundary(
 }
 
 template <typename Unit>
-JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffset(
+uint32_t TokenStreamAnyChars::computePartialColumn(
     const LineToken lineToken, const uint32_t offset,
     const SourceUnits<Unit>& sourceUnits) const {
   lineToken.assertConsistentOffset(offset);
 
-  const uint32_t start = srcCoords.lineStart(lineToken);
-  const uint32_t offsetInLine = offset - start;
-
-  if constexpr (std::is_same_v<Unit, char16_t>) {
-    // Column offset is in UTF-16 code units.
-    return JS::ColumnNumberUnsignedOffset(offsetInLine);
-  }
-
-  return computeColumnOffsetForUTF8(lineToken, offset, start, offsetInLine,
-                                    sourceUnits);
-}
-
-template <typename Unit>
-JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
-    const LineToken lineToken, const uint32_t offset, const uint32_t start,
-    const uint32_t offsetInLine, const SourceUnits<Unit>& sourceUnits) const {
   const uint32_t line = lineNumber(lineToken);
+  const uint32_t start = srcCoords.lineStart(lineToken);
 
-  // Reset the previous offset/column number offset cache for this line, if the
-  // previous lookup wasn't on this line.
+  // Reset the previous offset/column cache for this line, if the previous
+  // lookup wasn't on this line.
   if (line != lineOfLastColumnComputation_) {
     lineOfLastColumnComputation_ = line;
     lastChunkVectorForLine_ = nullptr;
     lastOffsetOfComputedColumn_ = start;
-    lastComputedColumnOffset_ = JS::ColumnNumberUnsignedOffset::zero();
+    lastComputedColumn_ = 0;
   }
 
-  // Compute and return the final column number offset from a partially
-  // calculated offset/column number offset, using the last-cached
-  // offset/column number offset if they're more optimal.
-  auto OffsetFromPartial =
-      [this, offset, &sourceUnits](
-          uint32_t partialOffset,
-          JS::ColumnNumberUnsignedOffset partialColumnOffset,
-          UnitsType unitsType) {
-        MOZ_ASSERT(partialOffset <= offset);
+  // Compute and return the final column number from a partial offset/column,
+  // using the last-cached offset/column if they're more optimal.
+  auto ColumnFromPartial = [this, offset, &sourceUnits](uint32_t partialOffset,
+                                                        uint32_t partialCols,
+                                                        UnitsType unitsType) {
+    MOZ_ASSERT(partialOffset <= offset);
 
-        // If the last lookup on this line was closer to |offset|, use it.
-        if (partialOffset < this->lastOffsetOfComputedColumn_ &&
-            this->lastOffsetOfComputedColumn_ <= offset) {
-          partialOffset = this->lastOffsetOfComputedColumn_;
-          partialColumnOffset = this->lastComputedColumnOffset_;
-        }
+    // If the last lookup on this line was closer to |offset|, use it.
+    if (partialOffset < this->lastOffsetOfComputedColumn_ &&
+        this->lastOffsetOfComputedColumn_ <= offset) {
+      partialOffset = this->lastOffsetOfComputedColumn_;
+      partialCols = this->lastComputedColumn_;
+    }
 
-        const Unit* begin = sourceUnits.codeUnitPtrAt(partialOffset);
-        const Unit* end = sourceUnits.codeUnitPtrAt(offset);
+    const Unit* begin = sourceUnits.codeUnitPtrAt(partialOffset);
+    const Unit* end = sourceUnits.codeUnitPtrAt(offset);
 
-        size_t offsetDelta =
-            AssertedCast<uint32_t>(PointerRangeSize(begin, end));
-        partialOffset += offsetDelta;
+    size_t offsetDelta = AssertedCast<uint32_t>(PointerRangeSize(begin, end));
+    partialOffset += offsetDelta;
 
-        if (unitsType == UnitsType::GuaranteedSingleUnit) {
-          MOZ_ASSERT(unicode::CountUTF16CodeUnits(begin, end) == offsetDelta,
-                     "guaranteed-single-units also guarantee pointer distance "
-                     "equals UTF-16 code unit count");
-          partialColumnOffset += JS::ColumnNumberUnsignedOffset(offsetDelta);
-        } else {
-          partialColumnOffset += JS::ColumnNumberUnsignedOffset(
-              AssertedCast<uint32_t>(unicode::CountUTF16CodeUnits(begin, end)));
-        }
+    if (unitsType == UnitsType::GuaranteedSingleUnit) {
+      MOZ_ASSERT(unicode::CountCodePoints(begin, end) == offsetDelta,
+                 "guaranteed-single-units also guarantee pointer distance "
+                 "equals code point count");
+      partialCols += offsetDelta;
+    } else {
+      partialCols +=
+          AssertedCast<uint32_t>(unicode::CountCodePoints(begin, end));
+    }
 
-        this->lastOffsetOfComputedColumn_ = partialOffset;
-        this->lastComputedColumnOffset_ = partialColumnOffset;
-        return partialColumnOffset;
-      };
+    this->lastOffsetOfComputedColumn_ = partialOffset;
+    this->lastComputedColumn_ = partialCols;
+    return partialCols;
+  };
+
+  const uint32_t offsetInLine = offset - start;
 
   // We won't add an entry to |longLineColumnInfo_| for lines where the maximum
   // column has offset less than this value.  The most common (non-minified)
@@ -681,15 +796,13 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
     // not *always* worst-case.)
     UnitsType unitsType;
     if (lastChunkVectorForLine_ && lastChunkVectorForLine_->length() > 0) {
-      MOZ_ASSERT((*lastChunkVectorForLine_)[0].columnOffset() ==
-                 JS::ColumnNumberUnsignedOffset::zero());
+      MOZ_ASSERT((*lastChunkVectorForLine_)[0].column() == 0);
       unitsType = (*lastChunkVectorForLine_)[0].unitsType();
     } else {
       unitsType = UnitsType::PossiblyMultiUnit;
     }
 
-    return OffsetFromPartial(start, JS::ColumnNumberUnsignedOffset::zero(),
-                             unitsType);
+    return ColumnFromPartial(start, 0, unitsType);
   }
 
   // If this line has no chunk vector yet, insert one in the hash map.  (The
@@ -702,8 +815,7 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
       if (!longLineColumnInfo_.add(ptr, line, Vector<ChunkInfo>(fc))) {
         // In case of OOM, just count columns from the start of the line.
         fc->recoverFromOutOfMemory();
-        return OffsetFromPartial(start, JS::ColumnNumberUnsignedOffset::zero(),
-                                 UnitsType::PossiblyMultiUnit);
+        return ColumnFromPartial(start, 0, UnitsType::PossiblyMultiUnit);
       }
     }
 
@@ -738,7 +850,7 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
   };
 
   uint32_t partialOffset;
-  JS::ColumnNumberUnsignedOffset partialColumnOffset;
+  uint32_t partialColumn;
   UnitsType unitsType;
 
   auto entriesLen = AssertedCast<uint32_t>(lastChunkVectorForLine_->length());
@@ -746,7 +858,7 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
     // We've computed the chunk |offset| resides in.  Compute the column number
     // from the chunk.
     partialOffset = RetractedOffsetOfChunk(chunkIndex);
-    partialColumnOffset = (*lastChunkVectorForLine_)[chunkIndex].columnOffset();
+    partialColumn = (*lastChunkVectorForLine_)[chunkIndex].column();
 
     // This is exact if |chunkIndex| isn't the last chunk.
     unitsType = (*lastChunkVectorForLine_)[chunkIndex].unitsType();
@@ -763,17 +875,16 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
     // also a suitable partial start point if we must recover from OOM.)
     if (entriesLen > 0) {
       partialOffset = RetractedOffsetOfChunk(entriesLen - 1);
-      partialColumnOffset =
-          (*lastChunkVectorForLine_)[entriesLen - 1].columnOffset();
+      partialColumn = (*lastChunkVectorForLine_)[entriesLen - 1].column();
     } else {
       partialOffset = start;
-      partialColumnOffset = JS::ColumnNumberUnsignedOffset::zero();
+      partialColumn = 0;
     }
 
     if (!lastChunkVectorForLine_->reserve(chunkIndex + 1)) {
       // As earlier, just start from the greatest offset/column in case of OOM.
       fc->recoverFromOutOfMemory();
-      return OffsetFromPartial(partialOffset, partialColumnOffset,
+      return ColumnFromPartial(partialOffset, partialColumn,
                                UnitsType::PossiblyMultiUnit);
     }
 
@@ -783,8 +894,7 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
     // with chunk units pessimally assumed not single-unit.
     if (entriesLen == 0) {
       lastChunkVectorForLine_->infallibleAppend(
-          ChunkInfo(JS::ColumnNumberUnsignedOffset::zero(),
-                    UnitsType::PossiblyMultiUnit));
+          ChunkInfo(0, UnitsType::PossiblyMultiUnit));
       entriesLen++;
     }
 
@@ -809,20 +919,19 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
       MOZ_ASSERT(chunkLimit <= limit);
 
       size_t numUnits = PointerRangeSize(begin, chunkLimit);
-      size_t numUTF16CodeUnits =
-          unicode::CountUTF16CodeUnits(begin, chunkLimit);
+      size_t numCodePoints = unicode::CountCodePoints(begin, chunkLimit);
 
       // If this chunk (which will become non-final at the end of the loop) is
       // all single-unit code points, annotate the chunk accordingly.
-      if (numUnits == numUTF16CodeUnits) {
+      if (numUnits == numCodePoints) {
         lastChunkVectorForLine_->back().guaranteeSingleUnits();
       }
 
       partialOffset += numUnits;
-      partialColumnOffset += JS::ColumnNumberUnsignedOffset(numUTF16CodeUnits);
+      partialColumn += numCodePoints;
 
       lastChunkVectorForLine_->infallibleEmplaceBack(
-          partialColumnOffset, UnitsType::PossiblyMultiUnit);
+          partialColumn, UnitsType::PossiblyMultiUnit);
     } while (entriesLen < chunkIndex + 1);
 
     // We're at a spot in the current final chunk, and final chunks never have
@@ -830,37 +939,41 @@ JS::ColumnNumberUnsignedOffset TokenStreamAnyChars::computeColumnOffsetForUTF8(
     unitsType = UnitsType::PossiblyMultiUnit;
   }
 
-  return OffsetFromPartial(partialOffset, partialColumnOffset, unitsType);
+  return ColumnFromPartial(partialOffset, partialColumn, unitsType);
 }
 
 template <typename Unit, class AnyCharsAccess>
-JS::LimitedColumnNumberOneOrigin
-GeneralTokenStreamChars<Unit, AnyCharsAccess>::computeColumn(
+uint32_t GeneralTokenStreamChars<Unit, AnyCharsAccess>::computeColumn(
     LineToken lineToken, uint32_t offset) const {
   lineToken.assertConsistentOffset(offset);
 
   const TokenStreamAnyChars& anyChars = anyCharsAccess();
 
-  JS::ColumnNumberUnsignedOffset columnOffset =
-      anyChars.computeColumnOffset(lineToken, offset, this->sourceUnits);
+  uint32_t column =
+      anyChars.computePartialColumn(lineToken, offset, this->sourceUnits);
 
-  if (!lineToken.isFirstLine()) {
-    return JS::LimitedColumnNumberOneOrigin::fromUnlimited(
-        JS::ColumnNumberOneOrigin() + columnOffset);
+  if (lineToken.isFirstLine()) {
+    if (column > ColumnLimit) {
+      return ColumnLimit;
+    }
+
+    static_assert(uint32_t(ColumnLimit + ColumnLimit) > ColumnLimit,
+                  "Adding ColumnLimit should not overflow");
+
+    uint32_t firstLineOffset = anyChars.options_.column;
+    column += firstLineOffset;
   }
 
-  if (1 + columnOffset.value() > JS::LimitedColumnNumberOneOrigin::Limit) {
-    return JS::LimitedColumnNumberOneOrigin::limit();
+  if (column > ColumnLimit) {
+    return ColumnLimit;
   }
 
-  return JS::LimitedColumnNumberOneOrigin::fromUnlimited(
-      (anyChars.options_.column + columnOffset).oneOriginValue());
+  return column;
 }
 
 template <typename Unit, class AnyCharsAccess>
 void GeneralTokenStreamChars<Unit, AnyCharsAccess>::computeLineAndColumn(
-    uint32_t offset, uint32_t* line,
-    JS::LimitedColumnNumberOneOrigin* column) const {
+    uint32_t offset, uint32_t* line, uint32_t* column) const {
   const TokenStreamAnyChars& anyChars = anyCharsAccess();
 
   auto lineToken = anyChars.lineToken(offset);
@@ -919,19 +1032,17 @@ MOZ_COLD void TokenStreamChars<Utf8Unit, AnyCharsAccess>::internalEncodingError(
 
     ptr[-1] = '\0';
 
-    uint32_t line;
-    JS::LimitedColumnNumberOneOrigin column;
+    uint32_t line, column;
     computeLineAndColumn(offset, &line, &column);
 
-    if (!notes->addNoteASCII(anyChars.fc, anyChars.getFilename().c_str(), 0,
-                             line, JS::ColumnNumberOneOrigin(column),
-                             GetErrorMessage, nullptr, JSMSG_BAD_CODE_UNITS,
-                             badUnitsStr)) {
+    if (!notes->addNoteASCII(anyChars.fc, anyChars.getFilename(), 0, line,
+                             column, GetErrorMessage, nullptr,
+                             JSMSG_BAD_CODE_UNITS, badUnitsStr)) {
       break;
     }
 
-    ReportCompileErrorLatin1VA(anyChars.fc, std::move(err), std::move(notes),
-                               errorNumber, &args);
+    ReportCompileErrorLatin1(anyChars.fc, std::move(err), std::move(notes),
+                             errorNumber, &args);
   } while (false);
 
   va_end(args);
@@ -1467,7 +1578,7 @@ void TokenStreamAnyChars::computeErrorMetadataNoOffset(
   err->isMuted = mutedErrors;
   err->filename = filename_;
   err->lineNumber = 0;
-  err->columnNumber = JS::ColumnNumberOneOrigin();
+  err->columnNumber = 0;
 
   MOZ_ASSERT(err->lineOfContext == nullptr);
 }
@@ -1480,16 +1591,13 @@ bool TokenStreamAnyChars::fillExceptingContext(ErrorMetadata* err,
   // get it from the caller.
   if (!filename_) {
     JSContext* maybeCx = context()->maybeCurrentJSContext();
-    if (maybeCx) {
+    if (maybeCx && !maybeCx->isHelperThreadContext()) {
       NonBuiltinFrameIter iter(maybeCx,
                                FrameIter::FOLLOW_DEBUGGER_EVAL_PREV_LINK,
                                maybeCx->realm()->principals());
       if (!iter.done() && iter.filename()) {
-        err->filename = JS::ConstUTF8CharsZ(iter.filename());
-        JS::TaggedColumnNumberOneOrigin columnNumber;
-        err->lineNumber = iter.computeLine(&columnNumber);
-        err->columnNumber =
-            JS::ColumnNumberOneOrigin(columnNumber.oneOriginValue());
+        err->filename = iter.filename();
+        err->lineNumber = iter.computeLine(&err->columnNumber);
         return false;
       }
     }
@@ -2547,8 +2655,6 @@ template <typename Unit, class AnyCharsAccess>
       flag = RegExpFlag::DotAll;
     } else if (unit == 'u') {
       flag = RegExpFlag::Unicode;
-    } else if (unit == 'v') {
-      flag = RegExpFlag::UnicodeSets;
     } else if (unit == 'y') {
       flag = RegExpFlag::Sticky;
     } else if (IsAsciiAlpha(unit)) {
@@ -2558,15 +2664,6 @@ template <typename Unit, class AnyCharsAccess>
     }
 
     if ((reflags & flag) || flag == RegExpFlag::NoFlags) {
-      ungetCodeUnit(unit);
-      char buf[2] = {char(unit), '\0'};
-      error(JSMSG_BAD_REGEXP_FLAG, buf);
-      return badToken();
-    }
-
-    // /u and /v flags are mutually exclusive.
-    if (((reflags & RegExpFlag::Unicode) && (flag & RegExpFlag::UnicodeSets)) ||
-        ((reflags & RegExpFlag::UnicodeSets) && (flag & RegExpFlag::Unicode))) {
       ungetCodeUnit(unit);
       char buf[2] = {char(unit), '\0'};
       error(JSMSG_BAD_REGEXP_FLAG, buf);

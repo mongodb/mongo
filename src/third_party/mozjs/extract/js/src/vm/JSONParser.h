@@ -16,10 +16,8 @@
 #include <stdint.h>  // uint32_t
 #include <utility>   // std::move
 
-#include "builtin/ParseRecordObject.h"  // js::ParseRecordObject
-#include "ds/IdValuePair.h"             // IdValuePair
-#include "gc/GC.h"                      // AutoSelectGCHeap
-#include "js/GCVector.h"                // JS::GCVector
+#include "ds/IdValuePair.h"  // IdValuePair
+#include "js/GCVector.h"     // JS::GCVector
 #include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle, MutableWrappedPtrOperations
 #include "js/Value.h"           // JS::Value, JS::BooleanValue, JS::NullValue
 #include "js/Vector.h"          // Vector
@@ -57,34 +55,24 @@ class MOZ_STACK_CLASS JSONTokenizer {
   using CharPtr = mozilla::RangedPtr<const CharT>;
 
  protected:
-  CharPtr sourceStart;
   CharPtr current;
   const CharPtr begin, end;
 
   ParserT* parser = nullptr;
 
-  JSONTokenizer(CharPtr sourceStart, CharPtr current, const CharPtr begin,
-                const CharPtr end, ParserT* parser)
-      : sourceStart(sourceStart),
-        current(current),
-        begin(begin),
-        end(end),
-        parser(parser) {
-    MOZ_ASSERT(current <= end);
-    MOZ_ASSERT(parser);
-  }
-
  public:
   JSONTokenizer(CharPtr current, const CharPtr begin, const CharPtr end,
                 ParserT* parser)
-      : JSONTokenizer(current, current, begin, end, parser) {}
+      : current(current), begin(begin), end(end), parser(parser) {
+    MOZ_ASSERT(current <= end);
+    MOZ_ASSERT(parser);
+  }
 
   explicit JSONTokenizer(mozilla::Range<const CharT> data, ParserT* parser)
       : JSONTokenizer(data.begin(), data.begin(), data.end(), parser) {}
 
   JSONTokenizer(JSONTokenizer<CharT, ParserT, StringBuilderT>&& other) noexcept
-      : JSONTokenizer(other.sourceStart, other.current, other.begin, other.end,
-                      other.parser) {}
+      : JSONTokenizer(other.current, other.begin, other.end, other.parser) {}
 
   JSONTokenizer(const JSONTokenizer<CharT, ParserT, StringBuilderT>& other) =
       delete;
@@ -129,11 +117,6 @@ class MOZ_STACK_CLASS JSONTokenizer {
   JSONToken readNumber();
 
   void error(const char* msg);
-
- protected:
-  inline mozilla::Span<const CharT> getSource() const {
-    return mozilla::Span<const CharT>(sourceStart.get(), current.get());
-  }
 };
 
 // Possible states the parser can be in between values.
@@ -167,7 +150,7 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
 
   // State for an object that is currently being parsed. This includes all
   // the key/value pairs that have been seen so far.
-  using PropertyVector = IdValueVector;
+  using PropertyVector = JS::GCVector<IdValuePair, 10>;
 
   enum class ParseType {
     // Parsing a string as if by JSON.parse.
@@ -190,10 +173,10 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
       return *static_cast<PropertyVector*>(vector);
     }
 
-    explicit StackEntry(JSContext* cx, ElementVector* elements)
+    explicit StackEntry(ElementVector* elements)
         : state(JSONParserState::FinishArrayElement), vector(elements) {}
 
-    explicit StackEntry(JSContext* cx, PropertyVector* properties)
+    explicit StackEntry(PropertyVector* properties)
         : state(JSONParserState::FinishObjectMember), vector(properties) {}
 
     JSONParserState state;
@@ -211,8 +194,6 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
 
   ParseType parseType = ParseType::JSONParse;
 
-  AutoSelectGCHeap gcHeap;
-
  private:
   // Unused element and property vectors for previous in progress arrays and
   // objects. These vectors are not freed until the end of the parse to avoid
@@ -221,11 +202,17 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
   Vector<PropertyVector*, 5> freeProperties;
 
  public:
-  explicit JSONFullParseHandlerAnyChar(JSContext* cx);
+  explicit JSONFullParseHandlerAnyChar(JSContext* cx)
+      : cx(cx), freeElements(cx), freeProperties(cx) {}
   ~JSONFullParseHandlerAnyChar();
 
   // Allow move construction for use with Rooted.
-  JSONFullParseHandlerAnyChar(JSONFullParseHandlerAnyChar&& other) noexcept;
+  JSONFullParseHandlerAnyChar(JSONFullParseHandlerAnyChar&& other) noexcept
+      : cx(other.cx),
+        v(other.v),
+        parseType(other.parseType),
+        freeElements(std::move(other.freeElements)),
+        freeProperties(std::move(other.freeProperties)) {}
 
   JSONFullParseHandlerAnyChar(const JSONFullParseHandlerAnyChar& other) =
       delete;
@@ -237,6 +224,8 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
     MOZ_ASSERT(v.isNumber());
     return v;
   }
+
+  inline void setNumberValue(double d);
 
   JS::Value stringValue() const {
     MOZ_ASSERT(v.isString());
@@ -255,12 +244,12 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
                          PropertyVector** properties);
   inline bool objectPropertyName(Vector<StackEntry, 10>& stack,
                                  bool* isProtoInEval);
-  inline bool finishObjectMember(Vector<StackEntry, 10>& stack,
+  inline void finishObjectMember(Vector<StackEntry, 10>& stack,
                                  JS::Handle<JS::Value> value,
                                  PropertyVector** properties);
   inline bool finishObject(Vector<StackEntry, 10>& stack,
                            JS::MutableHandle<JS::Value> vp,
-                           PropertyVector* properties);
+                           PropertyVector& properties);
 
   inline bool arrayOpen(Vector<StackEntry, 10>& stack,
                         ElementVector** elements);
@@ -269,7 +258,7 @@ class MOZ_STACK_CLASS JSONFullParseHandlerAnyChar {
                            ElementVector** elements);
   inline bool finishArray(Vector<StackEntry, 10>& stack,
                           JS::MutableHandle<JS::Value> vp,
-                          ElementVector* elements);
+                          ElementVector& elements);
 
   inline bool errorReturn() const {
     return parseType == ParseType::AttemptForEval;
@@ -312,111 +301,13 @@ class MOZ_STACK_CLASS JSONFullParseHandler
   void operator=(const JSONFullParseHandler& other) = delete;
 
   template <JSONStringType ST>
-  inline bool setStringValue(CharPtr start, size_t length,
-                             mozilla::Span<const CharT>&& source);
+  inline bool setStringValue(CharPtr start, size_t length);
   template <JSONStringType ST>
-  inline bool setStringValue(StringBuilder& builder,
-                             mozilla::Span<const CharT>&& source);
-  inline bool setNumberValue(double d, mozilla::Span<const CharT>&& source);
-  inline bool setBooleanValue(bool value, mozilla::Span<const CharT>&& source);
-  inline bool setNullValue(mozilla::Span<const CharT>&& source);
+  inline bool setStringValue(StringBuilder& builder);
 
-  void reportError(const char* msg, uint32_t line, uint32_t column);
+  void reportError(const char* msg, const char* lineString,
+                   const char* columnString);
 };
-
-#ifdef ENABLE_JSON_PARSE_WITH_SOURCE
-template <typename CharT>
-class MOZ_STACK_CLASS JSONReviveHandler : public JSONFullParseHandler<CharT> {
-  using CharPtr = mozilla::RangedPtr<const CharT>;
-  using Base = JSONFullParseHandler<CharT>;
-
- public:
-  using SourceT = mozilla::Span<const CharT>;
-  using ParseRecordEntry = ParseRecordObject::EntryMap;
-
-  using StringBuilder = typename Base::StringBuilder;
-  using StackEntry = typename Base::StackEntry;
-  using PropertyVector = typename Base::PropertyVector;
-  using ElementVector = typename Base::ElementVector;
-
- public:
-  explicit JSONReviveHandler(JSContext* cx) : Base(cx), parseRecordStack(cx) {}
-
-  JSONReviveHandler(JSONReviveHandler&& other) noexcept
-      : Base(std::move(other)),
-        parseRecordStack(std::move(other.parseRecordStack)),
-        parseRecord(std::move(other.parseRecord)) {}
-
-  JSONReviveHandler(const JSONReviveHandler& other) = delete;
-  void operator=(const JSONReviveHandler& other) = delete;
-
-  JSContext* context() { return this->cx; }
-
-  template <JSONStringType ST>
-  inline bool setStringValue(CharPtr start, size_t length, SourceT&& source) {
-    if (!Base::template setStringValue<ST>(start, length,
-                                           std::forward<SourceT&&>(source))) {
-      return false;
-    }
-    return finishPrimitiveParseRecord(this->v, source);
-  }
-
-  template <JSONStringType ST>
-  inline bool setStringValue(StringBuilder& builder, SourceT&& source) {
-    if (!Base::template setStringValue<ST>(builder,
-                                           std::forward<SourceT&&>(source))) {
-      return false;
-    }
-    return finishPrimitiveParseRecord(this->v, source);
-  }
-
-  inline bool setNumberValue(double d, SourceT&& source) {
-    if (!Base::setNumberValue(d, std::forward<SourceT&&>(source))) {
-      return false;
-    }
-    return finishPrimitiveParseRecord(this->v, source);
-  }
-
-  inline bool setBooleanValue(bool value, SourceT&& source) {
-    return finishPrimitiveParseRecord(JS::BooleanValue(value), source);
-  }
-  inline bool setNullValue(SourceT&& source) {
-    return finishPrimitiveParseRecord(JS::NullValue(), source);
-  }
-
-  inline bool objectOpen(Vector<StackEntry, 10>& stack,
-                         PropertyVector** properties);
-  inline bool finishObjectMember(Vector<StackEntry, 10>& stack,
-                                 JS::Handle<JS::Value> value,
-                                 PropertyVector** properties);
-  inline bool finishObject(Vector<StackEntry, 10>& stack,
-                           JS::MutableHandle<JS::Value> vp,
-                           PropertyVector* properties);
-
-  inline bool arrayOpen(Vector<StackEntry, 10>& stack,
-                        ElementVector** elements);
-  inline bool arrayElement(Vector<StackEntry, 10>& stack,
-                           JS::Handle<JS::Value> value,
-                           ElementVector** elements);
-  inline bool finishArray(Vector<StackEntry, 10>& stack,
-                          JS::MutableHandle<JS::Value> vp,
-                          ElementVector* elements);
-
-  void trace(JSTracer* trc);
-
- private:
-  inline bool finishMemberParseRecord(JS::PropertyKey& key,
-                                      ParseRecordEntry& objectEntry);
-  inline bool finishCompoundParseRecord(const Value& value,
-                                        ParseRecordEntry& objectEntry);
-  inline bool finishPrimitiveParseRecord(const Value& value, SourceT source);
-
-  Vector<ParseRecordEntry, 10> parseRecordStack;
-
- public:
-  ParseRecordObject parseRecord;
-};
-#endif  // ENABLE_JSON_PARSE_WITH_SOURCE
 
 template <typename CharT>
 class MOZ_STACK_CLASS JSONSyntaxParseHandler {
@@ -462,24 +353,16 @@ class MOZ_STACK_CLASS JSONSyntaxParseHandler {
   FrontendContext* context() { return fc; }
 
   template <JSONStringType ST>
-  inline bool setStringValue(CharPtr start, size_t length,
-                             mozilla::Span<const CharT>&& source) {
+  inline bool setStringValue(CharPtr start, size_t length) {
     return true;
   }
 
   template <JSONStringType ST>
-  inline bool setStringValue(StringBuilder& builder,
-                             mozilla::Span<const CharT>&& source) {
+  inline bool setStringValue(StringBuilder& builder) {
     return true;
   }
 
-  inline bool setNumberValue(double d, mozilla::Span<const CharT>&& source) {
-    return true;
-  }
-  inline bool setBooleanValue(bool value, mozilla::Span<const CharT>&& source) {
-    return true;
-  }
-  inline bool setNullValue(mozilla::Span<const CharT>&& source) { return true; }
+  inline void setNumberValue(double d) {}
 
   inline DummyValue numberValue() const { return DummyValue(); }
 
@@ -495,13 +378,11 @@ class MOZ_STACK_CLASS JSONSyntaxParseHandler {
     *isProtoInEval = false;
     return true;
   }
-  inline bool finishObjectMember(Vector<StackEntry, 10>& stack,
+  inline void finishObjectMember(Vector<StackEntry, 10>& stack,
                                  DummyValue& value,
-                                 PropertyVector** properties) {
-    return true;
-  }
+                                 PropertyVector** properties) {}
   inline bool finishObject(Vector<StackEntry, 10>& stack, DummyValue* vp,
-                           PropertyVector* properties);
+                           PropertyVector& properties);
 
   inline bool arrayOpen(Vector<StackEntry, 10>& stack,
                         ElementVector** elements);
@@ -510,7 +391,7 @@ class MOZ_STACK_CLASS JSONSyntaxParseHandler {
     return true;
   }
   inline bool finishArray(Vector<StackEntry, 10>& stack, DummyValue* vp,
-                          ElementVector* elements);
+                          ElementVector& elements);
 
   inline bool errorReturn() const { return false; }
 
@@ -518,7 +399,8 @@ class MOZ_STACK_CLASS JSONSyntaxParseHandler {
 
   inline void freeStackEntry(StackEntry& entry) {}
 
-  void reportError(const char* msg, uint32_t line, uint32_t column);
+  void reportError(const char* msg, const char* lineString,
+                   const char* columnString);
 };
 
 template <typename CharT, typename HandlerT>
@@ -601,49 +483,6 @@ class MOZ_STACK_CLASS JSONParser
 
   void trace(JSTracer* trc);
 };
-
-#ifdef ENABLE_JSON_PARSE_WITH_SOURCE
-template <typename CharT>
-class MOZ_STACK_CLASS JSONReviveParser
-    : JSONPerHandlerParser<CharT, JSONReviveHandler<CharT>> {
-  using Base = JSONPerHandlerParser<CharT, JSONReviveHandler<CharT>>;
-
- public:
-  using ParseType = JSONFullParseHandlerAnyChar::ParseType;
-
-  /* Public API */
-
-  /* Create a parser for the provided JSON data. */
-  JSONReviveParser(JSContext* cx, mozilla::Range<const CharT> data)
-      : Base(cx, data) {}
-
-  /* Allow move construction for use with Rooted. */
-  JSONReviveParser(JSONReviveParser&& other) noexcept
-      : Base(std::move(other)) {}
-
-  JSONReviveParser(const JSONReviveParser& other) = delete;
-  void operator=(const JSONReviveParser& other) = delete;
-
-  /*
-   * Parse the JSON data specified at construction time.  If it parses
-   * successfully, store the prescribed value in *vp and return true.  If an
-   * internal error (e.g. OOM) occurs during parsing, return false.
-   * Otherwise, if invalid input was specifed but no internal error occurred,
-   * behavior depends upon the error handling specified at construction: if
-   * error handling is RaiseError then throw a SyntaxError and return false,
-   * otherwise return true and set *vp to |undefined|.  (JSON syntax can't
-   * represent |undefined|, so the JSON data couldn't have specified it.)
-   *
-   * If it parses successfully, parse information for calling the reviver
-   * function is stored in *pro. If this function returns false, *pro will be
-   * set to |undefined|.
-   */
-  bool parse(JS::MutableHandle<JS::Value> vp,
-             JS::MutableHandle<ParseRecordObject> pro);
-
-  void trace(JSTracer* trc);
-};
-#endif  // ENABLE_JSON_PARSE_WITH_SOURCE
 
 template <typename CharT, typename Wrapper>
 class MutableWrappedPtrOperations<JSONParser<CharT>, Wrapper>

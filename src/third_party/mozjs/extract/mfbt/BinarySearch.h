@@ -8,9 +8,9 @@
 #define mozilla_BinarySearch_h
 
 #include "mozilla/Assertions.h"
+#include "mozilla/CompactPair.h"
 
 #include <stddef.h>
-#include <utility>
 
 namespace mozilla {
 
@@ -216,8 +216,9 @@ size_t UpperBound(const Container& aContainer, size_t aBegin, size_t aEnd,
 }
 
 template <typename Container, typename Comparator>
-std::pair<size_t, size_t> EqualRange(const Container& aContainer, size_t aBegin,
-                                     size_t aEnd, const Comparator& aCompare) {
+CompactPair<size_t, size_t> EqualRange(const Container& aContainer,
+                                       size_t aBegin, size_t aEnd,
+                                       const Comparator& aCompare) {
   MOZ_ASSERT(aBegin <= aEnd);
 
   size_t low = aBegin;
@@ -234,12 +235,13 @@ std::pair<size_t, size_t> EqualRange(const Container& aContainer, size_t aBegin,
     } else if (result > 0) {
       low = middle + 1;
     } else {
-      return {LowerBound(aContainer, low, middle, aCompare),
-              UpperBound(aContainer, middle + 1, high, aCompare)};
+      return MakeCompactPair(
+          LowerBound(aContainer, low, middle, aCompare),
+          UpperBound(aContainer, middle + 1, high, aCompare));
     }
   }
 
-  return {low, high};
+  return MakeCompactPair(low, high);
 }
 
 }  // namespace mozilla

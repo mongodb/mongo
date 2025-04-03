@@ -9,7 +9,7 @@
 import buildconfig
 
 is_64bit = "JS_64BIT" in buildconfig.defines
-cpu_arch = buildconfig.substs["TARGET_CPU"]
+cpu_arch = buildconfig.substs["CPU_ARCH"]
 is_gcc = buildconfig.substs["CC_TYPE"] == "gcc"
 is_windows = buildconfig.substs["OS_ARCH"] == "WINNT"
 
@@ -51,6 +51,8 @@ def gen_load(fun_name, cpp_type, size, barrier):
     # - MacroAssembler::wasmLoad
     if cpu_arch in ("x86", "x86_64"):
         insns = ""
+        if barrier:
+            insns += fmt_insn("mfence")
         if size == 8:
             insns += fmt_insn("movb (%[arg]), %[res]")
         elif size == 16:
@@ -60,6 +62,8 @@ def gen_load(fun_name, cpp_type, size, barrier):
         else:
             assert size == 64
             insns += fmt_insn("movq (%[arg]), %[res]")
+        if barrier:
+            insns += fmt_insn("mfence")
         return """
             INLINE_ATTR %(cpp_type)s %(fun_name)s(const %(cpp_type)s* arg) {
                 %(cpp_type)s res;
@@ -75,6 +79,8 @@ def gen_load(fun_name, cpp_type, size, barrier):
         }
     if cpu_arch == "aarch64":
         insns = ""
+        if barrier:
+            insns += fmt_insn("dmb ish")
         if size == 8:
             insns += fmt_insn("ldrb %w[res], [%x[arg]]")
         elif size == 16:
@@ -101,6 +107,8 @@ def gen_load(fun_name, cpp_type, size, barrier):
         }
     if cpu_arch == "arm":
         insns = ""
+        if barrier:
+            insns += fmt_insn("dmb sy")
         if size == 8:
             insns += fmt_insn("ldrb %[res], [%[arg]]")
         elif size == 16:
@@ -134,6 +142,8 @@ def gen_store(fun_name, cpp_type, size, barrier):
     # - MacroAssembler::wasmStore
     if cpu_arch in ("x86", "x86_64"):
         insns = ""
+        if barrier:
+            insns += fmt_insn("mfence")
         if size == 8:
             insns += fmt_insn("movb %[val], (%[addr])")
         elif size == 16:

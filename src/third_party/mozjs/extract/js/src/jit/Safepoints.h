@@ -46,7 +46,6 @@ class SafepointWriter {
   void writeGcSlots(LSafepoint* safepoint);
 
   void writeSlotsOrElementsSlots(LSafepoint* safepoint);
-  void writeWasmAnyRefSlots(LSafepoint* safepoint);
 
 #ifdef JS_PUNBOX64
   void writeValueSlots(LSafepoint* safepoint);
@@ -76,17 +75,14 @@ class SafepointReader {
   GeneralRegisterSet valueSpills_;
   GeneralRegisterSet slotsOrElementsSpills_;
   GeneralRegisterSet allGprSpills_;
-  GeneralRegisterSet wasmAnyRefSpills_;
   FloatRegisterSet allFloatSpills_;
   uint32_t nunboxSlotsRemaining_;
   uint32_t slotsOrElementsSlotsRemaining_;
-  uint32_t wasmAnyRefSlotsRemaining_;
 
  private:
   void advanceFromGcRegs();
   void advanceFromGcSlots();
   void advanceFromNunboxOrValueSlots();
-  void advanceFromSlotsOrElementsSlots();
   [[nodiscard]] bool getSlotFromBitmap(SafepointSlotEntry* entry);
 
  public:
@@ -101,9 +97,6 @@ class SafepointReader {
   }
   LiveGeneralRegisterSet slotsOrElementsSpills() const {
     return LiveGeneralRegisterSet(slotsOrElementsSpills_);
-  }
-  LiveGeneralRegisterSet wasmAnyRefSpills() const {
-    return LiveGeneralRegisterSet(wasmAnyRefSpills_);
   }
   LiveGeneralRegisterSet valueSpills() const {
     return LiveGeneralRegisterSet(valueSpills_);
@@ -128,9 +121,6 @@ class SafepointReader {
 
   // Returns true if a slot was read, false if there are no more slots.
   [[nodiscard]] bool getSlotsOrElementsSlot(SafepointSlotEntry* entry);
-
-  // Returns true if a slot was read, false if there are no more slots.
-  [[nodiscard]] bool getWasmAnyRefSlot(SafepointSlotEntry* entry);
 };
 
 }  // namespace jit

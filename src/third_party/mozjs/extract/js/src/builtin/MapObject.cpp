@@ -231,7 +231,7 @@ bool GlobalObject::initMapIteratorProto(JSContext* cx,
     return false;
   }
   if (!JS_DefineFunctions(cx, proto, MapIteratorObject::methods) ||
-      !DefineToStringTag(cx, proto, cx->names().Map_Iterator_)) {
+      !DefineToStringTag(cx, proto, cx->names().MapIterator)) {
     return false;
   }
   global->initBuiltinProto(ProtoKind::MapIteratorProto, proto);
@@ -271,8 +271,7 @@ MapIteratorObject* MapIteratorObject::create(JSContext* cx, HandleObject obj,
       RoundUp(sizeof(ValueMap::Range), gc::CellAlignBytes);
 
   Nursery& nursery = cx->nursery();
-  void* buffer =
-      nursery.allocateBufferSameLocation(iterobj, BufferSize, js::MallocArena);
+  void* buffer = nursery.allocateBufferSameLocation(iterobj, BufferSize);
   if (!buffer) {
     // Retry with |iterobj| and |buffer| forcibly tenured.
     iterobj = NewTenuredObjectWithGivenProto<MapIteratorObject>(cx, proto);
@@ -282,8 +281,7 @@ MapIteratorObject* MapIteratorObject::create(JSContext* cx, HandleObject obj,
 
     iterobj->init(mapobj, kind);
 
-    buffer = nursery.allocateBufferSameLocation(iterobj, BufferSize,
-                                                js::MallocArena);
+    buffer = nursery.allocateBufferSameLocation(iterobj, BufferSize);
     if (!buffer) {
       ReportOutOfMemory(cx);
       return nullptr;
@@ -333,42 +331,23 @@ size_t MapIteratorObject::objectMoved(JSObject* obj, JSObject* old) {
   Nursery& nursery = iter->runtimeFromMainThread()->gc.nursery();
   if (!nursery.isInside(range)) {
     nursery.removeMallocedBufferDuringMinorGC(range);
+    return 0;
   }
 
-  size_t size = RoundUp(sizeof(ValueMap::Range), gc::CellAlignBytes);
   AutoEnterOOMUnsafeRegion oomUnsafe;
-  void* buffer = nursery.allocateBufferSameLocation(obj, size, js::MallocArena);
-  if (!buffer) {
-    oomUnsafe.crash("MapIteratorObject::objectMoved");
+  auto newRange = iter->zone()->new_<ValueMap::Range>(*range);
+  if (!newRange) {
+    oomUnsafe.crash(
+        "MapIteratorObject failed to allocate Range data while tenuring.");
   }
 
-  bool iteratorIsInNursery = IsInsideNursery(obj);
-  MOZ_ASSERT(iteratorIsInNursery == nursery.isInside(buffer));
-  auto* newRange = new (buffer) ValueMap::Range(*range, iteratorIsInNursery);
   range->~Range();
   iter->setReservedSlot(MapIteratorObject::RangeSlot, PrivateValue(newRange));
-
-  if (iteratorIsInNursery && iter->target()) {
-    SetHasNurseryMemory(iter->target(), true);
-  }
-
-  return size;
-}
-
-MapObject* MapIteratorObject::target() const {
-  Value value = getFixedSlot(TargetSlot);
-  if (value.isUndefined()) {
-    return nullptr;
-  }
-
-  return &MaybeForwarded(&value.toObject())->as<MapObject>();
+  return sizeof(ValueMap::Range);
 }
 
 template <typename Range>
 static void DestroyRange(JSObject* iterator, Range* range) {
-  MOZ_ASSERT(IsInsideNursery(iterator) ==
-             iterator->runtimeFromMainThread()->gc.nursery().isInside(range));
-
   range->~Range();
   if (!IsInsideNursery(iterator)) {
     js_free(range);
@@ -473,12 +452,11 @@ const JSClassOps MapObject::classOps_ = {
 const ClassSpec MapObject::classSpec_ = {
     GenericCreateConstructor<MapObject::construct, 0, gc::AllocKind::FUNCTION>,
     GenericCreatePrototype<MapObject>,
-    MapObject::staticMethods,
+    nullptr,
     MapObject::staticProperties,
     MapObject::methods,
     MapObject::properties,
-    MapObject::finishInit,
-};
+    MapObject::finishInit};
 
 const JSClass MapObject::class_ = {
     "Map",
@@ -486,23 +464,17 @@ const JSClass MapObject::class_ = {
         JSCLASS_HAS_RESERVED_SLOTS(MapObject::SlotCount) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_Map) | JSCLASS_FOREGROUND_FINALIZE |
         JSCLASS_SKIP_NURSERY_FINALIZE,
-    &MapObject::classOps_,
-    &MapObject::classSpec_,
-};
+    &MapObject::classOps_, &MapObject::classSpec_};
 
 const JSClass MapObject::protoClass_ = {
-    "Map.prototype",
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Map),
-    JS_NULL_CLASS_OPS,
-    &MapObject::classSpec_,
-};
+    "Map.prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_Map), JS_NULL_CLASS_OPS,
+    &MapObject::classSpec_};
 
 const JSPropertySpec MapObject::properties[] = {
     JS_PSG("size", size, 0),
-    JS_STRING_SYM_PS(toStringTag, "Map", JSPROP_READONLY),
-    JS_PS_END,
-};
+    JS_STRING_SYM_PS(toStringTag, "Map", JSPROP_READONLY), JS_PS_END};
 
+// clang-format off
 const JSFunctionSpec MapObject::methods[] = {
     JS_INLINABLE_FN("get", get, 1, 0, MapGet),
     JS_INLINABLE_FN("has", has, 1, 0, MapHas),
@@ -516,18 +488,12 @@ const JSFunctionSpec MapObject::methods[] = {
     // @@iterator is re-defined in finishInit so that it has the
     // same identity as |entries|.
     JS_SYM_FN(iterator, entries, 0, 0),
-    JS_FS_END,
+    JS_FS_END
 };
+// clang-format on
 
 const JSPropertySpec MapObject::staticProperties[] = {
-    JS_SELF_HOSTED_SYM_GET(species, "$MapSpecies", 0),
-    JS_PS_END,
-};
-
-const JSFunctionSpec MapObject::staticMethods[] = {
-    JS_SELF_HOSTED_FN("groupBy", "MapGroupBy", 2, 0),
-    JS_FS_END,
-};
+    JS_SELF_HOSTED_SYM_GET(species, "$MapSpecies", 0), JS_PS_END};
 
 /* static */ bool MapObject::finishInit(JSContext* cx, HandleObject ctor,
                                         HandleObject proto) {
@@ -552,7 +518,7 @@ void MapObject::trace(JSTracer* trc, JSObject* obj) {
   }
 }
 
-using NurseryKeysVector = GCVector<Value, 0, SystemAllocPolicy>;
+using NurseryKeysVector = mozilla::Vector<Value, 0, SystemAllocPolicy>;
 
 template <typename TableObject>
 static NurseryKeysVector* GetNurseryKeys(TableObject* t) {
@@ -596,34 +562,17 @@ class js::OrderedHashTableRef : public gc::BufferableRef {
         reinterpret_cast<typename ObjectT::UnbarrieredTable*>(realTable);
     NurseryKeysVector* keys = GetNurseryKeys(object);
     MOZ_ASSERT(keys);
-
-    keys->mutableEraseIf([&](Value& key) {
-      MOZ_ASSERT(
-          unbarrieredTable->hash(key) ==
-          realTable->hash(*reinterpret_cast<const HashableValue*>(&key)));
-      MOZ_ASSERT(IsInsideNursery(key.toGCThing()));
-
-      auto result =
-          unbarrieredTable->rekeyOneEntry(key, [trc](const Value& prior) {
-            Value key = prior;
-            TraceManuallyBarrieredEdge(trc, &key, "ordered hash table key");
-            return key;
-          });
-
-      if (result.isNothing()) {
-        return true;  // Key removed.
-      }
-
-      key = result.value();
-      return !IsInsideNursery(key.toGCThing());
-    });
-
-    if (!keys->empty()) {
-      trc->runtime()->gc.storeBuffer().putGeneric(
-          OrderedHashTableRef<ObjectT>(object));
-      return;
+    for (Value key : *keys) {
+      MOZ_ASSERT(unbarrieredTable->hash(key) ==
+                 realTable->hash(*reinterpret_cast<HashableValue*>(&key)));
+      // Note: we use a lambda to avoid tenuring keys that have been removed
+      // from the Map or Set.
+      unbarrieredTable->rekeyOneEntry(key, [trc](const Value& prior) {
+        Value key = prior;
+        TraceManuallyBarrieredEdge(trc, &key, "ordered hash table key");
+        return key;
+      });
     }
-
     DeleteNurseryKeys(object);
   }
 };
@@ -775,8 +724,6 @@ void MapObject::finalize(JS::GCContext* gcx, JSObject* obj) {
     return;
   }
 
-  MOZ_ASSERT_IF(obj->isTenured(), !table->hasNurseryRanges());
-
   bool needsPostBarriers = obj->isTenured();
   if (needsPostBarriers) {
     // Use the ValueMap representation which has post barriers.
@@ -788,36 +735,21 @@ void MapObject::finalize(JS::GCContext* gcx, JSObject* obj) {
   }
 }
 
-void MapObject::clearNurseryRangesBeforeMinorGC() {
-  getTableUnchecked()->destroyNurseryRanges();
-  SetHasNurseryMemory(this, false);
-}
-
 /* static */
-MapObject* MapObject::sweepAfterMinorGC(JS::GCContext* gcx, MapObject* mapobj) {
-  Nursery& nursery = gcx->runtime()->gc.nursery();
-  bool wasInCollectedRegion = nursery.inCollectedRegion(mapobj);
-  if (wasInCollectedRegion && !IsForwarded(mapobj)) {
+void MapObject::sweepAfterMinorGC(JS::GCContext* gcx, MapObject* mapobj) {
+  bool wasInsideNursery = IsInsideNursery(mapobj);
+  if (wasInsideNursery && !IsForwarded(mapobj)) {
     finalize(gcx, mapobj);
-    return nullptr;
+    return;
   }
 
   mapobj = MaybeForwarded(mapobj);
+  mapobj->getTableUnchecked()->destroyNurseryRanges();
+  SetHasNurseryMemory(mapobj, false);
 
-  bool insideNursery = IsInsideNursery(mapobj);
-  if (insideNursery) {
-    SetHasNurseryMemory(mapobj, true);
-  }
-
-  if (wasInCollectedRegion && mapobj->isTenured()) {
+  if (wasInsideNursery) {
     AddCellMemory(mapobj, sizeof(ValueMap), MemoryUse::MapObjectTable);
   }
-
-  if (!HasNurseryMemory(mapobj)) {
-    return nullptr;
-  }
-
-  return mapobj;
 }
 
 bool MapObject::construct(JSContext* cx, unsigned argc, Value* vp) {
@@ -1158,7 +1090,7 @@ bool GlobalObject::initSetIteratorProto(JSContext* cx,
     return false;
   }
   if (!JS_DefineFunctions(cx, proto, SetIteratorObject::methods) ||
-      !DefineToStringTag(cx, proto, cx->names().Set_Iterator_)) {
+      !DefineToStringTag(cx, proto, cx->names().SetIterator)) {
     return false;
   }
   global->initBuiltinProto(ProtoKind::SetIteratorProto, proto);
@@ -1190,8 +1122,7 @@ SetIteratorObject* SetIteratorObject::create(JSContext* cx, HandleObject obj,
       RoundUp(sizeof(ValueSet::Range), gc::CellAlignBytes);
 
   Nursery& nursery = cx->nursery();
-  void* buffer =
-      nursery.allocateBufferSameLocation(iterobj, BufferSize, js::MallocArena);
+  void* buffer = nursery.allocateBufferSameLocation(iterobj, BufferSize);
   if (!buffer) {
     // Retry with |iterobj| and |buffer| forcibly tenured.
     iterobj = NewTenuredObjectWithGivenProto<SetIteratorObject>(cx, proto);
@@ -1201,8 +1132,7 @@ SetIteratorObject* SetIteratorObject::create(JSContext* cx, HandleObject obj,
 
     iterobj->init(setobj, kind);
 
-    buffer = nursery.allocateBufferSameLocation(iterobj, BufferSize,
-                                                js::MallocArena);
+    buffer = nursery.allocateBufferSameLocation(iterobj, BufferSize);
     if (!buffer) {
       ReportOutOfMemory(cx);
       return nullptr;
@@ -1252,36 +1182,19 @@ size_t SetIteratorObject::objectMoved(JSObject* obj, JSObject* old) {
   Nursery& nursery = iter->runtimeFromMainThread()->gc.nursery();
   if (!nursery.isInside(range)) {
     nursery.removeMallocedBufferDuringMinorGC(range);
+    return 0;
   }
 
-  size_t size = RoundUp(sizeof(ValueSet::Range), gc::CellAlignBytes);
-  ;
   AutoEnterOOMUnsafeRegion oomUnsafe;
-  void* buffer = nursery.allocateBufferSameLocation(obj, size, js::MallocArena);
-  if (!buffer) {
-    oomUnsafe.crash("SetIteratorObject::objectMoved");
+  auto newRange = iter->zone()->new_<ValueSet::Range>(*range);
+  if (!newRange) {
+    oomUnsafe.crash(
+        "SetIteratorObject failed to allocate Range data while tenuring.");
   }
 
-  bool iteratorIsInNursery = IsInsideNursery(obj);
-  MOZ_ASSERT(iteratorIsInNursery == nursery.isInside(buffer));
-  auto* newRange = new (buffer) ValueSet::Range(*range, iteratorIsInNursery);
   range->~Range();
   iter->setReservedSlot(SetIteratorObject::RangeSlot, PrivateValue(newRange));
-
-  if (iteratorIsInNursery && iter->target()) {
-    SetHasNurseryMemory(iter->target(), true);
-  }
-
-  return size;
-}
-
-SetObject* SetIteratorObject::target() const {
-  Value value = getFixedSlot(TargetSlot);
-  if (value.isUndefined()) {
-    return nullptr;
-  }
-
-  return &MaybeForwarded(&value.toObject())->as<SetObject>();
+  return sizeof(ValueSet::Range);
 }
 
 bool SetIteratorObject::next(SetIteratorObject* setIterator,
@@ -1351,8 +1264,7 @@ const ClassSpec SetObject::classSpec_ = {
     SetObject::staticProperties,
     SetObject::methods,
     SetObject::properties,
-    SetObject::finishInit,
-};
+    SetObject::finishInit};
 
 const JSClass SetObject::class_ = {
     "Set",
@@ -1365,18 +1277,14 @@ const JSClass SetObject::class_ = {
 };
 
 const JSClass SetObject::protoClass_ = {
-    "Set.prototype",
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Set),
-    JS_NULL_CLASS_OPS,
-    &SetObject::classSpec_,
-};
+    "Set.prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_Set), JS_NULL_CLASS_OPS,
+    &SetObject::classSpec_};
 
 const JSPropertySpec SetObject::properties[] = {
     JS_PSG("size", size, 0),
-    JS_STRING_SYM_PS(toStringTag, "Set", JSPROP_READONLY),
-    JS_PS_END,
-};
+    JS_STRING_SYM_PS(toStringTag, "Set", JSPROP_READONLY), JS_PS_END};
 
+// clang-format off
 const JSFunctionSpec SetObject::methods[] = {
     JS_INLINABLE_FN("has", has, 1, 0, SetHas),
     JS_FN("add", add, 1, 0),
@@ -1384,6 +1292,7 @@ const JSFunctionSpec SetObject::methods[] = {
     JS_FN("entries", entries, 0, 0),
     JS_FN("clear", clear, 0, 0),
     JS_SELF_HOSTED_FN("forEach", "SetForEach", 2, 0),
+#ifdef ENABLE_NEW_SET_METHODS
     JS_SELF_HOSTED_FN("union", "SetUnion", 1, 0),
     JS_SELF_HOSTED_FN("difference", "SetDifference", 1, 0),
     JS_SELF_HOSTED_FN("intersection", "SetIntersection", 1, 0),
@@ -1391,19 +1300,18 @@ const JSFunctionSpec SetObject::methods[] = {
     JS_SELF_HOSTED_FN("isSubsetOf", "SetIsSubsetOf", 1, 0),
     JS_SELF_HOSTED_FN("isSupersetOf", "SetIsSupersetOf", 1, 0),
     JS_SELF_HOSTED_FN("isDisjointFrom", "SetIsDisjointFrom", 1, 0),
+#endif
     JS_FN("values", values, 0, 0),
     // @@iterator and |keys| re-defined in finishInit so that they have the
     // same identity as |values|.
     JS_FN("keys", values, 0, 0),
     JS_SYM_FN(iterator, values, 0, 0),
-    JS_FS_END,
+    JS_FS_END
 };
 // clang-format on
 
 const JSPropertySpec SetObject::staticProperties[] = {
-    JS_SELF_HOSTED_SYM_GET(species, "$SetSpecies", 0),
-    JS_PS_END,
-};
+    JS_SELF_HOSTED_SYM_GET(species, "$SetSpecies", 0), JS_PS_END};
 
 /* static */ bool SetObject::finishInit(JSContext* cx, HandleObject ctor,
                                         HandleObject proto) {
@@ -1517,41 +1425,25 @@ void SetObject::finalize(JS::GCContext* gcx, JSObject* obj) {
   MOZ_ASSERT(gcx->onMainThread());
   SetObject* setobj = static_cast<SetObject*>(obj);
   if (ValueSet* set = setobj->getData()) {
-    MOZ_ASSERT_IF(obj->isTenured(), !set->hasNurseryRanges());
     gcx->delete_(obj, set, MemoryUse::MapObjectTable);
   }
 }
 
-void SetObject::clearNurseryRangesBeforeMinorGC() {
-  getTableUnchecked()->destroyNurseryRanges();
-  SetHasNurseryMemory(this, false);
-}
-
 /* static */
-SetObject* SetObject::sweepAfterMinorGC(JS::GCContext* gcx, SetObject* setobj) {
-  Nursery& nursery = gcx->runtime()->gc.nursery();
-  bool wasInCollectedRegion = nursery.inCollectedRegion(setobj);
-  if (wasInCollectedRegion && !IsForwarded(setobj)) {
+void SetObject::sweepAfterMinorGC(JS::GCContext* gcx, SetObject* setobj) {
+  bool wasInsideNursery = IsInsideNursery(setobj);
+  if (wasInsideNursery && !IsForwarded(setobj)) {
     finalize(gcx, setobj);
-    return nullptr;
+    return;
   }
 
   setobj = MaybeForwarded(setobj);
+  setobj->getData()->destroyNurseryRanges();
+  SetHasNurseryMemory(setobj, false);
 
-  bool insideNursery = IsInsideNursery(setobj);
-  if (insideNursery) {
-    SetHasNurseryMemory(setobj, true);
-  }
-
-  if (wasInCollectedRegion && setobj->isTenured()) {
+  if (wasInsideNursery) {
     AddCellMemory(setobj, sizeof(ValueSet), MemoryUse::MapObjectTable);
   }
-
-  if (!HasNurseryMemory(setobj)) {
-    return nullptr;
-  }
-
-  return setobj;
 }
 
 bool SetObject::isBuiltinAdd(HandleValue add) {
@@ -1820,33 +1712,6 @@ bool SetObject::clear(JSContext* cx, unsigned argc, Value* vp) {
   AutoJSMethodProfilerEntry pseudoFrame(cx, "Set.prototype", "clear");
   CallArgs args = CallArgsFromVp(argc, vp);
   return CallNonGenericMethod(cx, is, clear_impl, args);
-}
-
-bool SetObject::copy(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-  MOZ_ASSERT(args.length() == 1);
-  MOZ_ASSERT(SetObject::is(args[0]));
-
-  auto* result = SetObject::create(cx);
-  if (!result) {
-    return false;
-  }
-
-  ValueSet* set = result->getData();
-  MOZ_ASSERT(set);
-
-  auto* from = &args[0].toObject().as<SetObject>();
-  for (auto range = from->getData()->all(); !range.empty(); range.popFront()) {
-    HashableValue value = range.front().get();
-
-    if (!PostWriteBarrier(result, value) || !set->put(value)) {
-      ReportOutOfMemory(cx);
-      return false;
-    }
-  }
-
-  args.rval().setObject(*result);
-  return true;
 }
 
 /*** JS static utility functions ********************************************/

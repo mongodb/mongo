@@ -37,7 +37,7 @@ template <typename K, typename V>
 struct Utils {
   using KeyType = typename DataType<K>::BarrieredType;
   using ValueType = typename DataType<V>::BarrieredType;
-  using Type = WeakMap<KeyType, ValueType>;
+  typedef WeakMap<KeyType, ValueType> Type;
   using PtrType = Type*;
   static PtrType cast(void* ptr) { return static_cast<PtrType>(ptr); }
 };
@@ -88,7 +88,7 @@ bool JS::WeakMapPtr<K, V>::put(JSContext* cx, const K& key, const V& value) {
 
 template <typename K, typename V>
 V JS::WeakMapPtr<K, V>::removeValue(const K& key) {
-  using Map = typename WeakMapDetails::Utils<K, V>::Type;
+  typedef typename WeakMapDetails::Utils<K, V>::Type Map;
   using Ptr = typename Map::Ptr;
 
   MOZ_ASSERT(initialized());

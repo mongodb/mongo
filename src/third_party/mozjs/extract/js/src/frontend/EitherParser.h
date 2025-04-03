@@ -19,7 +19,6 @@
 #include <utility>
 
 #include "frontend/Parser.h"
-#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin
 
 namespace js::frontend {
 
@@ -41,7 +40,7 @@ class EitherParser final {
   }
 
   void computeLineAndColumn(uint32_t offset, uint32_t* line,
-                            JS::LimitedColumnNumberOneOrigin* column) const {
+                            uint32_t* column) const {
     return parser.match([offset, line, column](auto* parser) -> void {
       parser->tokenStream.computeLineAndColumn(offset, line, column);
     });

@@ -20,7 +20,6 @@
 #include "js/HashTable.h"
 #include "js/Id.h"  // JS::PropertyKey
 #include "js/MemoryMetrics.h"
-#include "js/Printer.h"  // js::GenericPrinter
 #include "js/RootingAPI.h"
 #include "js/UbiNode.h"
 #include "util/EnumFlags.h"
@@ -125,7 +124,6 @@ MOZ_ALWAYS_INLINE size_t JSSLOT_FREE(const JSClass* clasp) {
 
 namespace js {
 
-class JSONPrinter;
 class NativeShape;
 class Shape;
 class PropertyIteratorObject;
@@ -252,8 +250,7 @@ class BaseShape : public gc::TenuredCellWithNonGCPointer<const JSClass> {
  public:
   void finalize(JS::GCContext* gcx) {}
 
-  BaseShape(JSContext* cx, const JSClass* clasp, JS::Realm* realm,
-            TaggedProto proto);
+  BaseShape(const JSClass* clasp, JS::Realm* realm, TaggedProto proto);
 
   /* Not defined: BaseShapes must not be stack allocated. */
   ~BaseShape() = delete;
@@ -301,15 +298,6 @@ class BaseShape : public gc::TenuredCellWithNonGCPointer<const JSClass> {
     static_assert(sizeof(BaseShape) == 4 * sizeof(void*));
 #endif
   }
-
- public:
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dump() const;
-  void dump(js::GenericPrinter& out) const;
-  void dump(js::JSONPrinter& json) const;
-
-  void dumpFields(js::JSONPrinter& json) const;
-#endif
 };
 
 class Shape : public gc::CellWithTenuredGCPointer<gc::TenuredCell, BaseShape> {
@@ -438,13 +426,9 @@ class Shape : public gc::CellWithTenuredGCPointer<gc::TenuredCell, BaseShape> {
   inline const DictionaryShape& asDictionary() const;
   inline const WasmGCShape& asWasmGC() const;
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dump() const;
+#ifdef DEBUG
   void dump(js::GenericPrinter& out) const;
-  void dump(js::JSONPrinter& json) const;
-
-  void dumpFields(js::JSONPrinter& json) const;
-  void dumpStringContent(js::GenericPrinter& out) const;
+  void dump() const;
 #endif
 
   inline void purgeCache(JS::GCContext* gcx);

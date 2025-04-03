@@ -11,8 +11,6 @@
 
 #include "gc/Pretenuring.h"
 #include "js/TypeDecls.h"
-#include "vm/Realm.h"
-#include "vm/RealmFuses.h"
 
 struct JSAtomState;
 
@@ -86,9 +84,6 @@ class CompileRuntime {
   const void* addressOfStringToAtomCache();
   const void* addressOfLastBufferedWholeCell();
 
-  bool hasSeenObjectEmulateUndefinedFuseIntact();
-  const void* addressOfHasSeenObjectEmulateUndefinedFuse();
-
 #ifdef DEBUG
   const void* addressOfIonBailAfterCounter();
 #endif
@@ -99,16 +94,12 @@ class CompileRuntime {
   bool runtimeMatches(JSRuntime* rt);
 };
 
-class JitZone;
-
 class CompileZone {
   friend class MacroAssembler;
   JS::Zone* zone();
 
  public:
   static CompileZone* get(JS::Zone* zone);
-
-  const JitZone* jitZone();
 
   CompileRuntime* runtime();
   bool isAtomsZone();
@@ -128,9 +119,9 @@ class CompileZone {
 
   gc::AllocSite* catchAllAllocSite(JS::TraceKind traceKind,
                                    gc::CatchAllAllocSite siteKind);
-
-  bool hasRealmWithAllocMetadataBuilder();
 };
+
+class JitRealm;
 
 class CompileRealm {
   JS::Realm* realm();
@@ -143,13 +134,15 @@ class CompileRealm {
 
   const void* realmPtr() { return realm(); }
 
-  RealmFuses& realmFuses() { return realm()->realmFuses; }
-
   const mozilla::non_crypto::XorShift128PlusRNG*
   addressOfRandomNumberGenerator();
 
+  const JitRealm* jitRealm();
+
   const GlobalObject* maybeGlobal();
   const uint32_t* addressOfGlobalWriteBarriered();
+
+  bool hasAllocationMetadataBuilder();
 };
 
 class JitCompileOptions {

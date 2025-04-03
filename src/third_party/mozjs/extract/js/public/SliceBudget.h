@@ -50,30 +50,6 @@ class JS_PUBLIC_API SliceBudget {
  public:
   using InterruptRequestFlag = mozilla::Atomic<bool, mozilla::Relaxed>;
 
- private:
-  static constexpr int64_t UnlimitedCounter = INT64_MAX;
-
-  // Most calls to isOverBudget will only check the counter value. Every N
-  // steps, do a more "expensive" check -- look at the current time and/or
-  // check the atomic interrupt flag.
-  static constexpr int64_t StepsPerExpensiveCheck = 1000;
-
-  // How many steps to count before checking the time and possibly the interrupt
-  // flag.
-  int64_t counter = StepsPerExpensiveCheck;
-
-  // External flag to request the current slice to be interrupted
-  // (and return isOverBudget() early.) Applies only to time-based budgets.
-  InterruptRequestFlag* interruptRequested = nullptr;
-
-  // Configuration
-  mozilla::Variant<TimeBudget, WorkBudget, UnlimitedBudget> budget;
-
-  // This SliceBudget is considered interrupted from the time isOverBudget()
-  // finds the interrupt flag set.
-  bool interrupted = false;
-
- public:
   // Whether this slice is running in (predicted to be) idle time.
   // Only used for recording in the profile.
   bool idle = false;
@@ -83,10 +59,33 @@ class JS_PUBLIC_API SliceBudget {
   bool extended = false;
 
  private:
+  static const intptr_t UnlimitedCounter = INTPTR_MAX;
+
+  // Most calls to isOverBudget will only check the counter value. Every N
+  // steps, do a more "expensive" check -- look at the current time and/or
+  // check the atomic interrupt flag.
+  static constexpr intptr_t StepsPerExpensiveCheck = 1000;
+
+  // Configuration
+
+  mozilla::Variant<TimeBudget, WorkBudget, UnlimitedBudget> budget;
+
+  // External flag to request the current slice to be interrupted
+  // (and return isOverBudget() early.) Applies only to time-based budgets.
+  InterruptRequestFlag* interruptRequested = nullptr;
+
+  // How many steps to count before checking the time and possibly the interrupt
+  // flag.
+  int64_t counter = StepsPerExpensiveCheck;
+
+  // This SliceBudget is considered interrupted from the time isOverBudget()
+  // finds the interrupt flag set.
+  bool interrupted = false;
+
   explicit SliceBudget(InterruptRequestFlag* irqPtr)
-      : counter(irqPtr ? StepsPerExpensiveCheck : UnlimitedCounter),
+      : budget(UnlimitedBudget()),
         interruptRequested(irqPtr),
-        budget(UnlimitedBudget()) {}
+        counter(irqPtr ? StepsPerExpensiveCheck : UnlimitedCounter) {}
 
   bool checkOverBudget();
 
@@ -112,11 +111,11 @@ class JS_PUBLIC_API SliceBudget {
     counter -= steps;
   }
 
-  // Force an "expensive" (time) check on the next call to isOverBudget. Useful
-  // when switching between major phases of an operation like a cycle
-  // collection.
-  void forceCheck() {
-    if (isTimeBudget()) {
+  // Do enough steps to force an "expensive" (time and/or callback) check on
+  // the next call to isOverBudget. Useful when switching between major phases
+  // of an operation like a cycle collection.
+  void stepAndForceCheck() {
+    if (!isUnlimited()) {
       counter = 0;
     }
   }

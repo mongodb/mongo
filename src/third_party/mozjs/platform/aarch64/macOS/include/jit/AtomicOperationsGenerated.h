@@ -18,7 +18,8 @@ namespace jit {
             }
             inline uint8_t AtomicLoad8SeqCst(const uint8_t* arg) {
                 uint8_t res;
-                asm volatile ("ldrb %w[res], [%x[arg]]\n\t"
+                asm volatile ("dmb ish\n\t"
+"ldrb %w[res], [%x[arg]]\n\t"
 "dmb ish\n\t"
 
                     : [res] "=r" (res)
@@ -28,7 +29,8 @@ namespace jit {
             }
             inline uint16_t AtomicLoad16SeqCst(const uint16_t* arg) {
                 uint16_t res;
-                asm volatile ("ldrh %w[res], [%x[arg]]\n\t"
+                asm volatile ("dmb ish\n\t"
+"ldrh %w[res], [%x[arg]]\n\t"
 "dmb ish\n\t"
 
                     : [res] "=r" (res)
@@ -38,7 +40,8 @@ namespace jit {
             }
             inline uint32_t AtomicLoad32SeqCst(const uint32_t* arg) {
                 uint32_t res;
-                asm volatile ("ldr %w[res], [%x[arg]]\n\t"
+                asm volatile ("dmb ish\n\t"
+"ldr %w[res], [%x[arg]]\n\t"
 "dmb ish\n\t"
 
                     : [res] "=r" (res)
@@ -48,7 +51,8 @@ namespace jit {
             }
             inline uint64_t AtomicLoad64SeqCst(const uint64_t* arg) {
                 uint64_t res;
-                asm volatile ("ldr %x[res], [%x[arg]]\n\t"
+                asm volatile ("dmb ish\n\t"
+"ldr %x[res], [%x[arg]]\n\t"
 "dmb ish\n\t"
 
                     : [res] "=r" (res)

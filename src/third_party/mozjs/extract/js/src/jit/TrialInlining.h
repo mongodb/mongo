@@ -18,6 +18,7 @@
 
 #include "gc/Barrier.h"
 #include "jit/CacheIR.h"
+#include "jit/ICStubSpace.h"
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 #include "js/UniquePtr.h"
@@ -67,7 +68,6 @@ class ICCacheIRStub;
 class ICEntry;
 class ICFallbackStub;
 class ICScript;
-class ICStubSpace;
 
 /*
  * An InliningRoot is owned by a JitScript. In turn, it owns the set
@@ -80,14 +80,16 @@ class InliningRoot {
         inlinedScripts_(cx),
         totalBytecodeSize_(owningScript->length()) {}
 
+  JitScriptICStubSpace* jitScriptStubSpace() { return &jitScriptStubSpace_; }
+
   void trace(JSTracer* trc);
-  bool traceWeak(JSTracer* trc);
 
   bool addInlinedScript(js::UniquePtr<ICScript> icScript);
 
   uint32_t numInlinedScripts() const { return inlinedScripts_.length(); }
 
-  void purgeInactiveICScripts();
+  void purgeOptimizedStubs(Zone* zone);
+  void resetWarmUpCounts(uint32_t count);
 
   JSScript* owningScript() const { return owningScript_; }
 
@@ -95,14 +97,8 @@ class InliningRoot {
 
   void addToTotalBytecodeSize(size_t size) { totalBytecodeSize_ += size; }
 
-  template <typename F>
-  void forEachInlinedScript(const F& f) const {
-    for (auto& script : inlinedScripts_) {
-      f(script.get());
-    }
-  }
-
  private:
+  JitScriptICStubSpace jitScriptStubSpace_ = {};
   HeapPtr<JSScript*> owningScript_;
   js::Vector<js::UniquePtr<ICScript>> inlinedScripts_;
 
@@ -168,8 +164,6 @@ class MOZ_RAII TrialInliner {
 
   static bool canInline(JSFunction* target, HandleScript caller,
                         BytecodeLocation loc);
-
-  static bool IsValidInliningOp(JSOp op);
 
  private:
   ICCacheIRStub* maybeSingleStub(const ICEntry& entry);

@@ -5,8 +5,6 @@
 /* Portions Copyright Norbert Lindenberg 2011-2012. */
 
 /**
- * 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
- *
  * Compute an internal properties object from |lazyDateTimeFormatData|.
  */
 function resolveDateTimeFormatInternals(lazyDateTimeFormatData) {
@@ -28,9 +26,9 @@ function resolveDateTimeFormatInternals(lazyDateTimeFormatData) {
   //         hc: "h11" / "h12" / "h23" / "h24", // optional
   //       }
   //
-  //     timeZone: IANA time zone name or a normalized time zone offset string,
+  //     timeZone: IANA time zone name,
   //
-  //     formatOptions: // *second* opt computed in InitializeDateTimeFormat
+  //     formatOpt: // *second* opt computed in InitializeDateTimeFormat
   //       {
   //         // all the properties/values listed in Table 3
   //         // (weekday, era, year, month, day, &c.)
@@ -58,10 +56,10 @@ function resolveDateTimeFormatInternals(lazyDateTimeFormatData) {
 
   // Compute effective locale.
 
-  // Step 17.
+  // Step 10.
   var localeData = DateTimeFormat.localeData;
 
-  // Step 18.
+  // Step 11.
   var r = ResolveLocale(
     "DateTimeFormat",
     lazyDateTimeFormatData.requestedLocales,
@@ -70,51 +68,50 @@ function resolveDateTimeFormatInternals(lazyDateTimeFormatData) {
     localeData
   );
 
-  // Steps 19-22.
+  // Steps 12-13, 15.
   internalProps.locale = r.locale;
   internalProps.calendar = r.ca;
   internalProps.numberingSystem = r.nu;
 
-  // Step 34. (Reordered)
-  var formatOptions = lazyDateTimeFormatData.formatOptions;
+  // Step 20.
+  internalProps.timeZone = lazyDateTimeFormatData.timeZone;
 
-  // Steps 23-29.
-  //
+  // Step 21.
+  var formatOpt = lazyDateTimeFormatData.formatOpt;
+
+  // Step 14.
   // Copy the hourCycle setting, if present, to the format options. But
   // only do this if no hour12 option is present, because the latter takes
   // precedence over hourCycle.
-  if (r.hc !== null && formatOptions.hour12 === undefined) {
-    formatOptions.hourCycle = r.hc;
+  if (r.hc !== null && formatOpt.hour12 === undefined) {
+    formatOpt.hourCycle = r.hc;
   }
 
-  // Step 33.
-  internalProps.timeZone = lazyDateTimeFormatData.timeZone;
-
-  // Steps 45-50, more or less.
+  // Steps 26-31, more or less - see comment after this function.
   if (lazyDateTimeFormatData.patternOption !== undefined) {
     internalProps.pattern = lazyDateTimeFormatData.patternOption;
   } else if (
     lazyDateTimeFormatData.dateStyle !== undefined ||
     lazyDateTimeFormatData.timeStyle !== undefined
   ) {
-    internalProps.hourCycle = formatOptions.hourCycle;
-    internalProps.hour12 = formatOptions.hour12;
+    internalProps.hourCycle = formatOpt.hourCycle;
+    internalProps.hour12 = formatOpt.hour12;
     internalProps.dateStyle = lazyDateTimeFormatData.dateStyle;
     internalProps.timeStyle = lazyDateTimeFormatData.timeStyle;
   } else {
-    internalProps.hourCycle = formatOptions.hourCycle;
-    internalProps.hour12 = formatOptions.hour12;
-    internalProps.weekday = formatOptions.weekday;
-    internalProps.era = formatOptions.era;
-    internalProps.year = formatOptions.year;
-    internalProps.month = formatOptions.month;
-    internalProps.day = formatOptions.day;
-    internalProps.dayPeriod = formatOptions.dayPeriod;
-    internalProps.hour = formatOptions.hour;
-    internalProps.minute = formatOptions.minute;
-    internalProps.second = formatOptions.second;
-    internalProps.fractionalSecondDigits = formatOptions.fractionalSecondDigits;
-    internalProps.timeZoneName = formatOptions.timeZoneName;
+    internalProps.hourCycle = formatOpt.hourCycle;
+    internalProps.hour12 = formatOpt.hour12;
+    internalProps.weekday = formatOpt.weekday;
+    internalProps.era = formatOpt.era;
+    internalProps.year = formatOpt.year;
+    internalProps.month = formatOpt.month;
+    internalProps.day = formatOpt.day;
+    internalProps.dayPeriod = formatOpt.dayPeriod;
+    internalProps.hour = formatOpt.hour;
+    internalProps.minute = formatOpt.minute;
+    internalProps.second = formatOpt.second;
+    internalProps.fractionalSecondDigits = formatOpt.fractionalSecondDigits;
+    internalProps.timeZoneName = formatOpt.timeZoneName;
   }
 
   // The caller is responsible for associating |internalProps| with the right
@@ -228,7 +225,7 @@ function DefaultTimeZone() {
     // Before defaulting to "UTC", try to represent the default time zone
     // using the Etc/GMT + offset format. This format only accepts full
     // hour offsets.
-    var msPerHour = 60 * 60 * 1000;
+    const msPerHour = 60 * 60 * 1000;
     var offset = intl_defaultTimeZoneOffset();
     assert(
       offset === (offset | 0),
@@ -262,168 +259,6 @@ function DefaultTimeZone() {
 }
 
 /**
- * 21.4.1.33.1 IsTimeZoneOffsetString ( offsetString )
- * 21.4.1.33.2 ParseTimeZoneOffsetString ( offsetString )
- * 11.1.3 FormatOffsetTimeZoneIdentifier ( offsetMinutes )
- *
- * Function to parse, validate, and normalize time zone offset strings.
- *
- * ES2024 draft rev 10d44bfce4640894a0ed366bb769f2700cc8839a
- * ES2024 Intl draft rev 2f002b2000bf8b908efb793767bcfd23620e06db
- */
-function TimeZoneOffsetString(offsetString) {
-  assert(typeof(offsetString) === "string", "offsetString is a string");
-
-  // UTCOffset :::
-  //   TemporalSign Hour
-  //   TemporalSign Hour HourSubcomponents[+Extended]
-  //   TemporalSign Hour HourSubcomponents[~Extended]
-  //
-  // TemporalSign :::
-  //   ASCIISign
-  //   <MINUS>
-  //
-  // With <MINUS> = U+2212
-  //
-  // ASCIISign ::: one of
-  //   + -
-  //
-  // Hour :::
-  //   0 DecimalDigit
-  //   1 DecimalDigit
-  //   20
-  //   21
-  //   22
-  //   23
-  //
-  // HourSubcomponents[Extended] :::
-  //   TimeSeparator[?Extended] MinuteSecond
-  //
-  // TimeSeparator[Extended] :::
-  //   [+Extended] :
-  //   [~Extended] [empty]
-  //
-  // MinuteSecond :::
-  //   0 DecimalDigit
-  //   1 DecimalDigit
-  //   2 DecimalDigit
-  //   3 DecimalDigit
-  //   4 DecimalDigit
-  //   5 DecimalDigit
-
-  // Return if there are too few or too many characters for an offset string.
-  if (offsetString.length < 3 || offsetString.length > 6) {
-    return null;
-  }
-
-  // Self-hosted code only supports Latin-1 permanent atoms, so the Unicode <MINUS>
-  // can't be used in a string literal "\u2212". That means the first character has
-  // to be checked using the character code instead of performing a normal string
-  // comparison. Alternatively <MINUS> could be generated at runtime through
-  // |std_String_fromCharCode(0x2212)|, but that means allocating a string just for
-  // the comparison. And for consistency also check the remaining characters through
-  // their character code.
-
-  #define PLUS_SIGN 0x2b
-  #define HYPHEN_MINUS 0x2d
-  #define MINUS 0x2212
-  #define COLON 0x3a
-  #define DIGIT_ZERO 0x30
-  #define DIGIT_TWO 0x32
-  #define DIGIT_THREE 0x33
-  #define DIGIT_FIVE 0x35
-  #define DIGIT_NINE 0x39
-
-  /* global PLUS_SIGN, HYPHEN_MINUS, MINUS, COLON */
-  /* global DIGIT_ZERO, DIGIT_TWO, DIGIT_THREE, DIGIT_FIVE, DIGIT_NINE */
-
-  // The first character must match |TemporalSign|.
-  var sign = callFunction(std_String_charCodeAt, offsetString, 0);
-  if (sign !== PLUS_SIGN && sign !== HYPHEN_MINUS && sign !== MINUS) {
-    return null;
-  }
-
-  // Read the next two characters for the |Hour| grammar production.
-  var hourTens = callFunction(std_String_charCodeAt, offsetString, 1);
-  var hourOnes = callFunction(std_String_charCodeAt, offsetString, 2);
-
-  // Read the remaining characters for the optional |MinuteSecond| grammar production.
-  var minutesTens = DIGIT_ZERO;
-  var minutesOnes = DIGIT_ZERO;
-  if (offsetString.length > 3) {
-    // |TimeSeparator| is optional.
-    var separatorLength = offsetString[3] === ":" ? 1 : 0;
-
-    // Return if there are too many characters for an offset string.
-    if (offsetString.length !== (5 + separatorLength)) {
-      return null;
-    }
-
-    minutesTens = callFunction(
-      std_String_charCodeAt,
-      offsetString,
-      3 + separatorLength,
-    );
-    minutesOnes = callFunction(
-      std_String_charCodeAt,
-      offsetString,
-      4 + separatorLength,
-    );
-  }
-
-  // Validate the characters match the |Hour| and |MinuteSecond| productions:
-  // - hours must be in the range 0..23
-  // - minutes must in the range 0..59
-  if (
-    hourTens < DIGIT_ZERO ||
-    hourOnes < DIGIT_ZERO ||
-    minutesTens < DIGIT_ZERO ||
-    minutesOnes < DIGIT_ZERO ||
-    hourTens > DIGIT_TWO ||
-    hourOnes > DIGIT_NINE ||
-    minutesTens > DIGIT_FIVE ||
-    minutesOnes > DIGIT_NINE ||
-    (hourTens === DIGIT_TWO && hourOnes > DIGIT_THREE)
-  ) {
-    return null;
-  }
-
-  // FormatOffsetTimeZoneIdentifier, steps 1-5.
-  if (
-    hourTens === DIGIT_ZERO &&
-    hourOnes === DIGIT_ZERO &&
-    minutesTens === DIGIT_ZERO &&
-    minutesOnes === DIGIT_ZERO
-  ) {
-    sign = PLUS_SIGN;
-  } else if (sign === MINUS) {
-    sign = HYPHEN_MINUS;
-  }
-
-  return std_String_fromCharCode(
-    sign,
-    hourTens,
-    hourOnes,
-    COLON,
-    minutesTens,
-    minutesOnes,
-  );
-
-  #undef PLUS_SIGN
-  #undef HYPHEN_MINUS
-  #undef MINUS
-  #undef COLON
-  #undef DIGIT_ZERO
-  #undef DIGIT_TWO
-  #undef DIGIT_THREE
-  #undef DIGIT_FIVE
-  #undef DIGIT_NINE
-}
-
-/* eslint-disable complexity */
-/**
- * 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
- *
  * Initializes an object as a DateTimeFormat.
  *
  * This method is complicated a moderate bit by its implementing initialization
@@ -431,14 +266,14 @@ function TimeZoneOffsetString(offsetString) {
  * all the work we can until the object is actually used as a DateTimeFormat.
  * This later work occurs in |resolveDateTimeFormatInternals|; steps not noted
  * here occur there.
+ *
+ * Spec: ECMAScript Internationalization API Specification, 12.1.1.
  */
 function InitializeDateTimeFormat(
   dateTimeFormat,
   thisValue,
   locales,
   options,
-  required,
-  defaults,
   mozExtensions
 ) {
   assert(
@@ -448,14 +283,6 @@ function InitializeDateTimeFormat(
   assert(
     intl_GuardToDateTimeFormat(dateTimeFormat) !== null,
     "InitializeDateTimeFormat called with non-DateTimeFormat"
-  );
-  assert(
-    required === "date" || required === "time" || required === "any",
-    `InitializeDateTimeFormat called with invalid required value: ${required}`
-  );
-  assert(
-    defaults === "date" || defaults === "time" || defaults === "all",
-    `InitializeDateTimeFormat called with invalid defaults value: ${defaults}`
   );
 
   // Lazy DateTimeFormat data has the following structure:
@@ -474,9 +301,9 @@ function InitializeDateTimeFormat(
   //         hc: "h11" / "h12" / "h23" / "h24", // optional
   //       }
   //
-  //     timeZone: IANA time zone name or a normalized time zone offset string,
+  //     timeZone: IANA time zone name,
   //
-  //     formatOptions: // *second* opt computed in InitializeDateTimeFormat
+  //     formatOpt: // *second* opt computed in InitializeDateTimeFormat
   //       {
   //         // all the properties/values listed in Table 3
   //         // (weekday, era, year, month, day, &c.)
@@ -492,25 +319,19 @@ function InitializeDateTimeFormat(
   // never a subset of them.
   var lazyDateTimeFormatData = std_Object_create(null);
 
-  // Step 1. (Performed in caller)
-
-  // Step 2.
+  // Step 1.
   var requestedLocales = CanonicalizeLocaleList(locales);
   lazyDateTimeFormatData.requestedLocales = requestedLocales;
 
-  // Step 3. (Inlined call to CoerceOptionsToObject.)
-  if (options === undefined) {
-    options = std_Object_create(null);
-  } else {
-    options = ToObject(options);
-  }
+  // Step 2.
+  options = ToDateTimeOptions(options, "any", "date");
 
   // Compute options that impact interpretation of locale.
-  // Step 4.
+  // Step 3.
   var localeOpt = new_Record();
   lazyDateTimeFormatData.localeOpt = localeOpt;
 
-  // Steps 5-6.
+  // Steps 4-5.
   var localeMatcher = GetOption(
     options,
     "localeMatcher",
@@ -520,10 +341,8 @@ function InitializeDateTimeFormat(
   );
   localeOpt.localeMatcher = localeMatcher;
 
-  // Step 7.
   var calendar = GetOption(options, "calendar", "string", undefined, undefined);
 
-  // Step 8.
   if (calendar !== undefined) {
     calendar = intl_ValidateAndCanonicalizeUnicodeExtensionType(
       calendar,
@@ -532,10 +351,8 @@ function InitializeDateTimeFormat(
     );
   }
 
-  // Step 9.
   localeOpt.ca = calendar;
 
-  // Step 10.
   var numberingSystem = GetOption(
     options,
     "numberingSystem",
@@ -544,7 +361,6 @@ function InitializeDateTimeFormat(
     undefined
   );
 
-  // Step 11.
   if (numberingSystem !== undefined) {
     numberingSystem = intl_ValidateAndCanonicalizeUnicodeExtensionType(
       numberingSystem,
@@ -553,14 +369,13 @@ function InitializeDateTimeFormat(
     );
   }
 
-  // Step 12.
   localeOpt.nu = numberingSystem;
 
-  // Step 13.
-  var hour12 = GetOption(options, "hour12", "boolean", undefined, undefined);
+  // Step 6.
+  var hr12 = GetOption(options, "hour12", "boolean", undefined, undefined);
 
-  // Step 14.
-  var hourCycle = GetOption(
+  // Step 7.
+  var hc = GetOption(
     options,
     "hourCycle",
     "string",
@@ -568,142 +383,119 @@ function InitializeDateTimeFormat(
     undefined
   );
 
-  // Step 15.
-  if (hour12 !== undefined) {
+  // Step 8.
+  if (hr12 !== undefined) {
     // The "hourCycle" option is ignored if "hr12" is also present.
-    hourCycle = null;
+    hc = null;
   }
 
-  // Step 16.
-  localeOpt.hc = hourCycle;
+  // Step 9.
+  localeOpt.hc = hc;
 
-  // Steps 17-29 (see resolveDateTimeFormatInternals).
+  // Steps 10-16 (see resolveDateTimeFormatInternals).
 
-  // Step 29.
-  var timeZone = options.timeZone;
+  // Steps 17-20.
+  var tz = options.timeZone;
+  if (tz !== undefined) {
+    // Step 18.a.
+    tz = ToString(tz);
 
-  // Steps 30-34.
-  if (timeZone === undefined) {
-    // Step 30.a.
-    timeZone = DefaultTimeZone();
-
-    // Steps 32-34. (Not applicable in our implementation.)
-  } else {
-    // Step 31.a.
-    timeZone = ToString(timeZone);
-
-    // Steps 32-34.
-    var offsetString = TimeZoneOffsetString(timeZone);
-    if (offsetString !== null) {
-      // Steps 32.a-g. (Performed in TimeZoneOffsetString in our implementation.)
-      timeZone = offsetString;
-    } else {
-      // Steps 33-34.
-      var validTimeZone = intl_IsValidTimeZoneName(timeZone);
-      if (validTimeZone !== null) {
-        // Step 33.a.
-        timeZone = CanonicalizeTimeZoneName(validTimeZone);
-      } else {
-        // Step 34.a.
-        ThrowRangeError(JSMSG_INVALID_TIME_ZONE, timeZone);
-      }
+    // Step 18.b.
+    var timeZone = intl_IsValidTimeZoneName(tz);
+    if (timeZone === null) {
+      ThrowRangeError(JSMSG_INVALID_TIME_ZONE, tz);
     }
+
+    // Step 18.c.
+    tz = CanonicalizeTimeZoneName(timeZone);
+  } else {
+    // Step 19.
+    tz = DefaultTimeZone();
   }
+  lazyDateTimeFormatData.timeZone = tz;
 
-  // Step 33.
-  lazyDateTimeFormatData.timeZone = timeZone;
-
-  // Step 34.
-  var formatOptions = new_Record();
-  lazyDateTimeFormatData.formatOptions = formatOptions;
+  // Step 21.
+  var formatOpt = new_Record();
+  lazyDateTimeFormatData.formatOpt = formatOpt;
 
   if (mozExtensions) {
-    var pattern = GetOption(options, "pattern", "string", undefined, undefined);
+    let pattern = GetOption(options, "pattern", "string", undefined, undefined);
     lazyDateTimeFormatData.patternOption = pattern;
   }
 
-  // Step 35.
-  //
-  // Pass hr12 on to ICU. The hour cycle option is passed through |localeOpt|.
-  if (hour12 !== undefined) {
-    formatOptions.hour12 = hour12;
-  }
-
-  // Step 36. (Explicit format component computed in step 43.)
-
-  // Step 37.
-  // 11.5, Table 7: Components of date and time formats.
-  formatOptions.weekday = GetOption(
+  // Step 22.
+  // 12.1, Table 5: Components of date and time formats.
+  formatOpt.weekday = GetOption(
     options,
     "weekday",
     "string",
     ["narrow", "short", "long"],
     undefined
   );
-  formatOptions.era = GetOption(
+  formatOpt.era = GetOption(
     options,
     "era",
     "string",
     ["narrow", "short", "long"],
     undefined
   );
-  formatOptions.year = GetOption(
+  formatOpt.year = GetOption(
     options,
     "year",
     "string",
     ["2-digit", "numeric"],
     undefined
   );
-  formatOptions.month = GetOption(
+  formatOpt.month = GetOption(
     options,
     "month",
     "string",
     ["2-digit", "numeric", "narrow", "short", "long"],
     undefined
   );
-  formatOptions.day = GetOption(
+  formatOpt.day = GetOption(
     options,
     "day",
     "string",
     ["2-digit", "numeric"],
     undefined
   );
-  formatOptions.dayPeriod = GetOption(
+  formatOpt.dayPeriod = GetOption(
     options,
     "dayPeriod",
     "string",
     ["narrow", "short", "long"],
     undefined
   );
-  formatOptions.hour = GetOption(
+  formatOpt.hour = GetOption(
     options,
     "hour",
     "string",
     ["2-digit", "numeric"],
     undefined
   );
-  formatOptions.minute = GetOption(
+  formatOpt.minute = GetOption(
     options,
     "minute",
     "string",
     ["2-digit", "numeric"],
     undefined
   );
-  formatOptions.second = GetOption(
+  formatOpt.second = GetOption(
     options,
     "second",
     "string",
     ["2-digit", "numeric"],
     undefined
   );
-  formatOptions.fractionalSecondDigits = GetNumberOption(
+  formatOpt.fractionalSecondDigits = GetNumberOption(
     options,
     "fractionalSecondDigits",
     1,
     3,
     undefined
   );
-  formatOptions.timeZoneName = GetOption(
+  formatOpt.timeZoneName = GetOption(
     options,
     "timeZoneName",
     "string",
@@ -718,7 +510,9 @@ function InitializeDateTimeFormat(
     undefined
   );
 
-  // Step 38.
+  // Steps 23-24 provided by ICU - see comment after this function.
+
+  // Step 25.
   //
   // For some reason (ICU not exposing enough interface?) we drop the
   // requested format matcher on the floor after this.  In any case, even if
@@ -733,7 +527,8 @@ function InitializeDateTimeFormat(
   );
   void formatMatcher;
 
-  // Steps 39-40.
+  // "DateTimeFormat dateStyle & timeStyle" propsal
+  // https://github.com/tc39/proposal-intl-datetime-style
   var dateStyle = GetOption(
     options,
     "dateStyle",
@@ -743,7 +538,6 @@ function InitializeDateTimeFormat(
   );
   lazyDateTimeFormatData.dateStyle = dateStyle;
 
-  // Steps 41-42.
   var timeStyle = GetOption(
     options,
     "timeStyle",
@@ -753,104 +547,43 @@ function InitializeDateTimeFormat(
   );
   lazyDateTimeFormatData.timeStyle = timeStyle;
 
-  // Step 43.
   if (dateStyle !== undefined || timeStyle !== undefined) {
-    /* eslint-disable no-nested-ternary */
-    var explicitFormatComponent =
-      formatOptions.weekday !== undefined
-        ? "weekday"
-        : formatOptions.era !== undefined
-        ? "era"
-        : formatOptions.year !== undefined
-        ? "year"
-        : formatOptions.month !== undefined
-        ? "month"
-        : formatOptions.day !== undefined
-        ? "day"
-        : formatOptions.dayPeriod !== undefined
-        ? "dayPeriod"
-        : formatOptions.hour !== undefined
-        ? "hour"
-        : formatOptions.minute !== undefined
-        ? "minute"
-        : formatOptions.second !== undefined
-        ? "second"
-        : formatOptions.fractionalSecondDigits !== undefined
-        ? "fractionalSecondDigits"
-        : formatOptions.timeZoneName !== undefined
-        ? "timeZoneName"
-        : undefined;
-    /* eslint-enable no-nested-ternary */
+    var optionsList = [
+      "weekday",
+      "era",
+      "year",
+      "month",
+      "day",
+      "dayPeriod",
+      "hour",
+      "minute",
+      "second",
+      "fractionalSecondDigits",
+      "timeZoneName",
+    ];
 
-    // Step 43.a.
-    if (explicitFormatComponent !== undefined) {
-      ThrowTypeError(
-        JSMSG_INVALID_DATETIME_OPTION,
-        explicitFormatComponent,
-        dateStyle !== undefined ? "dateStyle" : "timeStyle"
-      );
+    for (var i = 0; i < optionsList.length; i++) {
+      var option = optionsList[i];
+      if (formatOpt[option] !== undefined) {
+        ThrowTypeError(
+          JSMSG_INVALID_DATETIME_OPTION,
+          option,
+          dateStyle !== undefined ? "dateStyle" : "timeStyle"
+        );
+      }
     }
-
-    // Step 43.b.
-    if (required === "date" && timeStyle !== undefined) {
-      ThrowTypeError(
-        JSMSG_INVALID_DATETIME_STYLE,
-        "timeStyle",
-        "toLocaleDateString"
-      );
-    }
-
-    // Step 43.c.
-    if (required === "time" && dateStyle !== undefined) {
-      ThrowTypeError(
-        JSMSG_INVALID_DATETIME_STYLE,
-        "dateStyle",
-        "toLocaleTimeString"
-      );
-    }
-  } else {
-    // Step 44.a.
-    var needDefaults = true;
-
-    // Step 44.b.
-    if (required === "date" || required === "any") {
-      needDefaults =
-        formatOptions.weekday === undefined &&
-        formatOptions.year === undefined &&
-        formatOptions.month === undefined &&
-        formatOptions.day === undefined;
-    }
-
-    // Step 44.c.
-    if (required === "time" || required === "any") {
-      needDefaults =
-        needDefaults &&
-        formatOptions.dayPeriod === undefined &&
-        formatOptions.hour === undefined &&
-        formatOptions.minute === undefined &&
-        formatOptions.second === undefined &&
-        formatOptions.fractionalSecondDigits === undefined;
-    }
-
-    // Step 44.d.
-    if (needDefaults && (defaults === "date" || defaults === "all")) {
-      formatOptions.year = "numeric";
-      formatOptions.month = "numeric";
-      formatOptions.day = "numeric";
-    }
-
-    // Step 44.e.
-    if (needDefaults && (defaults === "time" || defaults === "all")) {
-      formatOptions.hour = "numeric";
-      formatOptions.minute = "numeric";
-      formatOptions.second = "numeric";
-    }
-
-    // Steps 44.f-h provided by ICU, more or less.
   }
 
-  // Steps 45-50. (see resolveDateTimeFormatInternals).
+  // Steps 26-28 provided by ICU, more or less - see comment after this function.
 
+  // Steps 29-30.
+  // Pass hr12 on to ICU.
+  if (hr12 !== undefined) {
+    formatOpt.hour12 = hr12;
+  }
+
+  // Step 32.
+  //
   // We've done everything that must be done now: mark the lazy data as fully
   // computed and install it.
   initializeIntlObject(
@@ -859,7 +592,7 @@ function InitializeDateTimeFormat(
     lazyDateTimeFormatData
   );
 
-  // 11.1.1 Intl.DateTimeFormat, step 3. (Inlined call to ChainDateTimeFormat.)
+  // 12.2.1, steps 4-5.
   if (
     dateTimeFormat !== thisValue &&
     callFunction(
@@ -878,10 +611,115 @@ function InitializeDateTimeFormat(
     return thisValue;
   }
 
-  // Step 51.
+  // 12.2.1, step 6.
   return dateTimeFormat;
 }
-/* eslint-enable complexity */
+
+/**
+ * Returns a new options object that includes the provided options (if any)
+ * and fills in default components if required components are not defined.
+ * Required can be "date", "time", or "any".
+ * Defaults can be "date", "time", or "all".
+ *
+ * Spec: ECMAScript Internationalization API Specification, 12.1.1.
+ */
+function ToDateTimeOptions(options, required, defaults) {
+  assert(typeof required === "string", "ToDateTimeOptions");
+  assert(typeof defaults === "string", "ToDateTimeOptions");
+
+  // Steps 1-2.
+  if (options === undefined) {
+    options = null;
+  } else {
+    options = ToObject(options);
+  }
+  options = std_Object_create(options);
+
+  // Step 3.
+  var needDefaults = true;
+
+  // Step 4.
+  if (required === "date" || required === "any") {
+    if (options.weekday !== undefined) {
+      needDefaults = false;
+    }
+    if (options.year !== undefined) {
+      needDefaults = false;
+    }
+    if (options.month !== undefined) {
+      needDefaults = false;
+    }
+    if (options.day !== undefined) {
+      needDefaults = false;
+    }
+  }
+
+  // Step 5.
+  if (required === "time" || required === "any") {
+    if (options.dayPeriod !== undefined) {
+      needDefaults = false;
+    }
+    if (options.hour !== undefined) {
+      needDefaults = false;
+    }
+    if (options.minute !== undefined) {
+      needDefaults = false;
+    }
+    if (options.second !== undefined) {
+      needDefaults = false;
+    }
+    if (options.fractionalSecondDigits !== undefined) {
+      needDefaults = false;
+    }
+  }
+
+  // "DateTimeFormat dateStyle & timeStyle" propsal
+  // https://github.com/tc39/proposal-intl-datetime-style
+  var dateStyle = options.dateStyle;
+  var timeStyle = options.timeStyle;
+
+  if (dateStyle !== undefined || timeStyle !== undefined) {
+    needDefaults = false;
+  }
+
+  if (required === "date" && timeStyle !== undefined) {
+    ThrowTypeError(
+      JSMSG_INVALID_DATETIME_STYLE,
+      "timeStyle",
+      "toLocaleDateString"
+    );
+  }
+
+  if (required === "time" && dateStyle !== undefined) {
+    ThrowTypeError(
+      JSMSG_INVALID_DATETIME_STYLE,
+      "dateStyle",
+      "toLocaleTimeString"
+    );
+  }
+
+  // Step 6.
+  if (needDefaults && (defaults === "date" || defaults === "all")) {
+    // The specification says to call [[DefineOwnProperty]] with false for
+    // the Throw parameter, while Object.defineProperty uses true. For the
+    // calls here, the difference doesn't matter because we're adding
+    // properties to a new object.
+    DefineDataProperty(options, "year", "numeric");
+    DefineDataProperty(options, "month", "numeric");
+    DefineDataProperty(options, "day", "numeric");
+  }
+
+  // Step 7.
+  if (needDefaults && (defaults === "time" || defaults === "all")) {
+    // See comment for step 7.
+    DefineDataProperty(options, "hour", "numeric");
+    DefineDataProperty(options, "minute", "numeric");
+    DefineDataProperty(options, "second", "numeric");
+  }
+
+  // Step 8.
+  return options;
+}
 
 /**
  * Returns the subset of the given locale list for which this locale list has a

@@ -139,7 +139,7 @@ function InitializeListFormat(listFormat, locales, options) {
   lazyListFormatData.opt = opt;
 
   // Steps 7-8.
-  var matcher = GetOption(
+  let matcher = GetOption(
     options,
     "localeMatcher",
     "string",

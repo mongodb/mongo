@@ -27,7 +27,6 @@
 
 #include "frontend/ScriptIndex.h"  // ScriptIndex
 #include "gc/Barrier.h"
-#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin, JS::LimitedColumnNumberOneOrigin
 #include "js/CompileOptions.h"
 #include "js/Transcoding.h"
 #include "js/UbiNode.h"
@@ -422,11 +421,6 @@ class ScriptSource {
     ScriptSource* source_;
 
     explicit PinnedUnitsBase(ScriptSource* source) : source_(source) {}
-
-    void addReader();
-
-    template <typename Unit>
-    void removeReader();
   };
 
  public:
@@ -445,22 +439,6 @@ class ScriptSource {
                 size_t len);
 
     ~PinnedUnits();
-
-    const Unit* get() const { return units_; }
-
-    const typename SourceTypeTraits<Unit>::CharT* asChars() const {
-      return SourceTypeTraits<Unit>::toString(get());
-    }
-  };
-
-  template <typename Unit>
-  class PinnedUnitsIfUncompressed : public PinnedUnitsBase {
-    const Unit* units_;
-
-   public:
-    PinnedUnitsIfUncompressed(ScriptSource* source, size_t begin, size_t len);
-
-    ~PinnedUnitsIfUncompressed();
 
     const Unit* get() const { return units_; }
 
@@ -619,11 +597,10 @@ class ScriptSource {
   // 0 for other cases.
   uint32_t parameterListEnd_ = 0;
 
-  // Line number within the file where this source starts (1-origin).
+  // Line number within the file where this source starts.
   uint32_t startLine_ = 0;
-  // Column number within the file where this source starts,
-  // in UTF-16 code units.
-  JS::LimitedColumnNumberOneOrigin startColumn_;
+  // Column number within the file where this source starts.
+  uint32_t startColumn_ = 0;
 
   // See: CompileOptions::mutedErrors.
   bool mutedErrors_ = false;
@@ -655,9 +632,6 @@ class ScriptSource {
   template <typename Unit>
   const Unit* units(JSContext* cx, UncompressedSourceCache::AutoHoldEntry& asp,
                     size_t begin, size_t len);
-
-  template <typename Unit>
-  const Unit* uncompressedUnits(size_t begin, size_t len);
 
  public:
   // When creating a JSString* from TwoByte source characters, we don't try to
@@ -1030,9 +1004,6 @@ class ScriptSource {
   [[nodiscard]] bool setFilename(FrontendContext* fc, const char* filename);
   [[nodiscard]] bool setFilename(FrontendContext* fc, UniqueChars&& filename);
 
-  bool hasIntroducerFilename() const {
-    return introducerFilename_ ? true : false;
-  }
   const char* introducerFilename() const {
     return introducerFilename_ ? introducerFilename_.chars() : filename();
   }
@@ -1066,7 +1037,7 @@ class ScriptSource {
   bool mutedErrors() const { return mutedErrors_; }
 
   uint32_t startLine() const { return startLine_; }
-  JS::LimitedColumnNumberOneOrigin startColumn() const { return startColumn_; }
+  uint32_t startColumn() const { return startColumn_; }
 
   JS::DelazificationOption delazificationMode() const {
     return delazificationMode_;
@@ -1304,8 +1275,7 @@ static_assert(sizeof(ScriptWarmUpData) == sizeof(uintptr_t),
 // This class doesn't use the GC barrier wrapper classes. BaseScript::swapData
 // performs a manual pre-write barrier when detaching PrivateScriptData from a
 // script.
-class alignas(uintptr_t) PrivateScriptData final
-    : public TrailingArray<PrivateScriptData> {
+class alignas(uintptr_t) PrivateScriptData final : public TrailingArray {
  private:
   uint32_t ngcthings = 0;
 
@@ -1546,10 +1516,8 @@ class BaseScript : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   [[nodiscard]] bool appendSourceDataForToString(JSContext* cx,
                                                  js::StringBuffer& buf);
 
-  // Line number (1-origin)
   uint32_t lineno() const { return extent_.lineno; }
-  // Column number in UTF-16 code units
-  JS::LimitedColumnNumberOneOrigin column() const { return extent_.column; }
+  uint32_t column() const { return extent_.column; }
 
   JS::DelazificationOption delazificationMode() const {
     return scriptSource()->delazificationMode();
@@ -1665,10 +1633,6 @@ class BaseScript : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   static constexpr size_t offsetOfWarmUpData() {
     return offsetof(BaseScript, warmUpData_);
   }
-
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dumpStringContent(js::GenericPrinter& out) const;
-#endif
 };
 
 extern void SweepScriptData(JSRuntime* rt);
@@ -1940,9 +1904,6 @@ class JSScript : public js::BaseScript {
   inline void incWarmUpCounter();
   inline void resetWarmUpCounterForGC();
 
-  inline void updateLastICStubCounter();
-  inline uint32_t warmUpCountAtLastICStub() const;
-
   void resetWarmUpCounterToDelayIonCompilation();
 
   unsigned getWarmUpResetCount() const {
@@ -1991,7 +1952,7 @@ class JSScript : public js::BaseScript {
 
   void addSizeOfJitScript(mozilla::MallocSizeOf mallocSizeOf,
                           size_t* sizeOfJitScript,
-                          size_t* sizeOfAllocSites) const;
+                          size_t* sizeOfBaselineFallbackStubs) const;
 
   mozilla::Span<const js::TryNote> trynotes() const {
     return immutableScriptData()->tryNotes();
@@ -2025,10 +1986,6 @@ class JSScript : public js::BaseScript {
     MOZ_ASSERT(sharedData_);
     return immutableScriptData()->notes();
   }
-  js::SrcNote* notesEnd() const {
-    MOZ_ASSERT(sharedData_);
-    return immutableScriptData()->notes() + numNotes();
-  }
 
   JSString* getString(js::GCThingIndex index) const {
     return &gcthings()[index].as<JSString>();
@@ -2038,23 +1995,6 @@ class JSScript : public js::BaseScript {
     MOZ_ASSERT(containsPC<js::GCThingIndex>(pc));
     MOZ_ASSERT(js::JOF_OPTYPE((JSOp)*pc) == JOF_STRING);
     return getString(GET_GCTHING_INDEX(pc));
-  }
-
-  bool atomizeString(JSContext* cx, jsbytecode* pc) {
-    MOZ_ASSERT(containsPC<js::GCThingIndex>(pc));
-    MOZ_ASSERT(js::JOF_OPTYPE((JSOp)*pc) == JOF_STRING);
-    js::GCThingIndex index = GET_GCTHING_INDEX(pc);
-    JSString* str = getString(index);
-    if (str->isAtom()) {
-      return true;
-    }
-    JSAtom* atom = js::AtomizeString(cx, str);
-    if (!atom) {
-      return false;
-    }
-    js::gc::CellPtrPreWriteBarrier(data_->gcthings()[index]);
-    data_->gcthings()[index] = JS::GCCellPtr(atom);
-    return true;
   }
 
   JSAtom* getAtom(js::GCThingIndex index) const {
@@ -2158,6 +2098,10 @@ class JSScript : public js::BaseScript {
   // invariants of debuggee compartments, scripts, and frames.
   inline bool isDebuggee() const;
 
+  // Create an allocation site associated with this script/JitScript to track
+  // nursery allocations.
+  js::gc::AllocSite* createAllocSite();
+
   // A helper class to prevent relazification of the given function's script
   // while it's holding on to it.  This class automatically roots the script.
   class AutoDelazify;
@@ -2200,15 +2144,15 @@ class JSScript : public js::BaseScript {
   void dumpRecursive(JSContext* cx);
 
   static bool dump(JSContext* cx, JS::Handle<JSScript*> script,
-                   DumpOptions& options, js::StringPrinter* sp);
+                   DumpOptions& options, js::Sprinter* sp);
   static bool dumpSrcNotes(JSContext* cx, JS::Handle<JSScript*> script,
-                           js::GenericPrinter* sp);
+                           js::Sprinter* sp);
   static bool dumpTryNotes(JSContext* cx, JS::Handle<JSScript*> script,
-                           js::GenericPrinter* sp);
+                           js::Sprinter* sp);
   static bool dumpScopeNotes(JSContext* cx, JS::Handle<JSScript*> script,
-                             js::GenericPrinter* sp);
+                             js::Sprinter* sp);
   static bool dumpGCThings(JSContext* cx, JS::Handle<JSScript*> script,
-                           js::GenericPrinter* sp);
+                           js::Sprinter* sp);
 #endif
 };
 
@@ -2237,8 +2181,16 @@ struct ScriptAndCounts {
 };
 
 extern JS::UniqueChars FormatIntroducedFilename(const char* filename,
-                                                uint32_t lineno,
+                                                unsigned lineno,
                                                 const char* introducer);
+
+struct GSNCache;
+
+const js::SrcNote* GetSrcNote(GSNCache& cache, JSScript* script,
+                              jsbytecode* pc);
+
+extern const js::SrcNote* GetSrcNote(JSContext* cx, JSScript* script,
+                                     jsbytecode* pc);
 
 extern jsbytecode* LineNumberToPC(JSScript* script, unsigned lineno);
 
@@ -2253,14 +2205,12 @@ void maybeSpewScriptFinalWarmUpCount(JSScript* script);
 
 namespace js {
 
-extern unsigned PCToLineNumber(
-    JSScript* script, jsbytecode* pc,
-    JS::LimitedColumnNumberOneOrigin* columnp = nullptr);
+extern unsigned PCToLineNumber(JSScript* script, jsbytecode* pc,
+                               unsigned* columnp = nullptr);
 
-extern unsigned PCToLineNumber(
-    unsigned startLine, JS::LimitedColumnNumberOneOrigin startCol,
-    SrcNote* notes, SrcNote* notesEnd, jsbytecode* code, jsbytecode* pc,
-    JS::LimitedColumnNumberOneOrigin* columnp = nullptr);
+extern unsigned PCToLineNumber(unsigned startLine, unsigned startCol,
+                               SrcNote* notes, jsbytecode* code, jsbytecode* pc,
+                               unsigned* columnp = nullptr);
 
 /*
  * This function returns the file and line number of the script currently
@@ -2270,7 +2220,7 @@ extern unsigned PCToLineNumber(
  */
 extern void DescribeScriptedCallerForCompilation(
     JSContext* cx, MutableHandleScript maybeScript, const char** file,
-    uint32_t* linenop, uint32_t* pcOffset, bool* mutedErrors);
+    unsigned* linenop, uint32_t* pcOffset, bool* mutedErrors);
 
 /*
  * Like DescribeScriptedCallerForCompilation, but this function avoids looking
@@ -2278,10 +2228,11 @@ extern void DescribeScriptedCallerForCompilation(
  */
 extern void DescribeScriptedCallerForDirectEval(
     JSContext* cx, HandleScript script, jsbytecode* pc, const char** file,
-    uint32_t* linenop, uint32_t* pcOffset, bool* mutedErrors);
+    unsigned* linenop, uint32_t* pcOffset, bool* mutedErrors);
 
 bool CheckCompileOptionsMatch(const JS::ReadOnlyCompileOptions& options,
-                              js::ImmutableScriptFlags flags);
+                              js::ImmutableScriptFlags flags,
+                              bool isMultiDecode);
 
 void FillImmutableFlagsFromCompileOptionsForTopLevel(
     const JS::ReadOnlyCompileOptions& options, js::ImmutableScriptFlags& flags);

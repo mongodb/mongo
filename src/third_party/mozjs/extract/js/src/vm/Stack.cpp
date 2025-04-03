@@ -264,8 +264,7 @@ bool InterpreterFrame::pushLexicalEnvironment(JSContext* cx,
   return true;
 }
 
-bool InterpreterFrame::freshenLexicalEnvironment(JSContext* cx,
-                                                 jsbytecode* pc) {
+bool InterpreterFrame::freshenLexicalEnvironment(JSContext* cx) {
   Rooted<BlockLexicalEnvironmentObject*> env(
       cx, &envChain_->as<BlockLexicalEnvironmentObject>());
   BlockLexicalEnvironmentObject* fresh =
@@ -274,30 +273,17 @@ bool InterpreterFrame::freshenLexicalEnvironment(JSContext* cx,
     return false;
   }
 
-  if (MOZ_UNLIKELY(cx->realm()->isDebuggee())) {
-    Rooted<BlockLexicalEnvironmentObject*> freshRoot(cx, fresh);
-    DebugEnvironments::onPopLexical(cx, this, pc);
-    fresh = freshRoot;
-  }
-
   replaceInnermostEnvironment(*fresh);
   return true;
 }
 
-bool InterpreterFrame::recreateLexicalEnvironment(JSContext* cx,
-                                                  jsbytecode* pc) {
+bool InterpreterFrame::recreateLexicalEnvironment(JSContext* cx) {
   Rooted<BlockLexicalEnvironmentObject*> env(
       cx, &envChain_->as<BlockLexicalEnvironmentObject>());
   BlockLexicalEnvironmentObject* fresh =
       BlockLexicalEnvironmentObject::recreate(cx, env);
   if (!fresh) {
     return false;
-  }
-
-  if (MOZ_UNLIKELY(cx->realm()->isDebuggee())) {
-    Rooted<BlockLexicalEnvironmentObject*> freshRoot(cx, fresh);
-    DebugEnvironments::onPopLexical(cx, this, pc);
-    fresh = freshRoot;
   }
 
   replaceInnermostEnvironment(*fresh);
@@ -509,8 +495,9 @@ void JS::ProfilingFrameIterator::operator++() {
 
 void JS::ProfilingFrameIterator::settleFrames() {
   // Handle transition frames (see comment in JitFrameIter::operator++).
-  if (isJSJit() && jsJitIter().done() && jsJitIter().wasmCallerFP()) {
-    wasm::Frame* fp = (wasm::Frame*)jsJitIter().wasmCallerFP();
+  if (isJSJit() && !jsJitIter().done() &&
+      jsJitIter().frameType() == jit::FrameType::WasmToJSJit) {
+    wasm::Frame* fp = (wasm::Frame*)jsJitIter().fp();
     iteratorDestroy();
     new (storage()) wasm::ProfilingFrameIterator(fp);
     kind_ = Kind::Wasm;
@@ -528,6 +515,7 @@ void JS::ProfilingFrameIterator::settleFrames() {
     new (storage())
         jit::JSJitProfilingFrameIterator((jit::CommonFrameLayout*)fp);
     kind_ = Kind::JSJit;
+    MOZ_ASSERT(!jsJitIter().done());
     maybeSetEndStackAddress(jsJitIter().endStackAddress());
     return;
   }
@@ -640,20 +628,7 @@ JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(
 
   if (isWasm()) {
     Frame frame;
-    switch (wasmIter().category()) {
-      case wasm::ProfilingFrameIterator::Baseline: {
-        frame.kind = FrameKind::Frame_WasmBaseline;
-        break;
-      }
-      case wasm::ProfilingFrameIterator::Ion: {
-        frame.kind = FrameKind::Frame_WasmIon;
-        break;
-      }
-      default: {
-        frame.kind = FrameKind::Frame_WasmOther;
-        break;
-      }
-    }
+    frame.kind = Frame_Wasm;
     frame.stackAddress = stackAddr;
     frame.returnAddress_ = nullptr;
     frame.activation = activation_;
@@ -666,10 +641,6 @@ JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(
   }
 
   MOZ_ASSERT(isJSJit());
-
-  if (jit::IsPortableBaselineInterpreterEnabled()) {
-    return mozilla::Nothing();
-  }
 
   // Look up an entry for the return address.
   void* returnAddr = jsJitIter().resumePCinCurrentFrame();

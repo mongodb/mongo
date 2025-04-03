@@ -26,8 +26,7 @@
 #include "debugger/NoExecute.h"  // for LeaveDebuggeeNoExecute
 #include "debugger/Script.h"     // for DebuggerScript
 #include "debugger/Source.h"     // for DebuggerSource
-#include "gc/Tracer.h"        // for TraceManuallyBarrieredCrossCompartmentEdge
-#include "js/ColumnNumber.h"  // JS::ColumnNumberOneOrigin
+#include "gc/Tracer.h"  // for TraceManuallyBarrieredCrossCompartmentEdge
 #include "js/CompilationAndEvaluation.h"  //  for Compile
 #include "js/Conversions.h"               // for ToObject
 #include "js/experimental/JitInfo.h"      // for JSJitInfo
@@ -53,7 +52,7 @@
 #include "vm/GeneratorObject.h"          // for AbstractGeneratorObject
 #include "vm/GlobalObject.h"             // for JSObject::is, GlobalObject
 #include "vm/Interpreter.h"              // for Call
-#include "vm/JSAtomUtils.h"              // for Atomize, AtomizeString
+#include "vm/JSAtom.h"                   // for Atomize
 #include "vm/JSContext.h"                // for JSContext, ReportValueError
 #include "vm/JSFunction.h"               // for JSFunction
 #include "vm/JSObject.h"                 // for GenericObject, NewObjectKind
@@ -70,6 +69,7 @@
 #include "vm/Shape.h"                    // for Shape
 #include "vm/Stack.h"                    // for InvokeArgs
 #include "vm/StringType.h"               // for JSAtom, PropertyName
+#include "vm/WellKnownAtom.h"            // for js_apply_str
 #include "vm/WrapperObject.h"            // for JSObject::is, WrapperObject
 
 #include "gc/StableCellHasher-inl.h"
@@ -209,8 +209,8 @@ struct MOZ_STACK_CLASS DebuggerObject::CallData {
   bool executeInGlobalWithBindingsMethod();
   bool createSource();
   bool makeDebuggeeValueMethod();
+  bool makeDebuggeeNativeFunctionMethod();
   bool isSameNativeMethod();
-  bool isSameNativeWithJitInfoMethod();
   bool isNativeGetterWithJitInfo();
   bool unsafeDereferenceMethod();
   bool unwrapMethod();
@@ -313,11 +313,7 @@ bool DebuggerObject::CallData::nameGetter() {
     return true;
   }
 
-  JS::Rooted<JSAtom*> result(cx);
-  if (!object->name(cx, &result)) {
-    return false;
-  }
-
+  RootedString result(cx, object->name(cx));
   if (result) {
     args.rval().setString(result);
   } else {
@@ -332,10 +328,7 @@ bool DebuggerObject::CallData::displayNameGetter() {
     return true;
   }
 
-  JS::Rooted<JSAtom*> result(cx);
-  if (!object->displayName(cx, &result)) {
-    return false;
-  }
+  RootedString result(cx, object->displayName(cx));
   if (result) {
     args.rval().setString(result);
   } else {
@@ -996,7 +989,7 @@ bool DebuggerObject::CallData::applyMethod() {
   if (args.length() >= 2 && !args[1].isNullOrUndefined()) {
     if (!args[1].isObject()) {
       JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                                JSMSG_BAD_APPLY_ARGS, "apply");
+                                JSMSG_BAD_APPLY_ARGS, js_apply_str);
       return false;
     }
 
@@ -1129,7 +1122,7 @@ bool DebuggerObject::CallData::executeInGlobalMethod() {
   }
   mozilla::Range<const char16_t> chars = stableChars.twoByteRange();
 
-  EvalOptions options(EvalOptions::EnvKind::Global);
+  EvalOptions options;
   if (!ParseEvalOptions(cx, args.get(1), options)) {
     return false;
   }
@@ -1164,7 +1157,7 @@ bool DebuggerObject::CallData::executeInGlobalWithBindingsMethod() {
     return false;
   }
 
-  EvalOptions options(EvalOptions::EnvKind::GlobalWithExtraOuterBindings);
+  EvalOptions options;
   if (!ParseEvalOptions(cx, args.get(2), options)) {
     return false;
   }
@@ -1248,9 +1241,6 @@ bool DebuggerObject::CallData::createSource() {
   if (!ToUint32(cx, v, &startColumn)) {
     return false;
   }
-  if (startColumn == 0) {
-    startColumn = 1;
-  }
 
   if (!JS_GetProperty(cx, options, "sourceMapURL", &v)) {
     return false;
@@ -1272,18 +1262,18 @@ bool DebuggerObject::CallData::createSource() {
 
   JS::CompileOptions compileOptions(cx);
   compileOptions.lineno = startLine;
-  compileOptions.column = JS::ColumnNumberOneOrigin(startColumn);
+  compileOptions.column = startColumn;
 
   if (!JS::StringHasLatin1Chars(url)) {
     JS_ReportErrorASCII(cx, "URL must be a narrow string");
     return false;
   }
 
-  UniqueChars urlChars = JS_EncodeStringToUTF8(cx, url);
-  if (!urlChars) {
+  Vector<Latin1Char> urlChars(cx);
+  if (!CopyStringToVector(cx, url, urlChars)) {
     return false;
   }
-  compileOptions.setFile(urlChars.get());
+  compileOptions.setFile((const char*)urlChars.begin());
 
   Vector<char16_t> sourceMapURLChars(cx);
   if (sourceMapURL) {
@@ -1335,23 +1325,22 @@ bool DebuggerObject::CallData::makeDebuggeeValueMethod() {
   return DebuggerObject::makeDebuggeeValue(cx, object, args[0], args.rval());
 }
 
+bool DebuggerObject::CallData::makeDebuggeeNativeFunctionMethod() {
+  if (!args.requireAtLeast(
+          cx, "Debugger.Object.prototype.makeDebuggeeNativeFunction", 1)) {
+    return false;
+  }
+
+  return DebuggerObject::makeDebuggeeNativeFunction(cx, object, args[0],
+                                                    args.rval());
+}
+
 bool DebuggerObject::CallData::isSameNativeMethod() {
   if (!args.requireAtLeast(cx, "Debugger.Object.prototype.isSameNative", 1)) {
     return false;
   }
 
-  return DebuggerObject::isSameNative(cx, object, args[0], CheckJitInfo::No,
-                                      args.rval());
-}
-
-bool DebuggerObject::CallData::isSameNativeWithJitInfoMethod() {
-  if (!args.requireAtLeast(
-          cx, "Debugger.Object.prototype.isSameNativeWithJitInfo", 1)) {
-    return false;
-  }
-
-  return DebuggerObject::isSameNative(cx, object, args[0], CheckJitInfo::Yes,
-                                      args.rval());
+  return DebuggerObject::isSameNative(cx, object, args[0], args.rval());
 }
 
 bool DebuggerObject::CallData::isNativeGetterWithJitInfo() {
@@ -1435,11 +1424,6 @@ struct DebuggerObject::PromiseReactionRecordBuilder
     if (unwrappedGenerator->isClosed()) {
       // If the generator is closed, we can't generate a DebuggerFrame for it,
       // so we ignore it.
-      return true;
-    }
-    if (!unwrappedGenerator->realm()->isDebuggee()) {
-      // Caller can keep the reference to the debugger object even after
-      // removing the realm from debuggee.  Do nothing for this case.
       return true;
     }
     return dbg->getFrame(cx, unwrappedGenerator, &frame) && push(cx, frame);
@@ -1552,8 +1536,9 @@ const JSFunctionSpec DebuggerObject::methods_[] = {
                 executeInGlobalWithBindingsMethod, 2),
     JS_DEBUG_FN("createSource", createSource, 1),
     JS_DEBUG_FN("makeDebuggeeValue", makeDebuggeeValueMethod, 1),
+    JS_DEBUG_FN("makeDebuggeeNativeFunction", makeDebuggeeNativeFunctionMethod,
+                1),
     JS_DEBUG_FN("isSameNative", isSameNativeMethod, 1),
-    JS_DEBUG_FN("isSameNativeWithJitInfo", isSameNativeWithJitInfoMethod, 1),
     JS_DEBUG_FN("isNativeGetterWithJitInfo", isNativeGetterWithJitInfo, 1),
     JS_DEBUG_FN("unsafeDereference", unsafeDereferenceMethod, 0),
     JS_DEBUG_FN("unwrap", unwrapMethod, 0),
@@ -1696,29 +1681,13 @@ bool DebuggerObject::getClassName(JSContext* cx, Handle<DebuggerObject*> object,
   return true;
 }
 
-bool DebuggerObject::name(JSContext* cx,
-                          JS::MutableHandle<JSAtom*> result) const {
+JSAtom* DebuggerObject::name(JSContext* cx) const {
   if (isFunction()) {
-    JSFunction* fun = &referent()->as<JSFunction>();
-    if (!fun->isAccessorWithLazyName()) {
-      result.set(fun->fullExplicitName());
-      if (result) {
-        cx->markAtom(result);
-      }
-      return true;
+    JSAtom* atom = referent()->as<JSFunction>().explicitName();
+    if (atom) {
+      cx->markAtom(atom);
     }
-
-    {
-      Maybe<AutoRealm> ar;
-      EnterDebuggeeObjectRealm(cx, ar, fun);
-
-      result.set(fun->getAccessorNameForLazy(cx));
-      if (!result) {
-        return false;
-      }
-    }
-    cx->markAtom(result);
-    return true;
+    return atom;
   }
 
   MOZ_ASSERT(isBoundFunction());
@@ -1728,6 +1697,7 @@ bool DebuggerObject::name(JSContext* cx,
   // this fails use "bound".
   Rooted<BoundFunctionObject*> bound(cx,
                                      &referent()->as<BoundFunctionObject>());
+  JSAtom* atom = nullptr;
   {
     Maybe<AutoRealm> ar;
     EnterDebuggeeObjectRealm(cx, ar, bound);
@@ -1736,40 +1706,30 @@ bool DebuggerObject::name(JSContext* cx,
     bool found;
     if (GetOwnPropertyPure(cx, bound, NameToId(cx->names().name), &v, &found) &&
         found && v.isString()) {
-      result.set(AtomizeString(cx, v.toString()));
-      if (!result) {
-        return false;
+      atom = AtomizeString(cx, v.toString());
+      if (!atom) {
+        return nullptr;
       }
     } else {
-      result.set(cx->names().bound);
+      atom = cx->names().bound;
     }
   }
 
-  cx->markAtom(result);
-  return true;
+  cx->markAtom(atom);
+  return atom;
 }
 
-bool DebuggerObject::displayName(JSContext* cx,
-                                 JS::MutableHandle<JSAtom*> result) const {
+JSAtom* DebuggerObject::displayName(JSContext* cx) const {
   if (isFunction()) {
-    {
-      JS::Rooted<JSFunction*> fun(cx, &referent()->as<JSFunction>());
-
-      Maybe<AutoRealm> ar;
-      EnterDebuggeeObjectRealm(cx, ar, fun);
-
-      if (!fun->getDisplayAtom(cx, result)) {
-        return false;
-      }
+    JSAtom* atom = referent()->as<JSFunction>().displayAtom();
+    if (atom) {
+      cx->markAtom(atom);
     }
-    if (result) {
-      cx->markAtom(result);
-    }
-    return true;
+    return atom;
   }
 
   MOZ_ASSERT(isBoundFunction());
-  return name(cx, result);
+  return name(cx);
 }
 
 JS::PromiseState DebuggerObject::promiseState() const {
@@ -1967,7 +1927,7 @@ bool DebuggerObject::getErrorColumnNumber(JSContext* cx,
     return true;
   }
 
-  result.setNumber(report->column.oneOriginValue());
+  result.setNumber(report->column);
   return true;
 }
 
@@ -2450,10 +2410,8 @@ Maybe<Completion> DebuggerObject::call(JSContext* cx,
 
   // Note whether we are in an evaluation that might invoke the OnNativeCall
   // hook, so that the JITs will be disabled.
-  Maybe<AutoNoteExclusiveDebuggerOnEval> noteEvaluation;
-  if (dbg->isExclusiveDebuggerOnEval()) {
-    noteEvaluation.emplace(cx, dbg);
-  }
+  AutoNoteDebuggerEvaluationWithOnNativeCallHook noteEvaluation(
+      cx, dbg->observesNativeCalls() ? dbg : nullptr);
 
   // Call the function.
   LeaveDebuggeeNoExecute nnx(cx);
@@ -2569,17 +2527,62 @@ bool DebuggerObject::makeDebuggeeValue(JSContext* cx,
   return true;
 }
 
-static JSFunction* EnsureNativeFunction(const Value& value) {
+static JSFunction* EnsureNativeFunction(const Value& value,
+                                        bool allowExtended = true) {
   if (!value.isObject() || !value.toObject().is<JSFunction>()) {
     return nullptr;
   }
 
   JSFunction* fun = &value.toObject().as<JSFunction>();
-  if (!fun->isNativeFun()) {
+  if (!fun->isNativeFun() || (fun->isExtended() && !allowExtended)) {
     return nullptr;
   }
 
   return fun;
+}
+
+/* static */
+bool DebuggerObject::makeDebuggeeNativeFunction(JSContext* cx,
+                                                Handle<DebuggerObject*> object,
+                                                HandleValue value,
+                                                MutableHandleValue result) {
+  RootedObject referent(cx, object->referent());
+  Debugger* dbg = object->owner();
+
+  // The logic below doesn't work with extended functions, so do not allow them.
+  RootedFunction fun(cx, EnsureNativeFunction(value,
+                                              /* allowExtended */ false));
+  if (!fun) {
+    JS_ReportErrorASCII(cx, "Need native function");
+    return false;
+  }
+
+  RootedValue newValue(cx);
+  {
+    Maybe<AutoRealm> ar;
+    EnterDebuggeeObjectRealm(cx, ar, referent);
+
+    unsigned nargs = fun->nargs();
+    Rooted<JSAtom*> name(cx, fun->displayAtom());
+    if (name) {
+      cx->markAtom(name);
+    }
+    JSFunction* newFun = NewNativeFunction(cx, fun->native(), nargs, name);
+    if (!newFun) {
+      return false;
+    }
+
+    newValue.setObject(*newFun);
+  }
+
+  // Back in the debugger's compartment, produce a new Debugger.Object
+  // instance referring to the wrapped argument.
+  if (!dbg->wrapDebuggeeValue(cx, &newValue)) {
+    return false;
+  }
+
+  result.set(newValue);
+  return true;
 }
 
 static JSAtom* MaybeGetSelfHostedFunctionName(const Value& v) {
@@ -2595,36 +2598,9 @@ static JSAtom* MaybeGetSelfHostedFunctionName(const Value& v) {
   return GetClonedSelfHostedFunctionName(fun);
 }
 
-static bool IsSameNative(JSFunction* a, JSFunction* b,
-                         DebuggerObject::CheckJitInfo checkJitInfo) {
-  if (a->native() != b->native()) {
-    return false;
-  }
-
-  if (checkJitInfo == DebuggerObject::CheckJitInfo::No) {
-    return true;
-  }
-
-  // Both function should agree with the existence of JitInfo.
-
-  if (a->hasJitInfo() != b->hasJitInfo()) {
-    return false;
-  }
-
-  if (!a->hasJitInfo()) {
-    return true;
-  }
-
-  if (a->jitInfo() == b->jitInfo()) {
-    return true;
-  }
-
-  return false;
-}
-
 /* static */
 bool DebuggerObject::isSameNative(JSContext* cx, Handle<DebuggerObject*> object,
-                                  HandleValue value, CheckJitInfo checkJitInfo,
+                                  HandleValue value,
                                   MutableHandleValue result) {
   RootedValue referentValue(cx, ObjectValue(*object->referent()));
 
@@ -2648,8 +2624,7 @@ bool DebuggerObject::isSameNative(JSContext* cx, Handle<DebuggerObject*> object,
 
   RootedFunction referentFun(cx, EnsureNativeFunction(referentValue));
 
-  result.setBoolean(referentFun &&
-                    IsSameNative(referentFun, fun, checkJitInfo));
+  result.setBoolean(referentFun && referentFun->native() == fun->native());
   return true;
 }
 

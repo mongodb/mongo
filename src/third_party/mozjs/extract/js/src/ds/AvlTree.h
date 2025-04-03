@@ -37,7 +37,6 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/Likely.h"
-#include "mozilla/MathAlgorithms.h"
 #include "mozilla/Maybe.h"
 #include "ds/LifoAlloc.h"
 
@@ -92,65 +91,30 @@ class AvlTreeImpl {
   // protected.  Public facilities are provided by child class `AvlTree`.
  protected:
   // Tree node tags.
-  enum class Tag {
+  enum class Tag : uint8_t {
     Free,   // Node not in use -- is on the freelist.
     None,   // Node in use.  Neither subtree is deeper.
     Left,   // Node in use.  The left subtree is deeper.
     Right,  // Node in use.  The right subtree is deeper.
-
-    Count,  // Not used as an actual tag - should remain last in this list
   };
 
-  // Tree nodes. The tag is stored in the lower bits of the right Node pointer
-  // rather than as a separate field. For types T with alignment no more than
-  // twice the size of a pointer (ie, most types), this reduces the size of Node
-  // and enables them to pack more tightly, reducing memory requirements and
-  // improving cache behavior. (See bug 1847616.)
+  // Tree nodes.  To save space we could omit ::tag and instead steal two bits
+  // from ::left and/or ::right, but it hardly seems worth the hassle.
+  //
+  // For use cases that do a lot of lookups but few modifications, `left` and
+  // `right` are frequently accessed, but `tag` is not.  Lookups also require
+  // frequent access to (unspecified) areas of `item`.  It therefore makes
+  // sense to put those ares of `item` (as read by the compare method) at the
+  // end of `T`, so as to maximise the chance that they occupy the same cache
+  // line(s) as `left` and `right`.
   struct Node {
     T item;
     Node* left;
-
-    // This is the mask to use to extract the tag from `rightAndTag`.
-    static constexpr uintptr_t kTagMask = 3;
-    static_assert(mozilla::IsPowerOfTwo(kTagMask + 1),
-                  "kTagMask must only have a consecutive sequence of its "
-                  "lowest bits set");
-    static_assert(
-        kTagMask >= static_cast<uintptr_t>(Tag::Count) - 1,
-        "kTagMask must be sufficient to cover largest value in 'Tag'");
-
-   private:
-    uintptr_t rightAndTag;
-
-   public:
+    Node* right;
+    Tag tag;
     explicit Node(const T& item)
-        : item(item),
-          left(nullptr),
-          rightAndTag(static_cast<uintptr_t>(Tag::None)) {}
-
-    [[nodiscard]] Node* getRight() const {
-      return reinterpret_cast<Node*>(rightAndTag & ~kTagMask);
-    }
-    [[nodiscard]] Tag getTag() const {
-      return static_cast<Tag>(rightAndTag & kTagMask);
-    }
-
-    void setRight(Node* right) {
-      rightAndTag =
-          reinterpret_cast<uintptr_t>(right) | static_cast<uintptr_t>(getTag());
-    }
-    void setTag(const Tag tag) {
-      rightAndTag = (rightAndTag & ~kTagMask) | static_cast<uintptr_t>(tag);
-    }
-    void setRightAndTag(Node* right, const Tag tag) {
-      const uintptr_t rightAsUint = reinterpret_cast<uintptr_t>(right);
-      rightAndTag = rightAsUint | static_cast<uintptr_t>(tag);
-    }
+        : item(item), left(nullptr), right(nullptr), tag(Tag::None) {}
   };
-
-  // Ensure that we can use the needed lower bits of a Node pointer to store the
-  // tag.
-  static_assert(alignof(Node) >= Node::kTagMask + 1);
 
   // Once-per-tree components.
   Node* root_;
@@ -196,13 +160,14 @@ class AvlTreeImpl {
   // Put `node` onto the free list, for possible later reuse.
   inline void addToFreeList(Node* node) {
     node->left = freeList_;
-    node->setRightAndTag(nullptr, Tag::Free);  // for safety
+    node->right = nullptr;  // for safety
+    node->tag = Tag::Free;
     freeList_ = node;
   }
 
   // A safer version of `addToFreeList`.
   inline void freeNode(Node* node) {
-    MOZ_ASSERT(node->getTag() != Tag::Free);
+    MOZ_ASSERT(node->tag != Tag::Free);
     addToFreeList(node);
   }
 
@@ -251,7 +216,7 @@ class AvlTreeImpl {
   inline Node* allocateNode(const T& v) {
     Node* node = freeList_;
     if (MOZ_LIKELY(node)) {
-      MOZ_ASSERT(node->getTag() == Tag::Free);
+      MOZ_ASSERT(node->tag == Tag::Free);
       freeList_ = node->left;
       new (node) Node(v);
       return node;
@@ -268,8 +233,8 @@ class AvlTreeImpl {
 
   // Standard AVL single-rotate-left
   Node* rotate_left(Node* old_root) {
-    Node* new_root = old_root->getRight();
-    old_root->setRight(new_root->left);
+    Node* new_root = old_root->right;
+    old_root->right = new_root->left;
     new_root->left = old_root;
     return new_root;
   }
@@ -277,8 +242,8 @@ class AvlTreeImpl {
   // Standard AVL single-rotate-right
   Node* rotate_right(Node* old_root) {
     Node* new_root = old_root->left;
-    old_root->left = new_root->getRight();
-    new_root->setRight(old_root);
+    old_root->left = new_root->right;
+    new_root->right = old_root;
     return new_root;
   }
 
@@ -312,29 +277,29 @@ class AvlTreeImpl {
   // The dual function `rightgrown` is split similarly.
 
   MOZ_NEVER_INLINE Node* leftgrown_left(Node* root) {
-    if (root->left->getTag() == Tag::Left) {
-      root->setTag(Tag::None);
-      root->left->setTag(Tag::None);
+    if (root->left->tag == Tag::Left) {
+      root->tag = Tag::None;
+      root->left->tag = Tag::None;
       root = rotate_right(root);
     } else {
-      switch (root->left->getRight()->getTag()) {
+      switch (root->left->right->tag) {
         case Tag::Left:
-          root->setTag(Tag::Right);
-          root->left->setTag(Tag::None);
+          root->tag = Tag::Right;
+          root->left->tag = Tag::None;
           break;
         case Tag::Right:
-          root->setTag(Tag::None);
-          root->left->setTag(Tag::Left);
+          root->tag = Tag::None;
+          root->left->tag = Tag::Left;
           break;
         case Tag::None:
-          root->setTag(Tag::None);
-          root->left->setTag(Tag::None);
+          root->tag = Tag::None;
+          root->left->tag = Tag::None;
           break;
         case Tag::Free:
         default:
           MOZ_CRASH();
       }
-      root->left->getRight()->setTag(Tag::None);
+      root->left->right->tag = Tag::None;
       root->left = rotate_left(root->left);
       root = rotate_right(root);
     }
@@ -342,14 +307,14 @@ class AvlTreeImpl {
   }
 
   inline NodeAndResult leftgrown(Node* root) {
-    switch (root->getTag()) {
+    switch (root->tag) {
       case Tag::Left:
         return NodeAndResult(leftgrown_left(root), Result::OK);
       case Tag::Right:
-        root->setTag(Tag::None);
+        root->tag = Tag::None;
         return NodeAndResult(root, Result::OK);
       case Tag::None:
-        root->setTag(Tag::Left);
+        root->tag = Tag::Left;
         return NodeAndResult(root, Result::Balance);
       case Tag::Free:
       default:
@@ -362,44 +327,44 @@ class AvlTreeImpl {
   // details.
 
   MOZ_NEVER_INLINE Node* rightgrown_right(Node* root) {
-    if (root->getRight()->getTag() == Tag::Right) {
-      root->setTag(Tag::None);
-      root->getRight()->setTag(Tag::None);
+    if (root->right->tag == Tag::Right) {
+      root->tag = Tag::None;
+      root->right->tag = Tag::None;
       root = rotate_left(root);
     } else {
-      switch (root->getRight()->left->getTag()) {
+      switch (root->right->left->tag) {
         case Tag::Right:
-          root->setTag(Tag::Left);
-          root->getRight()->setTag(Tag::None);
+          root->tag = Tag::Left;
+          root->right->tag = Tag::None;
           break;
         case Tag::Left:
-          root->setTag(Tag::None);
-          root->getRight()->setTag(Tag::Right);
+          root->tag = Tag::None;
+          root->right->tag = Tag::Right;
           break;
         case Tag::None:
-          root->setTag(Tag::None);
-          root->getRight()->setTag(Tag::None);
+          root->tag = Tag::None;
+          root->right->tag = Tag::None;
           break;
         case Tag::Free:
         default:
           MOZ_CRASH();
       }
-      root->getRight()->left->setTag(Tag::None);
-      root->setRight(rotate_right(root->getRight()));
+      root->right->left->tag = Tag::None;
+      root->right = rotate_right(root->right);
       root = rotate_left(root);
     }
     return root;
   }
 
   inline NodeAndResult rightgrown(Node* root) {
-    switch (root->getTag()) {
+    switch (root->tag) {
       case Tag::Left:
-        root->setTag(Tag::None);
+        root->tag = Tag::None;
         return NodeAndResult(root, Result::OK);
       case Tag::Right:
         return NodeAndResult(rightgrown_right(root), Result::OK);
       case Tag::None:
-        root->setTag(Tag::Right);
+        root->tag = Tag::Right;
         return NodeAndResult(root, Result::Balance);
       case Tag::Free:
       default:
@@ -450,7 +415,7 @@ class AvlTreeImpl {
         node = node->left;
       } else if (cmpRes1 > 0) {
         stack[stackPtr++] = node;
-        node = node->getRight();
+        node = node->right;
       } else {
         // `v` is already in the tree.  Inform the caller, and don't change
         // the tree.
@@ -466,7 +431,7 @@ class AvlTreeImpl {
         node = node->left;
       } else if (cmpRes2 > 0) {
         stack[stackPtr++] = node;
-        node = node->getRight();
+        node = node->right;
       } else {
         return (Node*)(uintptr_t(1));
       }
@@ -503,7 +468,7 @@ class AvlTreeImpl {
           break;
         }
       } else {
-        parent_node->setRight(curr_node);
+        parent_node->right = curr_node;
         if (curr_node_action == Result::Balance) {
           auto pair = rightgrown(parent_node);
           curr_node = pair.first;
@@ -547,42 +512,42 @@ class AvlTreeImpl {
   //   Balance  Do not assume the entire tree is valid.
 
   NodeAndResult leftshrunk(Node* n) {
-    switch (n->getTag()) {
+    switch (n->tag) {
       case Tag::Left: {
-        n->setTag(Tag::None);
+        n->tag = Tag::None;
         return NodeAndResult(n, Result::Balance);
       }
       case Tag::Right: {
-        if (n->getRight()->getTag() == Tag::Right) {
-          n->setTag(Tag::None);
-          n->getRight()->setTag(Tag::None);
+        if (n->right->tag == Tag::Right) {
+          n->tag = Tag::None;
+          n->right->tag = Tag::None;
           n = rotate_left(n);
           return NodeAndResult(n, Result::Balance);
-        } else if (n->getRight()->getTag() == Tag::None) {
-          n->setTag(Tag::Right);
-          n->getRight()->setTag(Tag::Left);
+        } else if (n->right->tag == Tag::None) {
+          n->tag = Tag::Right;
+          n->right->tag = Tag::Left;
           n = rotate_left(n);
           return NodeAndResult(n, Result::OK);
         } else {
-          switch (n->getRight()->left->getTag()) {
+          switch (n->right->left->tag) {
             case Tag::Left:
-              n->setTag(Tag::None);
-              n->getRight()->setTag(Tag::Right);
+              n->tag = Tag::None;
+              n->right->tag = Tag::Right;
               break;
             case Tag::Right:
-              n->setTag(Tag::Left);
-              n->getRight()->setTag(Tag::None);
+              n->tag = Tag::Left;
+              n->right->tag = Tag::None;
               break;
             case Tag::None:
-              n->setTag(Tag::None);
-              n->getRight()->setTag(Tag::None);
+              n->tag = Tag::None;
+              n->right->tag = Tag::None;
               break;
             case Tag::Free:
             default:
               MOZ_CRASH();
           }
-          n->getRight()->left->setTag(Tag::None);
-          n->setRight(rotate_right(n->getRight()));
+          n->right->left->tag = Tag::None;
+          n->right = rotate_right(n->right);
           ;
           n = rotate_left(n);
           return NodeAndResult(n, Result::Balance);
@@ -590,7 +555,7 @@ class AvlTreeImpl {
         /*NOTREACHED*/ MOZ_CRASH();
       }
       case Tag::None: {
-        n->setTag(Tag::Right);
+        n->tag = Tag::Right;
         return NodeAndResult(n, Result::OK);
       }
       case Tag::Free:
@@ -605,41 +570,41 @@ class AvlTreeImpl {
   // `leftshrunk` for details.
 
   NodeAndResult rightshrunk(Node* n) {
-    switch (n->getTag()) {
+    switch (n->tag) {
       case Tag::Right: {
-        n->setTag(Tag::None);
+        n->tag = Tag::None;
         return NodeAndResult(n, Result::Balance);
       }
       case Tag::Left: {
-        if (n->left->getTag() == Tag::Left) {
-          n->setTag(Tag::None);
-          n->left->setTag(Tag::None);
+        if (n->left->tag == Tag::Left) {
+          n->tag = Tag::None;
+          n->left->tag = Tag::None;
           n = rotate_right(n);
           return NodeAndResult(n, Result::Balance);
-        } else if (n->left->getTag() == Tag::None) {
-          n->setTag(Tag::Left);
-          n->left->setTag(Tag::Right);
+        } else if (n->left->tag == Tag::None) {
+          n->tag = Tag::Left;
+          n->left->tag = Tag::Right;
           n = rotate_right(n);
           return NodeAndResult(n, Result::OK);
         } else {
-          switch (n->left->getRight()->getTag()) {
+          switch (n->left->right->tag) {
             case Tag::Left:
-              n->setTag(Tag::Right);
-              n->left->setTag(Tag::None);
+              n->tag = Tag::Right;
+              n->left->tag = Tag::None;
               break;
             case Tag::Right:
-              n->setTag(Tag::None);
-              n->left->setTag(Tag::Left);
+              n->tag = Tag::None;
+              n->left->tag = Tag::Left;
               break;
             case Tag::None:
-              n->setTag(Tag::None);
-              n->left->setTag(Tag::None);
+              n->tag = Tag::None;
+              n->left->tag = Tag::None;
               break;
             case Tag::Free:
             default:
               MOZ_CRASH();
           }
-          n->left->getRight()->setTag(Tag::None);
+          n->left->right->tag = Tag::None;
           n->left = rotate_left(n->left);
           n = rotate_right(n);
           return NodeAndResult(n, Result::Balance);
@@ -647,7 +612,7 @@ class AvlTreeImpl {
         /*NOTREACHED*/ MOZ_CRASH();
       }
       case Tag::None: {
-        n->setTag(Tag::Left);
+        n->tag = Tag::Left;
         return NodeAndResult(n, Result::OK);
       }
       case Tag::Free:
@@ -681,10 +646,10 @@ class AvlTreeImpl {
       return mozilla::Nothing();
     }
     auto res = Result::Balance;
-    if (n->getRight() != nullptr) {
-      auto fhi = findhighest(target, n->getRight());
+    if (n->right != nullptr) {
+      auto fhi = findhighest(target, n->right);
       if (fhi.isSome()) {
-        n->setRight(fhi.value().first);
+        n->right = fhi.value().first;
         res = fhi.value().second;
         if (res == Result::Balance) {
           auto pair = rightshrunk(n);
@@ -729,7 +694,7 @@ class AvlTreeImpl {
     }
     target->item = n->item;
     Node* tmp = n;
-    n = n->getRight();
+    n = n->right;
     freeNode(tmp);
     return mozilla::Some(NodeAndResult(n, res));
   }
@@ -759,8 +724,8 @@ class AvlTreeImpl {
       }
       return NodeAndResult(node, tmp);
     } else if (cmp_res > 0) {
-      auto pair1 = delete_worker(node->getRight(), item);
-      node->setRight(pair1.first);
+      auto pair1 = delete_worker(node->right, item);
+      node->right = pair1.first;
       tmp = pair1.second;
       if (tmp == Result::Balance) {
         auto pair2 = rightshrunk(node);
@@ -782,10 +747,10 @@ class AvlTreeImpl {
         }
         return NodeAndResult(node, tmp);
       }
-      if (node->getRight() != nullptr) {
-        auto flo = findlowest(node, node->getRight());
+      if (node->right != nullptr) {
+        auto flo = findlowest(node, node->right);
         if (flo.isSome()) {
-          node->setRight(flo.value().first);
+          node->right = flo.value().first;
           tmp = flo.value().second;
           if (tmp == Result::Balance) {
             auto pair = rightshrunk(node);
@@ -810,7 +775,7 @@ class AvlTreeImpl {
       if (cmpRes < 0) {
         node = node->left;
       } else if (cmpRes > 0) {
-        node = node->getRight();
+        node = node->right;
       } else {
         return node;
       }
@@ -886,7 +851,7 @@ class AvlTreeImpl {
           MOZ_RELEASE_ASSERT(stackPtr < MAX_TREE_DEPTH);
           node = node->left;
         } else if (cmpRes > 0) {
-          node = node->getRight();
+          node = node->right;
         } else {
           stack_[stackPtr++] = node;
           MOZ_RELEASE_ASSERT(stackPtr < MAX_TREE_DEPTH);
@@ -927,7 +892,7 @@ class AvlTreeImpl {
     T next() {
       MOZ_RELEASE_ASSERT(stackPtr_ > 0);
       Node* ret = stack_[--stackPtr_];
-      Node* right = ret->getRight();
+      Node* right = ret->right;
       if (right != nullptr) {
         stack_[stackPtr_++] = right;
         MOZ_RELEASE_ASSERT(stackPtr_ < MAX_TREE_DEPTH);

@@ -20,7 +20,9 @@
 
 namespace js {
 
+class AutoLockGC;
 class AutoLockHelperThreadState;
+class AutoUnlockGC;
 
 namespace gc {
 
@@ -50,22 +52,17 @@ class MOZ_STACK_CLASS ParallelMarker {
 
   bool hasWork(MarkColor color) const;
 
-  void addTask(ParallelMarkTask* task, const AutoLockHelperThreadState& lock);
+  void addTask(ParallelMarkTask* task, const AutoLockGC& lock);
 
-  void addTaskToWaitingList(ParallelMarkTask* task,
-                            const AutoLockHelperThreadState& lock);
+  void addTaskToWaitingList(ParallelMarkTask* task, const AutoLockGC& lock);
 #ifdef DEBUG
   bool isTaskInWaitingList(const ParallelMarkTask* task,
-                           const AutoLockHelperThreadState& lock) const;
+                           const AutoLockGC& lock) const;
 #endif
 
-  bool hasActiveTasks(const AutoLockHelperThreadState& lock) const {
-    return activeTasks;
-  }
-  void incActiveTasks(ParallelMarkTask* task,
-                      const AutoLockHelperThreadState& lock);
-  void decActiveTasks(ParallelMarkTask* task,
-                      const AutoLockHelperThreadState& lock);
+  bool hasActiveTasks(const AutoLockGC& lock) const { return activeTasks; }
+  void incActiveTasks(ParallelMarkTask* task, const AutoLockGC& lock);
+  void decActiveTasks(ParallelMarkTask* task, const AutoLockGC& lock);
 
   size_t workerCount() const;
 
@@ -74,10 +71,10 @@ class MOZ_STACK_CLASS ParallelMarker {
   GCRuntime* const gc;
 
   using ParallelMarkTaskList = mozilla::DoublyLinkedList<ParallelMarkTask>;
-  HelperThreadLockData<ParallelMarkTaskList> waitingTasks;
+  GCLockData<ParallelMarkTaskList> waitingTasks;
   AtomicCount waitingTaskCount;
 
-  HelperThreadLockData<size_t> activeTasks;
+  GCLockData<size_t> activeTasks;
 };
 
 // A helper thread task that performs parallel marking.
@@ -96,12 +93,13 @@ class alignas(TypicalCacheLineSize) ParallelMarkTask
   void recordDuration() override;
 
  private:
-  bool tryMarking(AutoLockHelperThreadState& lock);
-  bool requestWork(AutoLockHelperThreadState& lock);
+  void markOrRequestWork(AutoLockGC& lock);
+  bool tryMarking(AutoLockGC& lock);
+  bool requestWork(AutoLockGC& lock);
 
-  void waitUntilResumed(AutoLockHelperThreadState& lock);
+  void waitUntilResumed(AutoLockGC& lock);
   void resume();
-  void resumeOnFinish(const AutoLockHelperThreadState& lock);
+  void resumeOnFinish(const AutoLockGC& lock);
 
   bool hasWork() const;
 
@@ -112,7 +110,7 @@ class alignas(TypicalCacheLineSize) ParallelMarkTask
   SliceBudget budget;
   ConditionVariable resumed;
 
-  HelperThreadLockData<bool> isWaiting;
+  GCLockData<bool> isWaiting;
 
   // Length of time this task spent blocked waiting for work.
   MainThreadOrGCTaskData<mozilla::TimeDuration> markTime;

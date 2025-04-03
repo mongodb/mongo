@@ -15,6 +15,8 @@
 
 namespace js {
 
+class AutoUnlockGC;
+
 /*
  * RAII class that takes the GC lock while it is live.
  *
@@ -30,7 +32,7 @@ class MOZ_RAII AutoLockGC {
 
   ~AutoLockGC() { lockGuard_.reset(); }
 
-  LockGuard<Mutex>& guard() { return lockGuard_.ref(); }
+  js::LockGuard<js::Mutex>& guard() { return lockGuard_.ref(); }
 
  protected:
   void lock() {
@@ -46,12 +48,12 @@ class MOZ_RAII AutoLockGC {
   gc::GCRuntime* const gc;
 
  private:
-  mozilla::Maybe<LockGuard<Mutex>> lockGuard_;
+  mozilla::Maybe<js::LockGuard<js::Mutex>> lockGuard_;
 
   AutoLockGC(const AutoLockGC&) = delete;
   AutoLockGC& operator=(const AutoLockGC&) = delete;
 
-  friend class UnlockGuard<AutoLockGC>;  // For lock/unlock.
+  friend class AutoUnlockGC;  // For lock/unlock.
 };
 
 /*
@@ -90,7 +92,18 @@ class MOZ_RAII AutoLockGCBgAlloc : public AutoLockGC {
   bool startBgAlloc = false;
 };
 
-using AutoUnlockGC = UnlockGuard<AutoLockGC>;
+class MOZ_RAII AutoUnlockGC {
+ public:
+  explicit AutoUnlockGC(AutoLockGC& lock) : lock(lock) { lock.unlock(); }
+
+  ~AutoUnlockGC() { lock.lock(); }
+
+ private:
+  AutoLockGC& lock;
+
+  AutoUnlockGC(const AutoUnlockGC&) = delete;
+  AutoUnlockGC& operator=(const AutoUnlockGC&) = delete;
+};
 
 }  // namespace js
 

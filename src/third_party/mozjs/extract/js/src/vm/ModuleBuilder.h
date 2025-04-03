@@ -90,7 +90,7 @@ class MOZ_STACK_CLASS ModuleBuilder {
 
   MaybeModuleRequestIndex appendModuleRequest(
       frontend::TaggedParserAtomIndex specifier,
-      frontend::ListNode* attributeList);
+      frontend::ListNode* assertionList);
 
   bool appendExportEntry(frontend::TaggedParserAtomIndex exportName,
                          frontend::TaggedParserAtomIndex localName,
@@ -101,10 +101,12 @@ class MOZ_STACK_CLASS ModuleBuilder {
 
   void markUsedByStencil(frontend::TaggedParserAtomIndex name);
 
-  [[nodiscard]] bool processAttributes(frontend::StencilModuleRequest& request,
-                                       frontend::ListNode* attributeList);
+  [[nodiscard]] bool processAssertions(frontend::StencilModuleRequest& request,
+                                       frontend::ListNode* assertionList);
 
-  [[nodiscard]] bool isAttributeSupported(frontend::TaggedParserAtomIndex key);
+  [[nodiscard]] bool isAssertionSupported(
+      JS::ImportAssertion supportedAssertion,
+      frontend::TaggedParserAtomIndex key);
 };
 
 template <typename T>

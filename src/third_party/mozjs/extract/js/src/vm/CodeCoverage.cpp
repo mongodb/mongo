@@ -141,8 +141,7 @@ void LCovSource::writeScript(JSScript* script, const char* scriptName) {
 
   jsbytecode* snpc = script->code();
   const SrcNote* sn = script->notes();
-  const SrcNote* snEnd = script->notesEnd();
-  if (sn < snEnd) {
+  if (!sn->isTerminator()) {
     snpc += sn->delta();
   }
 
@@ -169,22 +168,17 @@ void LCovSource::writeScript(JSScript* script, const char* scriptName) {
     // current pc.
     if (snpc <= pc || !firstLineHasBeenWritten) {
       size_t oldLine = lineno;
-      SrcNoteIterator iter(sn, snEnd);
+      SrcNoteIterator iter(sn);
       while (!iter.atEnd() && snpc <= pc) {
         sn = *iter;
         SrcNoteType type = sn->type();
         if (type == SrcNoteType::SetLine) {
           lineno = SrcNote::SetLine::getLine(sn, script->lineno());
-        } else if (type == SrcNoteType::SetLineColumn) {
-          lineno = SrcNote::SetLineColumn::getLine(sn, script->lineno());
-        } else if (type == SrcNoteType::NewLine ||
-                   type == SrcNoteType::NewLineColumn) {
+        } else if (type == SrcNoteType::NewLine) {
           lineno++;
         }
         ++iter;
-        if (!iter.atEnd()) {
-          snpc += (*iter)->delta();
-        }
+        snpc += (*iter)->delta();
       }
       sn = *iter;
 
@@ -488,8 +482,8 @@ void LCovRealm::writeRealmName(JS::Realm* realm) {
 
 const char* LCovRealm::getScriptName(JSScript* script) {
   JSFunction* fun = script->function();
-  if (fun && fun->fullDisplayAtom()) {
-    JSAtom* atom = fun->fullDisplayAtom();
+  if (fun && fun->displayAtom()) {
+    JSAtom* atom = fun->displayAtom();
     size_t lenWithNull = js::PutEscapedString(nullptr, 0, atom, 0) + 1;
     char* name = alloc_.newArray<char>(lenWithNull);
     if (name) {
@@ -515,7 +509,7 @@ void EnableLCov() {
   gLCovIsEnabled = true;
 }
 
-LCovRuntime::LCovRuntime() : pid_(getpid()), isEmpty_(true) {}
+LCovRuntime::LCovRuntime() : out_(), pid_(getpid()), isEmpty_(true) {}
 
 LCovRuntime::~LCovRuntime() {
   if (out_.isInitialized()) {
@@ -598,6 +592,8 @@ bool InitScriptCoverage(JSContext* cx, JSScript* script) {
   MOZ_ASSERT(IsLCovEnabled());
   MOZ_ASSERT(script->hasBytecode(),
              "Only initialize coverage data for fully initialized scripts.");
+
+  MOZ_ASSERT(!cx->isHelperThreadContext());
 
   const char* filename = script->filename();
   if (!filename) {

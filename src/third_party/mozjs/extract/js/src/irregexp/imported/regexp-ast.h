@@ -130,6 +130,12 @@ class CharacterRange {
   static void AddUnicodeCaseEquivalents(ZoneList<CharacterRange>* ranges,
                                         Zone* zone);
 
+#ifdef V8_INTL_SUPPORT
+  // Creates the closeOver of the given UnicodeSet, removing all
+  // characters/strings that can't be derived via simple case folding.
+  static void UnicodeSimpleCloseOver(icu::UnicodeSet& set);
+#endif  // V8_INTL_SUPPORT
+
   bool Contains(base::uc32 i) const { return from_ <= i && i <= to_; }
   base::uc32 from() const { return from_; }
   base::uc32 to() const { return to_; }
@@ -305,12 +311,9 @@ class RegExpClassRanges final : public RegExpTree {
   //     the specified ranges.
   // CONTAINS_SPLIT_SURROGATE: The character class contains part of a split
   //     surrogate and should not be unicode-desugared (crbug.com/641091).
-  // IS_CASE_FOLDED: If case folding is required (/i), it was already
-  //     performed on individual ranges and should not be applied again.
   enum Flag {
     NEGATED = 1 << 0,
     CONTAINS_SPLIT_SURROGATE = 1 << 1,
-    IS_CASE_FOLDED = 1 << 2,
   };
   using ClassRangesFlags = base::Flags<Flag>;
 
@@ -353,9 +356,6 @@ class RegExpClassRanges final : public RegExpTree {
   bool contains_split_surrogate() const {
     return (class_ranges_flags_ & CONTAINS_SPLIT_SURROGATE) != 0;
   }
-  bool is_case_folded() const {
-    return (class_ranges_flags_ & IS_CASE_FOLDED) != 0;
-  }
 
  private:
   CharacterSet set_;
@@ -363,8 +363,8 @@ class RegExpClassRanges final : public RegExpTree {
 };
 
 struct CharacterClassStringLess {
-  bool operator()(base::Vector<const base::uc32> lhs,
-                  base::Vector<const base::uc32> rhs) const {
+  bool operator()(const base::Vector<const base::uc32>& lhs,
+                  const base::Vector<const base::uc32>& rhs) const {
     // Longer strings first so we generate matches for the largest string
     // possible.
     if (lhs.length() != rhs.length()) {
@@ -460,7 +460,7 @@ class RegExpClassSetExpression final : public RegExpTree {
       RegExpTree* root, ZoneList<CharacterRange>* temp_ranges, Zone* zone);
 
   const OperationType operation_;
-  bool is_negated_;
+  const bool is_negated_;
   const bool may_contain_strings_;
   ZoneList<RegExpTree*>* operands_ = nullptr;
   int max_match_;
@@ -626,9 +626,8 @@ class RegExpCapture final : public RegExpTree {
 
 class RegExpGroup final : public RegExpTree {
  public:
-  explicit RegExpGroup(RegExpTree* body, RegExpFlags flags)
+  explicit RegExpGroup(RegExpTree* body)
       : body_(body),
-        flags_(flags),
         min_match_(body->min_match()),
         max_match_(body->max_match()) {}
 
@@ -640,11 +639,9 @@ class RegExpGroup final : public RegExpTree {
   int max_match() override { return max_match_; }
   Interval CaptureRegisters() override { return body_->CaptureRegisters(); }
   RegExpTree* body() const { return body_; }
-  RegExpFlags flags() const { return flags_; }
 
  private:
   RegExpTree* body_;
-  const RegExpFlags flags_;
   int min_match_;
   int max_match_;
 };
@@ -654,13 +651,12 @@ class RegExpLookaround final : public RegExpTree {
   enum Type { LOOKAHEAD, LOOKBEHIND };
 
   RegExpLookaround(RegExpTree* body, bool is_positive, int capture_count,
-                   int capture_from, Type type, int index)
+                   int capture_from, Type type)
       : body_(body),
         is_positive_(is_positive),
         capture_count_(capture_count),
         capture_from_(capture_from),
-        type_(type),
-        index_(index) {}
+        type_(type) {}
 
   DECL_BOILERPLATE(Lookaround);
 
@@ -673,7 +669,6 @@ class RegExpLookaround final : public RegExpTree {
   int capture_count() const { return capture_count_; }
   int capture_from() const { return capture_from_; }
   Type type() const { return type_; }
-  int index() const { return index_; }
 
   class Builder {
    public:
@@ -697,17 +692,14 @@ class RegExpLookaround final : public RegExpTree {
   int capture_count_;
   int capture_from_;
   Type type_;
-  int index_;
 };
 
 
 class RegExpBackReference final : public RegExpTree {
  public:
-  explicit RegExpBackReference(Zone* zone) : captures_(1, zone) {}
-  explicit RegExpBackReference(RegExpCapture* capture, Zone* zone)
-      : captures_(1, zone) {
-    captures_.Add(capture, zone);
-  }
+  explicit RegExpBackReference(RegExpFlags flags) : flags_(flags) {}
+  RegExpBackReference(RegExpCapture* capture, RegExpFlags flags)
+      : capture_(capture), flags_(flags) {}
 
   DECL_BOILERPLATE(BackReference);
 
@@ -715,16 +707,16 @@ class RegExpBackReference final : public RegExpTree {
   // The back reference may be recursive, e.g. /(\2)(\1)/. To avoid infinite
   // recursion, we give up. Ignorance is bliss.
   int max_match() override { return kInfinity; }
-  const ZoneList<RegExpCapture*>* captures() const { return &captures_; }
-  void add_capture(RegExpCapture* capture, Zone* zone) {
-    captures_.Add(capture, zone);
-  }
+  int index() const { return capture_->index(); }
+  RegExpCapture* capture() const { return capture_; }
+  void set_capture(RegExpCapture* capture) { capture_ = capture; }
   const ZoneVector<base::uc16>* name() const { return name_; }
   void set_name(const ZoneVector<base::uc16>* name) { name_ = name; }
 
  private:
-  ZoneList<RegExpCapture*> captures_;
+  RegExpCapture* capture_ = nullptr;
   const ZoneVector<base::uc16>* name_ = nullptr;
+  const RegExpFlags flags_;
 };
 
 

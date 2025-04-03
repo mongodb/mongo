@@ -13,11 +13,10 @@
 
 namespace js {
 
-class AutoHelperTaskQueue;
 class AutoLockHelperThreadState;
+struct ParseTask;
 struct DelazifyTask;
 struct FreeDelazifyTask;
-class GlobalHelperThreadState;
 class SourceCompressionTask;
 
 namespace jit {
@@ -42,6 +41,11 @@ struct MapTypeToThreadType<wasm::Tier2GeneratorTask> {
 };
 
 template <>
+struct MapTypeToThreadType<ParseTask> {
+  static const ThreadType threadType = THREAD_TYPE_PARSE;
+};
+
+template <>
 struct MapTypeToThreadType<DelazifyTask> {
   static const ThreadType threadType = THREAD_TYPE_DELAZIFY;
 };
@@ -56,19 +60,14 @@ struct MapTypeToThreadType<SourceCompressionTask> {
   static const ThreadType threadType = THREAD_TYPE_COMPRESS;
 };
 
-}  // namespace js
-
-namespace JS {
-
-class HelperThreadTask {
- public:
-  virtual void runHelperThreadTask(js::AutoLockHelperThreadState& locked) = 0;
-  virtual js::ThreadType threadType() = 0;
+struct HelperThreadTask {
+  virtual void runHelperThreadTask(AutoLockHelperThreadState& locked) = 0;
+  virtual ThreadType threadType() = 0;
   virtual ~HelperThreadTask() = default;
 
   template <typename T>
   bool is() {
-    return js::MapTypeToThreadType<T>::threadType == threadType();
+    return MapTypeToThreadType<T>::threadType == threadType();
   }
 
   template <typename T>
@@ -76,17 +75,8 @@ class HelperThreadTask {
     MOZ_ASSERT(this->is<T>());
     return static_cast<T*>(this);
   }
-
- protected:
-  // Called when this task is dispatched to the thread pool.
-  virtual void onThreadPoolDispatch() {}
-  friend class js::AutoHelperTaskQueue;
 };
 
-}  // namespace JS
-
-namespace js {
-using JS::HelperThreadTask;
 }  // namespace js
 
 #endif /* vm_HelperThreadTask_h */

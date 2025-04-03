@@ -12,6 +12,7 @@
 #include "jsapi.h"
 
 #include "builtin/TupleObject.h"
+#include "gc/Allocator.h"
 #include "gc/AllocKind.h"
 
 #include "js/TypeDecls.h"

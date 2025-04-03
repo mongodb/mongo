@@ -13,10 +13,20 @@ namespace js {
 namespace jit {
 
 // ICStubSpace is an abstraction for allocation policy and storage for CacheIR
-// stub data. Each JitZone has a single ICStubSpace.
+// stub data. There are two kinds of Baseline CacheIR stubs:
+//
+// (1) CacheIR stubs that can make non-tail calls that can GC. These are
+//     allocated in a LifoAlloc stored in JitScript.
+//     See JitScriptICStubSpace.
+//
+// (2) Other CacheIR stubs (aka optimized IC stubs). Allocated in a per-Zone
+//     LifoAlloc and purged when JIT-code is discarded.
+//     See OptimizedICStubSpace.
 class ICStubSpace {
-  static constexpr size_t DefaultChunkSize = 4096;
-  LifoAlloc allocator_{DefaultChunkSize};
+ protected:
+  LifoAlloc allocator_;
+
+  explicit ICStubSpace(size_t chunkSize) : allocator_(chunkSize) {}
 
  public:
   inline void* alloc(size_t size) { return allocator_.alloc(size); }
@@ -25,13 +35,29 @@ class ICStubSpace {
 
   void freeAllAfterMinorGC(JS::Zone* zone);
 
-  void transferFrom(ICStubSpace& other) {
-    allocator_.transferFrom(&other.allocator_);
-  }
+#ifdef DEBUG
+  bool isEmpty() const { return allocator_.isEmpty(); }
+#endif
 
   size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
     return allocator_.sizeOfExcludingThis(mallocSizeOf);
   }
+};
+
+// Space for optimized stubs. Every JitZone has a single OptimizedICStubSpace.
+struct OptimizedICStubSpace : public ICStubSpace {
+  static const size_t STUB_DEFAULT_CHUNK_SIZE = 4096;
+
+ public:
+  OptimizedICStubSpace() : ICStubSpace(STUB_DEFAULT_CHUNK_SIZE) {}
+};
+
+// Space for Can-GC stubs. Every JitScript has a JitScriptICStubSpace.
+struct JitScriptICStubSpace : public ICStubSpace {
+  static const size_t STUB_DEFAULT_CHUNK_SIZE = 4096;
+
+ public:
+  JitScriptICStubSpace() : ICStubSpace(STUB_DEFAULT_CHUNK_SIZE) {}
 };
 
 }  // namespace jit

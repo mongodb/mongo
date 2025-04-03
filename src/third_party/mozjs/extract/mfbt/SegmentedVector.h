@@ -137,13 +137,6 @@ class SegmentedVector : private AllocPolicy {
 
   SegmentedVector(SegmentedVector&& aOther)
       : mSegments(std::move(aOther.mSegments)) {}
-  SegmentedVector& operator=(SegmentedVector&& aOther) {
-    if (&aOther != this) {
-      this->~SegmentedVector();
-      new (this) SegmentedVector(std::move(aOther));
-    }
-    return *this;
-  }
 
   ~SegmentedVector() { Clear(); }
 

@@ -21,7 +21,23 @@ namespace frontend {
 struct BytecodeEmitter;
 
 class MOZ_STACK_CLASS BranchEmitterBase {
- public:
+ protected:
+  BytecodeEmitter* bce_;
+
+  // Jump around the then clause, to the beginning of the else clause.
+  JumpList jumpAroundThen_;
+
+  // Jump around the else clause, to the end of the entire branch.
+  JumpList jumpsAroundElse_;
+
+  // The stack depth before emitting the then block.
+  // Used for restoring stack depth before emitting the else block.
+  // Also used for assertion to make sure then and else blocks pushed the
+  // same number of values.
+  int32_t thenDepth_ = 0;
+
+  enum class ConditionKind { Positive, Negative };
+
   // Whether the then-clause, the else-clause, or else-if condition may
   // contain declaration or access to lexical variables, which means they
   // should have their own TDZCheckCache.  Basically TDZCheckCache should be
@@ -41,23 +57,6 @@ class MOZ_STACK_CLASS BranchEmitterBase {
     // inside then-clause, else-clause, nor else-if condition.
     NoLexicalAccessInBranch
   };
-
- protected:
-  BytecodeEmitter* bce_;
-
-  // Jump around the then clause, to the beginning of the else clause.
-  JumpList jumpAroundThen_;
-
-  // Jump around the else clause, to the end of the entire branch.
-  JumpList jumpsAroundElse_;
-
-  // The stack depth before emitting the then block.
-  // Used for restoring stack depth before emitting the else block.
-  // Also used for assertion to make sure then and else blocks pushed the
-  // same number of values.
-  int32_t thenDepth_ = 0;
-
-  enum class ConditionKind { Positive, Negative };
   LexicalKind lexicalKind_;
 
   mozilla::Maybe<TDZCheckCache> tdzCache_;
@@ -247,10 +246,7 @@ class MOZ_STACK_CLASS IfEmitter : public BranchEmitterBase {
 //
 class MOZ_STACK_CLASS InternalIfEmitter : public IfEmitter {
  public:
-  explicit InternalIfEmitter(
-      BytecodeEmitter* bce,
-      LexicalKind lexicalKind =
-          BranchEmitterBase::LexicalKind::NoLexicalAccessInBranch);
+  explicit InternalIfEmitter(BytecodeEmitter* bce);
 };
 
 // Class for emitting bytecode for conditional expression.

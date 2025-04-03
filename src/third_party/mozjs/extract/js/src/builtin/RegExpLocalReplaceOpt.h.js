@@ -3,17 +3,18 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // Function template for the following functions:
-//   * RegExpLocalReplaceOptSimple
+//   * RegExpLocalReplaceOpt
 //   * RegExpLocalReplaceOptFunc
 //   * RegExpLocalReplaceOptSubst
 // Define the following macro and include this file to declare function:
 //   * FUNC_NAME     -- function name (required)
 //       e.g.
 //         #define FUNC_NAME RegExpLocalReplaceOpt
-// Define one of the following macros (without value) to switch the code:
+// Define the following macro (without value) to switch the code:
 //   * SUBSTITUTION     -- replaceValue is a string with "$"
 //   * FUNCTIONAL       -- replaceValue is a function
-//   * SIMPLE           -- replaceValue is a string without "$"
+//   * SHORT_STRING     -- replaceValue is a string without "$" and lengthS < 0x7fff
+//   * neither of above -- replaceValue is a string without "$"
 
 // ES2023 draft rev 2c78e6f6b5bc6bfbf79dd8a12a9593e5b57afcd2
 // 22.2.5.11 RegExp.prototype [ @@replace ] ( string, replaceValue )
@@ -56,7 +57,7 @@ function FUNC_NAME(
     lastIndex = 0;
   }
 
-#if !defined(SIMPLE)
+#if !defined(SHORT_STRING)
   // Step 12.a.
   var result = RegExpMatcher(rx, S, lastIndex);
 
@@ -72,10 +73,10 @@ function FUNC_NAME(
   }
 #else
   // Step 12.a.
-  var position = RegExpSearcher(rx, S, lastIndex);
+  var result = RegExpSearcher(rx, S, lastIndex);
 
   // Step 12.b.
-  if (position === -1) {
+  if (result === -1) {
     // 21.2.5.2.2 RegExpBuiltinExec, steps 12.a.i, 12.c.i.
     if (globalOrSticky) {
       rx.lastIndex = 0;
@@ -88,7 +89,7 @@ function FUNC_NAME(
 
   // Steps 12.c, 13-14.
 
-#if !defined(SIMPLE)
+#if !defined(SHORT_STRING)
   // Steps 15.a-b.
   assert(result.length >= 1, "RegExpMatcher doesn't return an empty array");
 
@@ -105,10 +106,13 @@ function FUNC_NAME(
   // To set rx.lastIndex before RegExpGetFunctionalReplacement.
   var nextSourcePosition = position + matchLength;
 #else
-  // Steps 15.a-f (skipped).
+  // Steps 15.a-d (skipped).
+
+  // Step 15.e-f.
+  var position = result & 0x7fff;
 
   // Step 15.m.iii (reordered)
-  var nextSourcePosition = RegExpSearcherLastLimit(S);
+  var nextSourcePosition = (result >> 15) & 0x7fff;
 #endif
 
   // 21.2.5.2.2 RegExpBuiltinExec, step 15.

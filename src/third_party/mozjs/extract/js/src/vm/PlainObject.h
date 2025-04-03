@@ -7,7 +7,6 @@
 #ifndef vm_PlainObject_h
 #define vm_PlainObject_h
 
-#include "ds/IdValuePair.h"
 #include "gc/AllocKind.h"     // js::gc::AllocKind
 #include "js/Class.h"         // JSClass
 #include "js/RootingAPI.h"    // JS::Handle
@@ -98,15 +97,14 @@ extern PlainObject* NewPlainObjectWithProtoAndAllocKind(
 
 // Create a plain object with the given properties. The list must not contain
 // duplicate keys or integer keys.
-extern PlainObject* NewPlainObjectWithUniqueNames(
-    JSContext* cx, Handle<IdValueVector> properties,
-    NewObjectKind newKind = GenericObject);
+extern PlainObject* NewPlainObjectWithUniqueNames(JSContext* cx,
+                                                  IdValuePair* properties,
+                                                  size_t nproperties);
 
 // Create a plain object with the given properties. The list may contain integer
 // keys or duplicate keys.
 extern PlainObject* NewPlainObjectWithMaybeDuplicateKeys(
-    JSContext* cx, Handle<IdValueVector> properties,
-    NewObjectKind newKind = GenericObject);
+    JSContext* cx, IdValuePair* properties, size_t nproperties);
 
 }  // namespace js
 

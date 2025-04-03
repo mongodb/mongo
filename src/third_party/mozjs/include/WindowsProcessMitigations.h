@@ -15,7 +15,6 @@ MFBT_API bool IsWin32kLockedDown();
 MFBT_API void SetWin32kLockedDownInPolicy();
 MFBT_API bool IsDynamicCodeDisabled();
 MFBT_API bool IsEafPlusEnabled();
-MFBT_API bool IsUserShadowStackEnabled();
 
 }  // namespace mozilla
 

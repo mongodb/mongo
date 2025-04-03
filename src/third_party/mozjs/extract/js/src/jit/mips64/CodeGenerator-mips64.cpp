@@ -296,7 +296,6 @@ template <typename T>
 void CodeGeneratorMIPS64::emitWasmLoadI64(T* lir) {
   const MWasmLoad* mir = lir->mir();
 
-  Register memoryBase = ToRegister(lir->memoryBase());
   Register ptrScratch = InvalidReg;
   if (!lir->ptrCopy()->isBogusTemp()) {
     ptrScratch = ToRegister(lir->ptrCopy());
@@ -309,11 +308,11 @@ void CodeGeneratorMIPS64::emitWasmLoadI64(T* lir) {
   }
 
   if (IsUnaligned(mir->access())) {
-    masm.wasmUnalignedLoadI64(mir->access(), memoryBase, ptrReg, ptrScratch,
+    masm.wasmUnalignedLoadI64(mir->access(), HeapReg, ptrReg, ptrScratch,
                               ToOutRegister64(lir),
                               ToRegister(lir->getTemp(1)));
   } else {
-    masm.wasmLoadI64(mir->access(), memoryBase, ptrReg, ptrScratch,
+    masm.wasmLoadI64(mir->access(), HeapReg, ptrReg, ptrScratch,
                      ToOutRegister64(lir));
   }
 }
@@ -330,7 +329,6 @@ template <typename T>
 void CodeGeneratorMIPS64::emitWasmStoreI64(T* lir) {
   const MWasmStore* mir = lir->mir();
 
-  Register memoryBase = ToRegister(lir->memoryBase());
   Register ptrScratch = InvalidReg;
   if (!lir->ptrCopy()->isBogusTemp()) {
     ptrScratch = ToRegister(lir->ptrCopy());
@@ -344,10 +342,10 @@ void CodeGeneratorMIPS64::emitWasmStoreI64(T* lir) {
 
   if (IsUnaligned(mir->access())) {
     masm.wasmUnalignedStoreI64(mir->access(), ToRegister64(lir->value()),
-                               memoryBase, ptrReg, ptrScratch,
+                               HeapReg, ptrReg, ptrScratch,
                                ToRegister(lir->getTemp(1)));
   } else {
-    masm.wasmStoreI64(mir->access(), ToRegister64(lir->value()), memoryBase,
+    masm.wasmStoreI64(mir->access(), ToRegister64(lir->value()), HeapReg,
                       ptrReg, ptrScratch);
   }
 }

@@ -86,7 +86,7 @@ struct AnyRegister {
     MOZ_ASSERT_IF(aliasIdx == 0, ret == *this);
     return ret;
   }
-  uint32_t numAliased() const {
+  uint8_t numAliased() const {
     if (isFloat()) {
       return fpu().numAliased();
     }
@@ -564,7 +564,7 @@ class AllocatableSetAccessors<RegisterSet> {
   }
 
  public:
-  AllocatableSetAccessors() = default;
+  AllocatableSetAccessors() : set_() {}
   explicit constexpr AllocatableSetAccessors(SetType) = delete;
   explicit constexpr AllocatableSetAccessors(RegisterSet set) : set_(set) {}
 
@@ -641,7 +641,7 @@ class LiveSetAccessors<RegisterSet> {
   }
 
  public:
-  LiveSetAccessors() = default;
+  LiveSetAccessors() : set_() {}
   explicit constexpr LiveSetAccessors(SetType) = delete;
   explicit constexpr LiveSetAccessors(RegisterSet set) : set_(set) {}
 

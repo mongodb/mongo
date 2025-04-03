@@ -109,6 +109,7 @@ class ExclusiveData {
   explicit ExclusiveData(const MutexId& id, Args&&... args)
       : lock_(id), value_(std::forward<Args>(args)...) {}
 
+
   ExclusiveData& operator=(ExclusiveData&& rhs) {
     this->~ExclusiveData();
     new (mozilla::KnownNotNull, this) ExclusiveData(std::move(rhs));

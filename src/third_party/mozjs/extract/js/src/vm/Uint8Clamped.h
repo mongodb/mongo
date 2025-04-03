@@ -9,8 +9,6 @@
 
 #include <stdint.h>
 
-#include "vm/Float16.h"
-
 namespace js {
 
 extern uint32_t ClampDoubleToUint8(const double x);
@@ -91,10 +89,6 @@ struct uint8_clamped {
 template <typename T>
 inline constexpr bool TypeIsFloatingPoint() {
   return false;
-}
-template <>
-inline constexpr bool TypeIsFloatingPoint<float16>() {
-  return true;
 }
 template <>
 inline constexpr bool TypeIsFloatingPoint<float>() {

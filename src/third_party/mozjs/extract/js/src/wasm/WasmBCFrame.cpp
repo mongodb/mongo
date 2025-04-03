@@ -76,7 +76,7 @@ void BaseLocalIter::settle() {
       case MIRType::Int64:
       case MIRType::Double:
       case MIRType::Float32:
-      case MIRType::WasmAnyRef:
+      case MIRType::RefOrNull:
 #ifdef ENABLE_WASM_SIMD
       case MIRType::Simd128:
 #endif
@@ -111,6 +111,9 @@ void BaseLocalIter::settle() {
       case ValType::V128:
 #endif
       case ValType::Ref:
+        // TODO/AnyRef-boxing: With boxed immediates and strings, the
+        // debugger must be made aware that AnyRef != Pointer.
+        ASSERT_ANYREF_IS_JSOBJECT;
         mirType_ = locals_[index_].toMIRType();
         frameOffset_ = pushLocal(MIRTypeToSize(mirType_));
         break;
@@ -224,16 +227,18 @@ bool StackMapGenerator::createStackMap(
   // function's prologue.  We now need to calculate how far the machine's
   // stack pointer is below where it was at the start of the body.  But we
   // must take care not to include any words pushed as arguments to an
-  // upcoming function call, since those words belong to the stackmap of
-  // the callee, not to the stackmap of this function.  Any alignment padding
-  // for the args also belongs to the callee.
+  // upcoming function call, since those words "belong" to the stackmap of
+  // the callee, not to the stackmap of this function.  Note however that
+  // any alignment padding pushed prior to pushing the args *does* belong to
+  // this function.
   //
-  // The only padding belonging to the stackmap of this function is that
-  // required to align the upcoming frame. This is accounted for where
-  // framePushedExcludingOutboundCallArgs is set, in startCallArgs(), and is
-  // comprised of just one component:
+  // That padding is taken into account at the point where
+  // framePushedExcludingOutboundCallArgs is set, viz, in startCallArgs(),
+  // and comprises two components:
   //
   // * call->frameAlignAdjustment
+  // * the padding applied to the stack arg area itself.  That is:
+  //   StackArgAreaSize(argTys) - StackArgAreaSizeUnpadded(argTys)
   Maybe<uint32_t> framePushedExcludingArgs;
   if (framePushedAtEntryToBody.isNothing()) {
     // Still in the prologue.  framePushedExcludingArgs remains Nothing.
@@ -353,19 +358,11 @@ bool StackMapGenerator::createStackMap(
     augmentedMst.setGCPointer(offsFromMapLowest / sizeof(void*));
   }
 
-  MOZ_ASSERT(numStackArgBytes % sizeof(void*) == 0);
-  const size_t numStackArgWords = numStackArgBytes / sizeof(void*);
-  const size_t numStackArgPaddingBytes =
-      AlignStackArgAreaSize(numStackArgBytes) - numStackArgBytes;
-  const size_t numStackArgPaddingWords =
-      numStackArgPaddingBytes / sizeof(void*);
-
   // Create the final StackMap.  The initial map is zeroed out, so there's
   // no need to write zero bits in it.
   const uint32_t extraWords = extras.length();
   const uint32_t augmentedMstWords = augmentedMst.length();
-  const uint32_t numMappedWords =
-      numStackArgPaddingWords + extraWords + augmentedMstWords;
+  const uint32_t numMappedWords = extraWords + augmentedMstWords;
   StackMap* stackMap = StackMap::create(numMappedWords);
   if (!stackMap) {
     return false;
@@ -376,7 +373,7 @@ bool StackMapGenerator::createStackMap(
     uint32_t i = 0;
     for (bool b : extras) {
       if (b) {
-        stackMap->set(i, StackMap::Kind::AnyRef);
+        stackMap->setBit(i);
       }
       i++;
     }
@@ -395,7 +392,7 @@ bool StackMapGenerator::createStackMap(
       if (i == MachineStackTracker::Iter::FINISHED) {
         break;
       }
-      stackMap->set(extraWords + i, StackMap::Kind::AnyRef);
+      stackMap->setBit(extraWords + i);
     }
   }
 
@@ -404,13 +401,12 @@ bool StackMapGenerator::createStackMap(
   // Record in the map, how far down from the highest address the Frame* is.
   // Take the opportunity to check that we haven't marked any part of the
   // Frame itself as a pointer.
-  stackMap->setFrameOffsetFromTop(numStackArgPaddingWords + numStackArgWords +
+  stackMap->setFrameOffsetFromTop(numStackArgWords +
                                   sizeof(Frame) / sizeof(void*));
 #ifdef DEBUG
   for (uint32_t i = 0; i < sizeof(Frame) / sizeof(void*); i++) {
-    MOZ_ASSERT(stackMap->get(stackMap->header.numMappedWords -
-                             stackMap->header.frameOffsetFromTop + i) ==
-               StackMap::Kind::POD);
+    MOZ_ASSERT(stackMap->getBit(stackMap->header.numMappedWords -
+                                stackMap->header.frameOffsetFromTop + i) == 0);
   }
 #endif
 
@@ -431,9 +427,7 @@ bool StackMapGenerator::createStackMap(
     uint32_t nw = stackMap->header.numMappedWords;
     uint32_t np = 0;
     for (uint32_t i = 0; i < nw; i++) {
-      if (stackMap->get(i) == StackMap::Kind::AnyRef) {
-        np += 1;
-      }
+      np += stackMap->getBit(i);
     }
     MOZ_ASSERT(size_t(np) == countedPointers);
   }

@@ -13,7 +13,6 @@
 #define gc_Marking_h
 
 #include "gc/Barrier.h"
-#include "gc/Tracer.h"
 #include "js/TypeDecls.h"
 
 class JSTracer;
@@ -71,12 +70,8 @@ inline bool IsAboutToBeFinalized(const BarrieredBase<T>& thing) {
       *ConvertToBase(thing.unbarrieredAddress()));
 }
 template <typename T>
-inline bool IsAboutToBeFinalizedUnbarriered(T* thing) {
+inline bool IsAboutToBeFinalizedUnbarriered(T thing) {
   return IsAboutToBeFinalizedInternal(*ConvertToBase(&thing));
-}
-template <typename T>
-inline bool IsAboutToBeFinalizedUnbarriered(const T& thing) {
-  return IsAboutToBeFinalizedInternal(thing);
 }
 
 inline bool IsAboutToBeFinalizedDuringMinorSweep(Cell* cell);

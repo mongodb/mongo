@@ -124,11 +124,10 @@ class OptimizationInfo {
     return inlineNative_ && !JitOptions.disableInlining;
   }
 
-  uint32_t compilerWarmUpThreshold(JSContext* cx, JSScript* script,
+  uint32_t compilerWarmUpThreshold(JSScript* script,
                                    jsbytecode* pc = nullptr) const;
 
-  uint32_t recompileWarmUpThreshold(JSContext* cx, JSScript* script,
-                                    jsbytecode* pc) const;
+  uint32_t recompileWarmUpThreshold(JSScript* script, jsbytecode* pc) const;
 
   bool gvnEnabled() const { return gvn_ && !JitOptions.disableGvn; }
 
@@ -181,8 +180,8 @@ class OptimizationInfo {
 
 class OptimizationLevelInfo {
  private:
-  mozilla::EnumeratedArray<OptimizationLevel, OptimizationInfo,
-                           size_t(OptimizationLevel::Count)>
+  mozilla::EnumeratedArray<OptimizationLevel, OptimizationLevel::Count,
+                           OptimizationInfo>
       infos_;
 
  public:
@@ -192,7 +191,7 @@ class OptimizationLevelInfo {
     return &infos_[level];
   }
 
-  OptimizationLevel levelForScript(JSContext* cx, JSScript* script,
+  OptimizationLevel levelForScript(JSScript* script,
                                    jsbytecode* pc = nullptr) const;
 };
 

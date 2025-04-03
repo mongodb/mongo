@@ -80,7 +80,6 @@ class IonBinaryArithIC;
 class IonToPropertyKeyIC;
 class IonOptimizeSpreadCallIC;
 class IonCloseIterIC;
-class IonOptimizeGetIteratorIC;
 
 class IonIC {
   // This either points at the OOL path for the fallback path, or the code for
@@ -113,7 +112,8 @@ class IonIC {
         pc_(nullptr),
         rejoinOffset_(0),
         fallbackOffset_(0),
-        kind_(kind) {}
+        kind_(kind),
+        state_() {}
 
   void attachStub(IonICStub* newStub, JitCode* code);
 
@@ -219,10 +219,6 @@ class IonIC {
   IonCloseIterIC* asCloseIterIC() {
     MOZ_ASSERT(kind_ == CacheKind::CloseIter);
     return (IonCloseIterIC*)this;
-  }
-  IonOptimizeGetIteratorIC* asOptimizeGetIteratorIC() {
-    MOZ_ASSERT(kind_ == CacheKind::OptimizeGetIterator);
-    return (IonOptimizeGetIteratorIC*)this;
   }
 
   // Returns the Register to use as scratch when entering IC stubs. This
@@ -660,31 +656,6 @@ class IonCloseIterIC : public IonIC {
 
   [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
                                    IonCloseIterIC* ic, HandleObject iter);
-};
-
-class IonOptimizeGetIteratorIC : public IonIC {
-  LiveRegisterSet liveRegs_;
-  ValueOperand value_;
-  Register output_;
-  Register temp_;
-
- public:
-  IonOptimizeGetIteratorIC(LiveRegisterSet liveRegs, ValueOperand value,
-                           Register output, Register temp)
-      : IonIC(CacheKind::OptimizeGetIterator),
-        liveRegs_(liveRegs),
-        value_(value),
-        output_(output),
-        temp_(temp) {}
-
-  ValueOperand value() const { return value_; }
-  Register output() const { return output_; }
-  Register temp() const { return temp_; }
-  LiveRegisterSet liveRegs() const { return liveRegs_; }
-
-  static bool update(JSContext* cx, HandleScript outerScript,
-                     IonOptimizeGetIteratorIC* ic, HandleValue value,
-                     bool* result);
 };
 
 }  // namespace jit

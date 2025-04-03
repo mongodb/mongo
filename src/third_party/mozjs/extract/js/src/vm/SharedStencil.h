@@ -23,7 +23,6 @@
 #include "frontend/TypedIndex.h"   // js::frontend::TypedIndex
 
 #include "js/AllocPolicy.h"            // js::SystemAllocPolicy
-#include "js/ColumnNumber.h"           // JS::LimitedColumnNumberOneOrigin
 #include "js/TypeDecls.h"              // JSContext,jsbytecode
 #include "js/UniquePtr.h"              // js::UniquePtr
 #include "js/Vector.h"                 // js::Vector
@@ -192,8 +191,7 @@ struct SourceExtent {
   SourceExtent() = default;
 
   SourceExtent(uint32_t sourceStart, uint32_t sourceEnd, uint32_t toStringStart,
-               uint32_t toStringEnd, uint32_t lineno,
-               JS::LimitedColumnNumberOneOrigin column)
+               uint32_t toStringEnd, uint32_t lineno, uint32_t column)
       : sourceStart(sourceStart),
         sourceEnd(sourceEnd),
         toStringStart(toStringStart),
@@ -202,11 +200,11 @@ struct SourceExtent {
         column(column) {}
 
   static SourceExtent makeGlobalExtent(uint32_t len) {
-    return SourceExtent(0, len, 0, len, 1, JS::LimitedColumnNumberOneOrigin());
+    return SourceExtent(0, len, 0, len, 1, 0);
   }
 
-  static SourceExtent makeGlobalExtent(
-      uint32_t len, uint32_t lineno, JS::LimitedColumnNumberOneOrigin column) {
+  static SourceExtent makeGlobalExtent(uint32_t len, uint32_t lineno,
+                                       uint32_t column) {
     return SourceExtent(0, len, 0, len, lineno, column);
   }
 
@@ -221,10 +219,8 @@ struct SourceExtent {
   uint32_t toStringEnd = 0;
 
   // Line and column of |sourceStart_| position.
-  // Line number (1-origin).
-  uint32_t lineno = 1;
-  // Column number in UTF-16 code units.
-  JS::LimitedColumnNumberOneOrigin column;
+  uint32_t lineno = 1;  // 1-indexed.
+  uint32_t column = 0;  // Count of Code Points
 
   FunctionKey toFunctionKey() const {
     // In eval("x=>1"), the arrow function will have a sourceStart of 0 which
@@ -403,7 +399,7 @@ class MutableScriptFlags : public EnumFlags<MutableScriptFlagsEnum> {
 //  L3:
 // ----
 //
-// NOTE: The notes() array must have been padded such that
+// NOTE: The notes() array must have been null-padded such that
 //       flags/code/notes together have uint32_t alignment.
 //
 // The labels shown are recorded as byte-offsets relative to 'this'. This is to
@@ -425,8 +421,7 @@ class MutableScriptFlags : public EnumFlags<MutableScriptFlagsEnum> {
 // In general, the length of each array is computed from subtracting the start
 // offset of the array from the start offset of the subsequent array. The
 // notable exception is that bytecode length is stored explicitly.
-class alignas(uint32_t) ImmutableScriptData final
-    : public TrailingArray<ImmutableScriptData> {
+class alignas(uint32_t) ImmutableScriptData final : public TrailingArray {
  private:
   Offset optArrayOffset_ = 0;
 
@@ -555,21 +550,20 @@ class alignas(uint32_t) ImmutableScriptData final
 
  public:
   // The code() and note() arrays together maintain an target alignment by
-  // padding the source notes with padding bytes. This allows arrays with
-  // stricter alignment requirements to follow them.
+  // padding the source notes with null. This allows arrays with stricter
+  // alignment requirements to follow them.
   static constexpr size_t CodeNoteAlign = sizeof(uint32_t);
 
-  // Compute number of padding notes to pad out source notes with.
+  // Compute number of null notes to pad out source notes with.
   static uint32_t ComputeNotePadding(uint32_t codeLength, uint32_t noteLength) {
     uint32_t flagLength = sizeof(Flags);
-    uint32_t paddingLength =
+    uint32_t nullLength =
         CodeNoteAlign - (flagLength + codeLength + noteLength) % CodeNoteAlign;
 
-    if (paddingLength == CodeNoteAlign) {
-      return 0;
-    }
+    // The source notes must have at least one null-terminator.
+    MOZ_ASSERT(nullLength >= 1);
 
-    return paddingLength;
+    return nullLength;
   }
 
   // Span over all raw bytes in this struct and its trailing arrays.
@@ -789,11 +783,7 @@ using SharedImmutableScriptDataTable =
                      SharedImmutableScriptData::Hasher, SystemAllocPolicy>;
 
 struct MemberInitializers {
-#ifdef ENABLE_DECORATORS
-  static constexpr size_t NumBits = 30;
-#else
   static constexpr size_t NumBits = 31;
-#endif
   static constexpr uint32_t MaxInitializers = BitMask(NumBits);
 
 #ifdef DEBUG
@@ -802,37 +792,20 @@ struct MemberInitializers {
 
   bool hasPrivateBrand : 1;
 
-#ifdef ENABLE_DECORATORS
-  bool hasDecorators : 1;
-#endif
-
   // This struct will eventually have a vector of constant values for optimizing
   // field initializers.
   uint32_t numMemberInitializers : NumBits;
 
-  MemberInitializers(bool hasPrivateBrand,
-#ifdef ENABLE_DECORATORS
-                     bool hasDecorators,
-#endif
-                     uint32_t numMemberInitializers)
+  MemberInitializers(bool hasPrivateBrand, uint32_t numMemberInitializers)
       :
 #ifdef DEBUG
         valid(true),
 #endif
         hasPrivateBrand(hasPrivateBrand),
-#ifdef ENABLE_DECORATORS
-        hasDecorators(hasDecorators),
-#endif
         numMemberInitializers(numMemberInitializers) {
-#ifdef ENABLE_DECORATORS
-    MOZ_ASSERT(
-        this->numMemberInitializers == numMemberInitializers,
-        "numMemberInitializers should easily fit in the 30-bit bitfield");
-#else
     MOZ_ASSERT(
         this->numMemberInitializers == numMemberInitializers,
         "numMemberInitializers should easily fit in the 31-bit bitfield");
-#endif
   }
 
   static MemberInitializers Invalid() { return MemberInitializers(); }
@@ -841,33 +814,17 @@ struct MemberInitializers {
   // fields. This is used when we elide the trivial data but still need a valid
   // set to stop scope walking.
   static const MemberInitializers& Empty() {
-    static const MemberInitializers zeroInitializers(false,
-#ifdef ENABLE_DECORATORS
-                                                     false,
-#endif
-                                                     0);
+    static const MemberInitializers zeroInitializers(false, 0);
     return zeroInitializers;
   }
 
   uint32_t serialize() const {
-#ifdef ENABLE_DECORATORS
-    auto serialised = (hasPrivateBrand << (NumBits + 1)) |
-                      hasDecorators << NumBits | numMemberInitializers;
-    return serialised;
-#else
     return (hasPrivateBrand << NumBits) | numMemberInitializers;
-#endif
   }
 
   static MemberInitializers deserialize(uint32_t bits) {
-#ifdef ENABLE_DECORATORS
-    return MemberInitializers((bits & Bit(NumBits + 1)) != 0,
-                              (bits & Bit(NumBits)) != 0,
-                              bits & BitMask(NumBits));
-#else
     return MemberInitializers((bits & Bit(NumBits)) != 0,
                               bits & BitMask(NumBits));
-#endif
   }
 
  private:
@@ -877,9 +834,6 @@ struct MemberInitializers {
         valid(false),
 #endif
         hasPrivateBrand(false),
-#ifdef ENABLE_DECORATORS
-        hasDecorators(false),
-#endif
         numMemberInitializers(0) {
   }
 };

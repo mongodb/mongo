@@ -11,7 +11,6 @@
 #include "gc/Cell.h"
 #include "js/TypeDecls.h"
 #include "js/UbiNode.h"
-#include "js/Utility.h"  // JS::UniqueChars
 #include "vm/ObjectFlags.h"
 #include "vm/PropertyInfo.h"
 #include "vm/PropertyKey.h"
@@ -208,9 +207,6 @@ class SharedPropMap;
 class LinkedPropMap;
 class CompactPropMap;
 class NormalPropMap;
-
-class JS_PUBLIC_API GenericPrinter;
-class JSONPrinter;
 
 // Template class for storing a PropMap* and a property index as tagged pointer.
 template <typename T>
@@ -409,7 +405,7 @@ class PropMapTable {
 
   void trace(JSTracer* trc);
 #ifdef JSGC_HASH_TABLE_CHECKS
-  void checkAfterMovingGC(JS::Zone* zone);
+  void checkAfterMovingGC();
 #endif
 };
 
@@ -453,10 +449,6 @@ class PropMap : public gc::TenuredCellWithFlags {
     NumPreviousMapsShift = 9,
     NumPreviousMapsMask = NumPreviousMapsMax << NumPreviousMapsShift,
   };
-
-  template <typename KnownF, typename UnknownF>
-  static void forEachPropMapFlag(uintptr_t flags, KnownF known,
-                                 UnknownF unknown);
 
   // Flags word, stored in the cell header. Note that this hides the
   // Cell::flags() method.
@@ -513,19 +505,9 @@ class PropMap : public gc::TenuredCellWithFlags {
 
   uint32_t approximateEntryCount() const;
 
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dump() const;
-  void dump(js::GenericPrinter& out) const;
-  void dump(js::JSONPrinter& json) const;
-
-  void dumpFields(js::JSONPrinter& json) const;
-  void dumpFieldsAt(js::JSONPrinter& json, uint32_t index) const;
-  void dumpDescriptorStringContentAt(js::GenericPrinter& out,
-                                     uint32_t index) const;
-  JS::UniqueChars getPropertyNameAt(uint32_t index) const;
-#endif
-
 #ifdef DEBUG
+  void dump(js::GenericPrinter& out) const;
+  void dump() const;
   void checkConsistency(NativeObject* obj) const;
 #endif
 
@@ -736,10 +718,6 @@ class SharedPropMap : public PropMap {
   static DictionaryPropMap* toDictionaryMap(JSContext* cx,
                                             Handle<SharedPropMap*> map,
                                             uint32_t length);
-
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dumpOwnFields(js::JSONPrinter& json) const;
-#endif
 };
 
 class CompactPropMap final : public SharedPropMap {
@@ -849,10 +827,6 @@ class LinkedPropMap final : public PropMap {
     MOZ_ASSERT(hasKey(index));
     return data_.propInfos[index];
   }
-
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dumpOwnFields(js::JSONPrinter& json) const;
-#endif
 };
 
 class NormalPropMap final : public SharedPropMap {
@@ -1057,10 +1031,6 @@ class DictionaryPropMap final : public PropMap {
     static_assert(offsetof(DictionaryPropMap, linkedData_) ==
                   offsetof(LinkedPropMap, data_));
   }
-
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dumpOwnFields(js::JSONPrinter& json) const;
-#endif
 };
 
 inline CompactPropMap* PropMap::asCompact() {

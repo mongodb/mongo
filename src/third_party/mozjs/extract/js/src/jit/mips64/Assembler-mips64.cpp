@@ -35,7 +35,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Int32:
     case MIRType::Int64:
     case MIRType::Pointer:
-    case MIRType::WasmAnyRef:
+    case MIRType::RefOrNull:
     case MIRType::StackResults: {
       Register destReg;
       GetIntArgReg(regIndex_++, &destReg);

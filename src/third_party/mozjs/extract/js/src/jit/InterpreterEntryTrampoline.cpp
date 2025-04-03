@@ -40,18 +40,19 @@ void EntryTrampolineMap::updateScriptsAfterMovingGC(void) {
 }
 
 #ifdef JSGC_HASH_TABLE_CHECKS
-void EntryTrampoline::checkTrampolineAfterMovingGC() const {
+void EntryTrampoline::checkTrampolineAfterMovingGC() {
   JitCode* trampoline = entryTrampoline_;
   CheckGCThingAfterMovingGC(trampoline);
 }
 
 void EntryTrampolineMap::checkScriptsAfterMovingGC() {
-  gc::CheckTableAfterMovingGC(*this, [](const auto& entry) {
-    BaseScript* script = entry.key();
+  for (jit::EntryTrampolineMap::Enum r(*this); !r.empty(); r.popFront()) {
+    BaseScript* script = r.front().key();
     CheckGCThingAfterMovingGC(script);
-    entry.value().checkTrampolineAfterMovingGC();
-    return script;
-  });
+    r.front().value().checkTrampolineAfterMovingGC();
+    auto ptr = lookup(script);
+    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
+  }
 }
 #endif
 
@@ -207,7 +208,7 @@ void JitRuntime::generateInterpreterEntryTrampoline(MacroAssembler& masm) {
   masm.passABIArg(arg0);  // cx
   masm.passABIArg(arg1);  // state
   masm.callWithABI<Fn, Interpret>(
-      ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
+      MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
 #ifdef JS_CODEGEN_ARM64
   masm.syncStackPtr();
@@ -233,15 +234,14 @@ JitCode* JitRuntime::generateEntryTrampolineForScript(JSContext* cx,
                                                       JSScript* script) {
   if (JitSpewEnabled(JitSpew_Codegen)) {
     UniqueChars funName;
-    if (script->function() && script->function()->fullDisplayAtom()) {
-      funName =
-          AtomToPrintableString(cx, script->function()->fullDisplayAtom());
+    if (script->function() && script->function()->displayAtom()) {
+      funName = AtomToPrintableString(cx, script->function()->displayAtom());
     }
 
     JitSpew(JitSpew_Codegen,
             "# Emitting Interpreter Entry Trampoline for %s (%s:%u:%u)",
             funName ? funName.get() : "*", script->filename(), script->lineno(),
-            script->column().oneOriginValue());
+            script->column());
   }
 
   TempAllocator temp(&cx->tempLifoAlloc());

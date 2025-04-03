@@ -732,12 +732,7 @@ class HashSet {
 //  - a static member function |HP::match| that tests equality of key and
 //    lookup values:
 //
-//      static bool match(const Key& aKey, const Lookup& aLookup);
-//
-//    |aKey| and |aLookup| can have different hash numbers, only when a
-//    collision happens with |prepareHash| operation, which is less frequent.
-//    Thus, |HP::match| shouldn't assume the hash equality in the comparison,
-//    even if the hash numbers are almost always same between them.
+//      static bool match(const Key&, const Lookup&);
 //
 // Normally, Lookup = Key. In general, though, different values and types of
 // values can be used to lookup and store. If a Lookup value |l| is not equal
@@ -757,7 +752,10 @@ template <typename Key>
 struct PointerHasher {
   using Lookup = Key;
 
-  static HashNumber hash(const Lookup& aLookup) { return HashGeneric(aLookup); }
+  static HashNumber hash(const Lookup& aLookup) {
+    size_t word = reinterpret_cast<size_t>(aLookup);
+    return HashGeneric(word);
+  }
 
   static bool match(const Key& aKey, const Lookup& aLookup) {
     return aKey == aLookup;
@@ -2047,7 +2045,6 @@ class HashTable : private AllocPolicy {
     }
 
     if (MOZ_UNLIKELY(aLen > sMaxInit)) {
-      this->reportAllocOverflow();
       return false;
     }
 

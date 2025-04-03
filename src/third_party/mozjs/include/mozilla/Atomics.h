@@ -16,7 +16,9 @@
 #ifndef mozilla_Atomics_h
 #define mozilla_Atomics_h
 
+#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/Compiler.h"
 
 #ifdef __wasi__
 #  include "mozilla/WasiAtomic.h"
@@ -24,7 +26,6 @@
 #  include <atomic>
 #endif  // __wasi__
 
-#include <stddef.h>  // For ptrdiff_t
 #include <stdint.h>
 #include <type_traits>
 

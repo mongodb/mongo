@@ -30,6 +30,7 @@
 
 #include "builtin/Array.h"
 #include "builtin/intl/CommonFunctions.h"
+#include "builtin/intl/DecimalNumber.h"
 #include "builtin/intl/FormatBuffer.h"
 #include "builtin/intl/LanguageTag.h"
 #include "builtin/intl/RelativeTimeFormat.h"
@@ -44,6 +45,7 @@
 #include "vm/JSContext.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/StringType.h"
+#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/GeckoProfiler-inl.h"
 #include "vm/JSObject-inl.h"
@@ -94,10 +96,12 @@ static const JSFunctionSpec numberFormat_methods[] = {
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_NumberFormat_resolvedOptions", 0,
                       0),
     JS_SELF_HOSTED_FN("formatToParts", "Intl_NumberFormat_formatToParts", 1, 0),
+#ifdef NIGHTLY_BUILD
     JS_SELF_HOSTED_FN("formatRange", "Intl_NumberFormat_formatRange", 2, 0),
     JS_SELF_HOSTED_FN("formatRangeToParts",
                       "Intl_NumberFormat_formatRangeToParts", 2, 0),
-    JS_FN("toSource", numberFormat_toSource, 0, 0),
+#endif
+    JS_FN(js_toSource_str, numberFormat_toSource, 0, 0),
     JS_FS_END,
 };
 
@@ -120,9 +124,9 @@ const ClassSpec NumberFormatObject::classSpec_ = {
     ClassSpec::DontDefineConstructor};
 
 /**
- * 15.1.1 Intl.NumberFormat ( [ locales [ , options ] ] )
+ * 11.2.1 Intl.NumberFormat([ locales [, options]])
  *
- * ES2024 Intl draft rev 74ca7099f103d143431b2ea422ae640c6f43e3e6
+ * ES2017 Intl draft rev 94045d234762ad107a3d09bb6f7381a65f1a2f9b
  */
 static bool NumberFormat(JSContext* cx, const CallArgs& args, bool construct) {
   AutoJSConstructorProfilerEntry pseudoFrame(cx, "Intl.NumberFormat");
@@ -148,8 +152,9 @@ static bool NumberFormat(JSContext* cx, const CallArgs& args, bool construct) {
   HandleValue options = args.get(1);
 
   // Step 3.
-  return intl::InitializeNumberFormatObject(cx, numberFormat, thisValue,
-                                            locales, options, args.rval());
+  return intl::LegacyInitializeObject(
+      cx, numberFormat, cx->names().InitializeNumberFormat, thisValue, locales,
+      options, DateTimeFormatOptions::Standard, args.rval());
 }
 
 static bool NumberFormat(JSContext* cx, unsigned argc, Value* vp) {
@@ -556,11 +561,22 @@ static bool FillNumberFormatOptions(JSContext* cx, HandleObject internals,
     options.mGrouping = grouping;
   } else {
     MOZ_ASSERT(value.isBoolean());
+#ifdef NIGHTLY_BUILD
+    // The caller passes the string "always" instead of |true| when the
+    // NumberFormat V3 spec is being used.
     MOZ_ASSERT(value.toBoolean() == false);
+#endif
 
     using Grouping = mozilla::intl::NumberFormatOptions::Grouping;
 
-    options.mGrouping = Grouping::Never;
+    Grouping grouping;
+    if (value.toBoolean()) {
+      grouping = Grouping::Auto;
+    } else {
+      grouping = Grouping::Never;
+    }
+
+    options.mGrouping = grouping;
   }
 
   if (!GetProperty(cx, internals, internals, cx->names().notation, &value)) {
@@ -957,55 +973,58 @@ static bool IsNonDecimalNumber(JSLinearString* str) {
                                : IsNonDecimalNumber(str->twoByteRange(nogc));
 }
 
-/**
- * 15.5.16 ToIntlMathematicalValue ( value )
- *
- * ES2024 Intl draft rev 74ca7099f103d143431b2ea422ae640c6f43e3e6
- */
 static bool ToIntlMathematicalValue(JSContext* cx, MutableHandleValue value) {
-  // Step 1.
   if (!ToPrimitive(cx, JSTYPE_NUMBER, value)) {
     return false;
   }
 
-  // Step 2.
-  if (value.isBigInt()) {
+  // Maximum exponent supported by ICU. Exponents larger than this value will
+  // cause ICU to report an error.
+  // See also "intl/icu/source/i18n/decContext.h".
+  constexpr int32_t maximumExponent = 999'999'999;
+
+  // We further limit the maximum positive exponent to avoid spending multiple
+  // seconds or even minutes in ICU when formatting large numbers.
+  constexpr int32_t maximumPositiveExponent = 9'999'999;
+
+  // Compute the maximum BigInt digit length from the maximum positive exponent.
+  //
+  // BigInts are stored with base |2 ** BigInt::DigitBits|, so we have:
+  //
+  //   |maximumPositiveExponent| * Log_DigitBase(10)
+  // = |maximumPositiveExponent| * Log2(10) / Log2(2 ** BigInt::DigitBits)
+  // = |maximumPositiveExponent| * Log2(10) / BigInt::DigitBits
+  // = 33219277.626945525... / BigInt::DigitBits
+  constexpr size_t maximumBigIntLength = 33219277.626945525 / BigInt::DigitBits;
+
+  if (!value.isString()) {
+    if (!ToNumeric(cx, value)) {
+      return false;
+    }
+
+    if (value.isBigInt() &&
+        value.toBigInt()->digitLength() > maximumBigIntLength) {
+      JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                                JSMSG_EXPONENT_TOO_LARGE);
+      return false;
+    }
+
     return true;
   }
 
-  // Step 4.
-  if (!value.isString()) {
-    // Step 4.a. (Steps 4.b-10 not applicable in our implementation.)
-    return ToNumber(cx, value);
-  }
-
-  // Step 3.
   JSLinearString* str = value.toString()->ensureLinear(cx);
   if (!str) {
     return false;
   }
 
-  // Steps 5-6, 8, and 9.a.
+  // Parse the string as a number.
   double number = LinearStringToNumber(str);
 
-  // Step 7.
+  bool exponentTooLarge = false;
   if (std::isnan(number)) {
     // Set to NaN if the input can't be parsed as a number.
     value.setNaN();
-    return true;
-  }
-
-  // Step 9.
-  if (number == 0.0 || std::isinf(number)) {
-    // Step 9.a. (Reordered)
-
-    // Steps 9.b-e.
-    value.setDouble(number);
-    return true;
-  }
-
-  // Step 10.
-  if (IsNonDecimalNumber(str)) {
+  } else if (IsNonDecimalNumber(str)) {
     // ICU doesn't accept non-decimal numbers, so we have to convert the input
     // into a base-10 string.
 
@@ -1025,9 +1044,41 @@ static bool ToIntlMathematicalValue(JSContext* cx, MutableHandleValue value) {
       JS_TRY_VAR_OR_RETURN_FALSE(cx, bi, StringToBigInt(cx, rooted));
       MOZ_ASSERT(bi);
 
-      value.setBigInt(bi);
+      if (bi->digitLength() > maximumBigIntLength) {
+        exponentTooLarge = true;
+      } else {
+        value.setBigInt(bi);
+      }
+    }
+  } else {
+    JS::AutoCheckCannotGC nogc;
+    if (auto decimal = intl::DecimalNumber::from(str, nogc)) {
+      if (decimal->isZero()) {
+        // Normalize positive/negative zero.
+        MOZ_ASSERT(number == 0);
+
+        value.setDouble(number);
+      } else if (decimal->exponentTooLarge() ||
+                 std::abs(decimal->exponent()) >= maximumExponent ||
+                 decimal->exponent() > maximumPositiveExponent) {
+        exponentTooLarge = true;
+      }
+    } else {
+      // If we can't parse the string as a decimal, it must be ±Infinity.
+      MOZ_ASSERT(std::isinf(number));
+      MOZ_ASSERT(StringFindPattern(str, cx->names().Infinity, 0) >= 0);
+
+      value.setDouble(number);
     }
   }
+
+  if (exponentTooLarge) {
+    // Throw an error if the exponent is too large.
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_EXPONENT_TOO_LARGE);
+    return false;
+  }
+
   return true;
 }
 
@@ -1081,15 +1132,20 @@ bool js::intl_FormatNumber(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   MOZ_ASSERT(args.length() == 3);
   MOZ_ASSERT(args[0].isObject());
+#ifndef NIGHTLY_BUILD
+  MOZ_ASSERT(args[1].isNumeric());
+#endif
   MOZ_ASSERT(args[2].isBoolean());
 
   Rooted<NumberFormatObject*> numberFormat(
       cx, &args[0].toObject().as<NumberFormatObject>());
 
   RootedValue value(cx, args[1]);
+#ifdef NIGHTLY_BUILD
   if (!ToIntlMathematicalValue(cx, &value)) {
     return false;
   }
+#endif
 
   mozilla::intl::NumberFormat* nf = GetOrCreateNumberFormat(cx, numberFormat);
   if (!nf) {

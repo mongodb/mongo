@@ -87,7 +87,7 @@ typedef enum ZyanMemoryPageProtection_
  *
  * @return  The system page size.
  */
-ZYCORE_EXPORT ZyanU32 ZyanMemoryGetSystemPageSize(void);
+ZYCORE_EXPORT ZyanU32 ZyanMemoryGetSystemPageSize();
 
 /**
  * Returns the system allocation granularity.
@@ -100,7 +100,7 @@ ZYCORE_EXPORT ZyanU32 ZyanMemoryGetSystemPageSize(void);
  *
  * @return  The system allocation granularity.
  */
-ZYCORE_EXPORT ZyanU32 ZyanMemoryGetSystemAllocationGranularity(void);
+ZYCORE_EXPORT ZyanU32 ZyanMemoryGetSystemAllocationGranularity();
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Memory management                                                                              */

@@ -136,28 +136,11 @@ typedef enum ZydisDecoderMode_
      * This mode is enabled by default.
      */
     ZYDIS_DECODER_MODE_CLDEMOTE,
-    /**
-     * Enables the `IPREFETCH` mode.
-     *
-     * The `IPREFETCH` isa-extension reuses (overrides) some of the widenop instruction opcodes.
-     *
-     * This mode is enabled by default.
-     */
-    ZYDIS_DECODER_MODE_IPREFETCH,
-    /**
-     * Enables the `UD0` compatibility mode.
-     *
-     * Some processors decode the `UD0` instruction without a ModR/M byte. Enable this decoder mode
-     * to mimic this behavior.
-     *
-     * This mode is disabled by default.
-     */
-    ZYDIS_DECODER_MODE_UD0_COMPAT,
 
     /**
      * Maximum value of this enum.
      */
-    ZYDIS_DECODER_MODE_MAX_VALUE = ZYDIS_DECODER_MODE_UD0_COMPAT,
+    ZYDIS_DECODER_MODE_MAX_VALUE = ZYDIS_DECODER_MODE_CLDEMOTE,
     /**
      * The minimum number of bits required to represent all values of this enum.
      */
@@ -185,9 +168,9 @@ typedef struct ZydisDecoder_
      */
     ZydisStackWidth stack_width;
     /**
-     * The decoder mode bitmap.
+     * The decoder mode array.
      */
-    ZyanU32 decoder_mode;
+    ZyanBool decoder_mode[ZYDIS_DECODER_MODE_MAX_VALUE + 1];
 } ZydisDecoder;
 
 /* ---------------------------------------------------------------------------------------------- */

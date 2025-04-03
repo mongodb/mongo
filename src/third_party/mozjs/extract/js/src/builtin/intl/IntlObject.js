@@ -47,15 +47,15 @@ function Intl_supportedValuesOf(key) {
  */
 function Intl_getCalendarInfo(locales) {
   // 1. Let requestLocales be ? CanonicalizeLocaleList(locales).
-  var requestedLocales = CanonicalizeLocaleList(locales);
+  const requestedLocales = CanonicalizeLocaleList(locales);
 
-  var DateTimeFormat = dateTimeFormatInternalProperties;
+  const DateTimeFormat = dateTimeFormatInternalProperties;
 
   // 2. Let localeData be %DateTimeFormat%.[[localeData]].
-  var localeData = DateTimeFormat.localeData;
+  const localeData = DateTimeFormat.localeData;
 
   // 3. Let localeOpt be a new Record.
-  var localeOpt = new_Record();
+  const localeOpt = new_Record();
 
   // 4. Set localeOpt.[[localeMatcher]] to "best fit".
   localeOpt.localeMatcher = "best fit";
@@ -63,7 +63,7 @@ function Intl_getCalendarInfo(locales) {
   // 5. Let r be ResolveLocale(%DateTimeFormat%.[[availableLocales]],
   //    requestedLocales, localeOpt,
   //    %DateTimeFormat%.[[relevantExtensionKeys]], localeData).
-  var r = ResolveLocale(
+  const r = ResolveLocale(
     "DateTimeFormat",
     requestedLocales,
     localeOpt,
@@ -72,7 +72,7 @@ function Intl_getCalendarInfo(locales) {
   );
 
   // 6. Let result be GetCalendarInfo(r.[[locale]]).
-  var result = intl_GetCalendarInfo(r.locale);
+  const result = intl_GetCalendarInfo(r.locale);
   DefineDataProperty(result, "calendar", r.ca);
   DefineDataProperty(result, "locale", r.locale);
 

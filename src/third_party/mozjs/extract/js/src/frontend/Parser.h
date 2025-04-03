@@ -183,7 +183,6 @@
 #include "frontend/SharedContext.h"
 #include "frontend/SyntaxParseHandler.h"
 #include "frontend/TokenStream.h"
-#include "js/CharacterEncoding.h"     // JS::ConstUTF8CharsZ
 #include "js/friend/ErrorMessages.h"  // JSErrNum, JSMSG_*
 #include "vm/GeneratorAndAsyncKind.h"  // js::GeneratorKind, js::FunctionAsyncKind
 
@@ -269,8 +268,6 @@ class MOZ_STACK_CLASS ParserSharedBase {
 
   LifoAlloc& stencilAlloc() { return compilationState_.alloc; }
 
-  const UsedNameTracker& usedNames() { return usedNames_; }
-
 #if defined(DEBUG) || defined(JS_JITSPEW)
   void dumpAtom(TaggedParserAtomIndex index) const;
 #endif
@@ -329,7 +326,7 @@ class MOZ_STACK_CLASS ParserBase : public ParserSharedBase,
 
   bool checkOptions();
 
-  JS::ConstUTF8CharsZ getFilename() const { return anyChars.getFilename(); }
+  const char* getFilename() const { return anyChars.getFilename(); }
   TokenPos pos() const { return anyChars.currentToken().pos; }
 
   // Determine whether |yield| is a valid name in the current context.
@@ -440,11 +437,9 @@ class MOZ_STACK_CLASS PerHandlerParser : public ParserBase {
 
  private:
   using Node = typename ParseHandler::Node;
-  using NodeResult = typename ParseHandler::NodeResult;
 
-#define DECLARE_TYPE(typeName)                                  \
-  using typeName##Type = typename ParseHandler::typeName##Type; \
-  using typeName##Result = typename ParseHandler::typeName##Result;
+#define DECLARE_TYPE(typeName, longTypeName, asMethodName) \
+  using longTypeName = typename ParseHandler::longTypeName;
   FOR_EACH_PARSENODE_SUBCLASS(DECLARE_TYPE)
 #undef DECLARE_TYPE
 
@@ -489,13 +484,7 @@ class MOZ_STACK_CLASS PerHandlerParser : public ParserBase {
 
   static typename ParseHandler::NullNode null() { return ParseHandler::null(); }
 
-  // The return value for the error case in the functions that returns
-  // Result type.
-  static constexpr typename ParseHandler::NodeErrorResult errorResult() {
-    return ParseHandler::errorResult();
-  }
-
-  NameNodeResult stringLiteral();
+  NameNodeType stringLiteral();
 
   const char* nameIsArgumentsOrEval(Node node);
 
@@ -521,27 +510,26 @@ class MOZ_STACK_CLASS PerHandlerParser : public ParserBase {
   bool checkForUndefinedPrivateFields(EvalSharedContext* evalSc = nullptr);
 
   bool finishFunctionScopes(bool isStandaloneFunction);
-  LexicalScopeNodeResult finishLexicalScope(
-      ParseContext::Scope& scope, Node body,
-      ScopeKind kind = ScopeKind::Lexical);
-  ClassBodyScopeNodeResult finishClassBodyScope(ParseContext::Scope& scope,
-                                                ListNodeType body);
+  LexicalScopeNodeType finishLexicalScope(ParseContext::Scope& scope, Node body,
+                                          ScopeKind kind = ScopeKind::Lexical);
+  ClassBodyScopeNodeType finishClassBodyScope(ParseContext::Scope& scope,
+                                              ListNodeType body);
   bool finishFunction(bool isStandaloneFunction = false);
 
-  inline NameNodeResult newName(TaggedParserAtomIndex name);
-  inline NameNodeResult newName(TaggedParserAtomIndex name, TokenPos pos);
+  inline NameNodeType newName(TaggedParserAtomIndex name);
+  inline NameNodeType newName(TaggedParserAtomIndex name, TokenPos pos);
 
-  inline NameNodeResult newPrivateName(TaggedParserAtomIndex name);
+  inline NameNodeType newPrivateName(TaggedParserAtomIndex name);
 
-  NameNodeResult newInternalDotName(TaggedParserAtomIndex name);
-  NameNodeResult newThisName();
-  NameNodeResult newNewTargetName();
-  NameNodeResult newDotGeneratorName();
+  NameNodeType newInternalDotName(TaggedParserAtomIndex name);
+  NameNodeType newThisName();
+  NameNodeType newNewTargetName();
+  NameNodeType newDotGeneratorName();
 
-  NameNodeResult identifierReference(TaggedParserAtomIndex name);
-  NameNodeResult privateNameReference(TaggedParserAtomIndex name);
+  NameNodeType identifierReference(TaggedParserAtomIndex name);
+  NameNodeType privateNameReference(TaggedParserAtomIndex name);
 
-  NodeResult noSubstitutionTaggedTemplate();
+  Node noSubstitutionTaggedTemplate();
 
   inline bool processExport(Node node);
   inline bool processExportFrom(BinaryNodeType node);
@@ -576,6 +564,14 @@ class MOZ_STACK_CLASS PerHandlerParser : public ParserBase {
   inline void clearAbortedSyntaxParse();
 
  public:
+  NameNodeType newPropertyName(TaggedParserAtomIndex key, const TokenPos& pos) {
+    return handler_.newPropertyName(key, pos);
+  }
+
+  PropertyAccessType newPropertyAccess(Node expr, NameNodeType key) {
+    return handler_.newPropertyAccess(expr, key);
+  }
+
   FunctionBox* newFunctionBox(FunctionNodeType funNode,
                               TaggedParserAtomIndex explicitName,
                               FunctionFlags flags, uint32_t toStringStart,
@@ -688,11 +684,9 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   using Base = PerHandlerParser<ParseHandler>;
   using FinalParser = Parser<ParseHandler, Unit>;
   using Node = typename ParseHandler::Node;
-  using NodeResult = typename ParseHandler::NodeResult;
 
-#define DECLARE_TYPE(typeName)                                  \
-  using typeName##Type = typename ParseHandler::typeName##Type; \
-  using typeName##Result = typename ParseHandler::typeName##Result;
+#define DECLARE_TYPE(typeName, longTypeName, asMethodName) \
+  using longTypeName = typename ParseHandler::longTypeName;
   FOR_EACH_PARSENODE_SUBCLASS(DECLARE_TYPE)
 #undef DECLARE_TYPE
 
@@ -715,7 +709,6 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   using Base::checkOptionsCalled_;
 #endif
   using Base::checkForUndefinedPrivateFields;
-  using Base::errorResult;
   using Base::finishClassBodyScope;
   using Base::finishFunctionScopes;
   using Base::finishLexicalScope;
@@ -939,7 +932,7 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   /*
    * Parse a top-level JS script.
    */
-  ListNodeResult parse();
+  ListNodeType parse();
 
  private:
   /*
@@ -993,8 +986,8 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   }
 
  private:
-  NameNodeResult noSubstitutionUntaggedTemplate();
-  ListNodeResult templateLiteral(YieldHandling yieldHandling);
+  NameNodeType noSubstitutionUntaggedTemplate();
+  ListNodeType templateLiteral(YieldHandling yieldHandling);
   bool taggedTemplate(YieldHandling yieldHandling, ListNodeType tagArgsList,
                       TokenKind tt);
   bool appendToCallSiteObj(CallSiteNodeType callSiteObj);
@@ -1016,12 +1009,12 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
 
  public:
   /* Public entry points for parsing. */
-  NodeResult statementListItem(YieldHandling yieldHandling,
-                               bool canHaveDirectives = false);
+  Node statementListItem(YieldHandling yieldHandling,
+                         bool canHaveDirectives = false);
 
   // Parse an inner function given an enclosing ParseContext and a
   // FunctionBox for the inner function.
-  [[nodiscard]] FunctionNodeResult innerFunctionForFunctionBox(
+  [[nodiscard]] FunctionNodeType innerFunctionForFunctionBox(
       FunctionNodeType funNode, ParseContext* outerpc, FunctionBox* funbox,
       InHandling inHandling, YieldHandling yieldHandling,
       FunctionSyntaxKind kind, Directives* newDirectives);
@@ -1043,59 +1036,59 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
    *
    * Each returns a parse node tree or null on error.
    */
-  FunctionNodeResult functionStmt(
+  FunctionNodeType functionStmt(
       uint32_t toStringStart, YieldHandling yieldHandling,
       DefaultHandling defaultHandling,
       FunctionAsyncKind asyncKind = FunctionAsyncKind::SyncFunction);
-  FunctionNodeResult functionExpr(uint32_t toStringStart,
-                                  InvokedPrediction invoked,
-                                  FunctionAsyncKind asyncKind);
+  FunctionNodeType functionExpr(uint32_t toStringStart,
+                                InvokedPrediction invoked,
+                                FunctionAsyncKind asyncKind);
 
-  NodeResult statement(YieldHandling yieldHandling);
+  Node statement(YieldHandling yieldHandling);
   bool maybeParseDirective(ListNodeType list, Node pn, bool* cont);
 
-  LexicalScopeNodeResult blockStatement(
+  LexicalScopeNodeType blockStatement(
       YieldHandling yieldHandling,
       unsigned errorNumber = JSMSG_CURLY_IN_COMPOUND);
-  BinaryNodeResult doWhileStatement(YieldHandling yieldHandling);
-  BinaryNodeResult whileStatement(YieldHandling yieldHandling);
+  BinaryNodeType doWhileStatement(YieldHandling yieldHandling);
+  BinaryNodeType whileStatement(YieldHandling yieldHandling);
 
-  NodeResult forStatement(YieldHandling yieldHandling);
+  Node forStatement(YieldHandling yieldHandling);
   bool forHeadStart(YieldHandling yieldHandling, IteratorKind iterKind,
                     ParseNodeKind* forHeadKind, Node* forInitialPart,
                     mozilla::Maybe<ParseContext::Scope>& forLetImpliedScope,
                     Node* forInOrOfExpression);
-  NodeResult expressionAfterForInOrOf(ParseNodeKind forHeadKind,
-                                      YieldHandling yieldHandling);
+  Node expressionAfterForInOrOf(ParseNodeKind forHeadKind,
+                                YieldHandling yieldHandling);
 
-  SwitchStatementResult switchStatement(YieldHandling yieldHandling);
-  ContinueStatementResult continueStatement(YieldHandling yieldHandling);
-  BreakStatementResult breakStatement(YieldHandling yieldHandling);
-  UnaryNodeResult returnStatement(YieldHandling yieldHandling);
-  BinaryNodeResult withStatement(YieldHandling yieldHandling);
-  UnaryNodeResult throwStatement(YieldHandling yieldHandling);
-  TernaryNodeResult tryStatement(YieldHandling yieldHandling);
-  LexicalScopeNodeResult catchBlockStatement(
+  SwitchStatementType switchStatement(YieldHandling yieldHandling);
+  ContinueStatementType continueStatement(YieldHandling yieldHandling);
+  BreakStatementType breakStatement(YieldHandling yieldHandling);
+  UnaryNodeType returnStatement(YieldHandling yieldHandling);
+  BinaryNodeType withStatement(YieldHandling yieldHandling);
+  UnaryNodeType throwStatement(YieldHandling yieldHandling);
+  TernaryNodeType tryStatement(YieldHandling yieldHandling);
+  LexicalScopeNodeType catchBlockStatement(
       YieldHandling yieldHandling, ParseContext::Scope& catchParamScope);
-  DebuggerStatementResult debuggerStatement();
+  DebuggerStatementType debuggerStatement();
 
-  DeclarationListNodeResult variableStatement(YieldHandling yieldHandling);
+  DeclarationListNodeType variableStatement(YieldHandling yieldHandling);
 
-  LabeledStatementResult labeledStatement(YieldHandling yieldHandling);
-  NodeResult labeledItem(YieldHandling yieldHandling);
+  LabeledStatementType labeledStatement(YieldHandling yieldHandling);
+  Node labeledItem(YieldHandling yieldHandling);
 
-  TernaryNodeResult ifStatement(YieldHandling yieldHandling);
-  NodeResult consequentOrAlternative(YieldHandling yieldHandling);
+  TernaryNodeType ifStatement(YieldHandling yieldHandling);
+  Node consequentOrAlternative(YieldHandling yieldHandling);
 
-  DeclarationListNodeResult lexicalDeclaration(YieldHandling yieldHandling,
-                                               DeclarationKind kind);
+  DeclarationListNodeType lexicalDeclaration(YieldHandling yieldHandling,
+                                             DeclarationKind kind);
 
-  NameNodeResult moduleExportName();
+  NameNodeType moduleExportName();
 
-  bool withClause(ListNodeType attributesSet);
+  bool assertClause(ListNodeType assertionsSet);
 
-  BinaryNodeResult importDeclaration();
-  NodeResult importDeclarationOrImportExpr(YieldHandling yieldHandling);
+  BinaryNodeType importDeclaration();
+  Node importDeclarationOrImportExpr(YieldHandling yieldHandling);
   bool namedImports(ListNodeType importSpecSet);
   bool namespaceImport(ListNodeType importSpecSet);
 
@@ -1103,26 +1096,25 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
     return bindingIdentifier(YieldIsName);
   }
 
-  BinaryNodeResult exportFrom(uint32_t begin, Node specList);
-  BinaryNodeResult exportBatch(uint32_t begin);
+  BinaryNodeType exportFrom(uint32_t begin, Node specList);
+  BinaryNodeType exportBatch(uint32_t begin);
   inline bool checkLocalExportNames(ListNodeType node);
-  NodeResult exportClause(uint32_t begin);
-  UnaryNodeResult exportFunctionDeclaration(
+  Node exportClause(uint32_t begin);
+  UnaryNodeType exportFunctionDeclaration(
       uint32_t begin, uint32_t toStringStart,
       FunctionAsyncKind asyncKind = FunctionAsyncKind::SyncFunction);
-  UnaryNodeResult exportVariableStatement(uint32_t begin);
-  UnaryNodeResult exportClassDeclaration(uint32_t begin);
-  UnaryNodeResult exportLexicalDeclaration(uint32_t begin,
-                                           DeclarationKind kind);
-  BinaryNodeResult exportDefaultFunctionDeclaration(
+  UnaryNodeType exportVariableStatement(uint32_t begin);
+  UnaryNodeType exportClassDeclaration(uint32_t begin);
+  UnaryNodeType exportLexicalDeclaration(uint32_t begin, DeclarationKind kind);
+  BinaryNodeType exportDefaultFunctionDeclaration(
       uint32_t begin, uint32_t toStringStart,
       FunctionAsyncKind asyncKind = FunctionAsyncKind::SyncFunction);
-  BinaryNodeResult exportDefaultClassDeclaration(uint32_t begin);
-  BinaryNodeResult exportDefaultAssignExpr(uint32_t begin);
-  BinaryNodeResult exportDefault(uint32_t begin);
-  NodeResult exportDeclaration();
+  BinaryNodeType exportDefaultClassDeclaration(uint32_t begin);
+  BinaryNodeType exportDefaultAssignExpr(uint32_t begin);
+  BinaryNodeType exportDefault(uint32_t begin);
+  Node exportDeclaration();
 
-  UnaryNodeResult expressionStatement(
+  UnaryNodeType expressionStatement(
       YieldHandling yieldHandling,
       InvokedPrediction invoked = PredictUninvoked);
 
@@ -1130,15 +1122,15 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   // with sub-functionality split out into the remaining methods.
 
   // |blockScope| may be non-null only when |kind| corresponds to a lexical
-  // declaration (that is, ParseNodeKind::LetDecl or ParseNodeKind::ConstDecl).
+  // declaration (that is, PNK_LET or PNK_CONST).
   //
   // The for* parameters, for normal declarations, should be null/ignored.
   // They should be non-null only when Parser::forHeadStart parses a
   // declaration at the start of a for-loop head.
   //
-  // In this case, on success |*forHeadKind| is ParseNodeKind::ForHead,
-  // ParseNodeKind::ForIn, or ParseNodeKind::ForOf, corresponding to the three
-  // for-loop kinds.  The precise value indicates what was parsed.
+  // In this case, on success |*forHeadKind| is PNK_FORHEAD, PNK_FORIN, or
+  // PNK_FOROF, corresponding to the three for-loop kinds.  The precise value
+  // indicates what was parsed.
   //
   // If parsing recognized a for(;;) loop, the next token is the ';' within
   // the loop-head that separates the init/test parts.
@@ -1146,10 +1138,10 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   // Otherwise, for for-in/of loops, the next token is the ')' ending the
   // loop-head.  Additionally, the expression that the loop iterates over was
   // parsed into |*forInOrOfExpression|.
-  DeclarationListNodeResult declarationList(
-      YieldHandling yieldHandling, ParseNodeKind kind,
-      ParseNodeKind* forHeadKind = nullptr,
-      Node* forInOrOfExpression = nullptr);
+  DeclarationListNodeType declarationList(YieldHandling yieldHandling,
+                                          ParseNodeKind kind,
+                                          ParseNodeKind* forHeadKind = nullptr,
+                                          Node* forInOrOfExpression = nullptr);
 
   // The items in a declaration list are either patterns or names, with or
   // without initializers.  These two methods parse a single pattern/name and
@@ -1160,76 +1152,70 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   // |*forInOrOfExpression|.  (An "initial declaration" is the first
   // declaration in a declaration list: |a| but not |b| in |var a, b|, |{c}|
   // but not |d| in |let {c} = 3, d|.)
-  NodeResult declarationPattern(DeclarationKind declKind, TokenKind tt,
-                                bool initialDeclaration,
-                                YieldHandling yieldHandling,
-                                ParseNodeKind* forHeadKind,
-                                Node* forInOrOfExpression);
-  NodeResult declarationName(DeclarationKind declKind, TokenKind tt,
-                             bool initialDeclaration,
-                             YieldHandling yieldHandling,
-                             ParseNodeKind* forHeadKind,
-                             Node* forInOrOfExpression);
+  Node declarationPattern(DeclarationKind declKind, TokenKind tt,
+                          bool initialDeclaration, YieldHandling yieldHandling,
+                          ParseNodeKind* forHeadKind,
+                          Node* forInOrOfExpression);
+  Node declarationName(DeclarationKind declKind, TokenKind tt,
+                       bool initialDeclaration, YieldHandling yieldHandling,
+                       ParseNodeKind* forHeadKind, Node* forInOrOfExpression);
 
   // Having parsed a name (not found in a destructuring pattern) declared by
   // a declaration, with the current token being the '=' separating the name
   // from its initializer, parse and bind that initializer -- and possibly
   // consume trailing in/of and subsequent expression, if so directed by
   // |forHeadKind|.
-  AssignmentNodeResult initializerInNameDeclaration(NameNodeType binding,
-                                                    DeclarationKind declKind,
-                                                    bool initialDeclaration,
-                                                    YieldHandling yieldHandling,
-                                                    ParseNodeKind* forHeadKind,
-                                                    Node* forInOrOfExpression);
+  AssignmentNodeType initializerInNameDeclaration(NameNodeType binding,
+                                                  DeclarationKind declKind,
+                                                  bool initialDeclaration,
+                                                  YieldHandling yieldHandling,
+                                                  ParseNodeKind* forHeadKind,
+                                                  Node* forInOrOfExpression);
 
-  NodeResult expr(InHandling inHandling, YieldHandling yieldHandling,
+  Node expr(InHandling inHandling, YieldHandling yieldHandling,
+            TripledotHandling tripledotHandling,
+            PossibleError* possibleError = nullptr,
+            InvokedPrediction invoked = PredictUninvoked);
+  Node assignExpr(InHandling inHandling, YieldHandling yieldHandling,
                   TripledotHandling tripledotHandling,
                   PossibleError* possibleError = nullptr,
                   InvokedPrediction invoked = PredictUninvoked);
-  NodeResult assignExpr(InHandling inHandling, YieldHandling yieldHandling,
-                        TripledotHandling tripledotHandling,
-                        PossibleError* possibleError = nullptr,
-                        InvokedPrediction invoked = PredictUninvoked);
-  NodeResult assignExprWithoutYieldOrAwait(YieldHandling yieldHandling);
-  UnaryNodeResult yieldExpression(InHandling inHandling);
-  NodeResult condExpr(InHandling inHandling, YieldHandling yieldHandling,
-                      TripledotHandling tripledotHandling,
-                      PossibleError* possibleError, InvokedPrediction invoked);
-  NodeResult orExpr(InHandling inHandling, YieldHandling yieldHandling,
+  Node assignExprWithoutYieldOrAwait(YieldHandling yieldHandling);
+  UnaryNodeType yieldExpression(InHandling inHandling);
+  Node condExpr(InHandling inHandling, YieldHandling yieldHandling,
+                TripledotHandling tripledotHandling,
+                PossibleError* possibleError, InvokedPrediction invoked);
+  Node orExpr(InHandling inHandling, YieldHandling yieldHandling,
+              TripledotHandling tripledotHandling, PossibleError* possibleError,
+              InvokedPrediction invoked);
+  Node unaryExpr(YieldHandling yieldHandling,
+                 TripledotHandling tripledotHandling,
+                 PossibleError* possibleError = nullptr,
+                 InvokedPrediction invoked = PredictUninvoked,
+                 PrivateNameHandling privateNameHandling =
+                     PrivateNameHandling::PrivateNameProhibited);
+  Node optionalExpr(YieldHandling yieldHandling,
+                    TripledotHandling tripledotHandling, TokenKind tt,
+                    PossibleError* possibleError = nullptr,
+                    InvokedPrediction invoked = PredictUninvoked);
+  Node memberExpr(YieldHandling yieldHandling,
+                  TripledotHandling tripledotHandling, TokenKind tt,
+                  bool allowCallSyntax, PossibleError* possibleError,
+                  InvokedPrediction invoked);
+  Node primaryExpr(YieldHandling yieldHandling,
+                   TripledotHandling tripledotHandling, TokenKind tt,
+                   PossibleError* possibleError, InvokedPrediction invoked);
+  Node exprInParens(InHandling inHandling, YieldHandling yieldHandling,
                     TripledotHandling tripledotHandling,
-                    PossibleError* possibleError, InvokedPrediction invoked);
-  NodeResult unaryExpr(YieldHandling yieldHandling,
-                       TripledotHandling tripledotHandling,
-                       PossibleError* possibleError = nullptr,
-                       InvokedPrediction invoked = PredictUninvoked,
-                       PrivateNameHandling privateNameHandling =
-                           PrivateNameHandling::PrivateNameProhibited);
-  NodeResult optionalExpr(YieldHandling yieldHandling,
-                          TripledotHandling tripledotHandling, TokenKind tt,
-                          PossibleError* possibleError = nullptr,
-                          InvokedPrediction invoked = PredictUninvoked);
-  NodeResult memberExpr(YieldHandling yieldHandling,
-                        TripledotHandling tripledotHandling, TokenKind tt,
-                        bool allowCallSyntax, PossibleError* possibleError,
-                        InvokedPrediction invoked);
-  NodeResult decoratorExpr(YieldHandling yieldHandling, TokenKind tt);
-  NodeResult primaryExpr(YieldHandling yieldHandling,
-                         TripledotHandling tripledotHandling, TokenKind tt,
-                         PossibleError* possibleError,
-                         InvokedPrediction invoked);
-  NodeResult exprInParens(InHandling inHandling, YieldHandling yieldHandling,
-                          TripledotHandling tripledotHandling,
-                          PossibleError* possibleError = nullptr);
+                    PossibleError* possibleError = nullptr);
 
   bool tryNewTarget(NewTargetNodeType* newTarget);
 
-  BinaryNodeResult importExpr(YieldHandling yieldHandling,
-                              bool allowCallSyntax);
+  BinaryNodeType importExpr(YieldHandling yieldHandling, bool allowCallSyntax);
 
-  FunctionNodeResult methodDefinition(uint32_t toStringStart,
-                                      PropertyType propType,
-                                      TaggedParserAtomIndex funName);
+  FunctionNodeType methodDefinition(uint32_t toStringStart,
+                                    PropertyType propType,
+                                    TaggedParserAtomIndex funName);
 
   /*
    * Additional JS parsers.
@@ -1237,7 +1223,7 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   bool functionArguments(YieldHandling yieldHandling, FunctionSyntaxKind kind,
                          FunctionNodeType funNode);
 
-  FunctionNodeResult functionDefinition(
+  FunctionNodeType functionDefinition(
       FunctionNodeType funNode, uint32_t toStringStart, InHandling inHandling,
       YieldHandling yieldHandling, TaggedParserAtomIndex name,
       FunctionSyntaxKind kind, GeneratorKind generatorKind,
@@ -1248,23 +1234,23 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   //
   // Don't include opening LeftCurly token when invoking.
   enum FunctionBodyType { StatementListBody, ExpressionBody };
-  LexicalScopeNodeResult functionBody(InHandling inHandling,
-                                      YieldHandling yieldHandling,
-                                      FunctionSyntaxKind kind,
-                                      FunctionBodyType type);
+  LexicalScopeNodeType functionBody(InHandling inHandling,
+                                    YieldHandling yieldHandling,
+                                    FunctionSyntaxKind kind,
+                                    FunctionBodyType type);
 
-  UnaryNodeResult unaryOpExpr(YieldHandling yieldHandling, ParseNodeKind kind,
-                              uint32_t begin);
+  UnaryNodeType unaryOpExpr(YieldHandling yieldHandling, ParseNodeKind kind,
+                            uint32_t begin);
 
-  NodeResult condition(InHandling inHandling, YieldHandling yieldHandling);
+  Node condition(InHandling inHandling, YieldHandling yieldHandling);
 
-  ListNodeResult argumentList(YieldHandling yieldHandling, bool* isSpread,
-                              PossibleError* possibleError = nullptr);
-  NodeResult destructuringDeclaration(DeclarationKind kind,
-                                      YieldHandling yieldHandling,
-                                      TokenKind tt);
-  NodeResult destructuringDeclarationWithoutYieldOrAwait(
-      DeclarationKind kind, YieldHandling yieldHandling, TokenKind tt);
+  ListNodeType argumentList(YieldHandling yieldHandling, bool* isSpread,
+                            PossibleError* possibleError = nullptr);
+  Node destructuringDeclaration(DeclarationKind kind,
+                                YieldHandling yieldHandling, TokenKind tt);
+  Node destructuringDeclarationWithoutYieldOrAwait(DeclarationKind kind,
+                                                   YieldHandling yieldHandling,
+                                                   TokenKind tt);
 
   inline bool checkExportedName(TaggedParserAtomIndex exportName);
   inline bool checkExportedNamesForArrayBinding(ListNodeType array);
@@ -1277,16 +1263,11 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   inline bool checkExportedNameForClause(NameNodeType nameNode);
 
   enum ClassContext { ClassStatement, ClassExpression };
-  ClassNodeResult classDefinition(YieldHandling yieldHandling,
-                                  ClassContext classContext,
-                                  DefaultHandling defaultHandling);
+  ClassNodeType classDefinition(YieldHandling yieldHandling,
+                                ClassContext classContext,
+                                DefaultHandling defaultHandling);
 
   struct ClassInitializedMembers {
-#ifdef ENABLE_DECORATORS
-    // Whether a non-static field has decorators or not.
-    bool hasInstanceDecorators = false;
-#endif
-
     // The number of instance class fields.
     size_t instanceFields = 0;
 
@@ -1313,7 +1294,7 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
     }
   };
 #ifdef ENABLE_DECORATORS
-  ListNodeResult decoratorList(YieldHandling yieldHandling);
+  ListNodeType decoratorList(YieldHandling yieldHandling);
 #endif
   [[nodiscard]] bool classMember(
       YieldHandling yieldHandling,
@@ -1328,45 +1309,43 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
       const ClassInitializedMembers& classInitializedMembers,
       ListNodeType& classMembers);
 
-  FunctionNodeResult privateMethodInitializer(
+  FunctionNodeType privateMethodInitializer(
       TokenPos propNamePos, TaggedParserAtomIndex propAtom,
       TaggedParserAtomIndex storedMethodAtom);
-  FunctionNodeResult fieldInitializerOpt(
+  FunctionNodeType fieldInitializerOpt(
       TokenPos propNamePos, Node name, TaggedParserAtomIndex atom,
       ClassInitializedMembers& classInitializedMembers, bool isStatic,
       HasHeritage hasHeritage);
 
-  FunctionNodeResult synthesizePrivateMethodInitializer(
+  FunctionNodeType synthesizePrivateMethodInitializer(
       TaggedParserAtomIndex propAtom, AccessorType accessorType,
       TokenPos propNamePos);
 
 #ifdef ENABLE_DECORATORS
-  FunctionNodeResult synthesizeAddInitializerFunction(
-      TaggedParserAtomIndex initializers, YieldHandling yieldHandling);
+  Node synthesizeAccessor(Node propName, TokenPos propNamePos,
+                          TaggedParserAtomIndex propAtom,
+                          TaggedParserAtomIndex privateStateNameAtom,
+                          bool isStatic, FunctionSyntaxKind syntaxKind,
+                          ListNodeType decorators,
+                          ClassInitializedMembers& classInitializedMembers);
 
-  ClassMethodResult synthesizeAccessor(
-      Node propName, TokenPos propNamePos, TaggedParserAtomIndex propAtom,
-      TaggedParserAtomIndex privateStateNameAtom, bool isStatic,
-      FunctionSyntaxKind syntaxKind,
-      ClassInitializedMembers& classInitializedMembers);
-
-  FunctionNodeResult synthesizeAccessorBody(TaggedParserAtomIndex funNameAtom,
-                                            TokenPos propNamePos,
-                                            TaggedParserAtomIndex propNameAtom,
-                                            FunctionSyntaxKind syntaxKind);
+  FunctionNodeType synthesizeAccessorBody(TokenPos propNamePos,
+                                          TaggedParserAtomIndex atom,
+                                          FunctionSyntaxKind syntaxKind);
 #endif
 
-  FunctionNodeResult staticClassBlock(
+  FunctionNodeType staticClassBlock(
       ClassInitializedMembers& classInitializedMembers);
 
-  FunctionNodeResult synthesizeConstructor(TaggedParserAtomIndex className,
-                                           TokenPos synthesizedBodyPos,
-                                           HasHeritage hasHeritage);
+  FunctionNodeType synthesizeConstructor(TaggedParserAtomIndex className,
+                                         TokenPos synthesizedBodyPos,
+                                         HasHeritage hasHeritage);
 
  protected:
-  bool synthesizeConstructorBody(TokenPos synthesizedBodyPos,
-                                 HasHeritage hasHeritage,
-                                 FunctionNodeType funNode, FunctionBox* funbox);
+  FunctionNodeType synthesizeConstructorBody(TokenPos synthesizedBodyPos,
+                                             HasHeritage hasHeritage,
+                                             FunctionNodeType funNode,
+                                             FunctionBox* funbox);
 
  private:
   bool checkBindingIdentifier(TaggedParserAtomIndex ident, uint32_t offset,
@@ -1396,18 +1375,8 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
   void reportMissingClosing(unsigned errorNumber, unsigned noteNumber,
                             uint32_t openedPos);
 
-  void reportRedeclarationHelper(TaggedParserAtomIndex& name,
-                                 DeclarationKind& prevKind, TokenPos& pos,
-                                 uint32_t& prevPos, const unsigned& errorNumber,
-                                 const unsigned& noteErrorNumber);
-
   void reportRedeclaration(TaggedParserAtomIndex name, DeclarationKind prevKind,
                            TokenPos pos, uint32_t prevPos);
-
-  void reportMismatchedPlacement(TaggedParserAtomIndex name,
-                                 DeclarationKind prevKind, TokenPos pos,
-                                 uint32_t prevPos);
-
   bool notePositionalFormalParameter(FunctionNodeType funNode,
                                      TaggedParserAtomIndex name,
                                      uint32_t beginPos,
@@ -1422,42 +1391,41 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
     PropertyNameInRecord
 #endif
   };
-  NodeResult propertyName(YieldHandling yieldHandling,
-                          PropertyNameContext propertyNameContext,
-                          const mozilla::Maybe<DeclarationKind>& maybeDecl,
-                          ListNodeType propList,
-                          TaggedParserAtomIndex* propAtomOut);
-  NodeResult propertyOrMethodName(
-      YieldHandling yieldHandling, PropertyNameContext propertyNameContext,
-      const mozilla::Maybe<DeclarationKind>& maybeDecl, ListNodeType propList,
-      PropertyType* propType, TaggedParserAtomIndex* propAtomOut);
-  UnaryNodeResult computedPropertyName(
+  Node propertyName(YieldHandling yieldHandling,
+                    PropertyNameContext propertyNameContext,
+                    const mozilla::Maybe<DeclarationKind>& maybeDecl,
+                    ListNodeType propList, TaggedParserAtomIndex* propAtomOut);
+  Node propertyOrMethodName(YieldHandling yieldHandling,
+                            PropertyNameContext propertyNameContext,
+                            const mozilla::Maybe<DeclarationKind>& maybeDecl,
+                            ListNodeType propList, PropertyType* propType,
+                            TaggedParserAtomIndex* propAtomOut);
+  UnaryNodeType computedPropertyName(
       YieldHandling yieldHandling,
       const mozilla::Maybe<DeclarationKind>& maybeDecl,
       PropertyNameContext propertyNameContext, ListNodeType literal);
-  ListNodeResult arrayInitializer(YieldHandling yieldHandling,
-                                  PossibleError* possibleError);
-  inline RegExpLiteralResult newRegExp();
+  ListNodeType arrayInitializer(YieldHandling yieldHandling,
+                                PossibleError* possibleError);
+  inline RegExpLiteralType newRegExp();
 
-  ListNodeResult objectLiteral(YieldHandling yieldHandling,
-                               PossibleError* possibleError);
+  ListNodeType objectLiteral(YieldHandling yieldHandling,
+                             PossibleError* possibleError);
 
 #ifdef ENABLE_RECORD_TUPLE
-  ListNodeResult recordLiteral(YieldHandling yieldHandling);
-  ListNodeResult tupleLiteral(YieldHandling yieldHandling);
+  ListNodeType recordLiteral(YieldHandling yieldHandling);
+  ListNodeType tupleLiteral(YieldHandling yieldHandling);
 #endif
 
-  BinaryNodeResult bindingInitializer(Node lhs, DeclarationKind kind,
-                                      YieldHandling yieldHandling);
-  NameNodeResult bindingIdentifier(DeclarationKind kind,
+  BinaryNodeType bindingInitializer(Node lhs, DeclarationKind kind,
+                                    YieldHandling yieldHandling);
+  NameNodeType bindingIdentifier(DeclarationKind kind,
+                                 YieldHandling yieldHandling);
+  Node bindingIdentifierOrPattern(DeclarationKind kind,
+                                  YieldHandling yieldHandling, TokenKind tt);
+  ListNodeType objectBindingPattern(DeclarationKind kind,
+                                    YieldHandling yieldHandling);
+  ListNodeType arrayBindingPattern(DeclarationKind kind,
                                    YieldHandling yieldHandling);
-  NodeResult bindingIdentifierOrPattern(DeclarationKind kind,
-                                        YieldHandling yieldHandling,
-                                        TokenKind tt);
-  ListNodeResult objectBindingPattern(DeclarationKind kind,
-                                      YieldHandling yieldHandling);
-  ListNodeResult arrayBindingPattern(DeclarationKind kind,
-                                     YieldHandling yieldHandling);
 
   enum class TargetBehavior {
     PermitAssignmentPattern,
@@ -1473,27 +1441,26 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
                                            PossibleError* exprPossibleError,
                                            PossibleError* possibleError);
 
-  NumericLiteralResult newNumber(const Token& tok) {
+  NumericLiteralType newNumber(const Token& tok) {
     return handler_.newNumber(tok.number(), tok.decimalPoint(), tok.pos);
   }
 
-  inline BigIntLiteralResult newBigInt();
+  inline BigIntLiteralType newBigInt();
 
   enum class OptionalKind {
     NonOptional = 0,
     Optional,
   };
-  NodeResult memberPropertyAccess(
+  Node memberPropertyAccess(
       Node lhs, OptionalKind optionalKind = OptionalKind::NonOptional);
-  NodeResult memberPrivateAccess(
+  Node memberPrivateAccess(
       Node lhs, OptionalKind optionalKind = OptionalKind::NonOptional);
-  NodeResult memberElemAccess(
-      Node lhs, YieldHandling yieldHandling,
-      OptionalKind optionalKind = OptionalKind::NonOptional);
-  NodeResult memberSuperCall(Node lhs, YieldHandling yieldHandling);
-  NodeResult memberCall(TokenKind tt, Node lhs, YieldHandling yieldHandling,
-                        PossibleError* possibleError,
+  Node memberElemAccess(Node lhs, YieldHandling yieldHandling,
                         OptionalKind optionalKind = OptionalKind::NonOptional);
+  Node memberSuperCall(Node lhs, YieldHandling yieldHandling);
+  Node memberCall(TokenKind tt, Node lhs, YieldHandling yieldHandling,
+                  PossibleError* possibleError,
+                  OptionalKind optionalKind = OptionalKind::NonOptional);
 
  protected:
   // Match the current token against the BindingIdentifier production with
@@ -1506,9 +1473,9 @@ class MOZ_STACK_CLASS GeneralParser : public PerHandlerParser<ParseHandler> {
                                        YieldHandling yieldHandling,
                                        TokenKind hint = TokenKind::Limit);
 
-  ListNodeResult statementList(YieldHandling yieldHandling);
+  ListNodeType statementList(YieldHandling yieldHandling);
 
-  [[nodiscard]] FunctionNodeResult innerFunction(
+  [[nodiscard]] FunctionNodeType innerFunction(
       FunctionNodeType funNode, ParseContext* outerpc,
       TaggedParserAtomIndex explicitName, FunctionFlags flags,
       uint32_t toStringStart, InHandling inHandling,
@@ -1544,11 +1511,9 @@ class MOZ_STACK_CLASS Parser<SyntaxParseHandler, Unit> final
     : public GeneralParser<SyntaxParseHandler, Unit> {
   using Base = GeneralParser<SyntaxParseHandler, Unit>;
   using Node = SyntaxParseHandler::Node;
-  using NodeResult = typename SyntaxParseHandler::NodeResult;
 
-#define DECLARE_TYPE(typeName)                               \
-  using typeName##Type = SyntaxParseHandler::typeName##Type; \
-  using typeName##Result = SyntaxParseHandler::typeName##Result;
+#define DECLARE_TYPE(typeName, longTypeName, asMethodName) \
+  using longTypeName = SyntaxParseHandler::longTypeName;
   FOR_EACH_PARSENODE_SUBCLASS(DECLARE_TYPE)
 #undef DECLARE_TYPE
 
@@ -1604,7 +1569,6 @@ class MOZ_STACK_CLASS Parser<SyntaxParseHandler, Unit> final
   using Base::checkOptionsCalled_;
 #endif
   using Base::checkForUndefinedPrivateFields;
-  using Base::errorResult;
   using Base::finishFunctionScopes;
   using Base::functionFormalParametersAndBody;
   using Base::handler_;
@@ -1644,11 +1608,11 @@ class MOZ_STACK_CLASS Parser<SyntaxParseHandler, Unit> final
   inline void setAwaitHandling(AwaitHandling awaitHandling);
   inline void setInParametersOfAsyncFunction(bool inParameters);
 
-  RegExpLiteralResult newRegExp();
-  BigIntLiteralResult newBigInt();
+  RegExpLiteralType newRegExp();
+  BigIntLiteralType newBigInt();
 
   // Parse a module.
-  ModuleNodeResult moduleBody(ModuleSharedContext* modulesc);
+  ModuleNodeType moduleBody(ModuleSharedContext* modulesc);
 
   inline bool checkLocalExportNames(ListNodeType node);
   inline bool checkExportedName(TaggedParserAtomIndex exportName);
@@ -1681,11 +1645,9 @@ class MOZ_STACK_CLASS Parser<FullParseHandler, Unit> final
     : public GeneralParser<FullParseHandler, Unit> {
   using Base = GeneralParser<FullParseHandler, Unit>;
   using Node = FullParseHandler::Node;
-  using NodeResult = typename FullParseHandler::NodeResult;
 
-#define DECLARE_TYPE(typeName)                             \
-  using typeName##Type = FullParseHandler::typeName##Type; \
-  using typeName##Result = FullParseHandler::typeName##Result;
+#define DECLARE_TYPE(typeName, longTypeName, asMethodName) \
+  using longTypeName = FullParseHandler::longTypeName;
   FOR_EACH_PARSENODE_SUBCLASS(DECLARE_TYPE)
 #undef DECLARE_TYPE
 
@@ -1748,7 +1710,6 @@ class MOZ_STACK_CLASS Parser<FullParseHandler, Unit> final
   using Base::checkOptionsCalled_;
 #endif
   using Base::checkForUndefinedPrivateFields;
-  using Base::errorResult;
   using Base::fc_;
   using Base::finishClassBodyScope;
   using Base::finishFunctionScopes;
@@ -1793,11 +1754,11 @@ class MOZ_STACK_CLASS Parser<FullParseHandler, Unit> final
   friend class AutoInParametersOfAsyncFunction<SyntaxParseHandler, Unit>;
   inline void setInParametersOfAsyncFunction(bool inParameters);
 
-  RegExpLiteralResult newRegExp();
-  BigIntLiteralResult newBigInt();
+  RegExpLiteralType newRegExp();
+  BigIntLiteralType newBigInt();
 
   // Parse a module.
-  ModuleNodeResult moduleBody(ModuleSharedContext* modulesc);
+  ModuleNodeType moduleBody(ModuleSharedContext* modulesc);
 
   bool checkLocalExportNames(ListNodeType node);
   bool checkExportedName(TaggedParserAtomIndex exportName);
@@ -1829,18 +1790,18 @@ class MOZ_STACK_CLASS Parser<FullParseHandler, Unit> final
   // Eval scripts are distinguished from global scripts in that in ES6, per
   // 18.2.1.1 steps 9 and 10, all eval scripts are executed under a fresh
   // lexical scope.
-  LexicalScopeNodeResult evalBody(EvalSharedContext* evalsc);
+  LexicalScopeNodeType evalBody(EvalSharedContext* evalsc);
 
   // Parse a function, given only its arguments and body. Used for lazily
   // parsed functions.
-  FunctionNodeResult standaloneLazyFunction(CompilationInput& input,
-                                            uint32_t toStringStart, bool strict,
-                                            GeneratorKind generatorKind,
-                                            FunctionAsyncKind asyncKind);
+  FunctionNodeType standaloneLazyFunction(CompilationInput& input,
+                                          uint32_t toStringStart, bool strict,
+                                          GeneratorKind generatorKind,
+                                          FunctionAsyncKind asyncKind);
 
   // Parse a function, used for the Function, GeneratorFunction, and
   // AsyncFunction constructors.
-  FunctionNodeResult standaloneFunction(
+  FunctionNodeType standaloneFunction(
       const mozilla::Maybe<uint32_t>& parameterListEnd,
       FunctionSyntaxKind syntaxKind, GeneratorKind generatorKind,
       FunctionAsyncKind asyncKind, Directives inheritedDirectives,
@@ -1849,7 +1810,7 @@ class MOZ_STACK_CLASS Parser<FullParseHandler, Unit> final
   bool checkStatementsEOF();
 
   // Parse the body of a global script.
-  ListNodeResult globalBody(GlobalSharedContext* globalsc);
+  ListNodeType globalBody(GlobalSharedContext* globalsc);
 
   bool checkLocalExportName(TaggedParserAtomIndex ident, uint32_t offset) {
     return checkLabelOrIdentifierReference(ident, offset, YieldIsName);
@@ -1963,6 +1924,26 @@ LexicalScope::ParserData* NewEmptyLexicalScopeData(FrontendContext* fc,
 FunctionScope::ParserData* NewEmptyFunctionScopeData(FrontendContext* fc,
                                                      LifoAlloc& alloc,
                                                      uint32_t numBindings);
+
+mozilla::Maybe<GlobalScope::ParserData*> NewGlobalScopeData(
+    JSContext* cx, FrontendContext* fc, ParseContext::Scope& scope,
+    LifoAlloc& alloc, ParseContext* pc);
+
+mozilla::Maybe<EvalScope::ParserData*> NewEvalScopeData(
+    JSContext* cx, FrontendContext* fc, ParseContext::Scope& scope,
+    LifoAlloc& alloc, ParseContext* pc);
+
+mozilla::Maybe<FunctionScope::ParserData*> NewFunctionScopeData(
+    JSContext* cx, FrontendContext* fc, ParseContext::Scope& scope,
+    bool hasParameterExprs, LifoAlloc& alloc, ParseContext* pc);
+
+mozilla::Maybe<VarScope::ParserData*> NewVarScopeData(
+    JSContext* cx, FrontendContext* fc, ParseContext::Scope& scope,
+    LifoAlloc& alloc, ParseContext* pc);
+
+mozilla::Maybe<LexicalScope::ParserData*> NewLexicalScopeData(
+    JSContext* cx, FrontendContext* fc, ParseContext::Scope& scope,
+    LifoAlloc& alloc, ParseContext* pc);
 
 bool FunctionScopeHasClosedOverBindings(ParseContext* pc);
 bool LexicalScopeHasClosedOverBindings(ParseContext* pc,

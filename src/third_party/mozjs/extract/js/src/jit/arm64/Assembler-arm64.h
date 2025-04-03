@@ -719,11 +719,6 @@ static constexpr Register WasmCallRefCallScratchReg0 = ABINonArgReg0;
 static constexpr Register WasmCallRefCallScratchReg1 = ABINonArgReg1;
 static constexpr Register WasmCallRefReg = ABINonArgReg3;
 
-// Registers used for wasm tail calls operations.
-static constexpr Register WasmTailCallInstanceScratchReg = ABINonArgReg1;
-static constexpr Register WasmTailCallRAScratchReg = lr;
-static constexpr Register WasmTailCallFPScratchReg = ABINonArgReg3;
-
 // Register used as a scratch along the return path in the fast js -> wasm stub
 // code.  This must not overlap ReturnReg, JSReturnOperand, or InstanceReg.
 // It must be a volatile register.
@@ -772,8 +767,7 @@ inline Imm32 Imm64::firstHalf() const { return low(); }
 
 inline Imm32 Imm64::secondHalf() const { return hi(); }
 
-// Forbids nop filling for testing purposes.  Nestable, but nested calls have
-// no effect on the no-nops status; it is only the top level one that counts.
+// Forbids nop filling for testing purposes. Not nestable.
 class AutoForbidNops {
  protected:
   Assembler* asm_;
@@ -783,9 +777,7 @@ class AutoForbidNops {
   ~AutoForbidNops() { asm_->leaveNoNops(); }
 };
 
-// Forbids pool generation during a specified interval.  Nestable, but nested
-// calls must imply a no-pool area of the assembler buffer that is completely
-// contained within the area implied by the outermost level call.
+// Forbids pool generation during a specified interval. Not nestable.
 class AutoForbidPoolsAndNops : public AutoForbidNops {
  public:
   AutoForbidPoolsAndNops(Assembler* asm_, size_t maxInst)

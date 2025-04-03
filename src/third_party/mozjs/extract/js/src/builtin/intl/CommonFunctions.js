@@ -5,14 +5,12 @@
 /* Portions Copyright Norbert Lindenberg 2011-2012. */
 
 #ifdef DEBUG
-#define JS_CONCAT2(x, y) x##y
-#define JS_CONCAT(x, y) JS_CONCAT2(x, y)
 #define assertIsValidAndCanonicalLanguageTag(locale, desc) \
   do { \
-    var JS_CONCAT(canonical, __LINE__) = intl_TryValidateAndCanonicalizeLanguageTag(locale); \
-    assert(JS_CONCAT(canonical, __LINE__) !== null, \
+    let canonical = intl_TryValidateAndCanonicalizeLanguageTag(locale); \
+    assert(canonical !== null, \
            `${desc} is a structurally valid language tag`); \
-    assert(JS_CONCAT(canonical, __LINE__) === locale, \
+    assert(canonical === locale, \
            `${desc} is a canonicalized language tag`); \
   } while (false)
 #else
@@ -717,10 +715,12 @@ function GetOption(options, property, type, values, fallback) {
 function GetStringOrBooleanOption(
   options,
   property,
-  stringValues,
+  values,
+  trueValue,
+  falsyValue,
   fallback
 ) {
-  assert(IsObject(stringValues), "GetStringOrBooleanOption");
+  assert(IsObject(values), "GetStringOrBooleanOption");
 
   // Step 1.
   var value = options[property];
@@ -732,20 +732,20 @@ function GetStringOrBooleanOption(
 
   // Step 3.
   if (value === true) {
-    return true;
+    return trueValue;
   }
 
   // Steps 4-5.
   if (!value) {
-    return false;
+    return falsyValue;
   }
 
   // Step 6.
   value = ToString(value);
 
   // Step 7.
-  if (callFunction(std_Array_indexOf, stringValues, value) === -1) {
-    ThrowRangeError(JSMSG_INVALID_OPTION_VALUE, property, `"${value}"`);
+  if (callFunction(std_Array_indexOf, values, value) === -1) {
+    return fallback;
   }
 
   // Step 8.
@@ -823,7 +823,7 @@ var intlFallbackSymbolHolder = { value: undefined };
 function intlFallbackSymbol() {
   var fallbackSymbol = intlFallbackSymbolHolder.value;
   if (!fallbackSymbol) {
-    var Symbol = GetBuiltinConstructor("Symbol");
+    let Symbol = GetBuiltinConstructor("Symbol");
     fallbackSymbol = Symbol("IntlLegacyConstructedSymbol");
     intlFallbackSymbolHolder.value = fallbackSymbol;
   }
@@ -843,8 +843,7 @@ function initializeIntlObject(obj, type, lazyData) {
       (type === "NumberFormat" && intl_GuardToNumberFormat(obj) !== null) ||
       (type === "PluralRules" && intl_GuardToPluralRules(obj) !== null) ||
       (type === "RelativeTimeFormat" &&
-        intl_GuardToRelativeTimeFormat(obj) !== null) ||
-      (type === "Segmenter" && intl_GuardToSegmenter(obj) !== null),
+        intl_GuardToRelativeTimeFormat(obj) !== null),
     "type must match the object's class"
   );
   assert(IsObject(lazyData), "non-object lazy data");
@@ -860,7 +859,6 @@ function initializeIntlObject(obj, type, lazyData) {
   // - NumberFormat
   // - PluralRules
   // - RelativeTimeFormat
-  // - Segmenter
   //
   // The .lazyData property stores information needed to compute -- without
   // observable side effects -- the actual internal Intl properties of
@@ -929,8 +927,7 @@ function getIntlObjectInternals(obj) {
       intl_GuardToListFormat(obj) !== null ||
       intl_GuardToNumberFormat(obj) !== null ||
       intl_GuardToPluralRules(obj) !== null ||
-      intl_GuardToRelativeTimeFormat(obj) !== null ||
-      intl_GuardToSegmenter(obj) !== null,
+      intl_GuardToRelativeTimeFormat(obj) !== null,
     "getIntlObjectInternals called with non-Intl object"
   );
 
@@ -951,9 +948,7 @@ function getIntlObjectInternals(obj) {
       (internals.type === "PluralRules" &&
         intl_GuardToPluralRules(obj) !== null) ||
       (internals.type === "RelativeTimeFormat" &&
-        intl_GuardToRelativeTimeFormat(obj) !== null) ||
-      (internals.type === "Segmenter" &&
-        intl_GuardToSegmenter(obj) !== null),
+        intl_GuardToRelativeTimeFormat(obj) !== null),
     "type must match the object's class"
   );
   assert(hasOwn("lazyData", internals), "missing lazyData");
@@ -989,11 +984,8 @@ function getInternals(obj) {
     internalProps = resolveNumberFormatInternals(internals.lazyData);
   } else if (type === "PluralRules") {
     internalProps = resolvePluralRulesInternals(internals.lazyData);
-  } else if (type === "RelativeTimeFormat") {
-    internalProps = resolveRelativeTimeFormatInternals(internals.lazyData);
   } else {
-    assert(type === "Segmenter", "unexpected Intl type");
-    internalProps = resolveSegmenterInternals(internals.lazyData);
+    internalProps = resolveRelativeTimeFormatInternals(internals.lazyData);
   }
   setInternalProperties(internals, internalProps);
   return internalProps;

@@ -11,11 +11,9 @@
 
 #include "jsfriendapi.h"  // for ScriptEnvironmentPreparer
 
-#include "js/CharacterEncoding.h"  // JS::ConstUTF8CharsZ
-#include "js/ColumnNumber.h"       // JS::ColumnNumberOneOrigin
-#include "js/ErrorReport.h"        // for JSErrorNotes, JSErrorReport
-#include "js/UniquePtr.h"          // for UniquePtr
-#include "js/Utility.h"            // for UniqueTwoByteChars
+#include "js/ErrorReport.h"  // for JSErrorNotes, JSErrorReport
+#include "js/UniquePtr.h"    // for UniquePtr
+#include "js/Utility.h"      // for UniqueTwoByteChars
 
 namespace js {
 
@@ -33,17 +31,13 @@ using JSAllocator = JSContext;
  */
 struct ErrorMetadata {
   // The file/URL where the error occurred.
-  JS::ConstUTF8CharsZ filename;
+  const char* filename;
 
   // The line and column numbers where the error occurred.  If the error
   // is with respect to the entire script and not with respect to a
   // particular location, these will both be zero.
-
-  // Line number (1-origin).
   uint32_t lineNumber;
-
-  // Column number in UTF-16 code units.
-  JS::ColumnNumberOneOrigin columnNumber;
+  uint32_t columnNumber;
 
   // If the error occurs at a particular location, context surrounding the
   // location of the error: the line that contained the error, or a small
@@ -96,25 +90,15 @@ extern void CallWarningReporter(JSContext* cx, JSErrorReport* report);
  * Report a compile error during script processing prior to execution of the
  * script.
  */
-extern void ReportCompileErrorLatin1VA(FrontendContext* fc,
-                                       ErrorMetadata&& metadata,
-                                       UniquePtr<JSErrorNotes> notes,
-                                       unsigned errorNumber, va_list* args);
-
-extern void ReportCompileErrorUTF8VA(FrontendContext* fc,
+extern void ReportCompileErrorLatin1(FrontendContext* fc,
                                      ErrorMetadata&& metadata,
                                      UniquePtr<JSErrorNotes> notes,
                                      unsigned errorNumber, va_list* args);
 
-extern void ReportCompileErrorLatin1(FrontendContext* fc,
-                                     ErrorMetadata&& metadata,
-                                     UniquePtr<JSErrorNotes> notes,
-                                     unsigned errorNumber, ...);
-
 extern void ReportCompileErrorUTF8(FrontendContext* fc,
                                    ErrorMetadata&& metadata,
                                    UniquePtr<JSErrorNotes> notes,
-                                   unsigned errorNumber, ...);
+                                   unsigned errorNumber, va_list* args);
 
 /**
  * Report a compile warning during script processing prior to execution of the

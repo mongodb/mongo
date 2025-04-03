@@ -51,8 +51,6 @@ enum Type {
   BigInt64,
   BigUint64,
 
-  Float16,
-
   /**
    * Types that don't have their own TypedArray equivalent, for now.
    * E.g. DataView
@@ -71,7 +69,6 @@ static inline size_t byteSize(Type atype) {
       return 1;
     case Int16:
     case Uint16:
-    case Float16:
       return 2;
     case Int32:
     case Uint32:
@@ -102,7 +99,6 @@ static inline bool isSignedIntType(Type atype) {
     case Uint8Clamped:
     case Uint16:
     case Uint32:
-    case Float16:
     case Float32:
     case Float64:
     case BigUint64:
@@ -127,7 +123,6 @@ static inline bool isBigIntType(Type atype) {
     case Uint8Clamped:
     case Uint16:
     case Uint32:
-    case Float16:
     case Float32:
     case Float64:
     case Simd128:
@@ -151,7 +146,6 @@ static inline bool isFloatingType(Type atype) {
     case BigInt64:
     case BigUint64:
       return false;
-    case Float16:
     case Float32:
     case Float64:
     case Simd128:
@@ -176,8 +170,6 @@ static inline const char* name(Type atype) {
       return "Int32";
     case Uint32:
       return "Uint32";
-    case Float16:
-      return "Float16";
     case Float32:
       return "Float32";
     case Float64:
@@ -206,7 +198,6 @@ static inline const char* byteSizeString(Type atype) {
       return "1";
     case Int16:
     case Uint16:
-    case Float16:
       return "2";
     case Int32:
     case Uint32:

@@ -236,10 +236,7 @@ static MOZ_ALWAYS_INLINE JSAtom* ComputeNameValue(
   JSString* name = nullptr;
   if (target->is<JSFunction>() && !target->as<JSFunction>().hasResolvedName()) {
     JSFunction* targetFn = &target->as<JSFunction>();
-    name = targetFn->getUnresolvedName(cx);
-    if (!name) {
-      return nullptr;
-    }
+    name = targetFn->infallibleGetUnresolvedName(cx);
   } else {
     // Use a fast path for getting the .name value if the target is a bound
     // function with its initial shape.
@@ -256,7 +253,7 @@ static MOZ_ALWAYS_INLINE JSAtom* ComputeNameValue(
       targetName = targetNameRoot;
     }
     if (!targetName.isString()) {
-      return cx->names().boundWithSpace_;
+      return cx->names().boundWithSpace;
     }
     name = targetName.toString();
   }
@@ -348,11 +345,12 @@ BoundFunctionObject* BoundFunctionObject::functionBindImpl(
         cx->global()->maybeBoundFunctionShapeWithDefaultProto()) {
       Rooted<SharedShape*> shape(
           cx, cx->global()->maybeBoundFunctionShapeWithDefaultProto());
-      bound = NativeObject::create<BoundFunctionObject>(
-          cx, allocKind, gc::Heap::Default, shape);
-      if (!bound) {
+      JSObject* obj =
+          NativeObject::create(cx, allocKind, gc::Heap::Default, shape);
+      if (!obj) {
         return nullptr;
       }
+      bound = &obj->as<BoundFunctionObject>();
     } else {
       bound = NewObjectWithGivenProto<BoundFunctionObject>(cx, proto);
       if (!bound) {
@@ -420,11 +418,11 @@ BoundFunctionObject* BoundFunctionObject::functionBindImpl(
 BoundFunctionObject* BoundFunctionObject::createWithTemplate(
     JSContext* cx, Handle<BoundFunctionObject*> templateObj) {
   Rooted<SharedShape*> shape(cx, templateObj->sharedShape());
-  auto* bound = NativeObject::create<BoundFunctionObject>(
-      cx, allocKind, gc::Heap::Default, shape);
-  if (!bound) {
+  JSObject* obj = NativeObject::create(cx, allocKind, gc::Heap::Default, shape);
+  if (!obj) {
     return nullptr;
   }
+  BoundFunctionObject* bound = &obj->as<BoundFunctionObject>();
   bound->initFlags(templateObj->numBoundArgs(), templateObj->isConstructor());
   bound->initLength(templateObj->getLengthForInitialShape().toInt32());
   bound->initName(&templateObj->getNameForInitialShape().toString()->asAtom());

@@ -15,12 +15,6 @@
 
 namespace js {
 
-enum class ArraySortResult : uint32_t;
-
-namespace jit {
-class TrampolineNativeFrameLayout;
-}
-
 class ArrayObject;
 
 MOZ_ALWAYS_INLINE bool IdIsIndex(jsid id, uint32_t* indexp) {
@@ -76,21 +70,15 @@ extern ArrayObject* NewDenseCopiedArray(JSContext* cx, uint32_t length,
                                         const Value* values,
                                         NewObjectKind newKind = GenericObject);
 
-// Create a dense array from the given (linear)string values, which must be
-// rooted
-extern ArrayObject* NewDenseCopiedArray(JSContext* cx, uint32_t length,
-                                        JSLinearString** values,
-                                        NewObjectKind newKind = GenericObject);
-
 // Like NewDenseCopiedArray, but the array will have |proto| as prototype (or
 // Array.prototype if |proto| is nullptr).
 extern ArrayObject* NewDenseCopiedArrayWithProto(JSContext* cx, uint32_t length,
                                                  const Value* values,
                                                  HandleObject proto);
 
-// Create a dense array with the given shape and length.
-extern ArrayObject* NewDenseFullyAllocatedArrayWithShape(
-    JSContext* cx, uint32_t length, Handle<SharedShape*> shape);
+// Create a dense array based on templateObject with the given length.
+extern ArrayObject* NewDenseFullyAllocatedArrayWithTemplate(
+    JSContext* cx, uint32_t length, ArrayObject* templateObject);
 
 extern ArrayObject* NewArrayWithShape(JSContext* cx, uint32_t length,
                                       Handle<Shape*> shape);
@@ -113,12 +101,16 @@ extern bool GetElements(JSContext* cx, HandleObject aobj, uint32_t length,
 
 /* Natives exposed for optimization by the interpreter and JITs. */
 
+extern bool intrinsic_ArrayNativeSort(JSContext* cx, unsigned argc,
+                                      js::Value* vp);
+
 extern bool array_includes(JSContext* cx, unsigned argc, js::Value* vp);
 extern bool array_indexOf(JSContext* cx, unsigned argc, js::Value* vp);
 extern bool array_lastIndexOf(JSContext* cx, unsigned argc, js::Value* vp);
+
 extern bool array_pop(JSContext* cx, unsigned argc, js::Value* vp);
+
 extern bool array_join(JSContext* cx, unsigned argc, js::Value* vp);
-extern bool array_sort(JSContext* cx, unsigned argc, js::Value* vp);
 
 extern void ArrayShiftMoveElements(ArrayObject* arr);
 
@@ -159,10 +151,6 @@ extern JSString* ArrayToSource(JSContext* cx, HandleObject obj);
 extern bool IsCrossRealmArrayConstructor(JSContext* cx, JSObject* obj,
                                          bool* result);
 
-extern bool ObjectMayHaveExtraIndexedOwnProperties(JSObject* obj);
-
-extern bool ObjectMayHaveExtraIndexedProperties(JSObject* obj);
-
 extern bool PrototypeMayHaveIndexedProperties(NativeObject* obj);
 
 // JS::IsArray has multiple overloads, use js::IsArrayFromJit to disambiguate.
@@ -173,9 +161,6 @@ extern bool ArrayLengthGetter(JSContext* cx, HandleObject obj, HandleId id,
 
 extern bool ArrayLengthSetter(JSContext* cx, HandleObject obj, HandleId id,
                               HandleValue v, ObjectOpResult& result);
-
-extern ArraySortResult ArraySortFromJit(
-    JSContext* cx, jit::TrampolineNativeFrameLayout* frame);
 
 class MOZ_NON_TEMPORARY_CLASS ArraySpeciesLookup final {
   /*
@@ -256,8 +241,6 @@ class MOZ_NON_TEMPORARY_CLASS ArraySpeciesLookup final {
     }
   }
 };
-
-bool IsArrayConstructor(const JSObject* obj);
 
 } /* namespace js */
 

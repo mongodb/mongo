@@ -181,8 +181,6 @@ class SupportsThreadSafeWeakPtr : public detail::SupportsThreadSafeWeakPtrBase {
     return cnt;
   }
 
-  using HasThreadSafeRefCnt = std::true_type;
-
   // Compatibility with wtf::RefPtr
   void ref() { AddRef(); }
   void deref() { Release(); }

@@ -8,7 +8,6 @@
 #define js_experimental_JitInfo_h
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
-#include "mozilla/Attributes.h"  // MOZ_NON_PARAM
 
 #include <stddef.h>  // size_t
 #include <stdint.h>  // uint16_t, uint32_t
@@ -22,7 +21,6 @@ namespace js {
 namespace jit {
 
 enum class InlinableNative : uint16_t;
-enum class TrampolineNative : uint16_t;
 
 }  // namespace jit
 
@@ -74,7 +72,7 @@ struct JSJitMethodCallArgsTraits;
  * A class, expected to be passed by reference, which represents the CallArgs
  * for a JSJitMethodOp.
  */
-class MOZ_NON_PARAM JSJitMethodCallArgs
+class JSJitMethodCallArgs
     : protected JS::detail::CallArgsBase<JS::detail::NoUsedRval> {
  private:
   using Base = JS::detail::CallArgsBase<JS::detail::NoUsedRval>;
@@ -139,7 +137,6 @@ class JSJitInfo {
     Method,
     StaticMethod,
     InlinableNative,
-    TrampolineNative,
     IgnoresReturnValueNative,
     // Must be last
     OpTypeCount
@@ -229,7 +226,6 @@ class JSJitInfo {
   union {
     uint16_t protoID;
     js::jit::InlinableNative inlinableNative;
-    js::jit::TrampolineNative trampolineNative;
   };
 
   union {

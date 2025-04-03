@@ -66,21 +66,11 @@ JS_PUBLIC_API bool JS::IsLargeArrayBufferMaybeShared(JSObject* obj) {
   size_t len = obj->is<ArrayBufferObject>()
                    ? obj->as<ArrayBufferObject>().byteLength()
                    : obj->as<SharedArrayBufferObject>().byteLength();
-  return len > ArrayBufferObject::ByteLengthLimitForSmallBuffer;
+  return len > ArrayBufferObject::MaxByteLengthForSmallBuffer;
 #else
   // Large ArrayBuffers are not supported on 32-bit.
-  static_assert(ArrayBufferObject::ByteLengthLimit ==
-                ArrayBufferObject::ByteLengthLimitForSmallBuffer);
+  static_assert(ArrayBufferObject::MaxByteLength ==
+                ArrayBufferObject::MaxByteLengthForSmallBuffer);
   return false;
 #endif
-}
-
-JS_PUBLIC_API bool JS::IsResizableArrayBufferMaybeShared(JSObject* obj) {
-  obj = UnwrapArrayBufferMaybeShared(obj);
-  MOZ_ASSERT(obj);
-
-  if (obj->is<ArrayBufferObject>()) {
-    return obj->as<ArrayBufferObject>().isResizable();
-  }
-  return obj->as<SharedArrayBufferObject>().isGrowable();
 }

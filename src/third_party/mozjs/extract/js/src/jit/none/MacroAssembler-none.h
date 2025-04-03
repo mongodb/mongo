@@ -11,10 +11,7 @@
 
 #include "jit/MoveResolver.h"
 #include "jit/none/Assembler-none.h"
-#include "wasm/WasmCodegenTypes.h"
 #include "wasm/WasmTypeDecls.h"
-
-using js::wasm::FaultingCodeOffsetPair;
 
 namespace js {
 namespace jit {
@@ -213,11 +210,11 @@ class MacroAssemblerNone : public Assembler {
   }
 
   template <typename T>
-  FaultingCodeOffset loadPtr(T, Register) {
+  void loadPtr(T, Register) {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset load32(T, Register) {
+  void load32(T, Register) {
     MOZ_CRASH();
   }
   template <typename T>
@@ -225,11 +222,11 @@ class MacroAssemblerNone : public Assembler {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset loadFloat32(T, FloatRegister) {
+  void loadFloat32(T, FloatRegister) {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset loadDouble(T, FloatRegister) {
+  void loadDouble(T, FloatRegister) {
     MOZ_CRASH();
   }
   template <typename T>
@@ -237,15 +234,15 @@ class MacroAssemblerNone : public Assembler {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset load8SignExtend(T, Register) {
+  void load8SignExtend(T, Register) {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset load8ZeroExtend(T, Register) {
+  void load8ZeroExtend(T, Register) {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset load16SignExtend(T, Register) {
+  void load16SignExtend(T, Register) {
     MOZ_CRASH();
   }
   template <typename T>
@@ -253,35 +250,28 @@ class MacroAssemblerNone : public Assembler {
     MOZ_CRASH();
   }
   template <typename T>
-  FaultingCodeOffset load16ZeroExtend(T, Register) {
+  void load16ZeroExtend(T, Register) {
     MOZ_CRASH();
   }
   template <typename T>
   void load16UnalignedZeroExtend(T, Register) {
     MOZ_CRASH();
   }
-#ifdef JS_64BIT
   template <typename T>
-  FaultingCodeOffset load64(T, Register64) {
+  void load64(T, Register64) {
     MOZ_CRASH();
   }
-#else
-  template <typename T>
-  FaultingCodeOffsetPair load64(T, Register64) {
-    MOZ_CRASH();
-  }
-#endif
   template <typename T>
   void load64Unaligned(T, Register64) {
     MOZ_CRASH();
   }
 
   template <typename T, typename S>
-  FaultingCodeOffset storePtr(const T&, S) {
+  void storePtr(const T&, S) {
     MOZ_CRASH();
   }
   template <typename T, typename S>
-  FaultingCodeOffset store32(T, S) {
+  void store32(T, S) {
     MOZ_CRASH();
   }
   template <typename T, typename S>
@@ -297,28 +287,21 @@ class MacroAssemblerNone : public Assembler {
     MOZ_CRASH();
   }
   template <typename T, typename S>
-  FaultingCodeOffset store8(T, S) {
+  void store8(T, S) {
     MOZ_CRASH();
   }
   template <typename T, typename S>
-  FaultingCodeOffset store16(T, S) {
+  void store16(T, S) {
     MOZ_CRASH();
   }
   template <typename T, typename S>
   void store16Unaligned(T, S) {
     MOZ_CRASH();
   }
-#ifdef JS_64BIT
   template <typename T, typename S>
-  FaultingCodeOffset store64(T, S) {
+  void store64(T, S) {
     MOZ_CRASH();
   }
-#else
-  template <typename T, typename S>
-  FaultingCodeOffsetPair store64(T, S) {
-    MOZ_CRASH();
-  }
-#endif
   template <typename T, typename S>
   void store64Unaligned(T, S) {
     MOZ_CRASH();
@@ -376,14 +359,6 @@ class MacroAssemblerNone : public Assembler {
   void unboxGCThingForGCBarrier(const T&, Register) {
     MOZ_CRASH();
   }
-
-  template <typename T>
-  void unboxWasmAnyRefGCThingForGCBarrier(const T&, Register) {
-    MOZ_CRASH();
-  }
-
-  void getWasmAnyRefGCThingChunk(Register, Register) { MOZ_CRASH(); }
-
   template <typename T>
   void unboxObjectOrNull(const T& src, Register dest) {
     MOZ_CRASH();

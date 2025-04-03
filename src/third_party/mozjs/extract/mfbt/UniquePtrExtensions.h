@@ -11,7 +11,6 @@
 
 #include <type_traits>
 
-#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/fallible.h"
@@ -104,11 +103,7 @@ typedef int FileHandleType;
 #endif
 
 struct FileHandleHelper {
-  MOZ_IMPLICIT FileHandleHelper(FileHandleType aHandle) : mHandle(aHandle) {
-#if defined(XP_UNIX) && (defined(DEBUG) || defined(FUZZING))
-    MOZ_RELEASE_ASSERT(aHandle == kInvalidHandle || aHandle > 2);
-#endif
-  }
+  MOZ_IMPLICIT FileHandleHelper(FileHandleType aHandle) : mHandle(aHandle) {}
 
   MOZ_IMPLICIT constexpr FileHandleHelper(std::nullptr_t)
       : mHandle(kInvalidHandle) {}

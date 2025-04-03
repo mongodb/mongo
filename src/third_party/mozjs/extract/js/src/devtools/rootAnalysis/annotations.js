@@ -12,7 +12,8 @@ var ignoreIndirectCalls = {
     "aMallocSizeOf" : true,
     "__conv" : true,
     "__convf" : true,
-    "callback_newtable" : true,
+    "prerrortable.c:callback_newtable" : true,
+    "mozalloc_oom.cpp:void (* gAbortHandler)(size_t)" : true,
 };
 
 // Types that when constructed with no arguments, are "safe" values (they do
@@ -238,7 +239,6 @@ var ignoreFunctions = {
     "void js::Nursery::freeMallocedBuffers()" : true,
 
     "void js::AutoEnterOOMUnsafeRegion::crash(uint64, int8*)" : true,
-    "void js::AutoEnterOOMUnsafeRegion::crash_impl(uint64, int8*)" : true,
 
     "void mozilla::dom::WorkerPrivate::AssertIsOnWorkerThread() const" : true,
 

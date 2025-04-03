@@ -207,28 +207,28 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  * things, all of which are detailed below. All env chain listings below are,
  * from top to bottom, outermost to innermost.
  *
- * A. JSM loading
+ * A. Component loading
  *
- * Most JSMs are loaded into a shared system global in order to save the memory
- * consumption and avoid CCWs. To support this, a NonSyntacticVariablesObject
- * is used for each JSM to provide a basic form of isolation.
- * NonSyntacticLexicalEnvironmentObject and
+ * Components may be loaded in a shared global mode where most JSMs share a
+ * single global in order to save on memory and avoid CCWs. To support this, a
+ * NonSyntacticVariablesObject is used for each JSM to provide a basic form of
+ * isolation. NonSyntacticLexicalEnvironmentObject and
  * NonSyntacticVariablesObject are allocated for each JSM, and
  * NonSyntacticLexicalEnvironmentObject holds lexical variables and
  * NonSyntacticVariablesObject holds qualified variables. JSMs cannot have
  * unqualified names, but if unqualified names are used by subscript, they
- * goes to NonSyntacticVariablesObject (see B.3 and B.4).
+ * goes to NonSyntacticVariablesObject.
  * They have the following env chain:
  *
  *   BackstagePass global
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
- *   NonSyntacticVariablesObject (qualified 'var's (and unqualified names))
+ *   NonSyntacticVariablesObject (qualified 'var's and unqualified names)
  *       |
  *   NonSyntacticLexicalEnvironmentObject[this=nsvo] (lexical vars)
  *
- * B.1 Subscript loading into a target object
+ * B.1 Subscript loading
  *
  * Subscripts may be loaded into a target object and it's associated global.
  * NonSyntacticLexicalEnvironmentObject holds lexical variables and
@@ -244,24 +244,16 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *       |
  *   NonSyntacticLexicalEnvironmentObject[this=target] (lexical vars)
  *
- * B.2 Subscript loading into global this
+ * B.2 Subscript loading (Shared-global JSM)
  *
- * Subscript may be loaded into global this. In this case no extra environment
- * object is created.
- *
- *   global (qualified 'var's and unqualified names)
- *       |
- *   GlobalLexicalEnvironmentObject[this=global] (lexical vars)
- *
- * B.3 Subscript loading into a target object in JSM
- *
- * The target object of a subscript load may be in a JSM, in which case we will
- * also have the NonSyntacticVariablesObject on the chain.
+ * The target object of a subscript load may be in a JSM with a shared global,
+ * in which case we will also have the NonSyntacticVariablesObject on the
+ * chain.
  * NonSyntacticLexicalEnvironmentObject for target object holds lexical
  * variables and WithEnvironmentObject holds qualified variables.
  * Unqualified names goes to NonSyntacticVariablesObject.
  *
- *   BackstagePass global
+ *   Target object's global
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
@@ -273,30 +265,17 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *       |
  *   NonSyntacticLexicalEnvironmentObject[this=target] (lexical vars)
  *
- * B.4 Subscript loading into per-JSM this
- *
- * Subscript may be loaded into global this.  In this case no extra environment
- * object is created.
- *
- *   BackstagePass global
- *       |
- *   GlobalLexicalEnvironmentObject[this=global]
- *       |
- *   NonSyntacticVariablesObject (qualified 'var's and unqualified names)
- *       |
- *   NonSyntacticLexicalEnvironmentObject[this=nsvo] (lexical vars)
- *
  * C.1. Frame scripts with unique scope
  *
  * XUL frame scripts with unique scope are loaded in the same global as
- * JSMs, with a NonSyntacticVariablesObject as a "polluting global" for
+ * components, with a NonSyntacticVariablesObject as a "polluting global" for
  * both qualified 'var' variables and unqualified names, and a with
  * environment wrapping a message manager object, and
  * NonSyntacticLexicalEnvironmentObject holding the message manager as `this`,
  * that holds lexical variables.
  * These environment objects except for globals are created for each run and
  * not shared across multiple runs. This is done exclusively in
- * js::ExecuteInFrameScriptEnvironment.
+ * js::ExecuteInScopeChainAndReturnNewScope.
  *
  *   BackstagePass global
  *       |
@@ -311,7 +290,7 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  * C.2. Frame scripts without unique scope
  *
  * XUL frame scripts without unique scope are loaded in the same global as
- * JSMs, with a with environment wrapping a message manager object for
+ * components, with a with environment wrapping a message manager object for
  * qualified 'var' variables, and NonSyntacticLexicalEnvironmentObject holding
  * the message manager as `this`, that holds lexical variables.
  * The environment chain is associated with the message manager object
@@ -321,7 +300,7 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *       |
  *   GlobalLexicalEnvironmentObject[this=global]
  *       |
- *   WithEnvironmentObject wrapping messageManager (qualified 'var's)
+ *   WithEnvironmentObject wrapping messageManager (qualified names)
  *       |
  *   NonSyntacticLexicalEnvironmentObject[this=messageManager] (lexical vars)
  *
@@ -374,14 +353,10 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  * E.1. Debugger.Frame.prototype.evalWithBindings
  *
  * Debugger.Frame.prototype.evalWithBindings uses WithEnvironmentObject for
- * given bindings, and the frame's enclosing scope.
- *
- * If qualified 'var's or unqualified names conflict with the bindings object's
- * properties, they go to the WithEnvironmentObject.
+ * given bindings, and the frame's enclosing scope
  *
  * If the frame is function, it has the following env chain.
- * lexical variables are optimized and uses frame slots, regardless of the name
- * conflicts with bindings:
+ * lexical variables are optimized and uses frame slots:
  *
  *   global (unqualified names)
  *       |
@@ -389,7 +364,7 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *       |
  *   [DebugProxy] CallObject (qualified 'var's)
  *       |
- *   WithEnvironmentObject wrapping bindings (conflicting 'var's and names)
+ *   WithEnvironmentObject wrapping bindings
  *
  * If the script has direct eval, BlockLexicalEnvironmentObject is created for
  * it:
@@ -400,9 +375,9 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  *       |
  *   [DebugProxy] CallObject (qualified 'var's)
  *       |
- *   WithEnvironmentObject wrapping bindings (conflicting 'var's and names)
+ *   BlockLexicalEnvironmentObject (lexical)
  *       |
- *   BlockLexicalEnvironmentObject (lexical vars, and conflicting lexical vars)
+ *   WithEnvironmentObject wrapping bindings
  *
  * NOTE: Debugger.Frame.prototype.eval uses the frame's enclosing scope only,
  *       and it doesn't use any dynamic environment, but still uses
@@ -411,47 +386,16 @@ extern PropertyName* EnvironmentCoordinateNameSlow(JSScript* script,
  * E.2. Debugger.Object.prototype.executeInGlobalWithBindings
  *
  * Debugger.Object.prototype.executeInGlobalWithBindings uses
- * WithEnvironmentObject for given bindings, and the object's global scope.
- *
- * If `options.useInnerBindings` is not true, if bindings conflict with
- * qualified 'var's or global lexicals, those bindings are shadowed and not
- * stored into the bindings object wrapped by WithEnvironmentObject.
+ * WithEnvironmentObject for given bindings, and the object's global scope:
  *
  *   global (qualified 'var's and unqualified names)
  *       |
- *   GlobalLexicalEnvironmentObject[this=global] (lexical vars)
+ *   GlobalLexicalEnvironmentObject[this=global] (lexical)
  *       |
- *   WithEnvironmentObject wrapping object with not-conflicting bindings
- *
- * If `options.useInnerBindings` is true, all bindings are stored into the
- * bindings object wrapped by WithEnvironmentObject, and they shadow globals
- *
- *   global (qualified 'var's and unqualified names)
- *       |
- *   GlobalLexicalEnvironmentObject[this=global] (lexical vars)
- *       |
- *   WithEnvironmentObject wrapping object with all bindings
- *
- * NOTE: If `options.useInnerBindings` is true, and if lexical variable names
- *       conflict with the bindings object's properties, the write on them
- *       within declarations is done for the GlobalLexicalEnvironmentObject,
- *       but the write within assignments and the read on lexicals are done
- *       from the WithEnvironmentObject (bug 1841964 and bug 1847219).
- *
- *   // bindings = { x: 10, y: 20 };
- *
- *   let x = 11; // written to GlobalLexicalEnvironmentObject
- *   x;          // read from WithEnvironmentObject
- *   let y;
- *   y = 21;     // written to WithEnvironmentObject
- *   y;          // read from WithEnvironmentObject
+ *   WithEnvironmentObject wrapping bindings
  *
  * NOTE: Debugger.Object.prototype.executeInGlobal uses the object's global
  *       scope only, and it doesn't use any dynamic environment or
- *       non-syntactic scope.
- * NOTE: If no extra bindings are used by script,
- *       Debugger.Object.prototype.executeInGlobalWithBindings uses the object's
- *       global scope only, and it doesn't use any dynamic environment or
  *       non-syntactic scope.
  *
  */
@@ -618,32 +562,18 @@ class VarEnvironmentObject : public EnvironmentObject {
 class ModuleEnvironmentObject : public EnvironmentObject {
   static constexpr uint32_t MODULE_SLOT = 1;
 
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  static constexpr uint32_t DISPOSABLE_OBJECTS_SLOT = 2;
-#endif
-
   static const ObjectOps objectOps_;
   static const JSClassOps classOps_;
 
  public:
-  using EnvironmentObject::setAliasedBinding;
-
   static const JSClass class_;
 
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  static constexpr uint32_t RESERVED_SLOTS = 3;
-#else
   static constexpr uint32_t RESERVED_SLOTS = 2;
-#endif
-
   static constexpr ObjectFlags OBJECT_FLAGS = {ObjectFlag::NotExtensible,
                                                ObjectFlag::QualifiedVarObj};
 
   static ModuleEnvironmentObject* create(JSContext* cx,
                                          Handle<ModuleObject*> module);
-  static ModuleEnvironmentObject* createSynthetic(JSContext* cx,
-                                                  Handle<ModuleObject*> module);
-
   ModuleObject& module() const;
   IndirectBindingMap& importBindings() const;
 
@@ -661,20 +591,6 @@ class ModuleEnvironmentObject : public EnvironmentObject {
   //
   // `env` may be a DebugEnvironmentProxy, but not a hollow environment.
   static ModuleEnvironmentObject* find(JSObject* env);
-
-  uint32_t firstSyntheticValueSlot() { return RESERVED_SLOTS; }
-
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  bool addDisposableObject(JSContext* cx, JS::Handle<JS::Value> val);
-
-  // Used to get the Disposable objects within the
-  // lexical scope, it returns a ListObject* if there
-  // is a non empty list of Disposables, else
-  // UndefinedValue.
-  Value getDisposables();
-
-  void clearDisposables();
-#endif
 
  private:
   static bool lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
@@ -754,18 +670,10 @@ class LexicalEnvironmentObject : public EnvironmentObject {
   // Since the two sets are disjoint, we only use one slot to save space.
   static constexpr uint32_t THIS_VALUE_OR_SCOPE_SLOT = 1;
 
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  static constexpr uint32_t DISPOSABLE_OBJECTS_SLOT = 2;
-#endif
-
  public:
   static const JSClass class_;
 
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  static constexpr uint32_t RESERVED_SLOTS = 3;
-#else
   static constexpr uint32_t RESERVED_SLOTS = 2;
-#endif
 
  protected:
   static LexicalEnvironmentObject* create(JSContext* cx,
@@ -784,18 +692,6 @@ class LexicalEnvironmentObject : public EnvironmentObject {
   // Is this a syntactic (i.e. corresponds to a source text) lexical
   // environment?
   bool isSyntactic() const { return !isExtensible() || isGlobal(); }
-
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  bool addDisposableObject(JSContext* cx, JS::Handle<JS::Value> val);
-
-  // Used to get the Disposable objects within the
-  // lexical scope, it returns a ListObject* if there
-  // is a non empty list of Disposables, else
-  // UndefinedValue.
-  Value getDisposables();
-
-  void clearDisposables();
-#endif
 };
 
 // A non-extensible lexical environment.
@@ -953,7 +849,10 @@ class NonSyntacticLexicalEnvironmentObject
 // assignments and unqualified bareword assignments. Its parent is always the
 // global lexical environment.
 //
-// See the long "Non-syntactic Environments" comment above.
+// This is used in ExecuteInGlobalAndReturnScope and sits in front of the
+// global scope to store 'var' bindings, and to store fresh properties created
+// by assignments to undeclared variables that otherwise would have gone on
+// the global object.
 class NonSyntacticVariablesObject : public EnvironmentObject {
  public:
   static const JSClass class_;

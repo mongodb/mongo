@@ -70,9 +70,6 @@
   _(IntlGuardToNumberFormat)                       \
   _(IntlGuardToPluralRules)                        \
   _(IntlGuardToRelativeTimeFormat)                 \
-  _(IntlGuardToSegmenter)                          \
-  _(IntlGuardToSegments)                           \
-  _(IntlGuardToSegmentIterator)                    \
                                                    \
   _(MapGet)                                        \
   _(MapHas)                                        \
@@ -121,8 +118,6 @@
                                                    \
   _(RegExpMatcher)                                 \
   _(RegExpSearcher)                                \
-  _(RegExpSearcherLastLimit)                       \
-  _(RegExpHasCaptureGroups)                        \
   _(IsRegExpObject)                                \
   _(IsPossiblyWrappedRegExpObject)                 \
   _(RegExpPrototypeOptimizable)                    \
@@ -130,27 +125,19 @@
   _(GetFirstDollarIndex)                           \
                                                    \
   _(SetHas)                                        \
-  _(SetSize)                                       \
                                                    \
   _(String)                                        \
   _(StringToString)                                \
   _(StringValueOf)                                 \
   _(StringCharCodeAt)                              \
-  _(StringCodePointAt)                             \
   _(StringFromCharCode)                            \
   _(StringFromCodePoint)                           \
   _(StringCharAt)                                  \
-  _(StringAt)                                      \
-  _(StringIncludes)                                \
   _(StringIndexOf)                                 \
-  _(StringLastIndexOf)                             \
   _(StringStartsWith)                              \
   _(StringEndsWith)                                \
   _(StringToLowerCase)                             \
   _(StringToUpperCase)                             \
-  _(StringTrim)                                    \
-  _(StringTrimStart)                               \
-  _(StringTrimEnd)                                 \
                                                    \
   _(IntrinsicStringReplaceString)                  \
   _(IntrinsicStringSplitString)                    \
@@ -159,7 +146,6 @@
   _(ObjectCreate)                                  \
   _(ObjectIs)                                      \
   _(ObjectIsPrototypeOf)                           \
-  _(ObjectKeys)                                    \
   _(ObjectToString)                                \
                                                    \
   _(TestBailout)                                   \
@@ -217,7 +203,6 @@
   _(IntrinsicIsTypedArray)                         \
   _(IntrinsicIsPossiblyWrappedTypedArray)          \
   _(IntrinsicTypedArrayLength)                     \
-  _(IntrinsicTypedArrayLengthZeroOnOutOfBounds)    \
   _(IntrinsicPossiblyWrappedTypedArrayLength)      \
   _(IntrinsicRegExpBuiltinExec)                    \
   _(IntrinsicRegExpBuiltinExecForTest)             \

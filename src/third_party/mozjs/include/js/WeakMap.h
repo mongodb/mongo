@@ -21,12 +21,12 @@ extern JS_PUBLIC_API bool IsWeakMapObject(JSObject* obj);
 
 extern JS_PUBLIC_API bool GetWeakMapEntry(JSContext* cx,
                                           JS::HandleObject mapObj,
-                                          JS::HandleValue key,
+                                          JS::HandleObject key,
                                           JS::MutableHandleValue val);
 
 extern JS_PUBLIC_API bool SetWeakMapEntry(JSContext* cx,
                                           JS::HandleObject mapObj,
-                                          JS::HandleValue key,
+                                          JS::HandleObject key,
                                           JS::HandleValue val);
 
 }  // namespace JS

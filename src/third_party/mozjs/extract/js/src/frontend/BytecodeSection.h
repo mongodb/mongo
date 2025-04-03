@@ -24,7 +24,6 @@
 #include "frontend/ParserAtom.h"  // ParserAtomsTable, TaggedParserAtomIndex, ParserAtom
 #include "frontend/SourceNotes.h"  // SrcNote
 #include "frontend/Stencil.h"      // Stencils
-#include "js/ColumnNumber.h"       // JS::LimitedColumnNumberOneOrigin
 #include "js/TypeDecls.h"          // jsbytecode, JSContext
 #include "js/Vector.h"             // Vector
 #include "vm/SharedStencil.h"      // TryNote, ScopeNote, GCThingIndex
@@ -179,8 +178,7 @@ typedef Vector<js::SrcNote, 64> SrcNotesVector;
 // bytecode is stored in this class.
 class BytecodeSection {
  public:
-  BytecodeSection(FrontendContext* fc, uint32_t lineNum,
-                  JS::LimitedColumnNumberOneOrigin column);
+  BytecodeSection(FrontendContext* fc, uint32_t lineNum, uint32_t column);
 
   // ---- Bytecode ----
 
@@ -241,14 +239,14 @@ class BytecodeSection {
   // ---- Line and column ----
 
   uint32_t currentLine() const { return currentLine_; }
-  JS::LimitedColumnNumberOneOrigin lastColumn() const { return lastColumn_; }
+  uint32_t lastColumn() const { return lastColumn_; }
   void setCurrentLine(uint32_t line, uint32_t sourceOffset) {
     currentLine_ = line;
-    lastColumn_ = JS::LimitedColumnNumberOneOrigin();
+    lastColumn_ = 0;
     lastSourceOffset_ = sourceOffset;
   }
 
-  void setLastColumn(JS::LimitedColumnNumberOneOrigin column, uint32_t offset) {
+  void setLastColumn(uint32_t column, uint32_t offset) {
     lastColumn_ = column;
     lastSourceOffset_ = offset;
   }
@@ -342,12 +340,12 @@ class BytecodeSection {
   // we can get undefined behavior.
   uint32_t currentLine_;
 
-  // Column index in UTF-16 code units on currentLine_ of last
+  // Zero-based column index on currentLine_ of last
   // SrcNoteType::ColSpan-annotated opcode.
   //
   // WARNING: If this becomes out of sync with already-emitted srcnotes,
   // we can get undefined behavior.
-  JS::LimitedColumnNumberOneOrigin lastColumn_;
+  uint32_t lastColumn_ = 0;
 
   // The last code unit used for srcnotes.
   uint32_t lastSourceOffset_ = 0;
@@ -357,7 +355,7 @@ class BytecodeSection {
   uint32_t lastSeparatorCodeOffset_ = 0;
   uint32_t lastSeparatorSourceOffset_ = 0;
   uint32_t lastSeparatorLine_ = 0;
-  JS::LimitedColumnNumberOneOrigin lastSeparatorColumn_;
+  uint32_t lastSeparatorColumn_ = 0;
 
   // ---- JIT ----
 

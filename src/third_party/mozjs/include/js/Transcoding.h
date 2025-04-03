@@ -35,6 +35,8 @@ struct TranscodeSource final {
   const uint32_t lineno;
 };
 
+using TranscodeSources = mozilla::Vector<TranscodeSource>;
+
 enum class TranscodeResult : uint8_t {
   // Successful encoding / decoding.
   Ok = 0,
@@ -128,6 +130,11 @@ extern JS_PUBLIC_API void AbortIncrementalEncoding(Handle<JSObject*> module);
 // Check if the compile options and script's flag matches.
 //
 // JS::DecodeScript* and JS::DecodeOffThreadScript internally check this.
+//
+// JS::DecodeMultiStencilsOffThread checks some options shared across multiple
+// scripts. Caller is responsible for checking each script with this API when
+// using the decoded script instead of compiling a new script wiht the given
+// options.
 extern JS_PUBLIC_API bool CheckCompileOptionsMatch(
     const ReadOnlyCompileOptions& options, JSScript* script);
 

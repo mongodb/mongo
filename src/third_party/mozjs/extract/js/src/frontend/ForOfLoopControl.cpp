@@ -38,22 +38,22 @@ bool ForOfLoopControl::emitBeginCodeNeedingIteratorClose(BytecodeEmitter* bce) {
 }
 
 bool ForOfLoopControl::emitEndCodeNeedingIteratorClose(BytecodeEmitter* bce) {
-  if (!tryCatch_->emitCatch(TryEmitter::ExceptionStack::Yes)) {
-    //              [stack] ITER ... EXCEPTION STACK
+  if (!tryCatch_->emitCatch()) {
+    //              [stack] ITER ... EXCEPTION
     return false;
   }
 
   unsigned slotFromTop = bce->bytecodeSection().stackDepth() - iterDepth_;
   if (!bce->emitDupAt(slotFromTop)) {
-    //              [stack] ITER ... EXCEPTION STACK ITER
+    //              [stack] ITER ... EXCEPTION ITER
     return false;
   }
   if (!emitIteratorCloseInInnermostScopeWithTryNote(bce,
                                                     CompletionKind::Throw)) {
-    return false;  // ITER ... EXCEPTION STACK
+    return false;  // ITER ... EXCEPTION
   }
 
-  if (!bce->emit1(JSOp::ThrowWithStack)) {
+  if (!bce->emit1(JSOp::Throw)) {
     //              [stack] ITER ...
     return false;
   }
@@ -61,7 +61,7 @@ bool ForOfLoopControl::emitEndCodeNeedingIteratorClose(BytecodeEmitter* bce) {
   // If any yields were emitted, then this for-of loop is inside a star
   // generator and must handle the case of Generator.return. Like in
   // yield*, it is handled with a finally block. If the generator is
-  // closing, then the exception/resumeindex value (third value on
+  // closing, then the exception/resumeindex value (second value on
   // the stack) will be a magic JS_GENERATOR_CLOSING value.
   // TODO: Refactor this to eliminate the swaps.
   uint32_t numYieldsEmitted = bce->bytecodeSection().numYields();
@@ -69,35 +69,35 @@ bool ForOfLoopControl::emitEndCodeNeedingIteratorClose(BytecodeEmitter* bce) {
     if (!tryCatch_->emitFinally()) {
       return false;
     }
-    //              [stack] ITER ... FVALUE FSTACK FTHROWING
+    //              [stack] ITER ... FVALUE FTYPE
     InternalIfEmitter ifGeneratorClosing(bce);
-    if (!bce->emitPickN(2)) {
-      //            [stack] ITER ... FSTACK FTHROWING FVALUE
+    if (!bce->emit1(JSOp::Swap)) {
+      //            [stack] ITER ... FTYPE FVALUE
       return false;
     }
     if (!bce->emit1(JSOp::IsGenClosing)) {
-      //            [stack] ITER ... FSTACK FTHROWING FVALUE CLOSING
+      //            [stack] ITER ... FTYPE FVALUE CLOSING
       return false;
     }
     if (!ifGeneratorClosing.emitThen()) {
-      //            [stack] ITER ... FSTACK FTHROWING FVALUE
+      //            [stack] ITER ... FTYPE FVALUE
       return false;
     }
     if (!bce->emitDupAt(slotFromTop + 1)) {
-      //            [stack] ITER ... FSTACK FTHROWING FVALUE ITER
+      //            [stack] ITER ... FTYPE FVALUE ITER
       return false;
     }
     if (!emitIteratorCloseInInnermostScopeWithTryNote(bce,
                                                       CompletionKind::Normal)) {
-      //            [stack] ITER ... FSTACK FTHROWING FVALUE
+      //            [stack] ITER ... FTYPE FVALUE
       return false;
     }
     if (!ifGeneratorClosing.emitEnd()) {
-      //            [stack] ITER ... FSTACK FTHROWING FVALUE
+      //            [stack] ITER ... FTYPE FVALUE
       return false;
     }
-    if (!bce->emitUnpickN(2)) {
-      //            [stack] ITER ... FVALUE FSTACK FTHROWING
+    if (!bce->emit1(JSOp::Swap)) {
+      //            [stack] ITER ... FVALUE FTYPE
       return false;
     }
   }

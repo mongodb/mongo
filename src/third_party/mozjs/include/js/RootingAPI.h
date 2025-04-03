@@ -115,8 +115,6 @@
 
 namespace js {
 
-class Nursery;
-
 // The defaulted Enable parameter for the following two types is for restricting
 // specializations with std::enable_if.
 template <typename T, typename Enable = void>
@@ -232,7 +230,7 @@ struct SafelyInitialized {
     // |T| per C++11 [expr.type.conv]p2 -- will produce a safely-initialized,
     // safely-usable T that it can return.
 
-#if defined(XP_WIN) || defined(XP_DARWIN) || \
+#if defined(XP_WIN) || defined(XP_MACOSX) || \
     (defined(XP_UNIX) && !defined(__clang__))
 
     // That presumption holds for pointers, where value initialization produces
@@ -981,12 +979,12 @@ enum class AutoGCRooterKind : uint8_t {
   Limit
 };
 
-using RootedListHeads = mozilla::EnumeratedArray<RootKind, js::StackRootedBase*,
-                                                 size_t(RootKind::Limit)>;
+using RootedListHeads =
+    mozilla::EnumeratedArray<RootKind, RootKind::Limit, js::StackRootedBase*>;
 
 using AutoRooterListHeads =
-    mozilla::EnumeratedArray<AutoGCRooterKind, AutoGCRooter*,
-                             size_t(AutoGCRooterKind::Limit)>;
+    mozilla::EnumeratedArray<AutoGCRooterKind, AutoGCRooterKind::Limit,
+                             AutoGCRooter*>;
 
 // Superclass of JSContext which can be used for rooting data in use by the
 // current thread but that does not provide all the functions of a JSContext.
@@ -1007,7 +1005,7 @@ class RootingContext {
   js::GeckoProfilerThread geckoProfiler_;
 
  public:
-  explicit RootingContext(js::Nursery* nursery);
+  RootingContext();
 
   void traceStackRoots(JSTracer* trc);
 
@@ -1020,24 +1018,16 @@ class RootingContext {
 
   js::GeckoProfilerThread& geckoProfiler() { return geckoProfiler_; }
 
-  js::Nursery& nursery() const {
-    MOZ_ASSERT(nursery_);
-    return *nursery_;
-  }
-
  protected:
   // The remaining members in this class should only be accessed through
   // JSContext pointers. They are unrelated to rooting and are in place so
   // that inlined API functions can directly access the data.
 
-  /* The nursery. Null for non-main-thread contexts. */
-  js::Nursery* nursery_;
+  /* The current realm. */
+  Realm* realm_;
 
   /* The current zone. */
   Zone* zone_;
-
-  /* The current realm. */
-  Realm* realm_;
 
  public:
   /* Limit pointer for checking native stack consumption. */

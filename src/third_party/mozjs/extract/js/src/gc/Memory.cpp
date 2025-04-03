@@ -36,7 +36,8 @@
 
 #endif  // !XP_WIN
 
-namespace js::gc {
+namespace js {
+namespace gc {
 
 /*
  * System allocation functions generally require the allocation size
@@ -437,7 +438,6 @@ void* MapAlignedPages(size_t length, size_t alignment) {
   void* region = nullptr;
   if (int err = posix_memalign(&region, alignment, length)) {
     MOZ_ASSERT(err == ENOMEM);
-    (void)err;
     return nullptr;
   }
   MOZ_ASSERT(region != nullptr);
@@ -1046,4 +1046,5 @@ void UnprotectPages(void* region, size_t length) {
   ProtectMemory(region, length, PageAccess::ReadWrite);
 }
 
-}  // namespace js::gc
+}  // namespace gc
+}  // namespace js

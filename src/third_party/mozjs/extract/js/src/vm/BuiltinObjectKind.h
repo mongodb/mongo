@@ -11,6 +11,7 @@
 
 #include "jstypes.h"
 
+class JS_PUBLIC_API JSAtom;
 struct JS_PUBLIC_API JSContext;
 class JS_PUBLIC_API JSObject;
 
@@ -31,6 +32,7 @@ enum class BuiltinObjectKind : uint8_t {
   Array,
   ArrayBuffer,
   Int32Array,
+  Iterator,
   Map,
   Promise,
   RegExp,
@@ -40,7 +42,6 @@ enum class BuiltinObjectKind : uint8_t {
 
   // Built-in prototypes.
   FunctionPrototype,
-  IteratorPrototype,
   ObjectPrototype,
   RegExpPrototype,
   StringPrototype,

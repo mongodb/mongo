@@ -72,18 +72,14 @@ void js::Mutex::assertOwnedByCurrentThread() const {
   // This check is only thread-safe if it succeeds.
   MOZ_ASSERT(ThreadId::ThisThreadId() == owningThread_);
 
-  MOZ_ASSERT(isOwnedByCurrentThread());
-}
-
-bool js::Mutex::isOwnedByCurrentThread() const {
-  // Check whether the mutex is on the thread-local mutex stack.
+  // Check the mutex is on the mutex stack.
   for (Mutex* mutex = HeldMutexStack.get(); mutex; mutex = mutex->prev_) {
     if (mutex == this) {
-      return true;
+      return;
     }
   }
 
-  return false;
+  MOZ_CRASH("Mutex not found on the stack of held mutexes");
 }
 
 #endif

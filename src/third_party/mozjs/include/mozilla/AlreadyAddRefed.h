@@ -24,10 +24,7 @@ struct unused_t;
  * already_AddRefed cooperates with reference counting smart pointers to enable
  * you to assign in a pointer _without_ |AddRef|ing it.  You might want to use
  * this as a return type from a function that returns an already |AddRef|ed
- * pointer.  Or, you might want to use this as a parameter type in a function
- * that wants to force a transfer-of-ownership from a RefPtr in the caller (for
- * example, if the function expects callers to pass in a newly-created object,
- * which the function then takes ownership of).
+ * pointer.
  *
  * TODO Move already_AddRefed to namespace mozilla.  This has not yet been done
  * because of the sheer number of usages of already_AddRefed.

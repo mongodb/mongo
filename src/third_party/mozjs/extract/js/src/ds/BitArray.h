@@ -99,12 +99,6 @@ class BitArray {
     return map[elementIndex];
   }
 
-  // Update a word at a time.
-  void setWord(size_t elementIndex, WordT value) {
-    MOZ_ASSERT(elementIndex < nbits);
-    map[elementIndex] = value;
-  }
-
   static void getIndexAndMask(size_t offset, size_t* indexp, WordT* maskp) {
     MOZ_ASSERT(offset < nbits);
     static_assert(bitsPerElement == 32, "unexpected bitsPerElement value");

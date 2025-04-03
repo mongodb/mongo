@@ -282,7 +282,7 @@ ZYDIS_EXPORT ZydisRegisterWidth ZydisRegisterGetWidth(ZydisMachineMode mode, Zyd
  * @param   reg     The register.
  *
  * @return  The largest enclosing register of the given register, or `ZYDIS_REGISTER_NONE` if the
- *          register is invalid for the active machine-mode.
+ *          register is invalid for the active machine-mode or does not have an enclosing-register.
  */
 ZYDIS_EXPORT ZydisRegister ZydisRegisterGetLargestEnclosing(ZydisMachineMode mode,
     ZydisRegister reg);

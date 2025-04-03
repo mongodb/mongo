@@ -19,7 +19,8 @@
 
 #include "gc/ArenaList-inl.h"
 
-namespace js::gc {
+namespace js {
+namespace gc {
 
 class AutoAssertEmptyNursery;
 
@@ -42,36 +43,12 @@ class ArenaListIter {
   Arena* operator->() const { return get(); }
 };
 
-// Iterate all arenas in a zone of the specified kind, for use by the GC.
-//
-// Since the GC never iterates arenas during foreground sweeping we can skip
-// traversing foreground swept arenas.
-class ArenaIterInGC : public ChainedIterator<ArenaListIter, 2> {
- public:
-  ArenaIterInGC(JS::Zone* zone, AllocKind kind)
-      : ChainedIterator(zone->arenas.getFirstArena(kind),
-                        zone->arenas.getFirstCollectingArena(kind)) {
-#ifdef DEBUG
-    MOZ_ASSERT(JS::RuntimeHeapIsMajorCollecting());
-    GCRuntime& gc = zone->runtimeFromMainThread()->gc;
-    MOZ_ASSERT(!gc.maybeGetForegroundFinalizedArenas(zone, kind));
-#endif
-  }
-};
-
-// Iterate all arenas in a zone of the specified kind. May be called at any
-// time.
-//
-// Most uses of this happen when we are not in incremental GC but the debugger
-// can iterate scripts at any time.
-class ArenaIter : public AutoGatherSweptArenas,
-                  public ChainedIterator<ArenaListIter, 3> {
+class ArenaIter : public ChainedIterator<ArenaListIter, 3> {
  public:
   ArenaIter(JS::Zone* zone, AllocKind kind)
-      : AutoGatherSweptArenas(zone, kind),
-        ChainedIterator(zone->arenas.getFirstArena(kind),
+      : ChainedIterator(zone->arenas.getFirstArena(kind),
                         zone->arenas.getFirstCollectingArena(kind),
-                        sweptArenas()) {}
+                        zone->arenas.getFirstSweptArena(kind)) {}
 };
 
 class ArenaCellIter {
@@ -361,6 +338,7 @@ class ZoneCellIter : protected ZoneAllCellIter<T> {
   }
 };
 
-}  // namespace js::gc
+} /* namespace gc */
+} /* namespace js */
 
 #endif /* gc_GC_inl_h */

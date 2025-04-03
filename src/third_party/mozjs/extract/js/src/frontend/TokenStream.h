@@ -204,8 +204,6 @@
 #include "frontend/ParserAtom.h"  // ParserAtom, ParserAtomsTable, TaggedParserAtomIndex
 #include "frontend/Token.h"
 #include "frontend/TokenKind.h"
-#include "js/CharacterEncoding.h"  // JS::ConstUTF8CharsZ
-#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin, JS::ColumnNumberOneOrigin, JS::ColumnNumberUnsignedOffset
 #include "js/CompileOptions.h"
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "js/HashTable.h"             // js::HashMap
@@ -223,8 +221,15 @@ class FrontendContext;
 
 namespace frontend {
 
-// True if str is a keyword.
-bool IsKeyword(TaggedParserAtomIndex atom);
+// Saturate column number at a limit that can be represented in various parts of
+// the engine. Source locations beyond this point will report at the limit
+// column instead.
+//
+// See:
+//  - TokenStreamAnyChars::checkOptions
+//  - ColSpan::isRepresentable
+//  - WasmFrameIter::computeLine
+static constexpr uint32_t ColumnLimit = std::numeric_limits<int32_t>::max() / 2;
 
 // If `name` is reserved word, returns the TokenKind of it.
 // TokenKind::Limit otherwise.
@@ -279,10 +284,8 @@ class TokenStreamPosition;
  */
 class TokenStreamShared {
  protected:
-  // 1 current + (3 lookahead if EXPLICIT_RESOURCE_MANAGEMENT is enabled
-  // else 2 lookahead and rounded up to ^2)
-  // NOTE: This must be power of 2, in order to make `ntokensMask` work.
-  static constexpr size_t ntokens = 4;
+  static constexpr size_t ntokens = 4;  // 1 current + 2 lookahead, rounded
+                                        // to power of 2 to avoid divmod by 3
 
   static constexpr unsigned ntokensMask = ntokens - 1;
 
@@ -290,12 +293,7 @@ class TokenStreamShared {
   friend class TokenStreamPosition;
 
  public:
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  // We need a lookahead buffer of atleast 3 for the AwaitUsing syntax.
-  static constexpr unsigned maxLookahead = 3;
-#else
   static constexpr unsigned maxLookahead = 2;
-#endif
 
   using Modifier = Token::Modifier;
   static constexpr Modifier SlashIsDiv = Token::SlashIsDiv;
@@ -361,12 +359,12 @@ class SourceUnits;
  *
  * for either |Unit = Utf8Unit| or |Unit = char16_t|.
  *
- * Note that, if |Unit = Utf8Unit|, the latter quantity is *not* the same as a
- * column number, which is a count of UTF-16 code units.  Computing a column
- * number requires the offset within the line and the source units of that line
- * (including what type |Unit| is, to know how to decode them).  If you need a
- * column number, functions in |GeneralTokenStreamChars<Unit>| will consult
- * this and source units to compute it.
+ * Note that the latter quantity is *not* the same as a column number, which is
+ * a count of code *points*.  Computing a column number requires the offset
+ * within the line and the source units of that line (including what type |Unit|
+ * is, to know how to decode them).  If you need a column number, functions in
+ * |GeneralTokenStreamChars<Unit>| will consult this and source units to compute
+ * it.
  */
 class SourceCoords {
   // For a given buffer holding source code, |lineStartOffsets_| has one
@@ -436,13 +434,14 @@ class SourceCoords {
   [[nodiscard]] bool add(uint32_t lineNum, uint32_t lineStartOffset);
   [[nodiscard]] bool fill(const SourceCoords& other);
 
-  std::optional<bool> isOnThisLine(uint32_t offset, uint32_t lineNum) const {
+  bool isOnThisLine(uint32_t offset, uint32_t lineNum, bool* onThisLine) const {
     uint32_t index = indexFromLineNumber(lineNum);
     if (index + 1 >= lineStartOffsets_.length()) {  // +1 due to sentinel
-      return std::nullopt;
+      return false;
     }
-    return (lineStartOffsets_[index] <= offset &&
-            offset < lineStartOffsets_[index + 1]);
+    *onThisLine = lineStartOffsets_[index] <= offset &&
+                  offset < lineStartOffsets_[index + 1];
+    return true;
   }
 
   /**
@@ -513,22 +512,20 @@ enum class UnitsType : unsigned char {
 
 class ChunkInfo {
  private:
-  // Column number offset in UTF-16 code units.
   // Store everything in |unsigned char|s so everything packs.
-  unsigned char columnOffset_[sizeof(uint32_t)];
+  unsigned char column_[sizeof(uint32_t)];
   unsigned char unitsType_;
 
  public:
-  ChunkInfo(JS::ColumnNumberUnsignedOffset offset, UnitsType type)
+  ChunkInfo(uint32_t col, UnitsType type)
       : unitsType_(static_cast<unsigned char>(type)) {
-    memcpy(columnOffset_, offset.addressOfValueForTranscode(), sizeof(offset));
+    memcpy(column_, &col, sizeof(col));
   }
 
-  JS::ColumnNumberUnsignedOffset columnOffset() const {
-    JS::ColumnNumberUnsignedOffset offset;
-    memcpy(offset.addressOfValueForTranscode(), columnOffset_,
-           sizeof(uint32_t));
-    return offset;
+  uint32_t column() const {
+    uint32_t col;
+    memcpy(&col, column_, sizeof(uint32_t));
+    return col;
   }
 
   UnitsType unitsType() const {
@@ -576,15 +573,14 @@ class TokenStreamAnyChars : public TokenStreamShared {
   StrictModeGetter* const strictModeGetter_;
 
   /** Input filename or null. */
-  JS::ConstUTF8CharsZ filename_;
+  const char* const filename_;
 
   // Column number computation fields.
-  // Used only for UTF-8 case.
 
   /**
    * A map of (line number => sequence of the column numbers at
    * |ColumnChunkLength|-unit boundaries rewound [if needed] to the nearest code
-   * point boundary).  (|TokenStreamAnyChars::computeColumnOffset| is the sole
+   * point boundary).  (|TokenStreamAnyChars::computePartialColumn| is the sole
    * user of |ColumnChunkLength| and therefore contains its definition.)
    *
    * Entries appear in this map only when a column computation of sufficient
@@ -630,10 +626,10 @@ class TokenStreamAnyChars : public TokenStreamShared {
   mutable uint32_t lastOffsetOfComputedColumn_ = UINT32_MAX;
 
   /**
-   * The column number offset from the 1st column for the offset (in code units)
-   * of the last column computation performed, relative to source start.
+   * The column number for the offset (in code units) of the last column
+   * computation performed, relative to source start.
    */
-  mutable JS::ColumnNumberUnsignedOffset lastComputedColumnOffset_;
+  mutable uint32_t lastComputedColumn_ = 0;
 
   // Intra-token fields.
 
@@ -911,21 +907,15 @@ class TokenStreamAnyChars : public TokenStreamShared {
 
  private:
   /**
-   * Compute the column number offset from the 1st code unit in the line in
-   * UTF-16 code units, for given absolute |offset| within source text on the
-   * line of |lineToken| (which must have been computed from |offset|).
+   * Compute the "partial" column number in Unicode code points of the absolute
+   * |offset| within source text on the line of |lineToken| (which must have
+   * been computed from |offset|).
    *
-   * A column number offset on a line that isn't the first line is just
-   * the actual column number in 0-origin.  But a column number offset
-   * on the first line is the column number offset from the initial
-   * line/column of the script.  For example, consider this HTML with
-   * line/column number keys:
+   * A partial column number on a line that isn't the first line is just the
+   * actual column number.  But a partial column number on the first line is the
+   * column number *ignoring the initial line/column of the script*.  For
+   * example, consider this HTML with line/column number keys:
    *
-   *     Column number in 1-origin
-   *                1         2            3
-   *       123456789012345678901234   567890
-   *
-   *     Column number in 0-origin, and the offset from 1st column
    *                 1         2            3
    *       0123456789012345678901234   567890
    *     ------------------------------------
@@ -938,26 +928,25 @@ class TokenStreamAnyChars : public TokenStreamShared {
    *   7 | </html>
    *
    * The script would be compiled specifying initial (line, column) of (3, 10)
-   * using |JS::ReadOnlyCompileOptions::{lineno,column}|, which is 0-origin.
-   * And the column reported by |computeColumn| for the "v" of |var| would be
-   * 11 (in 1-origin).  But the column number offset of the "v" in |var|, that
-   * this function returns, would be 0.  On the other hand, the column reported
-   * by |computeColumn| would be 1 (in 1-origin) and the column number offset
-   * returned by this function for the "c" in |const| would be 0, because it's
-   * not in the first line of source text.
+   * using |JS::ReadOnlyCompileOptions::{lineno,column}|.  And the column
+   * reported by |computeColumn| for the "v" of |var| would be 10.  But the
+   * partial column number of the "v" in |var|, that this function returns,
+   * would be 0.  On the other hand, the column reported by |computeColumn| and
+   * the partial column number returned by this function for the "c" in |const|
+   * would both be 0, because it's not in the first line of source text.
    *
-   * The column number offset is with respect *only* to the JavaScript source
-   * text as SpiderMonkey sees it.  In the example, the "&lt;" is converted to
-   * "<" by the browser before SpiderMonkey would see it.  So the column number
-   * offset of the "4" in the inequality would be 16, not 19.
+   * The partial column is with respect *only* to the JavaScript source text as
+   * SpiderMonkey sees it.  In the example, the "&lt;" is converted to "<" by
+   * the browser before SpiderMonkey would see it.  So the partial column of the
+   * "4" in the inequality would be 16, not 19.
    *
-   * UTF-16 code units are not all equal length in UTF-8 source, so counting
-   * requires *some* kind of linear-time counting from the start of the line.
-   * This function attempts various tricks to reduce this cost.  If these
-   * optimizations succeed, repeated calls to this function on a line will pay
-   * a one-time cost linear in the length of the line, then each call pays a
-   * separate constant-time cost.  If the optimizations do not succeed, this
-   * function works in time linear in the length of the line.
+   * Code points are not all equal length, so counting requires *some* kind of
+   * linear-time counting from the start of the line.  This function attempts
+   * various tricks to reduce this cost.  If these optimizations succeed,
+   * repeated calls to this function on a line will pay a one-time cost linear
+   * in the length of the line, then each call pays a separate constant-time
+   * cost.  If the optimizations do not succeed, this function works in time
+   * linear in the length of the line.
    *
    * It's unusual for a function in *this* class to be |Unit|-templated, but
    * while this operation manages |Unit|-agnostic fields in this class and in
@@ -965,14 +954,9 @@ class TokenStreamAnyChars : public TokenStreamShared {
    * And this is the best place to do that.
    */
   template <typename Unit>
-  JS::ColumnNumberUnsignedOffset computeColumnOffset(
-      const LineToken lineToken, const uint32_t offset,
-      const SourceUnits<Unit>& sourceUnits) const;
-
-  template <typename Unit>
-  JS::ColumnNumberUnsignedOffset computeColumnOffsetForUTF8(
-      const LineToken lineToken, const uint32_t offset, const uint32_t start,
-      const uint32_t offsetInLine, const SourceUnits<Unit>& sourceUnits) const;
+  uint32_t computePartialColumn(const LineToken lineToken,
+                                const uint32_t offset,
+                                const SourceUnits<Unit>& sourceUnits) const;
 
   /**
    * Update line/column information for the start of a new line at
@@ -1036,7 +1020,7 @@ class TokenStreamAnyChars : public TokenStreamShared {
 
   const JS::ReadOnlyCompileOptions& options() const { return options_; }
 
-  JS::ConstUTF8CharsZ getFilename() const { return filename_; }
+  const char* getFilename() const { return filename_; }
 };
 
 constexpr char16_t CodeUnitValue(char16_t unit) { return unit; }
@@ -1999,10 +1983,9 @@ class GeneralTokenStreamChars : public SpecializedTokenStreamCharsBase<Unit> {
    * |offset| must be a code point boundary, preceded only by validly-encoded
    * source units.  (It doesn't have to be *followed* by valid source units.)
    */
-  JS::LimitedColumnNumberOneOrigin computeColumn(LineToken lineToken,
-                                                 uint32_t offset) const;
+  uint32_t computeColumn(LineToken lineToken, uint32_t offset) const;
   void computeLineAndColumn(uint32_t offset, uint32_t* line,
-                            JS::LimitedColumnNumberOneOrigin* column) const;
+                            uint32_t* column) const;
 
   /**
    * Fill in |err| completely, except for line-of-context information.
@@ -2013,9 +1996,7 @@ class GeneralTokenStreamChars : public SpecializedTokenStreamCharsBase<Unit> {
   [[nodiscard]] bool fillExceptingContext(ErrorMetadata* err,
                                           uint32_t offset) const {
     if (anyCharsAccess().fillExceptingContext(err, offset)) {
-      JS::LimitedColumnNumberOneOrigin columnNumber;
-      computeLineAndColumn(offset, &err->lineNumber, &columnNumber);
-      err->columnNumber = JS::ColumnNumberOneOrigin(columnNumber);
+      computeLineAndColumn(offset, &err->lineNumber, &err->columnNumber);
       return true;
     }
     return false;
@@ -2168,7 +2149,7 @@ class GeneralTokenStreamChars : public SpecializedTokenStreamCharsBase<Unit> {
       end =
           this->sourceUnits.codeUnitPtrAt(anyChars.currentToken().pos.end - 2);
     } else {
-      // NoSubsTemplate is of the form   |`...`|   or   |}...`|
+      // NO_SUBS_TEMPLATE is of the form   |`...`|   or   |}...`|
       end =
           this->sourceUnits.codeUnitPtrAt(anyChars.currentToken().pos.end - 1);
     }
@@ -2541,9 +2522,9 @@ class MOZ_STACK_CLASS TokenStreamSpecific
  public:
   // Implement ErrorReporter.
 
-  std::optional<bool> isOnThisLine(size_t offset,
-                                   uint32_t lineNum) const final {
-    return anyCharsAccess().srcCoords.isOnThisLine(offset, lineNum);
+  bool isOnThisLine(size_t offset, uint32_t lineNum,
+                    bool* onThisLine) const final {
+    return anyCharsAccess().srcCoords.isOnThisLine(offset, lineNum, onThisLine);
   }
 
   uint32_t lineAt(size_t offset) const final {
@@ -2552,7 +2533,7 @@ class MOZ_STACK_CLASS TokenStreamSpecific
     return anyChars.lineNumber(lineToken);
   }
 
-  JS::LimitedColumnNumberOneOrigin columnAt(size_t offset) const final {
+  uint32_t columnAt(size_t offset) const final {
     return computeColumn(anyCharsAccess().lineToken(offset), offset);
   }
 
@@ -2735,14 +2716,13 @@ class MOZ_STACK_CLASS TokenStreamSpecific
     // stronger condition than what we are looking for, and we don't need
     // to return Eol.
     if (anyChars.lookahead != 0) {
-      std::optional<bool> onThisLineStatus =
-          anyChars.srcCoords.isOnThisLine(curr.pos.end, anyChars.lineno);
-      if (!onThisLineStatus.has_value()) {
+      bool onThisLine;
+      if (!anyChars.srcCoords.isOnThisLine(curr.pos.end, anyChars.lineno,
+                                           &onThisLine)) {
         error(JSMSG_OUT_OF_MEMORY);
         return false;
       }
 
-      bool onThisLine = *onThisLineStatus;
       if (onThisLine) {
         MOZ_ASSERT(!anyChars.flags.hadError);
         verifyConsistentModifier(modifier, anyChars.nextToken());

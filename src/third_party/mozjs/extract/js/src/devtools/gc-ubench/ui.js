@@ -10,8 +10,6 @@ var stroke = {
 
 var numSamples = 500;
 
-var tests = new Map();
-
 var gHistogram = new Map(); // {ms: count}
 var gHistory = new FrameHistory(numSamples);
 var gPerf = new PerfTracker();
@@ -53,14 +51,8 @@ var Firefox = class extends Host {
   get gcBytes() {
     return gMemory.zone.gcBytes;
   }
-  get mallocBytes() {
-    return gMemory.zone.mallocBytes;
-  }
   get gcAllocTrigger() {
     return gMemory.zone.gcAllocTrigger;
-  }
-  get mallocTrigger() {
-    return gMemory.zone.mallocTriggerBytes;
   }
 
   features = {
@@ -93,32 +85,22 @@ function parse_units(v) {
 }
 
 var Graph = class {
-  constructor(canvas) {
-    this.ctx = canvas.getContext('2d');
+  constructor(ctx) {
+    this.ctx = ctx;
 
-    // Adjust scale for high-DPI displays.
-    this.scale = window.devicePixelRatio || 1;
-    let rect = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * this.scale);
-    canvas.height = Math.floor(rect.height * this.scale);
-    canvas.style.width = rect.width;
-    canvas.style.height = rect.height;
-
-    // Record canvas size to draw into.
-    this.width = canvas.width;
-    this.height = canvas.height;
-
+    var { height } = ctx.canvas;
     this.layout = {
-      xAxisLabel_Y: this.height - 20 * this.scale,
+      xAxisLabel_Y: height - 20,
     };
   }
 
   xpos(index) {
-    return (index / numSamples) * (this.width - 100 * this.scale);
+    return index * 2;
   }
 
   clear() {
-    this.ctx.clearRect(0, 0, this.width, this.height);
+    const { width, height } = this.ctx.canvas;
+    this.ctx.clearRect(0, 0, width, height);
   }
 
   drawScale(delay) {
@@ -135,22 +117,20 @@ var Graph = class {
 
   drawAxisLabels(x_label, y_label) {
     const ctx = this.ctx;
+    const { width, height } = ctx.canvas;
 
-    ctx.font = `${10 * this.scale}px sans-serif`;
-
-    ctx.fillText(x_label, this.width / 2, this.layout.xAxisLabel_Y);
+    ctx.fillText(x_label, width / 2, this.layout.xAxisLabel_Y);
 
     ctx.save();
     ctx.rotate(Math.PI / 2);
-    var start = this.height / 2 - ctx.measureText(y_label).width / 2;
-    ctx.fillText(y_label, start, -this.width + 20 * this.scale);
+    var start = height / 2 - ctx.measureText(y_label).width / 2;
+    ctx.fillText(y_label, start, -width + 20);
     ctx.restore();
   }
 
   drawFrame() {
     const ctx = this.ctx;
-    const width = this.width;
-    const height = this.height;
+    const { width, height } = ctx.canvas;
 
     // Draw frame to show size
     ctx.strokeStyle = "rgb(0,0,0)";
@@ -168,16 +148,21 @@ var Graph = class {
 var LatencyGraph = class extends Graph {
   constructor(ctx) {
     super(ctx);
+    console.log(this.ctx);
   }
 
   ypos(delay) {
-    return this.height + this.scale * (100 - Math.log(delay) * 64);
+    const { height } = this.ctx.canvas;
+
+    const r = height + 100 - Math.log(delay) * 64;
+    if (r < 5) {
+      return 5;
+    }
+    return r;
   }
 
   drawHBar(delay, label, color = "rgb(0,0,0)", label_offset = 0) {
     const ctx = this.ctx;
-
-    let y = this.ypos(delay);
 
     ctx.fillStyle = color;
     ctx.strokeStyle = color;
@@ -292,19 +277,20 @@ var LatencyGraph = class extends Graph {
 var MemoryGraph = class extends Graph {
   constructor(ctx) {
     super(ctx);
-    this.range = 1;
+    this.worstEver = this.bestEver = gHost.gcBytes;
+    this.limit = Math.max(this.worstEver, gHost.gcAllocTrigger);
   }
 
   ypos(size) {
-    const percent = size / this.range;
-    return (1 - percent) * this.height * 0.9 + this.scale * 20;
+    const { height } = this.ctx.canvas;
+
+    const range = this.limit - this.bestEver;
+    const percent = (size - this.bestEver) / range;
+
+    return (1 - percent) * height * 0.9 + 20;
   }
 
-  drawHBarForBytes(size, name, color) {
-    this.drawHBar(size, `${format_bytes(size)} ${name}`, color)
-  }
-
-  drawHBar(size, label, color) {
+  drawHBar(size, label, color = "rgb(150,150,150)") {
     const ctx = this.ctx;
 
     const y = this.ypos(size);
@@ -327,48 +313,50 @@ var MemoryGraph = class extends Graph {
     this.clear();
     this.drawFrame();
 
-    let gcMaxPos = 0;
-    let mallocMaxPos = 0;
-    let gcMax = 0;
-    let mallocMax = 0;
+    var worst = 0,
+      worstpos = 0;
     for (let i = 0; i < numSamples; i++) {
-      if (gHistory.gcBytes[i] >= gcMax) {
-        gcMax = gHistory.gcBytes[i];
-        gcMaxPos = i;
+      if (gHistory.gcBytes[i] >= worst) {
+        worst = gHistory.gcBytes[i];
+        worstpos = i;
       }
-      if (gHistory.mallocBytes[i] >= mallocMax) {
-        mallocMax = gHistory.mallocBytes[i];
-        mallocMaxPos = i;
+      if (gHistory.gcBytes[i] < this.bestEver) {
+        this.bestEver = gHistory.gcBytes[i];
       }
     }
 
-    this.range = Math.max(gcMax, mallocMax, gHost.gcAllocTrigger, gHost.mallocTrigger);
+    if (this.worstEver < worst) {
+      this.worstEver = worst;
+      this.limit = Math.max(this.worstEver, gHost.gcAllocTrigger);
+    }
 
-    this.drawHBarForBytes(gcMax, "GC max", "#00cf61");
-    this.drawHBarForBytes(mallocMax, "Malloc max", "#cc1111");
-    this.drawHBarForBytes(gHost.gcAllocTrigger, "GC trigger", "#cc11cc");
-    this.drawHBarForBytes(gHost.mallocTrigger, "Malloc trigger", "#cc11cc");
+    this.drawHBar(
+      this.bestEver,
+      `${format_bytes(this.bestEver)} min`,
+      "#00cf61"
+    );
+    this.drawHBar(
+      this.worstEver,
+      `${format_bytes(this.worstEver)} max`,
+      "#cc1111"
+    );
+    this.drawHBar(
+      gHost.gcAllocTrigger,
+      `${format_bytes(gHost.gcAllocTrigger)} trigger`,
+      "#cc11cc"
+    );
 
     ctx.fillStyle = "rgb(255,0,0)";
-
-    if (gcMax !== 0) {
+    if (worst) {
       ctx.fillText(
-        format_bytes(gcMax),
-        this.xpos(gcMaxPos) - 10,
-        this.ypos(gcMax) - 14
+        format_bytes(worst),
+        this.xpos(worstpos) - 10,
+        this.ypos(worst) - 14
       );
     }
-    if (mallocMax !== 0) {
-      ctx.fillText(
-        format_bytes(mallocMax),
-        this.xpos(mallocMaxPos) - 10,
-        this.ypos(mallocMax) - 14
-      );
-    }
-
-    const where = sampleIndex % numSamples;
 
     ctx.beginPath();
+    var where = sampleIndex % numSamples;
     ctx.arc(
       this.xpos(where),
       this.ypos(gHistory.gcBytes[where]),
@@ -378,48 +366,19 @@ var MemoryGraph = class extends Graph {
       true
     );
     ctx.fill();
-    ctx.beginPath();
-    ctx.arc(
-      this.xpos(where),
-      this.ypos(gHistory.mallocBytes[where]),
-      5,
-      0,
-      Math.PI * 2,
-      true
-    );
-    ctx.fill();
 
     ctx.beginPath();
     for (let i = 0; i < numSamples; i++) {
-      let x = this.xpos(i);
-      let y = this.ypos(gHistory.gcBytes[i]);
       if (i == (sampleIndex + 1) % numSamples) {
-        ctx.moveTo(x, y);
+        ctx.moveTo(this.xpos(i), this.ypos(gHistory.gcBytes[i]));
       } else {
-        ctx.lineTo(x, y);
+        ctx.lineTo(this.xpos(i), this.ypos(gHistory.gcBytes[i]));
       }
       if (i == where) {
         ctx.stroke();
       }
     }
     ctx.stroke();
-
-    ctx.beginPath();
-    for (let i = 0; i < numSamples; i++) {
-      let x = this.xpos(i);
-      let y = this.ypos(gHistory.mallocBytes[i]);
-      if (i == (sampleIndex + 1) % numSamples) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-      if (i == where) {
-        ctx.stroke();
-      }
-    }
-    ctx.stroke();
-
-    ctx.fillStyle = "rgb(0,0,0)";
 
     this.drawAxisLabels("Time", "Heap Memory Usage");
   }
@@ -507,17 +466,10 @@ function reset_draw_state() {
 }
 
 function onunload() {
-  if (gLoadMgr) {
-    gLoadMgr.deactivateLoad();
-  }
+  gLoadMgr.deactivateLoad();
 }
 
-async function onload() {
-  // Collect all test loads into the `tests` Map.
-  let imports = [];
-  foreach_test_file(path => imports.push(import("./" + path)));
-  await Promise.all(imports);
-
+function onload() {
   // The order of `tests` is currently based on their asynchronous load
   // order, rather than the listed order. Rearrange by extracting the test
   // names from their filenames, which is kind of gross.
@@ -565,7 +517,7 @@ async function onload() {
 
   // Acquire our canvas.
   var canvas = document.getElementById("graph");
-  latencyGraph = new LatencyGraph(canvas);
+  latencyGraph = new LatencyGraph(canvas.getContext("2d"));
 
   if (!gHost.features.haveMemorySizes) {
     document.getElementById("memgraph-disabled").style.display = "block";
@@ -724,7 +676,7 @@ function garbage_per_frame_changed() {
     return;
   }
   if (gLoadMgr.load_running()) {
-    gLoadMgr.change_garbagePerFrame(value);
+    gLoadMgr.change_garbagePerFrame = value;
     console.log(
       `Updated garbage-per-frame to ${
         gLoadMgr.activeLoad().garbagePerFrame
@@ -740,7 +692,7 @@ function trackHeapSizes(track) {
 
   if (enabled.trackingSizes) {
     canvas.style.display = "block";
-    memoryGraph = new MemoryGraph(canvas);
+    memoryGraph = new MemoryGraph(canvas.getContext("2d"));
   } else {
     canvas.style.display = "none";
     memoryGraph = null;

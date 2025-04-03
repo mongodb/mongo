@@ -18,7 +18,9 @@ namespace jit {
             }
             inline uint8_t AtomicLoad8SeqCst(const uint8_t* arg) {
                 uint8_t res;
-                asm volatile ("movb (%[arg]), %[res]\n\t"
+                asm volatile ("mfence\n\t"
+"movb (%[arg]), %[res]\n\t"
+"mfence\n\t"
 
                     : [res] "=r" (res)
                     : [arg] "r" (arg)
@@ -27,7 +29,9 @@ namespace jit {
             }
             inline uint16_t AtomicLoad16SeqCst(const uint16_t* arg) {
                 uint16_t res;
-                asm volatile ("movw (%[arg]), %[res]\n\t"
+                asm volatile ("mfence\n\t"
+"movw (%[arg]), %[res]\n\t"
+"mfence\n\t"
 
                     : [res] "=r" (res)
                     : [arg] "r" (arg)
@@ -36,7 +40,9 @@ namespace jit {
             }
             inline uint32_t AtomicLoad32SeqCst(const uint32_t* arg) {
                 uint32_t res;
-                asm volatile ("movl (%[arg]), %[res]\n\t"
+                asm volatile ("mfence\n\t"
+"movl (%[arg]), %[res]\n\t"
+"mfence\n\t"
 
                     : [res] "=r" (res)
                     : [arg] "r" (arg)
@@ -45,7 +51,9 @@ namespace jit {
             }
             inline uint64_t AtomicLoad64SeqCst(const uint64_t* arg) {
                 uint64_t res;
-                asm volatile ("movq (%[arg]), %[res]\n\t"
+                asm volatile ("mfence\n\t"
+"movq (%[arg]), %[res]\n\t"
+"mfence\n\t"
 
                     : [res] "=r" (res)
                     : [arg] "r" (arg)
@@ -89,7 +97,8 @@ namespace jit {
                 return res;
             }
             inline void AtomicStore8SeqCst(uint8_t* addr, uint8_t val) {
-                asm volatile ("movb %[val], (%[addr])\n\t"
+                asm volatile ("mfence\n\t"
+"movb %[val], (%[addr])\n\t"
 "mfence\n\t"
 
                     :
@@ -97,7 +106,8 @@ namespace jit {
                     : "memory");
             }
             inline void AtomicStore16SeqCst(uint16_t* addr, uint16_t val) {
-                asm volatile ("movw %[val], (%[addr])\n\t"
+                asm volatile ("mfence\n\t"
+"movw %[val], (%[addr])\n\t"
 "mfence\n\t"
 
                     :
@@ -105,7 +115,8 @@ namespace jit {
                     : "memory");
             }
             inline void AtomicStore32SeqCst(uint32_t* addr, uint32_t val) {
-                asm volatile ("movl %[val], (%[addr])\n\t"
+                asm volatile ("mfence\n\t"
+"movl %[val], (%[addr])\n\t"
 "mfence\n\t"
 
                     :
@@ -113,7 +124,8 @@ namespace jit {
                     : "memory");
             }
             inline void AtomicStore64SeqCst(uint64_t* addr, uint64_t val) {
-                asm volatile ("movq %[val], (%[addr])\n\t"
+                asm volatile ("mfence\n\t"
+"movq %[val], (%[addr])\n\t"
 "mfence\n\t"
 
                     :

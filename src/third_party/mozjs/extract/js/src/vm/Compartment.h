@@ -120,7 +120,7 @@ class ObjectWrapperMap {
 
     InnerMap* map;
 
-    Ptr() : map(nullptr) {}
+    Ptr() : InnerMap::Ptr(), map(nullptr) {}
     Ptr(const InnerMap::Ptr& p, InnerMap& m) : InnerMap::Ptr(p), map(&m) {}
   };
 

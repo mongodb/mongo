@@ -13,8 +13,6 @@
 #  include "jit/x64/Assembler-x64.h"
 #endif
 
-using js::wasm::FaultingCodeOffset;
-
 namespace js {
 namespace jit {
 
@@ -161,6 +159,15 @@ class MacroAssemblerX86Shared : public Assembler {
   void atomic_inc32(const Operand& addr) { lock_incl(addr); }
   void atomic_dec32(const Operand& addr) { lock_decl(addr); }
 
+  void storeLoadFence() {
+    // This implementation follows Linux.
+    if (HasSSE2()) {
+      masm.mfence();
+    } else {
+      lock_addl(Imm32(0), Operand(Address(esp, 0)));
+    }
+  }
+
   void branch16(Condition cond, Register lhs, Register rhs, Label* label) {
     cmpw(rhs, lhs);
     j(cond, label);
@@ -259,63 +266,44 @@ class MacroAssemblerX86Shared : public Assembler {
   };
 
   void load8ZeroExtend(const Operand& src, Register dest) { movzbl(src, dest); }
-  FaultingCodeOffset load8ZeroExtend(const Address& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load8ZeroExtend(const Address& src, Register dest) {
     movzbl(Operand(src), dest);
-    return fco;
   }
-  FaultingCodeOffset load8ZeroExtend(const BaseIndex& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load8ZeroExtend(const BaseIndex& src, Register dest) {
     movzbl(Operand(src), dest);
-    return fco;
   }
   void load8SignExtend(const Operand& src, Register dest) { movsbl(src, dest); }
-  FaultingCodeOffset load8SignExtend(const Address& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load8SignExtend(const Address& src, Register dest) {
     movsbl(Operand(src), dest);
-    return fco;
   }
-  FaultingCodeOffset load8SignExtend(const BaseIndex& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load8SignExtend(const BaseIndex& src, Register dest) {
     movsbl(Operand(src), dest);
-    return fco;
   }
   template <typename T>
   void store8(Imm32 src, const T& dest) {
     movb(src, Operand(dest));
   }
   template <typename T>
-  FaultingCodeOffset store8(Register src, const T& dest) {
+  void store8(Register src, const T& dest) {
     AutoEnsureByteRegister ensure(this, dest, src);
-    // We must read the current offset only after AutoEnsureByteRegister's
-    // constructor has done its thing, since it may insert instructions, and
-    // we want to get the offset for the `movb` itself.
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
     movb(ensure.reg(), Operand(dest));
-    return fco;
   }
   void load16ZeroExtend(const Operand& src, Register dest) {
     movzwl(src, dest);
   }
-  FaultingCodeOffset load16ZeroExtend(const Address& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load16ZeroExtend(const Address& src, Register dest) {
     movzwl(Operand(src), dest);
-    return fco;
   }
-  FaultingCodeOffset load16ZeroExtend(const BaseIndex& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load16ZeroExtend(const BaseIndex& src, Register dest) {
     movzwl(Operand(src), dest);
-    return fco;
   }
   template <typename S>
   void load16UnalignedZeroExtend(const S& src, Register dest) {
     load16ZeroExtend(src, dest);
   }
   template <typename S, typename T>
-  FaultingCodeOffset store16(const S& src, const T& dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void store16(const S& src, const T& dest) {
     movw(src, Operand(dest));
-    return fco;
   }
   template <typename S, typename T>
   void store16Unaligned(const S& src, const T& dest) {
@@ -324,54 +312,36 @@ class MacroAssemblerX86Shared : public Assembler {
   void load16SignExtend(const Operand& src, Register dest) {
     movswl(src, dest);
   }
-  FaultingCodeOffset load16SignExtend(const Address& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load16SignExtend(const Address& src, Register dest) {
     movswl(Operand(src), dest);
-    return fco;
   }
-  FaultingCodeOffset load16SignExtend(const BaseIndex& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load16SignExtend(const BaseIndex& src, Register dest) {
     movswl(Operand(src), dest);
-    return fco;
   }
   template <typename S>
   void load16UnalignedSignExtend(const S& src, Register dest) {
     load16SignExtend(src, dest);
   }
-  FaultingCodeOffset load32(const Address& address, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void load32(const Address& address, Register dest) {
     movl(Operand(address), dest);
-    return fco;
   }
-  FaultingCodeOffset load32(const BaseIndex& src, Register dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
-    movl(Operand(src), dest);
-    return fco;
-  }
+  void load32(const BaseIndex& src, Register dest) { movl(Operand(src), dest); }
   void load32(const Operand& src, Register dest) { movl(src, dest); }
   template <typename S>
   void load32Unaligned(const S& src, Register dest) {
     load32(src, dest);
   }
   template <typename S, typename T>
-  FaultingCodeOffset store32(const S& src, const T& dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void store32(const S& src, const T& dest) {
     movl(src, Operand(dest));
-    return fco;
   }
   template <typename S, typename T>
   void store32Unaligned(const S& src, const T& dest) {
     store32(src, dest);
   }
-  FaultingCodeOffset loadDouble(const Address& src, FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void loadDouble(const Address& src, FloatRegister dest) { vmovsd(src, dest); }
+  void loadDouble(const BaseIndex& src, FloatRegister dest) {
     vmovsd(src, dest);
-    return fco;
-  }
-  FaultingCodeOffset loadDouble(const BaseIndex& src, FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
-    vmovsd(src, dest);
-    return fco;
   }
   void loadDouble(const Operand& src, FloatRegister dest) {
     switch (src.kind()) {
@@ -624,32 +594,20 @@ class MacroAssemblerX86Shared : public Assembler {
     MOZ_ASSERT(src.isSimd128() && dest.isSimd128());
     return HasAVX() ? dest : src;
   }
-  FaultingCodeOffset loadUnalignedSimd128Int(const Address& src,
-                                             FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void loadUnalignedSimd128Int(const Address& src, FloatRegister dest) {
     vmovdqu(Operand(src), dest);
-    return fco;
   }
-  FaultingCodeOffset loadUnalignedSimd128Int(const BaseIndex& src,
-                                             FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void loadUnalignedSimd128Int(const BaseIndex& src, FloatRegister dest) {
     vmovdqu(Operand(src), dest);
-    return fco;
   }
   void loadUnalignedSimd128Int(const Operand& src, FloatRegister dest) {
     vmovdqu(src, dest);
   }
-  FaultingCodeOffset storeUnalignedSimd128Int(FloatRegister src,
-                                              const Address& dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void storeUnalignedSimd128Int(FloatRegister src, const Address& dest) {
     vmovdqu(src, Operand(dest));
-    return fco;
   }
-  FaultingCodeOffset storeUnalignedSimd128Int(FloatRegister src,
-                                              const BaseIndex& dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void storeUnalignedSimd128Int(FloatRegister src, const BaseIndex& dest) {
     vmovdqu(src, Operand(dest));
-    return fco;
   }
   void storeUnalignedSimd128Int(FloatRegister src, const Operand& dest) {
     vmovdqu(src, dest);
@@ -723,17 +681,11 @@ class MacroAssemblerX86Shared : public Assembler {
     return dest;
   }
 
-  FaultingCodeOffset loadUnalignedSimd128(const Operand& src,
-                                          FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void loadUnalignedSimd128(const Operand& src, FloatRegister dest) {
     vmovups(src, dest);
-    return fco;
   }
-  FaultingCodeOffset storeUnalignedSimd128(FloatRegister src,
-                                           const Operand& dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void storeUnalignedSimd128(FloatRegister src, const Operand& dest) {
     vmovups(src, dest);
-    return fco;
   }
 
   static uint32_t ComputeShuffleMask(uint32_t x = 0, uint32_t y = 1,
@@ -768,15 +720,11 @@ class MacroAssemblerX86Shared : public Assembler {
     loadFloat32(src, dest);
     vcvtss2sd(dest, dest, dest);
   }
-  FaultingCodeOffset loadFloat32(const Address& src, FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void loadFloat32(const Address& src, FloatRegister dest) {
     vmovss(src, dest);
-    return fco;
   }
-  FaultingCodeOffset loadFloat32(const BaseIndex& src, FloatRegister dest) {
-    FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
+  void loadFloat32(const BaseIndex& src, FloatRegister dest) {
     vmovss(src, dest);
-    return fco;
   }
   void loadFloat32(const Operand& src, FloatRegister dest) {
     switch (src.kind()) {

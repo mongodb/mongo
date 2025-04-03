@@ -22,7 +22,6 @@
 #include "jspubtd.h"
 
 #include "js/AllocPolicy.h"
-#include "js/ColumnNumber.h"  // JS::TaggedColumnNumberOneOrigin
 #include "js/HashTable.h"
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
@@ -246,11 +245,11 @@ class BaseStackFrame {
   // Get this frame's parent frame.
   virtual StackFrame parent() const = 0;
 
-  // Get this frame's line number (1-origin).
+  // Get this frame's line number.
   virtual uint32_t line() const = 0;
 
-  // Get this frame's column number in UTF-16 code units.
-  virtual JS::TaggedColumnNumberOneOrigin column() const = 0;
+  // Get this frame's column number.
+  virtual uint32_t column() const = 0;
 
   // Get this frame's source name. Never null.
   virtual AtomOrTwoByteChars source() const = 0;
@@ -422,7 +421,7 @@ class StackFrame {
     return id;
   }
   uint32_t line() const { return base()->line(); }
-  JS::TaggedColumnNumberOneOrigin column() const { return base()->column(); }
+  uint32_t column() const { return base()->column(); }
   AtomOrTwoByteChars source() const { return base()->source(); }
   uint32_t sourceId() const { return base()->sourceId(); }
   AtomOrTwoByteChars functionDisplayName() const {
@@ -471,9 +470,7 @@ class ConcreteStackFrame<void> : public BaseStackFrame {
   }
 
   uint32_t line() const override { MOZ_CRASH("null JS::ubi::StackFrame"); }
-  JS::TaggedColumnNumberOneOrigin column() const override {
-    MOZ_CRASH("null JS::ubi::StackFrame");
-  }
+  uint32_t column() const override { MOZ_CRASH("null JS::ubi::StackFrame"); }
   AtomOrTwoByteChars source() const override {
     MOZ_CRASH("null JS::ubi::StackFrame");
   }

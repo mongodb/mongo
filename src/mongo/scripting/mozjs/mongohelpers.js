@@ -69,16 +69,12 @@ globalThis.exportToMongoHelpers = {
                 if (prevExprEnd.line != loc.line) {
                     prevExprEnd = 0;
                 } else {
-                    // Starting in MozJS ESR128, the column numbers returned by the engine are
-                    // 1-indexed. To ensure we reference the correct substring when we perform
-                    // string manipulation below, we need to subtract 1.
-                    prevExprEnd = prevExprEnd.column - 1;
+                    prevExprEnd = prevExprEnd.column;
                 }
             }
 
             var lines = fnSrc.split('\n');
-            // Adjust for 1-indexed column number by substracting 1.
-            var col = loc.column - 1;
+            var col = loc.column;
             var fnSrc;
             var tmpTree;
             var origLine = lines[loc.line - 1];

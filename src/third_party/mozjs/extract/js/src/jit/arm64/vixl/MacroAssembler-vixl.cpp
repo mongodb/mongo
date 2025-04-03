@@ -27,7 +27,6 @@
 #include "jit/arm64/vixl/MacroAssembler-vixl.h"
 
 #include <ctype.h>
-#include <limits>
 
 namespace vixl {
 
@@ -722,14 +721,11 @@ void MacroAssembler::Ccmp(const Register& rn,
                           const Operand& operand,
                           StatusFlags nzcv,
                           Condition cond) {
-  if (operand.IsImmediate()) {
-    int64_t imm = operand.immediate();
-    if (imm < 0 && imm != std::numeric_limits<int64_t>::min()) {
-      ConditionalCompareMacro(rn, -imm, nzcv, cond, CCMN);
-      return;
-    }
+  if (operand.IsImmediate() && (operand.immediate() < 0)) {
+    ConditionalCompareMacro(rn, -operand.immediate(), nzcv, cond, CCMN);
+  } else {
+    ConditionalCompareMacro(rn, operand, nzcv, cond, CCMP);
   }
-  ConditionalCompareMacro(rn, operand, nzcv, cond, CCMP);
 }
 
 
@@ -737,14 +733,11 @@ void MacroAssembler::Ccmn(const Register& rn,
                           const Operand& operand,
                           StatusFlags nzcv,
                           Condition cond) {
-  if (operand.IsImmediate()) {
-    int64_t imm = operand.immediate();
-    if (imm < 0 && imm != std::numeric_limits<int64_t>::min()) {
-      ConditionalCompareMacro(rn, -imm, nzcv, cond, CCMP);
-      return;
-    }
+  if (operand.IsImmediate() && (operand.immediate() < 0)) {
+    ConditionalCompareMacro(rn, -operand.immediate(), nzcv, cond, CCMP);
+  } else {
+    ConditionalCompareMacro(rn, operand, nzcv, cond, CCMN);
   }
-  ConditionalCompareMacro(rn, operand, nzcv, cond, CCMN);
 }
 
 
@@ -826,15 +819,12 @@ void MacroAssembler::Add(const Register& rd,
                          const Register& rn,
                          const Operand& operand,
                          FlagsUpdate S) {
-  if (operand.IsImmediate()) {
-    int64_t imm = operand.immediate();
-    if (imm < 0 && imm != std::numeric_limits<int64_t>::min() &&
-        IsImmAddSub(-imm)) {
-      AddSubMacro(rd, rn, -imm, S, SUB);
-      return;
-    }
+  if (operand.IsImmediate() && (operand.immediate() < 0) &&
+      IsImmAddSub(-operand.immediate())) {
+    AddSubMacro(rd, rn, -operand.immediate(), S, SUB);
+  } else {
+    AddSubMacro(rd, rn, operand, S, ADD);
   }
-  AddSubMacro(rd, rn, operand, S, ADD);
 }
 
 
@@ -849,15 +839,12 @@ void MacroAssembler::Sub(const Register& rd,
                          const Register& rn,
                          const Operand& operand,
                          FlagsUpdate S) {
-  if (operand.IsImmediate()) {
-    int64_t imm = operand.immediate();
-    if (imm < 0 && imm != std::numeric_limits<int64_t>::min() &&
-        IsImmAddSub(-imm)) {
-      AddSubMacro(rd, rn, -imm, S, ADD);
-      return;
-    }
+  if (operand.IsImmediate() && (operand.immediate() < 0) &&
+      IsImmAddSub(-operand.immediate())) {
+    AddSubMacro(rd, rn, -operand.immediate(), S, ADD);
+  } else {
+    AddSubMacro(rd, rn, operand, S, SUB);
   }
-  AddSubMacro(rd, rn, operand, S, SUB);
 }
 
 
@@ -961,13 +948,10 @@ void MacroAssembler::Fmov(VRegister vd, float imm) {
 void MacroAssembler::Neg(const Register& rd,
                          const Operand& operand) {
   if (operand.IsImmediate()) {
-    int64_t imm = operand.immediate();
-    if (imm != std::numeric_limits<int64_t>::min()) {
-      Mov(rd, -imm);
-      return;
-    }
+    Mov(rd, -operand.immediate());
+  } else {
+    Sub(rd, AppropriateZeroRegFor(rd), operand);
   }
-  Sub(rd, AppropriateZeroRegFor(rd), operand);
 }
 
 
@@ -1188,18 +1172,18 @@ void MacroAssembler::AddSubWithCarryMacro(const Register& rd,
   }
 }
 
-#define DEFINE_FUNCTION(FN, REGTYPE, REG, OP)                               \
-  js::wasm::FaultingCodeOffset MacroAssembler::FN(const REGTYPE REG,        \
-                                                  const MemOperand& addr) { \
-    return LoadStoreMacro(REG, addr, OP);                                   \
-  }
+
+#define DEFINE_FUNCTION(FN, REGTYPE, REG, OP)                         \
+void MacroAssembler::FN(const REGTYPE REG, const MemOperand& addr) {  \
+  LoadStoreMacro(REG, addr, OP);                                      \
+}
 LS_MACRO_LIST(DEFINE_FUNCTION)
 #undef DEFINE_FUNCTION
 
-js::wasm::FaultingCodeOffset MacroAssembler::LoadStoreMacro(
-    const CPURegister& rt,
-    const MemOperand& addr,
-    LoadStoreOp op) {
+
+void MacroAssembler::LoadStoreMacro(const CPURegister& rt,
+                                    const MemOperand& addr,
+                                    LoadStoreOp op) {
   // Worst case is ldr/str pre/post index:
   //  * 1 instruction for ldr/str
   //  * up to 4 instructions to materialise the constant
@@ -1212,7 +1196,6 @@ js::wasm::FaultingCodeOffset MacroAssembler::LoadStoreMacro(
   // Check if an immediate offset fits in the immediate field of the
   // appropriate instruction. If not, emit two instructions to perform
   // the operation.
-  js::wasm::FaultingCodeOffset fco;
   if (addr.IsImmediateOffset() && !IsImmLSScaled(offset, access_size) &&
       !IsImmLSUnscaled(offset)) {
     // Immediate offset that can't be encoded using unsigned or unscaled
@@ -1222,36 +1205,21 @@ js::wasm::FaultingCodeOffset MacroAssembler::LoadStoreMacro(
     VIXL_ASSERT(!temp.Is(rt));
     VIXL_ASSERT(!temp.Is(addr.base()) && !temp.Is(addr.regoffset()));
     Mov(temp, addr.offset());
-    {
-      js::jit::AutoForbidPoolsAndNops afp(this, 1);
-      fco = js::wasm::FaultingCodeOffset(currentOffset());
-      LoadStore(rt, MemOperand(addr.base(), temp), op);
-    }
+    LoadStore(rt, MemOperand(addr.base(), temp), op);
   } else if (addr.IsPostIndex() && !IsImmLSUnscaled(offset)) {
     // Post-index beyond unscaled addressing range.
-    {
-      js::jit::AutoForbidPoolsAndNops afp(this, 1);
-      fco = js::wasm::FaultingCodeOffset(currentOffset());
-      LoadStore(rt, MemOperand(addr.base()), op);
-    }
+    LoadStore(rt, MemOperand(addr.base()), op);
     Add(addr.base(), addr.base(), Operand(offset));
   } else if (addr.IsPreIndex() && !IsImmLSUnscaled(offset)) {
     // Pre-index beyond unscaled addressing range.
     Add(addr.base(), addr.base(), Operand(offset));
-    {
-      js::jit::AutoForbidPoolsAndNops afp(this, 1);
-      fco = js::wasm::FaultingCodeOffset(currentOffset());
-      LoadStore(rt, MemOperand(addr.base()), op);
-    }
+    LoadStore(rt, MemOperand(addr.base()), op);
   } else {
     // Encodable in one load/store instruction.
-    js::jit::AutoForbidPoolsAndNops afp(this, 1);
-    fco = js::wasm::FaultingCodeOffset(currentOffset());
     LoadStore(rt, addr, op);
   }
-
-  return fco;
 }
+
 
 #define DEFINE_FUNCTION(FN, REGTYPE, REG, REG2, OP)  \
 void MacroAssembler::FN(const REGTYPE REG,           \

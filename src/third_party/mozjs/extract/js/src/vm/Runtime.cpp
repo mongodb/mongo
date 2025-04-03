@@ -107,6 +107,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
       readPrincipals(nullptr),
       canAddPrivateElement(&DefaultHostEnsureCanAddPrivateElementCallback),
       warningReporter(nullptr),
+      selfHostedLazyScript(),
       geckoProfiler_(thisFromCtor()),
       trustedPrincipals_(nullptr),
       wrapObjectCallbacks(&DefaultWrapObjectCallbacks),
@@ -122,6 +123,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
       profilingScripts(false),
       scriptAndCountsVector(nullptr),
       watchtowerTestingLog(nullptr),
+      lcovOutput_(),
       jitRuntime_(nullptr),
       gc(thisFromCtor()),
       emptyString(nullptr),
@@ -149,7 +151,12 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
       stackFormat_(parentRuntime ? js::StackFormat::Default
                                  : js::StackFormat::SpiderMonkey),
       wasmInstances(mutexid::WasmRuntimeInstances),
-      moduleAsyncEvaluatingPostOrder(ASYNC_EVALUATING_POST_ORDER_INIT) {
+      moduleAsyncEvaluatingPostOrder(ASYNC_EVALUATING_POST_ORDER_INIT),
+      moduleResolveHook(),
+      moduleMetadataHook(),
+      moduleDynamicImportHook(),
+      scriptPrivateAddRefHook(),
+      scriptPrivateReleaseHook() {
   JS_COUNT_CTOR(JSRuntime);
   liveRuntimesCount++;
 
@@ -239,6 +246,7 @@ void JSRuntime::destroyRuntime() {
      * explicit canceling is needed for these.
      */
     CancelOffThreadIonCompile(this);
+    CancelOffThreadParses(this);
     CancelOffThreadDelazify(this);
     CancelOffThreadCompressions(this);
 
@@ -267,11 +275,6 @@ void JSRuntime::destroyRuntime() {
 #endif
 
   gc.finish();
-
-  for (auto [f, data] : cleanupClosures.ref()) {
-    f(data);
-  }
-  cleanupClosures.ref().clear();
 
   defaultLocale = nullptr;
   js_delete(jitRuntime_.ref());
@@ -332,7 +335,7 @@ void JSRuntime::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
   rtSizes->uncompressedSourceCache +=
       caches().uncompressedSourceCache.sizeOfExcludingThis(mallocSizeOf);
 
-  rtSizes->gc.nurseryCommitted += gc.nursery().totalCommitted();
+  rtSizes->gc.nurseryCommitted += gc.nursery().committed();
   rtSizes->gc.nurseryMallocedBuffers +=
       gc.nursery().sizeOfMallocedBuffers(mallocSizeOf);
   gc.storeBuffer().addSizeOfExcludingThis(mallocSizeOf, &rtSizes->gc);
@@ -468,11 +471,6 @@ void JSContext::requestInterrupt(InterruptReason reason) {
       fx.notify(FutexThread::NotifyForJSInterrupt);
     }
     fx.unlock();
-  }
-
-  if (reason == InterruptReason::CallbackUrgent ||
-      reason == InterruptReason::MajorGC ||
-      reason == InterruptReason::MinorGC) {
     wasm::InterruptRunningCode(this);
   }
 }
@@ -488,11 +486,6 @@ bool JSContext::handleInterrupt() {
     return HandleInterrupt(this, invokeCallback);
   }
   return true;
-}
-
-void JSContext::clearPendingInterrupt(js::InterruptReason reason) {
-  // Interrupt bit have already been cleared.
-  interruptBits_ &= ~uint32_t(reason);
 }
 
 bool JSRuntime::setDefaultLocale(const char* locale) {
@@ -553,6 +546,9 @@ void JSRuntime::traceSharedIntlData(JSTracer* trc) {
 #endif
 
 SharedScriptDataTableHolder& JSRuntime::scriptDataTableHolder() {
+  // NOTE: Assert that this is not helper thread.
+  //       worker thread also has access to the per-runtime table holder.
+  MOZ_ASSERT(CurrentThreadIsMainThread());
   return scriptDataTableHolder_;
 }
 
@@ -774,7 +770,10 @@ bool js::CurrentThreadCanAccessZone(Zone* zone) {
 }
 
 #ifdef DEBUG
-bool js::CurrentThreadIsMainThread() { return !!TlsContext.get(); }
+bool js::CurrentThreadIsMainThread() {
+  JSContext* cx = TlsContext.get();
+  return cx && cx->isMainThreadContext();
+}
 #endif
 
 JS_PUBLIC_API void JS::SetJSContextProfilerSampleBufferRangeStart(
@@ -790,11 +789,13 @@ JS_PUBLIC_API bool JS::IsProfilingEnabledForContext(JSContext* cx) {
 JS_PUBLIC_API void JS::EnableRecordingAllocations(
     JSContext* cx, JS::RecordAllocationsCallback callback, double probability) {
   MOZ_ASSERT(cx);
+  MOZ_ASSERT(cx->isMainThreadContext());
   cx->runtime()->startRecordingAllocations(probability, callback);
 }
 
 JS_PUBLIC_API void JS::DisableRecordingAllocations(JSContext* cx) {
   MOZ_ASSERT(cx);
+  MOZ_ASSERT(cx->isMainThreadContext());
   cx->runtime()->stopRecordingAllocations();
 }
 

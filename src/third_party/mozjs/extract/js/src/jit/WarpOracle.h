@@ -60,7 +60,6 @@ class MOZ_STACK_CLASS WarpOracle {
                          size_t bytecodeLength);
 
   size_t accumulatedBytecodeSize() { return accumulatedBytecodeSize_; }
-  void ignoreFailedICHash();
 };
 
 }  // namespace jit

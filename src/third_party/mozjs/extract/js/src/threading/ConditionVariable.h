@@ -55,7 +55,7 @@ class ConditionVariable {
     lock.postLockChecks();
 #endif
   }
-  void wait(UniqueLock<Mutex>& lock) { wait(lock.mutex); }
+  void wait(UniqueLock<Mutex>& lock) { wait(lock.lock); }
 
   // As with |wait|, block the current thread of execution until woken from
   // another thread. This method will resume waiting once woken until the given
@@ -100,15 +100,15 @@ class ConditionVariable {
   CVStatus wait_for(UniqueLock<Mutex>& lock,
                     const mozilla::TimeDuration& rel_time) {
 #ifdef DEBUG
-    lock.mutex.preUnlockChecks();
+    lock.lock.preUnlockChecks();
 #endif
     CVStatus res =
-        impl_.wait_for(lock.mutex.impl_, rel_time) == mozilla::CVStatus::Timeout
+        impl_.wait_for(lock.lock.impl_, rel_time) == mozilla::CVStatus::Timeout
             ? CVStatus::Timeout
             : CVStatus::NoTimeout;
 #ifdef DEBUG
-    lock.mutex.preLockChecks();
-    lock.mutex.postLockChecks();
+    lock.lock.preLockChecks();
+    lock.lock.postLockChecks();
 #endif
     return res;
   }

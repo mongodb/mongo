@@ -33,10 +33,9 @@ if CONFIG["FUZZING"]:
     include("/tools/fuzzing/libfuzzer-config.mozbuild")
 
 if CONFIG["FUZZING_INTERFACES"]:
-    if CONFIG["LIBFUZZER"]:
-        USE_LIBS += ["static:fuzzer"]
-    else:
-        USE_LIBS += ["static:fuzzer-interface"]
+    USE_LIBS += [
+        "static:fuzzer",
+    ]
 
 USE_LIBS += [
     "static:js",

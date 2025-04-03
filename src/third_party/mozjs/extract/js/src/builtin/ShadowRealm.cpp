@@ -13,7 +13,7 @@
 #include "builtin/ModuleObject.h"
 #include "builtin/Promise.h"
 #include "builtin/WrappedFunctionObject.h"
-#include "frontend/BytecodeCompiler.h"  // CompileEvalScript
+#include "frontend/BytecodeCompilation.h"
 #include "js/ErrorReport.h"
 #include "js/Exception.h"
 #include "js/GlobalObject.h"
@@ -161,11 +161,6 @@ static ShadowRealmObject* ValidateShadowRealmObject(JSContext* cx,
 void js::ReportPotentiallyDetailedMessage(JSContext* cx,
                                           const unsigned detailedError,
                                           const unsigned genericError) {
-  // Return for non-catchable exceptions like interrupt requests.
-  if (!cx->isExceptionPending()) {
-    return;
-  }
-
   Rooted<Value> exception(cx);
   if (!cx->getPendingException(&exception)) {
     return;
@@ -237,7 +232,7 @@ static bool PerformShadowRealmEval(JSContext* cx, Handle<JSString*> sourceText,
     // https://bugzilla.mozilla.org/show_bug.cgi?id=1770017
     RootedScript callerScript(cx);
     const char* filename;
-    uint32_t lineno;
+    unsigned lineno;
     uint32_t pcOffset;
     bool mutedErrors;
     DescribeScriptedCallerForCompilation(cx, &callerScript, &filename, &lineno,
@@ -289,10 +284,6 @@ static bool PerformShadowRealmEval(JSContext* cx, Handle<JSString*> sourceText,
   } while (false);  // AutoRealm
 
   if (!compileSuccess) {
-    if (!cx->isExceptionPending()) {
-      return false;
-    }
-
     // Clone the exception into the current global and re-throw, as the
     // exception has to come from the current global.
     Rooted<Value> exception(cx);
@@ -428,13 +419,16 @@ static JSObject* ShadowRealmImportValue(JSContext* cx,
     // Not Speced: Get referencing private to pass to importHook.
     RootedScript script(cx);
     const char* filename;
-    uint32_t lineno;
+    unsigned lineno;
     uint32_t pcOffset;
     bool mutedErrors;
     DescribeScriptedCallerForCompilation(cx, &script, &filename, &lineno,
                                          &pcOffset, &mutedErrors);
 
     MOZ_ASSERT(script);
+
+    Rooted<Value> referencingPrivate(cx, script->sourceObject()->getPrivate());
+    cx->runtime()->addRefScriptPrivate(referencingPrivate);
 
     Rooted<JSAtom*> specifierAtom(cx, AtomizeString(cx, specifierString));
     if (!specifierAtom) {
@@ -444,9 +438,9 @@ static JSObject* ShadowRealmImportValue(JSContext* cx,
       return promise;
     }
 
-    Rooted<UniquePtr<ImportAttributeVector>> attributes(cx);
+    Rooted<ArrayObject*> assertionArray(cx);
     Rooted<JSObject*> moduleRequest(
-        cx, ModuleRequestObject::create(cx, specifierAtom, &attributes));
+        cx, ModuleRequestObject::create(cx, specifierAtom, assertionArray));
     if (!moduleRequest) {
       if (!RejectPromiseWithPendingError(cx, promise)) {
         return nullptr;
@@ -467,8 +461,9 @@ static JSObject* ShadowRealmImportValue(JSContext* cx,
     //
     // I have filed https://github.com/tc39/proposal-shadowrealm/issues/363 to
     // discuss this.
-    Rooted<Value> referencingPrivate(cx, script->sourceObject()->getPrivate());
     if (!importHook(cx, referencingPrivate, moduleRequest, promise)) {
+      cx->runtime()->releaseScriptPrivate(referencingPrivate);
+
       // If there's no exception pending then the script is terminating
       // anyway, so just return nullptr.
       if (!cx->isExceptionPending() ||

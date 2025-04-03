@@ -69,11 +69,8 @@ Register IonIC::scratchRegisterForEntryJump() {
       return asCompareIC()->output();
     case CacheKind::CloseIter:
       return asCloseIterIC()->temp();
-    case CacheKind::OptimizeGetIterator:
-      return asOptimizeGetIteratorIC()->temp();
     case CacheKind::Call:
     case CacheKind::TypeOf:
-    case CacheKind::TypeOfEq:
     case CacheKind::ToBool:
     case CacheKind::GetIntrinsic:
     case CacheKind::NewArray:
@@ -365,7 +362,7 @@ bool IonGetNameIC::update(JSContext* cx, HandleScript outerScript,
     return false;
   }
 
-  if (IsTypeOfNameOp(JSOp(*GetNextPc(pc)))) {
+  if (JSOp(*GetNextPc(pc)) == JSOp::Typeof) {
     return FetchName<GetNameMode::TypeOf>(cx, obj, holder, name, prop, res);
   }
 
@@ -489,17 +486,6 @@ bool IonCloseIterIC::update(JSContext* cx, HandleScript outerScript,
   TryAttachIonStub<CloseIterIRGenerator>(cx, ic, ionScript, iter, kind);
 
   return CloseIterOperation(cx, iter, kind);
-}
-
-/* static */
-bool IonOptimizeGetIteratorIC::update(JSContext* cx, HandleScript outerScript,
-                                      IonOptimizeGetIteratorIC* ic,
-                                      HandleValue value, bool* result) {
-  IonScript* ionScript = outerScript->ionScript();
-
-  TryAttachIonStub<OptimizeGetIteratorIRGenerator>(cx, ic, ionScript, value);
-
-  return OptimizeGetIterator(cx, value, result);
 }
 
 /*  static */

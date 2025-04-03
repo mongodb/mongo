@@ -29,7 +29,11 @@ GeckoProfilerThread::GeckoProfilerThread()
     : profilingStack_(nullptr), profilingStackIfEnabled_(nullptr) {}
 
 GeckoProfilerRuntime::GeckoProfilerRuntime(JSRuntime* rt)
-    : rt(rt), slowAssertions(false), enabled_(false), eventMarker_(nullptr) {
+    : rt(rt),
+      strings_(),
+      slowAssertions(false),
+      enabled_(false),
+      eventMarker_(nullptr) {
   MOZ_ASSERT(rt != nullptr);
 }
 
@@ -57,15 +61,9 @@ static jit::JitFrameLayout* GetTopProfilingJitFrame(jit::JitActivation* act) {
     return nullptr;
   }
 
-  // Skip if the activation has no JS frames. This can happen if there's only a
-  // TrampolineNative frame because these are skipped by the profiling frame
-  // iterator.
   jit::JSJitProfilingFrameIterator jitIter(
       (jit::CommonFrameLayout*)iter.frame().fp());
-  if (jitIter.done()) {
-    return nullptr;
-  }
-
+  MOZ_ASSERT(!jitIter.done());
   return jitIter.framePtr();
 }
 
@@ -267,8 +265,8 @@ UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
   size_t nameLength = 0;
   UniqueChars nameStr;
   JSFunction* func = script->function();
-  if (func && func->fullDisplayAtom()) {
-    nameStr = StringToNewUTF8CharsZ(cx, *func->fullDisplayAtom());
+  if (func && func->displayAtom()) {
+    nameStr = StringToNewUTF8CharsZ(cx, *func->displayAtom());
     if (!nameStr) {
       return nullptr;
     }
@@ -288,9 +286,8 @@ UniqueChars GeckoProfilerRuntime::allocProfileString(JSContext* cx,
   size_t lineAndColumnLength = 0;
   char lineAndColumnStr[30];
   if (hasName || script->isFunction() || script->isForEval()) {
-    lineAndColumnLength =
-        SprintfLiteral(lineAndColumnStr, "%u:%u", script->lineno(),
-                       script->column().oneOriginValue());
+    lineAndColumnLength = SprintfLiteral(lineAndColumnStr, "%u:%u",
+                                         script->lineno(), script->column());
     hasLineAndColumn = true;
   }
 
@@ -371,11 +368,12 @@ void GeckoProfilerRuntime::fixupStringsMapAfterMovingGC() {
 
 #ifdef JSGC_HASH_TABLE_CHECKS
 void GeckoProfilerRuntime::checkStringsMapAfterMovingGC() {
-  CheckTableAfterMovingGC(strings(), [](const auto& entry) {
-    BaseScript* script = entry.key();
+  for (auto r = strings().all(); !r.empty(); r.popFront()) {
+    BaseScript* script = r.front().key();
     CheckGCThingAfterMovingGC(script);
-    return script;
-  });
+    auto ptr = strings().lookup(script);
+    MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &r.front());
+  }
 }
 #endif
 

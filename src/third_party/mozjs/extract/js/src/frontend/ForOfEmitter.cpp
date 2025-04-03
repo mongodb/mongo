@@ -19,29 +19,11 @@ using mozilla::Nothing;
 
 ForOfEmitter::ForOfEmitter(BytecodeEmitter* bce,
                            const EmitterScope* headLexicalEmitterScope,
-                           SelfHostedIter selfHostedIter, IteratorKind iterKind
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-                           ,
-                           HasUsingDeclarationInHead hasUsingDeclarationInHead
-#endif
-                           )
+                           SelfHostedIter selfHostedIter, IteratorKind iterKind)
     : bce_(bce),
       selfHostedIter_(selfHostedIter),
       iterKind_(iterKind),
-      headLexicalEmitterScope_(headLexicalEmitterScope) {
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  MOZ_ASSERT_IF(hasUsingDeclarationInHead == HasUsingDeclarationInHead::Yes,
-                headLexicalEmitterScope->hasEnvironment());
-  if (hasUsingDeclarationInHead == HasUsingDeclarationInHead::Yes) {
-    // The using bindings are closed over and stored in the lexical environment
-    // object for headLexicalEmitterScope.
-    // Mark that the environment has disposables for them to be disposed on
-    // every iteration.
-    MOZ_ASSERT(headLexicalEmitterScope == bce_->innermostEmitterScope());
-    bce_->innermostEmitterScope()->setHasDisposables();
-  }
-#endif
-}
+      headLexicalEmitterScope_(headLexicalEmitterScope) {}
 
 bool ForOfEmitter::emitIterated() {
   MOZ_ASSERT(state_ == State::Start);
@@ -57,25 +39,24 @@ bool ForOfEmitter::emitIterated() {
   return true;
 }
 
-bool ForOfEmitter::emitInitialize(uint32_t forPos) {
+bool ForOfEmitter::emitInitialize(uint32_t forPos,
+                                  bool isIteratorMethodOnStack) {
   MOZ_ASSERT(state_ == State::Iterated);
 
   tdzCacheForIteratedValue_.reset();
 
-  //                [stack] # if AllowContentWithNext
-  //                [stack] NEXT ITER
-  //                [stack] # elif AllowContentWith
+  //                [stack] # if isIteratorMethodOnStack
   //                [stack] ITERABLE ITERFN SYNC_ITERFN?
-  //                [stack] # else
+  //                [stack] # else isIteratorMethodOnStack
   //                [stack] ITERABLE
 
   if (iterKind_ == IteratorKind::Async) {
-    if (!bce_->emitAsyncIterator(selfHostedIter_)) {
+    if (!bce_->emitAsyncIterator(selfHostedIter_, isIteratorMethodOnStack)) {
       //            [stack] NEXT ITER
       return false;
     }
   } else {
-    if (!bce_->emitIterator(selfHostedIter_)) {
+    if (!bce_->emitIterator(selfHostedIter_, isIteratorMethodOnStack)) {
       //            [stack] NEXT ITER
       return false;
     }
@@ -105,26 +86,6 @@ bool ForOfEmitter::emitInitialize(uint32_t forPos) {
                ScopeKind::Lexical);
 
     if (headLexicalEmitterScope_->hasEnvironment()) {
-#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-      if (headLexicalEmitterScope_->hasDisposables()) {
-        // Before recreation of the lexical environment, we must dispose
-        // the disposables of the previous iteration.
-        //
-        // Emitting the bytecode to dispose over here means
-        // that we will have one extra disposal at the start of the loop which
-        // is a no op because there arent any disposables added yet.
-        //
-        // There also wouldn't be a dispose operation for the environment
-        // object recreated for the last iteration, where it leaves the loop
-        // before evaluating the body statement.
-        //
-        // TODO: Move the handling of emitting this bytecode to UsingEmitter
-        // (bug 1900756)
-        if (!bce_->emit1(JSOp::DisposeDisposables)) {
-          return false;
-        }
-      }
-#endif
       if (!bce_->emitInternedScopeOp(headLexicalEmitterScope_->index(),
                                      JSOp::RecreateLexicalEnv)) {
         //          [stack] NEXT ITER

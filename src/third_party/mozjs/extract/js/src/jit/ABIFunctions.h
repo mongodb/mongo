@@ -9,12 +9,6 @@
 
 #include "jstypes.h"  // JS_FUNC_TO_DATA_PTR
 
-struct JS_PUBLIC_API JSContext;
-
-namespace JS {
-class JS_PUBLIC_API Value;
-}
-
 namespace js {
 namespace jit {
 
@@ -72,11 +66,6 @@ struct ABIFunctionSignature {
 struct DynFn {
   void* address;
 };
-
-#ifdef JS_SIMULATOR
-bool CallAnyNative(JSContext* cx, unsigned argc, JS::Value* vp);
-const void* RedirectedCallAnyNative();
-#endif
 
 }  // namespace jit
 }  // namespace js

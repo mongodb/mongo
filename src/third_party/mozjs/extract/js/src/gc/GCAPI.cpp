@@ -15,7 +15,7 @@
 
 #include "gc/GC.h"
 #include "gc/PublicIterators.h"
-#include "jit/JitZone.h"
+#include "jit/JitRealm.h"
 #include "js/HeapAPI.h"
 #include "js/Value.h"
 #include "util/DifferentialTesting.h"
@@ -98,8 +98,11 @@ void js::ReleaseAllJITCode(JS::GCContext* gcx) {
 
   for (ZonesIter zone(gcx->runtime(), SkipAtoms); !zone.done(); zone.next()) {
     zone->forceDiscardJitCode(gcx);
-    if (jit::JitZone* jitZone = zone->jitZone()) {
-      jitZone->discardStubs();
+  }
+
+  for (RealmsIter realm(gcx->runtime()); !realm.done(); realm.next()) {
+    if (jit::JitRealm* jitRealm = realm->jitRealm()) {
+      jitRealm->discardStubs();
     }
   }
 }
@@ -157,13 +160,10 @@ JS::AutoAssertNoGC::AutoAssertNoGC(JSContext* maybecx) {
   }
 }
 
-JS::AutoAssertNoGC::~AutoAssertNoGC() { reset(); }
-
-void JS::AutoAssertNoGC::reset() {
+JS::AutoAssertNoGC::~AutoAssertNoGC() {
   if (cx_) {
     MOZ_ASSERT(cx_->inUnsafeRegion > 0);
     cx_->inUnsafeRegion--;
-    cx_ = nullptr;
   }
 }
 
@@ -417,14 +417,10 @@ JS_PUBLIC_API JS::DoCycleCollectionCallback JS::SetDoCycleCollectionCallback(
   return cx->runtime()->gc.setDoCycleCollectionCallback(callback);
 }
 
-JS_PUBLIC_API bool JS::AddGCNurseryCollectionCallback(
-    JSContext* cx, GCNurseryCollectionCallback callback, void* data) {
-  return cx->runtime()->gc.addNurseryCollectionCallback(callback, data);
-}
-
-JS_PUBLIC_API void JS::RemoveGCNurseryCollectionCallback(
-    JSContext* cx, GCNurseryCollectionCallback callback, void* data) {
-  return cx->runtime()->gc.removeNurseryCollectionCallback(callback, data);
+JS_PUBLIC_API JS::GCNurseryCollectionCallback
+JS::SetGCNurseryCollectionCallback(JSContext* cx,
+                                   GCNurseryCollectionCallback callback) {
+  return cx->runtime()->gc.setNurseryCollectionCallback(callback);
 }
 
 JS_PUBLIC_API void JS::SetLowMemoryState(JSContext* cx, bool newState) {
@@ -487,7 +483,8 @@ JS_PUBLIC_API bool JS::WasIncrementalGC(JSRuntime* rt) {
 bool js::gc::CreateUniqueIdForNativeObject(NativeObject* nobj, uint64_t* uidp) {
   JSRuntime* runtime = nobj->runtimeFromMainThread();
   *uidp = NextCellUniqueId(runtime);
-  return nobj->setUniqueId(runtime, *uidp);
+  JSContext* cx = runtime->mainContextFromOwnThread();
+  return nobj->setUniqueId(cx, *uidp);
 }
 
 bool js::gc::CreateUniqueIdForNonNativeObject(Cell* cell,
@@ -550,7 +547,7 @@ static bool GCBytesGetter(JSContext* cx, unsigned argc, Value* vp) {
 
 static bool MallocBytesGetter(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
-  size_t bytes = 0;
+  double bytes = 0;
   for (ZonesIter zone(cx->runtime(), WithAtoms); !zone.done(); zone.next()) {
     bytes += zone->mallocHeapSize.bytes();
   }
@@ -776,25 +773,20 @@ const char* StateName(JS::Zone::GCState state) {
   MOZ_CRASH("Invalid Zone::GCState enum value");
 }
 
-const char* CellColorName(CellColor color) {
-  switch (color) {
-    case CellColor::White:
-      return "white";
-    case CellColor::Black:
-      return "black";
-    case CellColor::Gray:
-      return "gray";
-    default:
-      MOZ_CRASH("Unexpected cell color");
-  }
-}
-
 } /* namespace gc */
 } /* namespace js */
 
-JS_PUBLIC_API JS::GCContext* js::gc::GetGCContext(JSContext* cx) {
+JS_PUBLIC_API void js::gc::FinalizeDeadNurseryObject(JSContext* cx,
+                                                     JSObject* obj) {
   CHECK_THREAD(cx);
-  return cx->gcContext();
+  MOZ_ASSERT(JS::RuntimeHeapIsMinorCollecting());
+
+  MOZ_ASSERT(obj);
+  MOZ_ASSERT(IsInsideNursery(obj));
+  MOZ_ASSERT(!IsForwarded(obj));
+
+  const JSClass* jsClass = JS::GetClass(obj);
+  jsClass->doFinalize(cx->gcContext(), obj);
 }
 
 JS_PUBLIC_API void js::gc::SetPerformanceHint(JSContext* cx,
@@ -804,69 +796,3 @@ JS_PUBLIC_API void js::gc::SetPerformanceHint(JSContext* cx,
 
   cx->runtime()->gc.setPerformanceHint(hint);
 }
-
-AutoSelectGCHeap::AutoSelectGCHeap(JSContext* cx,
-                                   size_t allowedNurseryCollections)
-    : cx_(cx), allowedNurseryCollections_(allowedNurseryCollections) {
-  if (!JS::AddGCNurseryCollectionCallback(cx, &NurseryCollectionCallback,
-                                          this)) {
-    cx_ = nullptr;
-  }
-}
-
-AutoSelectGCHeap::~AutoSelectGCHeap() {
-  if (cx_) {
-    JS::RemoveGCNurseryCollectionCallback(cx_, &NurseryCollectionCallback,
-                                          this);
-  }
-}
-
-/* static */
-void AutoSelectGCHeap::NurseryCollectionCallback(JSContext* cx,
-                                                 JS::GCNurseryProgress progress,
-                                                 JS::GCReason reason,
-                                                 void* data) {
-  if (progress == JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END) {
-    static_cast<AutoSelectGCHeap*>(data)->onNurseryCollectionEnd();
-  }
-}
-
-void AutoSelectGCHeap::onNurseryCollectionEnd() {
-  if (allowedNurseryCollections_ != 0) {
-    allowedNurseryCollections_--;
-    return;
-  }
-
-  heap_ = gc::Heap::Tenured;
-}
-
-JS_PUBLIC_API void js::gc::LockStoreBuffer(JSRuntime* runtime) {
-  MOZ_ASSERT(runtime);
-  runtime->gc.lockStoreBuffer();
-}
-
-JS_PUBLIC_API void js::gc::UnlockStoreBuffer(JSRuntime* runtime) {
-  MOZ_ASSERT(runtime);
-  runtime->gc.unlockStoreBuffer();
-}
-
-#ifdef JS_GC_ZEAL
-JS_PUBLIC_API void JS::GetGCZealBits(JSContext* cx, uint32_t* zealBits,
-                                     uint32_t* frequency,
-                                     uint32_t* nextScheduled) {
-  cx->runtime()->gc.getZealBits(zealBits, frequency, nextScheduled);
-}
-
-JS_PUBLIC_API void JS::SetGCZeal(JSContext* cx, uint8_t zeal,
-                                 uint32_t frequency) {
-  cx->runtime()->gc.setZeal(zeal, frequency);
-}
-
-JS_PUBLIC_API void JS::UnsetGCZeal(JSContext* cx, uint8_t zeal) {
-  cx->runtime()->gc.unsetZeal(zeal);
-}
-
-JS_PUBLIC_API void JS::ScheduleGC(JSContext* cx, uint32_t count) {
-  cx->runtime()->gc.setNextScheduled(count);
-}
-#endif

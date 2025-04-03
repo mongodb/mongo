@@ -87,8 +87,8 @@ class RegExp final : public AllStatic {
       RegExpFlags flags, uint32_t backtrack_limit);
 
   // Ensures that a regexp is fully compiled and ready to be executed on a
-  // subject string.  Returns true on success. Throw and return false on
-  // failure.
+  // subject string.  Returns true on success. Return false on failure, and
+  // then an exception will be pending.
   V8_WARN_UNUSED_RESULT static bool EnsureFullyCompiled(Isolate* isolate,
                                                         Handle<JSRegExp> re,
                                                         Handle<String> subject);
@@ -211,16 +211,14 @@ class RegExpResultsCache final : public AllStatic {
 
   // Attempt to retrieve a cached result.  On failure, 0 is returned as a Smi.
   // On success, the returned result is guaranteed to be a COW-array.
-  static Tagged<Object> Lookup(Heap* heap, Tagged<String> key_string,
-                               Tagged<Object> key_pattern,
-                               Tagged<FixedArray>* last_match_out,
-                               ResultsCacheType type);
+  static Object Lookup(Heap* heap, String key_string, Object key_pattern,
+                       FixedArray* last_match_out, ResultsCacheType type);
   // Attempt to add value_array to the cache specified by type.  On success,
   // value_array is turned into a COW-array.
   static void Enter(Isolate* isolate, Handle<String> key_string,
                     Handle<Object> key_pattern, Handle<FixedArray> value_array,
                     Handle<FixedArray> last_match_cache, ResultsCacheType type);
-  static void Clear(Tagged<FixedArray> cache);
+  static void Clear(FixedArray cache);
 
   static constexpr int kRegExpResultsCacheSize = 0x100;
 

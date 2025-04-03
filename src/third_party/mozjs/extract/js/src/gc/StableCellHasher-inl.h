@@ -132,11 +132,12 @@ inline bool HasUniqueId(Cell* cell) {
 
 inline void TransferUniqueId(Cell* tgt, Cell* src) {
   MOZ_ASSERT(src != tgt);
+  MOZ_ASSERT(!IsInsideNursery(tgt));
   MOZ_ASSERT(CurrentThreadCanAccessRuntime(tgt->runtimeFromAnyThread()));
   MOZ_ASSERT(src->zone() == tgt->zone());
 
   Zone* zone = tgt->zone();
-  MOZ_ASSERT_IF(zone->uniqueIds().has(src), !zone->uniqueIds().has(tgt));
+  MOZ_ASSERT(!zone->uniqueIds().has(tgt));
   zone->uniqueIds().rekeyIfMoved(src, tgt);
 }
 
@@ -225,8 +226,7 @@ template <typename T>
   // removed from the table later on.
   if (!gc::HasUniqueId(k)) {
     Key key = k;
-    MOZ_ASSERT(key->zoneFromAnyThread()->needsIncrementalBarrier() &&
-               !key->isMarkedAny());
+    MOZ_ASSERT(IsAboutToBeFinalizedUnbarriered(key));
   }
   MOZ_ASSERT(gc::HasUniqueId(l));
 #endif

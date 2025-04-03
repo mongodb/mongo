@@ -19,7 +19,7 @@
 
 #include "js/Class.h"  // js::{Delete,Get,Has}PropertyOp, JSMayResolveOp, JS::ObjectOpResult
 #include "js/GCAPI.h"         // JS::AutoSuppressGCAnalysis
-#include "js/Id.h"            // JS::PropertyKey, jsid
+#include "js/Id.h"            // INT_TO_JSID, jsid, JSID_INT_MAX, SYMBOL_TO_JSID
 #include "js/RootingAPI.h"    // JS::Handle, JS::MutableHandle, JS::Rooted
 #include "js/Value.h"         // JS::ObjectValue, JS::Value
 #include "proxy/Proxy.h"      // js::Proxy
@@ -30,7 +30,7 @@
 #include "vm/StringType.h"    // js::NameToId
 #include "vm/SymbolType.h"    // JS::Symbol
 
-#include "vm/JSAtomUtils-inl.h"  // js::PrimitiveValueToId, js::IndexToId
+#include "vm/JSAtom-inl.h"  // js::IndexToId
 
 namespace js {
 
@@ -62,6 +62,7 @@ inline bool GetPrototype(JSContext* cx, JS::Handle<JSObject*> obj,
 inline bool IsExtensible(JSContext* cx, JS::Handle<JSObject*> obj,
                          bool* extensible) {
   if (obj->is<ProxyObject>()) {
+    MOZ_ASSERT(!cx->isHelperThreadContext());
     return Proxy::isExtensible(cx, obj, extensible);
   }
 

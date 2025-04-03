@@ -87,7 +87,6 @@
 #include "mozilla/Range.h"
 #include "mozilla/RangedPtr.h"
 #include "mozilla/Span.h"  // mozilla::Span
-#include "mozilla/Try.h"
 #include "mozilla/WrappingOperations.h"
 
 #include <functional>
@@ -97,15 +96,14 @@
 
 #include "jsnum.h"
 
-#include "gc/GCEnum.h"
+#include "gc/Allocator.h"
 #include "js/BigInt.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "js/Printer.h"               // js::GenericPrinter
 #include "js/StableStringChars.h"
 #include "js/Utility.h"
 #include "util/CheckedArithmetic.h"
 #include "util/DifferentialTesting.h"
-#include "vm/JSONPrinter.h"  // js::JSONPrinter
+#include "vm/JSContext.h"
 #include "vm/StaticStrings.h"
 
 #include "gc/GCContext-inl.h"
@@ -133,7 +131,7 @@ static inline unsigned DigitLeadingZeroes(BigInt::Digit x) {
 }
 
 #ifdef DEBUG
-static bool HasLeadingZeroes(const BigInt* bi) {
+static bool HasLeadingZeroes(BigInt* bi) {
   return bi->digitLength() > 0 && bi->digit(bi->digitLength() - 1) == 0;
 }
 #endif
@@ -156,7 +154,7 @@ BigInt* BigInt::createUninitialized(JSContext* cx, size_t digitLength,
   MOZ_ASSERT(x->isNegative() == isNegative);
 
   if (digitLength > InlineDigitsLength) {
-    x->heapDigits_ = js::AllocateCellBuffer<Digit>(cx, x, digitLength);
+    x->heapDigits_ = js::AllocateBigIntDigits(cx, x, digitLength);
     if (!x->heapDigits_) {
       // |x| is partially initialized, expose it as a BigInt using inline digits
       // to the GC.
@@ -203,7 +201,7 @@ size_t BigInt::sizeOfExcludingThisInNursery(
 
   const Nursery& nursery = runtimeFromMainThread()->gc.nursery();
   if (nursery.isInside(heapDigits_)) {
-    // Buffer allocations are aligned to the size of JS::Value.
+    // See |AllocateBigIntDigits()|.
     return RoundUp(digitLength() * sizeof(Digit), sizeof(Value));
   }
 
@@ -403,8 +401,8 @@ BigInt::Digit BigInt::digitDiv(Digit high, Digit low, Digit divisor,
 
 // Multiplies `source` with `factor` and adds `summand` to the result.
 // `result` and `source` may be the same BigInt for inplace modification.
-void BigInt::internalMultiplyAdd(const BigInt* source, Digit factor,
-                                 Digit summand, unsigned n, BigInt* result) {
+void BigInt::internalMultiplyAdd(BigInt* source, Digit factor, Digit summand,
+                                 unsigned n, BigInt* result) {
   MOZ_ASSERT(source->digitLength() >= n);
   MOZ_ASSERT(result->digitLength() >= n);
 
@@ -449,7 +447,7 @@ void BigInt::inplaceMultiplyAdd(Digit factor, Digit summand) {
 // `accumulator`, starting at `accumulatorIndex` for the least-significant
 // digit.  Callers must ensure that `accumulator`'s digitLength and
 // corresponding digit storage is long enough to hold the result.
-void BigInt::multiplyAccumulate(const BigInt* multiplicand, Digit multiplier,
+void BigInt::multiplyAccumulate(BigInt* multiplicand, Digit multiplier,
                                 BigInt* accumulator,
                                 unsigned accumulatorIndex) {
   MOZ_ASSERT(accumulator->digitLength() >
@@ -492,7 +490,7 @@ void BigInt::multiplyAccumulate(const BigInt* multiplicand, Digit multiplier,
   }
 }
 
-inline int8_t BigInt::absoluteCompare(const BigInt* x, const BigInt* y) {
+inline int8_t BigInt::absoluteCompare(BigInt* x, BigInt* y) {
   MOZ_ASSERT(!HasLeadingZeroes(x));
   MOZ_ASSERT(!HasLeadingZeroes(y));
 
@@ -710,8 +708,7 @@ bool BigInt::absoluteDivWithDigitDivisor(
 
 // Adds `summand` onto `this`, starting with `summand`'s 0th digit
 // at `this`'s `startIndex`'th digit. Returns the "carry" (0 or 1).
-BigInt::Digit BigInt::absoluteInplaceAdd(const BigInt* summand,
-                                         unsigned startIndex) {
+BigInt::Digit BigInt::absoluteInplaceAdd(BigInt* summand, unsigned startIndex) {
   Digit carry = 0;
   unsigned n = summand->digitLength();
   MOZ_ASSERT(digitLength() > startIndex,
@@ -732,7 +729,7 @@ BigInt::Digit BigInt::absoluteInplaceAdd(const BigInt* summand,
 
 // Subtracts `subtrahend` from this, starting with `subtrahend`'s 0th digit
 // at `this`'s `startIndex`-th digit. Returns the "borrow" (0 or 1).
-BigInt::Digit BigInt::absoluteInplaceSub(const BigInt* subtrahend,
+BigInt::Digit BigInt::absoluteInplaceSub(BigInt* subtrahend,
                                          unsigned startIndex) {
   Digit borrow = 0;
   unsigned n = subtrahend->digitLength();
@@ -1455,6 +1452,8 @@ JSLinearString* BigInt::toStringGeneric(JSContext* cx, HandleBigInt x,
 
 static void FreeDigits(JSContext* cx, BigInt* bi, BigInt::Digit* digits,
                        size_t nbytes) {
+  MOZ_ASSERT(cx->isMainThreadContext());
+
   if (bi->isTenured()) {
     MOZ_ASSERT(!cx->nursery().isInside(digits));
     js_free(digits);
@@ -1489,8 +1488,8 @@ BigInt* BigInt::destructivelyTrimHighZeroDigits(JSContext* cx, BigInt* x) {
     MOZ_ASSERT(x->hasHeapDigits());
 
     size_t oldLength = x->digitLength();
-    Digit* newdigits = js::ReallocateCellBuffer<Digit>(
-        cx, x, x->heapDigits_, oldLength, newLength, js::MallocArena);
+    Digit* newdigits =
+        js::ReallocateBigIntDigits(cx, x, x->heapDigits_, oldLength, newLength);
     if (!newdigits) {
       return nullptr;
     }
@@ -2003,106 +2002,6 @@ BigInt* BigInt::mod(JSContext* cx, HandleBigInt x, HandleBigInt y) {
   }
 }
 
-bool BigInt::divmod(JSContext* cx, Handle<BigInt*> x, Handle<BigInt*> y,
-                    MutableHandle<BigInt*> quotient,
-                    MutableHandle<BigInt*> remainder) {
-  // 1. If y is 0n, throw a RangeError exception.
-  if (y->isZero()) {
-    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_BIGINT_DIVISION_BY_ZERO);
-    return false;
-  }
-
-  // 2. If x is 0n, quotient and remainder are zero, too.
-  if (x->isZero()) {
-    quotient.set(x);
-    remainder.set(x);
-    return true;
-  }
-
-  // 3. Let r be the BigInt defined by the mathematical relation r = x - (y ×
-  // q) where q is a BigInt that is negative only if x/y is negative and
-  // positive only if x/y is positive, and whose magnitude is as large as
-  // possible without exceeding the magnitude of the true mathematical
-  // quotient of x and y.
-  if (absoluteCompare(x, y) < 0) {
-    auto* zero = BigInt::zero(cx);
-    if (!zero) {
-      return false;
-    }
-
-    quotient.set(zero);
-    remainder.set(x);
-    return true;
-  }
-
-  bool resultNegative = x->isNegative() != y->isNegative();
-
-  if (y->digitLength() == 1) {
-    Digit divisor = y->digit(0);
-    if (divisor == 1) {
-      quotient.set(resultNegative == x->isNegative() ? x : neg(cx, x));
-      if (!quotient) {
-        return false;
-      }
-
-      remainder.set(BigInt::zero(cx));
-      if (!remainder) {
-        return false;
-      }
-    } else {
-      Rooted<BigInt*> quot(cx);
-      Digit remainderDigit;
-      if (!absoluteDivWithDigitDivisor(cx, x, divisor, Some(&quot),
-                                       &remainderDigit, resultNegative)) {
-        return false;
-      }
-
-      quotient.set(destructivelyTrimHighZeroDigits(cx, quot));
-      if (!quotient) {
-        return false;
-      }
-
-      if (!remainderDigit) {
-        remainder.set(zero(cx));
-      } else {
-        remainder.set(createFromDigit(cx, remainderDigit, x->isNegative()));
-      }
-      if (!remainder) {
-        return false;
-      }
-    }
-  } else {
-    RootedBigInt quot(cx);
-    RootedBigInt rem(cx);
-    if (!absoluteDivWithBigIntDivisor(cx, x, y, Some(&quot), Some(&rem),
-                                      resultNegative)) {
-      return false;
-    }
-
-    quotient.set(destructivelyTrimHighZeroDigits(cx, quot));
-    if (!quotient) {
-      return false;
-    }
-
-    remainder.set(destructivelyTrimHighZeroDigits(cx, rem));
-    if (!remainder) {
-      return false;
-    }
-  }
-
-  MOZ_ASSERT(quotient && remainder,
-             "quotient and remainder are computed on return");
-  MOZ_ASSERT(!quotient->isZero(), "zero quotient is handled earlier");
-  MOZ_ASSERT(quotient->isNegative() == resultNegative,
-             "quotient has the correct sign");
-  MOZ_ASSERT(
-      remainder->isZero() || (x->isNegative() == remainder->isNegative()),
-      "remainder has the correct sign");
-
-  return true;
-}
-
 // BigInt proposal section 1.1.3
 BigInt* BigInt::pow(JSContext* cx, HandleBigInt x, HandleBigInt y) {
   // 1. If exponent is < 0, throw a RangeError exception.
@@ -2252,7 +2151,8 @@ BigInt* BigInt::lshByAbsolute(JSContext* cx, HandleBigInt x, HandleBigInt y) {
   }
 
   if (y->digitLength() > 1 || y->digit(0) > MaxBitLength) {
-    ReportOversizedAllocation(cx, JSMSG_BIGINT_TOO_LARGE);
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_BIGINT_TOO_LARGE);
     if (js::SupportDifferentialTesting()) {
       fprintf(stderr, "ReportOutOfMemory called\n");
     }
@@ -2560,7 +2460,7 @@ uint64_t BigInt::toUint64(const BigInt* x) {
   return digit;
 }
 
-bool BigInt::isInt64(const BigInt* x, int64_t* result) {
+bool BigInt::isInt64(BigInt* x, int64_t* result) {
   MOZ_MAKE_MEM_UNDEFINED(result, sizeof(*result));
 
   if (!x->absFitsInUint64()) {
@@ -2593,7 +2493,7 @@ bool BigInt::isInt64(const BigInt* x, int64_t* result) {
   return false;
 }
 
-bool BigInt::isUint64(const BigInt* x, uint64_t* result) {
+bool BigInt::isUint64(BigInt* x, uint64_t* result) {
   MOZ_MAKE_MEM_UNDEFINED(result, sizeof(*result));
 
   if (!x->absFitsInUint64() || x->isNegative()) {
@@ -2609,7 +2509,7 @@ bool BigInt::isUint64(const BigInt* x, uint64_t* result) {
   return true;
 }
 
-bool BigInt::isNumber(const BigInt* x, double* result) {
+bool BigInt::isNumber(BigInt* x, double* result) {
   MOZ_MAKE_MEM_UNDEFINED(result, sizeof(*result));
 
   if (!x->absFitsInUint64()) {
@@ -3114,7 +3014,7 @@ JS::Result<uint64_t> js::ToBigUint64(JSContext* cx, HandleValue v) {
   return BigInt::toUint64(bi);
 }
 
-double BigInt::numberValue(const BigInt* x) {
+double BigInt::numberValue(BigInt* x) {
   if (x->isZero()) {
     return 0.0;
   }
@@ -3337,7 +3237,7 @@ double BigInt::numberValue(const BigInt* x) {
   return mozilla::BitwiseCast<double>(signBit | exponentBits | significandBits);
 }
 
-int8_t BigInt::compare(const BigInt* x, const BigInt* y) {
+int8_t BigInt::compare(BigInt* x, BigInt* y) {
   // Sanity checks to catch negative zeroes escaping to the wild.
   MOZ_ASSERT(!x->isNegative() || !x->isZero());
   MOZ_ASSERT(!y->isNegative() || !y->isZero());
@@ -3355,7 +3255,7 @@ int8_t BigInt::compare(const BigInt* x, const BigInt* y) {
   return absoluteCompare(x, y);
 }
 
-bool BigInt::equal(const BigInt* lhs, const BigInt* rhs) {
+bool BigInt::equal(BigInt* lhs, BigInt* rhs) {
   if (lhs == rhs) {
     return true;
   }
@@ -3373,7 +3273,7 @@ bool BigInt::equal(const BigInt* lhs, const BigInt* rhs) {
   return true;
 }
 
-int8_t BigInt::compare(const BigInt* x, double y) {
+int8_t BigInt::compare(BigInt* x, double y) {
   MOZ_ASSERT(!std::isnan(y));
 
   constexpr int LessThan = -1, Equal = 0, GreaterThan = 1;
@@ -3504,7 +3404,7 @@ int8_t BigInt::compare(const BigInt* x, double y) {
   return Equal;
 }
 
-bool BigInt::equal(const BigInt* lhs, double rhs) {
+bool BigInt::equal(BigInt* lhs, double rhs) {
   if (std::isnan(rhs)) {
     return false;
   }
@@ -3558,18 +3458,16 @@ JS::Result<bool> BigInt::looselyEqual(JSContext* cx, HandleBigInt lhs,
 }
 
 // BigInt proposal section 1.1.12. BigInt::lessThan ( x, y )
-bool BigInt::lessThan(const BigInt* x, const BigInt* y) {
-  return compare(x, y) < 0;
-}
+bool BigInt::lessThan(BigInt* x, BigInt* y) { return compare(x, y) < 0; }
 
-Maybe<bool> BigInt::lessThan(const BigInt* lhs, double rhs) {
+Maybe<bool> BigInt::lessThan(BigInt* lhs, double rhs) {
   if (std::isnan(rhs)) {
     return Maybe<bool>(Nothing());
   }
   return Some(compare(lhs, rhs) < 0);
 }
 
-Maybe<bool> BigInt::lessThan(double lhs, const BigInt* rhs) {
+Maybe<bool> BigInt::lessThan(double lhs, BigInt* rhs) {
   if (std::isnan(lhs)) {
     return Maybe<bool>(Nothing());
   }
@@ -3785,34 +3683,6 @@ void BigInt::dump() const {
 }
 
 void BigInt::dump(js::GenericPrinter& out) const {
-  js::JSONPrinter json(out);
-  dump(json);
-  out.put("\n");
-}
-
-void BigInt::dump(js::JSONPrinter& json) const {
-  json.beginObject();
-  dumpFields(json);
-  json.endObject();
-}
-
-void BigInt::dumpFields(js::JSONPrinter& json) const {
-  json.formatProperty("address", "(JS::BigInt*)0x%p", this);
-
-  json.property("digitLength", digitLength());
-
-  js::GenericPrinter& out = json.beginStringProperty("value");
-  dumpLiteral(out);
-  json.endStringProperty();
-}
-
-void BigInt::dumpStringContent(js::GenericPrinter& out) const {
-  dumpLiteral(out);
-
-  out.printf(" @ (JS::BigInt*)0x%p", this);
-}
-
-void BigInt::dumpLiteral(js::GenericPrinter& out) const {
   if (isNegative()) {
     out.putChar('-');
   }
@@ -3859,7 +3729,7 @@ BigInt* JS::NumberToBigInt(JSContext* cx, double num) {
 
 template <typename CharT>
 static inline BigInt* StringToBigIntHelper(JSContext* cx,
-                                           const Range<const CharT>& chars) {
+                                           Range<const CharT>& chars) {
   bool parseError = false;
   BigInt* bi = ParseStringBigIntLiteral(cx, chars, &parseError);
   if (!bi) {
@@ -3873,12 +3743,11 @@ static inline BigInt* StringToBigIntHelper(JSContext* cx,
   return bi;
 }
 
-BigInt* JS::StringToBigInt(JSContext* cx,
-                           const Range<const Latin1Char>& chars) {
+BigInt* JS::StringToBigInt(JSContext* cx, Range<const Latin1Char> chars) {
   return StringToBigIntHelper(cx, chars);
 }
 
-BigInt* JS::StringToBigInt(JSContext* cx, const Range<const char16_t>& chars) {
+BigInt* JS::StringToBigInt(JSContext* cx, Range<const char16_t> chars) {
   return StringToBigIntHelper(cx, chars);
 }
 
@@ -3933,19 +3802,17 @@ BigInt* JS::ToBigInt(JSContext* cx, HandleValue val) {
   return js::ToBigInt(cx, val);
 }
 
-int64_t JS::ToBigInt64(const JS::BigInt* bi) { return BigInt::toInt64(bi); }
+int64_t JS::ToBigInt64(JS::BigInt* bi) { return BigInt::toInt64(bi); }
 
-uint64_t JS::ToBigUint64(const JS::BigInt* bi) { return BigInt::toUint64(bi); }
+uint64_t JS::ToBigUint64(JS::BigInt* bi) { return BigInt::toUint64(bi); }
 
-double JS::BigIntToNumber(const JS::BigInt* bi) {
-  return BigInt::numberValue(bi);
-}
+double JS::BigIntToNumber(JS::BigInt* bi) { return BigInt::numberValue(bi); }
 
-bool JS::BigIntIsNegative(const BigInt* bi) {
+bool JS::BigIntIsNegative(BigInt* bi) {
   return !bi->isZero() && bi->isNegative();
 }
 
-bool JS::BigIntFitsNumber(const BigInt* bi, double* out) {
+bool JS::BigIntFitsNumber(BigInt* bi, double* out) {
   return bi->isNumber(bi, out);
 }
 
@@ -3971,10 +3838,10 @@ BigInt* JS::detail::BigIntFromBool(JSContext* cx, bool b) {
   return b ? BigInt::one(cx) : BigInt::zero(cx);
 }
 
-bool JS::detail::BigIntIsInt64(const BigInt* bi, int64_t* result) {
+bool JS::detail::BigIntIsInt64(BigInt* bi, int64_t* result) {
   return BigInt::isInt64(bi, result);
 }
 
-bool JS::detail::BigIntIsUint64(const BigInt* bi, uint64_t* result) {
+bool JS::detail::BigIntIsUint64(BigInt* bi, uint64_t* result) {
   return BigInt::isUint64(bi, result);
 }

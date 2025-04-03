@@ -21,9 +21,6 @@ using CompartmentSet =
 namespace js {
 
 class TaggedProto;
-namespace wasm {
-class AnyRef;
-}  // namespace wasm
 
 // Internal Tracing API
 //
@@ -112,7 +109,6 @@ JS_FOR_EACH_TRACEKIND(DEFINE_TRACE_FUNCTION)
 bool TraceEdgeInternal(JSTracer* trc, Value* thingp, const char* name);
 bool TraceEdgeInternal(JSTracer* trc, jsid* thingp, const char* name);
 bool TraceEdgeInternal(JSTracer* trc, TaggedProto* thingp, const char* name);
-bool TraceEdgeInternal(JSTracer* trc, wasm::AnyRef* thingp, const char* name);
 
 template <typename T>
 void TraceRangeInternal(JSTracer* trc, size_t len, T* vec, const char* name);
@@ -122,12 +118,10 @@ bool TraceWeakMapKeyInternal(JSTracer* trc, Zone* zone, T* thingp,
 
 #ifdef DEBUG
 void AssertRootMarkingPhase(JSTracer* trc);
-template <typename T>
-void AssertShouldMarkInZone(GCMarker* marker, T* thing);
+void AssertShouldMarkInZone(GCMarker* marker, gc::Cell* thing);
 #else
 inline void AssertRootMarkingPhase(JSTracer* trc) {}
-template <typename T>
-void AssertShouldMarkInZone(GCMarker* marker, T* thing) {}
+inline void AssertShouldMarkInZone(GCMarker* marker, gc::Cell* thing) {}
 #endif
 
 }  // namespace gc
@@ -278,7 +272,6 @@ struct TraceWeakResult {
 
   bool isLive() const { return live_; }
   bool isDead() const { return !live_; }
-  bool wasMoved() const { return isLive() && final_ != initial_; }
 
   MOZ_IMPLICIT operator bool() const { return isLive(); }
 
@@ -343,17 +336,13 @@ void TraceCrossCompartmentEdge(JSTracer* trc, JSObject* src,
 // GC peer first.
 template <typename T>
 void TraceSameZoneCrossCompartmentEdge(JSTracer* trc,
-                                       const BarrieredBase<T>* dst,
+                                       const WriteBarriered<T>* dst,
                                        const char* name);
 
 // Trace a weak map key. For debugger weak maps these may be cross compartment,
 // but the compartment must always be within the current sweep group.
 template <typename T>
 void TraceWeakMapKeyEdgeInternal(JSTracer* trc, Zone* weakMapZone, T** thingp,
-                                 const char* name);
-
-template <typename T>
-void TraceWeakMapKeyEdgeInternal(JSTracer* trc, Zone* weakMapZone, T* thingp,
                                  const char* name);
 
 template <typename T>

@@ -49,7 +49,7 @@ WindowsDpiInitializationResult WindowsDpiInitialization() {
     }
 
     return WindowsDpiInitializationResult::Success;
-  } else {
+  } else if (IsWin8Point1OrLater()) {
     DynamicallyLinkedFunctionPtr<SetProcessDpiAwarenessType>
         setProcessDpiAwareness(L"Shcore.dll", "SetProcessDpiAwareness");
     if (!setProcessDpiAwareness) {
@@ -58,6 +58,12 @@ WindowsDpiInitializationResult WindowsDpiInitialization() {
 
     if (FAILED(setProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE))) {
       return WindowsDpiInitializationResult::SetProcessDpiAwarenessFailed;
+    }
+
+    return WindowsDpiInitializationResult::Success;
+  } else {
+    if (!SetProcessDPIAware()) {
+      return WindowsDpiInitializationResult::SetProcessDPIAwareFailed;
     }
 
     return WindowsDpiInitializationResult::Success;

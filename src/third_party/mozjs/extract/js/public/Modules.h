@@ -14,7 +14,6 @@
 #include "jstypes.h"  // JS_PUBLIC_API
 
 #include "js/AllocPolicy.h"     // js::SystemAllocPolicy
-#include "js/ColumnNumber.h"    // JS::ColumnNumberOneOrigin
 #include "js/CompileOptions.h"  // JS::ReadOnlyCompileOptions
 #include "js/RootingAPI.h"      // JS::{Mutable,}Handle
 #include "js/Value.h"           // JS::Value
@@ -36,7 +35,19 @@ union Utf8Unit;
 
 namespace JS {
 
-enum class ModuleType : uint32_t { Unknown = 0, JavaScript, JSON };
+enum class ImportAssertion { Type };
+
+using ImportAssertionVector =
+    js::Vector<ImportAssertion, 1, js::SystemAllocPolicy>;
+
+/**
+ * Set the supported assertions for the runtime to the given vector.
+ *
+ * See:
+ * https://tc39.es/proposal-import-assertions/#sec-hostgetsupportedimportassertions
+ */
+extern JS_PUBLIC_API void SetSupportedImportAssertions(
+    JSRuntime* rt, const ImportAssertionVector& assertions);
 
 /**
  * The HostResolveImportedModule hook.
@@ -172,14 +183,6 @@ extern JS_PUBLIC_API JSObject* CompileModule(
     SourceText<mozilla::Utf8Unit>& srcBuf);
 
 /**
- * Parse the given source buffer as a JSON module in the scope of the current
- * global of cx and return a synthetic module record.
- */
-extern JS_PUBLIC_API JSObject* CompileJsonModule(
-    JSContext* cx, const ReadOnlyCompileOptions& options,
-    SourceText<char16_t>& srcBuf);
-
-/**
  * Set a private value associated with a source text module record.
  */
 extern JS_PUBLIC_API void SetModulePrivate(JSObject* module,
@@ -260,12 +263,9 @@ GetRequestedModulesCount(JSContext* cx, Handle<JSObject*> moduleRecord);
 extern JS_PUBLIC_API JSString* GetRequestedModuleSpecifier(
     JSContext* cx, Handle<JSObject*> moduleRecord, uint32_t index);
 
-/*
- * Get the position of a requested module's name in the source.
- */
 extern JS_PUBLIC_API void GetRequestedModuleSourcePos(
     JSContext* cx, Handle<JSObject*> moduleRecord, uint32_t index,
-    uint32_t* lineNumber, JS::ColumnNumberOneOrigin* columnNumber);
+    uint32_t* lineNumber, uint32_t* columnNumber);
 
 /*
  * Get the top-level script for a module which has not yet been executed.
@@ -298,8 +298,6 @@ extern JS_PUBLIC_API JSObject* GetModuleEnvironment(
  * Clear all bindings in a module's environment. Used during shutdown.
  */
 extern JS_PUBLIC_API void ClearModuleEnvironment(JSObject* moduleObj);
-
-extern JS_PUBLIC_API bool ModuleIsLinked(JSObject* moduleObj);
 
 }  // namespace JS
 

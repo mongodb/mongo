@@ -12,7 +12,6 @@
 #include <utility>
 
 #include "mozilla/Array.h"
-#include "EnumTypeTraits.h"
 
 namespace mozilla {
 
@@ -34,43 +33,39 @@ namespace mozilla {
  *     Count
  *   };
  *
- *   EnumeratedArray<AnimalSpecies, int, AnimalSpecies::Count> headCount;
+ *   EnumeratedArray<AnimalSpecies, AnimalSpecies::Count, int> headCount;
  *
  *   headCount[AnimalSpecies::Cow] = 17;
  *   headCount[AnimalSpecies::Sheep] = 30;
  *
- * If the enum class has contiguous values and provides a specialization of
- * mozilla::MaxContiguousEnumValue then the size will be calculated as the max
- * value + 1.
  */
-template <typename Enum, typename ValueType,
-          size_t Size = ContiguousEnumSize<Enum>::value>
+template <typename IndexType, IndexType SizeAsEnumValue, typename ValueType>
 class EnumeratedArray {
- private:
-  static_assert(UnderlyingValue(MinContiguousEnumValue<Enum>::value) == 0,
-                "All indexes would need to be corrected if min != 0");
+ public:
+  static const size_t kSize = size_t(SizeAsEnumValue);
 
-  using ArrayType = Array<ValueType, Size>;
+ private:
+  typedef Array<ValueType, kSize> ArrayType;
 
   ArrayType mArray;
 
  public:
-  constexpr EnumeratedArray() = default;
+  EnumeratedArray() = default;
 
   template <typename... Args>
   MOZ_IMPLICIT constexpr EnumeratedArray(Args&&... aArgs)
       : mArray{std::forward<Args>(aArgs)...} {}
 
-  ValueType& operator[](Enum aIndex) { return mArray[size_t(aIndex)]; }
+  ValueType& operator[](IndexType aIndex) { return mArray[size_t(aIndex)]; }
 
-  const ValueType& operator[](Enum aIndex) const {
+  const ValueType& operator[](IndexType aIndex) const {
     return mArray[size_t(aIndex)];
   }
 
-  using iterator = typename ArrayType::iterator;
-  using const_iterator = typename ArrayType::const_iterator;
-  using reverse_iterator = typename ArrayType::reverse_iterator;
-  using const_reverse_iterator = typename ArrayType::const_reverse_iterator;
+  typedef typename ArrayType::iterator iterator;
+  typedef typename ArrayType::const_iterator const_iterator;
+  typedef typename ArrayType::reverse_iterator reverse_iterator;
+  typedef typename ArrayType::const_reverse_iterator const_reverse_iterator;
 
   // Methods for range-based for loops.
   iterator begin() { return mArray.begin(); }

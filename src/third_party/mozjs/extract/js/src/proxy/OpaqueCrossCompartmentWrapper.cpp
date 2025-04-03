@@ -6,6 +6,7 @@
 
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/Wrapper.h"
+#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/JSObject-inl.h"
 
@@ -143,8 +144,8 @@ JSString* OpaqueCrossCompartmentWrapper::fun_toString(JSContext* cx,
                                                       HandleObject proxy,
                                                       bool isToSource) const {
   JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                            JSMSG_INCOMPATIBLE_PROTO, "Function", "toString",
-                            "object");
+                            JSMSG_INCOMPATIBLE_PROTO, js_Function_str,
+                            js_toString_str, "object");
   return nullptr;
 }
 

@@ -4,6 +4,8 @@
 
 # This script generates jit/CacheIROpsGenerated.h from CacheIROps.yaml
 
+from collections import OrderedDict
+
 import buildconfig
 import six
 import yaml
@@ -44,7 +46,20 @@ def load_yaml(yaml_path):
     pp.do_filter("substitution")
     pp.do_include(yaml_path)
     contents = pp.out.getvalue()
-    return yaml.safe_load(contents)
+
+    # Load into an OrderedDict to ensure order is preserved. Note: Python 3.7+
+    # also preserves ordering for normal dictionaries.
+    # Code based on https://stackoverflow.com/a/21912744.
+    class OrderedLoader(yaml.Loader):
+        pass
+
+    def construct_mapping(loader, node):
+        loader.flatten_mapping(node)
+        return OrderedDict(loader.construct_pairs(node))
+
+    tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
+    OrderedLoader.add_constructor(tag, construct_mapping)
+    return yaml.load(contents, OrderedLoader)
 
 
 # Information for generating CacheIRWriter code for a single argument. Tuple
@@ -62,14 +77,12 @@ arg_writer_info = {
     "IntPtrId": ("IntPtrOperandId", "writeOperandId"),
     "RawId": ("OperandId", "writeOperandId"),
     "ShapeField": ("Shape*", "writeShapeField"),
-    "WeakShapeField": ("Shape*", "writeWeakShapeField"),
-    "WeakGetterSetterField": ("GetterSetter*", "writeWeakGetterSetterField"),
+    "GetterSetterField": ("GetterSetter*", "writeGetterSetterField"),
     "ObjectField": ("JSObject*", "writeObjectField"),
-    "WeakObjectField": ("JSObject*", "writeWeakObjectField"),
     "StringField": ("JSString*", "writeStringField"),
     "AtomField": ("JSAtom*", "writeStringField"),
     "SymbolField": ("JS::Symbol*", "writeSymbolField"),
-    "WeakBaseScriptField": ("BaseScript*", "writeWeakBaseScriptField"),
+    "BaseScriptField": ("BaseScript*", "writeBaseScriptField"),
     "JitCodeField": ("JitCode*", "writeJitCodeField"),
     "RawInt32Field": ("uint32_t", "writeRawInt32Field"),
     "RawPointerField": ("const void*", "writeRawPointerField"),
@@ -79,12 +92,9 @@ arg_writer_info = {
     "DoubleField": ("double", "writeDoubleField"),
     "AllocSiteField": ("gc::AllocSite*", "writeAllocSiteField"),
     "JSOpImm": ("JSOp", "writeJSOpImm"),
-    "JSTypeImm": ("JSType", "writeJSTypeImm"),
-    "TypeofEqOperandImm": ("TypeofEqOperand", "writeTypeofEqOperandImm"),
     "BoolImm": ("bool", "writeBoolImm"),
     "ByteImm": ("uint32_t", "writeByteImm"),  # uint32_t to enable fits-in-byte asserts.
     "GuardClassKindImm": ("GuardClassKind", "writeGuardClassKindImm"),
-    "ArrayBufferViewKindImm": ("ArrayBufferViewKind", "writeArrayBufferViewKindImm"),
     "ValueTypeImm": ("ValueType", "writeValueTypeImm"),
     "JSWhyMagicImm": ("JSWhyMagic", "writeJSWhyMagicImm"),
     "CallFlagsImm": ("CallFlags", "writeCallFlagsImm"),
@@ -97,7 +107,6 @@ arg_writer_info = {
     "StaticStringImm": ("const char*", "writeStaticStringImm"),
     "AllocKindImm": ("gc::AllocKind", "writeAllocKindImm"),
     "CompletionKindImm": ("CompletionKind", "writeCompletionKindImm"),
-    "RealmFuseIndexImm": ("RealmFuses::FuseIndex", "writeRealmFuseIndexImm"),
 }
 
 
@@ -167,14 +176,12 @@ arg_reader_info = {
     "IntPtrId": ("IntPtrOperandId", "Id", "reader.intPtrOperandId()"),
     "RawId": ("uint32_t", "Id", "reader.rawOperandId()"),
     "ShapeField": ("uint32_t", "Offset", "reader.stubOffset()"),
-    "WeakShapeField": ("uint32_t", "Offset", "reader.stubOffset()"),
-    "WeakGetterSetterField": ("uint32_t", "Offset", "reader.stubOffset()"),
+    "GetterSetterField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "ObjectField": ("uint32_t", "Offset", "reader.stubOffset()"),
-    "WeakObjectField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "StringField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "AtomField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "SymbolField": ("uint32_t", "Offset", "reader.stubOffset()"),
-    "WeakBaseScriptField": ("uint32_t", "Offset", "reader.stubOffset()"),
+    "BaseScriptField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "JitCodeField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "RawInt32Field": ("uint32_t", "Offset", "reader.stubOffset()"),
     "RawPointerField": ("uint32_t", "Offset", "reader.stubOffset()"),
@@ -184,16 +191,9 @@ arg_reader_info = {
     "DoubleField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "AllocSiteField": ("uint32_t", "Offset", "reader.stubOffset()"),
     "JSOpImm": ("JSOp", "", "reader.jsop()"),
-    "JSTypeImm": ("JSType", "", "reader.jstype()"),
-    "TypeofEqOperandImm": ("TypeofEqOperand", "", "reader.typeofEqOperand()"),
     "BoolImm": ("bool", "", "reader.readBool()"),
     "ByteImm": ("uint8_t", "", "reader.readByte()"),
     "GuardClassKindImm": ("GuardClassKind", "", "reader.guardClassKind()"),
-    "ArrayBufferViewKindImm": (
-        "ArrayBufferViewKind",
-        "",
-        "reader.arrayBufferViewKind()",
-    ),
     "ValueTypeImm": ("ValueType", "", "reader.valueType()"),
     "JSWhyMagicImm": ("JSWhyMagic", "", "reader.whyMagic()"),
     "CallFlagsImm": ("CallFlags", "", "reader.callFlags()"),
@@ -206,7 +206,6 @@ arg_reader_info = {
     "StaticStringImm": ("const char*", "", "reinterpret_cast<char*>(reader.pointer())"),
     "AllocKindImm": ("gc::AllocKind", "", "reader.allocKind()"),
     "CompletionKindImm": ("CompletionKind", "", "reader.completionKind()"),
-    "RealmFuseIndexImm": ("RealmFuses::FuseIndex", "", "reader.realmFuseIndex()"),
 }
 
 
@@ -262,14 +261,12 @@ arg_spewer_method = {
     "IntPtrId": "spewOperandId",
     "RawId": "spewRawOperandId",
     "ShapeField": "spewField",
-    "WeakShapeField": "spewField",
-    "WeakGetterSetterField": "spewField",
+    "GetterSetterField": "spewField",
     "ObjectField": "spewField",
-    "WeakObjectField": "spewField",
     "StringField": "spewField",
     "AtomField": "spewField",
     "SymbolField": "spewField",
-    "WeakBaseScriptField": "spewField",
+    "BaseScriptField": "spewField",
     "JitCodeField": "spewField",
     "RawInt32Field": "spewField",
     "RawPointerField": "spewField",
@@ -279,12 +276,9 @@ arg_spewer_method = {
     "DoubleField": "spewField",
     "AllocSiteField": "spewField",
     "JSOpImm": "spewJSOpImm",
-    "JSTypeImm": "spewJSTypeImm",
-    "TypeofEqOperandImm": "spewTypeofEqOperandImm",
     "BoolImm": "spewBoolImm",
     "ByteImm": "spewByteImm",
     "GuardClassKindImm": "spewGuardClassKindImm",
-    "ArrayBufferViewKindImm": "spewArrayBufferViewKindImm",
     "ValueTypeImm": "spewValueTypeImm",
     "JSWhyMagicImm": "spewJSWhyMagicImm",
     "CallFlagsImm": "spewCallFlagsImm",
@@ -297,7 +291,6 @@ arg_spewer_method = {
     "StaticStringImm": "spewStaticStringImm",
     "AllocKindImm": "spewAllocKindImm",
     "CompletionKindImm": "spewCompletionKindImm",
-    "RealmFuseIndexImm": "spewRealmFuseIndexImm",
 }
 
 
@@ -404,14 +397,12 @@ arg_length = {
     "IntPtrId": 1,
     "RawId": 1,
     "ShapeField": 1,
-    "WeakShapeField": 1,
-    "WeakGetterSetterField": 1,
+    "GetterSetterField": 1,
     "ObjectField": 1,
-    "WeakObjectField": 1,
     "StringField": 1,
     "AtomField": 1,
     "SymbolField": 1,
-    "WeakBaseScriptField": 1,
+    "BaseScriptField": 1,
     "JitCodeField": 1,
     "RawInt32Field": 1,
     "RawPointerField": 1,
@@ -426,11 +417,8 @@ arg_length = {
     "ScalarTypeImm": 1,
     "UnaryMathFunctionImm": 1,
     "JSOpImm": 1,
-    "JSTypeImm": 1,
-    "TypeofEqOperandImm": 1,
     "ValueTypeImm": 1,
     "GuardClassKindImm": 1,
-    "ArrayBufferViewKindImm": 1,
     "JSWhyMagicImm": 1,
     "WasmValTypeImm": 1,
     "Int32Imm": 4,
@@ -439,7 +427,6 @@ arg_length = {
     "StaticStringImm": "sizeof(uintptr_t)",
     "AllocKindImm": 1,
     "CompletionKindImm": 1,
-    "RealmFuseIndexImm": 1,
 }
 
 
@@ -477,7 +464,7 @@ def generate_cacheirops_header(c_out, yaml_path):
         name = op["name"]
 
         args = op["args"]
-        assert args is None or isinstance(args, dict)
+        assert args is None or isinstance(args, OrderedDict)
 
         shared = op["shared"]
         assert isinstance(shared, bool)

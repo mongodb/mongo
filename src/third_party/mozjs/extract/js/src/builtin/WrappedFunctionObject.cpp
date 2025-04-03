@@ -203,11 +203,7 @@ static bool CopyNameAndLength(JSContext* cx, HandleObject fun,
   Rooted<Value> targetName(cx);
   if (target->is<JSFunction>() && !target->as<JSFunction>().hasResolvedName()) {
     JSFunction* targetFun = &target->as<JSFunction>();
-    JSString* targetNameStr = targetFun->getUnresolvedName(cx);
-    if (!targetNameStr) {
-      return false;
-    }
-    targetName.setString(targetNameStr);
+    targetName.setString(targetFun->infallibleGetUnresolvedName(cx));
   } else {
     if (!GetProperty(cx, target, target, cx->names().name, &targetName)) {
       return false;

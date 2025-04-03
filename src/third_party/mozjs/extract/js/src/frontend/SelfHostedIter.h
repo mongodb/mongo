@@ -20,13 +20,7 @@ enum class SelfHostedIter {
   Deny,
 
   // The operand is marked.
-  AllowContent,
-
-  // The operand is marked and the `@@iterator` method is on the stack.
-  AllowContentWith,
-
-  // The operand is marked and the `next` method is on the stack.
-  AllowContentWithNext,
+  Allow,
 };
 
 } /* namespace js::frontend */

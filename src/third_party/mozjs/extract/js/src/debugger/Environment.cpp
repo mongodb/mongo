@@ -13,17 +13,17 @@
 #include <string.h>  // for strlen, size_t
 #include <utility>   // for move
 
-#include "debugger/Debugger.h"  // for Env, Debugger, ValueToIdentifier
-#include "debugger/Object.h"    // for DebuggerObject
-#include "debugger/Script.h"    // for DebuggerScript
+#include "debugger/Debugger.h"          // for Env, Debugger, ValueToIdentifier
+#include "debugger/Object.h"            // for DebuggerObject
+#include "debugger/Script.h"            // for DebuggerScript
+#include "frontend/BytecodeCompiler.h"  // for IsIdentifier
 #include "gc/Tracer.h"    // for TraceManuallyBarrieredCrossCompartmentEdge
 #include "js/CallArgs.h"  // for CallArgs
 #include "js/friend/ErrorMessages.h"  // for GetErrorMessage, JSMSG_*
 #include "js/HeapAPI.h"               // for IsInsideNursery
 #include "js/RootingAPI.h"            // for Rooted, MutableHandle
-#include "util/Identifier.h"          // for IsIdentifier
 #include "vm/Compartment.h"           // for Compartment
-#include "vm/JSAtomUtils.h"           // for Atomize
+#include "vm/JSAtom.h"                // for Atomize
 #include "vm/JSContext.h"             // for JSContext
 #include "vm/JSFunction.h"            // for JSFunction
 #include "vm/JSObject.h"              // for JSObject, RequireObject,
@@ -45,6 +45,7 @@ class GlobalObject;
 
 using namespace js;
 
+using js::frontend::IsIdentifier;
 using mozilla::Maybe;
 using mozilla::Nothing;
 using mozilla::Some;
@@ -289,12 +290,12 @@ bool DebuggerEnvironment::CallData::findMethod() {
     return false;
   }
 
-  RootedId id(cx);
-  if (!ValueToIdentifier(cx, args[0], &id)) {
+  if (!environment->requireDebuggee(cx)) {
     return false;
   }
 
-  if (!environment->requireDebuggee(cx)) {
+  RootedId id(cx);
+  if (!ValueToIdentifier(cx, args[0], &id)) {
     return false;
   }
 
@@ -312,12 +313,12 @@ bool DebuggerEnvironment::CallData::getVariableMethod() {
     return false;
   }
 
-  RootedId id(cx);
-  if (!ValueToIdentifier(cx, args[0], &id)) {
+  if (!environment->requireDebuggee(cx)) {
     return false;
   }
 
-  if (!environment->requireDebuggee(cx)) {
+  RootedId id(cx);
+  if (!ValueToIdentifier(cx, args[0], &id)) {
     return false;
   }
 
@@ -329,12 +330,12 @@ bool DebuggerEnvironment::CallData::setVariableMethod() {
     return false;
   }
 
-  RootedId id(cx);
-  if (!ValueToIdentifier(cx, args[0], &id)) {
+  if (!environment->requireDebuggee(cx)) {
     return false;
   }
 
-  if (!environment->requireDebuggee(cx)) {
+  RootedId id(cx);
+  if (!ValueToIdentifier(cx, args[0], &id)) {
     return false;
   }
 

@@ -16,7 +16,6 @@
 
 #include "jit/ExecutableAllocator.h"
 #include "jit/JitCode.h"
-#include "jit/JitOptions.h"
 #include "jit/ProcessExecutableMemory.h"
 #include "vm/JSContext.h"
 #include "vm/Realm.h"
@@ -34,7 +33,6 @@ class MOZ_RAII AutoWritableJitCodeFallible {
   JSRuntime* rt_;
   void* addr_;
   size_t size_;
-  AutoMarkJitCodeWritableForThread writableForThread_;
 
  public:
   AutoWritableJitCodeFallible(JSRuntime* rt, void* addr, size_t size)
@@ -54,16 +52,10 @@ class MOZ_RAII AutoWritableJitCodeFallible {
   }
 
   ~AutoWritableJitCodeFallible() {
-    // Taking TimeStamps frequently can be expensive, and there's no point
-    // measuring this if write protection is disabled.
-    const bool measuringTime = JitOptions.writeProtectCode;
-    const mozilla::TimeStamp startTime =
-        measuringTime ? mozilla::TimeStamp::Now() : mozilla::TimeStamp();
+    mozilla::TimeStamp startTime = mozilla::TimeStamp::Now();
     auto timer = mozilla::MakeScopeExit([&] {
-      if (measuringTime) {
-        if (Realm* realm = rt_->mainContextFromOwnThread()->realm()) {
-          realm->timers.protectTime += mozilla::TimeStamp::Now() - startTime;
-        }
+      if (Realm* realm = rt_->mainContextFromOwnThread()->realm()) {
+        realm->timers.protectTime += mozilla::TimeStamp::Now() - startTime;
       }
     });
 
@@ -80,10 +72,7 @@ class MOZ_RAII AutoWritableJitCode : private AutoWritableJitCodeFallible {
  public:
   AutoWritableJitCode(JSRuntime* rt, void* addr, size_t size)
       : AutoWritableJitCodeFallible(rt, addr, size) {
-    AutoEnterOOMUnsafeRegion oomUnsafe;
-    if (!makeWritable()) {
-      oomUnsafe.crash("Failed to mmap. Likely no mappings available.");
-    }
+    MOZ_RELEASE_ASSERT(makeWritable());
   }
 
   AutoWritableJitCode(void* addr, size_t size)

@@ -21,7 +21,7 @@
 
 #include "intgemm/IntegerGemmIntrinsic.h"
 #include "jit/IonTypes.h"
-#include "wasm/WasmBuiltinModuleGenerated.h"
+#include "wasm/WasmIntrinsicGenerated.h"
 
 namespace js {
 namespace jit {
@@ -105,7 +105,6 @@ enum class SymbolicAddress {
   MemCopySharedM32,
   MemCopyM64,
   MemCopySharedM64,
-  MemCopyAny,
   DataDrop,
   MemFillM32,
   MemFillSharedM32,
@@ -131,26 +130,18 @@ enum class SymbolicAddress {
   PostBarrierPreciseWithOffset,
   ExceptionNew,
   ThrowException,
-  StructNewIL_true,
-  StructNewIL_false,
-  StructNewOOL_true,
-  StructNewOOL_false,
-  ArrayNew_true,
-  ArrayNew_false,
+  StructNew,
+  StructNewUninit,
+  ArrayNew,
+  ArrayNewUninit,
   ArrayNewData,
   ArrayNewElem,
-  ArrayInitData,
-  ArrayInitElem,
   ArrayCopy,
-  SlotsToAllocKindBytesTable,
-#define VISIT_BUILTIN_FUNC(op, export, sa_name, ...) sa_name,
-  FOR_EACH_BUILTIN_MODULE_FUNC(VISIT_BUILTIN_FUNC)
-#undef VISIT_BUILTIN_FUNC
-#ifdef ENABLE_WASM_JSPI
-      UpdateSuspenderState,
-#endif
+#define DECL_INTRINSIC_SA(op, export, sa_name, abitype, entry, idx) sa_name,
+  FOR_EACH_INTRINSIC(DECL_INTRINSIC_SA)
+#undef DECL_INTRINSIC_SA
 #ifdef WASM_CODEGEN_DEBUG
-  PrintI32,
+      PrintI32,
   PrintPtr,
   PrintF32,
   PrintF64,
@@ -167,7 +158,6 @@ enum class SymbolicAddress {
 enum class FailureMode : uint8_t {
   Infallible,
   FailOnNegI32,
-  FailOnMaxI32,
   FailOnNullPtr,
   FailOnInvalidRef
 };
@@ -246,7 +236,6 @@ extern const SymbolicAddressSignature SASigMemCopyM32;
 extern const SymbolicAddressSignature SASigMemCopySharedM32;
 extern const SymbolicAddressSignature SASigMemCopyM64;
 extern const SymbolicAddressSignature SASigMemCopySharedM64;
-extern const SymbolicAddressSignature SASigMemCopyAny;
 extern const SymbolicAddressSignature SASigDataDrop;
 extern const SymbolicAddressSignature SASigMemFillM32;
 extern const SymbolicAddressSignature SASigMemFillSharedM32;
@@ -272,22 +261,17 @@ extern const SymbolicAddressSignature SASigPostBarrierPrecise;
 extern const SymbolicAddressSignature SASigPostBarrierPreciseWithOffset;
 extern const SymbolicAddressSignature SASigExceptionNew;
 extern const SymbolicAddressSignature SASigThrowException;
-extern const SymbolicAddressSignature SASigStructNewIL_true;
-extern const SymbolicAddressSignature SASigStructNewIL_false;
-extern const SymbolicAddressSignature SASigStructNewOOL_true;
-extern const SymbolicAddressSignature SASigStructNewOOL_false;
-extern const SymbolicAddressSignature SASigArrayNew_true;
-extern const SymbolicAddressSignature SASigArrayNew_false;
+extern const SymbolicAddressSignature SASigStructNew;
+extern const SymbolicAddressSignature SASigStructNewUninit;
+extern const SymbolicAddressSignature SASigArrayNew;
+extern const SymbolicAddressSignature SASigArrayNewUninit;
 extern const SymbolicAddressSignature SASigArrayNewData;
 extern const SymbolicAddressSignature SASigArrayNewElem;
-extern const SymbolicAddressSignature SASigArrayInitData;
-extern const SymbolicAddressSignature SASigArrayInitElem;
 extern const SymbolicAddressSignature SASigArrayCopy;
-extern const SymbolicAddressSignature SASigUpdateSuspenderState;
-#define VISIT_BUILTIN_FUNC(op, export, sa_name, ...) \
+#define EXT_INTR_SA_DECL(op, export, sa_name, abitype, entry, idx) \
   extern const SymbolicAddressSignature SASig##sa_name;
-FOR_EACH_BUILTIN_MODULE_FUNC(VISIT_BUILTIN_FUNC)
-#undef VISIT_BUILTIN_FUNC
+FOR_EACH_INTRINSIC(EXT_INTR_SA_DECL)
+#undef EXT_INTR_SA_DECL
 
 bool IsRoundingFunction(SymbolicAddress callee, jit::RoundingMode* mode);
 

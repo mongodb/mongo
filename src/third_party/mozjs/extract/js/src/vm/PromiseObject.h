@@ -21,9 +21,6 @@ class JS_PUBLIC_API JSObject;
 
 namespace js {
 
-class JS_PUBLIC_API GenericPrinter;
-class JSONPrinter;
-
 class SavedFrame;
 
 enum PromiseSlots {
@@ -138,14 +135,14 @@ class PromiseObject : public NativeObject {
   static PromiseObject* unforgeableResolveWithNonPromise(
       JSContext* cx, JS::Handle<JS::Value> value);
 
-  int32_t flags() const { return getFixedSlot(PromiseSlot_Flags).toInt32(); }
+  int32_t flags() { return getFixedSlot(PromiseSlot_Flags).toInt32(); }
 
   void setHandled() {
     setFixedSlot(PromiseSlot_Flags,
                  JS::Int32Value(flags() | PROMISE_FLAG_HANDLED));
   }
 
-  JS::PromiseState state() const {
+  JS::PromiseState state() {
     int32_t flags = this->flags();
     if (!(flags & PROMISE_FLAG_RESOLVED)) {
       MOZ_ASSERT(!(flags & PROMISE_FLAG_FULFILLED));
@@ -157,22 +154,22 @@ class PromiseObject : public NativeObject {
     return JS::PromiseState::Rejected;
   }
 
-  JS::Value reactions() const {
+  JS::Value reactions() {
     MOZ_ASSERT(state() == JS::PromiseState::Pending);
     return getFixedSlot(PromiseSlot_ReactionsOrResult);
   }
 
-  JS::Value value() const {
+  JS::Value value() {
     MOZ_ASSERT(state() == JS::PromiseState::Fulfilled);
     return getFixedSlot(PromiseSlot_ReactionsOrResult);
   }
 
-  JS::Value reason() const {
+  JS::Value reason() {
     MOZ_ASSERT(state() == JS::PromiseState::Rejected);
     return getFixedSlot(PromiseSlot_ReactionsOrResult);
   }
 
-  JS::Value valueOrReason() const {
+  JS::Value valueOrReason() {
     MOZ_ASSERT(state() != JS::PromiseState::Pending);
     return getFixedSlot(PromiseSlot_ReactionsOrResult);
   }
@@ -237,11 +234,6 @@ class PromiseObject : public NativeObject {
   void setHadUserInteractionUponCreation(bool state);
 
   void copyUserInteractionFlagsFrom(PromiseObject& rhs);
-
-#if defined(DEBUG) || defined(JS_JITSPEW)
-  void dumpOwnFields(js::JSONPrinter& json) const;
-  void dumpOwnStringContent(js::GenericPrinter& out) const;
-#endif
 };
 
 /**

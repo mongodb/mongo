@@ -30,14 +30,13 @@ using namespace js;
   MOZ_ASSERT(is(args.thisv()));
 
   // Step 4.
-  if (!CanBeHeldWeakly(cx, args.get(0))) {
-    unsigned errorNum = GetErrorNumber(false);
-    ReportValueError(cx, errorNum, JSDVG_IGNORE_STACK, args.get(0), nullptr);
+  if (!args.get(0).isObject()) {
+    ReportNotObject(cx, JSMSG_OBJECT_REQUIRED_WEAKSET_VAL, args.get(0));
     return false;
   }
 
   // Steps 5-7.
-  RootedValue value(cx, args[0]);
+  RootedObject value(cx, &args[0].toObject());
   Rooted<WeakSetObject*> map(cx, &args.thisv().toObject().as<WeakSetObject>());
   if (!WeakCollectionPutEntryInternal(cx, map, value, TrueHandleValue)) {
     return false;
@@ -63,16 +62,16 @@ bool WeakSetObject::add(JSContext* cx, unsigned argc, Value* vp) {
   MOZ_ASSERT(is(args.thisv()));
 
   // Step 4.
-  if (!CanBeHeldWeakly(cx, args.get(0))) {
+  if (!args.get(0).isObject()) {
     args.rval().setBoolean(false);
     return true;
   }
 
   // Steps 5-6.
-  if (ValueValueWeakMap* map =
+  if (ObjectValueWeakMap* map =
           args.thisv().toObject().as<WeakSetObject>().getMap()) {
-    Value value = args[0];
-    if (ValueValueWeakMap::Ptr ptr = map->lookup(value)) {
+    JSObject* value = &args[0].toObject();
+    if (ObjectValueWeakMap::Ptr ptr = map->lookup(value)) {
       map->remove(ptr);
       args.rval().setBoolean(true);
       return true;
@@ -99,15 +98,15 @@ bool WeakSetObject::delete_(JSContext* cx, unsigned argc, Value* vp) {
   MOZ_ASSERT(is(args.thisv()));
 
   // Step 5.
-  if (!CanBeHeldWeakly(cx, args.get(0))) {
+  if (!args.get(0).isObject()) {
     args.rval().setBoolean(false);
     return true;
   }
 
   // Steps 4, 6.
-  if (ValueValueWeakMap* map =
+  if (ObjectValueWeakMap* map =
           args.thisv().toObject().as<WeakSetObject>().getMap()) {
-    Value value = args[0];
+    JSObject* value = &args[0].toObject();
     if (map->has(value)) {
       args.rval().setBoolean(true);
       return true;
@@ -191,20 +190,21 @@ bool WeakSetObject::construct(JSContext* cx, unsigned argc, Value* vp) {
 
     if (optimized) {
       RootedValue keyVal(cx);
+      RootedObject keyObject(cx);
       Rooted<ArrayObject*> array(cx, &iterable.toObject().as<ArrayObject>());
       for (uint32_t index = 0; index < array->getDenseInitializedLength();
            ++index) {
         keyVal.set(array->getDenseElement(index));
         MOZ_ASSERT(!keyVal.isMagic(JS_ELEMENTS_HOLE));
 
-        if (!CanBeHeldWeakly(cx, keyVal)) {
-          unsigned errorNum = GetErrorNumber(false);
-          ReportValueError(cx, errorNum, JSDVG_IGNORE_STACK, args.get(0),
-                           nullptr);
+        if (keyVal.isPrimitive()) {
+          ReportNotObject(cx, JSMSG_OBJECT_REQUIRED_WEAKSET_VAL, keyVal);
           return false;
         }
 
-        if (!WeakCollectionPutEntryInternal(cx, obj, keyVal, TrueHandleValue)) {
+        keyObject = &keyVal.toObject();
+        if (!WeakCollectionPutEntryInternal(cx, obj, keyObject,
+                                            TrueHandleValue)) {
           return false;
         }
       }

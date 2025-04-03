@@ -48,12 +48,6 @@ static bool ReportDetachedArrayBuffer(JSContext* cx) {
   return false;
 }
 
-static bool ReportResizedArrayBuffer(JSContext* cx) {
-  JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                            JSMSG_TYPED_ARRAY_RESIZED_BOUNDS);
-  return false;
-}
-
 static bool ReportOutOfRange(JSContext* cx) {
   // Use JSMSG_BAD_INDEX here, it is what ToIndex uses for some cases that it
   // reports directly.
@@ -115,28 +109,23 @@ static bool ValidateIntegerTypedArray(
 static bool ValidateAtomicAccess(JSContext* cx,
                                  Handle<TypedArrayObject*> typedArray,
                                  HandleValue requestIndex, size_t* index) {
+  // Step 1 (implicit).
+
   MOZ_ASSERT(!typedArray->hasDetachedBuffer());
+  size_t length = typedArray->length();
 
-  // Steps 1-2.
-  mozilla::Maybe<size_t> length = typedArray->length();
-  if (!length) {
-    // ValidateIntegerTypedArray doesn't check for out-of-bounds in our
-    // implementation, so we have to handle this case here.
-    return ReportResizedArrayBuffer(cx);
-  }
-
-  // Steps 3-4.
+  // Step 2.
   uint64_t accessIndex;
   if (!ToIndex(cx, requestIndex, &accessIndex)) {
     return false;
   }
 
-  // Step 5.
-  if (accessIndex >= *length) {
+  // Steps 3-5.
+  if (accessIndex >= length) {
     return ReportOutOfRange(cx);
   }
 
-  // Steps 6-9.
+  // Step 6.
   *index = size_t(accessIndex);
   return true;
 }
@@ -280,7 +269,6 @@ bool AtomicAccess(JSContext* cx, HandleValue obj, HandleValue index, Op op) {
       return op(ArrayOps<int64_t>{}, unwrappedTypedArray, intIndex);
     case Scalar::BigUint64:
       return op(ArrayOps<uint64_t>{}, unwrappedTypedArray, intIndex);
-    case Scalar::Float16:
     case Scalar::Float32:
     case Scalar::Float64:
     case Scalar::Uint8Clamped:
@@ -295,18 +283,8 @@ bool AtomicAccess(JSContext* cx, HandleValue obj, HandleValue index, Op op) {
 template <typename T>
 static SharedMem<T*> TypedArrayData(JSContext* cx, TypedArrayObject* typedArray,
                                     size_t index) {
-  // RevalidateAtomicAccess, steps 1-3.
-  mozilla::Maybe<size_t> length = typedArray->length();
-
-  // RevalidateAtomicAccess, step 4.
-  if (!length) {
+  if (typedArray->hasDetachedBuffer()) {
     ReportDetachedArrayBuffer(cx);
-    return {};
-  }
-
-  // RevalidateAtomicAccess, step 5.
-  if (index >= *length) {
-    ReportOutOfRange(cx);
     return {};
   }
 
@@ -670,27 +648,24 @@ static bool DoAtomicsWait(JSContext* cx,
       cx, unwrappedTypedArray->bufferShared());
 
   // Step 11.
-  mozilla::Maybe<size_t> offset = unwrappedTypedArray->byteOffset();
-  MOZ_ASSERT(
-      offset,
-      "offset can't become invalid because shared buffers can only grow");
+  size_t offset = unwrappedTypedArray->byteOffset();
 
   // Steps 12-13.
   // The computation will not overflow because range checks have been
   // performed.
-  size_t indexedPosition = index * sizeof(T) + *offset;
+  size_t indexedPosition = index * sizeof(T) + offset;
 
   // Steps 8-9, 14-25.
   switch (atomics_wait_impl(cx, unwrappedSab->rawBufferObject(),
                             indexedPosition, value, timeout)) {
     case FutexThread::WaitResult::NotEqual:
-      r.setString(cx->names().not_equal_);
+      r.setString(cx->names().futexNotEqual);
       return true;
     case FutexThread::WaitResult::OK:
-      r.setString(cx->names().ok);
+      r.setString(cx->names().futexOK);
       return true;
     case FutexThread::WaitResult::TimedOut:
-      r.setString(cx->names().timed_out_);
+      r.setString(cx->names().futexTimedOut);
       return true;
     case FutexThread::WaitResult::Error:
       return false;
@@ -842,16 +817,13 @@ static bool atomics_notify(JSContext* cx, unsigned argc, Value* vp) {
       cx, unwrappedTypedArray->bufferShared());
 
   // Step 6.
-  mozilla::Maybe<size_t> offset = unwrappedTypedArray->byteOffset();
-  MOZ_ASSERT(
-      offset,
-      "offset can't become invalid because shared buffers can only grow");
+  size_t offset = unwrappedTypedArray->byteOffset();
 
   // Steps 7-9.
   // The computation will not overflow because range checks have been
   // performed.
   size_t elementSize = Scalar::byteSize(unwrappedTypedArray->type());
-  size_t indexedPosition = intIndex * elementSize + *offset;
+  size_t indexedPosition = intIndex * elementSize + offset;
 
   // Steps 10-16.
   r.setNumber(double(atomics_notify_impl(unwrappedSab->rawBufferObject(),
@@ -932,7 +904,7 @@ FutexThread::WaitResult js::FutexThread::wait(
   // See explanation below.
 
   if (state_ == WaitingInterrupted) {
-    UnlockGuard unlock(locked);
+    UnlockGuard<Mutex> unlock(locked);
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                               JSMSG_ATOMICS_WAIT_NOT_ALLOWED);
     return WaitResult::Error;
@@ -1033,7 +1005,7 @@ FutexThread::WaitResult js::FutexThread::wait(
 
         state_ = WaitingInterrupted;
         {
-          UnlockGuard unlock(locked);
+          UnlockGuard<Mutex> unlock(locked);
           if (!cx->handleInterrupt()) {
             return WaitResult::Error;
           }

@@ -33,6 +33,11 @@ template <class T>
 class StaticLocalRefPtr;
 template <class T>
 class StaticRefPtr;
+#if defined(XP_WIN)
+namespace mscom {
+class AgileReference;
+}  // namespace mscom
+#endif  // defined(XP_WIN)
 
 // Traditionally, RefPtr supports automatic refcounting of any pointer type
 // with AddRef() and Release() methods that follow the traditional semantics.
@@ -97,7 +102,7 @@ class MOZ_IS_REFPTR RefPtr {
     }
   }
 
-  RefPtr(RefPtr<T>&& aRefPtr) noexcept : mRawPtr(aRefPtr.mRawPtr) {
+  RefPtr(RefPtr<T>&& aRefPtr) : mRawPtr(aRefPtr.mRawPtr) {
     aRefPtr.mRawPtr = nullptr;
   }
 
@@ -161,6 +166,9 @@ class MOZ_IS_REFPTR RefPtr {
 
   MOZ_IMPLICIT RefPtr(const nsQueryReferent& aHelper);
   MOZ_IMPLICIT RefPtr(const nsCOMPtr_helper& aHelper);
+#if defined(XP_WIN)
+  MOZ_IMPLICIT RefPtr(const mozilla::mscom::AgileReference& aAgileRef);
+#endif  // defined(XP_WIN)
 
   // Defined in OwningNonNull.h
   template <class U>
@@ -221,10 +229,13 @@ class MOZ_IS_REFPTR RefPtr {
 
   RefPtr<T>& operator=(const nsQueryReferent& aQueryReferent);
   RefPtr<T>& operator=(const nsCOMPtr_helper& aHelper);
+#if defined(XP_WIN)
+  RefPtr<T>& operator=(const mozilla::mscom::AgileReference& aAgileRef);
+#endif  // defined(XP_WIN)
 
   template <typename I,
             typename = std::enable_if_t<std::is_convertible_v<I*, T*>>>
-  RefPtr<T>& operator=(RefPtr<I>&& aRefPtr) noexcept {
+  RefPtr<T>& operator=(RefPtr<I>&& aRefPtr) {
     assign_assuming_AddRef(aRefPtr.forget().take());
     return *this;
   }

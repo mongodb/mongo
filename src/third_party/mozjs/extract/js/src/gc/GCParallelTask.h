@@ -100,9 +100,6 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
     // returned.
     Idle,
 
-    // The task is waiting in the per-runtime queue.
-    Queued,
-
     // The task has been started but has not yet begun running on a helper
     // thread.
     Dispatched,
@@ -117,13 +114,13 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
 
   UnprotectedData<State> state_;
 
-  HelperThreadLockData<bool> dispatchedToThreadPool;
-
   // May be set to the time this task was queued to collect telemetry.
   mozilla::TimeStamp maybeQueueTime_;
 
   // Amount of time this task took to execute.
   MainThreadOrGCTaskData<mozilla::TimeDuration> duration_;
+
+  explicit GCParallelTask(const GCParallelTask&) = delete;
 
  protected:
   // A flag to signal a request for early completion of the off-thread task.
@@ -137,14 +134,12 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
         use(use),
         state_(State::Idle),
         cancel_(false) {}
-  GCParallelTask(GCParallelTask&& other) noexcept
+  GCParallelTask(GCParallelTask&& other)
       : gc(other.gc),
         phaseKind(other.phaseKind),
         use(other.use),
         state_(other.state_),
         cancel_(false) {}
-
-  explicit GCParallelTask(const GCParallelTask&) = delete;
 
   // Derived classes must override this to ensure that join() gets called
   // before members get destructed.
@@ -163,6 +158,8 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
   void joinWithLockHeld(
       AutoLockHelperThreadState& lock,
       mozilla::Maybe<mozilla::TimeStamp> deadline = mozilla::Nothing());
+  void joinNonIdleTask(mozilla::Maybe<mozilla::TimeStamp> deadline,
+                       AutoLockHelperThreadState& lock);
 
   // Instead of dispatching to a helper, run the task on the current thread.
   void runFromMainThread();
@@ -171,6 +168,9 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
   // If the task is not already running, either start it or run it on the main
   // thread if that fails.
   void startOrRunIfIdle(AutoLockHelperThreadState& lock);
+
+  // Cancel a dispatched task before it started executing.
+  void cancelDispatchedTask(AutoLockHelperThreadState& lock);
 
   // Set the cancel flag and wait for the task to finish.
   void cancelAndWait();
@@ -190,17 +190,8 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
     return isDispatched(lock) || isRunning(lock);
   }
 
-  bool isQueued(const AutoLockHelperThreadState& lock) const {
-    return state_ == State::Queued;
-  }
-
   bool isDispatched(const AutoLockHelperThreadState& lock) const {
     return state_ == State::Dispatched;
-  }
-
-  bool isNotYetRunning(const AutoLockHelperThreadState& lock) const {
-    return state_ == State::Idle || state_ == State::Queued ||
-           state_ == State::Dispatched;
   }
 
  protected:
@@ -225,16 +216,12 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
     return state_ == State::Finished;
   }
 
-  void setQueued(const AutoLockHelperThreadState& lock) {
-    MOZ_ASSERT(isIdle(lock));
-    state_ = State::Queued;
-  }
   void setDispatched(const AutoLockHelperThreadState& lock) {
-    MOZ_ASSERT(isIdle(lock) || isQueued(lock));
+    MOZ_ASSERT(isIdle(lock));
     state_ = State::Dispatched;
   }
   void setRunning(const AutoLockHelperThreadState& lock) {
-    MOZ_ASSERT(isNotYetRunning(lock));
+    MOZ_ASSERT(isDispatched(lock));
     state_ = State::Running;
   }
   void setFinished(const AutoLockHelperThreadState& lock) {
@@ -242,13 +229,9 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
     state_ = State::Finished;
   }
   void setIdle(const AutoLockHelperThreadState& lock) {
-    MOZ_ASSERT(!isRunning(lock));
+    MOZ_ASSERT(isDispatched(lock) || isFinished(lock));
     state_ = State::Idle;
   }
-  friend class gc::GCRuntime;
-
-  void joinNonIdleTask(mozilla::Maybe<mozilla::TimeStamp> deadline,
-                       AutoLockHelperThreadState& lock);
 
   void runTask(JS::GCContext* gcx, AutoLockHelperThreadState& lock);
 
@@ -257,7 +240,6 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
     return ThreadType::THREAD_TYPE_GCPARALLEL;
   }
   void runHelperThreadTask(AutoLockHelperThreadState& locked) override;
-  void onThreadPoolDispatch() override;
 };
 
 } /* namespace js */

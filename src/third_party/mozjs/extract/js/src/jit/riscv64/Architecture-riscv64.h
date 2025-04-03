@@ -413,6 +413,7 @@ struct FloatRegister {
   template <RegTypeName Name = DefaultType>
   static SetType AllocatableAsIndexableSet(SetType s) {
     static_assert(Name != RegTypeName::Any, "Allocatable set are not iterable");
+    printf("AllocatableAsIndexableSet\n");
     return LiveAsIndexableSet<Name>(s);
   }
 
@@ -461,9 +462,7 @@ struct FloatRegister {
 
   bool isSingle() const {
     MOZ_ASSERT(!invalid_);
-    // On riscv64 arch, float register and double register using the same
-    // register file.
-    return kind_ == FloatRegisters::Single || kind_ == FloatRegisters::Double;
+    return kind_ == FloatRegisters::Single;
   }
   bool isDouble() const {
     MOZ_ASSERT(!invalid_);
@@ -494,7 +493,7 @@ FloatRegister::LiveAsIndexableSet<RegTypeName::Any>(SetType set) {
 inline bool hasUnaliasedDouble() { return false; }
 inline bool hasMultiAlias() { return false; }
 
-static constexpr uint32_t ShadowStackSpace = 0;
+static const uint32_t ShadowStackSpace = 0;
 static const uint32_t JumpImmediateRange = INT32_MAX;
 
 #ifdef JS_NUNBOX32

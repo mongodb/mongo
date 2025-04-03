@@ -16,11 +16,10 @@
 #include "jit/BaselineFrame.h"   // js::jit::BaselineFrame
 #include "jit/JitFrames.h"       // js::jit::EnsureUnwoundJitExitFrame
 #include "jit/JSJitFrameIter.h"  // js::jit::{FrameType,InlineFrameIterator,JSJitFrameIter,MaybeReadFallback,SnapshotIterator}
-#include "js/ColumnNumber.h"  // JS::LimitedColumnNumberOneOrigin, JS::TaggedColumnNumberOneOrigin
-#include "js/GCAPI.h"              // JS::AutoSuppressGCAnalysis
-#include "js/Principals.h"         // JSSubsumesOp
-#include "js/RootingAPI.h"         // JS::Rooted
-#include "vm/Activation.h"         // js::Activation{,Iterator}
+#include "js/GCAPI.h"            // JS::AutoSuppressGCAnalysis
+#include "js/Principals.h"       // JSSubsumesOp
+#include "js/RootingAPI.h"       // JS::Rooted
+#include "vm/Activation.h"       // js::Activation{,Iterator}
 #include "vm/EnvironmentObject.h"  // js::CallObject
 #include "vm/JitActivation.h"      // js::jit::JitActivation
 #include "vm/JSContext.h"          // JSContext
@@ -124,12 +123,7 @@ JS::Realm* JitFrameIter::realm() const {
     return asWasm().instance()->realm();
   }
 
-  if (asJSJit().isScripted()) {
-    return asJSJit().script()->realm();
-  }
-
-  MOZ_RELEASE_ASSERT(asJSJit().isTrampolineNative());
-  return asJSJit().callee()->realm();
+  return asJSJit().script()->realm();
 }
 
 uint8_t* JitFrameIter::resumePCinCurrentFrame() const {
@@ -574,7 +568,7 @@ JSAtom* FrameIter::maybeFunctionDisplayAtom() const {
         return wasmFrame().functionDisplayAtom();
       }
       if (isFunctionFrame()) {
-        return calleeTemplate()->fullDisplayAtom();
+        return calleeTemplate()->displayAtom();
       }
       return nullptr;
   }
@@ -624,7 +618,7 @@ const char16_t* FrameIter::displayURL() const {
   MOZ_CRASH("Unexpected state");
 }
 
-unsigned FrameIter::computeLine(JS::TaggedColumnNumberOneOrigin* column) const {
+unsigned FrameIter::computeLine(uint32_t* column) const {
   switch (data_.state_) {
     case DONE:
       break;
@@ -633,12 +627,7 @@ unsigned FrameIter::computeLine(JS::TaggedColumnNumberOneOrigin* column) const {
       if (isWasm()) {
         return wasmFrame().computeLine(column);
       }
-      JS::LimitedColumnNumberOneOrigin columnNumber;
-      unsigned lineNumber = PCToLineNumber(script(), pc(), &columnNumber);
-      if (column) {
-        *column = JS::TaggedColumnNumberOneOrigin(columnNumber);
-      }
-      return lineNumber;
+      return PCToLineNumber(script(), pc(), column);
   }
 
   MOZ_CRASH("Unexpected state");
@@ -783,7 +772,7 @@ void FrameIter::wasmUpdateBytecodeOffset() {
 
   // Relookup the current frame, updating the bytecode offset in the process.
   data_.jitFrames_ = JitFrameIter(data_.activations_->asJit());
-  while (!isWasm() || wasmFrame().debugFrame() != frame) {
+  while (wasmFrame().debugFrame() != frame) {
     ++data_.jitFrames_;
   }
 

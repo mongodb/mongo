@@ -46,24 +46,21 @@ class PerfSpewer {
     // Prologue/Epilogue, or to add operand info.
     UniqueChars str;
 
-    explicit OpcodeEntry(uint32_t offset_, unsigned opcode_, UniqueChars& str_,
-                         jsbytecode* pc)
+    OpcodeEntry(uint32_t offset_, unsigned opcode_, UniqueChars& str_,
+                jsbytecode* pc)
         : offset(offset_), opcode(opcode_), bytecodepc(pc) {
       str = std::move(str_);
     }
 
-    explicit OpcodeEntry(uint32_t offset_, unsigned opcode_, UniqueChars& str_)
+    OpcodeEntry(uint32_t offset_, unsigned opcode_, UniqueChars& str_)
         : offset(offset_), opcode(opcode_) {
       str = std::move(str_);
     }
-    explicit OpcodeEntry(uint32_t offset_, UniqueChars& str_)
-        : offset(offset_) {
+    OpcodeEntry(uint32_t offset_, UniqueChars& str_) : offset(offset_) {
       str = std::move(str_);
     }
-    explicit OpcodeEntry(uint32_t offset_, unsigned opcode_)
+    OpcodeEntry(uint32_t offset_, unsigned opcode_)
         : offset(offset_), opcode(opcode_) {}
-
-    explicit OpcodeEntry(jsbytecode* pc) : bytecodepc(pc) {}
 
     OpcodeEntry(OpcodeEntry&& copy) {
       offset = copy.offset;
@@ -86,7 +83,7 @@ class PerfSpewer {
 
   virtual void saveJitCodeSourceInfo(JSScript* script, JitCode* code,
                                      JS::JitCodeRecord* record,
-                                     AutoLockPerfSpewer& lock);
+                                     AutoLockPerfSpewer& lock) = 0;
 
   void saveDebugInfo(JSScript* script, JitCode* code,
                      JS::JitCodeRecord* profilerRecord,
@@ -126,6 +123,10 @@ class IonPerfSpewer : public PerfSpewer {
   JS::JitTier GetTier() override { return JS::JitTier::Ion; }
   const char* CodeName(unsigned op) override;
 
+  void saveJitCodeSourceInfo(JSScript* script, JitCode* code,
+                             JS::JitCodeRecord* record,
+                             AutoLockPerfSpewer& lock) override;
+
  public:
   void recordInstruction(MacroAssembler& masm, LInstruction* ins);
   void saveProfile(JSContext* cx, JSScript* script, JitCode* code);
@@ -150,6 +151,10 @@ class BaselinePerfSpewer : public PerfSpewer {
   JS::JitTier GetTier() override { return JS::JitTier::Baseline; }
   const char* CodeName(unsigned op) override;
 
+  void saveJitCodeSourceInfo(JSScript* script, JitCode* code,
+                             JS::JitCodeRecord* record,
+                             AutoLockPerfSpewer& lock) override;
+
  public:
   void recordInstruction(JSContext* cx, MacroAssembler& masm, jsbytecode* pc,
                          CompilerFrameInfo& frame);
@@ -160,30 +165,24 @@ class InlineCachePerfSpewer : public PerfSpewer {
   JS::JitTier GetTier() override { return JS::JitTier::IC; }
   const char* CodeName(unsigned op) override;
 
+  void saveJitCodeSourceInfo(JSScript* script, JitCode* code,
+                             JS::JitCodeRecord* record,
+                             AutoLockPerfSpewer& lock) override {
+    // IC stubs have no source code to reference.
+    return;
+  }
+
  public:
   void recordInstruction(MacroAssembler& masm, CacheOp op);
 };
 
 class BaselineICPerfSpewer : public InlineCachePerfSpewer {
-  void saveJitCodeSourceInfo(JSScript* script, JitCode* code,
-                             JS::JitCodeRecord* record,
-                             AutoLockPerfSpewer& lock) override {
-    // Baseline IC stubs are shared and have no source code to reference.
-    return;
-  }
-
  public:
   void saveProfile(JitCode* code, const char* stubName);
 };
 
 class IonICPerfSpewer : public InlineCachePerfSpewer {
  public:
-  explicit IonICPerfSpewer(jsbytecode* pc);
-
-  void saveJitCodeSourceInfo(JSScript* script, JitCode* code,
-                             JS::JitCodeRecord* record,
-                             AutoLockPerfSpewer& lock) override;
-
   void saveProfile(JSContext* cx, JSScript* script, JitCode* code,
                    const char* stubName);
 };
@@ -200,7 +199,6 @@ class PerfSpewerRangeRecorder {
   explicit PerfSpewerRangeRecorder(MacroAssembler& masm_) : masm(masm_){};
   void recordOffset(const char* name);
   void recordOffset(const char* name, JSContext* cx, JSScript* script);
-  void recordVMWrapperOffset(const char* name);
   void collectRangesForJitCode(JitCode* code);
 };
 

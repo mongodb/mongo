@@ -219,9 +219,9 @@ CodeOffset MacroAssembler::nopPatchableToCall() {
   return CodeOffset(0);
 }
 
-FaultingCodeOffset MacroAssembler::wasmTrapInstruction() {
+CodeOffset MacroAssembler::wasmTrapInstruction() {
   MOZ_CRASH();
-  return FaultingCodeOffset();
+  return CodeOffset(0);
 }
 
 template void MacroAssembler::storeUnboxedValue(const ConstantOrRegister& value,
@@ -386,11 +386,12 @@ void MacroAssembler::branchValueIsNurseryCell(Condition cond,
   MOZ_CRASH();
 }
 
-void MacroAssembler::callWithABINoProfiler(Register fun, ABIType result) {
+void MacroAssembler::callWithABINoProfiler(Register fun, MoveOp::Type result) {
   MOZ_CRASH();
 }
 
-void MacroAssembler::callWithABINoProfiler(const Address& fun, ABIType result) {
+void MacroAssembler::callWithABINoProfiler(const Address& fun,
+                                           MoveOp::Type result) {
   MOZ_CRASH();
 }
 
@@ -402,7 +403,7 @@ void MacroAssembler::call(ImmPtr imm) { MOZ_CRASH(); }
 
 void MacroAssembler::call(JitCode* c) { MOZ_CRASH(); }
 
-void MacroAssembler::callWithABIPost(uint32_t stackAdjust, ABIType result,
+void MacroAssembler::callWithABIPost(uint32_t stackAdjust, MoveOp::Type result,
                                      bool callFromWasm) {
   MOZ_CRASH();
 }

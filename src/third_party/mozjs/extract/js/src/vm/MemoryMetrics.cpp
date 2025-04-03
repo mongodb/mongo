@@ -211,9 +211,9 @@ static void StatsZoneCallback(JSRuntime* rt, void* data, Zone* zone,
   rtStats->currZoneStats = &zStats;
 
   zone->addSizeOfIncludingThis(
-      rtStats->mallocSizeOf_, &zStats.zoneObject, &zStats.code,
-      &zStats.regexpZone, &zStats.jitZone, &zStats.cacheIRStubs,
-      &zStats.uniqueIdMap, &zStats.initialPropMapTable, &zStats.shapeTables,
+      rtStats->mallocSizeOf_, &zStats.code, &zStats.regexpZone, &zStats.jitZone,
+      &zStats.baselineStubsOptimized, &zStats.uniqueIdMap,
+      &zStats.initialPropMapTable, &zStats.shapeTables,
       &rtStats->runtime.atomsMarkBitmaps, &zStats.compartmentObjects,
       &zStats.crossCompartmentWrappersTables, &zStats.compartmentsPrivateData,
       &zStats.scriptCountsMap);
@@ -236,7 +236,8 @@ static void StatsRealmCallback(JSContext* cx, void* data, Realm* realm,
   realm->addSizeOfIncludingThis(
       rtStats->mallocSizeOf_, &realmStats.realmObject, &realmStats.realmTables,
       &realmStats.innerViewsTable, &realmStats.objectMetadataTable,
-      &realmStats.savedStacksSet, &realmStats.nonSyntacticLexicalScopesTable);
+      &realmStats.savedStacksSet, &realmStats.nonSyntacticLexicalScopesTable,
+      &realmStats.jitRealm);
 }
 
 static void StatsArenaCallback(JSRuntime* rt, void* data, gc::Arena* arena,
@@ -388,7 +389,7 @@ static void StatsCellCallback(JSRuntime* rt, void* data, JS::GCCellPtr cellptr,
         JSScript* script = static_cast<JSScript*>(base);
         script->addSizeOfJitScript(rtStats->mallocSizeOf_,
                                    &realmStats.jitScripts,
-                                   &realmStats.allocSites);
+                                   &realmStats.baselineStubsFallback);
         jit::AddSizeOfBaselineData(script, rtStats->mallocSizeOf_,
                                    &realmStats.baselineData);
         realmStats.ionData +=

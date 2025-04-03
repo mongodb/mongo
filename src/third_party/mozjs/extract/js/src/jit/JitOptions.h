@@ -26,12 +26,6 @@ enum IonRegisterAllocator {
 // for baseRegForLocals in JitOptions.cpp for more information.
 enum class BaseRegForAddress { Default, FP, SP };
 
-enum class UseMonomorphicInlining : uint8_t {
-  Default,
-  Always,
-  Never,
-};
-
 static inline mozilla::Maybe<IonRegisterAllocator> LookupRegisterAllocator(
     const char* name) {
   if (!strcmp(name, "backtracking")) {
@@ -61,7 +55,6 @@ struct DefaultJitOptions {
   bool disablePruning;
   bool disableInstructionReordering;
   bool disableIteratorIndices;
-  bool disableMarkLoadsUsedAsPropertyKeys;
   bool disableRangeAnalysis;
   bool disableRecoverIns;
   bool disableScalarReplacement;
@@ -70,9 +63,6 @@ struct DefaultJitOptions {
   bool disableRedundantShapeGuards;
   bool disableRedundantGCBarriers;
   bool disableBailoutLoopCheck;
-#ifdef ENABLE_PORTABLE_BASELINE_INTERP
-  bool portableBaselineInterpreter;
-#endif
   bool baselineInterpreter;
   bool baselineJit;
   bool ion;
@@ -86,6 +76,7 @@ struct DefaultJitOptions {
   bool wasmFoldOffsets;
   bool wasmDelayTier2;
   bool lessDebugCode;
+  bool enableWatchtowerMegamorphic;
   bool onlyInlineSelfHosted;
   bool enableICFramePointers;
   bool enableWasmJitExit;
@@ -100,12 +91,8 @@ struct DefaultJitOptions {
   uint32_t baselineJitWarmUpThreshold;
   uint32_t trialInliningWarmUpThreshold;
   uint32_t trialInliningInitialWarmUpCount;
-  UseMonomorphicInlining monomorphicInlining = UseMonomorphicInlining::Default;
   uint32_t normalIonWarmUpThreshold;
   uint32_t regexpWarmUpThreshold;
-#ifdef ENABLE_PORTABLE_BASELINE_INTERP
-  uint32_t portableBaselineInterpreterWarmUpThreshold;
-#endif
   uint32_t exceptionBailoutThreshold;
   uint32_t frequentBailoutThreshold;
   uint32_t maxStackArgs;
@@ -135,16 +122,12 @@ struct DefaultJitOptions {
   bool spectreValueMasking;
   bool spectreJitToCxxCalls;
 
-  bool writeProtectCode;
-
   bool supportsUnalignedAccesses;
   BaseRegForAddress baseRegForLocals;
 
   // Irregexp shim flags
   bool correctness_fuzzer_suppressions;
   bool enable_regexp_unaligned_accesses;
-  bool js_regexp_modifiers;
-  bool js_regexp_duplicate_named_groups;
   bool regexp_possessive_quantifier;
   bool regexp_optimization;
   bool regexp_peephole_optimization;
@@ -156,17 +139,12 @@ struct DefaultJitOptions {
 
   DefaultJitOptions();
   bool isSmallFunction(JSScript* script) const;
-#ifdef ENABLE_PORTABLE_BASELINE_INTERP
-  void setEagerPortableBaselineInterpreter();
-#endif
   void setEagerBaselineCompilation();
   void setEagerIonCompilation();
   void setNormalIonWarmUpThreshold(uint32_t warmUpThreshold);
   void resetNormalIonWarmUpThreshold();
   void enableGvn(bool val);
   void setFastWarmUp();
-
-  void maybeSetWriteProtectCode(bool val);
 
   bool eagerIonCompilation() const { return normalIonWarmUpThreshold == 0; }
 };
@@ -184,14 +162,6 @@ inline bool HasJitBackend() {
 inline bool IsBaselineInterpreterEnabled() {
   return HasJitBackend() && JitOptions.baselineInterpreter;
 }
-
-#ifdef ENABLE_PORTABLE_BASELINE_INTERP
-inline bool IsPortableBaselineInterpreterEnabled() {
-  return JitOptions.portableBaselineInterpreter;
-}
-#else
-inline bool IsPortableBaselineInterpreterEnabled() { return false; }
-#endif
 
 inline bool TooManyActualArguments(size_t nargs) {
   return nargs > JitOptions.maxStackArgs;

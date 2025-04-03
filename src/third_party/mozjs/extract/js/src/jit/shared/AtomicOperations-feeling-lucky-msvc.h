@@ -22,8 +22,6 @@
 #ifndef jit_shared_AtomicOperations_feeling_lucky_msvc_h
 #define jit_shared_AtomicOperations_feeling_lucky_msvc_h
 
-#include <intrin.h>
-#include <limits>
 #include <windef.h>
 
 #include "mozilla/Assertions.h"

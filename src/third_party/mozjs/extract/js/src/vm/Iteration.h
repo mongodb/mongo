@@ -17,7 +17,6 @@
 #include "builtin/SelfHostingDefines.h"
 #include "gc/Barrier.h"
 #include "vm/NativeObject.h"
-#include "vm/TypedArrayObject.h"
 
 /*
  * [SMDOC] For-in enumeration
@@ -449,6 +448,10 @@ struct NativeIterator : public NativeIteratorListNode {
   }
 
   JSObject* iterObj() const { return iterObj_; }
+  GCPtr<JSLinearString*>* currentProperty() const {
+    MOZ_ASSERT(propertyCursor_ < propertiesEnd());
+    return propertyCursor_;
+  }
 
   void incCursor() {
     MOZ_ASSERT(isInitialized());
@@ -576,14 +579,6 @@ struct NativeIterator : public NativeIteratorListNode {
     return indicesState() == NativeIteratorIndices::AvailableOnRequest;
   }
 
-  // Indicates the native iterator may walk prototype properties.
-  bool mayHavePrototypeProperties() {
-    // If we can use indices for this iterator, we know it doesn't have
-    // prototype properties, and so we use this as a check for prototype
-    // properties.
-    return !hasValidIndices() && !indicesAvailableOnRequest();
-  }
-
   void disableIndices() {
     // If we have allocated indices, set the state to Disabled.
     // This will ensure that we don't use them, but we still
@@ -701,8 +696,6 @@ RegExpStringIteratorObject* NewRegExpStringIterator(JSContext* cx);
                                        MutableHandleIdVector props);
 
 PropertyIteratorObject* LookupInIteratorCache(JSContext* cx, HandleObject obj);
-PropertyIteratorObject* LookupInShapeIteratorCache(JSContext* cx,
-                                                   HandleObject obj);
 
 PropertyIteratorObject* GetIterator(JSContext* cx, HandleObject obj);
 PropertyIteratorObject* GetIteratorWithIndices(JSContext* cx, HandleObject obj);
@@ -751,8 +744,6 @@ class IteratorObject : public NativeObject {
  public:
   static const JSClass class_;
   static const JSClass protoClass_;
-
-  static bool finishInit(JSContext* cx, HandleObject ctor, HandleObject proto);
 };
 
 /*
@@ -763,15 +754,11 @@ class WrapForValidIteratorObject : public NativeObject {
  public:
   static const JSClass class_;
 
-  enum { IteratorSlot, NextMethodSlot, SlotCount };
+  enum { IteratedSlot, SlotCount };
 
   static_assert(
-      IteratorSlot == WRAP_FOR_VALID_ITERATOR_ITERATOR_SLOT,
-      "IteratedSlot must match self-hosting define for iterator object slot.");
-
-  static_assert(
-      NextMethodSlot == WRAP_FOR_VALID_ITERATOR_NEXT_METHOD_SLOT,
-      "NextMethodSlot must match self-hosting define for next method slot.");
+      IteratedSlot == ITERATED_SLOT,
+      "IteratedSlot must match self-hosting define for iterated object slot.");
 };
 
 WrapForValidIteratorObject* NewWrapForValidIterator(JSContext* cx);
@@ -801,13 +788,6 @@ IteratorHelperObject* NewIteratorHelper(JSContext* cx);
 
 bool IterableToArray(JSContext* cx, HandleValue iterable,
                      MutableHandle<ArrayObject*> array);
-
-// Typed arrays and classes with an enumerate hook can have extra properties not
-// included in the shape's property map or the object's dense elements.
-static inline bool ClassCanHaveExtraEnumeratedProperties(const JSClass* clasp) {
-  return IsTypedArrayClass(clasp) || clasp->getNewEnumerate() ||
-         clasp->getEnumerate();
-}
 
 } /* namespace js */
 

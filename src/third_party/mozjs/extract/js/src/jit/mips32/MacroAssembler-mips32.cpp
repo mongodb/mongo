@@ -1764,11 +1764,11 @@ void MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(
   ma_move(a0, StackPointer);  // Use a0 since it is a first function argument
 
   // Call the handler.
-  using Fn = void (*)(ResumeFromException* rfe);
+  using Fn = void (*)(ResumeFromException * rfe);
   asMasm().setupUnalignedABICall(a1);
   asMasm().passABIArg(a0);
   asMasm().callWithABI<Fn, HandleException>(
-      ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
+      MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
   Label entryFrame;
   Label catch_;
@@ -2115,7 +2115,7 @@ void MacroAssembler::callWithABIPre(uint32_t* stackAdjust, bool callFromWasm) {
   assertStackAlignment(ABIStackAlignment);
 }
 
-void MacroAssembler::callWithABIPost(uint32_t stackAdjust, ABIType result,
+void MacroAssembler::callWithABIPost(uint32_t stackAdjust, MoveOp::Type result,
                                      bool callFromWasm) {
   // Restore ra value (as stored in callWithABIPre()).
   loadPtr(Address(StackPointer, stackAdjust - sizeof(intptr_t)), ra);
@@ -2135,7 +2135,7 @@ void MacroAssembler::callWithABIPost(uint32_t stackAdjust, ABIType result,
 #endif
 }
 
-void MacroAssembler::callWithABINoProfiler(Register fun, ABIType result) {
+void MacroAssembler::callWithABINoProfiler(Register fun, MoveOp::Type result) {
   // Load the callee in t9, no instruction between the lw and call
   // should clobber it. Note that we can't use fun.base because it may
   // be one of the IntArg registers clobbered before the call.
@@ -2146,7 +2146,8 @@ void MacroAssembler::callWithABINoProfiler(Register fun, ABIType result) {
   callWithABIPost(stackAdjust, result);
 }
 
-void MacroAssembler::callWithABINoProfiler(const Address& fun, ABIType result) {
+void MacroAssembler::callWithABINoProfiler(const Address& fun,
+                                           MoveOp::Type result) {
   // Load the callee in t9, as above.
   loadPtr(Address(fun.base, fun.offset), t9);
   uint32_t stackAdjust;
@@ -2501,8 +2502,8 @@ void MacroAssemblerMIPSCompat::wasmLoadI64Impl(
 void MacroAssemblerMIPSCompat::wasmStoreI64Impl(
     const wasm::MemoryAccessDesc& access, Register64 value, Register memoryBase,
     Register ptr, Register ptrScratch, Register tmp) {
-  access.assertOffsetInGuardPages();
   uint32_t offset = access.offset();
+  MOZ_ASSERT(offset < asMasm().wasmMaxOffsetGuardLimit());
   MOZ_ASSERT_IF(offset, ptrScratch != InvalidReg);
 
   // Maybe add the offset.
@@ -2741,27 +2742,27 @@ static void AtomicFetchOp64(MacroAssembler& masm,
   masm.load64(Address(SecondScratchReg, 0), output);
 
   switch (op) {
-    case AtomicOp::Add:
+    case AtomicFetchAddOp:
       masm.as_addu(temp.low, output.low, value.low);
       masm.as_sltu(temp.high, temp.low, output.low);
       masm.as_addu(temp.high, temp.high, output.high);
       masm.as_addu(temp.high, temp.high, value.high);
       break;
-    case AtomicOp::Sub:
+    case AtomicFetchSubOp:
       masm.as_sltu(temp.high, output.low, value.low);
       masm.as_subu(temp.high, output.high, temp.high);
       masm.as_subu(temp.low, output.low, value.low);
       masm.as_subu(temp.high, temp.high, value.high);
       break;
-    case AtomicOp::And:
+    case AtomicFetchAndOp:
       masm.as_and(temp.low, output.low, value.low);
       masm.as_and(temp.high, output.high, value.high);
       break;
-    case AtomicOp::Or:
+    case AtomicFetchOrOp:
       masm.as_or(temp.low, output.low, value.low);
       masm.as_or(temp.high, output.high, value.high);
       break;
-    case AtomicOp::Xor:
+    case AtomicFetchXorOp:
       masm.as_xor(temp.low, output.low, value.low);
       masm.as_xor(temp.high, output.high, value.high);
       break;

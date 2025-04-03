@@ -10,9 +10,11 @@
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 
+namespace js {
+
 // StableCellHasher itself is defined in js/public/RootingAPI.h.
 
-namespace js::gc {
+namespace gc {
 
 struct Cell;
 
@@ -38,6 +40,7 @@ void RemoveUniqueId(Cell* cell);
 // Used to restore unique ID after JSObject::swap.
 bool SetOrUpdateUniqueId(JSContext* cx, Cell* cell, uint64_t uid);
 
-}  // namespace js::gc
+}  // namespace gc
+}  // namespace js
 
 #endif  // gc_StableCellHasher_h

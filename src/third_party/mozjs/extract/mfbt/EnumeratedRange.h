@@ -197,11 +197,6 @@ constexpr detail::EnumeratedRange<EnumType> MakeInclusiveEnumeratedRange(
   return MakeEnumeratedRange(aBegin, static_cast<EnumType>(end + 1));
 }
 
-template <typename EnumType>
-constexpr auto MakeInclusiveEnumeratedRange(EnumType aEnd) {
-  return MakeInclusiveEnumeratedRange(EnumType{0}, aEnd);
-}
-
 #ifdef __GNUC__
 #  pragma GCC diagnostic pop
 #endif

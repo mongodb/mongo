@@ -1154,42 +1154,10 @@ bool ScriptedProxyHandler::get(JSContext* cx, HandleObject proxy,
     }
   }
 
-  // Steps 9 and 10.
-  GetTrapValidationResult validation =
-      checkGetTrapResult(cx, target, id, trapResult);
-  if (validation != GetTrapValidationResult::OK) {
-    reportGetTrapValidationError(cx, id, validation);
-    return false;
-  }
-
-  // Step 11.
-  vp.set(trapResult);
-  return true;
-}
-
-void ScriptedProxyHandler::reportGetTrapValidationError(
-    JSContext* cx, HandleId id, GetTrapValidationResult validation) {
-  switch (validation) {
-    case GetTrapValidationResult::MustReportSameValue:
-      js::Throw(cx, id, JSMSG_MUST_REPORT_SAME_VALUE);
-      return;
-    case GetTrapValidationResult::MustReportUndefined:
-      js::Throw(cx, id, JSMSG_MUST_REPORT_SAME_VALUE);
-      return;
-    case GetTrapValidationResult::Exception:
-      return;
-    case GetTrapValidationResult::OK:
-      MOZ_CRASH("unreachable");
-  }
-}
-
-ScriptedProxyHandler::GetTrapValidationResult
-ScriptedProxyHandler::checkGetTrapResult(JSContext* cx, HandleObject target,
-                                         HandleId id, HandleValue trapResult) {
   // Step 9.
   Rooted<Maybe<PropertyDescriptor>> desc(cx);
   if (!GetOwnPropertyDescriptor(cx, target, id, &desc)) {
-    return GetTrapValidationResult::Exception;
+    return false;
   }
 
   // Step 10.
@@ -1200,22 +1168,23 @@ ScriptedProxyHandler::checkGetTrapResult(JSContext* cx, HandleObject target,
       RootedValue value(cx, desc->value());
       bool same;
       if (!SameValue(cx, trapResult, value, &same)) {
-        return GetTrapValidationResult::Exception;
+        return false;
       }
-
       if (!same) {
-        return GetTrapValidationResult::MustReportSameValue;
+        return js::Throw(cx, id, JSMSG_MUST_REPORT_SAME_VALUE);
       }
     }
 
     // Step 10b.
     if (desc->isAccessorDescriptor() && !desc->configurable() &&
         (desc->getter() == nullptr) && !trapResult.isUndefined()) {
-      return GetTrapValidationResult::MustReportUndefined;
+      return js::Throw(cx, id, JSMSG_MUST_REPORT_UNDEFINED);
     }
   }
 
-  return GetTrapValidationResult::OK;
+  // Step 11.
+  vp.set(trapResult);
+  return true;
 }
 
 // ES8 rev 0c1bd3004329336774cbc90de727cd0cf5f11e93

@@ -14,22 +14,18 @@ namespace js::jit {
 
 inline JitHintsMap::ScriptKey JitHintsMap::getScriptKey(
     JSScript* script) const {
-  ScriptKey filenameHash = script->filenameHash();
-  // Do not include scrips that have an introducer filename.  These include
-  // dynamically created scripts such as eval() and new Function() which
-  // have a high probability of containing difference source.
-  if (filenameHash && !script->scriptSource()->hasIntroducerFilename()) {
-    return mozilla::AddToHash(filenameHash, script->sourceStart());
+  if (ScriptKey key = script->filenameHash()) {
+    return mozilla::AddToHash(key, script->sourceStart());
   }
   return 0;
 }
 
-inline void JitHintsMap::incrementBaselineEntryCount() {
+inline void JitHintsMap::incrementEntryCount() {
   // Clear the cache if we've exceeded the false positivity rate
   // calculated by MaxEntries.
-  if (++baselineEntryCount_ > MaxEntries_) {
-    baselineHintMap_.clear();
-    baselineEntryCount_ = 0;
+  if (++entryCount_ > MaxEntries_) {
+    map_.clear();
+    entryCount_ = 0;
   }
 }
 
@@ -40,20 +36,20 @@ inline void JitHintsMap::setEagerBaselineHint(JSScript* script) {
   }
 
   // If the entry already exists, don't increment entryCount.
-  if (baselineHintMap_.mightContain(key)) {
+  if (map_.mightContain(key)) {
     return;
   }
 
   // Increment entry count, and possibly clear the cache.
-  incrementBaselineEntryCount();
+  incrementEntryCount();
 
   script->setNoEagerBaselineHint(false);
-  baselineHintMap_.add(key);
+  map_.add(key);
 }
 
 inline bool JitHintsMap::mightHaveEagerBaselineHint(JSScript* script) const {
   if (ScriptKey key = getScriptKey(script)) {
-    return baselineHintMap_.mightContain(key);
+    return map_.mightContain(key);
   }
   script->setNoEagerBaselineHint(true);
   return false;
