@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/validate/validate_results.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
 

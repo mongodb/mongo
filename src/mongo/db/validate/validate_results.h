@@ -43,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/serialization_context.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

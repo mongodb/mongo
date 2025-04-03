@@ -120,7 +120,7 @@ MongoDB repair attempts to address the following forms of corruption:
 - Missing WiredTiger data files
   - Includes all collections, `_mdb_catalog`, and `sizeStorer`
 - Index inconsistencies
-  - Validate [repair mode](../../catalog/validate/README.md#repair-mode) attempts to fix index inconsistencies to avoid a full index
+  - Validate [repair mode](../../validate/README.md#repair-mode) attempts to fix index inconsistencies to avoid a full index
     rebuild.
   - Indexes are rebuilt on collections after they have been salvaged or if they fail validation and
     validate repair mode is unable to fix all errors.

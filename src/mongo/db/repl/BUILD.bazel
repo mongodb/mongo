@@ -2145,8 +2145,8 @@ mongo_cc_library(
         ":oplog_applier_impl_test_fixture",
         ":oplog_entry_test_helpers",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/catalog/validate:collection_validation",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/validate:collection_validation",
     ],
 )
 

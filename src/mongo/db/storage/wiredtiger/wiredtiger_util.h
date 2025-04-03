@@ -31,8 +31,8 @@
 
 #include <span>
 
-#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
+#include "mongo/db/validate/validate_results.h"
 
 namespace mongo {
 

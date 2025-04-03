@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/validate/validate_results.h"
+#include "mongo/db/validate/validate_results.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_utf8.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/validate/validate_options.h"
+#include "mongo/db/validate/validate_options.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {

@@ -55,8 +55,6 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate/index_consistency.h"
-#include "mongo/db/catalog/validate/validate_adaptor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -76,6 +74,8 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/validate/index_consistency.h"
+#include "mongo/db/validate/validate_adaptor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep

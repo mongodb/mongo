@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,19 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/validate/validate_options.h"
+#pragma once
 
-namespace mongo::CollectionValidation {
+#include "mongo/base/status.h"
+#include "mongo/db/validate/validate_options.h"
 
-ValidationOptions::ValidationOptions(ValidateMode validateMode,
-                                     RepairMode repairMode,
-                                     bool logDiagnostics,
-                                     ValidationVersion validationVersion,
-                                     boost::optional<std::string> verifyConfigurationOverride)
-    : _validateMode(validateMode),
-      _repairMode(repairMode),
-      _logDiagnostics(logDiagnostics),
-      _validationVersion(validationVersion),
-      _verifyConfigurationOverride(std::move(verifyConfigurationOverride)) {}
+namespace mongo {
 
-}  // namespace mongo::CollectionValidation
+class NamespaceString;
+class OperationContext;
+class Collection;
+class CollectionPtr;
+class BSONObjBuilder;
+class Status;
+class ValidateResults;
+
+namespace CollectionValidation {
+
+/**
+ * Expects the caller to hold no locks.
+ *
+ * @return OK if the validate run successfully
+ *         OK will be returned even if corruption is found
+ *         details will be in 'results'.
+ */
+Status validate(OperationContext* opCtx,
+                const NamespaceString& nss,
+                ValidationOptions options,
+                ValidateResults* results);
+
+/**
+ * Checks whether a failpoint has been hit in the above validate() code..
+ */
+bool getIsValidationPausedForTest();
+
+}  // namespace CollectionValidation
+}  // namespace mongo

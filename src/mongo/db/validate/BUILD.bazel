@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -29,7 +29,19 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/bson:bson_validate",
-        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_results",
+    srcs = [
+        "validate_results.cpp",
+    ],
+    hdrs = [
+        "validate_results.h",
+    ],
+    deps = [
+        ":validate_options",
     ],
 )
 
@@ -71,14 +83,12 @@ mongo_cc_library(
         "index_consistency.h",
         "validate_adaptor.cpp",
         "validate_adaptor.h",
-        "validate_results.cpp",
     ],
     hdrs = [
         "collection_validation.h",
-        "validate_results.h",
-        ":validate_options",
     ],
     deps = [
+        ":validate_results",
         ":validate_state",
         "//src/mongo/bson/column",
         "//src/mongo/db:multi_key_path_tracker",
@@ -100,5 +110,22 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/util:progress_meter",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_validate_test",
+    srcs = [
+        "collection_validation_test.cpp",
+        "index_consistency_test.cpp",
+        "validate_results_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        ":collection_validation",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:sorted_data_interface_test_assert",
     ],
 )

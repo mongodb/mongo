@@ -61,8 +61,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog/validate/collection_validation.h"
-#include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
@@ -91,6 +89,8 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/validate/collection_validation.h"
+#include "mongo/db/validate/validate_results.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/unittest/unittest.h"

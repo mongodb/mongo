@@ -30,7 +30,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/validate/validate_options.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/validate/validate_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"

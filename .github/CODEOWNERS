@@ -1459,7 +1459,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/catalog/OWNERS.yml
 /src/mongo/db/catalog/**/collection_compact* @10gen/server-rss-sydney @svc-auto-approve-bot
-/src/mongo/db/catalog/**/collection_validation* @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/catalog/**/health_log* @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/db/catalog/**/import* @10gen/server-catalog-and-routing @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_key_validate* @10gen/server-index-builds @svc-auto-approve-bot
@@ -1501,9 +1500,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/external_data_source_scope_guard* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
 /src/mongo/db/catalog/**/README_terminology.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/cannot_convert_index_to_unique* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/catalog/validate/OWNERS.yml
-/src/mongo/db/catalog/validate/**/* @10gen/server-validate @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/collection_crud/OWNERS.yml
 /src/mongo/db/collection_crud/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -2296,6 +2292,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/update/OWNERS.yml
 /src/mongo/db/update/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/update/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/validate/OWNERS.yml
+/src/mongo/db/validate/**/* @10gen/server-validate @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/views/OWNERS.yml
 /src/mongo/db/views/**/* @10gen/query-optimization-views @svc-auto-approve-bot

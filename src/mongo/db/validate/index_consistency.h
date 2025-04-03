@@ -43,13 +43,13 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate/validate_results.h"
-#include "mongo/db/catalog/validate/validate_state.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/validate/validate_results.h"
+#include "mongo/db/validate/validate_state.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {

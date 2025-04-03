@@ -34,12 +34,12 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/catalog/validate/validate_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/validate/validate_gen.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"

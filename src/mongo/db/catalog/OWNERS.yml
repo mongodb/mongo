@@ -3,9 +3,6 @@ filters:
   - "collection_compact*":
     approvers:
       - 10gen/server-rss-sydney
-  - "collection_validation*":
-    approvers:
-      - 10gen/server-validate
   - "health_log*":
     approvers:
       - 10gen/server-dbcheck

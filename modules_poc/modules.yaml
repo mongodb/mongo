@@ -127,10 +127,10 @@ storage_engine_integration: # authoritative: @10gen/server-storage-engine-integr
   - src/mongo/dbtests/storage_debug_util* # specific files
 
 validate: # authoritative: @10gen/server-validate
-  - src/mongo/db/catalog/validate
   - src/mongo/db/catalog/collection_validation* # specific files
   - src/mongo/db/catalog/throttle_cursor* # specific files
   - src/mongo/db/commands/validate.cpp # specific file
+  - src/mongo/db/validate
   - src/mongo/dbtests/validate.cpp # specific file
 
 dbcheck: # authoritative: @10gen/server-dbcheck

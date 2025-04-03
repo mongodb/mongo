@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/validate/validate_results.h"
+#include "mongo/db/validate/validate_results.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

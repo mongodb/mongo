@@ -38,12 +38,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog/validate/index_consistency.h"
-#include "mongo/db/catalog/validate/validate_results.h"
-#include "mongo/db/catalog/validate/validate_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/validate/index_consistency.h"
+#include "mongo/db/validate/validate_results.h"
+#include "mongo/db/validate/validate_state.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
