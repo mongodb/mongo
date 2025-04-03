@@ -41,7 +41,9 @@ namespace mongo {
  */
 template <class ForwardIt, class Compare>
 constexpr ForwardIt constexprIsSortedUntil(ForwardIt first, ForwardIt last, Compare comp) {
-#if __cpp_lib_constexpr_algorithms >= 201806L
+    // TODO(SERVER-103321): GCC 14.2 will not constant-evaluate std::is_sorted_until in debug mode.
+    // Revisit this when we next upgrade GCC.
+#if !defined(_GLIBCXX_DEBUG) && __cpp_lib_constexpr_algorithms >= 201806L
     return std::is_sorted_until(first, last, comp);
 #else
     if (first != last) {
@@ -71,7 +73,9 @@ constexpr bool constexprIsSortedUntil(ForwardIt first, ForwardIt last) {
  */
 template <typename ForwardIt, typename Compare>
 constexpr bool constexprIsSorted(ForwardIt first, ForwardIt last, Compare comp) {
-#if __cpp_lib_constexpr_algorithms >= 201806L
+    // TODO(SERVER-103321): GCC 14.2 will not constant-evaluate std::is_sorted_until in debug mode.
+    // Revisit this when we next upgrade GCC.
+#if !defined(_GLIBCXX_DEBUG) && __cpp_lib_constexpr_algorithms >= 201806L
     return std::is_sorted(first, last, comp);
 #else
     return constexprIsSortedUntil(first, last, comp) == last;
