@@ -117,7 +117,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "local_oplog_info*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-oplog
   - "document_validation*":
     approvers:
       - 10gen/query-execution-doc-validation

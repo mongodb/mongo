@@ -2,13 +2,14 @@ version: 1.0.0
 filters:
   - "initial_sync.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-initial-sync
+      - 10gen/server-fcv
   - "mixed_version_fixture_test.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "multi_rs.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "multiversion_rollback.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv

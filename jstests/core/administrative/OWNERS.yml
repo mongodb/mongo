@@ -11,4 +11,4 @@ filters:
       - 10gen/server-replication
   - "hello_response_validation.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-hello

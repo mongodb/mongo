@@ -11,13 +11,13 @@ filters:
       - 10gen/query-integration-timeseries
   - "example_fcv_upgrade_downgrade_test.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "minor_version*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "mixed_replica_set_with_latest_primary.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "remove_invalid_index_options.js":
     approvers:
       - 10gen/server-catalog-and-routing

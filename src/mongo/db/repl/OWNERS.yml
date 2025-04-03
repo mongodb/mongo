@@ -6,3 +6,57 @@ filters:
   - "dbcheck*":
     approvers:
       - 10gen/server-dbcheck
+  - "*initial_sync*":
+    approvers:
+      - 10gen/server-initial-sync
+  - "*cloner*":
+    approvers:
+      - 10gen/server-initial-sync
+  - "*oplog*":
+    approvers:
+      - 10gen/server-oplog
+  - "*noop_writer*":
+    approvers:
+      - 10gen/server-oplog
+  - "*bgsync*":
+    approvers:
+      - 10gen/server-oplog
+  - "*sync_source*":
+    approvers:
+      - 10gen/server-oplog
+  - "*hello*":
+    approvers:
+      - 10gen/server-hello
+  - "*topology_version*":
+    approvers:
+      - 10gen/server-hello
+  - "*read_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "*write_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "*replication_recovery*":
+    approvers:
+      - 10gen/server-recovery
+  - "*replica_set_aware_service*":
+    approvers:
+      - 10gen/server-rs-aware-service
+  - "*primary_only_service*":
+    approvers:
+      - 10gen/server-rs-aware-service
+  - "*replication_coordinator*":
+    approvers:
+      - 10gen/server-replication-coordinator
+  - "*external_state*":
+    approvers:
+      - 10gen/server-replication-coordinator
+  - "*heartbeat*":
+    approvers:
+      - 10gen/server-replication-coordinator
+  - "*topology_coordinator*":
+    approvers:
+      - 10gen/server-replication-coordinator
+  - "*split_horizon*":
+    approvers:
+      - 10gen/server-split-horizon

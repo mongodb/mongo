@@ -74,7 +74,7 @@ filters:
       - 10gen/server-replication
   - "rollbacktests.cpp":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-recovery
   - "dbtests*":
     approvers:
       - 10gen/server-collection-write-path

@@ -100,34 +100,34 @@ filters:
       - 10gen/server-networking-and-observability
   - "core_txns*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-transactions
   - "cwrwc*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-rw-concerns
   - "fcv*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "jstestfuzz_replication*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "magic_restore*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-recovery
   - "multiversion*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "replica_sets*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "read_concern*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-rw-concerns
   - "retryable_writes*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-transactions
   - "rollback*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-recovery
   - "write_concern*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-rw-concerns

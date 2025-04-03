@@ -32,7 +32,7 @@ filters:
       - 10gen/query-optimization-parsers
   - "send_command_to_initial_sync_node*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-initial-sync
   - "txn_passthrough_cmd_massage.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-transactions

@@ -8,7 +8,7 @@ filters:
       - 10gen/server-cluster-scalability
   - "test_MongoFCVConstantCheck.*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "test_MongoMacroDefinitionLeaksCheck.*":
     approvers:
       - 10gen/server-networking-and-observability

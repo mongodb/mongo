@@ -1,11 +1,11 @@
 version: 1.0.0
 filters:
-  - "*":
-    approvers:
-      - 10gen/server-replication
   - "*initial_sync*":
     approvers:
       - 10gen/server-initial-sync
-  - "*replication_recovery*":
+  - "*rollback*":
     approvers:
       - 10gen/server-recovery
+  - "prepare_standalone_replication_recovery.js":
+    approvers:
+      - 10gen/server-transactions

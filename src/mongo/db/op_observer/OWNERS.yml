@@ -11,10 +11,10 @@ filters:
       - 10gen/server-collection-write-path
   - "op_observer_impl*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-oplog
   - "fcv_op_observer*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "find_and_modify_images_op_observer*":
     approvers:
       - 10gen/server-replication

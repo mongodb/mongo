@@ -9,3 +9,6 @@ filters:
   - "golden_test*":
     approvers:
       - 10gen/query-optimization-golden-test
+  - "ensure_fcv.h":
+    approvers:
+      - 10gen/server-fcv

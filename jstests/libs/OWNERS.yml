@@ -5,7 +5,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "replsettest.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "shardingtest.js":
     approvers:
       - 10gen/server-cluster-scalability

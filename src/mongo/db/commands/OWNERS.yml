@@ -89,10 +89,10 @@ filters:
       - 10gen/server-dbcheck
   - "feature_compatibility*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "oplog*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-oplog
   - "drop_index*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -128,11 +128,11 @@ filters:
       - 10gen/server-storage-engine-integration
   - "apply_ops*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-oplog
   - "set_feature_compatibility_version*":
     approvers:
       - 10gen/server-catalog-and-routing
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "snapshot_management*":
     approvers:
       - 10gen/server-replication

@@ -6,3 +6,36 @@ filters:
   - "*capped*":
     approvers:
       - 10gen/server-collection-write-path
+  - "*initial_sync*":
+    approvers:
+      - 10gen/server-initial-sync
+  - "*initialsync*":
+    approvers:
+      - 10gen/server-initial-sync
+  - "*read_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "*write_concern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "*rwconcern*":
+    approvers:
+      - 10gen/server-rw-concerns
+  - "*replication_recovery*":
+    approvers:
+      - 10gen/server-recovery
+  - "standalone_recover_to_oplog_timestamp.js":
+    approvers:
+      - 10gen/server-recovery
+  - "*startup_recovery*":
+    approvers:
+      - 10gen/server-recovery
+  - "*split_horizon*":
+    approvers:
+      - 10gen/server-split-horizon
+  - "awaitable_hello_errors_on_horizon_change.js":
+    approvers:
+      - 10gen/server-split-horizon
+  - "*fcv*":
+    approvers:
+      - 10gen/server-fcv

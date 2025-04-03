@@ -17,67 +17,68 @@ filters:
       - 10gen/server-replication
   - "3_upgrade_replset.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "abort_unprepared_transactions_on_FCV_downgrade.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "arbiter_always_has_latest_fcv.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "await_prepared_transactions_on_FCV_downgrade.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "can_upgrade_FCV_after_failed_downgrade.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "cannot_downgrade_from_latest_to_last_continuous.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "default_startup_FCV_parameter.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "do_upgrade_downgrade.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "downgrade_replset.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "fcv_upgrade_fails_during_is_cleaning_server_metadata.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "feature_compatibility_version_lagging_secondary.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "initial_sync*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-initial-sync
+      - 10gen/server-fcv
   - "major_version_upgrade.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "remove_feature_compatibility_version.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "repair_feature_compatibility_version.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "restart_during_downgrading_fcv.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "rollback*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "run_feature_flag_multiversion_test.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "set_feature_compatibility_version.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "set_feature_compatibility_version_confirm.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "test_replica_set_startup_in_downgrading_state.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "test_sharding_startup_in_downgrading_state.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv

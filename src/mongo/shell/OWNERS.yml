@@ -62,4 +62,4 @@ filters:
       - 10gen/query-integration-analytic-extensions
   - "feature_compatibility_version.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv

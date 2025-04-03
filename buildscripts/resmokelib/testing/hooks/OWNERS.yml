@@ -19,28 +19,28 @@ filters:
       - 10gen/query-integration-query-stats
   - "fcv_upgrade_downgrade.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "initialsync.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-initial-sync
   - "magic_restore.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-recovery
   - "oplog.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "periodic_kill_secondaries.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "reconfig_background.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "secondary_lag.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "stepdown.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "wait_for_replication.py":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra

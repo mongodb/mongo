@@ -8,28 +8,28 @@ filters:
       - 10gen/query-execution-change-streams
   - "run_fcv_upgrade_downgrade_background.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-fcv
   - "run_fuzzer_restore_settings.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "run_initial_sync_node_validation.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-initial-sync
   - "run_inject_hello_failures.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-hello
   - "run_reconfig_background.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "lag_secondary_application.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "magic_restore*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-recovery
   - "run_check_repl_oplogs.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-jstest-infra
   - "run_cleanup_hello_failures.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-hello
