@@ -1,6 +1,7 @@
 // Helper functions for testing time-series collections.
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -269,7 +270,7 @@ export var TimeseriesTest = class {
 
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
         const db = coll.getDB();
-        const buckets = db[this.getBucketsCollName(coll.getName())];
+        const buckets = getTimeseriesBucketsColl(coll);
         if (FixtureHelpers.isSharded(buckets)) {
             const timeFieldName =
                 db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
@@ -320,7 +321,7 @@ export var TimeseriesTest = class {
     }
 
     static getBucketsCollName(collName) {
-        return `system.buckets.${collName}`;
+        return getTimeseriesBucketsColl(collName);
     }
 
     static assertInsertWorked(res) {
@@ -348,7 +349,7 @@ export var TimeseriesTest = class {
     // timeseries view.
     static checkHint(coll, indexName, numDocsExpected) {
         const db = coll.getDB();
-        const bucketsColl = db[this.getBucketsCollName(coll.getName())];
+        const bucketsColl = getTimeseriesBucketsColl(coll);
 
         // Tests hint() using the index name.
         assert.eq(numDocsExpected, bucketsColl.find().hint(indexName).toArray().length);
@@ -369,7 +370,7 @@ export var TimeseriesTest = class {
 
     static checkIndex(coll, userKeyPattern, bucketsKeyPattern, numDocsExpected) {
         const db = coll.getDB();
-        const bucketsColl = db[this.getBucketsCollName(coll.getName())];
+        const bucketsColl = getTimeseriesBucketsColl(coll);
 
         const expectedName =
             Object.entries(userKeyPattern).map(([key, value]) => `${key}_${value}`).join('_');

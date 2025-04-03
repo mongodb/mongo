@@ -11,6 +11,67 @@ export var FeatureFlagUtil = (function() {
         kNotFound: 'kNotFound',
     };
 
+    function _getConnectionToMongod(db) {
+        // If db represents a connection to mongos, or some other configuration, we need
+        // to obtain the correct connection to a mongod.
+        const getMongodConn = (db) => {
+            if (!FixtureHelpers.isMongos(db)) {
+                return db;
+            }
+
+            // For sharded cluster get a connection to the first replicaset through a Mongo
+            // object. We may fail to connect if we are in a stepdown/terminate passthrough, so
+            // retry on retryable errors. After the connection is established, runCommand overrides
+            // should guarantee that subsequent operations on the connection are retried in the
+            // event of network errors in suites where that possibility exists.
+            return retryOnRetryableError(() => {
+                return new Mongo(
+                    FixtureHelpers.getAllReplicas(db)[0].getURL(), undefined, {gRPC: false});
+            });
+        };
+        try {
+            return getMongodConn(db);
+        } catch (err) {
+            // Some db-like objects (e.g. ShardingTest.shard0) aren't supported by FixtureHelpers,
+            // but we can replace it with an object that should work and try again.
+            if (typeof db.getDB === typeof Function) {
+                return getMongodConn(db.getDB(db.defaultDB));
+            } else {
+                // Some db-like objects (e.g ShardedClusterFixture) have a getSiblingDB method
+                // instead of getDB, use that here to avoid an undefined error.
+                return getMongodConn(db.getSiblingDB(db.getMongo().defaultDB));
+            }
+        }
+    }
+
+    function _getAuthenticatedConnectionToMongod(db, user) {
+        let mongodConn = _getConnectionToMongod(db);
+        if (user) {
+            mongodConn.auth(user.username, user.password);
+        }
+        return mongodConn;
+    }
+
+    function _getFullFeatureFlagName(featureFlagName) {
+        if (!featureFlagName.startsWith("featureFlag")) {
+            return `featureFlag${featureFlagName}`;
+        }
+        return featureFlagName;
+    }
+
+    function _getFeatureFlagDoc(conn, featureFlagName) {
+        const fullFlagName = _getFullFeatureFlagName(featureFlagName);
+        const parameterDoc = conn.adminCommand({getParameter: 1, [fullFlagName]: 1});
+        if (!parameterDoc.ok || !parameterDoc.hasOwnProperty(fullFlagName)) {
+            // Feature flag not found.
+            if (!parameterDoc.ok) {
+                assert.eq(parameterDoc.errmsg, "no option found to get");
+            }
+            return undefined;
+        }
+        return parameterDoc[fullFlagName];
+    }
+
     function _getStatusLegacy(conn, ignoreFCV, flagDoc) {
         const fcvDoc = assert.commandWorked(
             conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
@@ -39,6 +100,11 @@ export var FeatureFlagUtil = (function() {
         }
     }
 
+    function getFeatureFlagDoc(db, flagName) {
+        const conn = _getAuthenticatedConnectionToMongod(db);
+        return _getFeatureFlagDoc(conn, flagName);
+    }
+
     /**
      * @param 'featureFlag' - the name of the flag you want to check, but *without* the
      *     'featureFlag' prefix. For example, just "Toaster" instead of "featureFlagToaster."
@@ -55,57 +121,14 @@ export var FeatureFlagUtil = (function() {
      */
     function getStatus(db, featureFlag, user, ignoreFCV) {
         // In order to get an accurate answer for whether a feature flag is enabled, we need to ask
-        // a mongod. If db represents a connection to mongos, or some other configuration, we need
-        // to obtain the correct connection to a mongod.
-        let conn = null;
-        const setConn = (db) => {
-            if (!FixtureHelpers.isMongos(db)) {
-                conn = db;
-                return;
-            }
+        // a mongod.
+        const conn = _getAuthenticatedConnectionToMongod(db);
+        const flagDoc = _getFeatureFlagDoc(conn, featureFlag);
 
-            // For sharded cluster get a connection to the first replicaset through a Mongo
-            // object. We may fail to connect if we are in a stepdown/terminate passthrough, so
-            // retry on retryable errors. After the connection is established, runCommand overrides
-            // should guarantee that subsequent operations on the connection are retried in the
-            // event of network errors in suites where that possibility exists.
-            retryOnRetryableError(() => {
-                conn = new Mongo(
-                    FixtureHelpers.getAllReplicas(db)[0].getURL(), undefined, {gRPC: false});
-            });
-        };
-        try {
-            setConn(db);
-        } catch (err) {
-            // Some db-like objects (e.g. ShardingTest.shard0) aren't supported by FixtureHelpers,
-            // but we can replace it with an object that should work and try again.
-            if (typeof db.getDB === typeof Function) {
-                setConn(db.getDB(db.defaultDB));
-            } else {
-                // Some db-like objects (e.g ShardedClusterFixture) have a getSiblingDB method
-                // instead of getDB, use that here to avoid an undefined error.
-                setConn(db.getSiblingDB(db.getMongo().defaultDB));
-            }
-        }
-
-        if (user) {
-            conn.auth(user.username, user.password);
-        }
-
-        assert(!featureFlag.startsWith("featureFlag"),
-               `unexpected prefix in feature flag name: "${featureFlag}". Use "${
-                   featureFlag.replace(/^featureFlag/, '')}" instead.`);
-        const fullFlagName = `featureFlag${featureFlag}`;
-        const parameterDoc = conn.adminCommand({getParameter: 1, [fullFlagName]: 1});
-        if (!parameterDoc.ok || !parameterDoc.hasOwnProperty(fullFlagName)) {
-            // Feature flag not found.
-            if (!parameterDoc.ok) {
-                assert.eq(parameterDoc.errmsg, "no option found to get");
-            }
+        if (!flagDoc) {
             return FlagStatus.kNotFound;
         }
 
-        const flagDoc = parameterDoc[fullFlagName];
         // TODO (SERVER-102609): keep only top branch and remove _getStatusLegacy() once 9.0 becomes
         // last LTS.
         if (flagDoc.hasOwnProperty("currentlyEnabled")) {
@@ -202,6 +225,7 @@ export var FeatureFlagUtil = (function() {
         isEnabled: isEnabled,
         isPresentAndEnabled: isPresentAndEnabled,
         isPresentAndDisabled: isPresentAndDisabled,
+        getFeatureFlagDoc: getFeatureFlagDoc,
         getStatus: getStatus,
     };
 })();

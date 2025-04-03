@@ -7,13 +7,14 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawTimeseriesColl} from "jstests/libs/raw_operation_utils.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
-
     coll.drop();
 
     const timeFieldName = 'time';
@@ -101,8 +102,8 @@ TimeseriesTest.run((insert) => {
     assert.eq(numDocs, viewDocs.length, viewDocs);
 
     // Check bucket collection.
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    const bucketDocs = bucketsColl.find().toArray();
+    const bucketsColl = getRawTimeseriesColl(db, coll);
+    const bucketDocs = bucketsColl.find().rawData().toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];
     TimeseriesTest.decompressBucket(bucketDoc);

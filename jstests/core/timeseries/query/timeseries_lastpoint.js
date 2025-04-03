@@ -47,9 +47,10 @@ import {
     getSingleNodeExplain,
     isAggregationPlan
 } from "jstests/libs/query/analyze_plan.js";
+import {getRawTimeseriesColl, kRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
 const coll = db[jsTestName()];
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+const bucketsColl = getRawTimeseriesColl(db, coll);
 
 // The lastpoint optimization attempt to pick a bucket that would contain the event with max time
 // and then only unpack that bucket. This function creates a collection with three buckets that
@@ -92,9 +93,12 @@ let lpx2 = undefined;  // lastpoint value of x for m = 2
     // anymore.
     assertArrayEq({
         expected: [{t: timestamps.t3}, {t: timestamps.t4}, {t: timestamps.t5}, {t: timestamps.t6}],
-        actual: bucketsColl.aggregate({$project: {t: "$control.max.t", _id: 0}}).toArray(),
+        actual:
+            bucketsColl.aggregate([{$project: {t: "$control.max.t", _id: 0}}], kRawOperationSpec)
+                .toArray(),
         extraErrorMsg: `For the test data expect to create buckets with these max times but got ${
-            tojson(bucketsColl.aggregate({$project: {control: 1, _id: 0}}).toArray())}`
+            tojson(bucketsColl.aggregate([{$project: {control: 1, _id: 0}}], kRawOperationSpec)
+                       .toArray())}`
     });
 })();
 
