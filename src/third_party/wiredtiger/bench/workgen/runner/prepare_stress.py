@@ -80,7 +80,6 @@ import time
 context = Context()
 conn_config =   "cache_size=1G,checkpoint=(wait=60,log_size=2GB),\
                 eviction=(threads_min=12,threads_max=12),log=(enabled=true),session_max=800,\
-                debug_mode=(table_logging=true),\
                 eviction_target=60,statistics=(fast),statistics_log=(wait=1,json)"# explicitly added
 conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")

@@ -1686,7 +1686,7 @@ __live_restore_setup_lr_fh_file_data(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_
          */
         WT_RET(__live_restore_fs_open_in_source(lr_fs, session, lr_fh, flags));
         if (!dest_exist)
-            __live_restore_fs_create_destination_data_file(session, lr_fs, lr_fh, name);
+            WT_RET(__live_restore_fs_create_destination_data_file(session, lr_fs, lr_fh, name));
     }
     WT_RET(__live_restore_fs_open_in_destination(lr_fs, session, lr_fh, name, flags, !dest_exist));
     return (0);
@@ -1876,7 +1876,7 @@ __live_restore_fs_remove(
      * this file in the future. One such case is when a file is created, removed and then created
      * again with the same name.
      */
-    __live_restore_fs_create_stop_file(fs, session, name, flags);
+    WT_ERR(__live_restore_fs_create_stop_file(fs, session, name, flags));
 
 err:
     __wt_free(session, path);

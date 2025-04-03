@@ -1100,6 +1100,12 @@ err:
     WT_TRET(__wti_prefetch_destroy(session));
 
     /*
+     * Shut down background migration. This may perform a checkpoint as part of live restore clean
+     * up, and if it does we need to let the checkpoint complete before continuing.
+     */
+    WT_TRET(__wt_live_restore_server_destroy(session));
+
+    /*
      * There should be no active transactions running now. Therefore, it's safe for operations to
      * proceed without doing snapshot visibility checks.
      */

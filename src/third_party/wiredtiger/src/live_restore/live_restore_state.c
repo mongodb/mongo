@@ -123,7 +123,7 @@ __live_restore_get_state_from_file(
                 WT_ASSERT_ALWAYS(
                   session, false, "failed to parse live restore metadata from the turtle file!");
 
-            __live_restore_state_from_string(session, lr_metadata_string, &state_from_file);
+            WT_ERR(__live_restore_state_from_string(session, lr_metadata_string, &state_from_file));
         }
     }
 

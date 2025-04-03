@@ -85,6 +85,17 @@ struct __wti_live_restore_file_handle {
         __wt_writeunlock((session), &(lr_fh)->lock);            \
     } while (0)
 
+/*
+ * WTI_WITH_LIVE_RESTORE_QUEUE_LOCK --
+ *     Acquire the background migration queue lock and perform an operation.
+ */
+#define WTI_WITH_LIVE_RESTORE_QUEUE_LOCK(session, op)                                \
+    do {                                                                             \
+        __wt_spin_lock((session), &S2C(session)->live_restore_server->queue_lock);   \
+        op;                                                                          \
+        __wt_spin_unlock((session), &S2C(session)->live_restore_server->queue_lock); \
+    } while (0)
+
 typedef enum {
     WTI_LIVE_RESTORE_FS_LAYER_DESTINATION,
     WTI_LIVE_RESTORE_FS_LAYER_SOURCE,
@@ -163,6 +174,7 @@ struct __wti_live_restore_server {
     uint64_t msg_count;
     uint64_t work_count;
     uint64_t work_items_remaining;
+    bool shutting_down; /* Set when connection close terminates the server. */
 
     TAILQ_HEAD(__wti_live_restore_work_queue, __wti_live_restore_work_item) work_queue;
 };
