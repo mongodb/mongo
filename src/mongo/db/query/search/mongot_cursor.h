@@ -56,6 +56,8 @@ static constexpr StringData kRequiresSearchSequenceToken = "requiresSearchSequen
 static constexpr StringData kReturnStoredSourceArg = "returnStoredSource"_sd;
 static constexpr StringData kSlowQueryLogFieldName = "slowQueryLog"_sd;
 static constexpr StringData kScoreDetailsFieldName = "scoreDetails"_sd;
+static constexpr StringData kOptimizationFlagsField = "optimizationFlags"_sd;
+static constexpr StringData kOmitSearchDocumentResultsField = "omitSearchDocumentResults"_sd;
 
 static constexpr long long kMinimumMongotBatchSize = 10;
 static constexpr long long kDefaultMongotBatchSize = 101;
@@ -63,6 +65,31 @@ static constexpr long long kDefaultMongotBatchSize = 101;
 // Default sort spec is to sort decreasing by search score.
 static const BSONObj kSortSpec = BSON("$searchScore" << -1);
 static constexpr StringData kSearchSortValuesFieldPrefix = "$searchSortValues."_sd;
+
+/**
+ * Set of OptimizationFlags that can be passed in a mongot search request
+ */
+struct OptimizationFlags {
+    // When true, indicates that mongod is 100% sure that mongot can omit values from the response.
+    // Used primarily for $searchMeta.
+    bool omitSearchDocumentResults = false;
+
+    BSONObj serialize() const {
+        BSONObjBuilder ofBob;
+        ofBob.append(kOmitSearchDocumentResultsField, omitSearchDocumentResults);
+        return ofBob.obj();
+    }
+};
+
+/**
+ * Gets optimization flags for $searchMeta commands.
+ */
+OptimizationFlags getOptimizationFlagsForSearchMeta();
+
+/**
+ * Gets optimization flags for $search commands.
+ */
+OptimizationFlags getOptimizationFlagsForSearch();
 
 /**
  * Create the RemoteCommandRequest for the provided command.
@@ -124,6 +151,7 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
 BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
                                  executor::TaskExecutor* taskExecutor,
+                                 const OptimizationFlags& optimizationFlags,
                                  boost::optional<NamespaceString> viewNss = boost::none);
 
 /**

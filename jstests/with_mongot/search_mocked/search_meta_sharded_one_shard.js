@@ -51,7 +51,7 @@ function runTest(customStOpts) {
     st.shardColl(coll, {_id: 1}, false, false);
 
     // Set the mock responses for a query which includes the result cursors.
-    function setQueryMockResponses() {
+    function setQueryMockResponses(isSearchMeta) {
         expectPlanShardedSearch({mongotConn: mongotForTheMongos, coll: coll});
         const mongotQuery = searchQuery;
         {
@@ -67,7 +67,9 @@ function runTest(customStOpts) {
                             query: mongotQuery,
                             collName: collName,
                             db: dbName,
-                            collectionUUID: collUUID0
+                            collectionUUID: collUUID0,
+                            optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true}
+                                                            : null
                         }),
                         response: {
                             "cursor": {
@@ -87,7 +89,7 @@ function runTest(customStOpts) {
     // Test that a $search query properly computes the $$SEARCH_META value according to the pipeline
     // returned by mongot(mock).
     function testSearchQuery() {
-        setQueryMockResponses();
+        setQueryMockResponses(false);
         let queryResult =
             coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}])
                 .toArray();
@@ -97,7 +99,7 @@ function runTest(customStOpts) {
     // Test that a $searchMeta query properly computes the metadata value according to the pipeline
     // returned by mongot(mock).
     function testSearchMetaQuery() {
-        setQueryMockResponses();
+        setQueryMockResponses(true);
         let queryResult = coll.aggregate([{$searchMeta: searchQuery}]);
         // Same as above query result but not embedded in a document.
         assert.eq([expectedSearchMeta], queryResult.toArray());

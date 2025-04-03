@@ -199,7 +199,7 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
 }
 
 // Set the mock responses for a query which includes the result cursors.
-function setQueryMockResponses(removeGetMore) {
+function setQueryMockResponses(removeGetMore, hasSearchStage = false) {
     mongotConn.setMockResponses(mergingPipelineHistory, 1);
 
     const mongotQuery = searchQuery;
@@ -207,15 +207,17 @@ function setQueryMockResponses(removeGetMore) {
     const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
     // History for shard 1.
     {
-        const exampleCursor =
-            searchShardedExampleCursors1(dbName, collNS, collName, mongotCommandForQuery({
-                                             query: mongotQuery,
-                                             collName: collName,
-                                             db: dbName,
-                                             collectionUUID: collUUID0,
-                                             protocolVersion: protocolVersion
-                                         }));
-        // If the query we are setting responses for has a limit, the getMore is not needed.
+        const exampleCursor = searchShardedExampleCursors1(
+            dbName, collNS, collName, mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID0,
+                protocolVersion: protocolVersion,
+                optimizationFlags: hasSearchStage ? {omitSearchDocumentResults: true} : null
+            }));
+        // If the query we are setting responses for has a
+        // limit, the getMore is not needed.
         if (removeGetMore) {
             exampleCursor.historyResults.pop();
             exampleCursor.historyResults[0].response.cursors[0].cursor.id = NumberLong(0);
@@ -227,14 +229,15 @@ function setQueryMockResponses(removeGetMore) {
 
     // History for shard 2
     {
-        const exampleCursor =
-            searchShardedExampleCursors2(dbName, collNS, collName, mongotCommandForQuery({
-                                             query: mongotQuery,
-                                             collName: collName,
-                                             db: dbName,
-                                             collectionUUID: collUUID1,
-                                             protocolVersion: protocolVersion
-                                         }));
+        const exampleCursor = searchShardedExampleCursors2(
+            dbName, collNS, collName, mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion,
+                optimizationFlags: hasSearchStage ? {omitSearchDocumentResults: true} : null
+            }));
         if (removeGetMore) {
             exampleCursor.historyResults.pop();
             exampleCursor.historyResults[0].response.cursors[0].cursor.id = NumberLong(0);
@@ -257,7 +260,7 @@ function testSearchQuery() {
 // Test that a $searchMeta query properly computes the metadata value according to the pipeline
 // returned by mongot(mock).
 function testSearchMetaQuery() {
-    setQueryMockResponses(true);
+    setQueryMockResponses(true, true);
     let queryResult = coll.aggregate([{$searchMeta: searchQuery}]);
     // Same as above query result but not embedded in a document.
     assert.eq([{_id: {}, value: 56}], queryResult.toArray());

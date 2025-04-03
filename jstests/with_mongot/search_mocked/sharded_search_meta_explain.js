@@ -98,7 +98,8 @@ function runExplainTest(verbosity) {
             collName: collName,
             db: dbName,
             collectionUUID: collUUID,
-            explainVerbosity: {verbosity}
+            explainVerbosity: {verbosity},
+            optimizationFlags: {omitSearchDocumentResults: true}
         });
         // QueryPlanner verbosity doesn't include the protocolVersion.
         if (verbosity != "queryPlanner") {

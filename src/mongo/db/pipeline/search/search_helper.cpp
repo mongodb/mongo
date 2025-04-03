@@ -148,10 +148,12 @@ void assertSearchMetaAccessValidHelper(
 BSONObj getSearchRemoteExplain(const ExpressionContext* expCtx,
                                const BSONObj& searchQuery,
                                size_t remoteCursorId,
-                               boost::optional<BSONObj> sortSpec) {
+                               boost::optional<BSONObj> sortSpec,
+                               const mongot_cursor::OptimizationFlags& optimizationFlags) {
     auto executor =
         executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
-    auto explainObj = mongot_cursor::getSearchExplainResponse(expCtx, searchQuery, executor.get());
+    auto explainObj = mongot_cursor::getSearchExplainResponse(
+        expCtx, searchQuery, executor.get(), optimizationFlags);
     BSONObjBuilder builder;
     builder << "id" << static_cast<int>(remoteCursorId) << "mongotQuery" << searchQuery << "explain"
             << explainObj;
@@ -321,15 +323,15 @@ bool isMongotPipeline(const Pipeline* pipeline) {
  *    - a 'DocumentSourceSearch'.
  *    - a 'DocumentSourceInternalSearchMongotRemote' and not a 'DocumentSourceSearchMeta'.
  */
-bool isSearchStage(DocumentSource* stage) {
+bool isSearchStage(const DocumentSource* stage) {
     return stage &&
-        (dynamic_cast<mongo::DocumentSourceSearch*>(stage) ||
-         (dynamic_cast<mongo::DocumentSourceInternalSearchMongotRemote*>(stage) &&
-          !dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage)));
+        (dynamic_cast<const mongo::DocumentSourceSearch*>(stage) ||
+         (dynamic_cast<const mongo::DocumentSourceInternalSearchMongotRemote*>(stage) &&
+          !dynamic_cast<const mongo::DocumentSourceSearchMeta*>(stage)));
 }
 
-bool isSearchMetaStage(DocumentSource* stage) {
-    return stage && dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
+bool isSearchMetaStage(const DocumentSource* stage) {
+    return stage && dynamic_cast<const mongo::DocumentSourceSearchMeta*>(stage);
 }
 
 bool isMongotStage(DocumentSource* stage) {
@@ -625,17 +627,21 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     auto stage = cqPipeline.front().get();
     if (auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(stage)) {
         auto explainMap = std::make_unique<RemoteExplainVector>();
-        explainMap->push_back(getSearchRemoteExplain(expCtx,
-                                                     searchStage->getSearchQuery(),
-                                                     searchStage->getRemoteCursorId(),
-                                                     searchStage->getSortSpec()));
+        explainMap->push_back(
+            getSearchRemoteExplain(expCtx,
+                                   searchStage->getSearchQuery(),
+                                   searchStage->getRemoteCursorId(),
+                                   searchStage->getSortSpec(),
+                                   mongot_cursor::getOptimizationFlagsForSearch()));
         return explainMap;
     } else if (auto searchMetaStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage)) {
         auto explainMap = std::make_unique<RemoteExplainVector>();
-        explainMap->push_back(getSearchRemoteExplain(expCtx,
-                                                     searchMetaStage->getSearchQuery(),
-                                                     searchMetaStage->getRemoteCursorId(),
-                                                     boost::none /* sortSpec */));
+        explainMap->push_back(
+            getSearchRemoteExplain(expCtx,
+                                   searchMetaStage->getSearchQuery(),
+                                   searchMetaStage->getRemoteCursorId(),
+                                   boost::none /* sortSpec */,
+                                   mongot_cursor::getOptimizationFlagsForSearchMeta()));
         return explainMap;
     }
     return nullptr;

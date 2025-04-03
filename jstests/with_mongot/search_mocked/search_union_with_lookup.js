@@ -56,34 +56,38 @@ var cursorCounter = 123;
  * Batch: Docs for mongotmock to return.
  * searchMetaValue: Value to be used in all the documents as 'vars'. If times >1 and this is an
  * array, length must be equal to times.
- * Returns the query to run.
+ * hasSearchMetaStage: whether or not the command contains $searchMeta.  If times > 1 and this is an
+ * array, length must be equal to times. Returns the query to run.
  */
 function setupSearchQuery(term,
                           times,
                           batch,
                           searchMetaValue,
+                          hasSearchMetaStage = false,
                           view = null,
                           explainVerbosity = null,
                           explainObject = null) {
     const searchQuery = {query: term, path: "title"};
-    const searchCmd = mongotCommandForQuery({
-        query: searchQuery,
-        collName: coll.getName(),
-        db: dbName,
-        collectionUUID: collUUID,
-        explainVerbosity,
-        view,
-    });
 
     if (Array.isArray(searchMetaValue)) {
         assert.eq(times, searchMetaValue.length);
     }
+
+    if (Array.isArray(hasSearchMetaStage)) {
+        assert.eq(times, hasSearchMetaStage.length);
+    }
+
     // Give mongotmock some stuff to return.
     for (let i = 0; i < times; i++) {
         const cursorId = NumberLong(cursorCounter++);
         let thisMeta = searchMetaValue;
         if (Array.isArray(thisMeta)) {
             thisMeta = searchMetaValue[i];
+        }
+
+        let thisHasSearchMetaStage = hasSearchMetaStage;
+        if (Array.isArray(thisHasSearchMetaStage)) {
+            thisHasSearchMetaStage = hasSearchMetaStage[i];
         }
 
         let response = {
@@ -94,6 +98,20 @@ function setupSearchQuery(term,
         if (explainVerbosity != null) {
             response.explain = explainObject;
         }
+
+        let expectedCmd = {
+            query: searchQuery,
+            collName: coll.getName(),
+            db: dbName,
+            collectionUUID: collUUID,
+            explainVerbosity,
+            view,
+        };
+
+        if (thisHasSearchMetaStage) {
+            expectedCmd.optimizationFlags = {omitSearchDocumentResults: true};
+        }
+        const searchCmd = mongotCommandForQuery(expectedCmd);
 
         let history = {
             expectedCommand: searchCmd,
@@ -436,7 +454,8 @@ const lookupSubSearchMeta = setupSearchQuery("cakes",
                                                  {_id: 1, $searchScore: 0.9},
                                                  {_id: 2, $searchScore: 0.8},
                                              ],
-                                             "metaVal");
+                                             "metaVal",
+                                             true /*hasSearchMetaStage*/);
 result = assert.commandWorked(db.runCommand({
             aggregate: coll.getName(),
             pipeline: [
@@ -518,7 +537,8 @@ const unionSubSearchMeta = setupSearchQuery("cakes",
                                                 {_id: 1, $searchScore: 0.9},
                                                 {_id: 2, $searchScore: 0.8},
                                             ],
-                                            "metaVal");
+                                            "metaVal",
+                                            true /*hasSearchMetaStage*/);
 result = assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
     cursor: {},
@@ -542,7 +562,8 @@ const searchMetaTestGenericQuery = setupSearchQuery("cakes",
                                                         {_id: 1, $searchScore: 0.9},
                                                         {_id: 2, $searchScore: 0.8},
                                                     ],
-                                                    ["outer", "inner"]);
+                                                    ["outer", "inner"],
+                                                    [false, true]);
 result = assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
@@ -567,7 +588,8 @@ setupSearchQuery("cakes",
                      {_id: 1, $searchScore: 0.9},
                      {_id: 2, $searchScore: 0.8},
                  ],
-                 ["outer", "inner"]);
+                 ["outer", "inner"],
+                 [true, true] /*hasSearchMetaStage*/);
 // Multiple $searchMeta in the pipeline works.
 result = assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
@@ -590,7 +612,8 @@ setupSearchQuery("cakes",
                      {_id: 1, $searchScore: 0.9},
                      {_id: 2, $searchScore: 0.8},
                  ],
-                 ["outer", "first", "second"]);
+                 ["outer", "first", "second"],
+                 [false, true, true]);
 // Multiple $searchMeta in the pipeline works.
 result = assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
@@ -746,6 +769,7 @@ const lookupSearchViewQuery = setupSearchQuery(
         {_id: 8, $searchScore: 0.5}
     ],
     1,
+    false,
     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'MongotIndexedViews')
         ? {name: view1.getName()}
         : null  // view object is only included in the request to mongot if the feature flag to
@@ -865,6 +889,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
                                                              {_id: 8, $searchScore: 0.5}
                                                          ],
                                                          1,
+                                                         false,
                                                          null,  // viewName
                                                          {verbosity: currentVerbosity},
                                                          explainObj);
@@ -882,6 +907,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
                              {_id: 8, $searchScore: 0.5}
                          ],
                          1,
+                         false,
                          null,  // viewName
                          {verbosity: currentVerbosity},
                          explainObj);
@@ -918,6 +944,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
                                                                {_id: 2, $searchScore: 0.8},
                                                            ],
                                                            "metaVal",
+                                                           true,
                                                            null,  // viewName
                                                            {verbosity: currentVerbosity},
                                                            explainObj);
@@ -930,6 +957,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
                              {_id: 2, $searchScore: 0.8},
                          ],
                          "metaVal",
+                         true,
                          null,  // viewName
                          {verbosity: currentVerbosity},
                          explainObj);
@@ -968,6 +996,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
                                                               {_id: 8, $searchScore: 0.5}
                                                           ],
                                                           1,
+                                                          false,
                                                           null,  // viewName
                                                           {verbosity: currentVerbosity},
                                                           explainObj);
@@ -993,6 +1022,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
                                                              {_id: 2, $searchScore: 0.8},
                                                          ],
                                                          "metaVal",
+                                                         true,
                                                          null,  // viewName
                                                          {verbosity: currentVerbosity},
                                                          explainObj);

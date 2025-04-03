@@ -58,13 +58,6 @@ st.shardColl(shardedColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), shardedCollName);
 const mongotQuery = {};
 const protocolVersion = NumberInt(1);
-let expectedMongotCommand = mongotCommandForQuery({
-    query: mongotQuery,
-    collName: shardedCollName,
-    db: dbName,
-    collectionUUID: collUUID0,
-    protocolVersion: protocolVersion,
-});
 
 const cursorId = NumberLong(123);
 const metaCursorId = NumberLong(cursorId + 1001);
@@ -75,7 +68,7 @@ const shard0DB = shard0Conn.getDB(dbName);
 const shard1Conn = st.rs1.getPrimary();
 const shard1DB = shard1Conn.getDB(dbName);
 
-function mockShards() {
+function mockShards(hasSearchMetaStage = false) {
     // Mock shard0 responses.
     const mongot0ResponseBatch = [
         {_id: 3, $searchScore: 100},
@@ -83,6 +76,19 @@ function mockShards() {
         {_id: 4, $searchScore: 1},
         {_id: 1, $searchScore: 0.99},
     ];
+
+    let expectedMongotCommand = mongotCommandForQuery({
+        query: mongotQuery,
+        collName: shardedCollName,
+        db: dbName,
+        collectionUUID: collUUID0,
+        protocolVersion: protocolVersion,
+    });
+
+    if (hasSearchMetaStage) {
+        expectedMongotCommand.optimizationFlags = {omitSearchDocumentResults: true};
+    }
+
     const history0 = [{
         expectedCommand: expectedMongotCommand,
         response: mongotMultiCursorResponseForBatch(mongot0ResponseBatch,
@@ -129,8 +135,12 @@ function runRequiresSearchMetaCursorTest(
     {pipeline, coll, expectedDocs, shouldRequireSearchMetaCursor, hasSearchMetaStage = false}) {
     // Mock planShardedSearch responses.
     if (coll.getName() === shardedCollName) {
-        mockPlanShardedSearchResponse(
-            shardedColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(shardedColl.getName(),
+                                      mongotQuery,
+                                      dbName,
+                                      undefined /*sortSpec*/,
+                                      stWithMock,
+                                      hasSearchMetaStage);
     } else {
         // For queries where $search is in the subpipeline, we mock planShardedSearch on the shard
         // that has the unsharded collection, rather than mongos.
@@ -139,10 +149,11 @@ function runRequiresSearchMetaCursorTest(
                                             dbName,
                                             undefined /*sortSpec*/,
                                             stWithMock,
-                                            shard0Conn);
+                                            shard0Conn,
+                                            hasSearchMetaStage);
     }
 
-    mockShards();
+    mockShards(hasSearchMetaStage);
     resetShardProfilers();
 
     const comment = "search_query";

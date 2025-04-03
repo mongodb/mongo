@@ -62,7 +62,8 @@ function setQueryMockResponses(isSearchMeta) {
                     query: mongotQuery,
                     collName: collName,
                     db: dbName,
-                    collectionUUID: collUUID0
+                    collectionUUID: collUUID0,
+                    optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true} : null
                 }),
                 response: {
                     "cursor": {
@@ -81,7 +82,7 @@ function setQueryMockResponses(isSearchMeta) {
 // Test that a $search query properly computes the $$SEARCH_META value according to the pipeline
 // returned by mongot(mock).
 function testSearchQuery() {
-    setQueryMockResponses();
+    setQueryMockResponses(false);
     let queryResult =
         coll.aggregate([{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}]).toArray();
     assert.eq([{_id: singleResultId, meta: expectedSearchMeta}], queryResult);
@@ -90,7 +91,7 @@ function testSearchQuery() {
 // Test that a $searchMeta query properly computes the metadata value according to the pipeline
 // returned by mongot(mock).
 function testSearchMetaQuery() {
-    setQueryMockResponses();
+    setQueryMockResponses(true);
     let queryResult = coll.aggregate([{$searchMeta: searchQuery}]);
     // Same as above query result but not embedded in a document.
     assert.eq([expectedSearchMeta], queryResult.toArray());

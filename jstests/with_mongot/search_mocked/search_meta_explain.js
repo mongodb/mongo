@@ -57,7 +57,8 @@ function runExplainTest(verbosity) {
         collName: collName,
         db: dbName,
         collectionUUID: collUUID,
-        explainVerbosity: {verbosity}
+        explainVerbosity: {verbosity},
+        optimizationFlags: {omitSearchDocumentResults: true}
     });
     const pipeline = [{$searchMeta: searchQuery}];
     {

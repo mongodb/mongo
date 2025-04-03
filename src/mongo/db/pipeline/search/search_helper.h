@@ -111,12 +111,12 @@ bool isMongotPipeline(const Pipeline* pipeline);
 /**
  * Check if this is a $search stage.
  */
-bool isSearchStage(DocumentSource* stage);
+bool isSearchStage(const DocumentSource* stage);
 
 /**
  * Check if this is a $searchMeta stage.
  */
-bool isSearchMetaStage(DocumentSource* stage);
+bool isSearchMetaStage(const DocumentSource* stage);
 
 /**
  * Check if this is a search-related stage that will rely on calls to mongot.

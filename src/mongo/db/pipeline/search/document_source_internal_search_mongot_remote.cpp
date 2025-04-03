@@ -172,11 +172,16 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
                 _cursor->getOptions().getMoreStrategy);
     }
 
+    mongot_cursor::OptimizationFlags optFlags = search_helpers::isSearchMetaStage(this)
+        ? mongot_cursor::getOptimizationFlagsForSearchMeta()
+        : mongot_cursor::getOptimizationFlagsForSearch();
+
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
         return mongot_cursor::getSearchExplainResponse(
             pExpCtx.get(),
             _spec.getMongotQuery(),
             _taskExecutor.get(),
+            optFlags,
             _view ? boost::make_optional(_view->getViewNss()) : boost::none);
     });
 

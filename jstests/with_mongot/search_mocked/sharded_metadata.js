@@ -219,7 +219,8 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
             collName: testColl.getName(),
             db: dbName,
             collectionUUID: collUUID,
-            protocolVersion: protocolVersion
+            protocolVersion: protocolVersion,
+            optimizationFlags: {omitSearchDocumentResults: true}
         }),
         response: mongot0Response
     }];
@@ -243,7 +244,8 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
             collName: testColl.getName(),
             db: dbName,
             collectionUUID: collUUID,
-            protocolVersion: protocolVersion
+            protocolVersion: protocolVersion,
+            optimizationFlags: {omitSearchDocumentResults: true}
         }),
         response: mongot1Response
     }];

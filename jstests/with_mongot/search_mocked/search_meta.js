@@ -35,11 +35,40 @@ const explainContents = {
 };
 const cursorId = NumberLong(17);
 
+// Verify that $searchMeta does not *require* documents to be returned by mongot.
+{
+    const history = [{
+        expectedCommand: mongotCommandForQuery({
+            query: searchQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID,
+            optimizationFlags: {omitSearchDocumentResults: true}
+        }),
+        response: {
+            ok: 1,
+            cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
+            vars: {SEARCH_META: {value: 42}}
+        }
+    }];
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+
+    let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
+    const expectedMeta = [{value: 42}];
+    assert.eq(expectedMeta, cursorMeta.toArray());
+}
+
 // Verify that $searchMeta evaluates into SEARCH_META variable returned by mongot.
 {
     const history = [{
-        expectedCommand: mongotCommandForQuery(
-            {query: searchQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
+        expectedCommand: mongotCommandForQuery({
+            query: searchQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID,
+            optimizationFlags: {omitSearchDocumentResults: true}
+        }),
         response: {
             ok: 1,
             cursor: {
@@ -69,7 +98,8 @@ const cursorId = NumberLong(17);
             collName: collName,
             db: dbName,
             collectionUUID: collUUID,
-            explainVerbosity: {verbosity: "queryPlanner"}
+            explainVerbosity: {verbosity: "queryPlanner"},
+            optimizationFlags: {omitSearchDocumentResults: true},
         }),
         response: {explain: explainContents, ok: 1}
     }];

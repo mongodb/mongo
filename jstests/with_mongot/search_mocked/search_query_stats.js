@@ -39,8 +39,16 @@ const searchCmd = {
     $db: dbName
 };
 
+const searchMetaCmd = {
+    search: coll.getName(),
+    collectionUUID: collUUID,
+    query: searchQuery,
+    $db: dbName,
+    optimizationFlags: {omitSearchDocumentResults: true}
+};
+
 const cursorId = NumberLong(17);
-const history = [{
+const searchHistory = [{
     expectedCommand: searchCmd,
     response: {
         ok: 1,
@@ -50,8 +58,19 @@ const history = [{
     }
 }];
 
+const searchMetaHistory = [{
+    expectedCommand: searchMetaCmd,
+    response: {
+        ok: 1,
+        cursor:
+            {id: NumberLong(0), ns: coll.getFullName(), nextBatch: [{_id: 1}, {_id: 2}, {_id: 4}]},
+        vars: {SEARCH_META: {value: 42}}
+    }
+}];
+
 // Test for $searchMeta
-assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId, history: searchMetaHistory}));
 coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
 let stats = getLatestQueryStatsEntry(conn, {collName: coll.getName()});
 let queryShape = stats["key"]["queryShape"];
@@ -61,7 +80,7 @@ assertAggregatedMetricsSingleExec(stats, {docsExamined: 0, keysExamined: 0});
 
 // Test for $search
 assert.commandWorked(
-    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: searchHistory}));
 coll.aggregate([{$search: searchQuery}], {cursor: {}});
 stats = getLatestQueryStatsEntry(conn, {collName: coll.getName()});
 queryShape = stats["key"]["queryShape"];

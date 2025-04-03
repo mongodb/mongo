@@ -45,12 +45,14 @@ namespace mongo::mongot_cursor {
 MONGO_FAIL_POINT_DEFINE(shardedSearchOpCtxDisconnect);
 
 namespace {
+
 executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& uuid,
     const boost::optional<ExplainOptions::Verbosity>& explain,
     const BSONObj& query,
+    const OptimizationFlags& optimizationFlags,
     const boost::optional<NamespaceString> viewName = boost::none,
     const boost::optional<int> protocolVersion = boost::none,
     const boost::optional<long long> docsRequested = boost::none,
@@ -76,6 +78,16 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     }
     if (protocolVersion) {
         cmdBob.append(kIntermediateField, *protocolVersion);
+    }
+
+    if (optimizationFlags.omitSearchDocumentResults) {
+        // Tell mongot about any potential optimization flags.
+        // Currently this just includes omitSearchDocumentResults, which tells mongot that it is not
+        // *required* to send back document search scores/results. This is used for $searchMeta,
+        // where the document search results are thrown away.
+        // Note that mongot *may* send back results even in the presence of this flag due to
+        // versioning differences, etc.
+        cmdBob.append(kOptimizationFlagsField, optimizationFlags.serialize());
     }
 
     if (docsRequested.has_value() || batchSize.has_value() || requiresSearchSequenceToken) {
@@ -156,6 +168,15 @@ long long computeInitialBatchSize(const boost::intrusive_ptr<ExpressionContext>&
                  bounds.getMaxBounds());
 }
 }  // namespace
+
+
+OptimizationFlags getOptimizationFlagsForSearchMeta() {
+    return OptimizationFlags{.omitSearchDocumentResults = true};
+}
+
+OptimizationFlags getOptimizationFlagsForSearch() {
+    return OptimizationFlags();
+}
 
 HostAndPort getMongotAddress() {
     auto swHostAndPort = HostAndPort::parse(globalMongotParams.host);
@@ -317,6 +338,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               expCtx->getUUID(),
                                               expCtx->getExplain(),
                                               query,
+                                              getOptimizationFlagsForSearch(),
                                               viewNss,
                                               protocolVersion,
                                               docsRequested,
@@ -343,17 +365,19 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     auto getMoreStrategy = std::make_unique<executor::DefaultTaskExecutorCursorGetMoreStrategy>(
         /*batchSize*/ boost::none,
         /*preFetchNextBatch*/ false);
-    return establishCursors(expCtx,
-                            getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
-                                                                  expCtx->getNamespaceString(),
-                                                                  expCtx->getUUID(),
-                                                                  expCtx->getExplain(),
-                                                                  query,
-                                                                  viewNss,
-                                                                  protocolVersion),
-                            taskExecutor,
-                            std::move(getMoreStrategy),
-                            std::move(yieldPolicy));
+    return establishCursors(
+        expCtx,
+        getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
+                                              expCtx->getNamespaceString(),
+                                              expCtx->getUUID(),
+                                              expCtx->getExplain(),
+                                              query,
+                                              getOptimizationFlagsForSearchMeta(),
+                                              viewNss,
+                                              protocolVersion),
+        taskExecutor,
+        std::move(getMoreStrategy),
+        std::move(yieldPolicy));
 }
 
 
@@ -386,12 +410,14 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
 BSONObj getSearchExplainResponse(const ExpressionContext* expCtx,
                                  const BSONObj& query,
                                  executor::TaskExecutor* taskExecutor,
+                                 const OptimizationFlags& optimizationFlags,
                                  boost::optional<NamespaceString> viewNss) {
     const auto request = getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),
                                                                expCtx->getNamespaceString(),
                                                                expCtx->getUUID(),
                                                                expCtx->getExplain(),
                                                                query,
+                                                               optimizationFlags,
                                                                viewNss);
     return getExplainResponse(expCtx, request, taskExecutor);
 }

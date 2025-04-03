@@ -26,17 +26,42 @@ const searchQuery = {
     path: "title"
 };
 
+// Verify that omitSearchDocumentResults is set for $searchMeta queries.
+const searchMetaCmd = {
+    search: coll.getName(),
+    collectionUUID: collUUID,
+    query: searchQuery,
+    $db: dbName,
+    optimizationFlags: {omitSearchDocumentResults: true},
+};
+const searchMetaCursorId = NumberLong(17);
+
+{
+    const history = [{
+        expectedCommand: searchMetaCmd,
+        response: {
+            ok: 1,
+            cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
+            vars: {SEARCH_META: {value: 42}}
+        }
+    }];
+    assert.commandWorked(mongotConn.adminCommand(
+        {setMockResponses: 1, cursorId: searchMetaCursorId, history: history}));
+
+    let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
+    const expectedMeta = [{value: 42}];
+    assert.eq(expectedMeta, cursorMeta.toArray());
+}
+
+// Verify that omitSearchDocumentResults is not set for $search queries.
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
     $db: dbName,
-    optimizationFlags: {omitSearchDocumentResults: true}
 };
-const cursorId = NumberLong(17);
+const searchCursorId = NumberLong(18);
 
-// Verify that $searchMeta evaluates into SEARCH_META variable returned by mongot if no docs are
-// returned.
 {
     const history = [{
         expectedCommand: searchCmd,
@@ -47,11 +72,9 @@ const cursorId = NumberLong(17);
         }
     }];
     assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: searchCursorId, history: history}));
 
-    let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
-    const expectedMeta = [{value: 42}];
-    assert.eq(expectedMeta, cursorMeta.toArray());
+    coll.aggregate([{$search: searchQuery}], {cursor: {}});
 }
 
 MongoRunner.stopMongod(conn);

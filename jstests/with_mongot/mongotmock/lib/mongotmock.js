@@ -28,6 +28,7 @@ import {
  *     as number of requested docs.
  * @param {Object} explainVerbosity - Optional: contains explain verbosity object, i.e. {verbosity:
  *     "queryPlanner"}
+ * @param {Object} optimizationFlags - Optional: contains optimization options for mongot
  */
 export function mongotCommandForQuery({
     query,
@@ -37,7 +38,8 @@ export function mongotCommandForQuery({
     protocolVersion = null,
     cursorOptions = null,
     explainVerbosity = null,
-    view = null
+    view = null,
+    optimizationFlags = null,
 }) {
     let cmd = {search: collName, $db: db, collectionUUID, query};
     if (protocolVersion != null) {
@@ -51,6 +53,9 @@ export function mongotCommandForQuery({
     }
     if (view != null) {
         cmd.view = view;
+    }
+    if (optimizationFlags != null) {
+        cmd.optimizationFlags = optimizationFlags;
     }
     return cmd;
 }
@@ -152,7 +157,8 @@ export function mockPlanShardedSearchResponseOnConn(collName,
                                                     stWithMock,
                                                     conn,
                                                     maybeUnused = false,
-                                                    explainVerbosity = null) {
+                                                    explainVerbosity = null,
+                                                    hasSearchMetaStage = false) {
     mockPlanShardedSearchResponse.cursorId++;
     let resp = {
         ok: 1,
@@ -166,6 +172,11 @@ export function mockPlanShardedSearchResponseOnConn(collName,
 
     let expectedCommand =
         {planShardedSearch: collName, query: query, $db: dbName, searchFeatures: {shardedSort: 1}};
+
+    if (hasSearchMetaStage) {
+        expectedCommand.optimizationFlags = {omitSearchDocumentResults: true};
+    }
+
     if (explainVerbosity != null) {
         expectedCommand.explain = explainVerbosity;
     }
@@ -179,8 +190,14 @@ export function mockPlanShardedSearchResponseOnConn(collName,
  * Convenience helper function to simulate mockPlanShardedSearchResponseOnConn specifically on
  * mongos, which is the most common usage.
  */
-export function mockPlanShardedSearchResponse(
-    collName, query, dbName, sortSpec, stWithMock, maybeUnused = false, explainVerbosity = null) {
+export function mockPlanShardedSearchResponse(collName,
+                                              query,
+                                              dbName,
+                                              sortSpec,
+                                              stWithMock,
+                                              maybeUnused = false,
+                                              explainVerbosity = null,
+                                              hasSearchMetaStage = false) {
     mockPlanShardedSearchResponseOnConn(collName,
                                         query,
                                         dbName,
@@ -188,7 +205,8 @@ export function mockPlanShardedSearchResponse(
                                         stWithMock,
                                         stWithMock.st.s,
                                         maybeUnused,
-                                        explainVerbosity);
+                                        explainVerbosity,
+                                        hasSearchMetaStage);
 }
 
 mockPlanShardedSearchResponse.cursorId = 1423;
