@@ -3121,6 +3121,7 @@ const wcTimeseriesViewsCommandsTests = {
     streams_testOnlyGetFeatureFlags: {skip: "internal command"},
     streams_writeCheckpoint: {skip: "internal command"},
     streams_sendEvent: {skip: "internal command"},
+    streams_updateConnection: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     abortMoveCollection: {skip: "does not accept write concern"},
     abortReshardCollection: {skip: "does not accept write concern"},
