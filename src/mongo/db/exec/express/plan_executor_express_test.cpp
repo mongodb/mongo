@@ -28,8 +28,8 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/express/plan_executor_express.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/plan_executor_express.h"
 #include "mongo/unittest/unittest.h"
 
 

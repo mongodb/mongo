@@ -728,7 +728,6 @@ mongo_cc_unit_test(
         "interval_test.cpp",
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
-        "plan_executor_express_test.cpp",
         "plan_explainer_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
@@ -766,6 +765,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:index_catalog_entry_mock.h",
         "//src/mongo/db/catalog:index_catalog_mock.h",
         "//src/mongo/db/exec:shard_filterer_mock.h",
+        "//src/mongo/db/exec/express:plan_executor_express_test.cpp",
         "//src/mongo/db/exec/sbe:expression_test_base.h",
         "//src/mongo/db/exec/sbe:sbe_unittest.h",
         "//src/mongo/db/query:index_bounds_builder_test_fixture.h",
@@ -863,21 +863,6 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/rpc",
         "//src/mongo/util:clock_source_mock",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "express_execution_test",
-    srcs = ["express_plan_test.cpp"],
-    tags = ["mongo_unittest_first_group"],
-    deps = [
-        ":query_planner",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db:record_id_helpers",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db:write_stage_common",
-        "//src/mongo/db/catalog:catalog_test_fixture",
-        "//src/mongo/db/collection_crud",
     ],
 )
 

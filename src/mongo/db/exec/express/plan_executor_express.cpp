@@ -34,7 +34,7 @@
 #include <utility>
 #include <variant>
 
-#include "mongo/db/query/plan_executor_express.h"
+#include "mongo/db/exec/express/plan_executor_express.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
