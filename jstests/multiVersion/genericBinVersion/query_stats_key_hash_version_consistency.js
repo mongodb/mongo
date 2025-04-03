@@ -1,6 +1,5 @@
 /**
  * Tests that query stats key hashes are consistent across versions.
- * TODO SERVER-93204 Add queryShapeHash to this test.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 

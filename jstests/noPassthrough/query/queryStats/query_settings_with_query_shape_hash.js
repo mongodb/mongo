@@ -1,6 +1,4 @@
-// Tests that query settings have higher priority than index filters. Once query settings are set,
-// index filters for the given query are ignored. When query settings are removed, index filters are
-// applied again.
+// Tests that setting PQS works with the 'queryShapeHash' exposed via $queryStats.
 // @tags: [
 //   requires_fcv_80,
 // ]
@@ -10,7 +8,6 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {
     getQueryStatsFindCmd,
     getQueryStatsShapeHashes,
-    resetQueryStatsStore,
     runOnReplsetAndShardedCluster
 } from "jstests/libs/query/query_stats_utils.js";
 
