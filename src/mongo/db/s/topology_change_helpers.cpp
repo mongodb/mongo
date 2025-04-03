@@ -1796,6 +1796,25 @@ void propagateClusterUserWriteBlockToReplicaSet(OperationContext* opCtx,
         executor);
 }
 
+void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
+    // Check if we need to run recovery at all.
+    {
+        DBDirectClient client(opCtx);
+        const auto recoveryDoc =
+            client.findOne(NamespaceString::kServerConfigurationNamespace,
+                           BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId));
+        if (recoveryDoc.isEmpty()) {
+            // No need to do anything.
+            return;
+        }
+    }
+
+    // Unset the addOrRemoveShardInProgress cluster parameter.
+    LOGV2(5687906, "Resetting addOrRemoveShardInProgress cluster parameter after failure");
+    topology_change_helpers::unblockDDLCoordinators(opCtx);
+    LOGV2(5687907, "Resetted addOrRemoveShardInProgress cluster parameter after failure");
+}
+
 }  // namespace topology_change_helpers
 
 }  // namespace mongo

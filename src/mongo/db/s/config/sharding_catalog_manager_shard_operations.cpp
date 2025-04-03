@@ -191,31 +191,6 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 
 const Seconds kRemoteCommandTimeout{60};
 
-constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
-    "addOrRemoveShardInProgressRecovery"_sd;
-
-// If an add/removeShard recovery document is present on kServerConfigurationNamespace, unset the
-// addOrRemoveShardInProgress cluster parameter. Must be called under the kConfigsvrShardsNamespace
-// ddl lock.
-void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
-    // Check if we need to run recovery at all.
-    {
-        DBDirectClient client(opCtx);
-        const auto recoveryDoc =
-            client.findOne(NamespaceString::kServerConfigurationNamespace,
-                           BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId));
-        if (recoveryDoc.isEmpty()) {
-            // No need to do anything.
-            return;
-        }
-    }
-
-    // Unset the addOrRemoveShardInProgress cluster parameter.
-    LOGV2(5687906, "Resetting addOrRemoveShardInProgress cluster parameter after failure");
-    topology_change_helpers::unblockDDLCoordinators(opCtx);
-    LOGV2(5687907, "Resetted addOrRemoveShardInProgress cluster parameter after failure");
-}
-
 AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
                                                                            const ShardId& shardId,
                                                                            bool isCount = false) {
@@ -534,6 +509,7 @@ Status ShardingCatalogManager::updateClusterCardinalityParameterIfNeeded(Operati
 
 StatusWith<std::string> ShardingCatalogManager::addShard(
     OperationContext* opCtx,
+    const FixedFCVRegion& fcvRegion,
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
     bool isConfigShard) {
@@ -549,7 +525,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
     // failed addShard/removeShard operation.
-    resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+    topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
@@ -683,163 +659,147 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         _standardizeClusterParameters(opCtx, *targeter);
     }
 
-    {
-        // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and writing
-        // the entry for the new shard to config.shards. This ensures the FCV doesn't change after
-        // we send setFCV to the new shard, but before we write its entry to config.shards.
-        //
-        // NOTE: We don't use a Global IX lock here, because we don't want to hold the global lock
-        // while blocking on the network).
-        FixedFCVRegion fcvRegion(opCtx);
+    const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
 
-        const auto fcvSnapshot = (*fcvRegion).acquireFCVSnapshot();
-
-        std::vector<CollectionType> collList;
-        if (feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-            // TODO SERVER-80532: the sharding catalog might lose some collections.
-            auto listStatus = _getCollListFromShard(opCtx, dbNamesStatus.getValue(), targeter);
-            if (!listStatus.isOK()) {
-                return listStatus.getStatus();
-            }
-
-            collList = std::move(listStatus.getValue());
+    std::vector<CollectionType> collList;
+    if (feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+        // TODO SERVER-80532: the sharding catalog might lose some collections.
+        auto listStatus = _getCollListFromShard(opCtx, dbNamesStatus.getValue(), targeter);
+        if (!listStatus.isOK()) {
+            return listStatus.getStatus();
         }
 
-        // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-        uassert(5563603,
-                "Cannot add shard while in upgrading/downgrading FCV state",
-                !fcvSnapshot.isUpgradingOrDowngrading());
-
-        const auto currentFCV = fcvSnapshot.getVersion();
-        invariant(currentFCV == multiversion::GenericFCV::kLatest ||
-                  currentFCV == multiversion::GenericFCV::kLastContinuous ||
-                  currentFCV == multiversion::GenericFCV::kLastLTS);
-
-        if (isConfigShard &&
-            !feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-            auto res = _dropSessionsCollection(opCtx, targeter);
-            if (!res.isOK()) {
-                return res.withContext(
-                    "can't add shard with a local copy of config.system.sessions, please drop this "
-                    "collection from the shard manually and try again.");
-            }
-        }
-
-        if (!isConfigShard) {
-            SetFeatureCompatibilityVersion setFcvCmd(currentFCV);
-            setFcvCmd.setDbName(DatabaseName::kAdmin);
-            setFcvCmd.setFromConfigServer(true);
-            setFcvCmd.setWriteConcern(opCtx->getWriteConcern());
-
-            auto versionResponse = _runCommandForAddShard(
-                opCtx, targeter.get(), DatabaseName::kAdmin, setFcvCmd.toBSON());
-            if (!versionResponse.isOK()) {
-                return versionResponse.getStatus();
-            }
-
-            if (!versionResponse.getValue().commandStatus.isOK()) {
-                return versionResponse.getValue().commandStatus;
-            }
-        }
-
-        // Block new ShardingDDLCoordinators on the cluster and join ongoing ones.
-        ScopeGuard unblockDDLCoordinatorsGuard([&] { scheduleAsyncUnblockDDLCoordinators(opCtx); });
-        topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
-
-        // Tick clusterTime to get a new topologyTime for this mutation of the topology.
-        auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
-
-        ShardType shardType;
-        shardType.setName(shardName);
-        shardType.setHost(targeter->connectionString().toString());
-        shardType.setState(ShardType::ShardState::kShardAware);
-        shardType.setTopologyTime(newTopologyTime.asTimestamp());
-
-        LOGV2(21942,
-              "Going to insert new entry for shard into config.shards",
-              "shardType"_attr = shardType.toString());
-
-        clusterCardinalityParameterLock.lock();
-        shardMembershipLock.lock();
-
-        {
-            // Execute the transaction with a local write concern to make sure `stopMonitorGuard` is
-            // dimissed only when the transaction really fails.
-            const auto originalWC = opCtx->getWriteConcern();
-            ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
-            opCtx->setWriteConcern(ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
-
-            topology_change_helpers::addShardInTransaction(
-                opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
-        }
-        // Once the transaction has committed, we must immediately dismiss the guard to avoid
-        // incorrectly removing the RSM after persisting the shard addition.
-        stopMonitoringGuard.dismiss();
-
-        // Wait for majority can only be done after dismissing the `stopMonitoringGuard`.
-        if (opCtx->getWriteConcern().isMajority()) {
-            const auto majorityWriteStatus =
-                WaitForMajorityService::get(opCtx->getServiceContext())
-                    .waitUntilMajorityForWrite(
-                        repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-                            ->getMyLastAppliedOpTime(),
-                        opCtx->getCancellationToken())
-                    .getNoThrow();
-
-            if (majorityWriteStatus == ErrorCodes::CallbackCanceled) {
-                uassertStatusOK(opCtx->checkForInterruptNoAssert());
-            }
-            uassertStatusOK(majorityWriteStatus);
-        }
-
-        // Record in changelog
-        BSONObjBuilder shardDetails;
-        shardDetails.append("name", shardType.getName());
-        shardDetails.append("host", shardConnectionString.toString());
-
-        ShardingLogging::get(opCtx)->logChange(opCtx,
-                                               "addShard",
-                                               NamespaceString::kEmpty,
-                                               shardDetails.obj(),
-                                               defaultMajorityWriteConcernDoNotUse(),
-                                               _localConfigShard,
-                                               _localCatalogClient.get());
-
-        // Ensure the added shard is visible to this process.
-        shardRegistry->reload(opCtx);
-        tassert(9870600,
-                "Shard not found in ShardRegistry after committing addShard",
-                shardRegistry->getShard(opCtx, shardType.getName()).isOK());
-
-        topology_change_helpers::hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(
-            opCtx);
-        // Release the shard membership lock since the set cluster parameter operation below
-        // require taking this lock.
-        shardMembershipLock.unlock();
-
-        // Unblock ShardingDDLCoordinators on the cluster.
-
-        // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
-        // alongside the RSEndpoint.
-        // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
-        // the FixedFCVRegion and others take the FixedFCVRegion before the
-        // _kClusterCardinalityParameterLock lock. However, all paths take the
-        // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have a lock
-        // ordering problem. See SERVER-99708 for more information.
-        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        topology_change_helpers::unblockDDLCoordinators(opCtx);
-        unblockDDLCoordinatorsGuard.dismiss();
-
-        auto updateStatus = _updateClusterCardinalityParameterAfterAddShardIfNeeded(
-            clusterCardinalityParameterLock, opCtx);
-        if (!updateStatus.isOK()) {
-            return updateStatus;
-        }
-
-        return shardType.getName();
+        collList = std::move(listStatus.getValue());
     }
+
+    // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
+    const auto currentFCV = fcvSnapshot.getVersion();
+    invariant(currentFCV == multiversion::GenericFCV::kLatest ||
+              currentFCV == multiversion::GenericFCV::kLastContinuous ||
+              currentFCV == multiversion::GenericFCV::kLastLTS);
+
+    if (isConfigShard &&
+        !feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+        auto res = _dropSessionsCollection(opCtx, targeter);
+        if (!res.isOK()) {
+            return res.withContext(
+                "can't add shard with a local copy of config.system.sessions, please drop this "
+                "collection from the shard manually and try again.");
+        }
+    }
+
+    if (!isConfigShard) {
+        SetFeatureCompatibilityVersion setFcvCmd(currentFCV);
+        setFcvCmd.setDbName(DatabaseName::kAdmin);
+        setFcvCmd.setFromConfigServer(true);
+        setFcvCmd.setWriteConcern(opCtx->getWriteConcern());
+
+        auto versionResponse =
+            _runCommandForAddShard(opCtx, targeter.get(), DatabaseName::kAdmin, setFcvCmd.toBSON());
+        if (!versionResponse.isOK()) {
+            return versionResponse.getStatus();
+        }
+
+        if (!versionResponse.getValue().commandStatus.isOK()) {
+            return versionResponse.getValue().commandStatus;
+        }
+    }
+
+    // Block new ShardingDDLCoordinators on the cluster and join ongoing ones.
+    ScopeGuard unblockDDLCoordinatorsGuard([&] { scheduleAsyncUnblockDDLCoordinators(opCtx); });
+    topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
+
+    // Tick clusterTime to get a new topologyTime for this mutation of the topology.
+    auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
+
+    ShardType shardType;
+    shardType.setName(shardName);
+    shardType.setHost(targeter->connectionString().toString());
+    shardType.setState(ShardType::ShardState::kShardAware);
+    shardType.setTopologyTime(newTopologyTime.asTimestamp());
+
+    LOGV2(21942,
+          "Going to insert new entry for shard into config.shards",
+          "shardType"_attr = shardType.toString());
+
+    clusterCardinalityParameterLock.lock();
+    shardMembershipLock.lock();
+
+    {
+        // Execute the transaction with a local write concern to make sure `stopMonitorGuard` is
+        // dimissed only when the transaction really fails.
+        const auto originalWC = opCtx->getWriteConcern();
+        ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+        opCtx->setWriteConcern(ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+
+        topology_change_helpers::addShardInTransaction(
+            opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+    }
+    // Once the transaction has committed, we must immediately dismiss the guard to avoid
+    // incorrectly removing the RSM after persisting the shard addition.
+    stopMonitoringGuard.dismiss();
+
+    // Wait for majority can only be done after dismissing the `stopMonitoringGuard`.
+    if (opCtx->getWriteConcern().isMajority()) {
+        const auto majorityWriteStatus =
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajorityForWrite(
+                    repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                        ->getMyLastAppliedOpTime(),
+                    opCtx->getCancellationToken())
+                .getNoThrow();
+
+        if (majorityWriteStatus == ErrorCodes::CallbackCanceled) {
+            uassertStatusOK(opCtx->checkForInterruptNoAssert());
+        }
+        uassertStatusOK(majorityWriteStatus);
+    }
+
+    // Record in changelog
+    BSONObjBuilder shardDetails;
+    shardDetails.append("name", shardType.getName());
+    shardDetails.append("host", shardConnectionString.toString());
+
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "addShard",
+                                           NamespaceString::kEmpty,
+                                           shardDetails.obj(),
+                                           defaultMajorityWriteConcernDoNotUse(),
+                                           _localConfigShard,
+                                           _localCatalogClient.get());
+
+    // Ensure the added shard is visible to this process.
+    shardRegistry->reload(opCtx);
+    tassert(9870600,
+            "Shard not found in ShardRegistry after committing addShard",
+            shardRegistry->getShard(opCtx, shardType.getName()).isOK());
+
+    topology_change_helpers::hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
+    // Release the shard membership lock since the set cluster parameter operation below require
+    // taking this lock.
+    shardMembershipLock.unlock();
+
+    // Unblock ShardingDDLCoordinators on the cluster.
+
+    // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
+    // alongside the RSEndpoint. Some paths of add/remove shard take the
+    // _kClusterCardinalityParameterLock before the FixedFCVRegion and others take the
+    // FixedFCVRegion before the _kClusterCardinalityParameterLock lock. However, all paths take the
+    // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have a lock ordering
+    // problem. See SERVER-99708 for more information.
+    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+    topology_change_helpers::unblockDDLCoordinators(opCtx);
+    unblockDDLCoordinatorsGuard.dismiss();
+
+    auto updateStatus = _updateClusterCardinalityParameterAfterAddShardIfNeeded(
+        clusterCardinalityParameterLock, opCtx);
+    if (!updateStatus.isOK()) {
+        return updateStatus;
+    }
+
+    return shardType.getName();
 }
 
 std::pair<ConnectionString, std::string> ShardingCatalogManager::getConfigShardParameters(
@@ -859,16 +819,17 @@ std::pair<ConnectionString, std::string> ShardingCatalogManager::getConfigShardP
     return std::make_pair(configConnString, shardName);
 }
 
-void ShardingCatalogManager::addConfigShard(OperationContext* opCtx) {
+void ShardingCatalogManager::addConfigShard(OperationContext* opCtx,
+                                            const FixedFCVRegion& fixedFcvRegion) {
     const auto [configConnString, shardName] = getConfigShardParameters(opCtx);
-    uassertStatusOK(addShard(opCtx, &shardName, configConnString, true));
+    uassertStatusOK(addShard(opCtx, fixedFcvRegion, &shardName, configConnString, true));
 }
 
 boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsAndStartDrain(
     OperationContext* opCtx, const ShardId& shardId) {
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
     // failed addShard/removeShard operation.
-    resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+    topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
     const auto shardName = shardId.toString();
     audit::logRemoveShard(opCtx->getClient(), shardName);
@@ -990,7 +951,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
     // Unset the addOrRemoveShardInProgress cluster parameter in case it was left set by a previous
     // failed addShard/removeShard operation.
-    resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+    topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
     // Since we released the addRemoveShardLock between checking the preconditions and here, it is
     // possible that the shard has already been removed.
@@ -1320,7 +1281,8 @@ void ShardingCatalogManager::scheduleAsyncUnblockDDLCoordinators(OperationContex
                                                         NamespaceString::kConfigsvrShardsNamespace,
                                                         "scheduleAsyncUnblockDDLCoordinators",
                                                         LockMode::MODE_X);
-        resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
+
+        topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
     })
         .until([serviceContext](Status status) {
             // Retry until success or until this node is no longer the primary.

@@ -47,10 +47,15 @@ namespace mongo {
 
 namespace {
 
-RemoveShardProgress runCoordinatorRemoveShard(OperationContext* opCtx,
-                                              boost::optional<FixedFCVRegion>& fcvRegion,
-                                              const ShardId& shardId,
-                                              const std::string& replicaSetName) {
+RemoveShardProgress runCoordinatorRemoveShard(
+    OperationContext* opCtx,
+    boost::optional<DDLLockManager::ScopedCollectionDDLLock>& ddlLock,
+    boost::optional<FixedFCVRegion>& fcvRegion,
+    const ShardId& shardId,
+    const std::string& replicaSetName) {
+    invariant(ddlLock);
+    invariant(fcvRegion);
+
     const auto removeShardCommitCoordinator =
         [&, shardId = shardId, replicaSetName = replicaSetName] {
             auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
@@ -72,6 +77,7 @@ RemoveShardProgress runCoordinatorRemoveShard(OperationContext* opCtx,
             return coordinator;
         }();
     fcvRegion.reset();
+    ddlLock.reset();
 
     const auto& drainingStatus = [&]() -> RemoveShardProgress {
         try {
@@ -103,6 +109,7 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
                     NamespaceString::kConfigsvrShardsNamespace,
                     "startDraining",
                     LockMode::MODE_X);
+
                 if (auto drainingStatus =
                         shardingCatalogManager->checkPreconditionsAndStartDrain(opCtx, shardId)) {
                     return *drainingStatus;
@@ -113,8 +120,12 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
                 return *drainingStatus;
             }
 
-            // TODO (SERVER-101452) Remove once addShard takes the FCV lock before the DDL lock.
-            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+            boost::optional<DDLLockManager::ScopedCollectionDDLLock> ddlLock{
+                boost::in_place_init,
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                "removeShard",
+                LockMode::MODE_X};
             boost::optional<FixedFCVRegion> fixedFCV{boost::in_place_init, opCtx};
             // The Operation FCV is currently propagated only for DDL operations,
             // which cannot be nested. Therefore, the VersionContext shouldn't have
@@ -122,13 +133,8 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
             invariant(!VersionContext::getDecoration(opCtx).isInitialized());
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
                     VersionContext::getDecoration(opCtx), (*fixedFCV)->acquireFCVSnapshot())) {
-                return runCoordinatorRemoveShard(opCtx, fixedFCV, shardId, replicaSetName);
+                return runCoordinatorRemoveShard(opCtx, ddlLock, fixedFCV, shardId, replicaSetName);
             } else {
-                DDLLockManager::ScopedCollectionDDLLock ddlLock(
-                    opCtx,
-                    NamespaceString::kConfigsvrShardsNamespace,
-                    "removeShardFunction",
-                    LockMode::MODE_X);
                 fixedFCV.reset();
                 return shardingCatalogManager->removeShard(opCtx, shardId);
             }

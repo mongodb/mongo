@@ -51,6 +51,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
@@ -516,6 +517,7 @@ public:
      * On success returns the name of the newly added shard.
      */
     StatusWith<std::string> addShard(OperationContext* opCtx,
+                                     const FixedFCVRegion& fcvRegion,
                                      const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
                                      bool isConfigShard);
@@ -531,7 +533,7 @@ public:
      * config server connection string as the shard connection string.
      *
      */
-    void addConfigShard(OperationContext* opCtx);
+    void addConfigShard(OperationContext* opCtx, const FixedFCVRegion& fixedFcvRegion);
 
     /**
      * Inserts the config server shard identity document using a sentinel shard id. Requires the

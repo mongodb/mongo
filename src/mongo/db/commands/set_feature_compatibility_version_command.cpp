@@ -449,6 +449,12 @@ public:
                     _fixConfigShardsTopologyTime(opCtx);
                 }
 
+                if (role && role->has(ClusterRole::ConfigServer)) {
+                    // Waiting for recovery here to avoid waiting for recovery while holding the
+                    // fcvChangeRegion
+                    ShardingDDLCoordinatorService::getService(opCtx)->waitForRecovery(opCtx);
+                }
+
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
@@ -458,6 +464,15 @@ public:
                         "Failing setFeatureCompatibilityVersion before reaching the FCV "
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
+
+                if (role && role->has(ClusterRole::ConfigServer)) {
+                    uassert(
+                        ErrorCodes::ConflictingOperationInProgress,
+                        "Failed to start FCV change because an addShardCoordinator is in progress",
+                        ShardingDDLCoordinatorService::getService(opCtx)
+                            ->areAllCoordinatorsOfTypeFinished(opCtx,
+                                                               DDLCoordinatorTypeEnum::kAddShard));
+                }
 
                 // If this is a config server, then there must be no active
                 // SetClusterParameterCoordinator instances active when downgrading.

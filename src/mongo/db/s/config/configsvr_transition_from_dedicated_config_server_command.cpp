@@ -105,12 +105,26 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
+            // TODO(SERVER-97816): remove DDL locking and move the fcv upgrade checking logic to the
+            // coordinator
+            boost::optional<DDLLockManager::ScopedCollectionDDLLock> ddlLock{
+                boost::in_place_init,
+                opCtx,
+                NamespaceString::kConfigsvrShardsNamespace,
+                "addShard",
+                LockMode::MODE_X};
+            boost::optional<FixedFCVRegion> fcvRegion{boost::in_place_init, opCtx};
+            const auto fcvSnapshot = (*fcvRegion)->acquireFCVSnapshot();
+
+            // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Cannot add shard while in upgrading/downgrading FCV state",
+                    !fcvSnapshot.isUpgradingOrDowngrading());
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                _runNewPath(opCtx);
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                _runNewPath(opCtx, ddlLock, fcvRegion);
             } else {
-                _runOldPath(opCtx);
+                _runOldPath(opCtx, *fcvRegion);
             }
 
             ShardingStatistics::get(opCtx)
@@ -118,21 +132,34 @@ public:
         }
 
     private:
-        void _runOldPath(OperationContext* opCtx) {
-            DDLLockManager::ScopedCollectionDDLLock ddlLock(
-                opCtx,
-                NamespaceString::kConfigsvrShardsNamespace,
-                "addShardFunction",
-                LockMode::MODE_X);
-
-            ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx);
+        void _runOldPath(OperationContext* opCtx, const FixedFCVRegion& fcvRegion) {
+            ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx, fcvRegion);
         }
 
-        void _runNewPath(OperationContext* opCtx) {
+        void _runNewPath(OperationContext* opCtx,
+                         boost::optional<DDLLockManager::ScopedCollectionDDLLock>& ddlLock,
+                         boost::optional<FixedFCVRegion>& fcvRegion) {
+            invariant(ddlLock);
+            invariant(fcvRegion);
+
             const auto [configConnString, shardName] =
                 ShardingCatalogManager::get(opCtx)->getConfigShardParameters(opCtx);
+
+            // Since the addShardCoordinator will call functions that will take the FixedFCVRegion
+            // the ordering of locks will be DDLLock, FcvLock. We want to maintain this lock
+            // ordering to avoid deadlocks. If we only take the FixedFCVRegion before creating the
+            // addShardCoordinator, then if it starts to run before we can release the
+            // FixedFCVRegion the lock ordering will be reversed (FcvLock, DDLLock). It is safe to
+            // take the DDLLock before create the coordinator, as it will only prevent the running
+            // of the coordinator while we hold the FixedFCVRegion (FcvLock, DDLLock -> waiting for
+            // DDLLock in coordinator). After this we release the locks in reversed order, so we are
+            // sure that we are not holding the FixedFCVRegion while we acquire the DDLLock.
             auto coordinator = AddShardCoordinator::create(
-                opCtx, configConnString, shardName, /*isConfigShard*/ true);
+                opCtx, *fcvRegion, configConnString, shardName, /*isConfigShard*/ true);
+
+            fcvRegion.reset();
+            ddlLock.reset();
+
             coordinator->getCompletionFuture().get();
         }
 

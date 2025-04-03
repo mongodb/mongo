@@ -361,5 +361,10 @@ std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
                                            FetcherStatusCallbackFn processStatusCallback,
                                            std::shared_ptr<executor::TaskExecutor> executor);
 
+// If an add/removeShard recovery document is present on kServerConfigurationNamespace, unset the
+// addOrRemoveShardInProgress cluster parameter. Must be called under the kConfigsvrShardsNamespace
+// ddl lock.
+void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx);
+
 }  // namespace topology_change_helpers
 }  // namespace mongo

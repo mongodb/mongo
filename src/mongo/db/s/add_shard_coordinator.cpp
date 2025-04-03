@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/add_shard_coordinator.h"
 
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -37,7 +36,6 @@
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "src/mongo/db/list_collections_gen.h"
 
@@ -57,6 +55,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             [this, _ = shared_from_this()]() {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
+
+                // TODO(SERVER-97816): Remove this call after old add shard path does not exist
+                // anymore
+                topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
                 _verifyInput();
 
@@ -133,6 +135,16 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 auto& targeter = _getTargeter(opCtx);
 
+                // (Generic FCV reference): These FCV checks should exist across LTS binary
+                // versions.
+                const auto currentFCV =
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+                invariant(currentFCV == multiversion::GenericFCV::kLatest ||
+                          currentFCV == multiversion::GenericFCV::kLastContinuous ||
+                          currentFCV == multiversion::GenericFCV::kLastLTS);
+
+                _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
+
                 _dropSessionsCollection(opCtx, **executor);
 
                 topology_change_helpers::getClusterTimeKeysFromReplicaSet(
@@ -157,38 +169,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and
-                // writing the entry for the new shard to config.shards. This ensures the FCV
-                // doesn't change after we send setFCV to the new shard, but before we write its
-                // entry to config.shards.
-                //
-                // NOTE: We don't use a Global IX lock here, because we don't want to hold the
-                // global lock while blocking on the network).
-                const FixedFCVRegion fcvRegion(opCtx);
-                const auto fcvSnapshot = (*fcvRegion).acquireFCVSnapshot();
-
                 auto& targeter = _getTargeter(opCtx);
 
                 auto dbList = topology_change_helpers::getDBNamesListFromReplicaSet(
                     opCtx, targeter, **executor);
-
-                // (Generic FCV reference): These FCV checks should exist across LTS binary
-                // versions.
-                if (fcvSnapshot.isUpgradingOrDowngrading()) {
-                    triggerCleanup(
-                        opCtx,
-                        Status(ErrorCodes::Error(5563604),
-                               "Cannot add shard while in upgrading/downgrading FCV state"));
-                }
-
-                // (Generic FCV reference): These FCV checks should exist across LTS binary
-                // versions.
-                const auto currentFCV = fcvSnapshot.getVersion();
-                invariant(currentFCV == multiversion::GenericFCV::kLatest ||
-                          currentFCV == multiversion::GenericFCV::kLastContinuous ||
-                          currentFCV == multiversion::GenericFCV::kLastLTS);
-
-                _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
 
                 topology_change_helpers::blockDDLCoordinatorsAndDrain(
                     opCtx, /*persistRecoveryDocument*/ false);
@@ -353,6 +337,7 @@ bool AddShardCoordinator::canAlwaysStartWhenUserWritesAreDisabled() const {
 
 std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
     OperationContext* opCtx,
+    const FixedFCVRegion&,
     const mongo::ConnectionString& target,
     boost::optional<std::string> name,
     bool isConfigShard) {

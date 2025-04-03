@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/add_shard_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -55,6 +56,7 @@ public:
     bool canAlwaysStartWhenUserWritesAreDisabled() const override;
 
     static std::shared_ptr<AddShardCoordinator> create(OperationContext* opCtx,
+                                                       const FixedFCVRegion&,
                                                        const mongo::ConnectionString& target,
                                                        boost::optional<std::string> name,
                                                        bool isConfigShard);
