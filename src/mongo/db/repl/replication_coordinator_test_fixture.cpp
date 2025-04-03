@@ -253,6 +253,23 @@ void ReplCoordTest::start(const HostAndPort& selfHost) {
     start();
 }
 
+void ReplCoordTest::assertStartSuccessWithData(const BSONObj& configDoc,
+                                               const HostAndPort& selfHost,
+                                               const LastVote& lastVote,
+                                               const OpTime& topOfOplog) {
+    if (!_repl) {
+        init();
+    }
+
+    _externalState->setLocalLastVoteDocument(lastVote);
+    _externalState->setLastOpTimeAndWallTime(topOfOplog, Date_t() + Seconds(10));
+    _externalState->setLocalConfigDocument(StatusWith<BSONObj>(configDoc));
+    _externalState->addSelf(selfHost);
+    getReplCoord()->setConsistentDataAvailable_forTest();
+    start();
+    ASSERT_NE(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
+}
+
 void ReplCoordTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
     // Set default protocol version to 1.
     if (!configDoc.hasField("protocolVersion")) {

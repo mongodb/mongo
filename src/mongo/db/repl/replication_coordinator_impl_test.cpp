@@ -148,6 +148,54 @@ std::shared_ptr<const repl::HelloResponse> awaitHelloWithNewOpCtx(
     return replCoord->awaitHelloResponse(newOpCtx.get(), horizonParams, topologyVersion, deadline);
 }
 
+TEST_F(ReplCoordTest, SetTermAtStartupFromLastVote) {
+    auto lowerTerm = 1;
+    auto higherTerm = 2;
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "term" << lowerTerm << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345")
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345"))
+                                   << "protocolVersion" << 1);
+    auto lastVote = LastVote({higherTerm, 1});
+    auto topOfOplog = OpTime({10, 1}, lowerTerm);
+    assertStartSuccessWithData(configObj, HostAndPort("node1", 12345), lastVote, topOfOplog);
+    ASSERT_EQ(2, getReplCoord()->getTerm());
+}
+
+TEST_F(ReplCoordTest, SetTermAtStartupFromOplog) {
+    auto lowerTerm = 1;
+    auto higherTerm = 2;
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "term" << lowerTerm << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345")
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345"))
+                                   << "protocolVersion" << 1);
+    auto lastVote = LastVote({lowerTerm, 1});
+    auto topOfOplog = OpTime({10, 1}, higherTerm);
+    assertStartSuccessWithData(configObj, HostAndPort("node1", 12345), lastVote, topOfOplog);
+    ASSERT_EQ(2, getReplCoord()->getTerm());
+}
+
+TEST_F(ReplCoordTest, SetTermAtStartupFromConfig) {
+    auto lowerTerm = 1;
+    auto higherTerm = 2;
+    BSONObj configObj = BSON("_id" << "mySet"
+                                   << "version" << 1 << "term" << higherTerm << "members"
+                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                            << "node1:12345")
+                                                 << BSON("_id" << 2 << "host"
+                                                               << "node2:12345"))
+                                   << "protocolVersion" << 1);
+    auto lastVote = LastVote({lowerTerm, 1});
+    auto topOfOplog = OpTime({10, 1}, lowerTerm);
+    assertStartSuccessWithData(configObj, HostAndPort("node1", 12345), lastVote, topOfOplog);
+    ASSERT_EQ(2, getReplCoord()->getTerm());
+}
+
 TEST_F(ReplCoordTest, IsWritablePrimaryFalseDuringStepdown) {
     BSONObj configObj = BSON("_id" << "mySet"
                                    << "version" << 1 << "members"
