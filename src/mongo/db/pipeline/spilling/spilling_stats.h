@@ -43,10 +43,16 @@ public:
     uint64_t getSpills() const {
         return _spills;
     }
+    void setSpills(uint64_t spills) {
+        _spills = spills;
+    }
 
     void incrementSpilledBytes(uint64_t spilledBytes);
     uint64_t getSpilledBytes() const {
         return _spilledBytes;
+    }
+    void setSpilledBytes(uint64_t spilledBytes) {
+        _spilledBytes = spilledBytes;
     }
 
     void incrementSpilledDataStorageSize(uint64_t spilledDataStorageSize);
@@ -60,6 +66,9 @@ public:
     void incrementSpilledRecords(uint64_t spilledRecords);
     uint64_t getSpilledRecords() const {
         return _spilledRecords;
+    }
+    void setSpilledRecords(uint64_t spilledRecords) {
+        _spilledRecords = spilledRecords;
     }
 
     void updateSpillingStats(uint64_t additionalSpills,

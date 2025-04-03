@@ -64,7 +64,23 @@
 }
 ```
 
-## 5. Group
+## 5. Timeseries sort
+### Pipeline
+```json
+[ { "$sort" : { "time" : 1 } } ]
+```
+### Slow query spilling stats
+```json
+{
+	"sortSpilledBytes" : "X",
+	"sortSpilledDataStorageSize" : "X",
+	"sortSpilledRecords" : 50,
+	"sortSpills" : 50,
+	"usedDisk" : true
+}
+```
+
+## 6. Group
 ### Pipeline
 ```json
 [
@@ -98,7 +114,7 @@
 }
 ```
 
-## 6. TextOr and projection
+## 7. TextOr and projection
 ### Pipeline
 ```json
 [
@@ -129,7 +145,7 @@
 }
 ```
 
-## 7. TextOr and sort
+## 8. TextOr and sort
 ### Pipeline
 ```json
 [
