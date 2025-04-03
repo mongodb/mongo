@@ -24,10 +24,12 @@ there.
 [`mongo::DocumentSourceCursor`](https://github.com/10gen/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.h#L73)
 acts as an adapter from [`mongo::PlanExecutor`](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/plan_executor.h#L129)  
 to [`mongo::DocumentSource`](https://github.com/10gen/mongo/blob/master/src/mongo/db/pipeline/document_source.h#L198). It
-is responsible for aquiring and releasing the storage resources (snapshots, locks, etc.), so that
+is responsible for acquiring and releasing the storage resources (snapshots, locks, etc.), so that
 they don't leave the `mongo::DocumentSourceCursor` scope. Some of the storage resources are acquired
 and released by `mongo::PlanExecutor` via `mongo::PlanExecutor::restoreState` and
-`mongo::PlanExecutor::saveState`
+`mongo::PlanExecutor::saveState`.
+
+Before executing the `PlanExecutor`, `DocumentSourceCursor` must first [restore the ShardRole resources](https://github.com/mongodb/mongo/blob/master/src/mongo/db/README_shard_role_api.md#yielding-and-restoring) associated with the enclosed `PlanExecutor`. `DocumentSourceCursor` owns a reference to a `ShardRoleTransactionResourcesStasherForPipeline` object from which the ShardRole resources can be obtained. `DocumentSourceCursor` must stash back the ShardRole resources before handing control to the next pipeline stage.
 
 In order to avoid acquiring and releasing resources for every call to
 `mongo::PlanExecutor:getNextDocument`, `mongo::DocumentSourceCursor`
