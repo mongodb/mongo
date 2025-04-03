@@ -338,17 +338,16 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
     const boost::optional<TimeseriesOptions>& timeseriesOptions = boost::none) {
     // Retrieving the allowed indexes for the given collection.
     auto allowedIndexes = [&]() {
-        // We should only have the timeseries option present iff namespace is a bucket collection,
-        // as view resolution occurs before applying query settings. dassert is preferred, as this
-        // should not kill the operation when applying query settings in production.
-        dassert(timeseriesOptions.has_value() == nss.isTimeseriesBucketsCollection());
-        const bool isTimeseriesBucketsCollection =
-            nss.isTimeseriesBucketsCollection() && timeseriesOptions.has_value();
+        const bool isTimeseriesColl = timeseriesOptions.has_value();
 
-        // For time series collections, we need to compare time series view namespace instead of the
-        // internal one, as query settings should be specified with the view name.
-        const auto& namespaceToCompare =
-            isTimeseriesBucketsCollection ? nss.getTimeseriesViewNamespace() : nss;
+        // For legacy time series collections (view + buckets), we need to compare time series view
+        // namespace instead of the internal one, as query settings should be specified with the
+        // view name.
+        // TODO SERVER-103011 always use `nss` once 9.0 becomes last LTS. By then only viewless
+        // timeseries will exist.
+        const auto& namespaceToCompare = isTimeseriesColl && nss.isTimeseriesBucketsCollection()
+            ? nss.getTimeseriesViewNamespace()
+            : nss;
         auto isHintForCollection = [&](const auto& hint) {
             auto hintNs =
                 NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
@@ -359,7 +358,7 @@ void QueryPlannerParams::applyQuerySettingsForCollection(
             return std::vector<mongo::IndexHint>();
         }
 
-        if (isTimeseriesBucketsCollection) {
+        if (isTimeseriesColl) {
             // Time series KeyPatternIndexes hints need to be converted to match the bucket specs.
             return transformTimeseriesHints(hintIt->getAllowedIndexes(), *timeseriesOptions);
         }
