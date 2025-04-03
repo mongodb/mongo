@@ -329,9 +329,6 @@ private:
     // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
     value::SlotAccessor* _seekRecordIdAccessor{nullptr};
     RecordId _seekRecordId;
-    // Used when resuming scan with '_seekRecordIdAccessor'. If true, raise a KeyNotFound error,
-    // otherwise, seek to next valid RecordId.
-    bool _tolerateKeyNotFound;
 
     // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
     value::SlotAccessor* _minRecordIdAccessor{nullptr};
