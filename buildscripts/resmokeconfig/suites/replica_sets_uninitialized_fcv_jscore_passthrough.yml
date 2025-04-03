@@ -52,6 +52,9 @@ selector:
     - jstests/core/query/release_memory/set_window_fields.js
     - jstests/core/query/release_memory/sort.js
     - jstests/core/query/release_memory/text_or.js
+    # Time-outs waiting for a response to setServerParameter command because
+    # the node in init sync state ignores it and never responds to it.
+    - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
