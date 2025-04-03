@@ -41,10 +41,13 @@ function basicCRUD(conn) {
 }
 
 function flushRoutingAndDBCacheUpdates(conn) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(conn, "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+        assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
+    }
+
     assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: "does.not.exist"}));
-    assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
 }
 
 function getCatalogShardChunks(conn) {

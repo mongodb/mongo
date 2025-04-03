@@ -10,6 +10,7 @@ import {
     withAbortAndRetryOnTransientTxnError,
     withTxnAndAutoRetryOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
@@ -37,10 +38,12 @@ let sessionDB = session.getDatabase('test');
 let sessionColl = sessionDB.getCollection('user');
 let sessionUnsharded = sessionDB.getCollection('foo');
 
-// Transactions do not internally retry on StaleDbVersion errors, so we
-// ensure the primary shard's cached databaseVersion is fresh before running commands through
-// mongos on the unsharded collections.
-assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: "test"}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+    // Transactions do not internally retry on StaleDbVersion errors, so we ensure the primary
+    // shard's cached databaseVersion is fresh before running commands through mongos on the
+    // unsharded collections.
+    assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: "test"}));
+}
 
 // passthrough
 withAbortAndRetryOnTransientTxnError(session, () => {

@@ -11,6 +11,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkWriteConcernTimedOut,
@@ -232,8 +233,13 @@ let txnNumber = 0;
 // Force refresh of dbVersion now to avoid conflicting locks with test transactions.
 assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: 'test.user'}));
 assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: 'test.user'}));
-assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: 'test'}));
-assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: 'test'}));
+
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+    assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: 'test'}));
+}
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadataCRUD")) {
+    assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: 'test'}));
+}
 
 //
 // Generic test cases that are agnostic as to the transaction type

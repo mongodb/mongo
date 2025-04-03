@@ -303,8 +303,8 @@ protected:
                          "y"),
             boost::none);
 
-        ASSERT_OK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
-            opCtx, kNss.dbName(), boost::none));
+        ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
+            opCtx, kNss.dbName()));
         FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, kNss);
 
         if (refreshTempNss)

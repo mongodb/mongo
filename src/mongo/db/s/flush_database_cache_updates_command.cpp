@@ -157,8 +157,7 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
-            auto const shardingState = ShardingState::get(opCtx);
-            shardingState->assertCanAcceptShardedCommands();
+            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't issue _flushDatabaseCacheUpdates from 'eval'",
@@ -168,33 +167,43 @@ public:
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !opCtx->readOnly());
 
+            const auto dbName = _dbName();
+
+            tassert(10250100,
+                    "The admin and config databases have fixed metadata that does not need to be "
+                    "refreshed",
+                    !dbName.isAdminDB() && !dbName.isConfigDB());
+
             if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                // When the feature flag for authoritative database metadata is enabled, this should
-                // act as a noop. Refreshing the database metadata is no longer supported.
-                return;
-            }
+                // When the `ShardAuthoritativeDbMetadataCRUD` feature flag is enabled, this method
+                // should no longer be used, as nodes start relying on the `config.shard.catalog`
+                // authoritative collections rather than the config server (primary node) or
+                // contacting the primary to replicate filtering metadata in the `config.cache`
+                // collections (secondary nodes).
+                //
+                // However, there is a scenario where a lagging secondary node attempts to contact
+                // the primary node of the replica set while the secondary is still operating
+                // under 8.0 FCV, but the primary has already transitioned to 9.0 FCV. In this case,
+                // the lagging secondary will attempt to refresh using this command as part of the
+                // old protocol.
+                //
+                // In that situation, we will first make the secondary node wait for the latest
+                // opTime so that it becomes aware of the FCV change. This is no worse than the
+                // current behavior, as the existing protocol also relies on the `config.cache`
+                // collections for replication.
+                //
+                // After that, the command will fail, making the secondary aware that it needs
+                // to switch to the authoritative model.
 
-            const auto dbName = _dbName();
-            if (dbName.isAdminDB() || dbName.isConfigDB()) {
-                // The admin and config databases have fixed metadata that does not need to be
-                // refreshed.
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
 
-                if (Base::request().getSyncFromConfig()) {
-                    // To ensure compatibility with old secondaries that still call the
-                    // _flushDatabaseCacheUpdates command to get updated database metadata from
-                    // primary, an entry with fixed metadata is inserted in the
-                    // config.cache.databases collection.
-
-                    LOGV2_DEBUG(6910800,
-                                1,
-                                "Inserting a database collection entry with fixed metadata",
-                                "db"_attr = dbName);
-                    uassertStatusOK(insertDatabaseEntryForBackwardCompatibility(opCtx, dbName));
-                }
-
-                return;
+                uasserted(ErrorCodes::DatabaseMetadataRefreshCanceledDueToFCVTransition,
+                          "This command is deprecated, as shards are authoritative for database "
+                          "metadata. The secondary node must transition to the authoritative "
+                          "refresh model.");
             }
 
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
@@ -218,20 +227,9 @@ public:
 
             if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21981, 1, "Forcing remote routing table refresh", "db"_attr = dbName);
-                uassertStatusOK(FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
-                    opCtx, dbName, boost::none));
-            }
-
-            // A config server could receive this command even if not in config shard mode if the CS
-            // secondary is on an older binary version running a ShardServerCatalogCacheLoader. In
-            // that case we don't want to hit the MONGO_UNREACHABLE in
-            // ConfigServerCatalogCacheLoader::waitForDatabaseFlush() but throw an error instead so
-            // that the secondaries know they don't have updated metadata yet.
-
-            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-            if (!gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe() &&
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                uasserted(8454801, "config server is not storing cached metadata");
+                uassertStatusOK(
+                    FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
+                        opCtx, dbName));
             }
 
             FilteringMetadataCache::get(opCtx)->waitForDatabaseFlush(opCtx, dbName);

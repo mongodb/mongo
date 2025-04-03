@@ -849,6 +849,11 @@ error_codes:
       name: StreamProcessorS3Error,
       categories: [StreamProcessorUserError],
     }
+  - {
+      code: 445,
+      name: DatabaseMetadataRefreshCanceledDueToFCVTransition,
+      categories: [InternalOnly],
+    }
 
   # Error codes 4000-8999 are reserved.
 

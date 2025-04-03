@@ -8,6 +8,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -39,9 +40,14 @@ assert.commandWorked(db.foo.insert({"x": 50, "a": 6}));
 assert.commandWorked(db.foo.insert({"x": 100, "a": 8}));
 assert.commandWorked(db.foo.insert({"x": 150, "a": 20}));
 
-assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+    assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+}
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadataCRUD")) {
+    assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+}
+
 assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
 assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 
 let session = mongos.startSession({retryWrites: false});

@@ -60,7 +60,7 @@ protected:
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
 
         // Once locked, initialize the database version.
-        scopedDss->setDbInfo(opCtx, {dbName, kMyShardName, dbVersion});
+        scopedDss->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
     }
 
     // Database and version information.

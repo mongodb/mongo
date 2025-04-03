@@ -686,7 +686,7 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
             DatabaseType::parse(IDLParserContext("DatabaseType"), dssMetadataCursor->next());
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbInfo.getDbName());
-        scopedDss->setAuthoritativeDbInfo(opCtx, dbInfo);
+        scopedDss->setDbInfo(opCtx, dbInfo);
     }
 }
 

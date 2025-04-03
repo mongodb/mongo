@@ -9,6 +9,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -17,10 +18,13 @@ const collName = "bar";
 const ns = dbName + "." + collName;
 
 function flushRoutingAndDBCacheUpdates(conn) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(conn, "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+        assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
+    }
+
     assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     assert.commandWorked(conn.adminCommand({_flushRoutingTableCacheUpdates: "does.not.exist"}));
-    assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
 }
 
 const st = new ShardingTest({

@@ -455,19 +455,41 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
 Status FilteringMetadataCache::onDbVersionMismatch(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    boost::optional<DatabaseVersion> clientDbVersion) noexcept {
-    try {
-        if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            tassert(10003600, "Expected to be called with a clientDbVersion", clientDbVersion);
-            _onDbVersionMismatchAuthoritative(opCtx, dbName, *clientDbVersion);
-        } else {
-            _onDbVersionMismatch(opCtx, dbName, clientDbVersion);
+    const DatabaseVersion& clientDbVersion) noexcept {
+    while (true) {
+        try {
+            auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                _onDbVersionMismatchAuthoritative(opCtx, dbName, clientDbVersion);
+            } else {
+                _onDbVersionMismatch(opCtx, dbName, clientDbVersion);
+            }
+            return Status::OK();
+        } catch (const DBException& ex) {
+            LOGV2(22065,
+                  "Failed to refresh databaseVersion",
+                  "db"_attr = dbName,
+                  "error"_attr = redact(ex));
+
+            const auto status = ex.toStatus();
+
+            // If the error indicates an FCV transition, retry the operation. This ensures the
+            // secondary node correctly transitions to the authoritative model.
+            if (status != ErrorCodes::DatabaseMetadataRefreshCanceledDueToFCVTransition) {
+                return status;
+            }
         }
+    }
+}
+
+Status FilteringMetadataCache::forceDatabaseMetadataRefresh_DEPRECATED(
+    OperationContext* opCtx, const DatabaseName& dbName) noexcept {
+    try {
+        _onDbVersionMismatch(opCtx, dbName, boost::none);
         return Status::OK();
     } catch (const DBException& ex) {
-        LOGV2(22065,
+        LOGV2(10250102,
               "Failed to refresh databaseVersion",
               "db"_attr = dbName,
               "error"_attr = redact(ex));
@@ -657,7 +679,7 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
     if (!cancellationToken.isCanceled()) {
         if (swDbMetadata.isOK()) {
             // Set the refreshed database metadata in the local catalog.
-            scopedDss->setDbInfo(opCtx, *swDbMetadata.getValue());
+            scopedDss->setDbInfo_DEPRECATED(opCtx, *swDbMetadata.getValue());
         } else if (swDbMetadata == ErrorCodes::NamespaceNotFound) {
             // The non-authoritative database model stores metadata from other shards in the DSS to
             // respond to stale routers without requiring a refresh each time. While clearing

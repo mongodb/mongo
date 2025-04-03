@@ -174,7 +174,7 @@ void MultipleCollectionAccessorTest::installDatabaseMetadata(OperationContext* o
                                                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo(opCtx, {dbName, kMyShardName, dbVersion});
+    scopedDss->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
 }
 
 

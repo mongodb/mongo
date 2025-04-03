@@ -117,9 +117,17 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
     // Ensure all nodes know the dbVersion before the movePrimary.
     assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
     assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
-    assert.commandWorked(primaryShardBefore.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+
+    if (!FeatureFlagUtil.isPresentAndEnabled(primaryShardBefore,
+                                             "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(primaryShardBefore.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    }
+    if (!FeatureFlagUtil.isPresentAndEnabled(primaryShardAfter,
+                                             "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(primaryShardAfter.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    }
+
     assertMatchingDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
-    assert.commandWorked(primaryShardAfter.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     assertMatchingDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
 
     // Run movePrimary through the second mongos.

@@ -182,8 +182,8 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
         auto opCtx = operationContext();
 
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
-        ASSERT_OK(
-            FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(opCtx, kDbName, boost::none));
+        ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
+            opCtx, kDbName));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {
             const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, kDbName);
@@ -211,7 +211,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) 
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
-        dss->setDbInfo(operationContext(), dbInfoToInstall);
+        dss->setDbInfo_DEPRECATED(operationContext(), dbInfoToInstall);
     }
 
     const auto dss = DatabaseShardingState::acquireShared(operationContext(), kDbName);

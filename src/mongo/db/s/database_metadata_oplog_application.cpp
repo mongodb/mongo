@@ -41,7 +41,7 @@ void applyOplogEntryToInsertDatabaseMetadata(OperationContext* opCtx, const Data
     AutoGetDb autoDb(opCtx, db.getDbName(), MODE_IX);
     auto scopedDss =
         DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, db.getDbName());
-    scopedDss->setAuthoritativeDbInfo(opCtx, db);
+    scopedDss->setDbInfo(opCtx, db);
 }
 
 void applyOplogEntryToRemoveDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {

@@ -63,7 +63,7 @@ protected:
     void installDatabaseMetadata(OperationContext* opCtx, const DatabaseVersion& dbVersion) {
         AutoGetDb autoDb(opCtx, _dbName, MODE_X, {}, {});
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
-        scopedDss->setDbInfo(opCtx, {_dbName, kMyShardName, dbVersion});
+        scopedDss->setDbInfo_DEPRECATED(opCtx, {_dbName, kMyShardName, dbVersion});
         getCatalogCacheMock()->setDatabaseReturnValue(
             _dbName, CatalogCacheMock::makeDatabaseInfo(_dbName, kMyShardName, dbVersion));
         _dbVersion = dbVersion;

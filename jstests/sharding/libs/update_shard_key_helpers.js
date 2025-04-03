@@ -2,6 +2,7 @@ import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {
     withAbortAndRetryOnTransientTxnError
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export function shardCollectionMoveChunks(
     st, kDbName, ns, shardKey, docsToInsert, splitDoc, moveChunkDoc) {
@@ -22,9 +23,14 @@ export function shardCollectionMoveChunks(
             {moveChunk: ns, find: moveChunkDoc, to: st.shard1.shardName, _waitForDelete: true}));
     }
 
-    assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+    }
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
+    }
+
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns}));
-    assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
     assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns}));
     st.refreshCatalogCacheForNs(st.s, ns);
 }

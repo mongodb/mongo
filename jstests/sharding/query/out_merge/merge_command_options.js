@@ -1,4 +1,5 @@
 // Tests that aggregations with a $merge stage respect the options set on the command.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
@@ -49,11 +50,13 @@ profilerHasNumMatchingEntriesOrThrow({
     numExpectedMatches: 1
 });
 
-// Force a refresh on rs0. This is necessary because MongoS will get StaleDbVersion upon sending
-// the agg request below, causing it to retry the agg command from the top and thus send
-// listIndexes to the primary shard twice.
-assert.commandWorked(st.rs0.getPrimary().getDB('test').adminCommand(
-    {_flushDatabaseCacheUpdates: 'test', syncFromConfig: true}));
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "ShardAuthoritativeDbMetadataCRUD")) {
+    // Force a refresh on rs0. This is necessary because MongoS will get StaleDbVersion upon sending
+    // the agg request below, causing it to retry the agg command from the top and thus send
+    // listIndexes to the primary shard twice.
+    assert.commandWorked(st.rs0.getPrimary().getDB('test').adminCommand(
+        {_flushDatabaseCacheUpdates: 'test', syncFromConfig: true}));
+}
 
 // Test that the maxTimeMS value is used for both the listIndexes command for uniqueKey
 // validation as well as the $merge aggregation itself.

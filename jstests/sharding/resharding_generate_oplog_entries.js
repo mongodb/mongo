@@ -8,6 +8,7 @@ import {
     withAbortAndRetryOnTransientTxnError,
     withTxnAndAutoRetryOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
@@ -60,10 +61,16 @@ function simulateResharding() {
         {_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}));
 
     jsTestLog("Flushing routing table updates");
-    assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    }
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: dbName}));
+    }
+
     assert.commandWorked(
         st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
-    assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     assert.commandWorked(
         st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
 

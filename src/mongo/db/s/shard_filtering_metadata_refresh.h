@@ -152,7 +152,17 @@ public:
      */
     Status onDbVersionMismatch(OperationContext* opCtx,
                                const DatabaseName& dbName,
-                               boost::optional<DatabaseVersion> clientDbVersion) noexcept;
+                               const DatabaseVersion& clientDbVersion) noexcept;
+
+    /**
+     * Unconditionally causes the database metadata to be refreshed from the config server.
+     *
+     * NOTE: This method is deprecated and should not be used. In the authoritative model, database
+     * refreshes are not required, as shards are authoritative for the databases that own. This
+     * method is retained for backward compatibility.
+     */
+    Status forceDatabaseMetadataRefresh_DEPRECATED(OperationContext* opCtx,
+                                                   const DatabaseName& dbName) noexcept;
 
 private:
     /**

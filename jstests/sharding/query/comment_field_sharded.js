@@ -3,6 +3,7 @@
  * and profiler. This test also verifies that for a sharded collection, the 'comment' fields gets
  * passed on from mongos to the respective shards.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -103,14 +104,20 @@ function runCommentParamTest({
     // Force a refresh on the shards. This is necessary because MongoS could get StaleDbVersion
     // error upon sending an agg request, causing it to retry the agg command from the top and
     // resulting in more profiler entries than what is expected.
-    assert.commandWorked(st.rs0.getPrimary().getDB(testDB.getName()).adminCommand({
-        _flushDatabaseCacheUpdates: testDB.getName(),
-        syncFromConfig: true
-    }));
-    assert.commandWorked(st.rs1.getPrimary().getDB(testDB.getName()).adminCommand({
-        _flushDatabaseCacheUpdates: testDB.getName(),
-        syncFromConfig: true
-    }));
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(),
+                                             "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(st.rs0.getPrimary().getDB(testDB.getName()).adminCommand({
+            _flushDatabaseCacheUpdates: testDB.getName(),
+            syncFromConfig: true
+        }));
+    }
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs1.getPrimary(),
+                                             "ShardAuthoritativeDbMetadataCRUD")) {
+        assert.commandWorked(st.rs1.getPrimary().getDB(testDB.getName()).adminCommand({
+            _flushDatabaseCacheUpdates: testDB.getName(),
+            syncFromConfig: true
+        }));
+    }
 
     // Run the 'command' in a parallel shell.
     let outShell = startParallelShell(parallelFunction, st.s.port);

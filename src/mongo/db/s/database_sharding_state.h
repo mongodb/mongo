@@ -160,15 +160,17 @@ public:
      * Sets this node's cached database info in a non-authoritative way.
      *
      * The caller must hold the database lock in MODE_IX.
+     *
+     * NOTE: This method is deprecated and should not be used. In the authoritative model, database
+     * refreshes are not required, and there is no need to lock the database. The method is retained
+     * for backward compatibility, but its usage is discouraged in favor of the updated approach.
      */
-    void setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
+    void setDbInfo_DEPRECATED(OperationContext* opCtx, const DatabaseType& dbInfo);
 
     /**
      * Sets this node's cached database info.
-     *
-     * The caller must hold the database lock in MODE_IX.
      */
-    void setAuthoritativeDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
+    void setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
 
     /**
      * Resets this node's cached database info in a non-authoritative way.
