@@ -156,6 +156,12 @@ config_fuzzer_params = {
             "fuzz_at": ["startup", "runtime"],
         },
         "oplogFetcherUsesExhaust": {"choices": [True, False], "fuzz_at": ["startup"]},
+        # Default value False; we are enabling more data integrity checks during timeseries compression.
+        "performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert": {
+            "choices": [True, False],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         # The actual maximum of `replBatchLimitOperations` is 1000 * 1000 but this range doesn't work
         # for WINDOWS DEBUG, so that maximum is multiplied by 0.2, which is still a lot more than the
         # default value of 5000. The reason why the full range [1, 1000*1000] doesn't work on WINDOWS
@@ -183,6 +189,52 @@ config_fuzzer_params = {
             "min": 10,
             "max": 1000,
             "fuzz_at": ["startup"],
+        },
+        # Default value 1000; many tests don't insert enough measurements to rollover due to count, so we enable a larger range for this parameter.
+        "timeseriesBucketMaxCount": {
+            "min": 20,
+            "max": 2000,
+            "fuzz_at": ["startup"],
+        },
+        # Default value 10; maximum value is the lowest possible value of timeseriesBucketMaxCount.
+        "timeseriesBucketMinCount": {"min": 1, "max": 20, "fuzz_at": ["startup"]},
+        # Default value 128000 (125KB); many tests don't insert enough measurements to rollover due to size, so we enable a larger range for this parameter.
+        "timeseriesBucketMaxSize": {
+            "min": 5120,  # 5KB
+            "max": 256000,  # 250KB
+            "fuzz_at": ["startup"],
+        },
+        # Default value 5120; maximum value is the lowest possible value of timeseriesBucketMaxSize.
+        "timeseriesBucketMinSize": {
+            "min": 3072,  # 3KB
+            "max": 5120,  # 5KB
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        # Default value 3; Enables more bucket re-opening by increasing the number of buckets that we can expire when performing idle bucket expiry.
+        # Increasing bucket expiry was the most helpful way to increase re-opening because these buckets are still eligible for archived-based reopening, without side effects from doing more hard closes.
+        # We also extended the lower side of the range so we can test the theoretical minimum (2) that enables the system to make progress.
+        "timeseriesIdleBucketExpiryMaxCountPerAttempt": {
+            "min": 2,
+            "max": 32,
+            "fuzz_at": ["startup"],
+        },
+        # Default value 32; doesn't contribute to increasing re-opening when being fuzzed with other parameters.
+        # Having a lower value can increase rollover due to size because we have lower byte uncompressed size measurements having their uncompressed size being counted as the size in the bucket,
+        # but fuzzing timeseriesLargeMeasurementThreshold at a lower range led to less re-opening when fuzzing with other parameters.
+        "timeseriesLargeMeasurementThreshold": {
+            "min": 28,
+            "max": 36,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        # Default value 104857600 (100 MB); Enables more bucket re-opening by decreasing the side bucket catalog memory threshold so we can more aggressively expire buckets.
+        # Increasing bucket expiry was the most helpful way to increase re-opening because these buckets are still eligible for archived-based reopening, without side effects from doing more hard closes.
+        "timeseriesSideBucketCatalogMemoryUsageThreshold": {
+            "min": 200,
+            "max": 500,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
         "temporarilyUnavailableBackoffBaseMs": {"min": 1, "max": 1000, "fuzz_at": ["startup"]},
         "temporarilyUnavailableMaxRetries": {"min": 1, "max": 10, "fuzz_at": ["startup"]},

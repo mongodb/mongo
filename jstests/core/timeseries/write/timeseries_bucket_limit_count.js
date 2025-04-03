@@ -8,6 +8,8 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_getmore,
+ *   # The config fuzzer can fuzz the bucketMaxCount.
+ *   does_not_support_config_fuzzer
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
