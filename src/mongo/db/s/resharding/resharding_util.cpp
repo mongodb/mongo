@@ -507,20 +507,21 @@ boost::optional<Status> coordinatorAbortedError() {
                   "Recieved abort from the resharding coordinator"};
 }
 
-void validatePerformVerification(boost::optional<bool> performVerification) {
+void validatePerformVerification(const VersionContext& vCtx,
+                                 boost::optional<bool> performVerification) {
     if (performVerification.has_value()) {
-        validatePerformVerification(*performVerification);
+        validatePerformVerification(vCtx, *performVerification);
     }
 }
 
-void validatePerformVerification(bool performVerification) {
+void validatePerformVerification(const VersionContext& vCtx, bool performVerification) {
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when featureFlagReshardingVerification is not enabled",
             !performVerification ||
                 resharding::gFeatureFlagReshardingVerification.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
@@ -579,6 +580,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto performVerification = request.getPerformVerification();
     if (!performVerification.has_value() &&
         resharding::gFeatureFlagReshardingVerification.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         performVerification = true;
     }
@@ -588,6 +590,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setRelaxed(request.getRelaxed());
 
     if (!resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
+            VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::InvalidOptions,
                 "Resharding with numSamplesPerChunk is not enabled, reject numSamplesPerChunk "

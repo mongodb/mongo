@@ -109,6 +109,7 @@ public:
             reshardCollectionRequest.setPerformVerification(request().getPerformVerification());
 
             if (resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 reshardCollectionRequest.setNumSamplesPerChunk(request().getNumSamplesPerChunk());
             }

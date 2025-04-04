@@ -156,6 +156,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
 
             // TODO SERVER-92437 ensure this behavior is safe during FCV upgrade/downgrade
             if (!resharding::gFeatureFlagReshardingRelaxedMode.isEnabled(
+                    VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(ErrorCodes::InvalidOptions,
                         "Relaxed mode is not enabled, reject relaxed parameter",
@@ -179,7 +180,8 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
 
-            resharding::validatePerformVerification(_doc.getPerformVerification());
+            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
+                                                    _doc.getPerformVerification());
             configsvrReshardCollection.setPerformVerification(_doc.getPerformVerification());
 
             auto provenance = _doc.getProvenance();

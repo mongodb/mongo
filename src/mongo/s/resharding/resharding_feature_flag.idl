@@ -62,7 +62,6 @@ feature_flags:
         default: true
         version: 8.1
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagReshardingSkipCloningAndApplyingIfApplicable:
         description: "Feature flag to make recipient shards that are not going to own any chunks for
                       the collection after resharding only clone the options and indexes for the
@@ -71,7 +70,6 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagReshardingStoreOplogFetcherProgress:
         description: "Feature flag to make recipient shards store the count of oplog entries fetched
                       in a progress document and use this count instead of the fast count to recover
@@ -79,21 +77,18 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagReshardingNumSamplesPerChunk:
         description: "Feature flag for adding numSamplesPerChunk as a field in reshardCollection."
         cpp_varname: gfeatureFlagReshardingNumSamplesPerChunk
         default: true
         version: 8.1
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagReshardingVerification:
         description: "Feature flag to enable data loss and consistency verification steps during
                       resharding to ensure correctness."
         cpp_varname: gFeatureFlagReshardingVerification
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagReshardingCloneNoRefresh:
         description: "Feature flag to enable not using shard version refresh for resharding."
         cpp_varname: gFeatureFlagReshardingCloneNoRefresh

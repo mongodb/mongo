@@ -198,7 +198,8 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
     catalogCache->invalidateCollectionEntry_LINEARIZABLE(
         reshardingFields.getDonorFields()->getTempReshardingNss());
 
-    auto donorDoc = constructDonorDocumentFromReshardingFields(nss, metadata, reshardingFields);
+    auto donorDoc = constructDonorDocumentFromReshardingFields(
+        VersionContext::getDecoration(opCtx), nss, metadata, reshardingFields);
     createReshardingStateMachine<ReshardingDonorService,
                                  DonorStateMachine,
                                  ReshardingDonorDocument>(opCtx, donorDoc);
@@ -255,8 +256,8 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
         return;
     }
 
-    auto recipientDoc =
-        constructRecipientDocumentFromReshardingFields(opCtx, nss, metadata, reshardingFields);
+    auto recipientDoc = constructRecipientDocumentFromReshardingFields(
+        VersionContext::getDecoration(opCtx), nss, metadata, reshardingFields);
     createReshardingStateMachine<ReshardingRecipientService,
                                  RecipientStateMachine,
                                  ReshardingRecipientDocument>(opCtx, recipientDoc);
@@ -307,6 +308,7 @@ void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
 }  // namespace
 
 ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
+    const VersionContext& vCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields) {
@@ -325,7 +327,7 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
     commonMetadata.setStartTime(reshardingFields.getStartTime());
     commonMetadata.setProvenance(reshardingFields.getProvenance());
-    resharding::validatePerformVerification(reshardingFields.getPerformVerification());
+    resharding::validatePerformVerification(vCtx, reshardingFields.getPerformVerification());
     commonMetadata.setPerformVerification(reshardingFields.getPerformVerification());
 
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
@@ -334,7 +336,7 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
 }
 
 ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
-    OperationContext* opCtx,
+    const VersionContext& vCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields) {
@@ -360,7 +362,7 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    metadata.getShardKeyPattern().toBSON());
     commonMetadata.setStartTime(reshardingFields.getStartTime());
     commonMetadata.setProvenance(reshardingFields.getProvenance());
-    resharding::validatePerformVerification(reshardingFields.getPerformVerification());
+    resharding::validatePerformVerification(vCtx, reshardingFields.getPerformVerification());
     commonMetadata.setPerformVerification(reshardingFields.getPerformVerification());
 
     ReshardingRecipientMetrics metrics;
@@ -371,12 +373,12 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !metadata.currentShardHasAnyChunks()) {
         recipientDoc.setSkipCloningAndApplying(true);
     }
     if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         recipientDoc.setStoreOplogFetcherProgress(true);
     }
 

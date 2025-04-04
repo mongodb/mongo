@@ -671,13 +671,16 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ConstructDonorDocumentFromRe
             appendDonorFieldsToReshardingFields(reshardingFields, kReshardingKeyPattern);
             if (performVerification && !enableVerification) {
                 ASSERT_THROWS_CODE(resharding::constructDonorDocumentFromReshardingFields(
-                                       kOriginalNss, metadata, reshardingFields),
+                                       VersionContext::getDecoration(opCtx),
+                                       kOriginalNss,
+                                       metadata,
+                                       reshardingFields),
                                    DBException,
                                    ErrorCodes::InvalidOptions);
                 continue;
             }
             auto donorDoc = resharding::constructDonorDocumentFromReshardingFields(
-                kOriginalNss, metadata, reshardingFields);
+                VersionContext::getDecoration(opCtx), kOriginalNss, metadata, reshardingFields);
             assertDonorDocMatchesReshardingFields(
                 kOriginalNss, kExistingUUID, reshardingFields, donorDoc);
         }
@@ -715,13 +718,19 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
                 reshardingFields, kShards, kExistingUUID, kOriginalNss);
             if (performVerification && !enableVerification) {
                 ASSERT_THROWS_CODE(resharding::constructRecipientDocumentFromReshardingFields(
-                                       opCtx, kTemporaryReshardingNss, metadata, reshardingFields),
+                                       VersionContext::getDecoration(opCtx),
+                                       kTemporaryReshardingNss,
+                                       metadata,
+                                       reshardingFields),
                                    DBException,
                                    ErrorCodes::InvalidOptions);
                 continue;
             }
             auto recipientDoc = resharding::constructRecipientDocumentFromReshardingFields(
-                opCtx, kTemporaryReshardingNss, metadata, reshardingFields);
+                VersionContext::getDecoration(opCtx),
+                kTemporaryReshardingNss,
+                metadata,
+                reshardingFields);
             assertRecipientDocMatchesReshardingFields(metadata, reshardingFields, recipientDoc);
         }
     }

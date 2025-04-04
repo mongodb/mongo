@@ -412,8 +412,9 @@ boost::optional<Status> coordinatorAbortedError();
 /**
  * If 'performVerification' is true, asserts that featureFlagReshardingVerification is enabled.
  */
-void validatePerformVerification(boost::optional<bool> performVerification);
-void validatePerformVerification(bool performVerification);
+void validatePerformVerification(const VersionContext& vCtx,
+                                 boost::optional<bool> performVerification);
+void validatePerformVerification(const VersionContext& vCtx, bool performVerification);
 
 /**
  * Verifies that for each index spec in sourceIndexSpecs, there is an identical spec in

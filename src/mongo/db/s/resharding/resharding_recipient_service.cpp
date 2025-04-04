@@ -854,6 +854,7 @@ void ReshardingRecipientService::RecipientStateMachine::
                                              createCollRequest);
 
         if (resharding::gFeatureFlagReshardingVerification.isEnabled(
+                VersionContext::getDecoration(opCtx.get()),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             auto [sourceCollOptions, _] = _externalState->getCollectionOptions(
                 opCtx.get(),
@@ -1180,9 +1181,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                abortToken)
         .thenRunOn(**executor)
         .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
-            if (resharding::gFeatureFlagReshardingVerification.isEnabled(
+            if (auto opCtx = factory.makeOperationContext(&cc());
+                resharding::gFeatureFlagReshardingVerification.isEnabled(
+                    VersionContext::getDecoration(opCtx.get()),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                auto opCtx = factory.makeOperationContext(&cc());
                 auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
                     opCtx.get(),
                     _metadata.getSourceNss(),

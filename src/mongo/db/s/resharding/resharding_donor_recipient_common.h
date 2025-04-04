@@ -100,12 +100,13 @@ boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachineAndTh
  * The following functions construct a ReshardingDocument from the given 'reshardingFields'.
  */
 ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
+    const VersionContext& vCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
 
 ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
-    OperationContext* opCtx,
+    const VersionContext& vCtx,
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);

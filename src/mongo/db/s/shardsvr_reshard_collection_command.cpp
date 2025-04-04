@@ -100,7 +100,8 @@ public:
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
-            resharding::validatePerformVerification(request().getPerformVerification());
+            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
+                                                    request().getPerformVerification());
 
             {
                 FixedFCVRegion fixedFcvRegion{opCtx};

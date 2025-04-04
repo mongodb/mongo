@@ -177,7 +177,8 @@ public:
                 resharding::validateShardDistribution(
                     *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
             }
-            resharding::validatePerformVerification(request().getPerformVerification());
+            resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
+                                                    request().getPerformVerification());
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]()
