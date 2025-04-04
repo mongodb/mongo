@@ -211,7 +211,7 @@ TEST(FLE2EncryptionPlaceholder, TextSearchBadObjectAsValueFails) {
 
 TEST(FLE2RangeFindSpec, UpperAndLowerBoundTypeMismatches) {
     BSONObj values =
-        BSON("int" << int32_t(2) << "smallLong" << int64_t(48) << "largeLong" << 2147483650
+        BSON("int" << int32_t(2) << "smallLong" << int64_t(48) << "largeLong" << int64_t(2147483650)
                    << "date" << Date_t() << "double" << 1.2 << "decimal" << Decimal128()
                    << "infinity" << std::numeric_limits<double>::infinity());
 
