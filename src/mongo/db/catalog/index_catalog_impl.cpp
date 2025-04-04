@@ -1370,11 +1370,12 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
 
     // Recreate the ident on-disk. DurableCatalog::createIndex() will lookup the ident internally
     // using the catalogId and index name.
+    const auto indexDescriptor = released->descriptor();
     status = DurableCatalog::get(opCtx)->createIndex(opCtx,
                                                      collection->getCatalogId(),
                                                      collection->ns(),
                                                      collection->getCollectionOptions(),
-                                                     released->descriptor());
+                                                     indexDescriptor->toIndexConfig());
     if (!status.isOK()) {
         return status;
     }

@@ -43,8 +43,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -52,10 +50,9 @@
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -187,7 +184,7 @@ public:
                        const RecordId& catalogId,
                        const NamespaceString& nss,
                        const CollectionOptions& collOptions,
-                       const IndexDescriptor* spec);
+                       const IndexConfig& indexConfig);
 
     /**
      * Import a collection by inserting the given metadata into the durable catalog and instructing
@@ -239,7 +236,7 @@ public:
     Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const CollectionOptions& collOptions,
-                                              const IndexDescriptor* spec,
+                                              const IndexConfig& indexConfig,
                                               StringData ident);
 
     void getReadyIndexes(OperationContext* opCtx, RecordId catalogId, StringSet* names) const;
@@ -247,22 +244,6 @@ public:
     bool isIndexPresent(OperationContext* opCtx,
                         const RecordId& catalogId,
                         StringData indexName) const;
-
-    /**
-     * Returns true if the index identified by 'indexName' is multikey, and returns false otherwise.
-     *
-     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
-     * index type supports tracking path-level multikey information in the catalog, then this
-     * function sets 'multikeyPaths' as the path components that cause this index to be multikey.
-     *
-     * In particular, if this function returns false and the index supports tracking path-level
-     * multikey information, then 'multikeyPaths' is initialized as a vector with size equal to the
-     * number of elements in the index key pattern of empty sets.
-     */
-    bool isIndexMultikey(OperationContext* opCtx,
-                         const RecordId& catalogId,
-                         StringData indexName,
-                         MultikeyPaths* multikeyPaths) const;
 
 private:
     class AddIdentChange;

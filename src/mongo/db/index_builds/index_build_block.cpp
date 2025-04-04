@@ -114,7 +114,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             opCtx,
             collection->ns(),
             collection->getCollectionOptions(),
-            writableEntry->descriptor(),
+            writableEntry->descriptor()->toIndexConfig(),
             writableEntry->getIdent());
         if (!status.isOK())
             return status;

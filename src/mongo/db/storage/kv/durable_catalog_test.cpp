@@ -274,8 +274,8 @@ protected:
         md->insertIndex(std::move(imd));
         getDurableCatalog()->putMetaData(operationContext(), catalogId, *md);
 
-        ASSERT_OK(
-            getDurableCatalog()->createIndex(operationContext(), catalogId, nss, {}, &descriptor));
+        ASSERT_OK(getDurableCatalog()->createIndex(
+            operationContext(), catalogId, nss, {}, descriptor.toIndexConfig()));
         idxIdent = getDurableCatalog()->getIndexIdent(
             operationContext(), catalogId, descriptor.indexName());
 

@@ -870,20 +870,17 @@ public:
                              bool shouldBeMultikey,
                              const MultikeyPaths& expectedMultikeyPaths) {
         DurableCatalog* durableCatalog = DurableCatalog::get(opCtx);
-
-        OneOffRead oor(_opCtx, ts);
-
-        MultikeyPaths actualMultikeyPaths;
+        auto indexMetaData = getIndexMetaData(
+            getMetaDataAtTime(durableCatalog, collection->getCatalogId(), ts), indexName);
         if (!shouldBeMultikey) {
-            ASSERT_FALSE(durableCatalog->isIndexMultikey(
-                opCtx, collection->getCatalogId(), indexName, &actualMultikeyPaths))
+            ASSERT_FALSE(indexMetaData.multikey)
                 << "index " << indexName << " should not be multikey at timestamp " << ts;
         } else {
-            ASSERT(durableCatalog->isIndexMultikey(
-                opCtx, collection->getCatalogId(), indexName, &actualMultikeyPaths))
+            ASSERT_TRUE(indexMetaData.multikey)
                 << "index " << indexName << " should be multikey at timestamp " << ts;
         }
 
+        MultikeyPaths actualMultikeyPaths = indexMetaData.multikeyPaths;
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
         if (!match) {
             FAIL(str::stream() << "TS: " << ts.toString()

@@ -30,7 +30,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <algorithm>
-#include <array>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
@@ -45,8 +44,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/feature_document_util.h"
@@ -55,6 +52,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
@@ -505,14 +503,11 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
                                    const RecordId& catalogId,
                                    const NamespaceString& nss,
                                    const CollectionOptions& collOptions,
-                                   const IndexDescriptor* spec) {
-    std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
+                                   const IndexConfig& indexConfig) {
+    std::string ident = getIndexIdent(opCtx, catalogId, indexConfig.indexName);
 
-    Status status = _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
-                                                       nss,
-                                                       collOptions,
-                                                       ident,
-                                                       spec->toIndexConfig());
+    Status status = _engine->createSortedDataInterface(
+        *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, indexConfig);
     if (status.isOK()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
@@ -661,39 +656,17 @@ Status DurableCatalog::dropCollection(OperationContext* opCtx, const RecordId& c
 Status DurableCatalog::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
                                                           const NamespaceString& nss,
                                                           const CollectionOptions& collOptions,
-                                                          const IndexDescriptor* spec,
+                                                          const IndexConfig& indexConfig,
                                                           StringData ident) {
     auto status =
         _engine->dropSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx), ident);
     if (!status.isOK())
         return status;
 
-    status = _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
-                                                nss,
-                                                collOptions,
-                                                ident,
-                                                spec->toIndexConfig());
+    status = _engine->createSortedDataInterface(
+        *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, indexConfig);
 
     return status;
-}
-
-bool DurableCatalog::isIndexMultikey(OperationContext* opCtx,
-                                     const RecordId& catalogId,
-                                     StringData indexName,
-                                     MultikeyPaths* multikeyPaths) const {
-    auto catalogEntry = getParsedCatalogEntry(opCtx, catalogId);
-    auto md = catalogEntry->metadata;
-
-    int offset = md->findIndexOffset(indexName);
-    invariant(offset >= 0,
-              str::stream() << "cannot get multikey for index " << indexName << " @ " << catalogId
-                            << " : " << md->toBSON());
-
-    if (multikeyPaths && !md->indexes[offset].multikeyPaths.empty()) {
-        *multikeyPaths = md->indexes[offset].multikeyPaths;
-    }
-
-    return md->indexes[offset].multikey;
 }
 
 void DurableCatalog::getReadyIndexes(OperationContext* opCtx,
