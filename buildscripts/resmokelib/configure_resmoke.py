@@ -7,6 +7,7 @@ import datetime
 import glob
 import os
 import os.path
+import platform
 import random
 import shlex
 import subprocess
@@ -16,6 +17,7 @@ import traceback
 from pathlib import Path
 from typing import Dict, Optional
 
+import git
 import pymongo.uri_parser
 import yaml
 from opentelemetry import baggage, context, trace
@@ -31,6 +33,7 @@ from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.util.read_config import read_config_file
 
 BASE_16_TO_INT = 16
+COLLECTOR_ENDPOINT = "otel-collector.prod.corp.mongodb.com:443"
 
 
 def validate_and_update_config(parser, args, should_configure_otel=True):
@@ -191,21 +194,30 @@ def _find_resmoke_wrappers():
     return list(candidate_installs)
 
 
+def _should_skip_grpc_tracing():
+    """Check whether grpc tracing is enabled on the current machine's OS."""
+    return sys.platform.startswith("linux") and platform.machine().startswith(
+        ("ppc", "powerpc", "s390")
+    )
+
+
 def _set_up_tracing(
     otel_collector_dir: Optional[str],
     trace_id: Optional[str],
     parent_span_id: Optional[str],
-    extra_context: Optional[Dict[str, object]],
+    extra_context: Dict[str, object],
 ) -> bool:
     """Try to set up otel tracing. On success return True. On failure return False.
 
-    This method does 3 things:
+    This method does 4 things:
     1. If a user passes in a directory pathname to store OTel metrics in,
     then we export metrics to files in that directory using our custom exporter
     `FileSpanExporter`.
-    2. If a user passes in a trace ID and a parent span ID, we assume both of those.
+    2. If the user is running outside of Evergreen, we send data directly to the
+    OTEL collector.
+    3. If a user passes in a trace ID and a parent span ID, we assume both of those.
     This allows us to tie resmoke metrics to a parent metric.
-    3. If a user passes in extra_context, we add these "global" values to our baggage.
+    4. If a user passes in extra_context, we add these "global" values to our baggage.
     This allows us to propagate these values to all child spans in resmoke
     using our custom span processor `BatchedBaggageSpanProcessor`.
     """
@@ -227,7 +239,22 @@ def _set_up_tracing(
             provider.add_span_processor(processor)
         except OSError:
             traceback.print_exc()
+            print("Failed to create local file to send otel metrics to.")
             success = False
+
+    # If we're not running inside of Evergreen, we need to configure the endpoint to send traces directly to the ingestor.
+    if not _config.EVERGREEN_TASK_ID and not _should_skip_grpc_tracing():
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+        try:
+            user_email = git.config.GitConfigParser().get_value("user", "email")
+            extra_context["user.email"] = user_email
+            processor = BatchedBaggageSpanProcessor(OTLPSpanExporter(endpoint=COLLECTOR_ENDPOINT))
+            provider.add_span_processor(processor)
+        except Exception:
+            # We'll only track local usage we can actually follow back to real users.
+            pass
+
     trace.set_tracer_provider(provider)
 
     if trace_id and parent_span_id:
@@ -625,7 +652,9 @@ be invoked as either:
                     "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
                     "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
                     "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
-                    "evergreen.task.execution": _config.EVERGREEN_EXECUTION,
+                    "evergreen.task.execution": _config.EVERGREEN_EXECUTION
+                    if _config.EVERGREEN_TASK_ID
+                    else None,  # We need to explicitly set this to None to prevent it from being included even when it makes no sense locally.
                     "evergreen.task.id": _config.EVERGREEN_TASK_ID,
                     "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
                     "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
@@ -635,7 +664,9 @@ be invoked as either:
                 },
             )
             if not setup_success:
-                print("Failed to create file to send otel metrics to. Continuing.")
+                print(
+                    "Failed to set up otel metric collection. Continuing as this is not a blocking error."
+                )
         except (KeyboardInterrupt, SystemExit):
             raise
         except:

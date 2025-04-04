@@ -173,6 +173,7 @@ gcovr = "7.2"
 opentelemetry-api = "*"
 opentelemetry-sdk = "*"
 opentelemetry-exporter-otlp-proto-common = "*"
+opentelemetry-exporter-otlp-proto-grpc = { version = "*", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 
 [tool.poetry.group.tooling-metrics.dependencies]
 mongo-tooling-metrics = "1.0.8"
