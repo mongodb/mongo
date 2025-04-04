@@ -64,6 +64,7 @@
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
@@ -193,12 +194,13 @@ protected:
                                                                        getSourceId().getShardId(),
                                                                        _sourceDbVersion})));
 
-        auto [rawPipeline, expCtx] = _cloner->makeRawPipeline(
+        auto [rawPipeline, expCtx] = _cloner->makeRawNaturalOrderPipeline(
             operationContext(), std::make_shared<MockMongoInterface>(configCacheChunksData));
         _pipeline = Pipeline::parse(rawPipeline, expCtx);
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));
+        _resumeTokenNum = 0;
     }
 
     template <class T>
@@ -261,6 +263,39 @@ protected:
         return ChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)), boost::none);
     }
 
+    /**
+     * Fetches and inserts a single batch of documents. Returns true if there are more documents to
+     * be fetched and inserted, and returns false otherwise.
+     */
+    bool doOneBatch(OperationContext* opCtx,
+                    Pipeline& pipeline,
+                    TxnNumber& txnNum,
+                    ShardId donorShard,
+                    HostAndPort donorHost,
+                    size_t batchSize) {
+        pipeline.reattachToOperationContext(opCtx);
+        ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
+        _advanceResumeToken(batchSize);
+
+        std::vector<InsertStatement> batch;
+        do {
+            auto doc = pipeline.getNext();
+            if (!doc) {
+                break;
+            }
+
+            auto obj = doc->toBson();
+            batch.emplace_back(obj.getOwned());
+        } while (batch.size() < batchSize);
+
+        if (batch.empty()) {
+            return false;
+        }
+
+        _cloner->writeOneBatch(opCtx, txnNum, batch, donorShard, donorHost, _getResumeToken());
+        return true;
+    }
+
     void runPipelineTest(
         ShardKeyPattern shardKey,
         const ShardId& recipientShard,
@@ -280,9 +315,10 @@ protected:
         opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
 
         TxnNumber txnNum(0);
+        // Make the documents require multiple insert batches.
+        const size_t batchSize = std::max(static_cast<int64_t>(1), expectedDocumentsCount / 2);
 
-        while (_cloner->doOneBatch(
-            opCtx, *_pipeline, txnNum, kMyShardName, _myHostAndPort, _resumeToken)) {
+        while (doOneBatch(opCtx, *_pipeline, txnNum, kMyShardName, _myHostAndPort, batchSize)) {
             AutoGetCollection tempColl{opCtx, _tempNss, MODE_IX};
             ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsProcessedCount());
             ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
@@ -292,7 +328,7 @@ protected:
                 IDLParserContext("ReshardingCollectionClonerTest"), doc);
             ASSERT_BSONOBJ_EQ(parsedDoc.getId().toBSON(), getSourceId().toBSON());
             ASSERT_EQ(parsedDoc.getDonorHost(), _myHostAndPort);
-            ASSERT_BSONOBJ_EQ(*parsedDoc.getResumeToken(), _resumeToken);
+            ASSERT_BSONOBJ_EQ(*parsedDoc.getResumeToken(), _getResumeToken());
 
             if (testOptions.storeProgress) {
                 ASSERT_EQ(tempColl->numRecords(opCtx), *parsedDoc.getDocumentsCopied());
@@ -323,12 +359,20 @@ protected:
             BSON(ReshardingRecipientResumeData::kIdFieldName << getSourceId().toBSON()));
     }
 
-protected:
+private:
+    void _advanceResumeToken(size_t batchSize) {
+        _resumeTokenNum += batchSize;
+    }
+
+    BSONObj _getResumeToken() {
+        return BSON("tokenNum" << _resumeTokenNum);
+    }
+
     const DatabaseVersion _sourceDbVersion{UUID::gen(), Timestamp(1, 1)};
     int _sourceDbNum;
 
     const HostAndPort _myHostAndPort{kMyShardName + ":123"};
-    const BSONObj _resumeToken = BSON("token" << 123);
+
 
     // Initialized at the start of each test case.
     NamespaceString _sourceNss;
@@ -338,6 +382,8 @@ protected:
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingCollectionCloner> _cloner;
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    // Mock 'postBatchResumeToken'. Incremented every a mock batch is processed.
+    int _resumeTokenNum = 0;
 };
 
 TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {
@@ -357,15 +403,11 @@ TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {
         const auto verify = [](auto cursor) {
             auto next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 1 << "x" << MINKEY << "$sortKey" << BSON_ARRAY(1)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 1 << "x" << MINKEY), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 2 << "x" << -0.001 << "$sortKey" << BSON_ARRAY(2)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 2 << "x" << -0.001), next->data.toBson());
 
             ASSERT_FALSE(cursor->next());
         };
@@ -398,25 +440,19 @@ TEST_F(ReshardingCollectionClonerTest, MaxKeyChunk) {
         const auto verify = [](auto cursor) {
             auto next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << 0LL << "$sortKey" << BSON_ARRAY(3)),
-                                     next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << 0LL), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0 << "$sortKey" << BSON_ARRAY(4)),
-                                     next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 5 << "x" << 0.001 << "$sortKey" << BSON_ARRAY(5)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 6 << "x" << MAXKEY << "$sortKey" << BSON_ARRAY(6)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << MAXKEY), next->data.toBson());
 
             ASSERT_FALSE(cursor->next());
         };
@@ -461,25 +497,19 @@ TEST_F(ReshardingCollectionClonerTest, HashedShardKey) {
         const auto verify = [](auto cursor) {
             auto next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 3 << "x" << -0.123 << "$sortKey" << BSON_ARRAY(3)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << -0.123), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0 << "$sortKey" << BSON_ARRAY(4)),
-                                     next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0LL << "$sortKey" << BSON_ARRAY(5)),
-                                     next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0LL), next->data.toBson());
 
             next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 6 << "x" << 0.123 << "$sortKey" << BSON_ARRAY(6)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << 0.123), next->data.toBson());
 
             ASSERT_FALSE(cursor->next());
         };
@@ -524,9 +554,7 @@ TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
         const auto verify = [](auto cursor) {
             auto next = cursor->next();
             ASSERT(next);
-            ASSERT_BSONOBJ_BINARY_EQ(
-                BSON("_id" << 4 << "x" << 0 << "y" << 0 << "$sortKey" << BSON_ARRAY(4)),
-                next->data.toBson());
+            ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0 << "y" << 0), next->data.toBson());
 
             ASSERT_FALSE(cursor->next());
         };

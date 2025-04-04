@@ -139,73 +139,6 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
       _relaxed(std::move(relaxed)) {}
 
 std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
-ReshardingCollectionCloner::makeRawPipeline(
-    OperationContext* opCtx,
-    std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-    Value resumeId) {
-    // Assume that the input collection isn't a view. The collectionUUID parameter to
-    // the aggregate would enforce this anyway.
-    ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[_sourceNss] = {_sourceNss, std::vector<BSONObj>{}};
-
-    // Assume that the config.cache.chunks collection isn't a view either.
-    auto tempNss = resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
-    auto tempCacheChunksNss = NamespaceString::makeGlobalConfigCollection(
-        "cache.chunks." +
-        NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()));
-    resolvedNamespaces[tempCacheChunksNss] = {tempCacheChunksNss, std::vector<BSONObj>{}};
-
-    // Pipeline::makePipeline() ignores the collation set on the AggregationRequest (or lack
-    // thereof) and instead only considers the collator set on the ExpressionContext. Setting
-    // nullptr as the collator on the ExpressionContext means that the aggregation pipeline is
-    // always using the "simple" collation, even when the collection default collation for
-    // _sourceNss is non-simple. The chunk ranges in the $lookup stage must be compared using the
-    // simple collation because collections are always sharded using the simple collation. However,
-    // resuming by _id is only efficient (i.e. non-blocking seek/sort) when the aggregation pipeline
-    // would be using the collection's default collation. We cannot do both so we choose to disallow
-    // automatic resuming for collections with non-simple default collations.
-    uassert(4929303,
-            "Cannot resume cloning when sharded collection has non-simple default collation",
-            resumeId.missing() || collectionHasSimpleCollation(opCtx, _sourceNss));
-    auto expCtx = ExpressionContextBuilder{}
-                      .opCtx(opCtx)
-                      .mongoProcessInterface(mongoProcessInterface)
-                      .ns(_sourceNss)
-                      .resolvedNamespace(std::move(resolvedNamespaces))
-                      .collUUID(_sourceUUID)
-                      .build();
-    std::vector<BSONObj> rawPipeline;
-
-    if (!resumeId.missing()) {
-        rawPipeline.emplace_back(BSON(
-            "$match" << BSON(
-                "$expr" << BSON("$gte" << BSON_ARRAY("$_id" << BSON("$literal" << resumeId))))));
-    }
-
-    auto keyPattern = ShardKeyPattern(_newShardKeyPattern.getKeyPattern()).toBSON();
-    rawPipeline.emplace_back(BSON(
-        DocumentSourceReshardingOwnershipMatch::kStageName
-        << BSON("recipientShardId"
-                << _recipientShard << "reshardingKey" << keyPattern
-                << "temporaryReshardingNamespace"
-                << NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()))));
-
-    // We use $arrayToObject to synthesize the $sortKeys needed by the AsyncResultsMerger to
-    // merge the results from all of the donor shards by {_id: 1}. This expression wouldn't
-    // be correct if the aggregation pipeline was using a non-"simple" collation.
-    rawPipeline.emplace_back(
-        fromjson("{$replaceWith: {$mergeObjects: [\
-            '$$ROOT',\
-            {$arrayToObject: {$concatArrays: [[{\
-                k: {$literal: '$sortKey'},\
-                v: ['$$ROOT._id']\
-            }]]}}\
-        ]}}"));
-
-    return std::make_pair(std::move(rawPipeline), std::move(expCtx));
-}
-
-std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
 ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
     OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
     // Assume that the input collection isn't a view. The collectionUUID parameter to
@@ -238,58 +171,6 @@ ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
     return std::make_pair(std::move(rawPipeline), std::move(expCtx));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
-    const std::vector<BSONObj>& rawPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto opCtx = expCtx->getOperationContext();
-    // We associate the aggregation cursors established on each donor shard with a logical
-    // session to prevent them from killing the cursor when it is idle locally. Due to the
-    // cursor's merging behavior across all donor shards, it is possible for the cursor to be
-    // active on one donor shard while idle for a long period on another donor shard.
-    {
-        auto lk = stdx::lock_guard(*opCtx->getClient());
-        opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
-    }
-
-    AggregateCommandRequest request(_sourceNss, rawPipeline);
-    // If running in "relaxed" mode, do not set CollectionUUID to prevent NamespaceNotFound or
-    // CollectionUUIDMismatch errors.
-    if (!_relaxed) {
-        request.setCollectionUUID(_sourceUUID);
-    }
-    // If running in "relaxed" mode, also instruct the receiving shards to ignore collection uuid
-    // mismatches between the local and sharding catalogs.
-    boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
-        routerRelaxCollectionUUIDConsistencyCheckBlock(boost::in_place_init_if, _relaxed, opCtx);
-
-    auto hint = collectionHasSimpleCollation(opCtx, _sourceNss)
-        ? boost::optional<BSONObj>{BSON("_id" << 1)}
-        : boost::none;
-
-    if (hint) {
-        request.setHint(*hint);
-    }
-
-    request.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(_atClusterTime)));
-
-    // The read preference on the request is merely informational (e.g. for profiler entries) -- the
-    // pipeline's opCtx setting is actually used when sending the request.
-    auto readPref = ReadPreferenceSetting{ReadPreference::Nearest};
-    request.setUnwrappedReadPref(readPref.toContainingBSON());
-    ReadPreferenceSetting::get(opCtx) = readPref;
-
-    return shardVersionRetry(opCtx,
-                             Grid::get(opCtx)->catalogCache(),
-                             _sourceNss,
-                             "targeting donor shards for resharding collection cloning"_sd,
-                             [&] {
-                                 // We use the hint as an implied sort for $mergeCursors because
-                                 // the aggregation pipeline synthesizes the necessary $sortKeys
-                                 // fields in the result set.
-                                 return Pipeline::makePipeline(request, expCtx, hint);
-                             });
-}
-
 class ReshardingCloneFetcher {
 public:
     typedef std::function<void(OperationContext* opCtx,
@@ -303,7 +184,6 @@ public:
                            std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                            CancellationToken cancelToken,
                            std::vector<OwnedRemoteCursor> remoteCursors,
-                           int batchSizeLimitBytes,
                            int numWriteThreads)
         : _executor(std::move(executor)),
           _cleanupExecutor(std::move(cleanupExecutor)),
@@ -698,7 +578,6 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
         std::move(cleanupExecutor),
         cancelToken,
         std::move(remoteCursors),
-        resharding::gReshardingCollectionClonerBatchSizeInBytes.load(),
         resharding::gReshardingCollectionClonerWriteThreadCount);
 
     if (reshardingCollectionClonerShouldFailWithStaleConfig.shouldFail()) {
@@ -765,79 +644,6 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                                    cancelToken,
                                    std::move(dispatchResults.remoteCursors));
     });
-}
-
-std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartPipeline(
-    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
-    auto idToResumeFrom = [&] {
-        AutoGetCollection outputColl(opCtx, _outputNss, MODE_IS);
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Resharding collection cloner's output collection '"
-                              << _outputNss.toStringForErrorMsg() << "' did not already exist",
-                outputColl);
-        return resharding::data_copy::findHighestInsertedId(opCtx, *outputColl);
-    }();
-
-    // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
-    // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
-    // to be marked as having started.
-    auto* curOp = CurOp::get(opCtx);
-    curOp->ensureStarted();
-    ON_BLOCK_EXIT([curOp] { curOp->done(); });
-
-    auto [rawPipeline, expCtx] =
-        makeRawPipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom);
-
-    auto pipeline = _targetAggregationRequest(rawPipeline, expCtx);
-
-    if (!idToResumeFrom.missing()) {
-        // Skip inserting the first document retrieved after resuming because $gte was used in the
-        // aggregation pipeline.
-        auto firstDoc = pipeline->getNext();
-        uassert(4929301,
-                str::stream() << "Expected pipeline to retrieve document with _id: "
-                              << redact(idToResumeFrom.toString()),
-                firstDoc);
-
-        // Note that the following uassert() could throw because we're using the simple string
-        // comparator and the collection could have a non-simple collation. However, it would still
-        // be correct to throw an exception because it would mean the collection being resharded
-        // contains multiple documents with the same _id value as far as global uniqueness is
-        // concerned.
-        const auto& firstId = (*firstDoc)["_id"];
-        uassert(4929302,
-                str::stream() << "Expected pipeline to retrieve document with _id: "
-                              << redact(idToResumeFrom.toString())
-                              << ", but got _id: " << redact(firstId.toString()),
-                ValueComparator::kInstance.evaluate(firstId == idToResumeFrom));
-    }
-
-    pipeline->detachFromOperationContext();
-    pipeline.get_deleter().dismissDisposal();
-    return pipeline;
-}
-
-bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx,
-                                            Pipeline& pipeline,
-                                            TxnNumber& txnNum,
-                                            ShardId donorShard,
-                                            HostAndPort donorHost,
-                                            BSONObj resumeToken) {
-    pipeline.reattachToOperationContext(opCtx);
-    ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
-
-    Timer latencyTimer;
-    auto batch = resharding::data_copy::fillBatchForInsert(
-        pipeline, resharding::gReshardingCollectionClonerBatchSizeInBytes.load());
-
-    _metrics->onCloningRemoteBatchRetrieval(duration_cast<Milliseconds>(latencyTimer.elapsed()));
-
-    if (batch.empty()) {
-        return false;
-    }
-
-    writeOneBatch(opCtx, txnNum, batch, donorShard, donorHost, resumeToken);
-    return true;
 }
 
 void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,

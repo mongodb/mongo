@@ -131,14 +131,6 @@ boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
                                                        const CollectionPtr& collection);
 
 /**
- * Returns a batch of documents suitable for being inserted with insertBatch().
- *
- * The batch of documents is returned once its size exceeds batchSizeLimitBytes or the pipeline has
- * been exhausted.
- */
-std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes);
-
-/**
  * Atomically inserts a batch of documents in a single multi-document transaction, and updates
  * the resume token and increments the number of documents and bytes copied (only if 'storeProgress'
  * is true) in the same transaction. Returns the number of bytes inserted.

@@ -83,11 +83,6 @@ public:
                                bool storeProgress,
                                bool relaxed);
 
-    std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>> makeRawPipeline(
-        OperationContext* opCtx,
-        std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-        Value resumeId = Value());
-
     std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
     makeRawNaturalOrderPipeline(OperationContext* opCtx,
                                 std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
@@ -105,19 +100,6 @@ public:
                          CancelableOperationContextFactory factory);
 
     /**
-     * Fetches and inserts a single batch of documents.
-     *
-     * Returns true if there are more documents to be fetched and inserted, and returns false
-     * otherwise.
-     */
-    bool doOneBatch(OperationContext* opCtx,
-                    Pipeline& pipeline,
-                    TxnNumber& txnNum,
-                    ShardId donorShard,
-                    HostAndPort donorHost,
-                    BSONObj resumeToken);
-
-    /**
      * Inserts a single batch of documents and its resume information if provided.
      */
     void writeOneBatch(OperationContext* opCtx,
@@ -128,13 +110,6 @@ public:
                        BSONObj resumeToken);
 
 private:
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(
-        const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(
-        OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor);
-
     sharded_agg_helpers::DispatchShardPipelineResults _queryOnceWithNaturalOrder(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 

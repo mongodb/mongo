@@ -68,19 +68,6 @@ server_parameters:
             lte: 256
         redact: false
 
-    reshardingCollectionClonerBatchSizeInBytes:
-        description: >-
-            Limit for the number of bytes of data inserted per storage transaction (WriteUnitOfWork)
-            by ReshardingCollectionCloner.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: gReshardingCollectionClonerBatchSizeInBytes
-        default:
-            expr: 100 * 1024
-        validator:
-            gte: 1
-        redact: false
-
     reshardingCollectionClonerBatchSizeCount:
         description: >-
             Limit for the number of documents inserted per storage transaction (WriteUnitOfWork)

@@ -280,32 +280,6 @@ boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
     return Document{doc};
 }
 
-std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes) {
-    // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
-    // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
-    // to be marked as having started.
-    auto opCtx = pipeline.getContext()->getOperationContext();
-    auto* curOp = CurOp::get(opCtx);
-    curOp->ensureStarted();
-    ON_BLOCK_EXIT([curOp] { curOp->done(); });
-
-    std::vector<InsertStatement> batch;
-
-    int numBytes = 0;
-    do {
-        auto doc = pipeline.getNext();
-        if (!doc) {
-            break;
-        }
-
-        auto obj = doc->toBson();
-        batch.emplace_back(obj.getOwned());
-        numBytes += obj.objsize();
-    } while (numBytes < batchSizeLimitBytes);
-
-    return batch;
-}
-
 int insertBatchTransactionally(OperationContext* opCtx,
                                const NamespaceString& nss,
                                TxnNumber& txnNumber,
