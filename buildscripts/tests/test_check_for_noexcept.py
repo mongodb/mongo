@@ -162,6 +162,31 @@ class SomeClass {
         self.assertEqual(addition.line, 4)
         self.assertEqual(removal.line, 7)
 
+    def test_rewrite_change(self):
+        pre = """
+class SomeClass {
+    auto memberFunction(std::unique_ptr<int> x) const { return x.get(); }
+    void otherMemberFunction() const { return 7; }
+    template<typename T>
+    T anotherMemberFunction(T x) const { return x; }
+};
+"""
+        post = """
+class SomeClass {
+    template<typename T>
+    void anotherNewNoexceptFunction() noexcept { doSomething(); }
+    auto someNewNoexceptFunction(std::shared_ptr<T> x) const noexcept { return *x; }
+    int anotherNewNoexceptFunction2() const noexcept { return 7; }
+};
+"""
+        changes = analyze_text_diff(pre, post)
+        additions = [change for change in changes if change.kind == ChangeKind.ADDITION]
+        removals = [change for change in changes if change.kind == ChangeKind.REMOVAL]
+        self.assertEqual(len(additions), 3)
+        self.assertEqual(len(removals), 0)
+        lines = sorted([addition.line for addition in additions])
+        self.assertEqual(lines, [4, 5, 6])
+
 
 if __name__ == "__main__":
     unittest.main()

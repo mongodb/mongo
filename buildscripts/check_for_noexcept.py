@@ -55,7 +55,8 @@ ANNOTATION_MESSAGE_TEXT = (
     "This message will only be posted once per PR, even if\n"
     "there are multiple detected changes to noexcept usage. "
     "\n\n"
-    "This may be a false positive - if so, disregard this message. "
+    "This may be a false positive, such as on move operations.\n"
+    "If so, disregard this message. "
     "\n\n"
     "Documentation can be found here: " + DOCUMENTATION_URL
 )
@@ -250,18 +251,22 @@ def analyze_text_diff(lhs: str, rhs: str) -> list[LineBoundNoexceptChange]:
         inserted = rhs[rhs_start:rhs_end]
         block_changes = analyze_edit(deleted, inserted)
 
+        # Line number always refers to the rhs of the diff (post-changes). Annotations can only
+        # be put on that side.
+        rhs_start_line = get_line_for_char(rhs, rhs_start)
+
         # Indices are relative to the start of inserted/deleted, convert them to be relative
         # to lhs/rhs.
         for change in block_changes:
             if change.kind == ChangeKind.ADDITION:
+                # For additions, we bind to the line where noexcept appears.
                 change.index += rhs_start
+                changes += [change.bind_to_line(get_line_for_char(rhs, change.index))]
             elif change.kind == ChangeKind.REMOVAL:
+                # For removals, we bind to the start of the diff block due to the constraint that
+                # annotations go on the right-hand side.
                 change.index += lhs_start
-
-        # Line number always refers to the rhs of the diff (post-changes). Annotations can only
-        # be put on that side.
-        line = get_line_for_char(rhs, rhs_start)
-        changes += [change.bind_to_line(line) for change in block_changes]
+                changes += [change.bind_to_line(rhs_start_line)]
     return changes
 
 
