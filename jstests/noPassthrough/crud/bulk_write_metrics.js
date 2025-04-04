@@ -71,16 +71,17 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     const coll = testDB[collName1];
     const coll2 = testDB[collName2];
 
-    const metricChecker =
-        new BulkWriteMetricChecker(testDB,
-                                   [namespace1, namespace2],
-                                   bulkWrite,
-                                   isMongos,
-                                   false /*fle*/,
-                                   errorsOnly,
-                                   retryCount,
-                                   timeseries,
-                                   ISODate("2021-05-18T00:00:00.000Z") /* defaultTimestamp */);
+    const defaultTimestamp = ISODate("2021-05-18T00:00:00.000Z");
+
+    const metricChecker = new BulkWriteMetricChecker(testDB,
+                                                     [namespace1, namespace2],
+                                                     bulkWrite,
+                                                     isMongos,
+                                                     false /*fle*/,
+                                                     errorsOnly,
+                                                     retryCount,
+                                                     timeseries,
+                                                     defaultTimestamp);
 
     // Simplifies implementation of checkBulkWriteMetrics:
     // totals["testDB.testColl"] will not be undefined on first top call below.
@@ -114,9 +115,10 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         }],
         {updated: 1, updateArrayFilters: 1});
 
+    let query = timeseries ? {_id: 0, timestamp: defaultTimestamp} : {_id: 0};
     metricChecker.checkMetrics("Simple delete",
-                               [{delete: 0, filter: {_id: 0}}],
-                               [{delete: collName1, deletes: [{q: {_id: 0}, limit: 1}]}],
+                               [{delete: 0, filter: query}],
+                               [{delete: collName1, deletes: [{q: query, limit: 1}]}],
                                {deleted: 1});
 
     metricChecker.checkMetricsWithRetries("Simple insert with retry",
@@ -208,7 +210,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         "Simple update with multi: true",
         [{update: 0, filter: {timestamp: key4}, updateMods: {$set: {x: 3}}, multi: true}],
         [{update: collName1, updates: [{q: {timestamp: key4}, u: {$set: {x: 3}}, multi: true}]}],
-        {updated: 2, updateCount: 1, updateShardField: "oneShard"});
+        {updated: 2, updateCount: 1, updateManyCount: 1, updateShardField: "oneShard"});
 
     metricChecker.checkMetrics(
         "Multiple namespaces",
@@ -216,25 +218,55 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             {insert: 0, document: {_id: 5, timestamp: key0}},
             {insert: 1, document: {_id: 6, timestamp: key0}},
             {update: 1, filter: {timestamp: key0}, updateMods: {$set: {x: 2}}},
-            {delete: 0, filter: {_id: 5, timestamp: key0}}
+            {update: 0, filter: {timestamp: key4}, updateMods: {$set: {y: "tree"}}, multi: true},
+            {delete: 0, filter: {_id: 5, timestamp: key0}},
         ],
         [
             {insert: collName1, documents: [{_id: 5, timestamp: key0}]},
             {insert: collName2, documents: [{_id: 6, timestamp: key0}]},
             {update: collName2, updates: [{q: {timestamp: key0}, u: {$set: {x: 2}}}]},
-            {delete: collName1, deletes: [{q: {_id: 5, timestamp: key0}, limit: 1}]}
+            {
+                update: collName1,
+                updates: [{q: {timestamp: key4}, u: {$set: {y: "tree"}}, multi: true}]
+            },
+            {delete: collName1, deletes: [{q: {_id: 5, timestamp: key0}, limit: 1}]},
         ],
         {
             inserted: 2,
-            updated: 1,
+            updated: 3,
+            updateManyCount: 1,
+            updateCount: 2,
             deleted: 1,
             updateShardField: "oneShard",
             deleteShardField: "oneShard",
             perNamespaceMetrics: {
-                [namespace1]: {inserted: 1, deleted: 1},
-                [namespace2]: {inserted: 1, updateCount: 1}
+                [namespace1]: {inserted: 1, deleted: 1, deleteCount: 1, updated: 2, updateCount: 1},
+                [namespace2]: {inserted: 1, updateCount: 1, updated: 1}
             }
         });
+
+    metricChecker.checkMetrics("Simple delete with multi: true on one shard",
+                               [{delete: 0, filter: {timestamp: key4}, multi: true}],
+                               [{delete: collName1, deletes: [{q: {timestamp: key4}, limit: 0}]}],
+                               {
+                                   deleted: 2,
+                                   deleteCount: 1,
+                                   deleteManyCount: 1,
+                                   deleteShardField: "oneShard",
+                                   singleDeleteForBulkWrite: true
+                               });
+
+    metricChecker.checkMetrics(
+        "Simple delete with multi: true across shards",
+        [{delete: 0, filter: {_id: {$lt: 100}}, multi: true}],
+        [{delete: collName1, deletes: [{q: {_id: {$lt: 100}}, limit: 0}]}],
+        {
+            deleted: 3,
+            deleteCount: 1,
+            deleteManyCount: 1,
+            deleteShardField: "allShards",
+        },
+    );
 
     coll.drop();
     coll2.drop();

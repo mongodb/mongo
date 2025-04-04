@@ -117,7 +117,8 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
  * Processes a response from an FLE insert/update/delete command and converts it to equivalent
  * BulkWriteReplyInfo.
  */
-BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
+BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
+                                      const BatchedCommandRequest& request,
                                       const BulkWriteCRUDOp::OpType& firstOpType,
                                       bool errorsOnly,
                                       const BatchedCommandResponse& response);

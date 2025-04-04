@@ -82,6 +82,7 @@
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -121,6 +122,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -276,17 +278,20 @@ public:
     }
 
 
-    void addDeleteReply(size_t currentOpIdx,
+    void addDeleteReply(QueryCounters& queryCounters,
+                        size_t currentOpIdx,
                         long long nDeleted,
-                        const boost::optional<int32_t>& stmtId) {
+                        const boost::optional<int32_t>& stmtId,
+                        bool isMulti) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setN(nDeleted);
         _summaryFields.nDeleted += nDeleted;
-
         if (stmtId) {
             _retriedStmtIds.emplace_back(*stmtId);
         }
-
+        if (isMulti) {
+            queryCounters.deleteManyCount.increment(1);
+        }
         _addReply(replyItem);
     }
 
@@ -909,10 +914,8 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
             invariant(upsertedDocuments.size() == 1);
             upserted = upsertedDocuments[0];
         }
-
         responses.addUpdateReply(
             currentOpIdx, updateReply.getN(), updateReply.getNModified(), upserted, stmtId);
-
         return true;
     }
 }
@@ -948,8 +951,11 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
             invariant(retriedStmtIds.size() == 1);
             stmtId = retriedStmtIds[0];
         }
-
-        responses.addDeleteReply(currentOpIdx, deleteReply.getN(), stmtId);
+        if (op->getMulti()) {
+            getQueryCounters(opCtx).deleteManyCount.increment(1);
+        }
+        responses.addDeleteReply(
+            getQueryCounters(opCtx), currentOpIdx, deleteReply.getN(), stmtId, op->getMulti());
         return true;
     }
 }
@@ -1051,7 +1057,8 @@ bool handleDeleteOp(OperationContext* opCtx,
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 // Since multi:true is not allowed with retryable writes if the statement was
                 // executed there will always be 1 document deleted.
-                responses.addDeleteReply(currentOpIdx, 1, stmtId);
+                responses.addDeleteReply(
+                    getQueryCounters(opCtx), currentOpIdx, 1, stmtId, op->getMulti());
                 return true;
             }
         }
@@ -1101,7 +1108,8 @@ bool handleDeleteOp(OperationContext* opCtx,
                                                           nsEntry.getCollectionUUID(),
                                                           docFound);
             lastOpFixer.finishedOpSuccessfully();
-            responses.addDeleteReply(currentOpIdx, nDeleted, boost::none);
+            responses.addDeleteReply(
+                getQueryCounters(opCtx), currentOpIdx, nDeleted, boost::none, op->getMulti());
             return true;
         });
     } catch (const DBException& ex) {
@@ -1616,11 +1624,12 @@ bool handleUpdateOp(OperationContext* opCtx,
             write_ops_exec::runTimeseriesRetryableUpdates(
                 opCtx, bucketNs, updateRequest, executor, &out);
             responses.addUpdateReply(opCtx, currentOpIdx, out);
-
-            bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::ShardServer,
+            bulk_write_common::incrementBulkWriteUpdateMetrics(getQueryCounters(opCtx),
+                                                               ClusterRole::ShardServer,
                                                                op->getUpdateMods(),
                                                                nsEntry.getNs(),
-                                                               op->getArrayFilters());
+                                                               op->getArrayFilters(),
+                                                               op->getMulti());
             return out.canContinue;
         }
 
@@ -1636,11 +1645,12 @@ bool handleUpdateOp(OperationContext* opCtx,
 
                 responses.addUpdateReply(
                     currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
-
-                bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::ShardServer,
+                bulk_write_common::incrementBulkWriteUpdateMetrics(getQueryCounters(opCtx),
+                                                                   ClusterRole::ShardServer,
                                                                    op->getUpdateMods(),
                                                                    nsEntry.getNs(),
-                                                                   op->getArrayFilters());
+                                                                   op->getArrayFilters(),
+                                                                   op->getMulti());
                 return true;
             }
         }
@@ -1707,11 +1717,14 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 docFound,
                                                                 &updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
+
                     responses.addUpdateReply(currentOpIdx, result, boost::none);
-                    bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::ShardServer,
+                    bulk_write_common::incrementBulkWriteUpdateMetrics(getQueryCounters(opCtx),
+                                                                       ClusterRole::ShardServer,
                                                                        op->getUpdateMods(),
                                                                        nsEntry.getNs(),
-                                                                       op->getArrayFilters());
+                                                                       op->getArrayFilters(),
+                                                                       op->getMulti());
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                     auto cq = uassertStatusOK(

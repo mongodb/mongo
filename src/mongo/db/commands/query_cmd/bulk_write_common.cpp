@@ -355,10 +355,15 @@ UpdateMetrics& bulkWriteUpdateMetric(ClusterRole role) {
 }  // namespace
 
 void incrementBulkWriteUpdateMetrics(
+    QueryCounters& queryCounters,
     ClusterRole role,
     const write_ops::UpdateModification& updateMod,
     const mongo::NamespaceString& ns,
-    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters) {
+    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+    bool isMulti) {
+    if (isMulti) {
+        queryCounters.updateManyCount.increment(1);
+    }
     incrementUpdateMetrics(updateMod, ns, bulkWriteUpdateMetric(role), arrayFilters);
 }
 

@@ -5755,7 +5755,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     insertReply.setStatus(Status::OK());
     insertReply.setN(2); /* nInserted=2 */
     auto replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReply);
+        _opCtx, request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 2);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5772,7 +5772,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     insertReplyWithError.addToErrDetails(
         write_ops::WriteError(1, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReplyWithError);
+        _opCtx, request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5789,7 +5789,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     deleteReply.setStatus(Status::OK());
     deleteReply.setN(1); /* nDeleted=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, deleteReply);
+        _opCtx, request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, deleteReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5805,7 +5805,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     singleReplyWithError.addToErrDetails(
         write_ops::WriteError(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, singleReplyWithError);
+        _opCtx, request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5823,7 +5823,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     updateReply.setN(1);         /* nMatched=1 */
     updateReply.setNModified(1); /* nModified=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, updateReply);
+        _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, updateReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
@@ -5833,7 +5833,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
 
     // Reuse the single error reply from delete above.
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, singleReplyWithError);
+        _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5850,7 +5850,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     upsertDetails->setUpsertedID(BSON("_id" << 1));
     upsertReply.addToUpsertDetails(upsertDetails.release()); /* nUpserted=1 */
     replyInfo = bulk_write_exec::processFLEResponse(
-        request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, upsertReply);
+        _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, upsertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);

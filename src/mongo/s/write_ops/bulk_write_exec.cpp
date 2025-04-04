@@ -215,7 +215,8 @@ void fillOKInsertReplies(BulkWriteReplyInfo& replyInfo, int size) {
 
 }  // namespace
 
-BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
+BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
+                                      const BatchedCommandRequest& request,
                                       const BulkWriteCRUDOp::OpType& firstOpType,
                                       bool errorsOnly,
                                       const BatchedCommandResponse& response) {
@@ -308,10 +309,12 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
         case BulkWriteCRUDOp::kUpdate: {
             const auto& updateRequest = request.getUpdateRequest();
             const mongo::write_ops::UpdateOpEntry& updateOpEntry = updateRequest.getUpdates()[0];
-            bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::RouterServer,
+            bulk_write_common::incrementBulkWriteUpdateMetrics(getQueryCounters(opCtx),
+                                                               ClusterRole::RouterServer,
                                                                updateOpEntry.getU(),
                                                                updateRequest.getNamespace(),
-                                                               updateOpEntry.getArrayFilters());
+                                                               updateOpEntry.getArrayFilters(),
+                                                               updateOpEntry.getMulti());
             break;
         }
         case BulkWriteCRUDOp::kDelete:
@@ -460,8 +463,8 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
             return {FLEBatchResult::kNotProcessed, BulkWriteReplyInfo()};
         }
 
-        BulkWriteReplyInfo replyInfo =
-            processFLEResponse(fleRequest, firstOpType, clientRequest.getErrorsOnly(), response);
+        BulkWriteReplyInfo replyInfo = processFLEResponse(
+            opCtx, fleRequest, firstOpType, clientRequest.getErrorsOnly(), response);
         return {FLEBatchResult::kProcessed, std::move(replyInfo)};
     } catch (const DBException& ex) {
         LOGV2_WARNING(7749700,
@@ -1707,11 +1710,14 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                     const auto opIdx = writeOp.getWriteItem().getItemIndex();
                     const auto& bulkWriteOp = BulkWriteCRUDOp(_clientRequest.getOps()[opIdx]);
                     const auto& ns = _clientRequest.getNsInfo()[bulkWriteOp.getNsInfoIdx()].getNs();
-
-                    bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::RouterServer,
+                    // 'isMulti' is set to false as the metrics for multi updates were registered
+                    // for each operation individually.
+                    bulk_write_common::incrementBulkWriteUpdateMetrics(getQueryCounters(_opCtx),
+                                                                       ClusterRole::RouterServer,
                                                                        updateRef.getUpdateMods(),
                                                                        ns,
-                                                                       updateRef.getArrayFilters());
+                                                                       updateRef.getArrayFilters(),
+                                                                       false /* isMulti */);
                     break;
                 }
                 case BatchedCommandRequest::BatchType_Delete:

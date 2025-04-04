@@ -37,6 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
+#include "mongo/db/stats/counters.h"
 
 /**
  * Contains common functionality shared between the bulkWrite command in mongos and mongod.
@@ -137,9 +138,11 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
  * Helper for bulkWrite use of incrementUpdateMetrics.
  */
 void incrementBulkWriteUpdateMetrics(
+    QueryCounters& queryCounters,
     ClusterRole role,
     const write_ops::UpdateModification& updateMod,
     const mongo::NamespaceString& ns,
-    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters);
+    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+    bool isMulti);
 }  // namespace bulk_write_common
 }  // namespace mongo

@@ -86,10 +86,33 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     // Next call will not increase count.
     assert.commandWorked(unshardedColl.deleteOne({_id: 1}));
 
+    // Check that metrics are updated for bulk write.
+    assert.commandWorked(testDB.adminCommand({
+        bulkWrite: 1,
+        ops: [
+            {update: 0, filter: {_id: {$lt: 0}}, updateMods: {$set: {q: 10}}, multi: true},
+            {delete: 0, filter: {_id: {$lt: 0}}, multi: true}
+        ],
+        nsInfo: [{ns: "test.shardedColl"}],
+        writeConcern: {w: 'majority'},
+        errorsOnly: true,
+    }));
+
+    assert.commandWorked(testDB.adminCommand({
+        bulkWrite: 1,
+        ops: [
+            {update: 0, filter: {_id: {$lt: 2}}, updateMods: {$set: {q: 10}}, multi: true},
+            {delete: 0, filter: {_id: {$lt: 2}}, multi: true}
+        ],
+        nsInfo: [{ns: "test.unshardedColl"}],
+        writeConcern: {w: 'majority'},
+        errorsOnly: true,
+    }));
+
     mongosServerStatus = testDB.adminCommand({serverStatus: 1});
     // Verification for metrics.
-    assert.eq(7, mongosServerStatus.metrics.query.updateManyCount);
-    assert.eq(2, mongosServerStatus.metrics.query.deleteManyCount);
+    assert.eq(9, mongosServerStatus.metrics.query.updateManyCount);
+    assert.eq(4, mongosServerStatus.metrics.query.deleteManyCount);
 
     st.stop();
 }
@@ -150,11 +173,22 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     // Next call will not increase count.
     assert.commandWorked(testColl.deleteOne({_id: 1}));
 
+    assert.commandWorked(testDB.adminCommand({
+        bulkWrite: 1,
+        ops: [
+            {update: 0, filter: {_id: {$gt: 0}}, updateMods: {$set: {q: 10}}, multi: true},
+            {delete: 0, filter: {_id: {$gt: 0}}, multi: true}
+        ],
+        nsInfo: [{ns: "test.testColl"}],
+        writeConcern: {w: 'majority'},
+        errorsOnly: true,
+    }));
+
     mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
     // Verification for final metric values.
-    assert.eq(5, mongosServerStatus.metrics.query.updateManyCount);
-    assert.eq(1, mongosServerStatus.metrics.query.deleteManyCount);
+    assert.eq(6, mongosServerStatus.metrics.query.updateManyCount);
+    assert.eq(2, mongosServerStatus.metrics.query.deleteManyCount);
     assert.eq(4, mongosServerStatus.metrics.query.updateDeleteManyDocumentsMaxCount);
     assert(mongosServerStatus.metrics.query.hasOwnProperty("updateDeleteManyDurationMaxMs"));
     assert.lte(0, mongosServerStatus.metrics.query.updateDeleteManyDurationMaxMs);
