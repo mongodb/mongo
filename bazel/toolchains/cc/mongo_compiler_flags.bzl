@@ -1,4 +1,4 @@
-"""TODO: Add a comment"""
+"""This file contains compiler flags that are specific to linux cc compiling and linking."""
 
 load(
     "//bazel/toolchains/cc:mongo_errors.bzl",
@@ -9,6 +9,9 @@ load(
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
     "THREAD_SANITIZER_ERROR_MESSAGE",
 )
+
+# Flags listed in this file is only visible to the bazel build system.
+visibility("//bazel")
 
 LINUX_OPT_COPTS = select({
     # This is opt=debug, not to be confused with (opt=on && dbg=on)
@@ -579,7 +582,7 @@ MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc/third_party/valgrind/include",
 ]
 
-MONGO_CC_COPTS = (
+MONGO_LINUX_CC_COPTS = (
     MONGO_GLOBAL_INCLUDE_DIRECTORIES +
     LIBCXX_COPTS +
     ADDRESS_SANITIZER_COPTS +
@@ -608,7 +611,7 @@ MONGO_CC_COPTS = (
     RUNNING_THROUGH_BAZELISK_CHECK
 )
 
-MONGO_CC_LINKFLAGS = (
+MONGO_LINUX_CC_LINKFLAGS = (
     MEMORY_SANITIZER_LINKFLAGS +
     ADDRESS_SANITIZER_LINKFLAGS +
     FUZZER_SANITIZER_LINKFLAGS +
