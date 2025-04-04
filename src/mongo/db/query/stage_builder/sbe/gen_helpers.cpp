@@ -40,7 +40,6 @@
 #include <iterator>
 #include <numeric>
 #include <sstream>
-#include <string_view>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"

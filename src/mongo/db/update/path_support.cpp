@@ -47,9 +47,6 @@
 namespace mongo {
 namespace pathsupport {
 
-using std::string;
-using str::stream;
-
 namespace {
 
 Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
@@ -341,19 +338,17 @@ static Status checkEqualityConflicts(const EqualityMatches& equalities, const Fi
     if (parentEl.eoo())
         return Status::OK();
 
-    string errMsg = "cannot infer query fields to set, ";
-
     StringData pathStr = path.dottedField();
     StringData prefixStr = path.dottedSubstring(0, parentPathPart);
     StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
 
-    if (suffixStr.size() != 0)
-        errMsg += stream() << "both paths '" << pathStr << "' and '" << prefixStr
-                           << "' are matched";
-    else
-        errMsg += stream() << "path '" << pathStr << "' is matched twice";
-
-    return Status(ErrorCodes::NotSingleValueField, errMsg);
+    return Status(ErrorCodes::NotSingleValueField, [&] {
+        static constexpr auto pre = "cannot infer query fields to set, "_sd;
+        if (!suffixStr.empty())
+            return fmt::format("{}both paths '{}' and '{}' are matched", pre, pathStr, prefixStr);
+        else
+            return fmt::format("{}path '{}' is matched twice", pre, pathStr);
+    }());
 }
 
 static Status _extractFullEqualityMatches(const MatchExpression& root,

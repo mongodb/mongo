@@ -33,7 +33,6 @@
 #include <cstring>
 #include <iosfwd>
 #include <string>
-#include <string_view>
 #include <sys/types.h>
 
 #include "mongo/base/data_range.h"
@@ -200,7 +199,7 @@ public:
     template <typename H>
     friend H AbslHashValue(H h, const OID& oid) {
         const auto& d = oid._data;
-        return H::combine(std::move(h), std::string_view(d, sizeof(d)));
+        return H::combine(std::move(h), toStdStringViewForInterop({d, sizeof(d)}));
     }
 
     /** call this after a fork to update the process id */

@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 
 #include <boost/optional/optional.hpp>
-#include <string_view>
 
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/curop.h"

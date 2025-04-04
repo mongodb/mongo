@@ -30,7 +30,6 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <string_view>
 
 #include <absl/container/inlined_vector.h>
 #include <boost/cstdint.hpp>

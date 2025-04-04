@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+#include <functional>
+#include <string_view>  // NOLINT
 #include <variant>
 
 #include "mongo/base/string_data.h"
@@ -38,10 +41,6 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-
-#include <boost/container/small_vector.hpp>
-#include <functional>
-#include <string_view>
 
 namespace mongo::logv2 {
 
@@ -230,8 +229,8 @@ inline StringData mapValue(StringData value) {
 inline StringData mapValue(std::string const& value) {
     return value;
 }
-inline StringData mapValue(std::string_view value) {
-    return StringData(value.data(), value.size());
+inline StringData mapValue(std::string_view value) {  // NOLINT
+    return toStringDataForInterop(value);
 }
 inline StringData mapValue(char* value) {
     return value;

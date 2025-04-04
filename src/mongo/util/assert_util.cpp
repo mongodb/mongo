@@ -306,8 +306,8 @@ std::string causedBy(StringData e) {
     static constexpr auto prefix = " :: caused by :: "_sd;
     std::string out;
     out.reserve(prefix.size() + e.size());
-    out.append(std::string_view{prefix});  // NOLINT
-    out.append(std::string_view{e});       // NOLINT
+    out += prefix;
+    out += e;
     return out;
 }
 

@@ -251,7 +251,7 @@ Test Test::parseTest(std::fstream& fs,
                 auto sd = StringData{lineFromFile};
                 {
                     auto endDocument = sd.rfind("}");
-                    if (endDocument == std::string_view::npos) {
+                    if (endDocument == std::string::npos) {
                         continue;
                     }
                     // Count offset of endDocument from the end, but still include the '}'
@@ -260,7 +260,7 @@ Test Test::parseTest(std::fstream& fs,
                 }
                 {
                     auto startDocument = sd.find("{");
-                    if (startDocument == std::string_view::npos) {
+                    if (startDocument == std::string::npos) {
                         continue;
                     }
                     sd.remove_prefix(startDocument);

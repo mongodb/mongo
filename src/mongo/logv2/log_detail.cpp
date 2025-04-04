@@ -43,7 +43,6 @@
 #include <functional>
 #include <new>
 #include <string>
-#include <string_view>
 #include <system_error>
 #include <utility>
 #include <variant>
@@ -306,8 +305,7 @@ void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
     UnstructuredValueExtractor extractor;
     extractor.reserve(attrs.size());
     attrs.apply(extractor);
-    auto formatted =
-        fmt::vformat(std::string_view{message.rawData(), message.size()}, extractor.args());
+    auto formatted = fmt::vformat(toStdStringViewForInterop(message), extractor.args());
 
     doLogImpl(0, severity, options, formatted, TypeErasedAttributeStorage());
 }

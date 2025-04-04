@@ -33,7 +33,6 @@
 #include <optional>
 #include <ostream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #ifdef _WIN32
@@ -44,12 +43,13 @@
 #include <unistd.h>
 #endif
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 
 namespace mongo::query_tester {
-static constexpr auto kFeatureExtractorDir = std::string_view{"/home/ubuntu/feature-extractor"};
+static constexpr auto kFeatureExtractorDir = "/home/ubuntu/feature-extractor"_sd;
 static constexpr auto kShellMaxLen = std::numeric_limits<size_t>::max();
-static constexpr auto kShellTimeout = Milliseconds{60 * 60 * 1000};  // 1 hour
+static constexpr Milliseconds kShellTimeout = Hours{1};
 
 enum class DiffStyle { kPlain, kWord };
 enum class ErrorLogLevel { kSimple, kVerbose, kExtractFeatures };
@@ -78,7 +78,7 @@ inline bool isTerminal() {
 
 class ConditionalColor {
 public:
-    explicit ConditionalColor(std::string_view colorCode) : _colorCode(colorCode) {}
+    explicit ConditionalColor(StringData colorCode) : _colorCode(colorCode) {}
 
     friend std::ostream& operator<<(std::ostream& os, const ConditionalColor& cc) {
         if (isTerminal()) {
@@ -88,7 +88,7 @@ public:
     }
 
 private:
-    std::string_view _colorCode;
+    StringData _colorCode;
 };
 
 template <typename T, bool Multiline>

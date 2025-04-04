@@ -746,7 +746,8 @@ public:
 
     template <typename H>
     friend H AbslHashValue(H h, const NamespaceString& nss) {
-        return H::combine(std::move(h), std::string_view{nss._data.data(), nss._data.size()});
+        return H::combine(std::move(h),
+                          toStdStringViewForInterop({nss._data.data(), nss._data.size()}));
     }
 
     friend auto logAttrs(const NamespaceString& nss) {

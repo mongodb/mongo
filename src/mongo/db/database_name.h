@@ -302,7 +302,7 @@ public:
         //  _data might contain a collection : only hash the discriminator, tenant and database.
         return H::combine(
             std::move(h),
-            std::string_view{obj.view().substr(0, obj.sizeWithTenant() + kDataOffset)});
+            toStdStringViewForInterop(obj.view().substr(0, obj.sizeWithTenant() + kDataOffset)));
     }
 
     // Adds support for boost::Hash.

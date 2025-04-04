@@ -34,7 +34,6 @@
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
 #include <fmt/format.h>
-#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -797,13 +796,13 @@ bool OplogEntry::isSingleOplogEntryTransactionWithCommand() const {
 }
 
 bool OplogEntry::shouldLogAsDDLOperation() const {
-    constexpr std::array<std::string_view, 7> ddlOpsToLog{"create",
-                                                          "drop",
-                                                          "renameCollection",
-                                                          "collMod",
-                                                          "dropDatabase",
-                                                          "createIndexes",
-                                                          "dropIndexes"};
+    static constexpr std::array ddlOpsToLog{"create"_sd,
+                                            "drop"_sd,
+                                            "renameCollection"_sd,
+                                            "collMod"_sd,
+                                            "dropDatabase"_sd,
+                                            "createIndexes"_sd,
+                                            "dropIndexes"_sd};
     return _entry.isCommand() &&
         std::find(ddlOpsToLog.begin(),
                   ddlOpsToLog.end(),

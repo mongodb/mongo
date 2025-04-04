@@ -41,7 +41,6 @@
 #include <cstring>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -843,15 +842,6 @@ public:
 
     std::string str() const {
         return std::string(_buf.buf(), _buf.len());
-    }
-
-    /**
-     * stringView() returns a view of this string without copying.
-     *
-     * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
-     */
-    std::string_view stringView() const {
-        return std::string_view(_buf.buf(), _buf.len());
     }
 
     /**

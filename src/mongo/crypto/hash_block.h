@@ -33,7 +33,6 @@
 #include <array>
 #include <cstddef>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "mongo/base/data_range.h"

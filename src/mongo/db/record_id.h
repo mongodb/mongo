@@ -44,7 +44,6 @@
 #include <ostream>
 #include <span>
 #include <string>
-#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -333,11 +332,10 @@ public:
 
     size_t hash() const {
         size_t hash = 0;
-        withFormat([](Null n) {},
-                   [&](int64_t rid) { boost::hash_combine(hash, rid); },
-                   [&](const char* str, int size) {
-                       boost::hash_combine(hash, std::string_view(str, size));
-                   });
+        withFormat(
+            [](Null n) {},
+            [&](int64_t rid) { boost::hash_combine(hash, rid); },
+            [&](const char* str, int size) { boost::hash_combine(hash, StringData(str, size)); });
         return hash;
     }
 

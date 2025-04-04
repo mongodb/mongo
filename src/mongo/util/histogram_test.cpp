@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 #include <ostream>
-#include <string_view>
 #include <tuple>
 
 #include <boost/move/utility_core.hpp>

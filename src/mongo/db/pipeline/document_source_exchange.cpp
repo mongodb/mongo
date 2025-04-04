@@ -429,7 +429,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
     }
 
     key_string::Builder key{key_string::Version::V1, kb.obj(), _ordering};
-    std::string_view keyStr{key.getView().data(), key.getView().size()};
+    StringData keyStr{key.getView().data(), key.getView().size()};
 
     // Binary search for the consumer id.
     auto it = std::upper_bound(_boundaries.begin(), _boundaries.end(), keyStr);

@@ -30,7 +30,6 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
-#include <string_view>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

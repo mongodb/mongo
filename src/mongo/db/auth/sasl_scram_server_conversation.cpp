@@ -170,8 +170,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
      * This does not impact _authMessage, as it's composed from the raw
      * string input, rather than the output of the split operation.
      */
-    const std::vector<std::string> input =
-        absl::StrSplit(std::string_view(client_first_message_bare), ",", absl::SkipEmpty());
+    const std::vector<std::string> input = absl::StrSplit(
+        toStdStringViewForInterop(client_first_message_bare), ",", absl::SkipEmpty());
 
 
     if (input.size() < 2) {
@@ -345,7 +345,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
     const auto proof = last_field.substr(2);
 
     const std::vector<std::string> input = absl::StrSplit(
-        std::string_view(client_final_message_without_proof), ",", absl::SkipEmpty());
+        toStdStringViewForInterop(client_final_message_without_proof), ",", absl::SkipEmpty());
 
     if (input.size() < 2) {
         // Add count for proof back on.

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <string_view>
 #include <vector>
 
 #include "mongo/base/error_codes.h"

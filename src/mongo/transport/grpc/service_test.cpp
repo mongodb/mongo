@@ -685,16 +685,16 @@ TEST_F(CommandServiceTest, Shutdown) {
 }
 
 TEST(GRPCInteropTest, SharedBufferDeserialize) {
-    auto deserializationTest = [](std::vector<::grpc::Slice> slices, std::string_view expected) {
+    auto deserializationTest = [](std::vector<::grpc::Slice> slices, StringData expected) {
         SharedBuffer out;
         ::grpc::ByteBuffer buffer(&slices[0], slices.size());
         auto status = ::grpc::SerializationTraits<SharedBuffer>::Deserialize(&buffer, &out);
         ASSERT_TRUE(status.ok()) << "expected deserialization to succeed: "
                                  << status.error_message();
-        ASSERT_EQ((std::string_view{out.get(), expected.length()}), expected);
+        ASSERT_EQ(StringData(out.get(), expected.size()), expected);
     };
 
-    std::string_view expected{"foobar"};
+    StringData expected{"foobar"};
     deserializationTest({std::string{"foobar"}}, expected);
     deserializationTest({std::string{"foo"}, std::string{"bar"}}, expected);
 }

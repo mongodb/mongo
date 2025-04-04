@@ -44,7 +44,6 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #ifndef _WIN32
@@ -83,9 +82,6 @@ public:
     }
     operator std::string() const {
         return ss.str();
-    }
-    operator std::string_view() const {
-        return ss.stringView();
     }
     operator mongo::StringData() const {
         return ss.stringData();

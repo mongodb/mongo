@@ -35,7 +35,6 @@
 #include <functional>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 // IWYU pragma: no_include "libunwind-x86_64.h"
@@ -96,13 +95,13 @@ std::string trace() {
     return out;
 }
 
-void assertAndRemovePrefix(std::string_view& v, std::string_view prefix) {
+void assertAndRemovePrefix(StringData& v, StringData prefix) {
     auto pos = v.find(prefix);
     ASSERT(pos != v.npos) << fmt::format("expected to find '{}' in '{}'", prefix, v);
     v.remove_prefix(pos + prefix.size());
 }
 
-void assertAndRemoveSuffix(std::string_view& v, std::string_view suffix) {
+void assertAndRemoveSuffix(StringData& v, StringData suffix) {
     auto pos = v.rfind(suffix);
     ASSERT(pos != v.npos) << fmt::format("expected to find '{}' in '{}'", suffix, v);
     v.remove_suffix(v.size() - pos);
@@ -137,7 +136,7 @@ TEST(Unwind, Linkage) {
     normalFunction(os);
     std::string stacktrace = os.str();
 
-    std::string_view view = stacktrace;
+    StringData view = stacktrace;
 
     LOGV2_OPTIONS(31429, {logv2::LogTruncation::Disabled}, "Trace", "trace"_attr = view);
 
@@ -145,7 +144,7 @@ TEST(Unwind, Linkage) {
     assertAndRemovePrefix(view, R"(BACKTRACE: {"backtrace":)");
     assertAndRemovePrefix(view, "}\n");
 
-    std::string_view remainder = stacktrace;
+    StringData remainder = stacktrace;
 
     // Check that these function names appear in the trace, in order. The tracing code which
     // preceded our libunwind integration could *not* symbolize hiddenFunction,

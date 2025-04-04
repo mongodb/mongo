@@ -32,7 +32,6 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 
 #include <boost/optional/optional.hpp>
 
@@ -92,7 +91,7 @@ TEST(Status, ReasonStrings) {
     // Try several types of `reason` arguments.
     checkReason(kReason);
     checkReason(kReasonString);
-    checkReason(std::string_view{kReason});
+    checkReason(std::string_view{kReason});  // NOLINT
     checkReason(std::string{kReason});
     checkReason(StringData{kReason});
     checkReason(str::stream{} << kReason);

@@ -49,7 +49,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <string_view>
+#include <string_view>  // NOLINT
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -749,7 +749,7 @@ TEST_F(LogV2TypesTest, Stringlike) {
     ASSERT_EQUALS(lastBSONElement().String(), str_data);
 
     {
-        std::string_view s = "a std::string_view";
+        std::string_view s = "a std::string_view";  // NOLINT
         LOGV2(4329200, "std::string_view {name}", "name"_attr = s);
         ASSERT_EQUALS(text->back(), "std::string_view a std::string_view");
         validateJSON(std::string{s});

@@ -45,12 +45,12 @@
 
 namespace mongo::query_tester {
 namespace {
-static constexpr std::string_view kColorBold = "\033[1m";
-static constexpr std::string_view kColorBrown = "\033[33m";
-static constexpr std::string_view kColorCyan = "\033[1;36m";
-static constexpr std::string_view kColorRed = "\033[1;31m";
-static constexpr std::string_view kColorReset = "\033[m";
-static constexpr std::string_view kColorYellow = "\033[1;33m";
+constexpr auto kColorBold = "\033[1m"_sd;
+constexpr auto kColorBrown = "\033[33m"_sd;
+constexpr auto kColorCyan = "\033[1;36m"_sd;
+constexpr auto kColorRed = "\033[1;31m"_sd;
+constexpr auto kColorReset = "\033[m"_sd;
+constexpr auto kColorYellow = "\033[1;33m"_sd;
 
 /**
  * Regex to match the hunk header of the git diff output, which looks like @@ -lineNum, +lineNum @@
