@@ -4,8 +4,6 @@
  * @tags: [
  *   requires_fcv_80,
  *   config_shard_incompatible,
- *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
- *   incompatible_with_authoritative_shards,
  * ]
  */
 
@@ -36,6 +34,13 @@ const st = new ShardingTest({
     // electionTimeoutMillis to its default value.
     initiateWithDefaultElectionTimeout: true
 });
+
+// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
+                                        "ShardAuthoritativeDbMetadataDDL")) {
+    st.stop();
+    quit();
+}
 
 const configCS = st.configRS.getURL();
 

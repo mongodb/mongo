@@ -29,9 +29,8 @@
 
 #include "mongo/db/s/shard_catalog_operations.h"
 
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/shard_role.h"
@@ -77,56 +76,40 @@ void insertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& dbMetad
     const auto dbNameStr =
         DatabaseNameUtil::serialize(dbMetadata.getDbName(), SerializationContext::stateDefault());
 
-    WriteUnitOfWork wuow(opCtx);
+    write_ops::UpdateCommandRequest updateOp(
+        NamespaceString::kConfigShardCatalogDatabasesNamespace);
+    updateOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(dbMetadata.toBSON()));
+        entry.setUpsert(true);
+        entry.setMulti(false);
+        return entry;
+    }()});
+    updateOp.setWriteConcern(defaultMajorityWriteConcern());
 
-    auto coll = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kConfigShardCatalogDatabasesNamespace,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    if (!coll.exists()) {
-        ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &coll);
-        DatabaseHolder::get(opCtx)
-            ->openDb(opCtx, coll.nss().dbName())
-            ->createCollection(opCtx, coll.nss());
-    }
-    invariant(coll.exists());
-
-    Helpers::upsert(opCtx,
-                    coll,
-                    BSON(DatabaseType::kDbNameFieldName << dbNameStr),
-                    dbMetadata.toBSON(),
-                    false /* fromMigrate */);
-    wuow.commit();
+    DBDirectClient client(opCtx);
+    const auto result = client.update(std::move(updateOp));
+    write_ops::checkWriteErrors(result);
 }
 
 void deleteDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
     const auto dbNameStr =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
-    WriteUnitOfWork wuow(opCtx);
+    write_ops::DeleteCommandRequest deleteOp(
+        NamespaceString::kConfigShardCatalogDatabasesNamespace);
+    deleteOp.setDeletes({[&] {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
+        entry.setMulti(false);
+        return entry;
+    }()});
+    deleteOp.setWriteConcern(defaultMajorityWriteConcern());
 
-    auto coll = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kConfigShardCatalogDatabasesNamespace,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    // For a drop operation, this method is based on the assumption that previous database metadata
-    // exists, which implies that the authoritative collection should also be present. If that
-    // collection is not found, it indicates an inconsistency in the metadata. In other words, there
-    // is a database that was not registered in the shard catalog.
-    invariant(coll.exists());
-
-    deleteObjects(
-        opCtx, coll, BSON(DatabaseType::kDbNameFieldName << dbNameStr), true /* justOne */);
-
-    wuow.commit();
+    DBDirectClient client(opCtx);
+    const auto result = client.remove(std::move(deleteOp));
+    write_ops::checkWriteErrors(result);
 }
 
 }  // namespace shard_catalog_operations

@@ -3,8 +3,6 @@
  * being a shardsvr and back to non shardsvr.
  * @tags: [
  *   requires_persistence,
- *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
- *   incompatible_with_authoritative_shards,
  *   # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in order
  *   # to be able to add shard with data on it (which is only allowed on the first shard).
  *   config_shard_incompatible,
@@ -12,6 +10,7 @@
  */
 
 /* global retryOnRetryableError */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -304,6 +303,14 @@ const st = new ShardingTest({
     shards: numShards,
     other: {configOptions: nodeOptions, rsOptions: nodeOptions},
 });
+
+// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
+                                        "ShardAuthoritativeDbMetadataDDL")) {
+    st.stop();
+    quit();
+}
+
 const replShard = new ReplSetTest({nodes: NUM_NODES, nodeOptions: nodeOptions});
 
 replShard.startSet({verbose: 1});

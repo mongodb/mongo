@@ -324,6 +324,14 @@ let st = new ShardingTest({
     mongos: 1,
 });
 
+// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
+                                        "ShardAuthoritativeDbMetadataDDL")) {
+    st.stop();
+    rst0.stopSet();
+    quit();
+}
+
 jsTest.log("Second test: restart the replica set as a shardsvr but don't add it to a cluster.");
 rst0.restart(0, {shardsvr: ''});
 rst0.restart(1, {shardsvr: ''});

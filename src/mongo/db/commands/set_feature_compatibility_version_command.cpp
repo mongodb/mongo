@@ -1768,6 +1768,33 @@ private:
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
                                                            DDLCoordinatorTypeEnum::kDropDatabase);
         }
+
+        // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+        if (role && role->has(ClusterRole::ShardServer) &&
+            !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
+                opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                    static constexpr std::array drainCoordinatorTypes{
+                        DDLCoordinatorTypeEnum::kMovePrimary,
+                        DDLCoordinatorTypeEnum::kDropDatabase,
+                        DDLCoordinatorTypeEnum::kCreateDatabase,
+                    };
+                    const auto opType = coordinatorInstance.operationType();
+                    return std::ranges::any_of(drainCoordinatorTypes,
+                                               [&](auto&& type) { return opType == type; });
+                });
+
+            // Dropping the authoritative collections (config.shard.catalog.X) as the final step of
+            // the downgrade ensures that no leftover data remains. This guarantees a clean
+            // downgrade and makes it safe to upgrade again.
+            DropCollectionCoordinator::dropCollectionLocally(
+                opCtx,
+                NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                true /* fromMigrate */,
+                false /* dropSystemCollections */,
+                boost::none,
+                false /* requireCollectionEmpty */);
+        }
     }
 };
 MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand).forShard();

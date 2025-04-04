@@ -51,7 +51,6 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/mutex.h"
@@ -291,12 +290,6 @@ void DatabaseShardingState::setDbInfo_DEPRECATED(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
-    tassert(10003603,
-            "Expected to find the authoritative database metadata feature flag enabled",
-            feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
     tassert(10003604,
             fmt::format(
@@ -319,15 +312,6 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseTyp
 
 void DatabaseShardingState::clearDbInfo_DEPRECATED(OperationContext* opCtx,
                                                    bool cancelOngoingRefresh) {
-    tassert(
-        10250101,
-        "Clearing the database metadata should only be done through the authoritative model, "
-        "which is managed by the DDL commit to the shard catalog. This method is being called in a "
-        "non-authoritative way, which is not correct in the current implementation.",
-        !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     if (cancelOngoingRefresh) {
@@ -340,12 +324,6 @@ void DatabaseShardingState::clearDbInfo_DEPRECATED(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::clearDbInfo(OperationContext* opCtx) {
-    tassert(10003601,
-            "Expected to find the authoritative database metadata feature flag enabled",
-            feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
     LOGV2(10003602, "Clearing this node's cached database info", logAttrs(_dbName));
 
     _dbInfo = boost::none;

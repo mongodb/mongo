@@ -1,11 +1,4 @@
-// replica set as solo shard
-// TODO: Add assertion code that catches hang
-//
-// @tags: [
-//     # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-//     incompatible_with_authoritative_shards,
-// ]
-
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -47,6 +40,13 @@ var shardingTestConfig = {
     initiateWithDefaultElectionTimeout: true
 };
 var shardingTest = new ShardingTest(shardingTestConfig);
+
+// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
+if (FeatureFlagUtil.isPresentAndEnabled(shardingTest.configRS.getPrimary(),
+                                        "ShardAuthoritativeDbMetadataDDL")) {
+    shardingTest.stop();
+    quit();
+}
 
 // Get connection to the individual shard
 var replSet1 = shardingTest.rs0;

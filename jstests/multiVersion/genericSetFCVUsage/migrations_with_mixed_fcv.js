@@ -231,6 +231,10 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
     failpoint.off();
     awaitShell();
 
+    // Ensure FCV is consistent between all shards before stopping the test to pass teardown hooks.
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+
     st.stop();
 }
 

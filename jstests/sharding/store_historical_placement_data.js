@@ -1,10 +1,3 @@
-/**
- * @tags: [
- *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
- *   incompatible_with_authoritative_shards,
- * ]
- */
-
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -97,6 +90,12 @@ function getValidatedPlacementInfoForCollection(
                 {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000, /* 1 day */}
         }
     });
+
+    // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
+    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataDDL")) {
+        st.stop();
+        quit();
+    }
 
     configDB = st.s.getDB('config');
     const shard0 = st.shard0.shardName;

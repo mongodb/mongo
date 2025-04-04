@@ -1,13 +1,12 @@
 /**
  * @tags: [
- *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
- *   incompatible_with_authoritative_shards,
  *   # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in order
  *   # to be able to add shard with data on it (which is only allowed on the first shard).
  *   config_shard_incompatible,
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -16,6 +15,13 @@ import {
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 var s = new ShardingTest({name: "add_shard1", shards: 0, useHostname: false});
+
+// TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
+if (FeatureFlagUtil.isPresentAndEnabled(s.configRS.getPrimary(),
+                                        "ShardAuthoritativeDbMetadataDDL")) {
+    s.stop();
+    quit();
+}
 
 // Create a shard and add a database; for the first shard we allow data on the replica set
 var rs1 = new ReplSetTest({name: "addshard1-1", host: 'localhost', nodes: 1});
