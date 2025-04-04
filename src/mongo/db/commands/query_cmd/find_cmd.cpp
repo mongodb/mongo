@@ -1081,6 +1081,7 @@ public:
                 keyBob.append("shardVersion", 1);
                 keyBob.append("databaseVersion", 1);
                 keyBob.append("encryptionInformation", 1);
+                keyBob.append("rawData", 1);
                 return keyBob.obj();
             }();
 

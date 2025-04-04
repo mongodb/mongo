@@ -1341,6 +1341,7 @@ public:
             if (nsInfo.getDatabaseVersion()) {
                 bob->append("databaseVersion", nsInfo.getDatabaseVersion()->toBSON());
             }
+            req.getRawData().serializeToBSON(FindCommandRequest::kRawDataFieldName, bob);
         }
 
         Reply typedRun(OperationContext* opCtx) final {

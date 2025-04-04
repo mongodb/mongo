@@ -478,6 +478,9 @@ public:
                 !encryptionInfo.eoo()) {
                 bob->append(encryptionInfo);
             }
+            if (auto&& rawData = _commandObj["rawData"]) {
+                bob->append(rawData);
+            }
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {

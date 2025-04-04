@@ -723,6 +723,8 @@ void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) 
     if (const auto& databaseVersion = rawCmd.getField("databaseVersion"); !databaseVersion.eoo()) {
         bob->append(databaseVersion);
     }
+    req.getRawData().serializeToBSON(write_ops::FindAndModifyCommandRequest::kRawDataFieldName,
+                                     bob);
 
     // Prevent the find from returning multiple documents since we can
     bob->append("batchSize", 1);
