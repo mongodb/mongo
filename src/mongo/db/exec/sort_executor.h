@@ -134,9 +134,6 @@ public:
     }
 
     SorterFileStats* getSorterFileStats() const {
-        if (!_sorterFileStats) {
-            return nullptr;
-        }
         return _sorterFileStats.get();
     }
 
@@ -240,9 +237,6 @@ public:
             _sorter->spill();
         } else if (_output) {
             if (_output->spillable()) {
-                uint64_t previousSpilledBytes = spilledBytes();
-                uint64_t previousSpilledDataStorageSize = spilledDataStorageSize();
-
                 SorterTracker tracker;
                 auto opts = makeSortOptions();
                 opts.sorterTracker = &tracker;
@@ -252,9 +246,8 @@ public:
                 _stats.spillingStats.incrementSpills(tracker.spilledRanges.loadRelaxed());
                 _stats.spillingStats.incrementSpilledRecords(
                     tracker.spilledKeyValuePairs.loadRelaxed());
-                _stats.spillingStats.incrementSpilledBytes(spilledBytes() - previousSpilledBytes);
-                _stats.spillingStats.incrementSpilledDataStorageSize(
-                    spilledDataStorageSize() - previousSpilledDataStorageSize);
+                _stats.spillingStats.setSpilledBytes(spilledBytes());
+                _stats.spillingStats.updateSpilledDataStorageSize(spilledDataStorageSize());
             }
         }
     }

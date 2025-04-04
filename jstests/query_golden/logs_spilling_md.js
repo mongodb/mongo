@@ -46,6 +46,21 @@ function outputPipelineAndSlowQueryLog(coll, pipeline, comment) {
     linebreak();
 }
 
+function initTimeseriesColl(coll) {
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+    const bucketMaxSpanSeconds =
+        db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
+
+    const batch = [];
+    let batchTime = +(new Date());
+    for (let j = 0; j < 50; ++j) {
+        batch.push({time: new Date(batchTime), meta: 1});
+        batchTime += bucketMaxSpanSeconds / 10;
+    }
+    assert.commandWorked(coll.insertMany(batch));
+}
+
 assert.commandWorked(db.setProfilingLevel(1, {slowms: -1}));
 const coll = db[jsTestName()];
 coll.drop();
@@ -77,6 +92,11 @@ assert.commandWorked(coll.insertMany([{a: 1, b: 3}, {a: 2, b: 2}, {a: 3, b: 1}])
 outputPipelineAndSlowQueryLog(coll,
                               [{$sort: {a: 1}}, {$limit: 3}, {$sort: {b: 1}}],
                               "multiple sorts test: multiple sorts case");
+coll.drop();
+
+section("Timeseries sort");
+initTimeseriesColl(coll);
+outputPipelineAndSlowQueryLog(coll, [{$sort: {time: 1}}], "bounded sort on timeseries");
 coll.drop();
 
 saveParameterToRestore("internalDocumentSourceGroupMaxMemoryBytes");

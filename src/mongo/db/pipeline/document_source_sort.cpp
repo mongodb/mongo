@@ -238,6 +238,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
         // finished a partition. Restart the _timeSorter to make it ready for the next partition.
         if (_timeSorter->getState() == TimeSorterInterface::State::kDone &&
             timeSorterPeek() == GetNextResult::ReturnStatus::kAdvanced) {
+            updateTimeSorterStats();
             _timeSorter->restart();
             _timeSorterCurrentPartition.reset();
         }
@@ -267,8 +268,10 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
             }
         }
 
-        if (_timeSorter->getState() == TimeSorterInterface::State::kDone)
+        if (_timeSorter->getState() == TimeSorterInterface::State::kDone) {
+            updateTimeSorterStats();
             return GetNextResult::makeEOF();
+        }
 
         return _timeSorter->next().second;
     }
@@ -534,6 +537,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
             SortKeyGenerator{std::move(partitionKey), expCtx->getCollator()};
     }
 
+    ds->_timeSorterStats = ds->_sortExecutor->stats();
+
     return ds;
 }
 
@@ -663,7 +668,8 @@ void DocumentSourceSort::loadingDone() {
 }
 
 bool DocumentSourceSort::usedDisk() {
-    return _sortExecutor->wasDiskUsed();
+    return isBoundedSortStage() ? _timeSorter->stats().spilledRanges() > 0
+                                : _sortExecutor->wasDiskUsed();
 }
 
 std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) const {
@@ -730,6 +736,24 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
 void DocumentSourceSort::doForceSpill() {
     if (_sortExecutor.has_value()) {
         _sortExecutor->forceSpill();
+    }
+}
+
+void DocumentSourceSort::updateTimeSorterStats() {
+    tassert(10321900,
+            "Called updateTimeSorterStats() on a non-bounded sort stage",
+            isBoundedSortStage());
+    _timeSorterStats.totalDataSizeBytes = _timeSorter->stats().bytesSorted();
+    _timeSorterStats.memoryUsageBytes = _timeSorter->stats().memUsage();
+    _timeSorterStats.keysSorted = _timeSorter->stats().numSorted();
+    auto sorterFileStats = getSorterFileStats();
+    if (sorterFileStats) {
+        _timeSorterStats.spillingStats.setSpills(_timeSorter->stats().spilledRanges());
+        _timeSorterStats.spillingStats.setSpilledRecords(
+            _timeSorter->stats().spilledKeyValuePairs());
+        _timeSorterStats.spillingStats.setSpilledBytes(sorterFileStats->bytesSpilledUncompressed());
+        _timeSorterStats.spillingStats.updateSpilledDataStorageSize(
+            sorterFileStats->bytesSpilled());
     }
 }
 

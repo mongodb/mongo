@@ -260,7 +260,7 @@ public:
         return _populated;
     };
 
-    bool isBoundedSortStage() {
+    bool isBoundedSortStage() const {
         return (_timeSorter) ? true : false;
     }
 
@@ -269,11 +269,7 @@ public:
     }
 
     const SpecificStats* getSpecificStats() const final {
-        return &_sortExecutor->stats();
-    }
-
-    SorterFileStats* getSorterFileStats() const {
-        return _sortExecutor->getSorterFileStats();
+        return isBoundedSortStage() ? &_timeSorterStats : &_sortExecutor->stats();
     }
 
 protected:
@@ -297,6 +293,10 @@ private:
     void serializeForBoundedSort(std::vector<Value>& array, const SerializationOptions& opts) const;
     void serializeWithVerbosity(std::vector<Value>& array, const SerializationOptions& opts) const;
     void serializeForCloning(std::vector<Value>& array, const SerializationOptions& opts) const;
+
+    SorterFileStats* getSorterFileStats() const {
+        return _sortExecutor->getSorterFileStats();
+    }
 
     /**
      * Before returning anything, we have to consume all input and sort it. This method consumes all
@@ -342,6 +342,13 @@ private:
      */
     Document timeSorterGetNext();
 
+    /**
+     * Populates this stage specific stats using data from _timeSorter. Should be called atleast
+     * once after _timeSorter is exhausted. Can be called before to provide "online" stats during
+     * cursor lifetime.
+     */
+    void updateTimeSorterStats();
+
     bool _populated = false;
 
     boost::optional<SortExecutor<Document>> _sortExecutor;
@@ -365,6 +372,8 @@ private:
     boost::optional<Value> _timeSorterCurrentPartition;
     // Used in timeSorterPeek() to avoid calling getNext() on an exhausted pSource.
     bool _timeSorterInputEOF = false;
+    // Used only if _timeSorter is present.
+    SortStats _timeSorterStats;
 
     QueryMetadataBitSet _requiredMetadata;
 };

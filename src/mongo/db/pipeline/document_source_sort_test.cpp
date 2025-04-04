@@ -608,7 +608,6 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturin
     ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
 }
 
-
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturingFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
     auto [mock, sort] = initSpillingTest(getExpCtx(), tempDir, 1000000, 10);
@@ -637,6 +636,61 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturing
     ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 2);
     ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 86);
     ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(), 200);
+    ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
+}
+
+TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBoundedSort) {
+    RAIIServerParameterControllerForTest sortMemoryLimit{
+        "internalQueryMaxBlockingSortMemoryUsageBytes", 3 * 1024};
+
+    unittest::TempDir tempDir("DocumentSourceSortTest");
+    auto expCtx = getExpCtx();
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+    auto sort = DocumentSourceSort::createBoundedSort(
+        {BSON("time" << 1), expCtx}, "min", -1, boost::none /*limit*/, expCtx);
+
+    std::string largeStr(1024, 'x');
+
+    std::vector<Document> data = {
+        Document{{"time", Date_t::fromMillisSinceEpoch(1)}, {"largeStr", largeStr}},
+        Document{{"time", Date_t::fromMillisSinceEpoch(0)}, {"largeStr", largeStr}},
+        Document{{"time", Date_t::fromMillisSinceEpoch(2)}, {"largeStr", largeStr}},
+        Document{{"time", Date_t::fromMillisSinceEpoch(3)}, {"largeStr", largeStr}}};
+    for (auto& doc : data) {
+        MutableDocument mdoc{doc};
+        DocumentMetadataFields metadata;
+        metadata.setTimeseriesBucketMinTime(doc.getField("time").getDate());
+        mdoc.setMetadata(std::move(metadata));
+        doc = mdoc.freeze();
+    }
+
+    auto mock = DocumentSourceMock::createForTest(std::move(data), expCtx);
+    sort->setSource(mock.get());
+
+    auto next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(0)));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(1)));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(2)));
+
+    next = sort->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(next.releaseDocument()["time"], Value(Date_t::fromMillisSinceEpoch(3)));
+
+    ASSERT_TRUE(sort->getNext().isEOF());
+
+    const auto* sortStats = static_cast<const SortStats*>(sort->getSpecificStats());
+    ASSERT_EQ(sortStats->spillingStats.getSpills(), 2);
+    ASSERT_EQ(sortStats->spillingStats.getSpilledRecords(), 4);
+    ASSERT_EQ(sortStats->spillingStats.getSpilledBytes(), 4296);
+    ASSERT_LT(sortStats->spillingStats.getSpilledDataStorageSize(), 1024);
     ASSERT_GT(sortStats->spillingStats.getSpilledDataStorageSize(), 0);
 }
 
