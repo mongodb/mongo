@@ -8,6 +8,8 @@ variables:
     name: compile_bazel_task_group_template
     max_hosts: -1
     tasks: []
+    setup_task:
+      - func: "override task timeout"
     setup_group_can_fail_task: true
     setup_group:
       - command: manifest.load
@@ -36,6 +38,7 @@ variables:
       - func: "f_expansions_write"
       - func: "set task expansion macros"
       - func: "f_expansions_write"
+      - func: "override task timeout"
       - func: "get engflow creds"
       - func: "fetch pgo profile"
     teardown_task:

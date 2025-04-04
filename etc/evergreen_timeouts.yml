@@ -94,6 +94,30 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
+  enterprise-rhel-83-s390x:
+    - task: ^archive_.*
+      exec_timeout: 600 # 10 hours
+    - task: ^compile_.*
+      exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-83-s390x-shared:
+    - task: ^archive_.*
+      exec_timeout: 600 # 10 hours
+    - task: ^compile_.*
+      exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-9-s390x:
+    - task: ^archive_.*
+      exec_timeout: 600 # 10 hours
+    - task: ^compile_.*
+      exec_timeout: 600 # 10 hours
+
+  enterprise-rhel-9-s390x-shared:
+    - task: ^archive_.*
+      exec_timeout: 600 # 10 hours
+    - task: ^compile_.*
+      exec_timeout: 600 # 10 hours
+
   rhel-8-arm64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours

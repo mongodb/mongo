@@ -129,6 +129,7 @@ variables:
       - func: "f_expansions_write"
       - func: "set task expansion macros"
       - func: "f_expansions_write"
+      - func: "override task timeout"
       - func: "get engflow creds"
     teardown_task:
       - func: "f_expansions_write"

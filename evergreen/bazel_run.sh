@@ -19,14 +19,7 @@ activate_venv
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 
-source ./evergreen/bazel_RBE_supported.sh
 source ./evergreen/bazel_utility_functions.sh
-
-if bazel_rbe_supported; then
-  LOCAL_ARG=""
-else
-  LOCAL_ARG="--config=local"
-fi
 
 BAZEL_BINARY=$(bazel_get_binary_path)
 

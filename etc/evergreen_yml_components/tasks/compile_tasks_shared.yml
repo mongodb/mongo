@@ -12,6 +12,7 @@ variables:
       - func: "f_expansions_write"
       - func: "set task expansion macros"
       - func: "f_expansions_write"
+      - func: "override task timeout"
       - func: "get engflow creds"
       - func: "fetch pgo profile"
     teardown_task:
