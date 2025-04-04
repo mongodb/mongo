@@ -2295,6 +2295,96 @@ TEST_F(BSONColumnTest, DoubleScaleDownWithRLEPending) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, DoubleNoScaleDownAtSkipWithNonZeroRLEPending) {
+    // This test is verifying behavior of skip for the double type when we have pending non-zero
+    // RLE. Doubles are special that the last value in the previous block is tracked and the active
+    // delta being tracked by the compressor can change when it decides to re-scale doubles to
+    // optimally fit. After skip the latest compressor is allowed to scale down as long as there are
+    // no skips in pending values as that require us to maintain the existing state. This can happen
+    // when the skip flushed out pending non-zero RLE that does not evenly fit in Simple8b blocks.
+    static constexpr double kBase = 32.9375;
+    static constexpr double kDelta = 0.09375;
+    std::vector<BSONElement> elems = {
+        // uncompressed
+        createElementDouble(32.8125),
+        // first simple8b to allow for non-zero RLE next
+        createElementDouble(kBase),
+        createElementDouble(kBase + kDelta),
+        // pending non-zero RLE using monotonically increasing value
+        createElementDouble(kBase + kDelta * 2),
+        createElementDouble(kBase + kDelta * 3),
+        // this value will be part of pending RLE but will not fit in the Simple8b when the other
+        // two values are written
+        createElementDouble(kBase + kDelta * 4),
+        BSONElement(),
+        // additional value after skip, test that we have properly calculated state up to this point
+        createElementDouble(33.34375)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    // Every simple8b block written will contain a value that requires this scale factor, we can
+    // therefore share a single control block for all simple8b blocks.
+    appendSimple8bControl(expected, 0b1101, 0b0011);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 100000000.0), 4);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DoubleNoScaleDownAtSkipWithNonZeroRLEPendingWithLessPrecisionLast) {
+    // This test is verifying behavior of skip for the double type when we have pending non-zero
+    // RLE, like 'DoubleNoScaleDownAtSkipWithNonZeroRLEPending' above. The difference here is
+    // that the last value written to simple8b when writing out the pending RLE has fewer decimal
+    // points and could have used a smaller scale factor if written in its own block. We're testing
+    // here that we don't attempt to use this scale factor for the pending values left in the
+    // simple8b builder as they require larger scaling.
+
+    static constexpr double kBase = 42.625;
+    static constexpr double kDelta = 0.03125;
+    std::vector<BSONElement> elems = {
+        // uncompressed
+        createElementDouble(kBase),
+        // first simple8b to allow for non-zero RLE next
+        createElementDouble(kBase + kDelta),
+        createElementDouble(kBase + kDelta * 2),
+        // pending non-zero RLE using monotonically increasing value
+        createElementDouble(kBase + kDelta * 3),
+        // last value to be written in Simple8b when encountering the skip, this has less precision
+        // than the other values. We're testing that we're not attempting to use this scale factor
+        // for the next block.
+        createElementDouble(kBase + kDelta * 4),
+        // this value will be part of pending RLE but will not fit in the Simple8b when the other
+        // two values are written
+        createElementDouble(kBase + kDelta * 5),
+        BSONElement(),
+        // additional value after skip, test that we have properly calculated state up to this point
+        createElementDouble(42.78125)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    // Every simple8b block written will contain a value that requires this scale factor, we can
+    // therefore share a single control block for all simple8b blocks.
+    appendSimple8bControl(expected, 0b1101, 0b0011);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 100000000.0), 4);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, DoubleIncreaseScaleWithoutOverflow) {
     // This test needs to rescale doubles but can do so where there's no overflow in the new control
     std::vector<BSONElement> elems = {createElementDouble(314159264193.46228),

@@ -2060,11 +2060,23 @@ void EncodingState<Allocator>::skip(allocator_aware::BufBuilder<Allocator>& buff
         },
         _encoder);
 
-    // Rescale previous known value if this skip caused Simple-8b blocks to be written
+    // For the double type we can potentially rescale down if this skip caused Simple-8b blocks to
+    // be written. For this to be possible we need to verify that everything left in pending are
+    // skip only. This is typically the case, but if the simple8b builder was in pending RLE there
+    // can be non-skipped values in pending if the values written does not evenly fill simple8b
+    // blocks.
     if (before != buffer.len() && _previous().type == NumberDouble) {
         auto& encoder = std::get<Encoder64>(_encoder);
-        std::tie(encoder.prevEncoded64, encoder.scaleIndex) =
-            scaleAndEncodeDouble(encoder.lastValueInPrevBlock, 0);
+
+        bool pendingSkipOnly = std::none_of(
+            encoder.simple8bBuilder.begin(),
+            encoder.simple8bBuilder.end(),
+            [](const boost::optional<uint64_t>& pending) { return pending.has_value(); });
+
+        if (pendingSkipOnly) {
+            std::tie(encoder.prevEncoded64, encoder.scaleIndex) =
+                scaleAndEncodeDouble(encoder.lastValueInPrevBlock, 0);
+        }
     }
 }
 
