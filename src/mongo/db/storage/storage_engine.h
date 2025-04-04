@@ -927,6 +927,13 @@ public:
     virtual bool underCachePressure() {
         return false;
     };
+
+    /**
+     * Return the size (in megabytes) allocated to the storage engine for cache.
+     */
+    virtual size_t getCacheSizeMB() {
+        return 0;
+    }
 };
 
 }  // namespace mongo

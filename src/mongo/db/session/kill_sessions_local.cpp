@@ -179,8 +179,8 @@ void killAllExpiredTransactions(OperationContext* opCtx,
 void killOldestTransaction(OperationContext* opCtx,
                            Milliseconds timeout,
                            int64_t* numKills,
-                           int64_t* numTimeOuts) {
-
+                           int64_t* numTimeOuts,
+                           int64_t* bytesClearedEstimate) {
     SessionKiller::Matcher matcher(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     boost::optional<LogicalSessionId> oldest;
@@ -232,6 +232,8 @@ void killOldestTransaction(OperationContext* opCtx,
                   "txnNumberAndRetryCounter"_attr =
                       txnParticipant.getActiveTxnNumberAndRetryCounter());
             if (txnParticipant.transactionIsInProgress()) {
+                (*bytesClearedEstimate) +=
+                    shard_role_details::getRecoveryUnit(opCtx)->getCacheDirtyBytes();
                 txnParticipant.abortTransaction(
                     opCtx,
                     Status(ErrorCodes::TemporarilyUnavailable,

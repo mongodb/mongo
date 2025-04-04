@@ -841,6 +841,14 @@ public:
     virtual void setCacheMaxWaitTimeout(Milliseconds) {}
 
     /**
+     * Determine the amount of cache memory this recovery unit has dirtied. If this information is
+     * not perfectly accurate, prefer to return a lower bound.
+     */
+    virtual size_t getCacheDirtyBytes() {
+        return 0;
+    }
+
+    /**
      * Returns true if currently managed by a WriteUnitOfWork.
      *
      * TODO: might should be removed after SERVER-90704

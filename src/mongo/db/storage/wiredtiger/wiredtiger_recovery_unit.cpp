@@ -942,6 +942,13 @@ void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
         "cache_max_wait_ms=0");
 }
 
+size_t WiredTigerRecoveryUnit::getCacheDirtyBytes() {
+    auto session = getSessionNoTxn();
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:session", "statistics=(fast)", WT_STAT_SESSION_TXN_BYTES_DIRTY);
+    return result.isOK() ? result.getValue() : 0;
+}
+
 WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
                                                    uint64_t tableID,
                                                    bool allowOverwrite,

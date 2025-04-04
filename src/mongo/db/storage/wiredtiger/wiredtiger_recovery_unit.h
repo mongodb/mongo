@@ -161,6 +161,8 @@ public:
 
     void setCacheMaxWaitTimeout(Milliseconds) override;
 
+    size_t getCacheDirtyBytes() override;
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();

@@ -68,7 +68,8 @@ void killAllExpiredTransactions(OperationContext* opCtx,
 void killOldestTransaction(OperationContext* opCtx,
                            Milliseconds timeout,
                            int64_t* numKills,
-                           int64_t* numTimeOuts);
+                           int64_t* numTimeOuts,
+                           int64_t* bytesClearedEstimate);
 
 /**
  * Run during shutdown to kill all in-progress transactions, including those in prepare.

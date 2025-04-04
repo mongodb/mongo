@@ -1180,6 +1180,24 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, PreparedTransactionSkipsOptionalEvicti
     ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, CacheSizeEstimatesTransactionBytes) {
+    OperationContext* opCtx = clientAndCtx1.second.get();
+    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.table"));
+
+    // Check that if we haven't done anything, the txn holds no cache.
+    StorageWriteTransaction txn(*ru1);
+    ASSERT_EQ(ru1->getCacheDirtyBytes(), 0);
+
+    // Write some data, now the txn is at least as large as the write.
+    std::string data(1024, 'a');  // 1MB.
+    ASSERT_OK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp(13, 37)));
+    ASSERT_GTE(ru1->getCacheDirtyBytes(), data.size());
+
+    // Rolling back returns us to zero.
+    txn.abort();
+    ASSERT_EQ(ru1->getCacheDirtyBytes(), 0);
+}
+
 DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
                    MultiTimestampConstraints,
                    "Fatal assertion.*4877100") {

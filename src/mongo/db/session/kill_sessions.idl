@@ -62,6 +62,7 @@ server_parameters:
         cpp_varname: gAbortExpiredTransactionsSessionCheckoutTimeout
         default: 100
         redact: false
+
     AbortOldestTransactionSessionCheckoutTimeoutMilliseconds:
         description: >-
             The maximum number of milliseconds for a session to checkout when aborting oldest transactions.
@@ -69,6 +70,30 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: gAbortOldestTransactionSessionCheckoutTimeoutMilliseconds
         default: 100
+        redact: false
+    AbortOldestTransactionSessionKillLimitPerBatch:
+        description: >-
+            The maximum number of sessions that will be killed at a time when aborting oldest transactions.
+            A value of zero effectively disables evicting the oldest transaction.
+        set_at: [ startup, runtime ]
+        cpp_vartype: int
+        cpp_varname: gAbortOldestTransactionSessionKillLimitPerBatch
+        default: 1
+        validator: { gte: 0 }
+        redact: false
+    AbortOldestTransactionMemoryClearLimitPerBatch:
+        description: >-
+            The target amount of memory which will be freed at a time when aborting oldest transactions.
+             - Positive values are absolute targets, in MB. So "1024" means a gigabyte.
+             - Negative values are percentages, relative to the cache size allocated for storage. so "-3"
+               means 3% of the cache's configured maximum size.
+             - Zero (the default) means that no limit will be applied, i.e. transactions will continue to
+               be rolled-back until the system is not under memory pressure or a different limit is reached.
+        set_at: [ startup, runtime ]
+        cpp_vartype: double
+        cpp_varname: gAbortOldestTransactionMemoryClearLimitPerBatch
+        default: 0
+        validator: { gte: -100}
         redact: false
 
 structs:

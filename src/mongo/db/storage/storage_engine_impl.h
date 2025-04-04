@@ -275,6 +275,8 @@ public:
 
     bool underCachePressure() override;
 
+    size_t getCacheSizeMB() override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

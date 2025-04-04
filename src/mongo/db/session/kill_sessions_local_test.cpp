@@ -132,11 +132,13 @@ TEST_F(KillSessionsTest, killOldestTransaction) {
 
     int64_t numKills = 0;
     int64_t numTimeOuts = 0;
+    int64_t bytesFreed = 0;
 
-    killOldestTransaction(sideOpCtx.get(), Milliseconds(100), &numKills, &numTimeOuts);
+    killOldestTransaction(sideOpCtx.get(), Milliseconds(100), &numKills, &numTimeOuts, &bytesFreed);
 
     ASSERT_EQ(1, numKills);
     ASSERT_EQ(0, numTimeOuts);
+    ASSERT_EQ(0, bytesFreed);
 }
 
 TEST_F(KillSessionsTest, killOldestTransactionTimesOut) {
@@ -159,11 +161,13 @@ TEST_F(KillSessionsTest, killOldestTransactionTimesOut) {
 
     int64_t numKills = 0;
     int64_t numTimeOuts = 0;
+    int64_t bytesFreed = 0;
 
-    killOldestTransaction(sideOpCtx.get(), Milliseconds(0), &numKills, &numTimeOuts);
+    killOldestTransaction(sideOpCtx.get(), Milliseconds(0), &numKills, &numTimeOuts, &bytesFreed);
 
     ASSERT_EQ(0, numKills);
     ASSERT_EQ(1, numTimeOuts);
+    ASSERT_EQ(0, bytesFreed);
 }
 
 }  // namespace

@@ -48,6 +48,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -69,6 +70,23 @@ bool underCachePressure(OperationContext* opCtx) {
 const auto periodicThreadToRollbackUnderCachePressureDecoration =
     ServiceContext::declareDecoration<PeriodicThreadToRollbackUnderCachePressure>();
 
+int64_t getPerBatchMemoryLimitBytes(OperationContext* opCtx) {
+    double limitParameter = gAbortOldestTransactionMemoryClearLimitPerBatch;
+
+    // Positive values are MB.
+    if (limitParameter > 0) {
+        return limitParameter * 1024 * 1024;
+    }
+    // 0 means no limit, so just set the limit to be larger than the total memory.
+    if (limitParameter == 0) {
+        limitParameter = -101;
+    }
+    // Negative values are percentages of cache allocated to the engine.
+    double onePercentMB = opCtx->getServiceContext()->getStorageEngine()->getCacheSizeMB() / 100.0;
+    double cacheLimitMB = onePercentMB * (-limitParameter);
+    return cacheLimitMB * 1024 * 1024;
+}
+
 }  // namespace
 
 // Tracks the number of passes the "abortOldestTransactions" thread makes to abort oldest
@@ -81,6 +99,9 @@ auto& abortOldestTransactionsSuccessfulKills =
 // due to timing out trying to checkout a sessions.
 auto& abortOldestTransactionsTimedOutKills =
     *MetricBuilder<Counter64>("abortOldestTransactions.timedOutKills");
+// Tracks the (estimated) number of bytes freed up by killing oldest transactions.
+auto& abortOldestTransactionsBytesClearedEstimate =
+    *MetricBuilder<Counter64>("abortOldestTransactions.bytesClearedEstimate");
 
 auto PeriodicThreadToRollbackUnderCachePressure::get(ServiceContext* serviceContext)
     -> PeriodicThreadToRollbackUnderCachePressure& {
@@ -130,20 +151,35 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                 // engine to not do any extra eviction for this thread, if supported.
                 shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
 
-                if (!underCachePressure(opCtx)) {
-                    return;
-                }
 
-                int64_t numKills = 0;
-                int64_t numTimeOuts = 0;
-                killOldestTransaction(
-                    opCtx,
-                    Milliseconds(gAbortOldestTransactionSessionCheckoutTimeoutMilliseconds),
-                    &numKills,
-                    &numTimeOuts);
-                abortOldestTransactionsPasses.increment(1);
-                abortOldestTransactionsSuccessfulKills.increment(numKills);
-                abortOldestTransactionsTimedOutKills.increment(numTimeOuts);
+                int64_t bytesTarget = getPerBatchMemoryLimitBytes(opCtx);
+                int64_t killsTarget = gAbortOldestTransactionSessionKillLimitPerBatch;
+                while (bytesTarget > 0 && killsTarget > 0) {
+                    if (!underCachePressure(opCtx)) {
+                        break;
+                    }
+
+                    int64_t numKills = 0;
+                    int64_t numTimeOuts = 0;
+                    int64_t bytesClearedEstimate = 0;
+                    // TODO(SERVER-102762): This is a linear scan of the session catalog for every
+                    // session we try to kill. If we find that "larger than a small constant" is a
+                    // reasonable default then we should re-visit this strategy, and find more than
+                    // one oldest transaction per scan.
+                    killOldestTransaction(
+                        opCtx,
+                        Milliseconds(gAbortOldestTransactionSessionCheckoutTimeoutMilliseconds),
+                        &numKills,
+                        &numTimeOuts,
+                        &bytesClearedEstimate);
+                    abortOldestTransactionsPasses.increment(1);
+                    abortOldestTransactionsSuccessfulKills.increment(numKills);
+                    abortOldestTransactionsTimedOutKills.increment(numTimeOuts);
+                    abortOldestTransactionsBytesClearedEstimate.increment(bytesClearedEstimate);
+
+                    bytesTarget -= bytesClearedEstimate;
+                    killsTarget -= numKills;
+                }
             } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(10036701, 2, "Periodic job canceled", "reason"_attr = ex.reason());
             } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
