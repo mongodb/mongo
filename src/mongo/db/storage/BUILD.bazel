@@ -149,39 +149,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "flow_control_parameters_gen",
-    src = "flow_control_parameters.idl",
-)
-
-mongo_cc_library(
-    name = "flow_control_parameters",
-    srcs = [
-        ":flow_control_parameters_gen",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
-    ],
-)
-
-mongo_cc_library(
-    name = "flow_control",
-    srcs = [
-        "flow_control.cpp",
-    ],
-    hdrs = [
-        "flow_control.h",
-    ],
-    deps = [
-        ":flow_control_parameters",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
-        "//src/mongo/util:background_job",
-    ],
-)
-
 mongo_cc_library(
     name = "storage_file_util",
     srcs = [
@@ -693,7 +660,6 @@ mongo_cc_unit_test(
     srcs = [
         "collection_truncate_markers_test.cpp",
         "disk_space_monitor_test.cpp",
-        "flow_control_test.cpp",
         "index_entry_comparison_test.cpp",
         "storage_engine_lock_file_test.cpp",
         "storage_engine_metadata_test.cpp",
@@ -706,8 +672,6 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":disk_space_monitor",
-        ":flow_control",
-        ":flow_control_parameters",
         ":record_store_base",
         ":storage_engine_common",
         ":storage_engine_lock_file",
@@ -723,7 +687,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:topology_coordinator",

@@ -36,11 +36,11 @@
 #include <mutex>
 #include <utility>
 
+#include "mongo/db/admission/flow_control.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"

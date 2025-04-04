@@ -39,6 +39,8 @@
 #include <utility>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/flow_control.h"
+#include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
@@ -47,8 +49,6 @@
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/flow_control.h"
-#include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"

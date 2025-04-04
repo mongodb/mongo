@@ -90,9 +90,9 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:vector_clock_mutable",
+        "//src/mongo/db/admission:flow_control",
         "//src/mongo/db/repl:optime",
         "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:flow_control",
         "//src/mongo/db/storage:record_store_base",
     ],
 )

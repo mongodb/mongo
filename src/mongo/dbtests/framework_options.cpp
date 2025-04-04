@@ -44,9 +44,9 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep

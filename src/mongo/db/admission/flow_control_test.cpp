@@ -31,14 +31,14 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/admission/flow_control.h"
+#include "mongo/db/admission/flow_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/flow_control.h"
-#include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 

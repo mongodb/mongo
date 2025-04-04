@@ -124,6 +124,53 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "flow_control_parameters_gen",
+    src = "flow_control_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "flow_control_parameters",
+    srcs = [
+        ":flow_control_parameters_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "flow_control",
+    srcs = [
+        "flow_control.cpp",
+    ],
+    hdrs = [
+        "flow_control.h",
+    ],
+    deps = [
+        ":flow_control_parameters",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/util:background_job",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "flow_control_test",
+    srcs = [
+        "flow_control_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":flow_control",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "ingress_admission_control_test",
     srcs = [
