@@ -2,9 +2,6 @@
  * Creates a regular collection and a time series collection with block processing enabled, and runs
  * queries that result in different BSON types to ensure the results are the same.
  */
-// TODO(SERVER-102640): Re-enable this test once implicit natural ordering assumption has been
-// addressed.
-quit();
 
 import {
     blockProcessingTestCases,
@@ -107,10 +104,6 @@ for (const data1 of leafsMinusUndefined) {
 assert.commandWorked(scalarColl.insert(tsData));
 assert.commandWorked(bpColl.insert(tsData));
 
-function isNumberDecimal(num) {
-    return (num + "").startsWith('NumberDecimal');
-}
-
 function compareScalarAndBlockProcessing(test, allowDiskUse) {
     let scalarFailed = false;
     let scalarResults = [];
@@ -133,54 +126,9 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
         return;
     }
 
-    assert.eq(scalarResults.length, bpResults.length);
-
-    // Sort the data so we can compare by iterating through both results pairwise.
-    const cmpFn = function(doc1, doc2) {
-        const doc1Json = tojson(doc1);
-        const doc2Json = tojson(doc2);
-        return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
-    };
-
-    const normalizeNaN = function(arg) {
-        if (Number.isNaN(arg)) {
-            return NumberDecimal("NaN");
-        } else if (arg !== null && (arg.constructor === Object || Array.isArray(arg))) {
-            let newArg = Array.isArray(arg) ? [] : {};
-            for (let prop in arg) {
-                newArg[prop] = normalizeNaN(arg[prop]);
-            }
-            return newArg;
-        }
-        return arg;
-    };
-
-    scalarResults = normalizeNaN(scalarResults);
-    bpResults = normalizeNaN(bpResults);
-
-    scalarResults.sort(cmpFn);
-    bpResults.sort(cmpFn);
-    for (let i = 0; i < scalarResults.length; i++) {
-        const scalarKeys = Object.keys(scalarResults[i]);
-        const bpKeys = Object.keys(bpResults[i]);
-        assert.eq(scalarKeys, bpKeys);
-
-        for (const key of scalarKeys) {
-            const debugInfo = {name: test.name, resultIndex: i};
-            const scalarField = scalarResults[i][key];
-            const bpField = bpResults[i][key];
-            // If the values are NumberDecimal, we have to call .equals().
-            const scalarIsDec = isNumberDecimal(scalarField);
-            const bpIsDec = isNumberDecimal(bpField);
-            if (scalarIsDec && !bpIsDec) {
-                assert(scalarField.equals(NumberDecimal(bpField)), debugInfo);
-            } else if (!scalarIsDec && bpIsDec) {
-                assert(bpField.equals(NumberDecimal(scalarField)), debugInfo);
-            } else {
-                assert.eq(scalarField, bpField, debugInfo);
-            }
-        }
-    }
+    // `_resultSetsEqualNormalized` normalizes number types (included NaN), sorts between documents
+    // and within documents, and then returns true or false if the result sets are equal.
+    assert(_resultSetsEqualNormalized(scalarResults, bpResults), {test, scalarResults, bpResults});
 }
 
 function runTestCases(allowDiskUse, forceSpilling) {

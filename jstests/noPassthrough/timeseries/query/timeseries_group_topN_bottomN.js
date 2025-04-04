@@ -3,9 +3,6 @@
  * on edge cases. It is aimed at testing the accumulators, not the $group stage itself. It compares
  * the results between SBE using $group block processing and Classic engine.
  */
-// TODO(SERVER-102640): Re-enable this test once implicit natural ordering assumption has been
-// addressed.
-quit();
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
 const classicConn =
@@ -70,22 +67,15 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
     const classicResults = classicColl.aggregate(pipeline, {allowDiskUse}).toArray();
     const bpResults = bpColl.aggregate(pipeline, {allowDiskUse}).toArray();
 
-    // Sort order is not guaranteed, so let's sort by the object itself before comparing.
-    const cmpFn = function(doc1, doc2) {
-        const doc1Json = tojson(doc1);
-        const doc2Json = tojson(doc2);
-        return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
-    };
-    classicResults.sort(cmpFn);
-    bpResults.sort(cmpFn);
-
     function errFn() {
         jsTestLog(classicColl.explain().aggregate(pipeline, {allowDiskUse}));
         jsTestLog(bpColl.explain().aggregate(pipeline, {allowDiskUse}));
 
         return "compareClassicAndBP: Got different results for pipeline " + tojson(pipeline);
     }
-    assert.eq(classicResults, bpResults, errFn);
+    // `_resultSetsEqualNormalized` normalizes number types (included NaN), sorts between documents
+    // and within documents, and then returns true or false if the result sets are equal.
+    assert(_resultSetsEqualNormalized(classicResults, bpResults), errFn);
 }
 
 // Group IDs of varying complexities.
