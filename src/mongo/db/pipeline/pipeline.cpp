@@ -634,13 +634,16 @@ void Pipeline::stitch(SourceContainer* container) {
 }
 
 boost::optional<Document> Pipeline::getNext() {
-    invariant(!_sources.empty());
-    auto nextResult = _sources.back()->getNext();
-    while (nextResult.isPaused()) {
-        nextResult = _sources.back()->getNext();
+    if (MONGO_likely(!_sources.empty())) {
+        auto nextResult = _sources.back()->getNext();
+        while (nextResult.isPaused()) {
+            nextResult = _sources.back()->getNext();
+        }
+        if (!nextResult.isEOF()) {
+            return nextResult.releaseDocument();
+        }
     }
-    return nextResult.isEOF() ? boost::none
-                              : boost::optional<Document>{nextResult.releaseDocument()};
+    return boost::none;
 }
 
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
