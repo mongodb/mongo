@@ -96,6 +96,14 @@ public:
         return _remoteAddr;
     }
 
+    const SockAddr& getProxiedSrcRemoteAddr() const {
+        if (_proxiedSrcRemoteAddr) {
+            return *_proxiedSrcRemoteAddr;
+        }
+
+        return _remoteAddr;
+    }
+
     const SockAddr& localAddr() const {
         return _localAddr;
     }
@@ -311,6 +319,8 @@ protected:
     bool _isFromLoadBalancer = false;
     boost::optional<HostAndPort> _proxiedSrcEndpoint;
     boost::optional<HostAndPort> _proxiedDstEndpoint;
+
+    boost::optional<SockAddr> _proxiedSrcRemoteAddr;
 
     AsyncOperationState _asyncOpState;
 
