@@ -170,7 +170,7 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("type", networkOpToString(networkOp));
     }
 
-    pAttrs->add("isFromUserConnection", client->isFromUserConnection());
+    pAttrs->add("isFromUserConnection", client && client->isFromUserConnection());
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
     pAttrs->addDeepCopy("collectionType", getCollectionType(curop.getNSS()));
 
