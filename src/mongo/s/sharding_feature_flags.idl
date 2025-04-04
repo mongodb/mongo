@@ -129,7 +129,8 @@ feature_flags:
       transitional FCV because the new coordinator is needed during the transition phase of
       authoritative databases.
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
-    default: false
+    default: true
+    version: 8.2
     shouldBeFCVGated: true
     enable_on_transitional_fcv: true
   # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
