@@ -54,6 +54,7 @@ export const $config = (function() {
                                                     ErrorCodes.SnapshotTooOld,
                                                     ErrorCodes.NoMatchingDocument,
                                                     ErrorCodes.NotWritablePrimary,
+                                                    ErrorCodes.FailedToSatisfyReadPreference,
                                                 ],
                                                 [
                                                     ErrorCodes.IndexBuildAborted,
