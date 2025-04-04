@@ -119,7 +119,7 @@ toolchain_download = repository_rule(
             doc = "Host architecture.",
         ),
         "version": attr.string(
-            values = ["v5"],
+            values = ["v4", "v5"],
             doc = "Mongodbtoolchain version.",
             mandatory = True,
         ),
@@ -136,12 +136,19 @@ toolchain_download = repository_rule(
 
 def setup_mongo_toolchains():
     toolchain_download(
+        name = "mongo_toolchain_v4",
+        version = "v4",
+        flags_tpl = "//bazel/toolchains/cc:mongo_toolchain_flags_v4.bzl",
+    )
+
+    toolchain_download(
         name = "mongo_toolchain_v5",
         version = "v5",
         flags_tpl = "//bazel/toolchains/cc:mongo_toolchain_flags_v5.bzl",
     )
 
     native.register_toolchains(
+        "@mongo_toolchain_v4//:all",
         "@mongo_toolchain_v5//:all",
     )
 
