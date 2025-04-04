@@ -1329,7 +1329,6 @@ mongo_cc_unit_test(
         "document_source_list_mql_entities_test.cpp",
         "document_source_lookup_test.cpp",
         "document_source_match_test.cpp",
-        "document_source_merge_cursors_test.cpp",
         "document_source_merge_test.cpp",
         "document_source_mock_test.cpp",
         "document_source_out_test.cpp",
@@ -1445,6 +1444,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/window_function:window_function_sum_test.cpp",
         "//src/mongo/db/s:sharding_mongod_test_fixture.h",
         "//src/mongo/dbtests:dbtests.h",
+        "//src/mongo/s/query/exec:document_source_merge_cursors_test.cpp",
         "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
     tags = [
