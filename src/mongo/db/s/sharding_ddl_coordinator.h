@@ -131,9 +131,10 @@ public:
     // TODO SERVER-99655: update once the operationFCV is always present for sharded DDLs
     boost::optional<multiversion::FeatureCompatibilityVersion> getOperationFCV() const {
         const auto versionContext = getForwardableOpMetadata().getVersionContext();
-        invariant(!versionContext || versionContext->getOperationFCV());
+        invariant(!versionContext || versionContext->getOperationFCV(VersionContext::Passkey()));
         return versionContext
-            ? boost::make_optional(versionContext->getOperationFCV()->getVersion())
+            ? boost::make_optional(
+                  versionContext->getOperationFCV(VersionContext::Passkey())->getVersion())
             : boost::none;
     }
 

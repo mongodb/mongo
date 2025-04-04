@@ -35,72 +35,78 @@
 #include "src/mongo/bson/bsonmisc.h"
 
 namespace mongo {
-namespace {
 // (Generic FCV reference): used for testing, should exist across LTS binary versions
 using GenericFCV = multiversion::GenericFCV;
 using FCV = multiversion::FeatureCompatibilityVersion;
 
-TEST(VersionContextTest, DefaultConstructorDoesNotInitializeOFCV) {
+class VersionContextTest : public unittest::Test {
+public:
+    boost::optional<ServerGlobalParams::FCVSnapshot> getOFCV(const VersionContext& vCtx) const {
+        return vCtx.getOperationFCV(VersionContext::Passkey());
+    }
+};
+
+TEST_F(VersionContextTest, DefaultConstructorDoesNotInitializeOFCV) {
     VersionContext vCtx;
-    ASSERT_FALSE(vCtx.getOperationFCV().has_value());
+    ASSERT_FALSE(getOFCV(vCtx).has_value());
 }
 
-TEST(VersionContextTest, NoVersionContextHasNoOperationFCV) {
-    ASSERT_FALSE(kNoVersionContext.getOperationFCV().has_value());
+TEST_F(VersionContextTest, NoVersionContextHasNoOperationFCV) {
+    ASSERT_FALSE(getOFCV(kNoVersionContext).has_value());
 }
 
-TEST(VersionContextTest, VersionContextIgnoredHasNoOperationFCV) {
-    ASSERT_FALSE(kVersionContextIgnored.getOperationFCV().has_value());
+TEST_F(VersionContextTest, VersionContextIgnoredHasNoOperationFCV) {
+    ASSERT_FALSE(getOFCV(kVersionContextIgnored).has_value());
 }
 
-TEST(VersionContextTest, FCVConstructorInitializesOFCVToLatest) {
+TEST_F(VersionContextTest, FCVConstructorInitializesOFCVToLatest) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx(GenericFCV::kLatest);
-    ASSERT_TRUE(vCtx.getOperationFCV().has_value());
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_TRUE(getOFCV(vCtx).has_value());
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, FCVSnapshotConstructorInitializesOFCVToLatest) {
+TEST_F(VersionContextTest, FCVSnapshotConstructorInitializesOFCVToLatest) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx(ServerGlobalParams::FCVSnapshot{GenericFCV::kLatest});
-    ASSERT_TRUE(vCtx.getOperationFCV().has_value());
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_TRUE(getOFCV(vCtx).has_value());
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, CopyConstructorInitializesOFCV) {
+TEST_F(VersionContextTest, CopyConstructorInitializesOFCV) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx{GenericFCV::kLatest};
     VersionContext vCtxCopy{vCtx};
-    ASSERT_TRUE(vCtxCopy.getOperationFCV().has_value());
-    ASSERT_EQ(vCtxCopy.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_TRUE(getOFCV(vCtxCopy).has_value());
+    ASSERT_EQ(getOFCV(vCtxCopy)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, AssignmentOperatorSetsOFCV) {
+TEST_F(VersionContextTest, AssignmentOperatorSetsOFCV) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtxA{GenericFCV::kLatest};
     VersionContext vCtxB;
     vCtxB = vCtxA;
-    ASSERT_TRUE(vCtxB.getOperationFCV().has_value());
-    ASSERT_EQ(vCtxB.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_TRUE(getOFCV(vCtxB).has_value());
+    ASSERT_EQ(getOFCV(vCtxB)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, SetOFCVWithFCV) {
+TEST_F(VersionContextTest, SetOFCVWithFCV) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx;
     vCtx.setOperationFCV(GenericFCV::kLatest);
-    ASSERT_TRUE(vCtx.getOperationFCV().has_value());
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_TRUE(getOFCV(vCtx).has_value());
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, SetOFCVWithLatestFCVSnapshot) {
+TEST_F(VersionContextTest, SetOFCVWithLatestFCVSnapshot) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx;
     vCtx.setOperationFCV(ServerGlobalParams::FCVSnapshot{GenericFCV::kLatest});
-    ASSERT_TRUE(vCtx.getOperationFCV().has_value());
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_TRUE(getOFCV(vCtx).has_value());
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, CheckForEquality) {
+TEST_F(VersionContextTest, CheckForEquality) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     // Metadata
     ASSERT_TRUE(VersionContext{GenericFCV::kLatest} == VersionContext{GenericFCV::kLatest});
@@ -115,49 +121,49 @@ TEST(VersionContextTest, CheckForEquality) {
                  VersionContext{VersionContext::OutsideOperationTag{}});
 }
 
-TEST(VersionContextTest, UpdatingIsIdempotent) {
+TEST_F(VersionContextTest, UpdatingIsIdempotent) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx{GenericFCV::kLatest};
     ASSERT_DOES_NOT_THROW(vCtx = VersionContext{GenericFCV::kLatest});
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
     ASSERT_DOES_NOT_THROW(vCtx.setOperationFCV(GenericFCV::kLatest));
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
     ASSERT_DOES_NOT_THROW(
         vCtx.setOperationFCV(ServerGlobalParams::FCVSnapshot{GenericFCV::kLatest}));
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLatest);
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLatest);
 }
 
-TEST(VersionContextTest, UpdatingThrowsWhenAlreadyInitializedWithDifferentValue) {
+TEST_F(VersionContextTest, UpdatingThrowsWhenAlreadyInitializedWithDifferentValue) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     VersionContext vCtx{GenericFCV::kLastLTS};
     ASSERT_THROWS_CODE(vCtx = VersionContext{GenericFCV::kLatest},
                        AssertionException,
                        ErrorCodes::AlreadyInitialized);
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLastLTS);
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLastLTS);
     ASSERT_THROWS_CODE(vCtx.setOperationFCV(GenericFCV::kLatest),
                        AssertionException,
                        ErrorCodes::AlreadyInitialized);
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLastLTS);
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLastLTS);
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     ASSERT_THROWS_CODE(vCtx.setOperationFCV(ServerGlobalParams::FCVSnapshot{GenericFCV::kLatest}),
                        AssertionException,
                        ErrorCodes::AlreadyInitialized);
-    ASSERT_EQ(vCtx.getOperationFCV()->getVersion(), GenericFCV::kLastLTS);
+    ASSERT_EQ(getOFCV(vCtx)->getVersion(), GenericFCV::kLastLTS);
 }
 
-TEST(VersionContextTest, SerializeDeserialize) {
+TEST_F(VersionContextTest, SerializeDeserialize) {
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     // Verify that an uninitialized VersionContext can be serialized and deserialized.
     VersionContext vCtxA;
     VersionContext vCtxB{vCtxA.toBSON()};
-    ASSERT_FALSE(vCtxB.getOperationFCV().has_value());
+    ASSERT_FALSE(getOFCV(vCtxB).has_value());
     // Verify that stable as well as transitory FCV states can be serialized and deserialized.
     const std::vector<FCV> fcvs{GenericFCV::kLatest, GenericFCV::kUpgradingFromLastLTSToLatest};
     for (const auto fcv : fcvs) {
         VersionContext vCtxA{fcv};
         VersionContext vCtxB{vCtxA.toBSON()};
-        ASSERT_TRUE(vCtxB.getOperationFCV().has_value());
-        ASSERT_EQ(vCtxB.getOperationFCV()->getVersion(), fcv);
+        ASSERT_TRUE(getOFCV(vCtxB).has_value());
+        ASSERT_EQ(getOFCV(vCtxB)->getVersion(), fcv);
     }
 }
 
@@ -176,7 +182,7 @@ VersionContext makeFromDowngradingOFCVString(StringData from, StringData to) {
     return makeFromOFCVString(fmt::format("downgrading from {} to {}", from, to));
 }
 
-TEST(VersionContextTest, DeserializeFromValidDocument) {
+TEST_F(VersionContextTest, DeserializeFromValidDocument) {
     ASSERT_EQ(VersionContext{}, VersionContext{BSONObj()});
 
     // (Generic FCV reference): used for testing, should exist across LTS binary version
@@ -213,7 +219,7 @@ TEST(VersionContextTest, DeserializeFromValidDocument) {
 
 // Tests that deserializing an invalid input fails gracefully by throwing an exception.
 // This is important since VersionContext is exposed as a generic request argument.
-TEST(VersionContextTest, DeserializeFromInvalidDocument) {
+TEST_F(VersionContextTest, DeserializeFromInvalidDocument) {
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(""));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString(" "));
     ASSERT_THROWS_BAD_VALUE(makeFromOFCVString("xyzzy"));
@@ -239,5 +245,4 @@ TEST(VersionContextTest, DeserializeFromInvalidDocument) {
     ASSERT_THROWS_BAD_VALUE(makeFromDowngradingOFCVString(kLatestFCVString, kLatestFCVString));
 }
 
-}  // namespace
 }  // namespace mongo

@@ -83,7 +83,21 @@ public:
         return !std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag);
     }
 
-    inline boost::optional<FCVSnapshot> getOperationFCV() const {
+    class Passkey {
+    private:
+        friend class VersionContextTest;
+        friend class FCVGatedFeatureFlag;
+        friend class ShardingDDLCoordinator;
+        Passkey() = default;
+        ~Passkey() = default;
+    };
+
+    // To prevent potential misuse or confusion in the codebase regarding the distinction
+    // between operation-specific and global FCV contexts, access to the getOperationFCV()
+    // method is restricted. This restriction is implemented using the Passkey pattern,
+    // such that only specific classes can construct an instance of the passkey and,
+    // consequently, call the restricted getOperationFCV() method.
+    inline boost::optional<FCVSnapshot> getOperationFCV(Passkey) const {
         if (auto* metadata = std::get_if<VersionContextMetadata>(&_metadataOrTag)) {
             return boost::optional<FCVSnapshot>{metadata->getOFCV()};
         }

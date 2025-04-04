@@ -84,14 +84,14 @@ FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled,
 // functions in feature_flag_util.js also incorporate the change.
 bool FCVGatedFeatureFlag::isEnabled(const VersionContext& vCtx,
                                     const ServerGlobalParams::FCVSnapshot fcv) const {
-    const auto currentFcv = vCtx.getOperationFCV().value_or(fcv);
+    const auto currentFcv = vCtx.getOperationFCV(VersionContext::Passkey()).value_or(fcv);
 
     return isEnabledOnVersion(currentFcv.getVersion());
 }
 
 bool FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot fcv) const {
-    const auto currentFcv = vCtx.getOperationFCV().value_or(fcv);
+    const auto currentFcv = vCtx.getOperationFCV(VersionContext::Passkey()).value_or(fcv);
     // (Generic FCV reference): This reference is needed for the feature flag check API.
     const auto applicableFcv = currentFcv.isVersionInitialized()
         ? currentFcv
@@ -102,7 +102,7 @@ bool FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
 
 bool FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot fcv) const {
-    const auto currentFcv = vCtx.getOperationFCV().value_or(fcv);
+    const auto currentFcv = vCtx.getOperationFCV(VersionContext::Passkey()).value_or(fcv);
     // (Generic FCV reference): This reference is needed for the feature flag check API.
     const auto applicableFcv = currentFcv.isVersionInitialized()
         ? currentFcv
