@@ -56,5 +56,29 @@ void BM_LowerABTLetExpr(benchmark::State& state) {
 }
 
 BENCHMARK(BM_LowerABTLetExpr)->Arg(1)->Arg(10)->Arg(20)->Arg(40)->Arg(100);
+
+void BM_LowerABTMultiLetExpr(benchmark::State& state) {
+    auto nLets = state.range(0);
+    std::vector<std::pair<optimizer::ProjectionName, optimizer::ABT>> vars;
+    for (int i = 0; i < nLets; i++) {
+        vars.push_back(std::make_pair(
+            optimizer::ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
+            optimizer::Constant::int32(i)));
+    }
+    optimizer::ABT n =
+        optimizer::make<optimizer::MultiLet>(std::move(vars), optimizer::Constant::boolean(true));
+    for (auto keepRunning : state) {
+        auto env = optimizer::VariableEnvironment::build(n);
+        SlotVarMap map;
+        sbe::RuntimeEnvironment runtimeEnv;
+        sbe::value::SlotIdGenerator ids;
+        sbe::InputParamToSlotMap inputParamToSlotMap;
+        benchmark::DoNotOptimize(
+            SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}.optimize(n));
+        benchmark::ClobberMemory();
+    }
+}
+
+BENCHMARK(BM_LowerABTMultiLetExpr)->Arg(1)->Arg(10)->Arg(20)->Arg(40)->Arg(100);
 }  // namespace
 }  // namespace mongo::stage_builder::abt

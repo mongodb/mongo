@@ -2,91 +2,97 @@
 ExpressionConcatArrays
 
     let [
-        l5.0 = getField(s1, "arr2") 
+        l5.0 = getField(s1, "arr1") 
+        l5.1 = getField(s1, "arr2") 
+        l5.2 = concatArrays(l5.0, [2.5L, "str"], l5.1) 
     ] 
     in 
-        let [
-            l6.0 = getField(s1, "arr1") 
-        ] 
-        in 
-            let [
-                l7.0 = concatArrays(l6.0, [2.5L, "str"], l5.0) 
-            ] 
-            in 
-                if exists(l7.0) 
-                then makeOwn(move(l7.0)) 
-                else 
-                    if ((typeMatch(move(l6.0), 1088) ?: true) || (typeMatch(move(l5.0), 1088) ?: true)) 
-                    then null 
-                    else fail(7158000, "$concatArrays only supports arrays") 
+        if exists(l5.2) 
+        then makeOwn(move(l5.2)) 
+        elif ((typeMatch(move(l5.0), 1088) ?: true) || (typeMatch(move(l5.1), 1088) ?: true)) 
+        then null 
+        else fail(7158000, "$concatArrays only supports arrays") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetDifference
 
     let [
-        l10.0 = getField(s1, "arr2") 
-        l10.1 = getField(s1, "arr3") 
+        l8.0 = getField(s1, "arr2") 
+        l8.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((typeMatch(l10.0, 1088) ?: true) || (typeMatch(l10.1, 1088) ?: true)) 
+        if ((typeMatch(l8.0, 1088) ?: true) || (typeMatch(l8.1, 1088) ?: true)) 
         then null 
-        elif (!(isArray(l10.0)) || !(isArray(l10.1))) 
+        elif (!(isArray(l8.0)) || !(isArray(l8.1))) 
         then fail(7158101, "All operands of $setDifference must be arrays.") 
-        else setDifference(move(l10.0), move(l10.1)) 
+        else setDifference(move(l8.0), move(l8.1)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetEquals
 
     let [
-        l13.0 = getField(s1, "arr2") 
-        l13.1 = getField(s1, "arr3") 
+        l11.0 = getField(s1, "arr2") 
+        l11.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((!(isArray(l13.0)) || !(isArray(l13.1))) ?: true) 
+        if ((!(isArray(l11.0)) || !(isArray(l11.1))) ?: true) 
         then fail(7158100, "All operands of $setEquals must be arrays.") 
-        else setEquals(move(l13.0), move(l13.1)) 
+        else setEquals(move(l11.0), move(l11.1)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetIntersection
 
     let [
-        l16.0 = getField(s1, "arr2") 
-        l16.1 = getField(s1, "arr3") 
+        l14.0 = getField(s1, "arr2") 
+        l14.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((typeMatch(l16.0, 1088) ?: true) || (typeMatch(l16.1, 1088) ?: true)) 
+        if ((typeMatch(l14.0, 1088) ?: true) || (typeMatch(l14.1, 1088) ?: true)) 
         then null 
-        elif (!(isArray(l16.0)) || !(isArray(l16.1))) 
+        elif (!(isArray(l14.0)) || !(isArray(l14.1))) 
         then fail(7158101, "All operands of $setIntersection must be arrays.") 
-        else setIntersection(move(l16.0), move(l16.1)) 
+        else setIntersection(move(l14.0), move(l14.1)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetIsSubset
 
     let [
-        l19.0 = getField(s1, "arr2") 
+        l17.0 = getField(s1, "arr2") 
     ] 
     in 
-        if (!(isArray(l19.0)) ?: true) 
+        if (!(isArray(l17.0)) ?: true) 
         then fail(7158100, "All operands of $setIsSubset must be arrays.") 
-        else setIsSubset([2.5L, "str"], move(l19.0)) 
+        else setIsSubset([2.5L, "str"], move(l17.0)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionSetUnion
 
     let [
-        l22.0 = getField(s1, "arr2") 
-        l22.1 = getField(s1, "arr3") 
+        l20.0 = getField(s1, "arr2") 
+        l20.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((typeMatch(l22.0, 1088) ?: true) || (typeMatch(l22.1, 1088) ?: true)) 
+        if ((typeMatch(l20.0, 1088) ?: true) || (typeMatch(l20.1, 1088) ?: true)) 
         then null 
-        elif (!(isArray(l22.0)) || !(isArray(l22.1))) 
+        elif (!(isArray(l20.0)) || !(isArray(l20.1))) 
         then fail(7158101, "All operands of $setUnion must be arrays.") 
-        else setUnion(move(l22.0), move(l22.1)) 
+        else setUnion(move(l20.0), move(l20.1)) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet
 ExpressionReverseArray
+
+    let [
+        l22.0 = getField(s1, "arr2") 
+    ] 
+    in 
+        if (typeMatch(l22.0, 1088) ?: true) 
+        then null 
+        elif isArray(l22.0) 
+        then reverseArray(move(l22.0)) 
+        else fail(7158002, "$reverseArray argument must be an array") 
+
+# Golden test output of GoldenGenExpressionTest/TestExprArraySet
+ExpressionSortArray
 
     let [
         l24.0 = getField(s1, "arr2") 
@@ -95,20 +101,7 @@ ExpressionReverseArray
         if (typeMatch(l24.0, 1088) ?: true) 
         then null 
         elif isArray(l24.0) 
-        then reverseArray(move(l24.0)) 
-        else fail(7158002, "$reverseArray argument must be an array") 
-
-# Golden test output of GoldenGenExpressionTest/TestExprArraySet
-ExpressionSortArray
-
-    let [
-        l26.0 = getField(s1, "arr2") 
-    ] 
-    in 
-        if (typeMatch(l26.0, 1088) ?: true) 
-        then null 
-        elif isArray(l26.0) 
-        then sortArray(move(l26.0), {"" : -1L}) 
+        then sortArray(move(l24.0), {"" : -1L}) 
         else fail(7158001, "$sortArray input argument must be an array") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprArraySet

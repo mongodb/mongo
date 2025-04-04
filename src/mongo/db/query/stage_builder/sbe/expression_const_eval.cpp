@@ -246,7 +246,19 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
             }
             break;
         }
-
+        case optimizer::Operations::Neg: {
+            // Negation is implemented as a subtraction from 0.
+            if (const auto childConst = child.cast<optimizer::Constant>(); childConst) {
+                auto [tag, value] = childConst->get();
+                auto [_, resultType, resultValue] =
+                    sbe::value::genericSub(sbe::value::TypeTags::NumberInt32,
+                                           sbe::value::bitcastFrom<int32_t>(0),
+                                           tag,
+                                           value);
+                swapAndUpdate(n, optimizer::make<optimizer::Constant>(resultType, resultValue));
+            }
+            break;
+        }
         default:
             break;
     }

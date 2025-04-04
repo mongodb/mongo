@@ -16,149 +16,143 @@ ExpressionReplaceOne
 
     let [
         l11.0 = getField(s1, "str") 
+        l11.1 = (typeMatch(l11.0, 1088) ?: true) 
     ] 
     in 
-        let [
-            l12.0 = (typeMatch(l11.0, 1088) ?: true) 
-        ] 
-        in 
-            if !((l12.0 || isString(l11.0))) 
-            then fail(7158302, "$replaceOne requires that 'input' be a string") 
-            elif move(l12.0) 
-            then null 
-            else replaceOne(move(l11.0), "test", "nice place") 
+        if !((l11.1 || isString(l11.0))) 
+        then fail(7158302, "$replaceOne requires that 'input' be a string") 
+        elif move(l11.1) 
+        then null 
+        else replaceOne(move(l11.0), "test", "nice place") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionSplit
 
     let [
-        l15.0 = getField(s1, "str") 
+        l14.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l15.0, 1088) ?: true) 
+        if (typeMatch(l14.0, 1088) ?: true) 
         then null 
-        elif !(isString(l15.0)) 
+        elif !(isString(l14.0)) 
         then fail(7158202, "$split string expression must be a string") 
-        elif (l15.0 == "") 
+        elif (l14.0 == "") 
         then [""] 
-        else split(move(l15.0), " ") 
+        else split(move(l14.0), " ") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionStrcasecmp
 (toUpper(coerceToString("this IS a TEST.")) <=> 
     let [
-        l18.0 = getField(s1, "str") 
+        l17.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l18.0, 1088) ?: true) 
+        if (typeMatch(l17.0, 1088) ?: true) 
         then "" 
-        else 
-            if typeMatch(l18.0, 999942) 
-            then toUpper(coerceToString(move(l18.0))) 
-            else fail(7158200, "$toUpper input type is not supported") 
+        elif typeMatch(l17.0, 999942) 
+        then toUpper(coerceToString(move(l17.0))) 
+        else fail(7158200, "$toUpper input type is not supported") 
 ) 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionSubstrBytes
 
     let [
-        l22.0 = getField(s1, "str") 
+        l21.0 = getField(s1, "str") 
     ] 
     in substrBytes(
-        if (typeMatch(l22.0, 1088) ?: true) 
+        if (typeMatch(l21.0, 1088) ?: true) 
         then "" 
-        elif (coerceToString(l22.0) ?: true) 
+        elif (coerceToString(l21.0) ?: true) 
         then fail(5155608, "$substrBytes: string expression could not be resolved to a string") 
-        else coerceToString(move(l22.0)) 
+        else coerceToString(move(l21.0)) 
    , 10ll, 4ll) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionSubstrCP
 
     let [
-        l26.0 = getField(s1, "str") 
+        l25.0 = getField(s1, "str") 
     ] 
     in substrCP(
-        if (typeMatch(l26.0, 1088) ?: true) 
+        if (typeMatch(l25.0, 1088) ?: true) 
         then "" 
-        elif (coerceToString(l26.0) ?: true) 
+        elif (coerceToString(l25.0) ?: true) 
         then fail(5155708, "$substrCP: string expression could not be resolved to a string") 
-        else coerceToString(move(l26.0)) 
+        else coerceToString(move(l25.0)) 
    , 10, 4) 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionStrLenBytes
 
     let [
-        l28.0 = getField(s1, "str") 
+        l27.0 = getField(s1, "str") 
     ] 
     in 
-        if (isString(l28.0) ?: false) 
-        then strLenBytes(move(l28.0)) 
+        if (isString(l27.0) ?: false) 
+        then strLenBytes(move(l27.0)) 
         else fail(5155800, "$strLenBytes requires a string argument") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionStrLenCP
 
     let [
-        l30.0 = getField(s1, "str") 
+        l29.0 = getField(s1, "str") 
     ] 
     in 
-        if (isString(l30.0) ?: false) 
-        then strLenCP(move(l30.0)) 
+        if (isString(l29.0) ?: false) 
+        then strLenCP(move(l29.0)) 
         else fail(5155900, "$strLenCP requires a string argument") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionToLower
 
     let [
-        l32.0 = getField(s1, "str") 
+        l31.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l32.0, 1088) ?: true) 
+        if (typeMatch(l31.0, 1088) ?: true) 
         then "" 
-        else 
-            if typeMatch(l32.0, 999942) 
-            then toLower(coerceToString(move(l32.0))) 
-            else fail(7158200, "$toLower input type is not supported") 
+        elif typeMatch(l31.0, 999942) 
+        then toLower(coerceToString(move(l31.0))) 
+        else fail(7158200, "$toLower input type is not supported") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionToUpper
 
     let [
-        l34.0 = getField(s1, "str") 
+        l33.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l34.0, 1088) ?: true) 
+        if (typeMatch(l33.0, 1088) ?: true) 
         then "" 
-        else 
-            if typeMatch(l34.0, 999942) 
-            then toUpper(coerceToString(move(l34.0))) 
-            else fail(7158200, "$toUpper input type is not supported") 
+        elif typeMatch(l33.0, 999942) 
+        then toUpper(coerceToString(move(l33.0))) 
+        else fail(7158200, "$toUpper input type is not supported") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionTrim
 
     let [
-        l37.0 = getField(s1, "str") 
+        l36.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l37.0, 1088) ?: true) 
+        if (typeMatch(l36.0, 1088) ?: true) 
         then null 
-        elif isString(l37.0) 
-        then trim(move(l37.0), ".") 
+        elif isString(l36.0) 
+        then trim(move(l36.0), ".") 
         else fail(5156302, "$trim input expression must be a string") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionIndexOfBytes
 
     let [
-        l41.0 = getField(s1, "str") 
+        l40.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l41.0, 1088) ?: true) 
+        if (typeMatch(l40.0, 1088) ?: true) 
         then null 
-        elif isString(l41.0) 
-        then indexOfBytes(move(l41.0), "is", 
+        elif isString(l40.0) 
+        then indexOfBytes(move(l40.0), "is", 
             if (!(isNaN(0ll)) && false) 
             then fail(7158004, "$indexOfBytes start index must be positive") 
             else 0ll 
@@ -169,13 +163,13 @@ ExpressionIndexOfBytes
 ExpressionIndexOfCP
 
     let [
-        l45.0 = getField(s1, "str") 
+        l44.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l45.0, 1088) ?: true) 
+        if (typeMatch(l44.0, 1088) ?: true) 
         then null 
-        elif isString(l45.0) 
-        then indexOfCP(move(l45.0), "is", 
+        elif isString(l44.0) 
+        then indexOfCP(move(l44.0), "is", 
             if (!(isNaN(4)) && false) 
             then fail(7158004, "$indexOfCP start index must be positive") 
             else 4ll 
@@ -186,13 +180,13 @@ ExpressionIndexOfCP
 ExpressionIndexOfCP
 
     let [
-        l50.0 = getField(s1, "str") 
+        l49.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l50.0, 1088) ?: true) 
+        if (typeMatch(l49.0, 1088) ?: true) 
         then null 
-        elif isString(l50.0) 
-        then indexOfCP(move(l50.0), " ", 
+        elif isString(l49.0) 
+        then indexOfCP(move(l49.0), " ", 
             if (!(isNaN(1)) && false) 
             then fail(7158004, "$indexOfCP start index must be positive") 
             else 1ll 
@@ -207,87 +201,81 @@ ExpressionIndexOfCP
 ExpressionRegexFind
 
     let [
-        l54.0 = getField(s1, "str") 
+        l53.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l54.0, 1088) ?: true) 
+        if (typeMatch(l53.0, 1088) ?: true) 
         then null 
-        else 
-            if isString(l54.0) 
-            then 
-                let [
-                    l55.0 = regexFind(PcreRegex(/test/), move(l54.0)) 
-                ] 
-                in 
-                    if exists(l55.0) 
-                    then makeOwn(move(l55.0)) 
-                    else fail(5073403, "$regexFind: error occurred while executing the regular expression") 
-            
-            else fail(5073401, "$regexFind: input must be of type string") 
+        elif isString(l53.0) 
+        then 
+            let [
+                l54.0 = regexFind(PcreRegex(/test/), move(l53.0)) 
+            ] 
+            in 
+                if exists(l54.0) 
+                then makeOwn(move(l54.0)) 
+                else fail(5073403, "$regexFind: error occurred while executing the regular expression") 
+        
+        else fail(5073401, "$regexFind: input must be of type string") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionRegexFindAll
 
     let [
-        l59.0 = getField(s1, "str") 
+        l58.0 = getField(s1, "str") 
+        l58.1 = getField(s1, "pattern") 
     ] 
     in 
-        let [
-            l60.0 = getField(s1, "pattern") 
-        ] 
-        in 
-            if (typeMatch(l59.0, 1088) ?: true) 
+        if (typeMatch(l58.0, 1088) ?: true) 
+        then [] 
+        elif isString(l58.0) 
+        then 
+            if isNull(l58.1) 
             then [] 
             else 
-                if isString(l59.0) 
-                then 
-                    if isNull(l60.0) 
-                    then [] 
-                    else 
-                        let [
-                            l61.0 = regexFindAll(regexCompile(
-                                if isString(l60.0) 
-                                then 
-                                    if hasNullBytes(l60.0) 
-                                    then fail(5126602, "$regexFindAll: regex pattern must not have embedded null bytes") 
-                                    else l60.0 
-                                
-                                else 
-                                    if typeMatch(l60.0, 2048) 
-                                    then getRegexPattern(l60.0) 
-                                    else fail(5126601, "$regexFindAll: regex pattern must have either string or BSON RegEx type") 
-                           , 
-                                if typeMatch(l60.0, 2048) 
-                                then getRegexFlags(l60.0) 
-                                else "" 
-                           ), move(l59.0)) 
-                        ] 
-                        in 
-                            if exists(l61.0) 
-                            then makeOwn(move(l61.0)) 
-                            else fail(5073403, "$regexFindAll: error occurred while executing the regular expression") 
-                
-                else fail(5073401, "$regexFindAll: input must be of type string") 
+                let [
+                    l59.0 = regexFindAll(regexCompile(
+                        if isString(l58.1) 
+                        then 
+                            if hasNullBytes(l58.1) 
+                            then fail(5126602, "$regexFindAll: regex pattern must not have embedded null bytes") 
+                            else l58.1 
+                        
+                        else 
+                            if typeMatch(l58.1, 2048) 
+                            then getRegexPattern(l58.1) 
+                            else fail(5126601, "$regexFindAll: regex pattern must have either string or BSON RegEx type") 
+                   , 
+                        if typeMatch(l58.1, 2048) 
+                        then getRegexFlags(l58.1) 
+                        else "" 
+                   ), move(l58.0)) 
+                ] 
+                in 
+                    if exists(l59.0) 
+                    then makeOwn(move(l59.0)) 
+                    else fail(5073403, "$regexFindAll: error occurred while executing the regular expression") 
+        
+        else fail(5073401, "$regexFindAll: input must be of type string") 
 
 # Golden test output of GoldenGenExpressionTest/TestExprStr
 ExpressionRegexMatch
 
     let [
-        l65.0 = getField(s1, "str") 
+        l63.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l65.0, 1088) ?: true) 
+        if (typeMatch(l63.0, 1088) ?: true) 
         then false 
-        else 
-            if isString(l65.0) 
-            then 
-                let [
-                    l66.0 = regexMatch(PcreRegex(/test/), move(l65.0)) 
-                ] 
-                in 
-                    if exists(l66.0) 
-                    then makeOwn(move(l66.0)) 
-                    else fail(5073403, "$regexMatch: error occurred while executing the regular expression") 
-            
-            else fail(5073401, "$regexMatch: input must be of type string") 
+        elif isString(l63.0) 
+        then 
+            let [
+                l64.0 = regexMatch(PcreRegex(/test/), move(l63.0)) 
+            ] 
+            in 
+                if exists(l64.0) 
+                then makeOwn(move(l64.0)) 
+                else fail(5073403, "$regexMatch: error occurred while executing the regular expression") 
+        
+        else fail(5073401, "$regexMatch: input must be of type string") 
 

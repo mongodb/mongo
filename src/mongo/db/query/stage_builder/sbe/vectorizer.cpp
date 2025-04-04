@@ -920,10 +920,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             return bind;
         }
         bindVec.emplace_back(std::move(bind));
-    }
-
-    // Forward the inferred type to the inner expressions.
-    for (size_t idx = 0; idx < op.numBinds(); ++idx) {
+        // Forward the inferred type to the subsequent binding expressions.
         _variableTypes.insert_or_assign(
             op.varName(idx), std::make_pair(bindVec[idx].typeSignature, bindVec[idx].sourceCell));
     }

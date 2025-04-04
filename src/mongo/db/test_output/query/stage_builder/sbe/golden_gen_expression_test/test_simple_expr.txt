@@ -21,12 +21,11 @@ ExpressionObjectToArray
     in 
         if exists(l9.0) 
         then makeOwn(move(l9.0)) 
-        else 
-            if (typeMatch(s1, 1088) ?: true) 
-            then null 
-            elif isObject(s1) 
-            then Nothing 
-            else fail(5153215, "$objectToArray requires an object input") 
+        elif (typeMatch(s1, 1088) ?: true) 
+        then null 
+        elif isObject(s1) 
+        then Nothing 
+        else fail(5153215, "$objectToArray requires an object input") 
 
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionArrayToObject
