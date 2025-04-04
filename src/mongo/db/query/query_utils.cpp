@@ -87,6 +87,11 @@ bool isSimpleIdQuery(const BSONObj& query) {
     while (it.more()) {
         BSONElement elt = it.next();
         if (elt.fieldNameStringData() == "_id") {
+            if (hasID) {
+                // we already encountered an _id field
+                return false;
+            }
+
             // Verify that the query on _id is a simple equality.
             hasID = true;
 

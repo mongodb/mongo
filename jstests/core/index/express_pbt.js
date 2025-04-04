@@ -136,6 +136,14 @@ function verifyWriteOperations(collection, query, updateValue) {
     }
 }
 
+// Malformed predicates like {_id: 1, _id: 2} should either error out
+// or be ignored (server behavior is undefined, but obviously should not crash).
+function verifyInvalidWriteOperations(collection, query, updateValue) {
+    const errors = [11000, 9248801, 9248804];
+    assert.commandWorkedOrFailedWithCode(collection.update(query, updateValue), errors);
+    assert.commandWorkedOrFailedWithCode(collection.deleteOne(query), errors);
+}
+
 fc.assert(
     fc.property(testCaseArb,
                 ({indexSpec, docs, projectSpec, isIndexUnique, isClustered, updateValue}) => {
@@ -175,17 +183,25 @@ fc.assert(
                     }
                     assert.commandWorked(coll.insert(docs));
 
-                    let queryList = [];
+                    let queryList = [], invalidQueryList = [];
                     const indexes = ["_id", fields[0]];
                     indexes.forEach((curField) => {
                         const value = docs[0][curField];
                         queryList.push({[curField]: value});
+                        queryList.push({[curField]: {$eq: value}});
                         if (Array.isArray(value) && value.length > 0) {
                             queryList.push({[curField]: value[0]});
+                            queryList.push({[curField]: {$eq: value[0]}});
                         }
                         // test queries with no expected matches too
                         queryList.push({[curField]: "no match"});
                         queryList.push({[curField]: 123});
+                        queryList.push({[curField]: {$eq: 123}});
+                        // test queries with invalid predicates
+                        const cfs = String([curField]);
+                        invalidQueryList.push(_buildBsonObj(cfs, value, cfs, value));
+                        invalidQueryList.push(_buildBsonObj(cfs, value, cfs, 0));
+                        invalidQueryList.push(_buildBsonObj(cfs, {$eq: value}, cfs, 0));
                     });
 
                     jsTestLog(docs);
@@ -199,6 +215,11 @@ fc.assert(
 
                     // queryList[0] should always produce exactly 1 match.
                     verifyWriteOperations(coll, queryList[0], updateValue);
+
+                    invalidQueryList.forEach((query) => {
+                        verifyReadOperations(coll, query, projectSpec);
+                        verifyInvalidWriteOperations(coll, query, {newField: updateValue});
+                    });
                 }),
     {
         seed: 413,

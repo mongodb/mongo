@@ -570,7 +570,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
                 queryFilter = cq->getQueryObj();
             } else {
                 ComparisonMatchExpressionBase* me =
-                    static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+                    dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+                tassert(10269301, "Invalid match expression", me);
                 queryFilter = me->getData().wrap("_id");
             }
 
@@ -603,7 +604,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
                 queryFilter = cq->getQueryObj();
             } else {
                 ComparisonMatchExpressionBase* me =
-                    static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+                    dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+                tassert(10269302, "Invalid match expression", me);
                 queryFilter = me->getData().wrap("_id");
             }
 
@@ -640,9 +642,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     return std::visit(
         [&](auto collectionAlternative) {
             const CollatorInterface* collator = cq->getCollator();
-            BSONElement queryFilter =
-                static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression())
-                    ->getData();
+            auto cmpExpr =
+                dynamic_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+            tassert(10269303, "Invalid match expression", cmpExpr);
+            BSONElement queryFilter = cmpExpr->getData();
             return makeExpressExecutor(opCtx,
                                        express::LookupViaUserIndex<decltype(collectionAlternative)>(
                                            queryFilter,
@@ -824,8 +827,9 @@ boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
     const bool needsShardFilter =
         plannerParams.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER;
     const bool hasLimitOne = (findCommand.getLimit() && findCommand.getLimit().get() == 1);
-    const auto& data =
-        static_cast<ComparisonMatchExpressionBase*>(cq.getPrimaryMatchExpression())->getData();
+    auto cmpExpr = dynamic_cast<ComparisonMatchExpressionBase*>(cq.getPrimaryMatchExpression());
+    tassert(10269304, "Invalid match expression", cmpExpr);
+    const auto& data = cmpExpr->getData();
     const bool collationRelevant = data.type() == BSONType::String ||
         data.type() == BSONType::Object || data.type() == BSONType::Array;
 

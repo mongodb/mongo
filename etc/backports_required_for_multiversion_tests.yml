@@ -426,6 +426,8 @@ last-continuous:
       ticket: SERVER-100421
     - test_file: jstests/sharding/reshard_collection_cache_size.js
       ticket: SERVER-100264
+    - test_file: jstests/core/index/express_pbt.js
+      ticket: SERVER-102693
   suites: null
 last-lts:
   all:
@@ -901,4 +903,6 @@ last-lts:
       ticket: SERVER-100421
     - test_file: jstests/sharding/reshard_collection_cache_size.js
       ticket: SERVER-100264
+    - test_file: jstests/core/index/express_pbt.js
+      ticket: SERVER-102693
   suites: null
