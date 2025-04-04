@@ -36,6 +36,7 @@ const kRetryableErrors = [
     {code: ErrorCodes.HostUnreachable},
     {code: ErrorCodes.ShutdownInProgress},
     {code: ErrorCodes.ShardNotFound},
+    {code: ErrorCodes.AddOrRemoveShardInProgress}
 ];
 
 // Commands known not to work with transitions so tests can fail immediately with a clear error.
