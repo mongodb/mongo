@@ -423,6 +423,15 @@ LIBGCC_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
+LINUX_EXTRA_GLOBAL_LIBS_LINKFLAGS = select({
+    "@platforms//os:linux": [
+        "-lm",
+        "-lresolv",
+        "-latomic",
+    ],
+    "//conditions:default": [],
+})
+
 DEBUG_TYPES_SECTION_FLAGS = select({
     "//bazel/config:linux_clang_linkstatic": [
         "-fdebug-types-section",
@@ -634,5 +643,6 @@ MONGO_LINUX_CC_LINKFLAGS = (
     PGO_PROFILE_FLAGS +
     SANITIZE_WITHOUT_TSAN_LINKFLAGS +
     SHARED_ARCHIVE_LINKFLAGS +
-    LIBGCC_LINKFLAGS
+    LIBGCC_LINKFLAGS +
+    LINUX_EXTRA_GLOBAL_LIBS_LINKFLAGS
 )

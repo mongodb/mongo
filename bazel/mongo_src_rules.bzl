@@ -18,6 +18,11 @@ load(
     "MONGO_WIN_CC_LINKFLAGS",
     "WINDOWS_MULTITHREAD_RUNTIME_COPTS",
 )
+load(
+    "//bazel/toolchains/cc/mongo_apple:mongo_compiler_flags.bzl",
+    "MONGO_MAC_CC_COPTS",
+    "MONGO_MAC_CC_LINKFLAGS",
+)
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@poetry//:dependencies.bzl", "dependency")
@@ -38,17 +43,6 @@ load(
     "extract_debuginfo_test",
 )
 load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
-
-MACOS_WARNINGS_COPTS = select({
-    "@platforms//os:macos": [
-        # As of XCode 9, this flag must be present (it is not enabled by -Wall),
-        # in order to enforce that -mXXX-version-min=YYY will enforce that you
-        # don't use APIs from ZZZ.
-        "-Wunguarded-availability",
-        "-Wno-enum-constexpr-conversion",
-    ],
-    "//conditions:default": [],
-})
 
 # These are added to both copts and linker flags.
 DWARF_VERSION_FEATURES = select({
@@ -74,18 +68,6 @@ DEBUG_LEVEL_FEATURES = select({
     ],
     "//bazel/config:gcc_or_clang_dbg_level_3": [
         "g3",
-    ],
-    "//conditions:default": [],
-})
-
-EXTRA_GLOBAL_LIBS_LINKFLAGS = select({
-    "@platforms//os:linux": [
-        "-lm",
-        "-lresolv",
-        "-latomic",
-    ],
-    "@platforms//os:macos": [
-        "-lresolv",
     ],
     "//conditions:default": [],
 })
@@ -318,27 +300,6 @@ OVERLOADED_VIRTUAL_FEATURES = select({
     "//conditions:default": [],
 })
 
-# Avoid deduping symbols on OS X debug builds, as it takes a long time.
-DEDUPE_SYMBOL_LINKFLAGS = select({
-    "//bazel/config:macos_opt_off": ["-Wl,-no_deduplicate"],
-    "//conditions:default": [],
-})
-
-# Enable sized deallocation support.
-#
-# Bazel doesn't allow for defining C++-only flags without a custom toolchain
-# config. This is setup in the Linux toolchain, but currently there is no custom
-# MacOS toolchain. Enabling warnings-as-errors will fail the build if this flag
-# is passed to the compiler when building C code. Define it here on MacOS only
-# to allow us to configure warnings-as-errors on Linux.
-#
-# TODO(SERVER-90183): Remove this once custom toolchain configuration is
-#                     implemented on MacOS.
-FSIZED_DEALLOCATION_COPT = select({
-    "@platforms//os:macos": ["-fsized-deallocation"],
-    "//conditions:default": [],
-})
-
 SYMBOL_ORDER_FILES = [
     "//:symbols.orderfile",
 ]
@@ -370,19 +331,9 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/abseil-cpp:absl_local_repo_deps",
 ]
 
-MONGO_GLOBAL_COPTS = (
-    MONGO_LINUX_CC_COPTS +
-    MONGO_WIN_CC_COPTS +
-    MACOS_WARNINGS_COPTS +
-    FSIZED_DEALLOCATION_COPT
-)
+MONGO_GLOBAL_COPTS = MONGO_LINUX_CC_COPTS + MONGO_WIN_CC_COPTS + MONGO_MAC_CC_COPTS
 
-MONGO_GLOBAL_LINKFLAGS = (
-    MONGO_LINUX_CC_LINKFLAGS +
-    MONGO_WIN_CC_LINKFLAGS +
-    EXTRA_GLOBAL_LIBS_LINKFLAGS +
-    DEDUPE_SYMBOL_LINKFLAGS
-)
+MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS + MONGO_WIN_CC_LINKFLAGS + MONGO_MAC_CC_LINKFLAGS
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
 
