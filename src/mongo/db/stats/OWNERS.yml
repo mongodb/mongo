@@ -28,3 +28,9 @@ filters:
   - "server_write_concern*":
     approvers:
       - 10gen/server-rw-concerns
+  - "api_version_metrics*":
+    approvers:
+      - 10gen/query-optimization
+  - "change_collection_server_status.cpp":
+    approvers:
+      - 10gen/query-execution-change-streams

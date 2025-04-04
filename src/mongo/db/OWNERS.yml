@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "api_parameters*":
+    approvers:
+      - 10gen/query-optimization
   - "basic_types.*":
     approvers:
       - 10gen/server-programmability
@@ -45,6 +48,9 @@ filters:
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability
+  - "index_names.*":
+    approvers:
+      - 10gen/query-execution-indexing
   - "json.*":
     approvers:
       - 10gen/server-programmability
@@ -310,3 +316,6 @@ filters:
   - "raw_data_operation*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "validate_api_parameters*":
+    approvers:
+      - 10gen/query-optimization
