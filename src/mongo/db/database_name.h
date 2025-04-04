@@ -108,8 +108,7 @@ public:
             _data = Storage(dbName._data, dbName.sizeWithTenant() + kDataOffset);
         } else if (dbName._data.isSmallString()) {
             _data = dbName._data;
-            _data.updateFooter(database_name::kSmallStringFlag,
-                               dbName.sizeWithTenant() + kDataOffset);
+            _data.setFlags(database_name::kSmallStringFlag, dbName.sizeWithTenant() + kDataOffset);
         } else {
             _data = dbName._data;
         }
@@ -457,20 +456,17 @@ protected:
         constexpr Storage(const char* data, size_t length) noexcept
             : _data(data),
               _length(length),
-              _footer(createFooter(database_name::kStaticAllocFlag, 0)) {}
+              _flags(createFlags(database_name::kStaticAllocFlag, 0)) {}
 
         Storage() noexcept
             : _data(nullptr),
               _length(0),
-              _footer(createFooter(database_name::kSmallStringFlag, kDataOffset)) {}
+              _flags(createFlags(database_name::kSmallStringFlag, kDataOffset)) {}
 
         constexpr ~Storage() {
             if (!std::is_constant_evaluated()) {
                 if (isDynamicAlloc() && _data != nullptr) {
-                    MONGO_COMPILER_DIAGNOSTIC_PUSH
-                    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wfree-nonheap-object")
                     delete[] _data;
-                    MONGO_COMPILER_DIAGNOSTIC_POP
                 }
             }
         }
@@ -482,14 +478,18 @@ protected:
          * a collection and we are only trying to copy the database part from it.
          */
         Storage(const Storage& other, const size_t newSize)
-            : _data(other._data), _length(other._length), _footer(other._footer) {
+            : _data(other._data),
+              _length(other._length),
+              _padding(other._padding),
+              _flags(other._flags) {
             if (other.isStaticAlloc() && other.size() == newSize) {
                 return;
             } else if (other.isSmallString()) {
-                updateFooter(database_name::kSmallStringFlag, newSize);
+                setFlags(database_name::kSmallStringFlag, newSize);
             } else if (newSize < kSmallStringSize) {
-                setFooter(database_name::kSmallStringFlag, newSize);
-                memcpy(mutableDataptr(), other._data, newSize);
+                setFlags(database_name::kSmallStringFlag, newSize);
+                clearPadding();
+                memcpy(smallStringDataptr(), other._data, newSize);
             } else if (other.isDynamicAlloc()) {
                 char* dataptr = new char[newSize];
                 _data = dataptr;
@@ -499,7 +499,10 @@ protected:
         }
 
         Storage(Storage&& other) noexcept
-            : _data(other._data), _length(other._length), _footer(other._footer) {
+            : _data(other._data),
+              _length(other._length),
+              _padding(other._padding),
+              _flags(other._flags) {
             if (other.isDynamicAlloc()) {
                 other.reset();
             }
@@ -531,39 +534,33 @@ protected:
         void copy(const Storage& other) noexcept {
             _data = other._data;
             _length = other._length;
-            _footer = other._footer;
+            _padding = other._padding;
+            _flags = other._flags;
         }
 
         /**
-         * Returns a word with a valid flag byte and the rest of the data cleared.
+         * Returns flagsIn, optionally with the length mixed-in if flagsIn indicate small string
+         * optimization.
          */
-        constexpr size_t createFooter(unsigned char flagsIn, unsigned char length) {
+        constexpr unsigned char createFlags(unsigned char flagsIn, unsigned char length) {
             if (flagsIn & database_name::kSmallStringFlag) {
                 flagsIn |= (length << 2);
             }
-
-            char byteflags[sizeof(size_t)] = {0};
-            byteflags[sizeof(size_t) - 1] = flagsIn;
-            return absl::bit_cast<size_t>(byteflags);
+            return flagsIn;
         }
 
         /**
-         * Sets the footer field with the correct flags and length. Clear the first sizeof(_footer)
-         * - 1 bytes which might store data when using the small string optimisation.
+         * Clear _padding, which might store data when using the small string optimisation.
          */
-        void setFooter(unsigned char flagsIn, unsigned char length = 0) {
-            _footer = createFooter(flagsIn, length);
+        void clearPadding() {
+            std::fill(_padding.begin(), _padding.end(), 0);
         }
 
         /**
-         * Sets the flag and length of the footer field without changing the first sizeof(_footer) -
-         * 1 bytes which might contain data.
+         * Sets the flags and length of the _flags field.
          */
-        void updateFooter(unsigned char flagsIn, unsigned char length) {
-            if (flagsIn & database_name::kSmallStringFlag) {
-                flagsIn |= (length << 2);
-            }
-            reinterpret_cast<unsigned char*>(&_footer)[sizeof(size_t) - 1] = flagsIn;
+        void setFlags(unsigned char flagsIn, unsigned char length) {
+            _flags = createFlags(flagsIn, length);
         }
 
         /**
@@ -628,12 +625,13 @@ protected:
                 dataptr = new char[length];
                 data._data = dataptr;
                 data._length = length;
-                data._footer = 0;
+                data._flags = 0;
             } else {
-                data.setFooter(database_name::kSmallStringFlag, static_cast<unsigned char>(length));
-                dataptr = data.mutableDataptr();
+                data.setFlags(database_name::kSmallStringFlag, static_cast<unsigned char>(length));
+                data.clearPadding();
+                dataptr = data.smallStringDataptr();
             }
-            invariant(dataptr == data.mutableDataptr());
+            invariant(dataptr == data.data());
 
             *dataptr = details;
             if (hasTenant) {
@@ -688,17 +686,12 @@ protected:
         }
 
     private:
-        /**
-         * Extracts the flags's byte from the _footer field.
-         */
         constexpr unsigned char getFlags() const {
-            return absl::bit_cast<std::array<char, sizeof(size_t)>>(_footer)[sizeof(size_t) - 1];
+            return _flags;
         }
 
-        char* mutableDataptr() {
-            if (isSmallString())
-                return reinterpret_cast<char*>(&_data);
-            return const_cast<char*>(_data);
+        char* smallStringDataptr() {
+            return reinterpret_cast<char*>(&_data);
         }
 
         /**
@@ -707,23 +700,22 @@ protected:
         void reset() {
             _data = nullptr;
             _length = 0;
-            setFooter(database_name::kSmallStringFlag, kDataOffset);
+            setFlags(database_name::kSmallStringFlag, kDataOffset);
+            clearPadding();
         }
 
         void deallocate() {
             if (isDynamicAlloc() && _data != nullptr) {
-                MONGO_COMPILER_DIAGNOSTIC_PUSH
-                MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wfree-nonheap-object")
                 delete[] _data;
-                MONGO_COMPILER_DIAGNOSTIC_POP
                 reset();
             }
         }
 
         /**
-         * Storage can work in three different mode (dynamic allocation, static allocation or
-         * small-string optimisation) depending on the flag bits (the last two bits of _footer) :
-         *     Flags value given by _footer[sizeof(_footer) - 1] & 0x00000011:
+         * Storage can work in three different modes (dynamic allocation, static allocation or
+         * small-string optimisation) depending on the flag bits (the two least significant bits of
+         * _flags):
+         *     Flags value given by _flags & 0b11:
          *         0: the data is dynamically allocated.
          *         1: the data is statically allocated.
          *         2: the data is packed using the small string optimisation
@@ -731,13 +723,13 @@ protected:
          * When using static of dynamic allocation, _data is a pointer to the actual data and
          * _length contains its size.
          *
-         * When using the small string optimisation the data is packed in _data, _length and the
-         * first sizeof(_footer)-1 bytes of _footer. The size of the data is contained in the first
-         * 6 bits of the last byte of _footer :
+         * When using the small string optimisation the data is packed in _data, _length and
+         * _padding. The size of the data is contained in 6 most significant bits of _flags.
          */
         const char* _data;
         size_t _length;
-        size_t _footer;
+        std::array<char, sizeof(size_t) - 1> _padding{};
+        unsigned char _flags;
     };
     Storage _data;
 

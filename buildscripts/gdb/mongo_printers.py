@@ -367,11 +367,7 @@ class DatabaseNamePrinter(object):
     def _get_storage_data(self):
         """Return the data pointer from the _data Storage class."""
         data = self.val["_data"]
-        footer = data["_footer"]
-        f_size = footer.type.sizeof
-
-        # The last byte of _footer contain the flags (and the size when using small string).
-        flags = footer.cast(gdb.lookup_type("char").array(f_size))[f_size - 1]
+        flags = data["_flags"]
 
         data_ptr = data["_data"]
         if is_small_string(flags):

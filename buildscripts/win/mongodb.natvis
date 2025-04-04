@@ -429,8 +429,8 @@
   </Type>
 
   <Type Name="mongo::DatabaseName">
-    <!-- (((const char *)&_footer)[sizeof(size_t) - 1]) & 2 -->
-    <DisplayString Condition="(((const char*)&amp; _data._footer)[sizeof(size_t) - 1]) &amp; 2">{ ((const char *)&amp;(_data._data)),[(((const char*)&amp; _data._footer)[sizeof(size_t) - 1]) &gt;&gt; 2]s8 }</DisplayString>
+    <!-- _data._flags & 2 -->
+    <DisplayString Condition="_data._flags &amp; 2">{ ((const char *)&amp;(_data._data)),[_data._flags &gt;&gt; 2]s8 }</DisplayString>
     <DisplayString>{_data._data,[_data._length]s8}</DisplayString>
   </Type>
 
