@@ -47,6 +47,29 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         cursor['SOMEKEY'] = 'SOMEVALUE'
         cursor.close()
 
+    def create_tables(self, tablename):
+        """
+        Create a mix of populated and empty tables
+        """
+        params = self.session_params
+        self.session.create('table:' + tablename + '5', params)
+        self.session.create('table:' + tablename + '3', params)
+        self.session.create('table:' + tablename + '1', params)
+        self.session.create('table:' + tablename + '2', params)
+        self.session.create('table:' + tablename + '4', params)
+        self.populate(tablename + '2')
+        self.populate(tablename + '3')
+
+    def compare_two_files(self, file1, file2):
+        """
+        Return true if files contain same content, false otherwise
+        """
+        try:
+            with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+                return f1.read() == f2.read()
+        except FileNotFoundError:
+            return False
+
     def test_list_none(self):
         """
         Test list in a 'wt' process, with no tables
@@ -63,14 +86,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         Test list in a 'wt' process, with a mix of populated and empty tables
         """
         pfx = self.tablenamepfx
-        params = self.session_params
-        self.session.create('table:' + pfx + '5', params)
-        self.session.create('table:' + pfx + '3', params)
-        self.session.create('table:' + pfx + '1', params)
-        self.session.create('table:' + pfx + '2', params)
-        self.session.create('table:' + pfx + '4', params)
-        self.populate(pfx + '2')
-        self.populate(pfx + '3')
+        self.create_tables(pfx)
 
         # Construct what we think we'll find
         tablelist = ''
@@ -87,14 +103,8 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         after some tables have been dropped.
         """
         pfx = self.tablenamepfx
-        params = self.session_params
-        self.session.create('table:' + pfx + '5', params)
-        self.session.create('table:' + pfx + '3', params)
-        self.session.create('table:' + pfx + '1', params)
-        self.session.create('table:' + pfx + '2', params)
-        self.session.create('table:' + pfx + '4', params)
-        self.populate(pfx + '2')
-        self.populate(pfx + '3')
+        self.create_tables(pfx)
+
         self.dropUntilSuccess(self.session, 'table:' + pfx + '2')
         self.dropUntilSuccess(self.session, 'table:' + pfx + '4')
 
@@ -111,14 +121,8 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         after all tables have been dropped.
         """
         pfx = self.tablenamepfx
-        params = self.session_params
-        self.session.create('table:' + pfx + '5', params)
-        self.session.create('table:' + pfx + '3', params)
-        self.session.create('table:' + pfx + '1', params)
-        self.session.create('table:' + pfx + '2', params)
-        self.session.create('table:' + pfx + '4', params)
-        self.populate(pfx + '2')
-        self.populate(pfx + '3')
+        self.create_tables(pfx)
+
         self.dropUntilSuccess(self.session, 'table:' + pfx + '5')
         self.dropUntilSuccess(self.session, 'table:' + pfx + '4')
         self.dropUntilSuccess(self.session, 'table:' + pfx + '3')
@@ -130,3 +134,24 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         outfile = "listout.txt"
         self.runWt(["list"], outfilename=outfile)
         self.check_file_content(outfile, filelist)
+
+    def test_list_file_output(self):
+        """
+        Test list in a 'wt' process, checking custom output file content
+        """
+        pfx = self.tablenamepfx
+        self.create_tables(pfx)
+
+        outfile = "listout.txt"
+        customfile = "listcustomout.txt"
+        self.runWt(["list", "-c", "-f", customfile, "table:"], outfilename=outfile)
+
+        # Check that stdout is empty
+        filelist = ''
+        self.check_file_content(outfile, filelist)
+
+        # Run without custom output file argument
+        self.runWt(["list", "-c", "table:"], outfilename=outfile)
+
+        # Compare output with and without -f
+        self.compare_two_files(customfile, outfile)

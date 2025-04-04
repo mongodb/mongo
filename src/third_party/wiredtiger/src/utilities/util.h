@@ -60,3 +60,5 @@ void *util_realloc(void *, size_t);
 void *util_calloc(size_t, size_t);
 void util_free(void *);
 char *util_strdup(const char *);
+FILE *util_open_output_file(const char *ofile);
+int util_close_output_file(FILE *fp);

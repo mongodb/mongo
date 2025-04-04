@@ -197,13 +197,15 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
         return (usage());
     }
 
-    /* Open any optional output file. */
-    if (ofile == NULL)
-        fp = stdout;
-    else if (explore) {
+    /* -f and -e are incompatible. */
+    if (ofile != NULL && explore) {
         fprintf(stderr, "%s: the options -e and -f are incompatible\n", progname);
         return (usage());
-    } else if ((fp = fopen(ofile, "w")) == NULL)
+    }
+
+    /* Open an optional output file. */
+    fp = util_open_output_file(ofile);
+    if (fp == NULL)
         return (util_err(session, errno, "%s: open", ofile));
 
     if (!explore && json &&
@@ -325,7 +327,7 @@ err:
             ret = util_err(session, ret, NULL);
     }
 
-    if (ofile != NULL && (ret = fclose(fp)) != 0)
+    if (util_close_output_file(fp) != 0)
         ret = util_err(session, errno, NULL);
 
     __wt_scr_free(session_impl, &tmp);

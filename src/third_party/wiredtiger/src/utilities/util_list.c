@@ -21,12 +21,17 @@ usage(void)
 {
     static const char *options[] = {"-c",
       "display checkpoints in human-readable format (by default checkpoints are not displayed)",
-      "-v", "display the complete schema table (by default only a subset is displayed)", "-?",
+      "-f output",
+      "redirect output to the specified file (the default is stdout)"
+      "-v",
+      "display the complete schema table (by default only a subset is displayed)", "-?",
       "show this message", NULL, NULL};
 
-    util_usage("list [-cv] [uri]", "options:", options);
+    util_usage("list [-cv] [-f output-file] [uri]", "options:", options);
     return (1);
 }
+
+static FILE *fp;
 
 /*
  * util_list --
@@ -37,15 +42,18 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 {
     WT_DECL_RET;
     int ch;
-    char *uri;
+    char *uri, *ofile;
     bool cflag, vflag;
 
     cflag = vflag = false;
-    uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "cv?")) != EOF)
+    uri = ofile = NULL;
+    while ((ch = __wt_getopt(progname, argc, argv, "cf:v?")) != EOF)
         switch (ch) {
         case 'c':
             cflag = true;
+            break;
+        case 'f':
+            ofile = __wt_optarg;
             break;
         case 'v':
             vflag = true;
@@ -70,7 +78,15 @@ util_list(WT_SESSION *session, int argc, char *argv[])
         return (usage());
     }
 
+    /* Open an optional output file. */
+    fp = util_open_output_file(ofile);
+    if (fp == NULL)
+        return (util_err(session, errno, "%s: open", ofile));
+
     ret = list_print(session, uri, cflag, vflag);
+
+    if (util_close_output_file(fp) != 0)
+        ret = util_err(session, errno, "%s: close", ofile);
 
     util_free(uri);
     return (ret);
@@ -168,7 +184,7 @@ list_print(WT_SESSION *session, const char *uri, bool cflag, bool vflag)
         if (!vflag && WT_PREFIX_MATCH(key, WT_SYSTEM_PREFIX))
             continue;
         if (cflag || vflag || (strcmp(key, WT_METADATA_URI) != 0 && strcmp(key, WT_HS_URI) != 0))
-            printf("%s\n", key);
+            fprintf(fp, "%s\n", key);
 
         if (!cflag && !vflag)
             continue;
@@ -178,7 +194,7 @@ list_print(WT_SESSION *session, const char *uri, bool cflag, bool vflag)
         if (vflag) {
             if ((ret = cursor->get_value(cursor, &value)) != 0)
                 return (util_cerr(cursor, "get_value", ret));
-            printf("%s\n", value);
+            fprintf(fp, "%s\n", value);
         }
     }
     if (ret != WT_NOTFOUND)
@@ -199,17 +215,17 @@ static void
 list_print_size(uint64_t v)
 {
     if (v >= WT_PETABYTE)
-        printf("%" PRIu64 " PB", v / WT_PETABYTE);
+        fprintf(fp, "%" PRIu64 " PB", v / WT_PETABYTE);
     else if (v >= WT_TERABYTE)
-        printf("%" PRIu64 " TB", v / WT_TERABYTE);
+        fprintf(fp, "%" PRIu64 " TB", v / WT_TERABYTE);
     else if (v >= WT_GIGABYTE)
-        printf("%" PRIu64 " GB", v / WT_GIGABYTE);
+        fprintf(fp, "%" PRIu64 " GB", v / WT_GIGABYTE);
     else if (v >= WT_MEGABYTE)
-        printf("%" PRIu64 " MB", v / WT_MEGABYTE);
+        fprintf(fp, "%" PRIu64 " MB", v / WT_MEGABYTE);
     else if (v >= WT_KILOBYTE)
-        printf("%" PRIu64 " KB", v / WT_KILOBYTE);
+        fprintf(fp, "%" PRIu64 " KB", v / WT_KILOBYTE);
     else
-        printf("%" PRIu64 " B", v);
+        fprintf(fp, "%" PRIu64 " B", v);
 }
 
 /*
@@ -254,47 +270,47 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
          * different from the POSIX standard.
          */
         if (ckpt != ckptbase)
-            printf("\n");
+            fprintf(fp, "\n");
         t = (time_t)ckpt->sec;
-        printf("\t%*s: %.24s", (int)len, ckpt->name, ctime(&t));
+        fprintf(fp, "\t%*s: %.24s", (int)len, ckpt->name, ctime(&t));
 
-        printf(" (size ");
+        fprintf(fp, " (size ");
         list_print_size(ckpt->size);
-        printf(")\n");
+        fprintf(fp, ")\n");
 
         /* Decode the checkpoint block. */
         if (ckpt->raw.data == NULL)
             continue;
         if ((ret = __wt_block_ckpt_decode(session, block, ckpt->raw.data, ckpt->raw.size, &ci)) ==
           0) {
-            printf(
+            fprintf(fp,
               "\t\t"
               "file-size: ");
             list_print_size((uint64_t)ci.file_size);
-            printf(", checkpoint-size: ");
+            fprintf(fp, ", checkpoint-size: ");
             list_print_size(ci.ckpt_size);
-            printf("\n\n");
+            fprintf(fp, "\n\n");
 
-            printf(
+            fprintf(fp,
               "\t\t"
               "          offset, size, checksum\n");
-            printf(
+            fprintf(fp,
               "\t\t"
               "root    "
               ": %" PRIuMAX ", %" PRIu32 ", %" PRIu32 " (%#" PRIx32 ")\n",
               (uintmax_t)ci.root_offset, ci.root_size, ci.root_checksum, ci.root_checksum);
-            printf(
+            fprintf(fp,
               "\t\t"
               "alloc   "
               ": %" PRIuMAX ", %" PRIu32 ", %" PRIu32 " (%#" PRIx32 ")\n",
               (uintmax_t)ci.alloc.offset, ci.alloc.size, ci.alloc.checksum, ci.alloc.checksum);
-            printf(
+            fprintf(fp,
               "\t\t"
               "discard "
               ": %" PRIuMAX ", %" PRIu32 ", %" PRIu32 " (%#" PRIx32 ")\n",
               (uintmax_t)ci.discard.offset, ci.discard.size, ci.discard.checksum,
               ci.discard.checksum);
-            printf(
+            fprintf(fp,
               "\t\t"
               "avail   "
               ": %" PRIuMAX ", %" PRIu32 ", %" PRIu32 " (%#" PRIx32 ")\n",

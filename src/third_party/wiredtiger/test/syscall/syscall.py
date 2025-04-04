@@ -127,7 +127,7 @@
 
 from __future__ import print_function
 import argparse, fnmatch, os, platform, re, shutil, \
-    subprocess, sys
+    subprocess, sys, enum
 
 # A class that represents a context in which predefined constants can be
 # set, and new variables can be assigned.
@@ -195,6 +195,27 @@ headpatterns = [ [ tracepat, 'trace_syscalls', 0],
 pwrite_in = r'pwrite64'
 pwrite_out = r'pwrite'
 
+# Known environments issues and messages with suggestions on how to fix them
+env_known_issues = {
+    'Darwin' : {
+        "dtrace: system integrity protection is on, some features will not be available" :
+            "Test skipped due to the inability to trace system calls since macOS SIP is enabled."
+    }
+}
+
+# Return codes
+class TestReturnCode(enum.Enum):
+    SUCCESS = 0
+    FAILURE = 1
+    BAD_INPUT = 2
+    ENV_ISSUE = 3
+
+    def is_success(self):
+        return self == TestReturnCode.SUCCESS
+
+    def is_failure(self):
+        return self == TestReturnCode.FAILURE or self == TestReturnCode.BAD_INPUT
+
 # To create breakpoints while debugging this script
 def bp():
     import pdb
@@ -205,7 +226,7 @@ def msg(s):
 
 def die(s):
     msg(s)
-    sys.exit(1)
+    sys.exit(TestReturnCode.FAILURE.value)
 
 # If wttop appears as a prefix of pathname, strip it off.
 def simplify_path(wttop, pathname):
@@ -651,14 +672,25 @@ class Runner:
         self.fail(runline, 'unrecognized pattern in runfile:' + runline)
         return False
 
+    def match_env_error(self, errline):
+        system_known_issues = env_known_issues.get(self.args.systype)
+        if not system_known_issues:
+            return False # no issues to check on this OS
+
+        err_msg = system_known_issues.get(errline)
+        if err_msg:
+            print(err_msg)
+            return True
+
+        return False # no issues detected
+
     def match_lines(self):
         outfile = FileReader(self.wttopdir, self.outfilename, True)
         errfile = FileReader(self.wttopdir, self.errfilename, True)
 
         if outfile.readline():
             self.fail(None, 'output file has content, expected to be empty')
-            return False
-
+            return TestReturnCode.BAD_INPUT
         with outfile, errfile:
             runlines = self.order_runfile(self.runfile)
             errline = errfile.readline()
@@ -677,18 +709,17 @@ class Runner:
                 first_errline = errline
                 while errline and not self.match(runline, errline,
                                                  self.args.verbose, skiplines):
+                    if self.match_env_error(errline):
+                        return TestReturnCode.ENV_ISSUE
                     if skiplines or hasattr(errline, 'skip'):
                         errline = errfile.readline().normalize()
                     else:
-                        self.fail(runline, "expecting " + runline)
-                        self.failrange(errfile, first_errline, errline,
-                                       "does not match")
-                        return False
-                if not errline:
+                        break
+                if not errline or not self.match(runline, errline, self.args.verbose, skiplines):
                     self.fail(runline, "failed to match line: " + runline)
                     self.failrange(errfile, first_errline, errline,
                                    "does not match")
-                    return False
+                    return TestReturnCode.FAILURE
                 errline = errfile.readline()
                 if re.match(dtruss_init_pat, errline):
                     errline = errfile.readline()
@@ -696,8 +727,8 @@ class Runner:
                 skiplines = False
             if errline and not skiplines:
                 self.fail(errline, "extra lines seen starting at " + errline)
-                return False
-            return True
+                return TestReturnCode.FAILURE
+            return TestReturnCode.SUCCESS
 
     def order_runfile(self, f):
         # In OS X, dtruss is implemented using dtrace's apparently buffered
@@ -840,28 +871,28 @@ class SyscallCommand:
         return True
 
     def runone(self, runfilename, exedir, testexe, args):
-        result = True
+        result = TestReturnCode.SUCCESS
         runner = Runner(self.disttop, runfilename, exedir, testexe,
                         self.strace, args, self.variables, self.defines)
         okay, skip = runner.init(args.systype)
         if not okay:
             if not skip:
-                result = False
+                result = TestReturnCode.FAILURE
         else:
             if testexe:
                 print('running ' + testexe)
                 if not runner.run():
-                    result = False
-            if result:
+                    result = TestReturnCode.FAILURE
+            if result.is_success():
                 print('comparing:')
                 print('  ' + simplify_path(self.disttop, runfilename))
                 print('  ' + simplify_path(self.disttop, runner.errfilename))
                 result = runner.match_lines()
-                if not result and args.verbose:
+                if not result.is_success() and args.verbose:
                     printfile(runfilename, "runfile")
                     printfile(runner.errfilename, "trace output")
-        runner.close(not result)
-        if not result:
+        runner.close(result.is_failure())
+        if result.is_failure():
             print('************************ FAILED ************************')
             print('  see results in ' + exedir)
         print('')
@@ -928,12 +959,14 @@ class SyscallCommand:
 
     def execute(self):
         args = self.args
-        result = True
+        result = TestReturnCode.SUCCESS
         if not self.build_system_defines():
             die('cannot build system defines')
         if not self.dorun:
             for testname in args.tests:
-                result = self.runone(testname, None, None, args) and result
+                result = self.runone(testname, None, None, args)
+                if not result.is_success():
+                    break
         else:
             if len(args.tests) > 0:
                 tests = []
@@ -960,7 +993,12 @@ class SyscallCommand:
                             exedir += '.' + str(testnum)
                             testnum += 1
                         result = self.runone(runfilename, exedir,
-                                             testexe, args) and result
+                                             testexe, args)
+                        if not result.is_success():
+                            break
+        if result.is_failure():
+            print('For a HOW TO on debugging, see the top of syscall.py',
+                  file=sys.stderr)
         return result
 
 # Set paths, determining the top of the build.
@@ -987,9 +1025,7 @@ else:
 
 cmd = SyscallCommand(wt_disttop, wt_builddir)
 if not cmd.parse_args(sys.argv):
-    die('bad usage')
-if not cmd.execute():
-    print('For a HOW TO on debugging, see the top of syscall.py',
-          file=sys.stderr)
-    sys.exit(1)
-sys.exit(0)
+    print('Bad usage')
+    sys.exit(TestReturnCode.BAD_INPUT.value)
+
+sys.exit(cmd.execute().value)

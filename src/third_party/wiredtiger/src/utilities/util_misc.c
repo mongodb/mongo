@@ -213,3 +213,29 @@ util_strdup(const char *s)
 {
     return (strdup(s));
 }
+
+/*
+ * util_open_output_file --
+ *     Open custom output file, return `stdout` if no file name provided.
+ */
+FILE *
+util_open_output_file(const char *ofile)
+{
+    if (ofile == NULL)
+        return (stdout);
+
+    return (fopen(ofile, "w"));
+}
+
+/*
+ * util_close_output_file --
+ *     Close custom output file if one was provided.
+ */
+int
+util_close_output_file(FILE *fp)
+{
+    if (fp != stdout)
+        return (fclose(fp));
+
+    return (0);
+}

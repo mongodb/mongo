@@ -161,10 +161,11 @@ if not _python3:
 # in decoding before the regular decoding output appears.
 # Those 'input bytes' are shown shifted to the right.
 class Printer(object):
-    def __init__(self, binfile, issplit, verbose = False):
+    def __init__(self, binfile, opts):
         self.binfile = binfile
-        self.issplit = issplit
-        self.verbose = verbose
+        self.issplit = opts.split
+        self.verbose = opts.verbose
+        self.ext = opts.ext
         self.cellpfx = ''
         self.in_cell = False
 
@@ -215,6 +216,10 @@ class Printer(object):
 
     def rint_v(self, s):
         if self.verbose:
+            self.rint(s)
+            
+    def rint_ext(self, s):
+        if self.ext:
             self.rint(s)
 
 def ts(uint64):
@@ -365,7 +370,7 @@ def block_decode(p, b, opts):
     page_data = bytearray(b.read(40))
     b.saved_bytes()
     b_page = binary_data.BinaryFile(io.BytesIO(page_data))
-    p = Printer(b_page, opts.split, opts.verbose)
+    p = Printer(b_page, opts)
 
     # WT_PAGE_HEADER in btmem.h (28 bytes)
     pagehead = btree_format.PageHeader.parse(b_page)
@@ -461,7 +466,7 @@ def block_decode(p, b, opts):
     page_data.extend(payload_data)
     b_page = binary_data.BinaryFile(io.BytesIO(page_data))
     b_page.seek(header_length)
-    p = Printer(b_page, opts.split, opts.verbose)
+    p = Printer(b_page, opts)
 
     # Parse the block contents
     if pagehead.type == btree_format.PageType.WT_PAGE_INVALID:
@@ -560,12 +565,12 @@ def extlist_decode(p, b, pagehead, blockhead, pagestats):
     okay = True
     cellnum = -1
     lastoff = 0
-    p.rint_v('extent list follows:')
+    p.rint_ext('extent list follows:')
     while True:
         cellnum += 1
         cellpos = b.tell()
         if cellpos >= pagehead.mem_size:
-            p.rint_v(f'** OVERFLOW memsize ** memsize={pagehead.mem_size}, position={cellpos}')
+            p.rint_ext(f'** OVERFLOW memsize ** memsize={pagehead.mem_size}, position={cellpos}')
             #return
         p.begin_cell(cellnum)
 
@@ -611,7 +616,7 @@ def extlist_decode(p, b, pagehead, blockhead, pagestats):
                 else:
                     extra_stuff += f' -- ERROR unexpected size={size} has no meaning here'
                     okay = False
-            p.rint_v(f'  {off}, {size}{extra_stuff}')
+            p.rint_ext(f'  {off}, {size}{extra_stuff}')
         finally:
             p.end_cell()
         if off == 0 or not okay:
@@ -657,7 +662,7 @@ def outfile_stats_end(opts, pagehead, blockhead, pagestats):
         opts.output.write(",".join(str(x) for x in line))
 
 def wtdecode_file_object(b, opts, nbytes):
-    p = Printer(b, opts.split, opts.verbose)
+    p = Printer(b, opts)
     pagecount = 0
     if opts.offset == 0 and not opts.fragment:
         file_header_decode(p, b)
@@ -735,6 +740,7 @@ parser.add_argument("-c", "--csv", type=argparse.FileType('w'), dest='output', h
 parser.add_argument('--continue', help="continue on checksum failure", dest='cont', action='store_true')
 parser.add_argument('-D', '--debug', help="debug this tool", action='store_true')
 parser.add_argument('-d', '--dumpin', help="input is hex dump (may be embedded in log messages)", action='store_true')
+parser.add_argument('--ext', help="dump only the extent lists", action='store_true')
 parser.add_argument('-f', '--fragment', help="input file is a fragment, does not have a WT file header", action='store_true')
 parser.add_argument('-o', '--offset', help="seek offset before decoding", type=int, default=0)
 parser.add_argument('-p', '--pages', help="number of pages to decode", type=int, default=0)

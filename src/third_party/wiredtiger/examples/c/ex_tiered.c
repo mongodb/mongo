@@ -87,8 +87,8 @@ show_data(WT_SESSION *session, const char *uri, int nentries, const char *commen
 }
 
 /*
- * FIXME-WT-10567 At the moment, this example will not run on Windows, because it requires an
- * extension module to be loaded that is not yet built or tested on that platform.
+ * At the moment, this example will not run on Windows, because it requires an extension module to
+ * be loaded that is not yet built or tested on that platform.
  */
 static bool
 platform_supported(void)

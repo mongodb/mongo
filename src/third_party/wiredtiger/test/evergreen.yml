@@ -943,19 +943,6 @@ functions:
         for i in $(seq ${times|1}); do
           ./format.sh -j ${num_jobs} ${format_test_script_args|} cache.maximum=$memory_max 2>&1
         done
-  "format test tiered":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/format"
-      shell: bash
-      script: |
-        # To make sure we have plenty of flush_tier calls, we set the flush frequency high
-        # and the time between checkpoints low. We specify only using tables, as that's the
-        # only kind of URI that participates in tiered storage.
-        set -o errexit
-        set -o verbose
-        ${PREPARE_TEST_ENV}
-        ../../../test/evergreen/format_test_tiered.sh ${times} ${test_format_extra_args}
   "many dbs test":
     command: shell.exec
     params:
@@ -4085,18 +4072,6 @@ tasks:
         vars:
           times: 5
 
-  - name: format-tiered-test
-    # Set 2.5 hour timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_with_builtins
-      - func: "format test tiered"
-        vars:
-          times: 10
-
   - name: schema-abort-predictable-test
     # Set 20 minute timeout (60 * 20)
     exec_timeout_secs: 1200
@@ -5689,8 +5664,6 @@ buildvariants:
       - ubuntu2004-medium
     - name: format-abort-recovery-stress-test
     - name: format-predictable-test
-    # FIXME-WT-10822
-    # - name: format-tiered-test
     - name: schema-abort-predictable-test
     - name: checkpoint-filetypes-predictable-test
 
