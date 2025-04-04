@@ -73,10 +73,11 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
             } else if (command === 'update') {
                 assert.commandWorked(sessionColl2.update({x: 1}, {$set: {c: 1}}));
             } else if (command === 'bulkWrite') {
-                sessionColl2.bulkWrite([
-                    {insertOne: {document: {y: 1}}},
-                    {updateOne: {filter: {x: 1}, update: {$set: {dbName: 1}}}},
-                ]);
+                assert.commandWorked(session.getDatabase('admin').runCommand({
+                    bulkWrite: 1,
+                    ops: [{update: 0, filter: {x: 1}, updateMods: {$set: {c: 1}}}],
+                    nsInfo: [{ns: dbName + "." + collName2}]
+                }));
             }
         }, ErrorCodes.MigrationConflict);
         assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
@@ -136,10 +137,11 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
                 assert.commandWorked(
                     session.getDatabase(dbName2)[collName2].update({x: 1}, {$set: {c: 1}}));
             } else if ((command === 'bulkWrite')) {
-                session.getDatabase(dbName2)[collName2].bulkWrite([
-                    {insertOne: {document: {y: 1}}},
-                    {updateOne: {filter: {x: 1}, update: {$set: {dbName: 1}}}},
-                ]);
+                assert.commandWorked(session.getDatabase('admin').runCommand({
+                    bulkWrite: 1,
+                    ops: [{update: 0, filter: {x: 1}, updateMods: {$set: {c: 1}}}],
+                    nsInfo: [{ns: dbName2 + "." + collName2}]
+                }));
             }
         }, ErrorCodes.MigrationConflict);
 
@@ -216,10 +218,11 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
                 assert.commandWorked(
                     session.getDatabase(dbName2)[collName2].update({x: 1}, {$set: {c: 1}}));
             } else if ((command === 'bulkWrite')) {
-                session.getDatabase(dbName2)[collName2].bulkWrite([
-                    {insertOne: {document: {y: 1}}},
-                    {updateOne: {filter: {x: 1}, update: {$set: {dbName: 1}}}},
-                ]);
+                assert.commandWorked(session.getDatabase('admin').runCommand({
+                    bulkWrite: 1,
+                    ops: [{update: 0, filter: {x: 1}, updateMods: {$set: {c: 1}}}],
+                    nsInfo: [{ns: dbName2 + "." + collName2}]
+                }));
             }
         }, expectedError);
 
@@ -314,10 +317,11 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
                 } else if (command === 'update') {
                     assert.commandWorked(sessionColl3.update({x: 1}, {$set: {c: 1}}));
                 } else if ((command === 'bulkWrite')) {
-                    sessionColl3.bulkWrite([
-                        {insertOne: {document: {y: 1}}},
-                        {updateOne: {filter: {x: 1}, update: {$set: {dbName: 1}}}},
-                    ]);
+                    assert.commandWorked(session.getDatabase('admin').runCommand({
+                        bulkWrite: 1,
+                        ops: [{update: 0, filter: {x: 1}, updateMods: {$set: {c: 1}}}],
+                        nsInfo: [{ns: dbName + "." + collName3}]
+                    }));
                 }
             }, [ErrorCodes.SnapshotUnavailable]);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
@@ -400,10 +404,11 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
                 } else if (command === 'update') {
                     assert.commandWorked(sessionColl1.update({x: 1}, {$set: {c: 1}}));
                 } else if (command === 'bulkWrite') {
-                    sessionColl1.bulkWrite([
-                        {insertOne: {document: {y: 1}}},
-                        {updateOne: {filter: {x: 1}, update: {$set: {dbName: 1}}}},
-                    ]);
+                    assert.commandWorked(session.getDatabase('admin').runCommand({
+                        bulkWrite: 1,
+                        ops: [{update: 0, filter: {x: 1}, updateMods: {$set: {c: 1}}}],
+                        nsInfo: [{ns: dbName + "." + collName1}]
+                    }));
                 }
             }, isWriteCommand ? ErrorCodes.WriteConflict : ErrorCodes.SnapshotUnavailable);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
@@ -501,10 +506,11 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
                 } else if (command === 'update') {
                     assert.commandWorked(sessionColl1.updateMany({}, {$set: {c: 1}}));
                 } else if (command === 'bulkWrite') {
-                    sessionColl1.bulkWrite([
-                        {insertOne: {document: {y: 1}}},
-                        {updateOne: {filter: {x: 1}, update: {$set: {dbName: 1}}}},
-                    ]);
+                    assert.commandWorked(session.getDatabase('admin').runCommand({
+                        bulkWrite: 1,
+                        ops: [{update: 0, filter: {x: 1}, updateMods: {$set: {c: 1}}}],
+                        nsInfo: [{ns: dbName + "." + collName1}]
+                    }));
                 }
             }, [ErrorCodes.WriteConflict, ErrorCodes.SnapshotUnavailable]);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
