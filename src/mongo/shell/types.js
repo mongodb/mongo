@@ -925,11 +925,3 @@ isNumber = function(x) {
 isObject = function(x) {
     return typeof (x) == "object";
 };
-
-stringifyErrorMessageAndAttributes = function(e) {
-    const escapedMsg = JSON.stringify(e.message);
-    if (!e.extraAttr) {
-        return escapedMsg;
-    }
-    return `${escapedMsg}: ${tojson(e.extraAttr)}`;
-};

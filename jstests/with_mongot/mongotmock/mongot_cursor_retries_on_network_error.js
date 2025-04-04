@@ -56,7 +56,7 @@ function runStandaloneTest(stageRegex, pipeline, expectedCommand) {
 
         const result = assert.throws(() => coll.aggregate(pipeline, {cursor: {batchSize: 2}}));
         assert(isNetworkError(result));
-        assert(stageRegex.test(stringifyErrorMessageAndAttributes(result)),
+        assert(stageRegex.test(formatErrorMsg(result.message, result.extraAttr)),
                `Error wasn't due to stage failing: ${result}`);
     }
 }

@@ -62,6 +62,17 @@ declare function assert(value: boolean | any, msg?: string | function | object, 
  */
 declare function sortDoc(doc: object): any
 
+/**
+ * Format error message by replacing occurrences of '{key}'s in 'msg' with 'value' in [key, value] pairs from 'attr'.
+ * 
+ * @param msg Failure message.
+ * @param attr Additional attributes to be included in failure messages.
+ * @param serializeFn Additional function to serialize 'value' in [key, value] pairs from 'attr'.
+ * 
+ * @returns Failure message.
+ */
+declare function formatErrorMsg(msg: string, attr?: object, serializeFn?: function): string
+
 declare module assert {
 
     /**

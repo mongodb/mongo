@@ -82,7 +82,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this is
     // identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        const errorMsg = stringifyErrorMessageAndAttributes(err);
+        const errorMsg = formatErrorMsg(err.message, err.extraAttr);
         return (errorMsg.includes("CommandFailed") ||
                 errorMsg.includes("Documents in target range may still be in use") ||
                 // This error can occur when the test updates the shard key value of a document

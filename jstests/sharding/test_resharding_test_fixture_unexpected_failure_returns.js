@@ -45,5 +45,5 @@ const err = assert.throws(() => {
     });
 });
 
-assert(/ResumableRangeDeleterDisabled/.test(stringifyErrorMessageAndAttributes(err)), err);
+assert(/ResumableRangeDeleterDisabled/.test(formatErrorMsg(err.message, err.extraAttr)), err);
 reshardingTest.teardown();

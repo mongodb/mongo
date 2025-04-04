@@ -39,6 +39,7 @@ export default [
                             assert: true,
                             doassert: true,
                             sortDoc: true,
+                            formatErrorMsg: true,
 
                             // src/mongo/shell/bridge.d.ts
                             MongoBridge: true,
@@ -189,7 +190,6 @@ export default [
                             isString: true,
                             printjson: true,
                             printjsononeline: true,
-                            stringifyErrorMessageAndAttributes: true,
                             toJsonForLog: true,
                             tojson: true,
                             tojsonObject: true,

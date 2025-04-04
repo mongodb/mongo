@@ -297,7 +297,7 @@ tests.push(function invalidResponsesAttemptToProvideInformationToCommandWorks() 
         const error = assert.throws(() => {
             assert.commandWorked(invalidRes);
         });
-        const errorMsg = stringifyErrorMessageAndAttributes(error);
+        const errorMsg = formatErrorMsg(error.message, error.extraAttr);
         assert.gte(errorMsg.indexOf(invalidRes), 0);
         assert.gte(errorMsg.indexOf(typeof invalidRes), 0);
     });
@@ -310,7 +310,7 @@ tests.push(function invalidResponsesAttemptToProvideInformationCommandFailed() {
         const error = assert.throws(() => {
             assert.commandFailed(invalidRes);
         });
-        const errorMsg = stringifyErrorMessageAndAttributes(error);
+        const errorMsg = formatErrorMsg(error.message, error.extraAttr);
         assert.gte(errorMsg.indexOf(invalidRes), 0);
         assert.gte(errorMsg.indexOf(typeof invalidRes), 0);
     });

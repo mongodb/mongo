@@ -176,7 +176,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
             }
         }
     } catch (e) {
-        if (stringifyErrorMessageAndAttributes(e).indexOf("Unauthorized") < 0) {
+        if (formatErrorMsg(e.message, e.extraAttr).indexOf("Unauthorized") < 0) {
             throw e;
         }
         jsTest.log.info("ignoring exception while checking UUID consistency across cluster",

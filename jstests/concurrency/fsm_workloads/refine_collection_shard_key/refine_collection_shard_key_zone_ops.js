@@ -210,7 +210,7 @@ export const $config = (function() {
                 // become refined. Retrying swapping the zone range will allow us to target the
                 // shard key in its refined state.
                 const newShardKeyField = this.newShardKeyFields[1];
-                const errorMsg = stringifyErrorMessageAndAttributes(e);
+                const errorMsg = formatErrorMsg(e.message, e.extraAttr);
                 if ((errorMsg.includes(newShardKeyField) && errorMsg.includes('are not equal')) ||
                     (errorMsg.includes(newShardKeyField) &&
                      errorMsg.includes('assert.eq() failed'))) {

@@ -39,8 +39,9 @@ for (let config of invalidMixedVersionsToCheck) {
         () => new ShardingTest({shouldFailInit: true, shards: config.shards, other: config.other}));
     assert.eq(
         true,
-        err.message.includes(
-            "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+        formatErrorMsg(err.message, err.extraAttr)
+            .includes(
+                "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
         "Unexpected Error");
 }
 
