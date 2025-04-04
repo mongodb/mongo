@@ -2122,7 +2122,6 @@ TEST(ExpressionFilterTest, CorrectRedactionWithLimit) {
 // This test fails since featureFlagQETextSearchPreview is disabled by default.
 // TODO SERVER-65769: Remove when feature flag is enabled by default.
 TEST(ExpressionFLEStartsWithTest, FeatureFlagDisabled) {
-
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
     {
@@ -2132,7 +2131,6 @@ TEST(ExpressionFLEStartsWithTest, FeatureFlagDisabled) {
 }
 
 TEST(ExpressionFLEStartsWithTest, ParseAssertConstraints) {
-
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
 
@@ -2265,7 +2263,6 @@ TEST(ExpressionFLEStartsWithTest, ParseBinDataPayloadRoundtrip) {
 // This test fails since featureFlagQETextSearchPreview is disabled by default.
 // TODO SERVER-65769: Remove when feature flag is enabled by default.
 TEST(ExpressionFLEEndsWithTest, FeatureFlagDisabled) {
-
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
     {
@@ -2275,7 +2272,6 @@ TEST(ExpressionFLEEndsWithTest, FeatureFlagDisabled) {
 }
 
 TEST(ExpressionFLEEndsWithTest, ParseAssertConstraints) {
-
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
 
@@ -2408,7 +2404,6 @@ TEST(ExpressionFLEEndsWithTest, ParseBinDataPayloadRoundtrip) {
 // This test fails since featureFlagQETextSearchPreview is disabled by default.
 // TODO SERVER-65769: Remove when feature flag is enabled by default.
 TEST(ExpressionFLEStrContainsTest, FeatureFlagDisabled) {
-
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
     {
@@ -2418,7 +2413,6 @@ TEST(ExpressionFLEStrContainsTest, FeatureFlagDisabled) {
 }
 
 TEST(ExpressionFLEStrContainsTest, ParseAssertConstraints) {
-
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
 
@@ -2536,6 +2530,147 @@ TEST(ExpressionFLEStrContainsTest, ParseBinDataPayloadRoundtrip) {
         {$encStrContains: {
             input: "$foo", 
             substring: {
+               "$const": {
+                "$binary" : {
+                    base64:
+                         "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    subType: "6"
+                }}}}})");
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
+}
+
+// This test fails since featureFlagQETextSearchPreview is disabled by default.
+// TODO SERVER-65769: Remove when feature flag is enabled by default.
+TEST(ExpressionFLEStrNormalizedEqTest, FeatureFlagDisabled) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    {
+        auto expr = fromjson("{$encStrNormalizedEq: 12}");
+        ASSERT_THROWS_CODE(Parse::Object::parseObject(expr), DBException, 168);
+    }
+}
+
+TEST(ExpressionFLEStrNormalizedEqTest, ParseAssertConstraints) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrNormalizedEq: 12}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            10065);
+    }
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrNormalizedEq: {input: {}}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            14);
+    }
+
+    {
+        auto exprInvalidBson = fromjson("{$encStrNormalizedEq: {input: 2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            14);
+    }
+
+    // Error, missing input field.
+    {
+        auto exprInvalidBson = fromjson("{$encStrNormalizedEq: {string: 2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            40414);
+    }
+
+    // Error, input must be a field path expression.
+    {
+        auto exprInvalidBson = fromjson("{$encStrNormalizedEq: {input: \"foo\", string:\"test\"}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            16873);
+    }
+
+    // Error, string must be string or bindata.
+    {
+        auto exprInvalidBson = fromjson("{$encStrNormalizedEq: {input: \"$foo\", string:2}}");
+        ASSERT_THROWS_CODE(
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprInvalidBson.firstElement(), vps),
+            DBException,
+            10111802);
+    }
+
+    // Success with string string.
+    {
+        auto exprBson = fromjson("{$encStrNormalizedEq: {input: \"$foo\", string:\"test\"}}");
+        auto parsedExpr =
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprBson.firstElement(), vps);
+
+        auto* exprNormalizedEq = dynamic_cast<ExpressionEncStrNormalizedEq*>(parsedExpr.get());
+        ASSERT_NE(exprNormalizedEq, nullptr);
+    }
+
+    // Success with BinData string payload.
+    {
+        auto exprBson = fromjson(R"(
+            {$encStrNormalizedEq: {
+                input: "$foo", 
+                string: {
+                    "$binary" : {
+                        base64:
+                             "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                        subType: "6"
+                    }
+                }
+            }})");
+        auto parsedExpr =
+            ExpressionEncStrNormalizedEq::parse(&expCtx, exprBson.firstElement(), vps);
+
+        auto* normalizedEq = dynamic_cast<ExpressionEncStrNormalizedEq*>(parsedExpr.get());
+        ASSERT_NE(normalizedEq, nullptr);
+    }
+}
+
+TEST(ExpressionFLEStrNormalizedEqTest, ParseStringPayloadRoundtrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto exprBson = fromjson("{$encStrNormalizedEq: {input: \"$foo\", string:\"test\"}}");
+
+    auto exprFle = ExpressionEncStrNormalizedEq::parse(&expCtx, exprBson.firstElement(), vps);
+    auto value = exprFle->serialize();
+    auto roundTripExpr =
+        fromjson("{$encStrNormalizedEq: {input: \"$foo\", string: {$const:\"test\"}}}");
+
+    ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
+}
+
+TEST(ExpressionFLEStrNormalizedEqTest, ParseBinDataPayloadRoundtrip) {
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto exprBson = fromjson(R"(
+        {$encStrNormalizedEq: {
+            input: "$foo", 
+            string: {
+                "$binary" : {
+                    base64:
+                         "BxI0VngSNJh2EjQSNFZ4kBIQ0JE8aMUFkPk5sSTVqfdNNfjqUfQQ1Uoj0BBcthrWoe9wyU3cN6zmWaQBPJ97t0ZPbecnMsU736yXre6cBO4Zdt/wThtY+v5+7vFgNnWpgRP0e+vam6QPmLvbBrO0LdsvAPTGW4yqwnzCIXCoEg7QPGfbfAXKPDTNenBfRlawiblmTOhO/6ljKotWsMp22q/rpHrn9IEIeJmecwuuPIJ7EA+XYQ3hOKVccYf2ogoK73+8xD/Vul83Qvr84Q8afc4QUMVs8A==",
+                    subType: "6"
+                }
+            }
+        }})");
+    auto exprFle = ExpressionEncStrNormalizedEq::parse(&expCtx, exprBson.firstElement(), vps);
+    auto value = exprFle->serialize();
+
+    auto roundTripExpr = fromjson(R"(
+        {$encStrNormalizedEq: {
+            input: "$foo", 
+            string: {
                "$const": {
                 "$binary" : {
                     base64:

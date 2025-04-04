@@ -96,3 +96,16 @@ structs:
             description: "Substring expression"
             type: IDLAnyType
             cpp_name: substring
+
+    EncStrNormalizedEqStruct:
+        description: "Struct for $encStrNormalizedEq"
+        strict: true
+        fields:
+          input:
+            description: "Target field path expression"
+            type: string
+            cpp_name: input
+          string:
+            description: "String expression"
+            type: IDLAnyType
+            cpp_name: string

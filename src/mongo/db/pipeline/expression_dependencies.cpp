@@ -203,6 +203,7 @@ public:
     void visit(const ExpressionEncStrStartsWith*) override {}
     void visit(const ExpressionEncStrEndsWith*) override {}
     void visit(const ExpressionEncStrContains*) override {}
+    void visit(const ExpressionEncStrNormalizedEq*) override {}
     void visit(const ExpressionInternalRawSortKey*) override {}
     void visit(const ExpressionInternalOwningShard*) override {}
     void visit(const ExpressionInternalIndexKey*) override {}

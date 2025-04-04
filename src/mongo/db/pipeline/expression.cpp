@@ -4891,7 +4891,6 @@ constexpr auto kEncStrStartsWith = "$encStrStartsWith"_sd;
 boost::intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionContext* const expCtx,
                                                                    BSONElement expr,
                                                                    const VariablesParseState& vps) {
-
     IDLParserContext ctx(kEncStrStartsWith);
 
     auto fleEncStartsWith = EncStrStartsWithStruct::parse(ctx, expr.Obj());
@@ -4938,7 +4937,6 @@ constexpr auto kEncStrEndsWith = "$encStrEndsWith"_sd;
 boost::intrusive_ptr<Expression> ExpressionEncStrEndsWith::parse(ExpressionContext* const expCtx,
                                                                  BSONElement expr,
                                                                  const VariablesParseState& vps) {
-
     IDLParserContext ctx(kEncStrEndsWith);
 
     auto fleEncEndsWith = EncStrEndsWithStruct::parse(ctx, expr.Obj());
@@ -4984,7 +4982,6 @@ constexpr auto kEncStrContains = "$encStrContains"_sd;
 boost::intrusive_ptr<Expression> ExpressionEncStrContains::parse(ExpressionContext* const expCtx,
                                                                  BSONElement expr,
                                                                  const VariablesParseState& vps) {
-
     IDLParserContext ctx(kEncStrContains);
 
     auto fleEncStrContains = EncStrContainsStruct::parse(ctx, expr.Obj());
@@ -5011,6 +5008,53 @@ const char* ExpressionEncStrContains::getOpName() const {
 Value ExpressionEncStrContains::evaluate(const Document& root, Variables* variables) const {
     uassert(10208800,
             "ExpressionEncStrContains can't be evaluated without binary payload",
+            canBeEvaluated());
+    return exec::expression::evaluate(*this, root, variables);
+}
+
+/* --------------------------------- encStrNormalizedEq -------------------------------------------
+ */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrNormalizedEq,
+                                      ExpressionEncStrNormalizedEq::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      gFeatureFlagQETextSearchPreview);
+
+ExpressionEncStrNormalizedEq::ExpressionEncStrNormalizedEq(
+    ExpressionContext* const expCtx,
+    boost::intrusive_ptr<Expression> input,
+    boost::intrusive_ptr<Expression> substring)
+    : ExpressionEncTextSearch(expCtx, std::move(input), std::move(substring)) {}
+
+constexpr auto kEncStrNormalizedEq = "$encStrNormalizedEq"_sd;
+boost::intrusive_ptr<Expression> ExpressionEncStrNormalizedEq::parse(
+    ExpressionContext* const expCtx, BSONElement expr, const VariablesParseState& vps) {
+    IDLParserContext ctx(kEncStrNormalizedEq);
+
+    auto fleEncStrNormalizedEq = EncStrNormalizedEqStruct::parse(ctx, expr.Obj());
+
+    auto inputExpr =
+        ExpressionFieldPath::parse(expCtx, fleEncStrNormalizedEq.getInput().toString(), vps);
+
+    auto stringExpr =
+        Expression::parseOperand(expCtx, fleEncStrNormalizedEq.getString().getElement(), vps);
+
+    return new ExpressionEncStrNormalizedEq(expCtx, std::move(inputExpr), std::move(stringExpr));
+}
+
+Value ExpressionEncStrNormalizedEq::serialize(const SerializationOptions& options) const {
+    return Value(Document{{kEncStrNormalizedEq,
+                           Document{{"input", _children[_kInput]->serialize(options)},
+                                    {"string", _children[_kTextOperand]->serialize(options)}}}});
+}
+
+const char* ExpressionEncStrNormalizedEq::getOpName() const {
+    return kEncStrNormalizedEq.rawData();
+}
+
+Value ExpressionEncStrNormalizedEq::evaluate(const Document& root, Variables* variables) const {
+    uassert(10255705,
+            "ExpressionEncStrNormalizedEq can't be evaluated without binary payload",
             canBeEvaluated());
     return exec::expression::evaluate(*this, root, variables);
 }

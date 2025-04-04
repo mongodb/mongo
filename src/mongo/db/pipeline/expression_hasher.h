@@ -103,6 +103,7 @@ public:
         kEncStrStartsWith,
         kEncStrEndsWith,
         kEncStrContains,
+        kEncStrNormalizedEq,
         kInternalRawSortKey,
         kMap,
         kMeta,
@@ -424,6 +425,10 @@ public:
 
     void visit(const ExpressionEncStrContains* expr) final {
         combine(OpType::kEncStrContains);
+    }
+
+    void visit(const ExpressionEncStrNormalizedEq* expr) final {
+        combine(OpType::kEncStrNormalizedEq);
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {

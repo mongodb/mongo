@@ -484,6 +484,9 @@ Value evaluate(const ExpressionInternalFLEBetween& expr,
 Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionEncStrEndsWith& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionEncStrContains& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionEncStrNormalizedEq& expr,
+               const Document& root,
+               Variables* variables);
 
 }  // namespace exec::expression
 }  // namespace mongo

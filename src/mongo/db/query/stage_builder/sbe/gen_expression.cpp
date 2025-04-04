@@ -321,6 +321,7 @@ public:
     void visit(const ExpressionEncStrStartsWith* expr) final {}
     void visit(const ExpressionEncStrEndsWith* expr) final {}
     void visit(const ExpressionEncStrContains* expr) final {}
+    void visit(const ExpressionEncStrNormalizedEq* expr) final {}
     void visit(const ExpressionInternalRawSortKey* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
@@ -503,6 +504,7 @@ public:
     void visit(const ExpressionEncStrStartsWith* expr) final {}
     void visit(const ExpressionEncStrEndsWith* expr) final {}
     void visit(const ExpressionEncStrContains* expr) final {}
+    void visit(const ExpressionEncStrNormalizedEq* expr) final {}
     void visit(const ExpressionInternalRawSortKey* expr) final {}
     void visit(const ExpressionMap* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
@@ -2287,6 +2289,9 @@ public:
     }
     void visit(const ExpressionEncStrContains* expr) final {
         unsupportedExpression("$encStrContains");
+    }
+    void visit(const ExpressionEncStrNormalizedEq* expr) final {
+        unsupportedExpression("$encStrNormalizedEq");
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {

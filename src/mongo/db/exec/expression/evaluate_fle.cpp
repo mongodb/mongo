@@ -135,5 +135,29 @@ Value evaluate(const ExpressionEncStrContains& expr, const Document& root, Varia
         }));
 }
 
+Value evaluate(const ExpressionEncStrNormalizedEq& expr,
+               const Document& root,
+               Variables* variables) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+    if (fieldValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(10255700,
+            "ExpressionEncStrNormalizedEq can't be evaluated without binary payload",
+            expr.canBeEvaluated());
+
+    // Note, when the below lambda is filled in, we must hang on to the
+    // FLE2IndexedTextEncryptedValue object to extend the lifetime of the serverValue beyond the
+    // scope of the lambda. This is because ConstDataRange is just a view on the original metadata
+    // block data.
+    return Value(expr.getEncryptedPredicateEvaluator().evaluate(
+        fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
+            // TODO SERVER-102560: Implement this lambda expression's body which should extract the
+            // metadata blocks.
+            std::vector<ConstDataRange> metadataBlocks;
+            return metadataBlocks;
+        }));
+}
+
 }  // namespace exec::expression
 }  // namespace mongo
