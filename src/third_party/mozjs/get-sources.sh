@@ -10,7 +10,7 @@ NAME=spidermonkey
 
 VERSION="128.8.0esr"
 LIB_GIT_BRANCH=spidermonkey-esr128.8-cpp-only
-LIB_GIT_REVISION=ee5eabe03bfae1cba9d97eb380fbc9408707b9ee
+LIB_GIT_REVISION=ce5a650267050c12052e748363092b530e5f5fc5
 LIB_GIT_REPO=git@github.com:mongodb-forks/spidermonkey.git
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/mozjs

@@ -1998,7 +1998,9 @@ SortedArenaList* GCRuntime::maybeGetForegroundFinalizedArenas(Zone* zone,
   auto& finalizedArenas = foregroundFinalizedArenas.ref();
 
   if (finalizedArenas.isNothing() || zone != foregroundFinalizedZone ||
-      kind != foregroundFinalizedAllocKind) {
+      // MONGODB MODIFICATION: MSVC isn't able to coerce MainThreadOrGCTaskData<AllocKind>
+      // into AllocKind. Make this conversion explicit.
+      kind != foregroundFinalizedAllocKind.ref()) {
     return nullptr;
   }
 
