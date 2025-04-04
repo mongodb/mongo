@@ -3,7 +3,12 @@
  * command, and that the number of queries sampled by each mongod in a standalone replica set is
  * proportional to the number of queries it executes.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   requires_fcv_70,
+ *    # On slow machines, the number of sampled queries could fall outside the expected range.
+ *    incompatible_aubsan,
+ *    tsan_incompatible,
+ * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

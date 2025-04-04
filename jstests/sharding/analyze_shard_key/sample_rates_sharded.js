@@ -7,6 +7,10 @@
  *   requires_fcv_70,
  *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
+ *    # On slow machines, the number of sample queries could fall outside the expected range.
+ *    requires_fast_memory,
+ *    incompatible_aubsan,
+ *    tsan_incompatible,
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
