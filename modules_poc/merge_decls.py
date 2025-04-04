@@ -75,14 +75,16 @@ def merge_decl(decl: Decl):
         # Make this the primary decl, even if from same mod
         all_decls[usr] = decl
         decl["used_from"] = old_used_from
-        if mod != old["mod"]:
-            if mod in old_other_mods:
-                del old_other_mods[mod]  # we are not an "other"
+        if decl["loc"] != old["loc"]:
             old_other_mods.setdefault(old["mod"], set()).add(old["loc"])
+            if mod in old_other_mods and decl["loc"] in old_other_mods[mod]:
+                old_other_mods[mod].remove(decl["loc"])
+                if not old_other_mods[mod]:
+                    del old_other_mods[mod]
         if old_other_mods:
             decl["other_mods"] = old_other_mods
     else:
-        if mod != old["mod"]:
+        if decl["loc"] != old["loc"]:
             old_other_mods.setdefault(mod, set()).add(decl["loc"])
         if old_other_mods:
             old["other_mods"] = old_other_mods

@@ -242,7 +242,7 @@ class Decl:
 def pretty_location(loc: clang.SourceLocation | clang.Cursor):
     if isinstance(loc, Cursor):
         loc = loc.location
-    name = loc.file.name if loc.file else "<unknown>"
+    name = os.path.normpath(loc.file.name) if loc.file else "<unknown>"
     # return f"{name}({loc.line},{loc.column})"  # MSVC format
     return f"{name}:{loc.line}:{loc.column}"  # gcc format
 
