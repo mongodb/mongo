@@ -199,8 +199,14 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
 
                     opCtx->setWriteConcern(defaultMajorityWriteConcernDoNotUse());
-                    topology_change_helpers::addShardInTransaction(
-                        opCtx, shard, std::move(dbList), std::vector<CollectionType>{});
+                    try {
+                        topology_change_helpers::addShardInTransaction(
+                            opCtx, shard, std::move(dbList), std::vector<CollectionType>{});
+                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+                        // If this happens, it means something happened in the previous try after
+                        // doing the transaction, so it's okay to swallow the duplicate key
+                        // exception on the next try.
+                    }
                 }
 
                 BSONObjBuilder shardDetails;
