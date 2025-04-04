@@ -15,4 +15,4 @@
 - featureFlagGRPC
 - featureFlagReplicaSetEndpoint
 - featureFlagCreateCollectionInPreparedTransactions
-- featureFlagMongogProxyProcolSupport
+- featureFlagMongodProxyProcolSupport
