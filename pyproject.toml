@@ -60,7 +60,7 @@ cheetah3 = "<=3.2.6.post1" # src/mongo/base/generate_error_codes.py
 packaging = "^24.0"
 regex = "^2021.11.10"
 setuptools = "^58.1.0"
-wheel = "0.37.0"
+wheel = "0.45.0"
 
 [tool.poetry.group.core.dependencies]
 psutil = "^6.0.0"
