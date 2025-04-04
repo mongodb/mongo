@@ -19,7 +19,12 @@ class Tests(unittest.TestCase):
 
         result = test_runner_interface(args, False, buildozer_output)
 
-        assert result == ["test", "//some:test", "--test_arg=-fileNameFilter", "--test_arg=source1"]
+        assert result == [
+            "test",
+            "//some:test",
+            "--test_arg=--fileNameFilter",
+            "--test_arg=source1",
+        ]
 
     def test_double_source_file(self):
         def buildozer_output(autocomplete_query):
@@ -32,7 +37,7 @@ class Tests(unittest.TestCase):
         assert result == [
             "test",
             "//some:test",
-            "--test_arg=-fileNameFilter",
+            "--test_arg=--fileNameFilter",
             "--test_arg=source1|source2",
         ]
 
@@ -44,7 +49,12 @@ class Tests(unittest.TestCase):
 
         result = test_runner_interface(args, False, buildozer_output)
 
-        assert result == ["test", "//some:test", "--test_arg=-fileNameFilter", "--test_arg=source1"]
+        assert result == [
+            "test",
+            "//some:test",
+            "--test_arg=--fileNameFilter",
+            "--test_arg=source1",
+        ]
 
     def test_no_plus_targets(self):
         def buildozer_output(autocomplete_query):
@@ -78,7 +88,7 @@ class Tests(unittest.TestCase):
             "//some:other_target",
             "--features",
             "+some_feature",
-            "--test_arg=-fileNameFilter",
+            "--test_arg=--fileNameFilter",
             "--test_arg=source1|source2",
         ]
 
@@ -159,12 +169,13 @@ class Tests(unittest.TestCase):
     "source5.cpp",
 ]"""
 
-        args = ["wrapper_hook", "+source1", "+source2", "+source3", "+source4"]
+        args = ["wrapper_hook", "test", "+source1", "+source2", "+source3", "+source4"]
 
         result = test_runner_interface(args, False, buildozer_output)
         assert result == [
+            "test",
             "//some/select:test",
-            "--test_arg=-fileNameFilter",
+            "--test_arg=--fileNameFilter",
             "--test_arg=source1|source2|source3|source4",
         ]
 
@@ -180,7 +191,7 @@ class Tests(unittest.TestCase):
             "test",
             "//some:test",
             "+source2",
-            "--test_arg=-fileNameFilter",
+            "--test_arg=--fileNameFilter",
             "--test_arg=source1|source3|source4",
         ]
 
@@ -195,7 +206,7 @@ class Tests(unittest.TestCase):
         assert result == [
             "test",
             "//some:test",
-            "--test_arg=-fileNameFilter",
+            "--test_arg=--fileNameFilter",
             "--test_arg=source1|source2|source3",
         ]
 

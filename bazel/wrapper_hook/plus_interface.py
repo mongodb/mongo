@@ -72,6 +72,31 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     bin_targets = []
     source_targets = {}
 
+    bazel_commands = [
+        "aquery",
+        "build",
+        "canonicalize-flags",
+        "clean",
+        "coverage",
+        "cquery",
+        "dump",
+        "fetch",
+        "help",
+        "info",
+        "license",
+        "mobile-install",
+        "mod",
+        "print_action",
+        "query",
+        "run",
+        "shutdown",
+        "sync",
+        "test",
+        "vendor",
+        "version",
+    ]
+    current_bazel_command = None
+
     if autocomplete_query:
         str_args = " ".join(args)
         if "'//:*'" in str_args or "':*'" in str_args or "//:all" in str_args or ":all" in str_args:
@@ -81,6 +106,8 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
         persistent_compdb = False
 
     for arg in args:
+        if not current_bazel_command and arg in bazel_commands:
+            current_bazel_command = arg
         if arg in compiledb_targets:
             compiledb_target = True
         if arg in lint_targets:
@@ -220,8 +247,14 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
             new_args.append(arg)
 
     if fileNameFilter:
-        new_args.append("--test_arg=-fileNameFilter")
-        new_args.append(f"--test_arg={'|'.join(fileNameFilter)}")
+        if current_bazel_command == "test":
+            new_args.append("--test_arg=--fileNameFilter")
+            new_args.append(f"--test_arg={'|'.join(fileNameFilter)}")
+        if current_bazel_command == "run":
+            if "--" not in args:
+                new_args.append("--")
+            new_args.append("--fileNameFilter")
+            new_args.append(f"{'|'.join(fileNameFilter)}")
 
     wrapper_debug(f"plus interface time: {time.time() - start}")
 
