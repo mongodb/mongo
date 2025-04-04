@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/repl/optime.h"
+#include <memory>
 
 namespace mongo {
 
@@ -48,11 +48,12 @@ class OperationContext;
  */
 class JournalListener {
 public:
-    // The second bool value is used to identify whether this token is acquired on primary or
-    // secondary. It is used to drive the onDurable() hook to call different lastDurable setters.
-    using Token = std::pair<repl::OpTimeAndWallTime, bool>;
+    class Token {
+    public:
+        virtual ~Token() = default;
+    };
     virtual ~JournalListener() = default;
-    virtual Token getToken(OperationContext* opCtx) = 0;
+    virtual std::unique_ptr<Token> getToken(OperationContext* opCtx) = 0;
     virtual void onDurable(const Token& token) = 0;
 };
 

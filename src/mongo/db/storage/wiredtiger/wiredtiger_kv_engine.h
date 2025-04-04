@@ -706,7 +706,7 @@ private:
      * Returns JournalListener along with an optional token if requested
      * by the UseJournalListener value.
      */
-    std::pair<JournalListener*, boost::optional<JournalListener::Token>>
+    std::pair<JournalListener*, std::unique_ptr<JournalListener::Token>>
     _getJournalListenerWithToken(OperationContext* opCtx, UseJournalListener useListener);
 
     // Removes empty directories associated with ident (or subdirectories, when startPos is set).

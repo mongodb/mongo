@@ -78,6 +78,14 @@ class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordina
         const ReplicationCoordinatorExternalStateImpl&) = delete;
 
 public:
+    class ReplDurabilityToken : public JournalListener::Token {
+    public:
+        ReplDurabilityToken(OpTimeAndWallTime opTimeAndWallTime, bool isPrimary)
+            : opTimeAndWallTime(opTimeAndWallTime), isPrimary(isPrimary) {}
+        OpTimeAndWallTime opTimeAndWallTime;
+        bool isPrimary;
+    };
+
     ReplicationCoordinatorExternalStateImpl(ServiceContext* service,
                                             StorageInterface* storageInterface,
                                             ReplicationProcess* replicationProcess);
@@ -135,7 +143,7 @@ public:
 
 
     // Methods from JournalListener.
-    JournalListener::Token getToken(OperationContext* opCtx) override;
+    std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx) override;
     void onDurable(const JournalListener::Token& token) override;
 
     void setupNoopWriter(Seconds waitTime) override;

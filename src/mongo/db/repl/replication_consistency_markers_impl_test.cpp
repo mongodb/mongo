@@ -81,7 +81,7 @@ BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minV
 
 class JournalListenerWithDurabilityTracking : public JournalListener {
 public:
-    Token getToken(OperationContext* opCtx) override {
+    std::unique_ptr<Token> getToken(OperationContext* opCtx) override {
         return {};
     }
 

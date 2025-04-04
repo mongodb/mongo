@@ -1368,13 +1368,14 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
     return oplogFetcherInitialSyncMaxFetcherRestarts.load();
 }
 
-JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(OperationContext* opCtx) {
+std::unique_ptr<JournalListener::Token> ReplicationCoordinatorExternalStateImpl::getToken(
+    OperationContext* opCtx) {
     // If in state PRIMARY, the oplogTruncateAfterPoint must be used for the Durable timestamp
     // in order to avoid majority confirming any writes that could later be truncated.
     if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
                                  ->getConsistencyMarkers()
                                  ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
-        return {*truncatePoint, true /*isPrimary*/};
+        return std::make_unique<ReplDurabilityToken>(*truncatePoint, true /*isPrimary*/);
     }
 
     // All other repl states use the 'lastWritten'.
@@ -1389,26 +1390,28 @@ JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(Operati
     // divergent 'lastWritten' value is present. The JournalFlusher will start up again in
     // ROLLBACK and never transition from non-ROLLBACK to ROLLBACK with a divergent
     // 'lastWritten' value.
-    return {repl::ReplicationCoordinator::get(_service)->getMyLastWrittenOpTimeAndWallTime(
-                /*rollbackSafe=*/true),
-            false /*isPrimary*/};
+    return std::make_unique<ReplDurabilityToken>(
+        repl::ReplicationCoordinator::get(_service)->getMyLastWrittenOpTimeAndWallTime(
+            /*rollbackSafe=*/true),
+        false /*isPrimary*/);
 }
 
-void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
+void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& t) {
     if (MONGO_unlikely(skipDurableTimestampUpdates.shouldFail())) {
         return;
     }
-    // The second value in the token means whether this token was acquired when this node was a
+    auto& token = dynamic_cast<const ReplDurabilityToken&>(t);
+    // The isPrimary value in the token means whether this token was acquired when this node was a
     // primary. On primary, the lastWritten OpTime is updated by the storage transaction's
     // onCommit() hook, which has a chance to be called later than this onDurable(). In that case,
     // we want to advance lastWritten here as well to maintain the property that lastWritten >=
     // lastDurable. However, on secondary, we should always have lastWritten being advanced first.
-    if (token.second) {
+    if (token.isPrimary) {
         repl::ReplicationCoordinator::get(_service)
-            ->setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(token.first);
+            ->setMyLastDurableAndLastWrittenOpTimeAndWallTimeForward(token.opTimeAndWallTime);
     } else {
         repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeAndWallTimeForward(
-            token.first);
+            token.opTimeAndWallTime);
     }
 }
 

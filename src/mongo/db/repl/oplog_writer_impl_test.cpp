@@ -74,14 +74,24 @@ public:
 
 class JournalListenerMock : public JournalListener {
 public:
-    Token getToken(OperationContext* opCtx) override {
-        return {repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTimeAndWallTime(true),
-                false /* isPrimary */};
+    class Token : public JournalListener::Token {
+    public:
+        Token(OpTimeAndWallTime opTimeAndWallTime, bool isPrimary)
+            : opTimeAndWallTime(opTimeAndWallTime), isPrimary(isPrimary) {}
+        OpTimeAndWallTime opTimeAndWallTime;
+        bool isPrimary;
+    };
+
+    std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx) override {
+        return std::make_unique<Token>(
+            repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTimeAndWallTime(true),
+            false /* isPrimary */);
     }
 
-    void onDurable(const Token& token) override {
+    void onDurable(const JournalListener::Token& t) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _onDurableToken = token.first;
+        auto& token = dynamic_cast<const Token&>(t);
+        _onDurableToken = token.opTimeAndWallTime;
     }
 
     OpTimeAndWallTime getOnDurableToken() {
