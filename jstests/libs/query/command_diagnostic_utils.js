@@ -67,6 +67,11 @@ export const queryPlannerAlwaysFails = {
     failpointOpts: {},
     errorCode: 9656400,
 };
+export const planFromCacheAlwaysFails = {
+    failpointName: "planFromCacheAlwaysFails",
+    failpointOpts: {},
+    errorCode: 9319600,
+};
 
 // This is useful in a sharded environment to ensure that we only hit the failpoint for the query we
 // sent via the test, rather than for a background query.

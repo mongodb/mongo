@@ -77,6 +77,7 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache_diagnostic_printer.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/planner_access.h"
@@ -131,6 +132,7 @@ void logNumberOfSolutions(size_t numSolutions) {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(queryPlannerAlwaysFails);
+MONGO_FAIL_POINT_DEFINE(planFromCacheAlwaysFails);
 
 /**
  * Attempts to apply the index tags from 'branchCacheData' to 'orChild'. If the index assignments
@@ -717,6 +719,14 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     const SolutionCacheData& solnCacheData) {
+    // Create an RAII object that prints the cached plan in the case of a tassert or crash.
+    ScopedDebugInfo planCacheDiagnostics(
+        "PlanCacheDiagnostics", diagnostic_printers::PlanCacheDiagnosticPrinter{solnCacheData});
+
+    if (auto scoped = planFromCacheAlwaysFails.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tasserted(9319600, "Hit planFromCacheAlwaysFails fail point");
+    }
+
     // A query not suitable for caching should not have made its way into the cache. The exception
     // is if `internalQueryDisablePlanCache` was enabled after a cache entry was made. This knob
     // marks all entries as "should not cache", meaning we would end up in a state where a query

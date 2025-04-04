@@ -465,6 +465,7 @@ mongo_cc_library(
         "query_solution.h",
         "record_id_range.h",
         "stage_types.h",
+        "//src/mongo/db/query/plan_cache:plan_cache_diagnostic_printer.h",
         "//src/mongo/db/query/plan_cache:plan_cache_indexability.h",
         "//src/mongo/db/query/plan_enumerator:enumerator_memo.h",
         "//src/mongo/db/query/plan_enumerator:memo_prune.h",
