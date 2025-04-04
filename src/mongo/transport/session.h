@@ -171,6 +171,7 @@ public:
     virtual const HostAndPort& local() const = 0;
 
     virtual const SockAddr& remoteAddr() const = 0;
+    virtual const SockAddr& getProxiedSrcRemoteAddr() const = 0;
     virtual const SockAddr& localAddr() const = 0;
 
 

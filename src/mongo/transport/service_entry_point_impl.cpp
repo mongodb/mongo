@@ -106,7 +106,7 @@ bool shouldOverrideMaxConns(const std::shared_ptr<transport::Session>& session,
         return false;
 
     boost::optional<CIDR> remoteCIDR;
-    if (const auto& ra = session->remoteAddr(); ra.isValid() && ra.isIP())
+    if (const auto& ra = session->getProxiedSrcRemoteAddr(); ra.isValid() && ra.isIP())
         remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
 
 #ifndef _WIN32

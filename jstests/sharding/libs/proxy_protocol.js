@@ -21,6 +21,9 @@ export class ProxyProtocolServer {
 
         assert(version === 1 || version === 2);
         this.version = version;
+
+        this.ingress_address = '127.0.0.1';
+        this.egress_address = '127.0.0.1';
     }
 
     /**
@@ -30,6 +33,20 @@ export class ProxyProtocolServer {
      */
     getIngressPort() {
         return ingress_port;
+    }
+
+    /**
+     * The the ingress connection string which can be passed to `new Mongo(...)`.
+     */
+    getIngressString() {
+        return `${this.ingress_address}:${this.ingress_port}`;
+    }
+
+    /**
+     * The the egress connection string pointing to the output.
+     */
+    getEgressString() {
+        return `${this.egress_address}:${this.egress_port}`;
     }
 
     /**
@@ -53,8 +70,8 @@ export class ProxyProtocolServer {
             "-u",
             this.web_server_py,
             "--service",
-            "127.0.0.1:" + this.ingress_port,
-            "127.0.0.1:" + this.egress_port + "?pp=v" + this.version
+            this.ingress_address + ':' + this.ingress_port,
+            this.egress_address + ':' + this.egress_port + "?pp=v" + this.version,
         ];
 
         clearRawMongoProgramOutput();

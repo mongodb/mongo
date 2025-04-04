@@ -66,6 +66,10 @@ public:
         return _remoteAddr;
     }
 
+    const SockAddr& getProxiedSrcRemoteAddr() const final {
+        MONGO_UNIMPLEMENTED;
+    }
+
     const SockAddr& localAddr() const override {
         return _localAddr;
     }
