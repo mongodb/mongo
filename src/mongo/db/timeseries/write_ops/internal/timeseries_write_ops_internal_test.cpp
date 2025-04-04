@@ -32,11 +32,15 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/session/session_catalog.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -98,6 +102,26 @@ protected:
         const UUID& collectionUUID,
         const std::vector<BSONObj>& batchOfMeasurements,
         const std::vector<size_t>& numWriteBatches) const;
+
+    void _setUpRetryableWrites(TxnNumber txnNumber,
+                               std::unique_ptr<MongoDSessionCatalog::Session>& session);
+
+    void _addExecutedStatementsToTransactionParticipant(const std::vector<StmtId>& stmtIds);
+
+    mongo::write_ops::InsertCommandRequest _createInsertCommandRequest(
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& measurements,
+        boost::optional<std::vector<StmtId>&> stmtIds = boost::none,
+        boost::optional<StmtId> stmtId = boost::none);
+
+    void _testStageUnorderedWritesUnoptimized(
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& userBatch,
+        const std::vector<size_t>& expectedIndices,
+        const std::vector<size_t>& docsToRetry,
+        boost::optional<std::vector<StmtId>&> stmtIds = boost::none,
+        boost::optional<StmtId> stmtId = boost::none,
+        boost::optional<std::vector<StmtId>&> executedStmtIds = boost::none);
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
     std::string _bigStr = std::string(1000, 'a');
@@ -431,6 +455,81 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatchWithoutMetaFieldInColl
     const std::vector<size_t>& numWriteBatches) const {
     _assertNoMetaFieldsInCollWithMetaField(ns, batchOfMeasurements);
     _testStageInsertBatch(ns, collectionUUID, batchOfMeasurements, numWriteBatches);
+}
+
+void TimeseriesWriteOpsInternalTest::_setUpRetryableWrites(
+    TxnNumber txnNumber, std::unique_ptr<MongoDSessionCatalog::Session>& contextSession) {
+
+    MongoDSessionCatalog::set(
+        _opCtx->getServiceContext(),
+        std::make_unique<MongoDSessionCatalog>(
+            std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
+
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    _opCtx->setTxnNumber(txnNumber);
+
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    contextSession = mongoDSessionCatalog->checkOutSession(_opCtx);
+    auto txnParticipant = TransactionParticipant::get(_opCtx);
+    txnParticipant.beginOrContinue(_opCtx,
+                                   {*_opCtx->getTxnNumber()},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
+}
+
+void TimeseriesWriteOpsInternalTest::_addExecutedStatementsToTransactionParticipant(
+    const std::vector<StmtId>& stmtIds) {
+    auto txnParticipant = TransactionParticipant::get(_opCtx);
+    txnParticipant.addCommittedStmtIds(_opCtx, stmtIds, repl::OpTime());
+};
+
+
+mongo::write_ops::InsertCommandRequest TimeseriesWriteOpsInternalTest::_createInsertCommandRequest(
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& measurements,
+    boost::optional<std::vector<StmtId>&> stmtIds,
+    boost::optional<StmtId> stmtId) {
+
+    mongo::write_ops::WriteCommandRequestBase base;
+    if (stmtIds) {
+        base.setStmtIds(stmtIds.get());
+    }
+    if (stmtId) {
+        base.setStmtId(stmtId.get());
+    }
+    mongo::write_ops::InsertCommandRequest request(nss);
+    request.setWriteCommandRequestBase(base);
+    request.setDocuments(measurements);
+    return request;
+};
+
+void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& userBatch,
+    const std::vector<size_t>& expectedIndices,
+    const std::vector<size_t>& docsToRetry,
+    boost::optional<std::vector<StmtId>&> stmtIds,
+    boost::optional<StmtId> stmtId,
+    boost::optional<std::vector<StmtId>&> executedStmtIds) {
+    // Set up retryable writes.
+    std::unique_ptr<MongoDSessionCatalog::Session> session;
+    _setUpRetryableWrites(TxnNumber(), session);
+
+    auto request = _createInsertCommandRequest(nss, userBatch, stmtIds, stmtId);
+    boost::optional<UUID> optUuid = boost::none;
+    std::vector<mongo::write_ops::WriteError> errors;
+
+    if (executedStmtIds) {
+        // Simulate some measurements having already been executed.
+        _addExecutedStatementsToTransactionParticipant(executedStmtIds.get());
+    }
+
+    auto batches = write_ops::internal::stageUnorderedWritesToBucketCatalogUnoptimized(
+        _opCtx, request, 0, request.getDocuments().size(), docsToRetry, optUuid, &errors);
+    ASSERT_EQ(batches.size(), 1);
+    auto batch = batches.front();
+    ASSERT_EQ(batch->measurements.size(), expectedIndices.size());
+    ASSERT_EQ(batch->userBatchIndices, expectedIndices);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsOneBatchNoMetafield) {
@@ -1367,10 +1466,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
 
-    mongo::write_ops::WriteCommandRequestBase base;
-    base.setBypassDocumentValidation(true);
-    mongo::write_ops::InsertCommandRequest request(_ns1);
-    request.setWriteCommandRequestBase(base);
+    auto request = _createInsertCommandRequest(_ns1, filteredUserBatch);
 
     internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, originalIndices, writeBatches);
 
@@ -1424,11 +1520,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
 
-    mongo::write_ops::WriteCommandRequestBase base;
-    base.setBypassDocumentValidation(true);
-    base.setStmtIds(stmtIds);
-    mongo::write_ops::InsertCommandRequest request(_ns1);
-    request.setWriteCommandRequestBase(base);
+    auto request = _createInsertCommandRequest(_ns1, filteredUserBatch, stmtIds);
 
     internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, originalIndices, writeBatches);
 
@@ -1483,11 +1575,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
 
-    mongo::write_ops::WriteCommandRequestBase base;
-    base.setBypassDocumentValidation(true);
-    base.setStmtId(stmtId);
-    mongo::write_ops::InsertCommandRequest request(_ns1);
-    request.setWriteCommandRequestBase(base);
+    auto request = _createInsertCommandRequest(_ns1, filteredUserBatch, boost::none, stmtId);
 
     internal::rewriteIndicesForSubsetOfBatch(_opCtx, request, originalIndices, writeBatches);
 
@@ -1748,6 +1836,140 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsDocsToRetr
     }
 
     ASSERT_EQ(actualIndices, std::unordered_set<size_t>(docsToRetry.begin(), docsToRetry.end()));
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, StageUnorderedWritesToBucketCatalogHandlesDocsToRetry) {
+
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "b", "time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "b", "time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+    };
+    std::vector<size_t> docsToRetry{1};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{1};
+    _testStageUnorderedWritesUnoptimized(_ns1, userBatch, expectedIndices, docsToRetry);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       StageUnorderedWritesToBucketCatalogHandlesExecutedStatementsNoMeta) {
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:03:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:05:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"),
+    };
+    std::vector<StmtId> stmtIds{0, 10, 20, 30, 40, 50};
+    std::vector<StmtId> executedStmtIds{0, 10, 20};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 5, 4};
+    _testStageUnorderedWritesUnoptimized(_nsNoMeta,
+                                         userBatch,
+                                         expectedIndices,
+                                         /*docsToRetry=*/{},
+                                         stmtIds,
+                                         boost::none,
+                                         executedStmtIds);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       StageUnorderedWritesToBucketCatalogHandlesExecutedStatementsWithMeta) {
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:03:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:05:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:04:00.000Z"}})"),
+    };
+    std::vector<StmtId> stmtIds{0, 10, 20, 30, 40, 50};
+    std::vector<StmtId> executedStmtIds{0, 10, 20};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 5, 4};
+    _testStageUnorderedWritesUnoptimized(_ns1,
+                                         userBatch,
+                                         expectedIndices,
+                                         /*docsToRetry=*/{},
+                                         stmtIds,
+                                         boost::none,
+                                         executedStmtIds);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       StageUnorderedWritesToBucketCatalogHandlesDocsToRetryAndExecutedStatementsNoMeta) {
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:03:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:05:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"),
+    };
+    std::vector<StmtId> stmtIds{0, 10, 20, 30, 40, 50};
+    std::vector<StmtId> executedStmtIds{0, 10, 20};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 4};
+    std::vector<size_t> docsToRetry{1, 2, 3, 4};
+    _testStageUnorderedWritesUnoptimized(
+        _nsNoMeta, userBatch, expectedIndices, docsToRetry, stmtIds, boost::none, executedStmtIds);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       StageUnorderedWritesToBucketCatalogHandlesDocsToRetryAndExecutedStatementsWithMeta) {
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:03:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:05:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:04:00.000Z"}})"),
+    };
+    std::vector<StmtId> stmtIds{0, 10, 20, 30, 40, 50};
+    std::vector<StmtId> executedStmtIds{0, 10, 20};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 4};
+    std::vector<size_t> docsToRetry{1, 2, 3, 4};
+    _testStageUnorderedWritesUnoptimized(
+        _ns1, userBatch, expectedIndices, docsToRetry, stmtIds, boost::none, executedStmtIds);
+}
+
+TEST_F(
+    TimeseriesWriteOpsInternalTest,
+    StageUnorderedWritesToBucketCatalogHandlesDocsToRetryWithExecutedStatementsReverseOrderingNoMeta) {
+    // Measurements are sorted in perfectly reverse order by time.
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:05:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:04:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:03:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+    };
+
+    std::vector<StmtId> executedStmtIds{0, 20, 40, 50};
+    std::vector<StmtId> stmtIds{0, 10, 20, 30, 40, 50};
+    std::vector<size_t> docsToRetry{0, 1, 2, 3};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 1};
+    _testStageUnorderedWritesUnoptimized(
+        _nsNoMeta, userBatch, expectedIndices, docsToRetry, stmtIds, boost::none, executedStmtIds);
+}
+
+TEST_F(
+    TimeseriesWriteOpsInternalTest,
+    StageUnorderedWritesToBucketCatalogHandlesDocsToRetryWithExecutedStatementsReverseOrderingWithMeta) {
+    // Measurements are sorted in perfectly reverse order by time.
+    std::vector<BSONObj> userBatch{
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:05:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:04:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:03:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:02:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:01:00.000Z"}})"),
+        mongo::fromjson(R"({"tag": "a", "time":{"$date":"2025-03-06T10:00:00.000Z"}})"),
+    };
+
+    std::vector<StmtId> executedStmtIds{0, 20, 40, 50};
+    std::vector<StmtId> stmtIds{0, 10, 20, 30, 40, 50};
+    std::vector<size_t> docsToRetry{0, 1, 2, 3};
+    std::vector<bucket_catalog::UserBatchIndex> expectedIndices{3, 1};
+    _testStageUnorderedWritesUnoptimized(
+        _ns1, userBatch, expectedIndices, docsToRetry, stmtIds, boost::none, executedStmtIds);
 }
 
 

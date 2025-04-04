@@ -259,4 +259,33 @@ void processErrorsForSubsetOfBatch(OperationContext* opCtx,
                                    const std::vector<size_t>& originalIndices,
                                    std::vector<mongo::write_ops::WriteError>* errors);
 
+/**
+ * Stages unordered writes. If an error is encountered while trying to stage a given measurement,
+ * will continue staging and committing subsequent measurements if doing so is possible.
+ *
+ * Stages measurements in the range [startIndex, startIndex + numDocsToStage).
+ *
+ * On success, returns WriteBatches with the staged writes.
+ */
+TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    size_t startIndex,
+    size_t numDocsToStage,
+    boost::optional<UUID>& optUuid,
+    std::vector<mongo::write_ops::WriteError>* errors);
+
+/**
+ * Stages unordered writes. Same as above, but handles retryable writes that have already been
+ * executed and also any documents that need to be retried due to continuable errors.
+ */
+TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnoptimized(
+    OperationContext* opCtx,
+    const mongo::write_ops::InsertCommandRequest& request,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& docsToRetry,
+    boost::optional<UUID>& optUuid,
+    std::vector<mongo::write_ops::WriteError>* errors);
+
 }  // namespace mongo::timeseries::write_ops::internal
