@@ -451,5 +451,8 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
     }
 }
 
+bool maybeProxyProtocolHeader(StringData buffer) {
+    return buffer.startsWith(kV1Start) || buffer.startsWith(kV2Start);
+}
 
 }  // namespace mongo::transport

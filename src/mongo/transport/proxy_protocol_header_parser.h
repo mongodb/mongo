@@ -82,6 +82,16 @@ struct ParserResults {
  */
 boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer);
 
+/**
+ * Peek a buffer fo at least 12 bytes to determine if it may be a proxy protocol header.
+ *
+ * Note that this does not definitively identify the initial packet as proxy protocol,
+ * it only establishes that it is possible that it is such.
+ * To be used in determining appropriate error messages during otherwise failed
+ * initial handshakes only.
+ */
+bool maybeProxyProtocolHeader(StringData buffer);
+
 namespace proxy_protocol_details {
 static constexpr size_t kMaxUnixPathLength = 108;
 

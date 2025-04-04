@@ -356,6 +356,10 @@ public:
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
         auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
 
+        uassert(ErrorCodes::LoadBalancerSupportMismatch,
+                "Mongod does not support load-balanced connections",
+                !cmd.getLoadBalanced().value_or(false));
+
         waitInHello.execute(
             [&](const BSONObj& customArgs) { _handleHelloFailPoint(customArgs, opCtx, cmdObj); });
 

@@ -1,7 +1,7 @@
 /**
  * Control the proxy protocol server.
  */
-class ProxyProtocolServer {
+export class ProxyProtocolServer {
     /**
      * Create a new proxy protocol server.
      */
