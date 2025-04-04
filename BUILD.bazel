@@ -369,3 +369,10 @@ mongo_install(
         "//conditions:default": [],
     }),
 )
+
+mongo_install(
+    name = "mongotmock",
+    srcs = [
+        "//src/mongo/db/query/search/mongotmock",
+    ],
+)
