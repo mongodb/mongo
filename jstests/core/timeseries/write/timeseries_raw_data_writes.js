@@ -6,7 +6,6 @@
  *   does_not_support_transactions,
  *   featureFlagRawDataCrudOperations,
  *   requires_non_retryable_writes,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 

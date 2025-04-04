@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   featureFlagRawDataCrudOperations,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  *   requires_timeseries,
  *   requires_getmore,
  * ]
