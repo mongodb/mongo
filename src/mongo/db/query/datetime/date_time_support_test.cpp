@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#include <array>
 #include <boost/move/utility_core.hpp>
-#include <timelib.h>
+#include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <initializer_list>
 #include <limits>
+#include <string>
+#include <timelib.h>
 
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/unittest/unittest.h"
@@ -2981,6 +2984,87 @@ TEST(ParseDayOfWeek, Basic) {
     ASSERT(DayOfWeek::thursday == parseDayOfWeek("thursday"));
     ASSERT(DayOfWeek::saturday == parseDayOfWeek("SAT"));
     ASSERT_THROWS_CODE(parseDayOfWeek(""), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST(ParseUtcOffset, InvalidInputs) {
+    for (auto&& value :
+         {"",       " ",       "  ",      "🤡",     "a",       "ABC",     "\0",     "\n",
+          " +",     "\n+",     "+",       "-",      ":",       "++",      "--",     "+ 0",
+          "- 0",    "+0:",     "+a",      "+aa",    "+0a",     "0",       "0:",     "+0:0",
+          "+0a:0",  "+00:a",   "+00:0",   "-00:0",  "+01:000", "-12:000", "-01:0a", "+09:ab",
+          "+00:0a", "+00:00a", "-12:34x", "+xx:xx", "-  :  ",  "+00:-00", "-00:+00"}) {
+        ASSERT_EQ(boost::none, kDefaultTimeZoneDatabase.parseUtcOffset(value));
+    }
+}
+
+TEST(ParseUtcOffset, HourInputs) {
+    // '-99:00' is a valid input, as is '+99:00'.
+    for (int i = -99; i <= 99; ++i) {
+        // '+/-HH':
+        auto value = fmt::format("{:+03}", i);
+        auto offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(i * 3600), *offset);
+
+        // '+HHMM' / '-HHMM':
+        value = fmt::format("{:+03}00", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(i * 3600), *offset);
+
+        // '+HH:MM' / '-HH:MM':
+        value = fmt::format("{:+03}:00", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(i * 3600), *offset);
+
+        // '+HH:99' / '-HH:99':
+        value = fmt::format("{:+03}:99", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(i * 3600 + 60 * (i >= 0 ? 99 : -99)), *offset);
+
+        // '+HHMM' / '-HH:MM':
+        value = fmt::format("{:+03}99", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(i * 3600 + 60 * (i >= 0 ? 99 : -99)), *offset);
+
+        // '+HH:MM:99' / '-HH:MM:99':
+        value = fmt::format("{:+03}:99", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(i * 3600 + 60 * (i >= 0 ? 99 : -99)), *offset);
+    }
+}
+
+TEST(ParseUtcOffset, MinuteInputs) {
+    // '-00:99' is a valid input, as is '+00:99'.
+    for (int i = 0; i <= 99; ++i) {
+        // '+HHMM'
+        auto value = fmt::format("+01{:02}", i);
+        auto offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(3600 + i * 60), *offset);
+
+        // '-HH:MM':
+        value = fmt::format("-11:{:02}", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(-11 * 3600 - i * 60), *offset);
+
+        // '+HH:MM'
+        value = fmt::format("+04:{:02}", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(4 * 3600 + i * 60), *offset);
+
+        // '-HH:MM'
+        value = fmt::format("-77:{:02}", i);
+        offset = kDefaultTimeZoneDatabase.parseUtcOffset(value);
+        ASSERT_TRUE(offset.has_value());
+        ASSERT_EQ(Seconds(-77 * 3600 - i * 60), *offset);
+    }
 }
 
 TEST(TimeZoneToString, Basic) {

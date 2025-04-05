@@ -531,6 +531,12 @@ public:
 
     std::vector<std::string> getTimeZoneStrings() const;
 
+    /**
+     * Tries to find a UTC offset in 'offsetSpec' in an ISO8601 format (±HH, ±HHMM, or ±HH:MM) and
+     * returns it as an offset to UTC in seconds.
+     */
+    boost::optional<Seconds> parseUtcOffset(StringData offsetSpec) const;
+
 private:
     struct TimelibTZInfoDeleter {
         void operator()(_timelib_tzinfo* tzInfo);
@@ -541,12 +547,6 @@ private:
      * 'timeZoneDatabase'.
      */
     void loadTimeZoneInfo(std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> timeZoneDatabase);
-
-    /**
-     * Tries to find a UTC offset in 'offsetSpec' in an ISO8601 format (±HH, ±HHMM, or ±HH:MM) and
-     * returns it as an offset to UTC in seconds.
-     */
-    boost::optional<Seconds> parseUtcOffset(StringData offsetSpec) const;
 
     // A map from the time zone name to the struct describing the timezone. These are pre-populated
     // at startup to avoid reading the source files repeatedly.
