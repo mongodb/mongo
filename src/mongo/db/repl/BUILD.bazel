@@ -36,6 +36,22 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "intent_registry",
+    srcs = [
+        "intent_registry.cpp",
+    ],
+    hdrs = [
+        "intent_registry.h",
+    ],
+    deps = [
+        ":repl_coordinator_interface",
+        ":repl_server_parameters",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
     name = "repl_settings",
     srcs = [
         "repl_settings.cpp",

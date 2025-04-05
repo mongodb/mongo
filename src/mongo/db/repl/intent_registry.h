@@ -1,0 +1,156 @@
+/**
+ *    Copyright (C) 2025-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#pragma once
+
+#include <vector>
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/future.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+
+
+namespace mongo {
+namespace rss {
+namespace consensus {
+
+/**
+ * Implementation of the Intent Registration system, used by operations to declare intents which are
+ * required for access into the Storage layer.
+ */
+class IntentRegistry {
+    friend class IntentRegistryTest;
+
+public:
+    enum class Intent {
+        Read,
+        Write,
+        LocalWrite,
+        _NumDistinctIntents_,
+    };
+
+    enum class InterruptionType {
+        StepUp,
+        StepDown,
+        Rollback,
+        Shutdown,
+        None,
+    };
+
+    /**
+     * Class used to represent a unique Intent for a specific operation.
+     */
+    class IntentToken {
+        friend class IntentRegistry;
+        using idType = uint64_t;
+
+    public:
+        IntentToken(Intent intent);
+        idType id() const;
+        Intent intent() const;
+
+    private:
+        static inline AtomicWord<idType> _currentTokenId = {};
+        Intent _intent;
+        idType _id;
+    };
+
+    /**
+     * Creates the IntentRegistry to hold and manage all IntentTokens.
+     */
+    IntentRegistry();
+
+    static IntentRegistry& get(ServiceContext* serviceContext);
+    static IntentRegistry& get(OperationContext* opCtx);
+
+    /**
+     * Validates that the intent is compatible with the current system state and
+     * registers intent in IntentRegistry, or rejects the request if it is
+     * incompatible. This function can throw an exception if the intent cannot
+     * be registered.
+     */
+    IntentToken registerIntent(Intent intent, OperationContext* opCtx);
+
+    /**
+     * Removes the intent from the IntentRegistry. This function can throw an
+     * exception if the intent cannot be deregistered.
+     */
+    void deregisterIntent(IntentToken token);
+
+    /**
+     * Provides a way for transition threads to kill operations with intents
+     * which conflict with the state transition, and wait for all of those
+     * operations to deregsiter. While active, it will also prevent operations
+     * that conflict with the ongoing state transtion from registering their
+     * intent.
+     */
+    stdx::future<bool> killConflictingOperations(InterruptionType interruption);
+
+    /**
+     * Marks the IntentRegistry enabled and resets the active and last interruption.
+     */
+    void enable();
+
+    /**
+     * Marks the IntentRegistry disabled.
+     */
+    void disable();
+
+    void setDrainTimeout(uint32_t sec);
+
+
+private:
+    struct tokenMap {
+        stdx::mutex lock;
+        stdx::condition_variable cv;
+        stdx::unordered_map<IntentToken::idType, OperationContext*> map;
+    };
+
+    bool _validIntent(Intent intent) const;
+    bool _killOperationsByIntent(Intent intent);
+    bool _waitForDrain(Intent intent);
+    static std::string _intentToString(Intent intent);
+
+    bool _enabled = true;
+    stdx::mutex _stateMutex;
+    stdx::condition_variable activeInterruptionCV;
+    bool _activeInterruption = false;
+    InterruptionType _lastInterruption = InterruptionType::None;
+    std::vector<tokenMap> _tokenMaps;
+    std::chrono::seconds _drainTimeoutSec =
+        std::chrono::seconds(repl::fassertOnLockTimeoutForStepUpDown.load());
+};
+}  // namespace consensus
+}  // namespace rss
+}  // namespace mongo
