@@ -561,6 +561,15 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("validate") && params["validate"].as<bool>() == true) {
         storageGlobalParams.validate = 1;
+        if (params.count("validateDbName")) {
+            gValidateDbName = params["validateDbName"].as<std::string>();
+            if (params.count("validateCollectionName")) {
+                gValidateCollectionName = params["validateCollectionName"].as<std::string>();
+            }
+        } else if (params.count("validateCollectionName")) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Cannot specify collection name without DB name");
+        }
     }
     if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
         storageGlobalParams.upgrade = 1;

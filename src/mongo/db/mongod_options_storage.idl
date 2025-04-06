@@ -74,6 +74,22 @@ server_parameters:
         default: false
         redact: false
 
+    validateDbName:
+        description: 'Run validation on this db'
+        set_at: [ startup ]
+        cpp_vartype: std::string
+        cpp_varname: gValidateDbName
+        default: ""
+        redact: false
+
+    validateCollectionName:
+        description: 'Run validation on this collection'
+        set_at: [ startup ]
+        cpp_vartype: std::string
+        cpp_varname: gValidateCollectionName
+        default: ""
+        redact: false
+
 configs:
     'storage.engine':
         description: 'What storage engine to use - defaults to wiredTiger if no data files present'

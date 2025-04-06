@@ -1065,7 +1065,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/txns_too_large_for_cache/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/validate/OWNERS.yml
-/jstests/noPassthrough/validate/**/* @10gen/server-rss-sydney @svc-auto-approve-bot
+/jstests/noPassthrough/validate/**/* @10gen/server-validate @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/versioning_protocol/OWNERS.yml
 /jstests/noPassthrough/versioning_protocol/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
