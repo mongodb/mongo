@@ -12,7 +12,6 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-    tests: true
   config:
     shell_options:
       global_vars:
