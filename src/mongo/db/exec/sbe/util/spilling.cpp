@@ -92,8 +92,7 @@ SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
     _recordStore =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx, format);
 
-    _spillingUnit = std::unique_ptr<RecoveryUnit>(
-        opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit());
+    _spillingUnit = opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit();
     _spillingUnit->setCacheMaxWaitTimeout(Milliseconds(internalQuerySpillingMaxWaitTimeout.load()));
     _spillingState = WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 }

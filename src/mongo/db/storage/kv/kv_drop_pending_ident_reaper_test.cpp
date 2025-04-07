@@ -70,7 +70,7 @@ public:
     void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override {}
 
     // Unused KVEngine functions below.
-    RecoveryUnit* newRecoveryUnit() override {
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
         return nullptr;
     }
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,

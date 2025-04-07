@@ -69,12 +69,10 @@ public:
     class Operation {
     public:
         Operation() = default;
-        Operation(ServiceContext::UniqueClient client, RecoveryUnit* ru)
+        Operation(ServiceContext::UniqueClient client, std::unique_ptr<RecoveryUnit> ru)
             : _client(std::move(client)), _opCtx(_client->makeOperationContext()) {
             shard_role_details::setRecoveryUnit(
-                _opCtx.get(),
-                std::unique_ptr<RecoveryUnit>(ru),
-                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+                _opCtx.get(), std::move(ru), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         }
 
 

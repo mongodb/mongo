@@ -68,12 +68,11 @@ class CappedDeleteSideTxn {
 public:
     CappedDeleteSideTxn(OperationContext* opCtx, const CollectionPtr& collection) : _opCtx(opCtx) {
         ClientLock lk(opCtx->getClient());
-        _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx, lk).release();
+        _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx, lk);
         invariant(_originalRecoveryUnit);
         _originalRecoveryUnitState = shard_role_details::setRecoveryUnit(
             _opCtx,
-            std::unique_ptr<RecoveryUnit>(
-                _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+            _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
             lk);
 
@@ -90,15 +89,13 @@ public:
 
     ~CappedDeleteSideTxn() {
         ClientLock lk(_opCtx->getClient());
-        shard_role_details::setRecoveryUnit(_opCtx,
-                                            std::unique_ptr<RecoveryUnit>(_originalRecoveryUnit),
-                                            _originalRecoveryUnitState,
-                                            lk);
+        shard_role_details::setRecoveryUnit(
+            _opCtx, std::move(_originalRecoveryUnit), _originalRecoveryUnitState, lk);
     }
 
 private:
     OperationContext* const _opCtx;
-    RecoveryUnit* _originalRecoveryUnit;
+    std::unique_ptr<RecoveryUnit> _originalRecoveryUnit;
     WriteUnitOfWork::RecoveryUnitState _originalRecoveryUnitState;
 };
 

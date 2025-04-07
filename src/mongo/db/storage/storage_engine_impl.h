@@ -91,7 +91,7 @@ public:
 
     void notifyReplStartupRecoveryComplete(RecoveryUnit&) override;
 
-    RecoveryUnit* newRecoveryUnit() override;
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     bool supportsCappedCollections() const override {
         return _supportsCappedCollections;

@@ -205,10 +205,8 @@ public:
     /**
      * Returns a new interface to the storage engine's recovery unit.  The recovery
      * unit is the durability interface.  For details, see recovery_unit.h
-     *
-     * Caller owns the returned pointer.
      */
-    virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
 
     /**
      * Returns whether the storage engine supports capped collections.

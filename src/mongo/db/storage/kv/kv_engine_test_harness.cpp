@@ -99,10 +99,9 @@ protected:
     ClientAndCtx makeClientAndCtx(const std::string& clientName) {
         auto client = getGlobalServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        shard_role_details::setRecoveryUnit(
-            opCtx.get(),
-            std::unique_ptr<RecoveryUnit>(helper->getEngine()->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(opCtx.get(),
+                                            helper->getEngine()->newRecoveryUnit(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return {std::move(client), std::move(opCtx)};
     }
 
@@ -156,10 +155,9 @@ class KVEngineTestHarness : public ServiceContextTest {
 protected:
     ServiceContext::UniqueOperationContext _makeOperationContext(KVEngine* engine) {
         auto opCtx = makeOperationContext();
-        shard_role_details::setRecoveryUnit(
-            opCtx.get(),
-            std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        shard_role_details::setRecoveryUnit(opCtx.get(),
+                                            engine->newRecoveryUnit(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
 
@@ -175,7 +173,7 @@ protected:
             auto opCtx = client->makeOperationContext();
             shard_role_details::setRecoveryUnit(
                 opCtx.get(),
-                std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
+                engine->newRecoveryUnit(),
                 WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
             opCtxs.emplace_back(std::move(client), std::move(opCtx));
         }

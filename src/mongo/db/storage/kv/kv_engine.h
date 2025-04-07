@@ -76,7 +76,7 @@ public:
      */
     virtual void notifyReplStartupRecoveryComplete(RecoveryUnit&) {}
 
-    virtual RecoveryUnit* newRecoveryUnit() {
+    virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() {
         MONGO_UNREACHABLE;
     }
 

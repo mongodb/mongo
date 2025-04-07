@@ -1421,8 +1421,8 @@ void WiredTigerKVEngine::setOldestActiveTransactionTimestampCallback(
     _oldestActiveTransactionTimestampCallback = std::move(callback);
 };
 
-RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {
-    return new WiredTigerRecoveryUnit(_connection.get());
+std::unique_ptr<RecoveryUnit> WiredTigerKVEngine::newRecoveryUnit() {
+    return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
 }
 
 void WiredTigerKVEngine::setRecordStoreExtraOptions(const std::string& options) {

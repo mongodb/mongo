@@ -69,7 +69,7 @@ public:
         if (storageEngine) {
             shard_role_details::setRecoveryUnit(
                 opCtx,
-                std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
+                storageEngine->newRecoveryUnit(),
                 WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         }
     }

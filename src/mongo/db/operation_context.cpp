@@ -480,18 +480,16 @@ std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit_DO_NOT_USE(C
 std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit_DO_NOT_USE(
     ClientLock& clientLock) {
     auto ru = releaseRecoveryUnit_DO_NOT_USE(clientLock);
-    setRecoveryUnit_DO_NOT_USE(
-        std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
-        clientLock);
+    setRecoveryUnit_DO_NOT_USE(getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                               clientLock);
     return ru;
 }
 
 void OperationContext::replaceRecoveryUnit_DO_NOT_USE(ClientLock& clientLock) {
-    setRecoveryUnit_DO_NOT_USE(
-        std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
-        clientLock);
+    setRecoveryUnit_DO_NOT_USE(getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                               clientLock);
 }
 
 WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit_DO_NOT_USE(

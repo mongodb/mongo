@@ -2225,8 +2225,7 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
         ClientLock clientLock(opCtx->getClient());
         shard_role_details::setRecoveryUnit(
             opCtx,
-            std::unique_ptr<RecoveryUnit>(
-                opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+            opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
             clientLock);
     }
@@ -2642,8 +2641,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
         ClientLock clientLock(opCtx->getClient());
         shard_role_details::setRecoveryUnit(
             opCtx,
-            std::unique_ptr<RecoveryUnit>(
-                opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+            opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
             clientLock);
     }

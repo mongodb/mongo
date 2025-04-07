@@ -38,7 +38,7 @@ namespace mongo {
  */
 class StorageEngineMock : public StorageEngine {
 public:
-    RecoveryUnit* newRecoveryUnit() final {
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
         return nullptr;
     }
     bool supportsCappedCollections() const final {

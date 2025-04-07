@@ -66,7 +66,7 @@ public:
     DevNullKVEngine();
     ~DevNullKVEngine() override;
 
-    RecoveryUnit* newRecoveryUnit() override;
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     Status createRecordStore(const NamespaceString& nss,
                              StringData ident,

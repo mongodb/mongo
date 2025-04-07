@@ -289,7 +289,7 @@ public:
     void setOldestActiveTransactionTimestampCallback(
         StorageEngine::OldestActiveTransactionTimestampCallback callback) override;
 
-    RecoveryUnit* newRecoveryUnit() override;
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     Status createRecordStore(const NamespaceString& ns,
                              StringData ident,

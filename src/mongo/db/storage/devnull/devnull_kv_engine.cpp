@@ -387,8 +387,8 @@ DevNullKVEngine::DevNullKVEngine() : _engineDbPath(storageGlobalParams.dbpath) {
 
 DevNullKVEngine::~DevNullKVEngine() = default;
 
-RecoveryUnit* DevNullKVEngine::newRecoveryUnit() {
-    return new RecoveryUnitNoop();
+std::unique_ptr<RecoveryUnit> DevNullKVEngine::newRecoveryUnit() {
+    return std::make_unique<RecoveryUnitNoop>();
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,

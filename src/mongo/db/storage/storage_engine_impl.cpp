@@ -124,9 +124,8 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     // assigned a noop recovery unit. See the StorageClientObserver class.
     auto prevRecoveryUnit = shard_role_details::releaseRecoveryUnit(opCtx);
     invariant(prevRecoveryUnit->isNoop());
-    shard_role_details::setRecoveryUnit(opCtx,
-                                        std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
-                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    shard_role_details::setRecoveryUnit(
+        opCtx, _engine->newRecoveryUnit(), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     // If we throw in this constructor, make sure to destroy the RecoveryUnit instance created above
     // before '_engine' is destroyed.
     ScopeGuard recoveryUnitResetGuard([&] {
@@ -855,7 +854,7 @@ void StorageEngineImpl::notifyReplStartupRecoveryComplete(RecoveryUnit& ru) {
     _engine->notifyReplStartupRecoveryComplete(ru);
 }
 
-RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
+std::unique_ptr<RecoveryUnit> StorageEngineImpl::newRecoveryUnit() {
     if (!_engine) {
         // shutdown
         return nullptr;
