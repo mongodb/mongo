@@ -854,6 +854,21 @@ error_codes:
       name: DatabaseMetadataRefreshCanceledDueToFCVTransition,
       categories: [InternalOnly],
     }
+  # This error code must NEVER be used outside of cluster user management commands.
+  # This error must only be used to wrap both the actual command error and a write concern error
+  # in its extra info, in the event that a cluster UMC passthrough command receives both errors
+  # from the config shard. As cluster UMC commands are typed commands, and there's currently no
+  # clean, standard way to attach the write concern error in the final reply when a non-OK
+  # command status needs to be thrown, this works around that limitation. This error code is
+  # internal-only and must never be returned to clients, so a special handling of this error
+  # (where the contained WCE is appended to the final reply, and this error replaced by the
+  # contained error) must be performed in ClientCommand::_handleException() in strategy.cpp.
+  - {
+      code: 446,
+      name: ClusterUMCErrorWithWriteConcernError,
+      extra: ClusterUMCErrorWithWriteConcernErrorInfo,
+      categories: [InternalOnly],
+    }
 
   # Error codes 4000-8999 are reserved.
 

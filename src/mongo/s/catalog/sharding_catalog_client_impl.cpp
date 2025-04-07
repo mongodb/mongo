@@ -89,6 +89,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_umc_error_with_write_concern_error_info.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_cluster_parameters_gen.h"
@@ -1303,6 +1304,12 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
     auto response = std::move(swResponse.getValue());
 
     if (!response.commandStatus.isOK()) {
+        if (!response.writeConcernStatus.isOK()) {
+            auto wce = getWriteConcernErrorDetailFromBSONObj(response.response);
+            invariant(wce);
+            return Status{ClusterUMCErrorWithWriteConcernErrorInfo(response.commandStatus, *wce),
+                          "Cluster user management command error with write concern error"};
+        }
         return response.commandStatus;
     }
 

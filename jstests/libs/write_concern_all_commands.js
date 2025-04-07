@@ -877,7 +877,7 @@ const wcCommandsTests = {
     createRole: {
         targetConfigServer: true,
         success: {
-            // Basic create user
+            // Basic create role
             req: {createRole: "foo", privileges: [], roles: []},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs, st) => {
                 assert.eq(coll.getDB().getRole("foo"), null);
@@ -911,6 +911,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc:
@@ -919,6 +928,7 @@ const wcCommandsTests = {
                         assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
                         cluster.configRS.restart(secondariesRunning[0]);
+                        coll.getDB().runCommand({dropUser: "fakeusr"});
                     } else {
                         assert.commandFailedWithCode(res, 51002);
                     }
@@ -967,6 +977,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc:
@@ -975,6 +994,7 @@ const wcCommandsTests = {
                         assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
                         cluster.configRS.restart(secondariesRunning[0]);
+                        coll.getDB().runCommand({dropRole: "bar"});
                     } else {
                         assert.commandFailedWithCode(res, 51003);
                     }
@@ -1106,6 +1126,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -1118,6 +1147,7 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().runCommand({dropRole: "bar"});
                 }
             },
         },
@@ -1267,15 +1297,25 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.RoleNotFound);
-                assert.eq(coll.getDB().getRoles().length, 0);
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().runCommand({dropRole: "bar"});
                 }
+                assert.eq(coll.getDB().getRoles().length, 0);
             },
         },
     },
@@ -1315,6 +1355,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -1323,6 +1372,7 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().runCommand({dropRole: "bar"});
                 }
             },
         },
@@ -1438,7 +1488,7 @@ const wcCommandsTests = {
     grantPrivilegesToRole: {
         targetConfigServer: true,
         noop: {
-            // No roles exist
+            // Role already has privilege
             req: {
                 grantPrivilegesToRole: "foo",
                 privileges: [{resource: {db: dbName, collection: collName}, actions: ["find"]}]
@@ -1459,10 +1509,23 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                if (clusterType == "sharded") {
+                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+                } else {
+                    assert.commandWorkedIgnoringWriteConcernErrors(res);
+                }
                 let role = coll.getDB().getRoles({rolesInfo: 1, showPrivileges: true});
                 assert.eq(role.length, 1);
                 assert.eq(role[0].privileges.length, 1);
@@ -1470,6 +1533,7 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropUser("fakeusr");
                 }
 
                 coll.getDB().dropRole("foo");
@@ -1536,16 +1600,30 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                if (clusterType == "sharded") {
+                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+                } else {
+                    assert.commandWorkedIgnoringWriteConcernErrors(res);
+                }
                 let role = coll.getDB().getRole("foo");
                 assert.eq(role.inheritedRoles.length, 1);
                 assert.eq(role.inheritedRoles[0].role, "bar");
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropUser("fakeusr");
                 }
 
                 coll.getDB().dropRole("foo");
@@ -1608,6 +1686,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -1621,6 +1708,7 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropRole("foo");
                 coll.getDB().runCommand({dropUser: "foo"});
@@ -1671,6 +1759,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -1684,8 +1781,10 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropRole("foo");
+                coll.getDB().runCommand({dropUser: "foo"});
             },
         },
     },
@@ -2096,7 +2195,7 @@ const wcCommandsTests = {
     revokePrivilegesFromRole: {
         targetConfigServer: true,
         noop: {
-            // Role does not have privelege
+            // Role does not have privilege
             req: {
                 revokePrivilegesFromRole: "foo",
                 privileges: [{resource: {db: dbName, collection: collName}, actions: ["insert"]}]
@@ -2120,16 +2219,30 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                if (clusterType == "sharded") {
+                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+                } else {
+                    assert.commandWorkedIgnoringWriteConcernErrors(res);
+                }
                 let role = coll.getDB().getRoles({rolesInfo: 1, showPrivileges: true});
                 assert.eq(role.length, 1);
                 assert.eq(role[0].privileges.length, 0);
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropUser("fakeusr");
                 }
 
                 coll.getDB().dropRole("foo");
@@ -2192,15 +2305,29 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                if (clusterType == "sharded") {
+                    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
+                } else {
+                    assert.commandWorkedIgnoringWriteConcernErrors(res);
+                }
                 let role = coll.getDB().getRole("foo");
                 assert.eq(role.inheritedRoles.length, 0);
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropUser("fakeusr");
                 }
 
                 coll.getDB().dropRole("foo");
@@ -2263,6 +2390,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2276,6 +2412,7 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropRole("foo");
                 coll.getDB().runCommand({dropUser: "foo"});
@@ -2801,6 +2938,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2812,6 +2958,7 @@ const wcCommandsTests = {
                 assert.eq(coll.getDB().getRoles().length, 1);
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropUser("fakeusr");
                 }
                 coll.getDB().dropRole("foo");
             },
@@ -2861,6 +3008,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createUser: "fakeusr",
+                        pwd: "bar",
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2869,7 +3025,9 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropUser("fakeusr");
                 }
+                coll.getDB().dropRole("foo");
             },
         },
     },
@@ -2891,6 +3049,15 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2904,6 +3071,7 @@ const wcCommandsTests = {
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropRole("bar");
                 }
 
                 coll.getDB().dropUser("foo");
@@ -2953,14 +3121,24 @@ const wcCommandsTests = {
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
                     cluster.configRS.stop(secondariesRunning[0]);
+                    // Run this to advance the system optime on the config server, so that the
+                    // subsequent failing request will also encounter a WriteConcernTimeout.
+                    assert.commandFailedWithCode(coll.getDB().runCommand({
+                        createRole: "bar",
+                        privileges: [],
+                        roles: [],
+                        writeConcern: {w: "majority", wtimeout: 100}
+                    }),
+                                                 ErrorCodes.WriteConcernTimeout);
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
-                assert.eq(coll.getDB().getUser().length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.RoleNotFound);
+                assert.eq(coll.getDB().getUser("foo").roles.length, 0);
 
                 if (clusterType == "sharded") {
                     cluster.configRS.restart(secondariesRunning[0]);
+                    coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropUser("foo");
             },
@@ -5748,15 +5926,6 @@ function shouldSkipTestCase(
     }
 
     if (testCase == "noop") {
-        // TODO SERVER-100935 dropAllUsersFromDatabase does not return WCE
-        // TODO SERVER-100935 grantPrivilegesToRole does not return WCE
-        // TODO SERVER-100935 grantRolesToRole does not return WCE
-        // TODO SERVER-100935 grantRolesToUser does not return WCE
-        // TODO SERVER-100935 revokePrivilegesFromRole does not return WCE
-        // TODO SERVER-100935 revokeRolesFromRole does not return WCE
-        // TODO SERVER-100935 updateRole does not return WCE
-        // TODO SERVER-100935 updateUser does not return WCE
-
         // TODO SERVER-100937 dropIndexes does not return WCE
 
         // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
@@ -5765,12 +5934,8 @@ function shouldSkipTestCase(
         // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
             (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-             command == "dropIndexes" || command == "dropAllUsersFromDatabase" ||
-             command == "grantPrivilegesToRole" || command == "grantRolesToRole" ||
-             command == "grantRolesToUser" || command == "revokePrivilegesFromRole" ||
-             command == "revokeRolesFromRole" || command == "revokeRolesFromUser" ||
-             command == "updateRole" || command == "updateUser" ||
-             command == "setFeatureCompatibilityVersion" || command == "enableSharding")) {
+             command == "dropIndexes" || command == "setFeatureCompatibilityVersion" ||
+             command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for no-op case.");
             return true;
         }
@@ -5785,39 +5950,23 @@ function shouldSkipTestCase(
     }
 
     if (testCase == "failure") {
-        // TODO SERVER-100935 createRole does not return WCE
-        // TODO SERVER-100935 createUser does not return WCE
-        // TODO SERVER-100935 dropRole does not return WCE
-        // TODO SERVER-100935 dropUser does not return WCE
-        // TODO SERVER-100935 grantRolesToUser does not return WCE
-        // TODO SERVER-100935 updateRole does not return WCE
-        // TODO SERVER-100935 updateUser does not return WCE
-
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
 
         // TODO SERVER-100938 createIndexes does not return WCE
 
         // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
         // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
-        if (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-            command == "createIndexes" || command == "createRole" || command == "createUser" ||
-            command == "dropRole" || command == "dropUser" || command == "grantRolesToUser" ||
-            command == "updateRole" || command == "updateUser" ||
-            command == "setDefaultRWConcern" || command == "findOneAndUpdate" ||
-            command == "findAndModify") {
+        if (clusterType == "sharded" &&
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
+             command == "createIndexes" || command == "setDefaultRWConcern" ||
+             command == "findOneAndUpdate" || command == "findAndModify")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
 
-        // TODO SERVER-100935 dropRole does not return WCE
-        // TODO SERVER-100935 grantRolesToUser does not return WCE
-        // TODO SERVER-100935 updateRole does not return WCE
-        // TODO SERVER-100935 updateUser does not return WCE
-
-        // TODO SERVER-100942 setDefaultRWConcern does not return WCE
         if (clusterType == "rs" &&
-            (command == "dropRole" || command == "grantRolesToUser" || command == "updateRole" ||
-             command == "updateUser" || command == "setDefaultRWConcern")) {
+            (command == "setDefaultRWConcern" || command == "createIndexes")) {
+            jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
     }

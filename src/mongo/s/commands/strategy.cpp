@@ -102,6 +102,7 @@
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_ddl.h"
+#include "mongo/s/cluster_umc_error_with_write_concern_error_info.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
@@ -1264,10 +1265,18 @@ void ClientCommand::_handleException(Status status) {
     auto opCtx = _rec->getOpCtx();
     auto reply = _rec->getReplyBuilder();
 
-    // Salvage the value of the 'writeConcernError' field, if already set in the reply.
+    // Salvage the value of the 'writeConcernError' field.
+    // If the command status is ClusterUMCErrorWithWriteConcernError, then
+    // obtain the write concern error from the Status extra info, and replace status
+    // with the real command status.
+    // Otherwise, check if the reply builder already has a writeConcernError, and salvage it.
     // We will re-add this value later to the reply we will build from scratch.
     BSONObjBuilder wceBuilder;
-    {
+    if (status.code() == ErrorCodes::ClusterUMCErrorWithWriteConcernError) {
+        auto ei = status.extraInfo<ClusterUMCErrorWithWriteConcernErrorInfo>();
+        status = ei->getMainStatus();
+        wceBuilder.append("writeConcernError"_sd, ei->getWriteConcernErrorDetail().toBSON());
+    } else {
         auto bob = reply->getBodyBuilder().asTempObj();
         if (auto f = bob.getField("writeConcernError"_sd); !f.eoo()) {
             wceBuilder.append(f);
