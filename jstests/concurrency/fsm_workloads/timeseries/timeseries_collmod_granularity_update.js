@@ -18,7 +18,7 @@ export const $config = (function() {
     // The config transition suites involve moving unsharded collections in and out of the config
     // server. Having up to 50 unsharded collections to move may make this test take too long to run
     // and get killed by resmoke.
-    const collCount = TestData.shardsAddedRemoved ? 10 : 50;
+    const collCount = TestData.shardsAddedRemoved ? 8 : 50;
     const threadCount = 10;
     const collPerThread = collCount / threadCount;
     const timeField = 'time';
