@@ -8,7 +8,7 @@ load(
     "REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE",
 )
 load(
-    "//bazel/toolchains/cc:mongo_compiler_flags.bzl",
+    "//bazel/toolchains/cc/mongo_linux:mongo_compiler_flags.bzl",
     "MONGO_LINUX_CC_COPTS",
     "MONGO_LINUX_CC_LINKFLAGS",
 )

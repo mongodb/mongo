@@ -1,6 +1,6 @@
 load("//bazel:utils.bzl", "get_host_distro_major_version", "retry_download_and_extract")
 load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP")
-load("//bazel/toolchains/cc:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
+load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 
 def _generate_noop_toolchain(ctx, substitutions):
     # BUILD file is required for a no-op
@@ -128,7 +128,7 @@ toolchain_download = repository_rule(
             mandatory = True,
         ),
         "build_tpl": attr.label(
-            default = "//bazel/toolchains/cc:mongo_toolchain.BUILD",
+            default = "//bazel/toolchains/cc/mongo_linux:mongo_toolchain.BUILD.tmpl",
             doc = "Label denoting the BUILD file template that gets installed in the repo.",
         ),
     },
@@ -138,13 +138,13 @@ def setup_mongo_toolchains():
     toolchain_download(
         name = "mongo_toolchain_v4",
         version = "v4",
-        flags_tpl = "//bazel/toolchains/cc:mongo_toolchain_flags_v4.bzl",
+        flags_tpl = "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v4.bzl",
     )
 
     toolchain_download(
         name = "mongo_toolchain_v5",
         version = "v5",
-        flags_tpl = "//bazel/toolchains/cc:mongo_toolchain_flags_v5.bzl",
+        flags_tpl = "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl",
     )
 
     native.register_toolchains(

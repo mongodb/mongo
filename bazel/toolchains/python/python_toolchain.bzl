@@ -185,7 +185,7 @@ py_download = repository_rule(
             doc = "Path you'd expect the python interpreter binary to live.",
         ),
         "build_tpl": attr.label(
-            default = "//bazel/toolchains/python:python_toolchain.BUILD",
+            default = "//bazel/toolchains/python:python_toolchain.BUILD.tmpl",
             doc = "Label denoting the BUILD file template that get's installed in the repo.",
         ),
     },
@@ -204,7 +204,6 @@ def setup_mongo_python_toolchains():
         name = "py_linux_arm64",
         arch = "aarch64",
         os = "linux",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         sha256 = URLS_MAP["linux_aarch64"]["sha"],
         urls = [URLS_MAP["linux_aarch64"]["url"]],
     )
@@ -213,7 +212,6 @@ def setup_mongo_python_toolchains():
         name = "py_linux_x86_64",
         arch = "amd64",
         os = "linux",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         sha256 = URLS_MAP["linux_amd64"]["sha"],
         urls = [URLS_MAP["linux_amd64"]["url"]],
     )
@@ -222,7 +220,6 @@ def setup_mongo_python_toolchains():
         name = "py_linux_ppc64le",
         arch = "ppc64le",
         os = "linux",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         sha256 = URLS_MAP["linux_ppc64le"]["sha"],
         urls = [URLS_MAP["linux_ppc64le"]["url"]],
     )
@@ -231,7 +228,6 @@ def setup_mongo_python_toolchains():
         name = "py_linux_s390x",
         arch = "s390x",
         os = "linux",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         sha256 = URLS_MAP["linux_s390x"]["sha"],
         urls = [URLS_MAP["linux_s390x"]["url"]],
     )
@@ -240,7 +236,6 @@ def setup_mongo_python_toolchains():
         name = "py_windows_x86_64",
         arch = "amd64",
         os = "windows",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         interpreter_path = "dist/python.exe",
         sha256 = URLS_MAP["windows_amd64"]["sha"],
         urls = [URLS_MAP["windows_amd64"]["url"]],
@@ -250,7 +245,6 @@ def setup_mongo_python_toolchains():
         name = "py_macos_arm64",
         arch = "aarch64",
         os = "macos",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         sha256 = URLS_MAP["macos_aarch64"]["sha"],
         urls = [URLS_MAP["macos_aarch64"]["url"]],
     )
@@ -259,7 +253,6 @@ def setup_mongo_python_toolchains():
         name = "py_macos_x86_64",
         arch = "amd64",
         os = "macos",
-        build_tpl = "//bazel/toolchains/python:python_toolchain.BUILD",
         sha256 = URLS_MAP["macos_x86_64"]["sha"],
         urls = [URLS_MAP["macos_x86_64"]["url"]],
     )

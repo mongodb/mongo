@@ -59,7 +59,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "hJjUHd8gYJ+UhUuc0EhGnjmPEIJWFeFqwY2XLEMFLG4=",
+        "bzlTransitiveDigest": "SVoEAY77WWPJ+9GloaKfza9WLdxM2NnwYLr4MY3svP4=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -76,7 +76,6 @@
             "attributes": {
               "arch": "aarch64",
               "os": "linux",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "sha256": "3e26a672df17708c4dc928475a5974c3fb3a34a9b45c65fb4bd1e50504cc84ec",
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-unknown-linux-gnu-install_only.tar.gz"
@@ -89,7 +88,6 @@
             "attributes": {
               "arch": "amd64",
               "os": "linux",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "sha256": "ee37a7eae6e80148c7e3abc56e48a397c1664f044920463ad0df0fc706eacea8",
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz"
@@ -102,7 +100,6 @@
             "attributes": {
               "arch": "ppc64le",
               "os": "linux",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "sha256": "7937035f690a624dba4d014ffd20c342e843dd46f89b0b0a1e5726b85deb8eaf",
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-ppc64le-unknown-linux-gnu-install_only.tar.gz"
@@ -115,7 +112,6 @@
             "attributes": {
               "arch": "s390x",
               "os": "linux",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "sha256": "f9f19823dba3209cedc4647b00f46ed0177242917db20fb7fb539970e384531c",
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-s390x-unknown-linux-gnu-install_only.tar.gz"
@@ -128,7 +124,6 @@
             "attributes": {
               "arch": "amd64",
               "os": "windows",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "interpreter_path": "dist/python.exe",
               "sha256": "35458ef3163a2705cd0952ba1df6012acb42b043349dcb31ab49afec341369cf",
               "urls": [
@@ -142,7 +137,6 @@
             "attributes": {
               "arch": "aarch64",
               "os": "macos",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "sha256": "916c35125b5d8323a21526d7a9154ca626453f63d0878e95b9f613a95006c990",
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-apple-darwin-install_only.tar.gz"
@@ -155,7 +149,6 @@
             "attributes": {
               "arch": "amd64",
               "os": "macos",
-              "build_tpl": "@@//bazel/toolchains/python:python_toolchain.BUILD",
               "sha256": "178cb1716c2abc25cb56ae915096c1a083e60abeba57af001996e8bc6ce1a371",
               "urls": [
                 "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-apple-darwin-install_only.tar.gz"

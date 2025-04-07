@@ -333,7 +333,7 @@ mongo_apple_toolchain_setup = repository_rule(
             doc = "Host architecture.",
         ),
         "build_tpl": attr.label(
-            default = "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.BUILD",
+            default = "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.BUILD.tmpl",
             doc = "Label denoting the BUILD file template that get's installed in the repo.",
         ),
     },

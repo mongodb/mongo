@@ -1,6 +1,6 @@
 # This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
 
-load("@//bazel/toolchains/cc:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
+load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
 load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
     "CLANG_INCLUDE_DIRS",
     "COMMON_BINDIRS",
