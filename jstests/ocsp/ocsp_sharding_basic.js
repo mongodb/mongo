@@ -15,6 +15,10 @@ const ocsp_options = {
     sslPEMKeyFile: OCSP_SERVER_CERT,
     sslCAFile: OCSP_CA_CERT,
     sslAllowInvalidHostnames: "",
+    setParameter: {
+        "failpoint.disableStapling": "{'mode':'alwaysOn'}",
+        "ocspEnabled": "true",
+    },
 };
 
 const sharding_config = {
@@ -81,8 +85,12 @@ MongoRunner.runHangAnalyzer.enable();
 mock_ocsp = new MockOCSPServer("", 10000);
 mock_ocsp.start();
 
+clearOCSPCache();
+
 // Get the mongos back up again so that we can shutdown the ShardingTest.
 st.restartMongos(0);
+
+clearOCSPCache();
 
 mock_ocsp.stop();
 st.stop();
