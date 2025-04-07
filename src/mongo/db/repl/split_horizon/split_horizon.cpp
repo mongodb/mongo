@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/split_horizon.h"
+#include "mongo/db/repl/split_horizon/split_horizon.h"
 
 #include <algorithm>
 #include <iterator>

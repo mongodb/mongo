@@ -1936,7 +1936,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_set_config_validators.h",
         "//src/mongo/db/repl:repl_set_tag.h",
         "//src/mongo/db/repl:repl_set_write_concern_mode_definitions.h",
-        "//src/mongo/db/repl:split_horizon.h",
+        "//src/mongo/db/repl/split_horizon:split_horizon.h",
     ],
     header_deps = [
         "//src/mongo/executor:network_interface_thread_pool",

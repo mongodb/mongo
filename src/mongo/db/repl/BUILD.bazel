@@ -450,12 +450,12 @@ mongo_cc_library(
         ":optime",
         ":read_concern_args",  # TODO(SERVER-93876): Remove.
         ":repl_server_parameters",
-        ":split_horizon",
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/client:connection_string",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl/split_horizon",
         "//src/mongo/rpc:command_status",
         "//src/mongo/rpc:metadata",
         "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
@@ -652,7 +652,6 @@ mongo_cc_library(
         "repl_settings.h",
         "replication_coordinator.h",
         "replication_coordinator_fwd.h",
-        "split_horizon.h",
         "split_prepare_session_manager.h",
         "storage_interface.h",
         "sync_source_selector.h",
@@ -850,21 +849,6 @@ mongo_cc_library(
     deps = [
         ":optime",
         "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
-    name = "split_horizon",
-    srcs = [
-        "split_horizon.cpp",
-    ],
-    hdrs = [
-        "split_horizon.h",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
-        "//src/mongo/util/concurrency:spin_lock",
-        "//src/mongo/util/net:network",
     ],
 )
 
@@ -1451,7 +1435,6 @@ mongo_cc_library(
         ":repl_settings",
         ":replica_set_messages",
         ":replication_auth",
-        ":split_horizon",
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:dbhelpers",
@@ -1460,6 +1443,7 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:saslauth",
         "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/repl/split_horizon",
         "//src/mongo/db/stats:counters",
         "//src/mongo/transport:message_compressor",
     ],
@@ -1822,7 +1806,6 @@ mongo_cc_library(
         "replication_process",
         "reporter",
         "scatter_gather",
-        "split_horizon",
         "topology_coordinator",
         "//src/mongo/db:common",
         "//src/mongo/db:mongod_options",
@@ -1835,6 +1818,7 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/repl/split_horizon",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/storage:journal_flusher",
@@ -2228,7 +2212,6 @@ mongo_cc_unit_test(
         "reporter_test.cpp",
         "scatter_gather_test.cpp",
         "speculative_majority_read_info_test.cpp",
-        "split_horizon_test.cpp",
         "split_prepare_session_manager_test.cpp",
         "sync_source_resolver_test.cpp",
         "task_runner_test.cpp",
@@ -2269,7 +2252,6 @@ mongo_cc_unit_test(
         ":reporter",
         ":scatter_gather",
         ":speculative_majority_read_info",
-        ":split_horizon",
         ":split_prepare_session_manager",
         ":storage_interface_impl",
         ":sync_source_resolver",

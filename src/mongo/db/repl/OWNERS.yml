@@ -57,6 +57,3 @@ filters:
   - "*topology_coordinator*":
     approvers:
       - 10gen/server-replication-coordinator
-  - "*split_horizon*":
-    approvers:
-      - 10gen/server-split-horizon

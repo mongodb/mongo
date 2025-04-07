@@ -30,12 +30,6 @@ filters:
   - "*startup_recovery*":
     approvers:
       - 10gen/server-recovery
-  - "*split_horizon*":
-    approvers:
-      - 10gen/server-split-horizon
-  - "awaitable_hello_errors_on_horizon_change.js":
-    approvers:
-      - 10gen/server-split-horizon
   - "*fcv*":
     approvers:
       - 10gen/server-fcv

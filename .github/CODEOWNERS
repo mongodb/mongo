@@ -1171,14 +1171,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/replsets/**/*replication_recovery* @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/**/standalone_recover_to_oplog_timestamp.js @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/**/*startup_recovery* @10gen/server-recovery @svc-auto-approve-bot
-/jstests/replsets/**/*split_horizon* @10gen/server-split-horizon @svc-auto-approve-bot
-/jstests/replsets/**/awaitable_hello_errors_on_horizon_change.js @10gen/server-split-horizon @svc-auto-approve-bot
 /jstests/replsets/**/*fcv* @10gen/server-fcv @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/replsets/libs/OWNERS.yml
 /jstests/replsets/libs/**/*initial_sync* @10gen/server-initial-sync @svc-auto-approve-bot
 /jstests/replsets/libs/**/*rollback* @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/libs/**/prepare_standalone_replication_recovery.js @10gen/server-transactions @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/replsets/split_horizon/OWNERS.yml
+/jstests/replsets/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/resmoke_selftest/OWNERS.yml
 /jstests/resmoke_selftest/**/* @10gen/devprod-correctness @svc-auto-approve-bot
@@ -2125,7 +2126,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/*external_state* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*heartbeat* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*topology_coordinator* @10gen/server-replication-coordinator @svc-auto-approve-bot
-/src/mongo/db/repl/**/*split_horizon* @10gen/server-split-horizon @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/repl/split_horizon/OWNERS.yml
+/src/mongo/db/repl/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/*migration* @10gen/server-cluster-scalability @svc-auto-approve-bot

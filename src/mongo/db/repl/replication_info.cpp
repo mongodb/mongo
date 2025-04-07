@@ -80,7 +80,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/split_horizon.h"
+#include "mongo/db/repl/split_horizon/split_horizon.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
