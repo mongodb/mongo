@@ -158,8 +158,8 @@ RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
 }
 
 /**
- * Disallows query-based reopening if the rollover reason is time-forward.
- * Once query-based reopening is disabled, it cannot be re-enabled.
+ * Disallows query-based reopening if the rollover reason is not time-backward.
+ * Once 'allowQueryBasedReopening' is disabled, it cannot be re-enabled.
  */
 void decideQueryBasedReopening(const RolloverReason& rolloverReason,
                                AllowQueryBasedReopening& allowQueryBasedReopening) {
@@ -168,7 +168,7 @@ void decideQueryBasedReopening(const RolloverReason& rolloverReason,
             return;
         }
         case AllowQueryBasedReopening::kAllow: {
-            if (rolloverReason == RolloverReason::kTimeForward) {
+            if (rolloverReason != RolloverReason::kTimeBackward) {
                 allowQueryBasedReopening = AllowQueryBasedReopening::kDisallow;
             }
             return;
@@ -672,9 +672,11 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                 }
                 break;
             }
-            case RolloverAction::kHardClose:
+            case RolloverAction::kHardClose: {
                 internal::rollover(catalog, stripe, stripeLock, *openBucket, reason);
+                decideQueryBasedReopening(reason, allowQueryBasedReopening);
                 break;
+            }
             case RolloverAction::kArchive:
             case RolloverAction::kSoftClose: {
                 auto bucketMinTime = openBucket->minTime;

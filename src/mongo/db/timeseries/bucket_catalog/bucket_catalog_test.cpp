@@ -2269,6 +2269,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
     ASSERT_EQ(&bucket, potentialBuckets[0]);
+    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
@@ -2404,7 +2405,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
         ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
         ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
-        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
     }
 }
 
@@ -2448,7 +2449,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
         ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
         ASSERT(!_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
-        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
     }
 }
 
