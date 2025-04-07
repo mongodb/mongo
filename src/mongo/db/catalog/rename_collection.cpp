@@ -354,13 +354,17 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
             opCtx, source, AcquisitionPrerequisites::OperationType::kWrite),
         CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx, target, AcquisitionPrerequisites::OperationType::kWrite)};
-    auto acquisitions = acquireCollectionsOrViews(opCtx, acquisitionRequests, LockMode::MODE_X);
+    // acquireCollectionsOrViews changes the order provided by acquisitionRequests and returns a
+    // vector sorted by the ResourceId. Creates the map to access the corresponding collection.
+    auto acquisitions =
+        makeAcquisitionMap(acquireCollectionsOrViews(opCtx, acquisitionRequests, LockMode::MODE_X));
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
-    auto catalog = CollectionCatalog::get(opCtx);
-    const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
-    const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
-
+    const auto& sourceColl = acquisitions.at(source).getCollectionPtr();
+    const auto& targetColl = acquisitions.at(target).getCollectionPtr();
+    // While acquireCollectionsOrViews can validate expected UUIDs (if provided via fromOpCtx),
+    // we perform the validation separately here after acquisition. This preserves the exact
+    // order of CollectionUUIDMismatchInfo in the reply for backward compatibility.
     checkCollectionUUIDMismatch(opCtx, source, sourceColl, options.expectedSourceUUID);
     checkCollectionUUIDMismatch(opCtx, target, targetColl, options.expectedTargetUUID);
 
@@ -402,7 +406,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
     } else {
         return renameCollectionAndDropTarget(
-            opCtx, db, sourceColl->uuid(), source, target, CollectionPtr(targetColl), options, {});
+            opCtx, db, sourceColl->uuid(), source, target, targetColl, options, {});
     }
 }
 
