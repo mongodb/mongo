@@ -5,6 +5,23 @@ import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_ti
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+/**
+ * Read-only object with each of the numBucketReopeningsFailed* counters set to 0.
+ */
+const bucketReopeningsFailedCounters = Object.freeze({
+    numBucketReopeningsFailedDueToEraMismatch: 0,
+    numBucketReopeningsFailedDueToMalformedIdField: 0,
+    numBucketReopeningsFailedDueToHashCollision: 0,
+    numBucketReopeningsFailedDueToMarkedFrozen: 0,
+    numBucketReopeningsFailedDueToValidator: 0,
+    numBucketReopeningsFailedDueToMarkedClosed: 0,
+    numBucketReopeningsFailedDueToMinMaxCalculation: 0,
+    numBucketReopeningsFailedDueToSchemaGeneration: 0,
+    numBucketReopeningsFailedDueToUncompressedTimeColumn: 0,
+    numBucketReopeningsFailedDueToCompressionFailure: 0,
+    numBucketReopeningsFailedDueToWriteConflict: 0
+});
+
 export var TimeseriesTest = class {
     static verifyAndDropIndex(coll, bucketsColl, shouldHaveOriginalSpec, indexName) {
         const checkIndexSpec = function(spec, userIndex) {
@@ -389,6 +406,30 @@ export var TimeseriesTest = class {
         assert.eq(bucketsKeyPattern, bucketIndexes[expectedName].key);
 
         this.checkHint(coll, expectedName, numDocsExpected);
+    }
+
+    /**
+     * Checks that for each numBucketReopeningsFailed* key in `expected`, the associated counter in
+     * `stats` has the specified value. Each counter that is not specified in `expected` is expected
+     * to have the value 0.
+     * @param {object} stats
+     * @param {Record<keyof typeof bucketReopeningsFailedCounters, number>} expected
+     */
+    static checkBucketReopeningsFailedCounters(stats, expected) {
+        for (const key in expected) {
+            assert.eq(bucketReopeningsFailedCounters[key],
+                      0,
+                      `Unexpected key ${
+                          key} passed to TimeseriesTest.checkBucketReopeningsFailedCounters`);
+        }
+        for (const key in bucketReopeningsFailedCounters) {
+            const value = TimeseriesTest.getStat(stats, key);
+            const expectedValue = TimeseriesTest.getStat(expected, key);
+            assert.eq(expectedValue,
+                      value,
+                      `TimeseriesTest.checkBucketReopeningsFailedCounters found value ${
+                          value} for key ${key} where ${expectedValue} was expected.`);
+        }
     }
 };
 

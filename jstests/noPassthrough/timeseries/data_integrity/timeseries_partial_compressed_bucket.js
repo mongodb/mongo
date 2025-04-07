@@ -10,6 +10,8 @@
  * ]
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 // This test intentionally corrupts a bucket, so disable testing diagnostics.
 TestData.testingDiagnosticsEnabled = false;
 
@@ -58,7 +60,8 @@ assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
 // TODO(SERVER-102525): Re-enable check after timeseries write path integration.
 // assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
-assert.eq(stats.timeseries.numBucketReopeningsFailed, 1, tojson(stats.timeseries));
+TimeseriesTest.checkBucketReopeningsFailedCounters(
+    stats.timeseries, {numBucketReopeningsFailedDueToCompressionFailure: 1});
 
 jsTestLog("Remove the newly created bucket, so it will not be present for the next insert.");
 bucketId = bucketsColl.find({"control.min.a": 2})[0]._id;
@@ -76,7 +79,10 @@ assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
 // TODO(SERVER-102525): Re-enable check after timeseries write path integration.
 // assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
-assert.eq(stats.timeseries.numBucketReopeningsFailed, 2, tojson(stats.timeseries));
+TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {
+    numBucketReopeningsFailedDueToCompressionFailure: 1,
+    numBucketReopeningsFailedDueToMarkedFrozen: 1
+});
 
 // Skip validation due to the corrupt buckets.
 MongoRunner.stopMongod(conn, null, {skipValidation: true});

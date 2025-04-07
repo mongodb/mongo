@@ -100,8 +100,8 @@ const runTest = function(ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
+    TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {});
 
     const insert = function(docs) {
         return db.runCommand({insert: coll.getName(), documents: docs, ordered: ordered});
@@ -148,8 +148,8 @@ const runTest = function(ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
+    TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {});
     assert.eq(coll.find().itcount(), 8);
 
     res = assert.commandWorked(insert(docs.slice(1)));
@@ -180,8 +180,8 @@ const runTest = function(ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
-    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketReopeningsFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
+    TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {});
 
     assert.eq(coll.find().itcount(), 13);
     assert.eq(coll.find({[metaFieldName]: 0}).itcount(), 6);

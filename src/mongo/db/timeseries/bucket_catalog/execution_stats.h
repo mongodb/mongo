@@ -73,7 +73,6 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketsQueried;
     AtomicWord<long long> numBucketFetchesFailed;
     AtomicWord<long long> numBucketQueriesFailed;
-    AtomicWord<long long> numBucketReopeningsFailed;
     AtomicWord<long long> numBucketReopeningsFailedDueToEraMismatch;
     AtomicWord<long long> numBucketReopeningsFailedDueToMalformedIdField;
     AtomicWord<long long> numBucketReopeningsFailedDueToHashCollision;
@@ -123,7 +122,6 @@ public:
     void incNumBucketsQueried(long long increment = 1);
     void incNumBucketFetchesFailed(long long increment = 1);
     void incNumBucketQueriesFailed(long long increment = 1);
-    void incNumBucketReopeningsFailed(long long increment = 1);
     void incNumBucketReopeningsFailedDueToEraMismatch(long long increment = 1);
     void incNumBucketReopeningsFailedDueToMalformedIdField(long long increment = 1);
     void incNumBucketReopeningsFailedDueToHashCollision(long long increment = 1);

@@ -159,11 +159,6 @@ void ExecutionStatsController::incNumBucketsQueried(long long increment) {
     _globalStats->numBucketsQueried.fetchAndAddRelaxed(increment);
 }
 
-void ExecutionStatsController::incNumBucketReopeningsFailed(long long increment) {
-    _collectionStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
-}
-
 void ExecutionStatsController::incNumBucketReopeningsFailedDueToEraMismatch(long long increment) {
     _collectionStats->numBucketReopeningsFailedDueToEraMismatch.fetchAndAddRelaxed(increment);
     _globalStats->numBucketReopeningsFailedDueToEraMismatch.fetchAndAddRelaxed(increment);
@@ -274,7 +269,6 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketsQueried", stats.numBucketsQueried.load());
     builder.appendNumber("numBucketFetchesFailed", stats.numBucketFetchesFailed.load());
     builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
-    builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
     builder.appendNumber("numBucketReopeningsFailedDueToEraMismatch",
                          stats.numBucketReopeningsFailedDueToEraMismatch.load());
     builder.appendNumber("numBucketReopeningsFailedDueToMalformedIdField",
@@ -331,7 +325,6 @@ void addCollectionExecutionCounters(ExecutionStatsController& stats,
     stats.incNumBucketsQueried(collStats.numBucketsQueried.load());
     stats.incNumBucketFetchesFailed(collStats.numBucketFetchesFailed.load());
     stats.incNumBucketQueriesFailed(collStats.numBucketQueriesFailed.load());
-    stats.incNumBucketReopeningsFailed(collStats.numBucketReopeningsFailed.load());
     stats.incNumBucketReopeningsFailedDueToEraMismatch(
         collStats.numBucketReopeningsFailedDueToEraMismatch.load());
     stats.incNumBucketReopeningsFailedDueToMalformedIdField(

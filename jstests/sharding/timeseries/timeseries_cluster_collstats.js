@@ -121,9 +121,8 @@ assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "bucketCo
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketFetchesFailed"));
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketInserts"));
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketQueriesFailed"));
-assert.eq(0,
-          TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketReopeningsFailed"));
 assert.eq(0, TimeseriesTest.getStat(clusterCollStatsResult.timeseries, "numBucketUpdates"));
+TimeseriesTest.checkBucketReopeningsFailedCounters(clusterCollStatsResult.timeseries, {});
 
 // Force splitting numShards chunks.
 const splitPoint = {

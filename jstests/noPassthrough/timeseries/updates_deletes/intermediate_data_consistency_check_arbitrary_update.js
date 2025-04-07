@@ -7,6 +7,8 @@
  *   requires_fcv_80,
  * ]
  */
+
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.testingDiagnosticsEnabled = false;
@@ -101,7 +103,7 @@ function runIntermediateDataCheckTest(isOrdered) {
         assert.eq(stats.numBucketsOpenedDueToMetadata, 4, tojson(stats));
         assert.eq(stats.numBucketFetchesFailed, 0, tojson(stats));
         assert.eq(stats.numBucketQueriesFailed, 3, tojson(stats));
-        assert.eq(stats.numBucketReopeningsFailed, 0, tojson(stats));
+        TimeseriesTest.checkBucketReopeningsFailedCounters(stats, {});
         // One bucket frozen from the triggered failpoint.
         assert.eq(stats.numBucketsFrozen, 1, tojson(stats));
         // Check that we have 3 buckets and that two of them are the untouched Bucket 1
@@ -129,7 +131,7 @@ function runIntermediateDataCheckTest(isOrdered) {
         assert.eq(stats.numBucketsOpenedDueToMetadata, 5, tojson(stats));
         assert.eq(stats.numBucketFetchesFailed, 0, tojson(stats));
         assert.eq(stats.numBucketQueriesFailed, 3, tojson(stats));
-        assert.eq(stats.numBucketReopeningsFailed, 0, tojson(stats));
+        TimeseriesTest.checkBucketReopeningsFailedCounters(stats, {});
         // One bucket frozen from the triggered failpoint.
         assert.eq(stats.numBucketsFrozen, 1, tojson(stats));
         assert.eq(stats.bucketCount, 1, tojson(stats));

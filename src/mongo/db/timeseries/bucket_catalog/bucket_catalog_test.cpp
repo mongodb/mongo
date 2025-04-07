@@ -1443,7 +1443,6 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
     ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
 }
 
@@ -1714,7 +1713,7 @@ TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
     ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
+    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
 }
 
 TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {

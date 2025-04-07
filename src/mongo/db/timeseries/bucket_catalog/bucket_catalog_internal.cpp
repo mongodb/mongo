@@ -446,7 +446,6 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                                                          const StringDataComparator* comparator,
                                                          const BucketDocumentValidator& validator,
                                                          ExecutionStatsController& stats) {
-    ScopeGuard updateStatsOnError([&stats] { stats.incNumBucketReopeningsFailed(); });
 
     if (catalogEra < getCurrentEra(catalog.bucketStateRegistry)) {
         stats.incNumBucketReopeningsFailedDueToEraMismatch();
@@ -595,7 +594,6 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
             ex.reason());
     }
 
-    updateStatsOnError.dismiss();
     freezeBucketOnError.dismiss();
     return {std::move(bucket)};
 }

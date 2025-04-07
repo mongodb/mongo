@@ -956,7 +956,6 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     auto swBucket = internal::loadBucketIntoCatalog(
         catalog, stripe, stripeLock, stats, bucketKey, std::move(reopenedBucket), catalogEra);
     if (!swBucket.isOK()) {
-        stats.incNumBucketReopeningsFailed();
         return swBucket.getStatus();
     }
 

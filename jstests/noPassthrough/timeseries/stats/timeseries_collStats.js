@@ -56,7 +56,7 @@ const clearCollection = function() {
     // expectedStats.numBucketsQueried = 0;
     expectedStats.numBucketFetchesFailed = 0;
     // expectedStats.numBucketQueriesFailed = 0;
-    expectedStats.numBucketReopeningsFailed = 0;
+    TimeseriesTest.checkBucketReopeningsFailedCounters(expectedStats, {});
     // expectedStats.numDuplicateBucketsReopened = 0;
     expectedStats.numCommits = 0;
     expectedStats.numWaits = 0;
