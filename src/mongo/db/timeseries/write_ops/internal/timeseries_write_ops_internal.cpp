@@ -1091,7 +1091,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
                     : updateStatus};
         } else if (!updateStatus.isOK()) {
             if (output.canContinue) {
-                return commit_result::ContinuableRetryableErrorWithAbortBatch{updateStatus};
+                return commit_result::ContinuableErrorWithAbortBatch{updateStatus};
             }
             return commit_result::NonContinuableErrorWithAbortBatch{updateStatus};
         }
