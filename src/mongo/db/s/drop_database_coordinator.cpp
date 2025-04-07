@@ -45,7 +45,6 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -55,17 +54,12 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/shard_metadata_util.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
-#include "mongo/db/s/type_shard_database.h"
-#include "mongo/db/s/type_shard_database_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -82,17 +76,14 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/database_version_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/database_name_util.h"
@@ -101,7 +92,6 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
-#include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -110,6 +100,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(dropDatabaseCoordinatorPauseAfterConfigCommit);
 
 BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbVersion) {
     // Making the dbVersion timestamp part of the query ensures idempotency.
@@ -204,31 +196,27 @@ void removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(
             .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
                 uassertStatusOK(insertPlacementEntryResponse.toStatus());
 
-                const bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
-                    feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-                if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-
-                // Inserts a document {_id: <dbName>, version: {timestamp: <timestamp>}}
-                // to 'config.dropPendingDBs' collection on the config server. This
-                // blocks createDatabase coordinator from committing the creation of
-                // database with the same name to the sharding catalog.
-                write_ops::InsertCommandRequest insertConfigDropPendingDBsEntry(
-                    NamespaceString::kConfigDropPendingDBsNamespace,
-                    {BSON(DatabaseType::kDbNameFieldName
-                          << DatabaseNameUtil::serialize(
-                                 dbName, SerializationContext::stateCommandRequest())
-                          << DatabaseType::kVersionFieldName
-                          << BSON(DatabaseVersion::kTimestampFieldName
-                                  << dbVersion.getTimestamp()))});
-                return txnClient.runCRUDOp(insertConfigDropPendingDBsEntry, {2});
+                // Upserts a document {_id: <dbName>, version: {timestamp: <timestamp>}} to
+                // 'config.dropPendingDBs' collection on the config server. This blocks
+                // createDatabase coordinator from committing the creation of database with the same
+                // name to the sharding catalog.
+                // We are upserting instead of inserting because, in multiversion, there could be
+                // garbage left behind by old binaries. The garbage is removed in FCV upgrade, but
+                // before that, the coordinator must be resilient to it.
+                // TODO (SERVER-94362): turn this back to an insert command.
+                write_ops::UpdateCommandRequest updateConfigDropPendingDBsEntry(
+                    NamespaceString::kConfigDropPendingDBsNamespace);
+                updateConfigDropPendingDBsEntry.setUpdates({[&] {
+                    write_ops::UpdateOpEntry entry;
+                    entry.setQ(BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(
+                                        dbName, SerializationContext::stateCommandRequest())));
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                        DatabaseType::kVersionFieldName << BSON(DatabaseVersion::kTimestampFieldName
+                                                                << dbVersion.getTimestamp()))));
+                    entry.setUpsert(true);
+                    return entry;
+                }()});
+                return txnClient.runCRUDOp(updateConfigDropPendingDBsEntry, {2});
             })
             .thenRunOn(txnExec)
             .then([](const BatchedCommandResponse& insertConfigDropPendingDBsEntryResponse) {
@@ -570,6 +558,10 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
+
+            if (MONGO_unlikely(dropDatabaseCoordinatorPauseAfterConfigCommit.shouldFail())) {
+                dropDatabaseCoordinatorPauseAfterConfigCommit.pauseWhileSet();
+            }
 
             const bool clearDbInfo = _doc.getAuthoritativeMetadataAccessLevel() ==
                 AuthoritativeMetadataAccessLevelEnum::kNone;

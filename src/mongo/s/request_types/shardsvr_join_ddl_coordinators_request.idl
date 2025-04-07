@@ -40,3 +40,10 @@ commands:
         namespace: ignored
         api_version: ""
         strict: false
+        fields:
+            types:
+                type: array<string>
+                description: >-
+                    Array with values from the enumeration DDLCoordinatorTypeEnum. If present, only
+                    coordinators of these types will be waited for.
+                optional: true

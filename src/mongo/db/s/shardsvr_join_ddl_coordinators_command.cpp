@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <type_traits>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
@@ -82,13 +84,24 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
 
+            const auto& types = request().getTypes();
+            IDLParserContext parserContext(Request::kTypesFieldName);
+
             // Exclude add and remove shard from this since it is used to drain operations for add
             // and remove shard.
             ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
-                opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
-                    const auto& opType = coordinatorInstance.operationType();
-                    return opType != DDLCoordinatorTypeEnum::kRemoveShardCommit &&
-                        opType != DDLCoordinatorTypeEnum::kAddShard;
+                opCtx, [&](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                    const auto opType = coordinatorInstance.operationType();
+                    if (opType == DDLCoordinatorTypeEnum::kRemoveShardCommit ||
+                        opType == DDLCoordinatorTypeEnum::kAddShard) {
+                        return false;
+                    }
+                    if (types) {
+                        return std::ranges::any_of(*types, [&](StringData type) {
+                            return DDLCoordinatorType_parse(parserContext, type) == opType;
+                        });
+                    }
+                    return true;
                 });
         }
 

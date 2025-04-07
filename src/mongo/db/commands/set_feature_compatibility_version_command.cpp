@@ -66,6 +66,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -80,7 +81,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -117,6 +120,7 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
+#include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -152,6 +156,7 @@ MONGO_FAIL_POINT_DEFINE(hangAtSetFCVStart);
 MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangAfterBlockingIndexBuildsForFcvDowngrade);
 MONGO_FAIL_POINT_DEFINE(automaticallyCollmodToRecordIdsReplicatedFalse);
+MONGO_FAIL_POINT_DEFINE(setFCVPauseAfterReadingConfigDropPedingDBs);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -264,6 +269,127 @@ void maybeModifyDataOnDowngradeForTest(OperationContext* opCtx,
             }
         }
     }
+}
+
+void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
+    // We are using DBDirectClient with specific read/write concerns, so open up an alternative
+    // client region.
+    auto newClient = parentOpCtx->getService()->makeClient(
+        "setFeatureCompatibilityVersion handleDropPendingDBsGarbage");
+    const AlternativeClientRegion clientRegion{newClient};
+    const auto opCtxShared = cc().makeOperationContext();
+    auto* const opCtx = opCtxShared.get();
+
+    const auto kVersionTimestampFieldName = std::string{} + DatabaseType::kVersionFieldName + "." +
+        DatabaseVersion::kTimestampFieldName;
+
+    const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
+
+    const auto getTimestampFromDropPendingDBs = [&](int order) {
+        boost::optional<Timestamp> timestamp;
+
+        AggregateCommandRequest request{
+            NamespaceString::kConfigDropPendingDBsNamespace,
+            {
+                BSON("$sort" << BSON(kVersionTimestampFieldName << order)),
+                BSON("$limit" << 1),
+            },
+        };
+        request.setReadConcern(repl::ReadConcernArgs::kMajority);
+
+        uassertStatusOK(configShard->runAggregation(
+            opCtx,
+            request,
+            [&](const std::vector<BSONObj>& batch, const boost::optional<BSONObj>&) {
+                invariant(batch.size() == 1);
+                const auto bsonVersion = batch[0][DatabaseType::kVersionFieldName];
+                tassert(10291400,
+                        "The version field is expected to exist and be an object",
+                        bsonVersion.type() == BSONType::Object);
+                const BSONElement bsonTimestamp = bsonVersion[DatabaseVersion::kTimestampFieldName];
+                tassert(10291401,
+                        "The timestamp field is expected to exist and be a timestamp",
+                        bsonTimestamp.type() == BSONType::bsonTimestamp);
+                timestamp = bsonTimestamp.timestamp();
+                return true;
+            }));
+
+        return timestamp;
+    };
+
+    const auto getLatestTimestampFromDropPendingDBs = [&] {
+        return getTimestampFromDropPendingDBs(-1);
+    };
+    const auto getEarliestTimestampFromDropPendingDBs = [&] {
+        return getTimestampFromDropPendingDBs(1);
+    };
+
+    // 1. Get the latest timestamp in config.dropPendingDBs.
+
+    const auto latestTimestamp = getLatestTimestampFromDropPendingDBs();
+
+    // If there's none, we're done.
+    if (!latestTimestamp) {
+        return;
+    }
+
+    if (MONGO_unlikely(setFCVPauseAfterReadingConfigDropPedingDBs.shouldFail())) {
+        setFCVPauseAfterReadingConfigDropPedingDBs.pauseWhileSet();
+    }
+
+    // 2. Drain drop database coordinators in all shards.
+
+    // The list of shards is stable during the execution of this function, since it is called during
+    // FCV upgrade.
+    const auto opTimeWithShards = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
+        opCtx, repl::ReadConcernLevel::kSnapshotReadConcern));
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
+        if (!shardStatus.isOK()) {
+            continue;
+        }
+        const auto shard = shardStatus.getValue();
+
+        ShardsvrJoinDDLCoordinators request;
+        request.setDbName(DatabaseName::kAdmin);
+        request.setTypes({{DDLCoordinatorType_serializer(DDLCoordinatorTypeEnum::kDropDatabase)}});
+
+        const auto response = shard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin,
+            request.toBSON(),
+            Shard::RetryPolicy::kIdempotent);
+
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+    }
+
+    // 3. Get new earliest timestamp. After draining all coordinators, the new earliest timestamp,
+    // if there's any, should be strictly later than the latest timestamp we got before the drain.
+
+    const auto newEarliestTimestamp = getEarliestTimestampFromDropPendingDBs();
+
+    if (!newEarliestTimestamp || *newEarliestTimestamp > *latestTimestamp) {
+        return;
+    }
+
+    // 4. If there's still a timestamp and it is equal or lower than the latest timestamp we got
+    // before the drain, then, assuming that all binaries are upgraded, we know that all entries
+    // with that timestamp or lower are garbage, and we can safely delete them. Since this function
+    // is called during setFeatureCompatibilityVersion, by the documented upgrade protocol, all
+    // binaries should be upgraded by this point.
+    DBDirectClient dbClient{opCtx};
+    write_ops::checkWriteErrors(dbClient.remove([&] {
+        write_ops::DeleteCommandRequest request{
+            NamespaceString::kConfigDropPendingDBsNamespace,
+            {
+                {BSON(kVersionTimestampFieldName << BSON("$lte" << *latestTimestamp)),
+                 true /* multi */},
+            }};
+        request.setWriteConcern(defaultMajorityWriteConcern());
+        return request;
+    }()));
 }
 
 /**
@@ -483,6 +609,16 @@ public:
                              ConfigsvrCoordinatorService::getService(opCtx)
                                  ->areAllCoordinatorsOfTypeFinished(
                                      opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter)));
+                }
+
+                // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
+                if (role && role->has(ClusterRole::ConfigServer) &&
+                    feature_flags::gCreateDatabaseDDLCoordinator
+                        .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                      actualVersion)) {
+                    // Drain drop database coordinators and remove possible garbage from
+                    // config.dropPendingDBs.
+                    handleDropPendingDBsGarbage(opCtx);
                 }
 
                 // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
