@@ -25,8 +25,11 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
         } else {
             res = s.adminCommand({removeShard: shardName});
         }
+
+        // TODO (SERVER-97816): remove multiversion check
+        const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
         if (!res.ok) {
-            if (res.code === ErrorCodes.ShardNotFound) {
+            if (isMultiversion && res.code === ErrorCodes.ShardNotFound) {
                 // TODO SERVER-32553: Clarify whether we should handle this scenario in tests or
                 // mongos If the config server primary steps down right after removing the
                 // config.shards doc for the shard but before responding with "state": "completed",

@@ -73,6 +73,9 @@ private:
     // Checks that the shard still exists in the cluster and that the draining flag is still set.
     void _checkShardExistsAndIsDraining(OperationContext* opCtx);
 
+    // Get the replica set name from the shard registry and write it to the state document.
+    void _setReplicaSetNameOnDocument(OperationContext* opCtx);
+
     // Joins migrations on the config server if we are transitioning from dedicated and checks
     // if there are range deletions to wait for.
     void _joinMigrationsAndCheckRangeDeletions();

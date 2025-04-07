@@ -140,47 +140,47 @@ public:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         const auto& request = requestParser.request();
+        const auto shardIdOrUrl = request.getCommandParameter();
+        boost::optional<ShardId> shardId;
 
-        const auto [shardId, replicaSetName] = [&] {
-            const auto shardIdOrUrl = request.getCommandParameter();
-            auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl);
-            if (swShard == ErrorCodes::ShardNotFound) {
-                // If the replica set endpoint is not active, then it isn't safe to allow direct
-                // connections again after a second shard has been added. Unsharded collections are
-                // allowed to be tracked and moved as soon as a second shard is added to the
-                // cluster, and these collections will not handle direct connections properly.
-                if (replica_set_endpoint::isFeatureFlagEnabled(
-                        VersionContext::getDecoration(opCtx))) {
-                    uassertStatusOK(ShardingCatalogManager::get(opCtx)
-                                        ->updateClusterCardinalityParameterIfNeeded(opCtx));
-                }
-            }
-            const auto shard = uassertStatusOK(swShard);
-            return std::make_pair(shard->getId(), shard->getConnString().getReplicaSetName());
-        }();
-
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot remove the config server as a shard using removeShard. To transition the "
-                "config shard to a dedicated config server use the "
-                "transitionToDedicatedConfigServer command.",
-                shardId != ShardId::kConfigServerId);
-
-        const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
-
-        const auto shardDrainingStatus = [&, shardId = shardId, replicaSetName = replicaSetName] {
+        const auto shardDrainingStatus = [&] {
             try {
-                return topology_change_helpers::removeShard(opCtx, shardId, replicaSetName);
+                auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl);
+                if (swShard == ErrorCodes::ShardNotFound) {
+                    // If the replica set endpoint is not active, then it isn't safe to allow direct
+                    // connections again after a second shard has been added. Unsharded collections
+                    // are allowed to be tracked and moved as soon as a second shard is added to the
+                    // cluster, and these collections will not handle direct connections properly.
+                    if (replica_set_endpoint::isFeatureFlagEnabled(
+                            VersionContext::getDecoration(opCtx))) {
+                        uassertStatusOK(ShardingCatalogManager::get(opCtx)
+                                            ->updateClusterCardinalityParameterIfNeeded(opCtx));
+                    }
+                    return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+                }
+                const auto shard = uassertStatusOK(swShard);
+                shardId.emplace(shard->getId());
+
+                uassert(ErrorCodes::IllegalOperation,
+                        "Cannot remove the config server as a shard using removeShard. To "
+                        "transition the "
+                        "config shard to a dedicated config server use the "
+                        "transitionToDedicatedConfigServer command.",
+                        *shardId != ShardId::kConfigServerId);
+
+                return topology_change_helpers::removeShard(opCtx, *shardId);
             } catch (const DBException& ex) {
                 LOGV2(21923,
                       "Failed to remove shard",
-                      "shardId"_attr = shardId,
+                      "shardId"_attr = shardId ? *shardId : shardIdOrUrl,
                       "error"_attr = redact(ex));
                 throw;
             }
         }();
 
+        const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
         shardingCatalogManager->appendShardDrainingStatus(
-            opCtx, result, shardDrainingStatus, shardId);
+            opCtx, result, shardDrainingStatus, shardId ? *shardId : shardIdOrUrl);
 
         return true;
     }

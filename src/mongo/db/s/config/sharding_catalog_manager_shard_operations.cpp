@@ -855,8 +855,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
         auto updateStatus = _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
             clusterCardinalityParameterLock, opCtx);
         uassertStatusOK(updateStatus);
-        uasserted(ErrorCodes::ShardNotFound,
-                  str::stream() << "Shard " << shardId << " does not exist");
+        return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
     }
 
     const auto shard = *optShard;
@@ -958,9 +957,9 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Since we released the addRemoveShardLock between checking the preconditions and here, it is
     // possible that the shard has already been removed.
     auto optShard = topology_change_helpers::getShardIfExists(opCtx, _localConfigShard, shardId);
-    uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "Shard " << shardId << " does not exist",
-            optShard.is_initialized());
+    if (!optShard.is_initialized()) {
+        return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+    }
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Shard " << shardId << " is not currently draining",
             optShard->getDraining());

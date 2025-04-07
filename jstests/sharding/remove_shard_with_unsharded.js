@@ -91,6 +91,13 @@ var existingShards = config.shards.find({}).toArray();
 assert.eq(
     1, existingShards.length, "Removed server still appears in count: " + tojson(existingShards));
 
-assert.commandFailed(st.s.adminCommand({removeShard: st.shard1.shardName}));
+// TODO (SERVER-97816): remove multiversion check
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+if (!isMultiversion) {
+    assert.commandWorked(st.s.adminCommand({removeShard: st.shard1.shardName}));
+} else {
+    assert.commandWorkedOrFailedWithCode(st.s.adminCommand({removeShard: st.shard1.shardName}),
+                                         ErrorCodes.ShardNotFound);
+}
 
 st.stop();

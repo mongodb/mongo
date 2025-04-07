@@ -42,9 +42,7 @@ namespace topology_change_helpers {
  * checkDrainingStatus, and commit of the removal. Will retry the entire procedure after receiving
  * a ConflictingOperationOnProgress error.
  */
-RemoveShardProgress removeShard(OperationContext* opCtx,
-                                const ShardId& shardId,
-                                const std::string& replicaSetName);
+RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
 }  // namespace topology_change_helpers
 }  // namespace mongo

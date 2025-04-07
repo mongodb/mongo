@@ -53,6 +53,7 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
                 topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
                 _checkShardExistsAndIsDraining(opCtx);
+                _setReplicaSetNameOnDocument(opCtx);
             }))
         .then(_buildPhaseHandler(
             Phase::kJoinMigrationsAndCheckRangeDeletions,
@@ -141,6 +142,12 @@ void RemoveShardCommitCoordinator::_checkShardExistsAndIsDraining(OperationConte
             optShard->getDraining());
 }
 
+void RemoveShardCommitCoordinator::_setReplicaSetNameOnDocument(OperationContext* opCtx) {
+    auto shard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _doc.getShardId()));
+    _doc.setReplicaSetName(shard->getConnString().getReplicaSetName());
+}
+
 void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions() {
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
@@ -226,7 +233,7 @@ void RemoveShardCommitCoordinator::_commitRemoveShard(
 
     if (!_doc.getIsTransitionToDedicated()) {
         // Don't remove the config shard's RSM because it is used to target the config server.
-        ReplicaSetMonitor::remove(_doc.getReplicaSetName().toString());
+        ReplicaSetMonitor::remove(_doc.getReplicaSetName()->toString());
     }
 }
 
@@ -277,8 +284,7 @@ void RemoveShardCommitCoordinator::checkIfOptionsConflict(const BSONObj& stateDo
 
     const auto optionsMatch = [&] {
         stdx::lock_guard lk(_docMutex);
-        return _doc.getShardId() == otherDoc.getShardId() &&
-            _doc.getReplicaSetName() == otherDoc.getReplicaSetName();
+        return _doc.getShardId() == otherDoc.getShardId();
     }();
 
     uassert(ErrorCodes::ConflictingOperationInProgress,

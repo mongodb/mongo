@@ -113,15 +113,17 @@ public:
             auto shardingState = ShardingState::get(opCtx);
             shardingState->assertCanAcceptShardedCommands();
             const auto shardId = shardingState->shardId();
-            const auto shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-            const auto replicaSetName = shard->getConnString().getReplicaSetName();
-
-            const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
             const auto shardDrainingStatus = [&] {
                 try {
-                    return topology_change_helpers::removeShard(opCtx, shardId, replicaSetName);
+                    const auto swShard =
+                        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
+                    if (swShard == ErrorCodes::ShardNotFound) {
+                        return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+                    }
+                    const auto shard = uassertStatusOK(swShard);
+
+                    return topology_change_helpers::removeShard(opCtx, shard->getId());
                 } catch (const DBException& ex) {
                     LOGV2(7470500,
                           "Failed to remove shard",
@@ -131,6 +133,7 @@ public:
                 }
             }();
 
+            const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
             BSONObjBuilder result;
             shardingCatalogManager->appendShardDrainingStatus(
                 opCtx, result, shardDrainingStatus, shardId);

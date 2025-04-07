@@ -91,10 +91,13 @@ jsTest.log('Testing cluster downscaling until reaching the minimum amount of sha
             originalShardNames.slice(i + 1),
             `Unexpected response of listShard after completing the removal of ${shardToRemove}`);
 
-        // Once removed, the shard should not be target-able anymore.
-        assert.commandFailedWithCode(db.adminCommand({removeShard: shardToRemove}),
-                                     ErrorCodes.ShardNotFound,
-                                     'Removal on non-existing shard succeeded unexpectedly');
+        // Shard removal should be idempotent unless we are in multiversion scenarios.
+        // TODO (SERVER-97816): remove multiversion check
+        const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+        if (!isMultiversion) {
+            let res = assert.commandWorked(db.adminCommand({removeShard: shardToRemove}));
+            assert.eq(res.state, "completed");
+        }
     }
 
     // A single-sharded cluster cannot be downscaled any further.

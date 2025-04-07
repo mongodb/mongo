@@ -400,7 +400,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     ASSERT_TRUE(response.docs.empty());
 }
 
-TEST_F(RemoveShardTest, RemoveShardCommitFailsIfPreconditionsNotMet) {
+TEST_F(RemoveShardTest, RemoveShardCommitWithPreconditionsNotMet) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
@@ -415,10 +415,9 @@ TEST_F(RemoveShardTest, RemoveShardCommitFailsIfPreconditionsNotMet) {
 
     // Removing a shard that was already removed or does not exist should throw ShardNotFound.
     ShardId nonExistingShard{"fakeShardId"};
-    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->removeShard(operationContext(), nonExistingShard),
-                       DBException,
-                       ErrorCodes::ShardNotFound);
+    auto res = ShardingCatalogManager::get(operationContext())
+                   ->removeShard(operationContext(), nonExistingShard);
+    ASSERT_EQ(res.getState(), ShardDrainingStateEnum::kCompleted);
     // Calling the final function in the shard removal procedure on a shard which is not draining
     // should throw ConflictingOperationInProgress as this should only happen if a sequence of
     // parallel add/remove shard operations or a manual update of the draining flag occurred. This

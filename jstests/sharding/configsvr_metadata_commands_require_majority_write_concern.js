@@ -68,12 +68,6 @@ const cleanupFuncs = {
         assert.commandWorked(st.s.getDB(dbName).runCommand({dropDatabase: 1}));
     },
     removeShardIfExists: function() {
-        var res = st.s.adminCommand({removeShard: newShardName});
-        if (!res.ok && res.code == ErrorCodes.ShardNotFound) {
-            return;
-        }
-        assert.commandWorked(res);
-        assert.eq('started', res.state);
         removeShard(st, newShardName);
     },
 };

@@ -16,9 +16,11 @@ export const ShardTransitionUtil = (function() {
             timeout = 10 * 60 * 1000;  // 10 minutes
         }
 
+        // TODO (SERVER-97816): remove multiversion check and assume removeShard is idempotent.
+        const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
         assert.soon(function() {
             const res = st.s.adminCommand({transitionToDedicatedConfigServer: 1});
-            if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
+            if (isMultiversion && !res.ok && res.code === ErrorCodes.ShardNotFound) {
                 // If the config server primary steps down right after removing the config.shards
                 // doc for the shard but before responding with "state": "completed", the mongos
                 // would retry the _configsvrTransitionToDedicatedConfigServer command against the

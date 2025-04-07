@@ -63,6 +63,7 @@ structs:
             replicaSetName:
                 type: string
                 description: "The replica set name of the shard to be removed."
+                optional: true
             isTransitionToDedicated:
                 type: bool
                 description: >-

@@ -212,8 +212,15 @@ if (!isMultiversion) {
     });
 
     jsTest.log("Retry the removeShard command");
-    assert.commandFailedWithCode(st.s.adminCommand({[removeShardCmdName]: st.shard0.shardName}),
-                                 ErrorCodes.ShardNotFound);
+    // TODO (SERVER-97816): remove multiversion check
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+    if (!isMultiversion) {
+        assert.commandWorked(st.s.adminCommand({[removeShardCmdName]: st.shard0.shardName}));
+    } else {
+        assert.commandWorkedOrFailedWithCode(
+            st.s.adminCommand({[removeShardCmdName]: st.shard0.shardName}),
+            ErrorCodes.ShardNotFound);
+    }
 
     jsTest.log("Checking the cluster parameter");
     checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);

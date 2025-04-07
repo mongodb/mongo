@@ -51,31 +51,28 @@ RemoveShardProgress runCoordinatorRemoveShard(
     OperationContext* opCtx,
     boost::optional<DDLLockManager::ScopedCollectionDDLLock>& ddlLock,
     boost::optional<FixedFCVRegion>& fcvRegion,
-    const ShardId& shardId,
-    const std::string& replicaSetName) {
+    const ShardId& shardId) {
     invariant(ddlLock);
     invariant(fcvRegion);
 
-    const auto removeShardCommitCoordinator =
-        [&, shardId = shardId, replicaSetName = replicaSetName] {
-            auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
-            coordinatorDoc.setShardId(shardId);
-            coordinatorDoc.setReplicaSetName(replicaSetName);
-            coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
-            // The Operation FCV is currently propagated only for DDL operations,
-            // which cannot be nested. Therefore, the VersionContext shouldn't have
-            // been initialized yet.
-            invariant(!VersionContext::getDecoration(opCtx).isInitialized());
-            coordinatorDoc.setShouldUpdateClusterCardinality(
-                replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx)));
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{NamespaceString::kConfigsvrShardsNamespace,
-                  DDLCoordinatorTypeEnum::kRemoveShardCommit}});
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-            return coordinator;
-        }();
+    const auto removeShardCommitCoordinator = [&] {
+        auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
+        coordinatorDoc.setShardId(shardId);
+        coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
+        // The Operation FCV is currently propagated only for DDL operations,
+        // which cannot be nested. Therefore, the VersionContext shouldn't have
+        // been initialized yet.
+        invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+        coordinatorDoc.setShouldUpdateClusterCardinality(
+            replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx)));
+        coordinatorDoc.setShardingDDLCoordinatorMetadata(
+            {{NamespaceString::kConfigsvrShardsNamespace,
+              DDLCoordinatorTypeEnum::kRemoveShardCommit}});
+        auto service = ShardingDDLCoordinatorService::getService(opCtx);
+        auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+        return coordinator;
+    }();
     fcvRegion.reset();
     ddlLock.reset();
 
@@ -97,9 +94,7 @@ RemoveShardProgress runCoordinatorRemoveShard(
 
 namespace topology_change_helpers {
 
-RemoveShardProgress removeShard(OperationContext* opCtx,
-                                const ShardId& shardId,
-                                const std::string& replicaSetName) {
+RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId) {
     const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
     while (true) {
         try {
@@ -133,7 +128,7 @@ RemoveShardProgress removeShard(OperationContext* opCtx,
             invariant(!VersionContext::getDecoration(opCtx).isInitialized());
             if (feature_flags::gUseTopologyChangeCoordinators.isEnabled(
                     VersionContext::getDecoration(opCtx), (*fixedFCV)->acquireFCVSnapshot())) {
-                return runCoordinatorRemoveShard(opCtx, ddlLock, fixedFCV, shardId, replicaSetName);
+                return runCoordinatorRemoveShard(opCtx, ddlLock, fixedFCV, shardId);
             } else {
                 // We need to check that there are not any coordinators which have been created but
                 // have not yet acquired the DDL lock in case we are just after an FCV downgrade. We
