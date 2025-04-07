@@ -7,6 +7,7 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag
  *   # This test relies on the bucket size/count being the default values, which can be fuzzed by
  *   # the config fuzzer.
  *   does_not_support_config_fuzzer

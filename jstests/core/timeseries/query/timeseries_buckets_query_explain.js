@@ -6,6 +6,7 @@
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
  *   featureFlagRawDataCrudOperations,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  *   requires_timeseries,
  * ]
  */
