@@ -70,7 +70,7 @@ bool AbstractAsyncComponent::_isShuttingDown(WithLock lk) noexcept {
     return State::kShuttingDown == _state;
 }
 
-Status AbstractAsyncComponent::startup() noexcept {
+Status AbstractAsyncComponent::startup() {
     stdx::lock_guard<stdx::mutex> lock(*_getMutex());
     switch (_state) {
         case State::kPreStart:

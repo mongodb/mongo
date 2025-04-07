@@ -73,7 +73,7 @@ public:
      * _doStartup() defined in the concrete class. If _doStartup() fails, this
      * component will transition to Complete and any restarts after this will be disallowed.
      */
-    Status startup() noexcept;
+    Status startup();
 
     /**
      * Signals this component to begin shutting down. If the transition from Running to ShuttingDown
