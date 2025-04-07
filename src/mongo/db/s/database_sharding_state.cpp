@@ -290,8 +290,14 @@ void DatabaseShardingState::setDbInfo_DEPRECATED(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
-    const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    tassert(10003604,
+    // During the recovery phase, when the ShardingRecoveryService is reading from disk and
+    // populating the DatabaseShardingState, the ShardingState is not yet initialized. Therefore,
+    // the following sanity check cannot be performed, as it requires knowing which ShardId this
+    // shard belongs to.
+    if (ShardingState::get(opCtx)->enabled()) {
+        const auto thisShardId = ShardingState::get(opCtx)->shardId();
+        tassert(
+            10003604,
             fmt::format(
                 "Expected to be setting this node's cached database info with its corresponding "
                 "database version. Found primary shard in the database info: {}, expected: {} for "
@@ -300,7 +306,8 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseTyp
                 thisShardId.toString(),
                 _dbName.toStringForErrorMsg(),
                 dbInfo.getVersion().toString()),
-            !thisShardId.isValid() || dbInfo.getPrimary() == thisShardId);
+            dbInfo.getPrimary() == thisShardId);
+    }
 
     LOGV2(10003605,
           "Setting this node's cached database info",
