@@ -38,9 +38,11 @@ idl_generator(
 mongo_cc_library(
     name = "intent_registry",
     srcs = [
+        "intent_guard.cpp",
         "intent_registry.cpp",
     ],
     hdrs = [
+        "intent_guard.h",
         "intent_registry.h",
     ],
     deps = [
