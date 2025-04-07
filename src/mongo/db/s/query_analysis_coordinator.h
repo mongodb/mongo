@@ -185,6 +185,7 @@ private:
      * Returns the minimum last ping time for a sampler to be considered as active.
      */
     Date_t _getMinLastPingTime();
+    Date_t _getMinLastPingTime(Date_t now);
 
     mutable stdx::mutex _mutex;
 

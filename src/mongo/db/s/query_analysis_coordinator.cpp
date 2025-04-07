@@ -139,8 +139,11 @@ void QueryAnalysisCoordinator::onConfigurationDelete(const QueryAnalyzerDocument
 
 Date_t QueryAnalysisCoordinator::_getMinLastPingTime() {
     auto serviceContext = getQueryAnalysisCoordinator.owner(this);
-    return serviceContext->getFastClockSource()->now() -
-        Seconds(gQueryAnalysisSamplerInActiveThresholdSecs.load());
+    return _getMinLastPingTime(serviceContext->getFastClockSource()->now());
+}
+
+Date_t QueryAnalysisCoordinator::_getMinLastPingTime(Date_t now) {
+    return now - Seconds(gQueryAnalysisSamplerInActiveThresholdSecs.load());
 }
 
 void QueryAnalysisCoordinator::Sampler::setLastPingTime(Date_t pingTime) {
@@ -293,7 +296,7 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     double weight = numQueriesExecutedPerSecond;
     double totalWeight = 0;
 
-    auto minPingTime = _getMinLastPingTime();
+    auto minPingTime = _getMinLastPingTime(now);
     for (const auto& [name, sampler] : _samplers) {
         if (sampler.getLastPingTime() > minPingTime) {
             numActiveSamplers++;
