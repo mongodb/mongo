@@ -60,13 +60,11 @@ def list_files_without_targets(
     # are contained within targets.
 
     exempt_list = {
-        # TODO(SERVER-101365): Remove the exemptions below once resolved.
+        # TODO(SERVER-101360): Remove the exemptions below once resolved.
         "src/mongo/crypto/fle_options.cpp",
         # TODO(SERVER-101361): Remove the exemptions below once resolved.
         "src/mongo/db/auth/authz_manager_external_state_local.cpp",
         "src/mongo/db/auth/authz_manager_external_state_s.cpp",
-        # TODO(SERVER-101365): Remove the exemptions below once resolved.
-        "src/mongo/db/service_entry_point_test_fixture.cpp",
         # TODO(SERVER-101368): Remove the exemptions below once resolved.
         "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
         # TODO(SERVER-101370): Remove the exemptions below once resolved.
