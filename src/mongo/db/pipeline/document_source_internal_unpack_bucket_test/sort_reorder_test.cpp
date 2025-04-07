@@ -60,6 +60,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
     ASSERT_EQ(2, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{ $sort: {'meta.a': 1, 'meta.b': -1} }"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
@@ -77,6 +80,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
     ASSERT_EQ(2, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}"), serialized[1]);
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
@@ -109,6 +115,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
     // additional stage. The container from pipeline->getSources(), on the other hand, preserves the
     // original pipeline with limit absorbed into sort. Therefore, there should only be 4 stages
     ASSERT_EQ(4, container.size());
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
@@ -137,6 +146,21 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
         serialized[2]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 3}"), serialized[3]);
     ASSERT_BSONOBJ_EQ(fromjson("{$skip: 1}"), serialized[4]);
+
+    // Optimize the optimized pipeline again. More rewrites will happen here.
+    auto optimizedPipeline = Pipeline::parse(serialized, getExpCtx());
+    optimizedPipeline->optimizePipeline();
+    auto optimizedSerialized = optimizedPipeline->serializeToBson();
+    ASSERT_EQ(6, optimizedSerialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {t:'$meta.a'}}"), optimizedSerialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta.a': 1}}"), optimizedSerialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 3}"), optimizedSerialized[2]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: {include:['_id', 't'], timeField: 'foo', metaField: "
+                 "'meta1', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['t'] } }"),
+        optimizedSerialized[3]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 3}"), optimizedSerialized[4]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$skip: 1}"), optimizedSerialized[5]);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaLimitSortSkipLimit) {
@@ -171,7 +195,10 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaLimitSortSkipLimit) {
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 4}"), serialized[3]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta1.a': 1}}"), serialized[4]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 3}"), serialized[5]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$skip: 1}"), serialized[6]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$skip : 1}"), serialized[6]);
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 }  // namespace

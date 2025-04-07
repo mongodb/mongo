@@ -232,6 +232,19 @@ public:
         }
     }
 
+    void makePipelineOptimizeAssertNoRewrites(
+        boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+        std::vector<BSONObj> expectedStages) {
+        auto optimizedPipeline = Pipeline::parse(expectedStages, expCtx);
+        optimizedPipeline->optimizePipeline();
+        auto optimizedSerialized = optimizedPipeline->serializeToBson();
+
+        ASSERT_EQ(expectedStages.size(), optimizedSerialized.size());
+        for (size_t i = 0; i < expectedStages.size(); i++) {
+            ASSERT_BSONOBJ_EQ(expectedStages[i], optimizedSerialized[i]);
+        }
+    }
+
 
 private:
     const unittest::TempDir _tempDir{"AggregationContextFixture"};
