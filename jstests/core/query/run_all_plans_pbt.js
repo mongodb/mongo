@@ -99,8 +99,8 @@ testProperty(hintedQueryHasSameResultsAsControlCollScan,
              makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
              numRuns);
 
-// TODO SERVER-101271 re-enable PBT testing for time-series
-// // Test with a TS collection.
+// TODO SERVER-103381 re-enable timeseries PBT testing.
+// Test with a TS collection.
 // {
 //     // TODO SERVER-83072 re-enable $group in this test, by removing the filter below.
 //     const tsAggModel = aggModel.filter(query => {
@@ -111,12 +111,11 @@ testProperty(hintedQueryHasSameResultsAsControlCollScan,
 //         }
 //         return true;
 //     });
-//     testProperty(hintedQueryHasSameResultsAsControlCollScan,
-//                  {controlColl, experimentColl},
-//                  makeWorkloadModel({
-//                      collModel: getCollectionModel({isTS: true}),
-//                      aggModel: tsAggModel,
-//                      numQueriesPerRun
-//                  }),
-//                  numRuns);
+//     testProperty(
+//         hintedQueryHasSameResultsAsControlCollScan,
+//         {controlColl, experimentColl},
+//         makeWorkloadModel(
+//             {collModel: getCollectionModel({isTS: true}), aggModel: tsAggModel,
+//             numQueriesPerRun}),
+//         numRuns);
 // }

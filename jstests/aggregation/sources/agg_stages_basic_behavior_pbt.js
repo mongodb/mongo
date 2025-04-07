@@ -223,7 +223,7 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
         makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun: 20}),
         numRuns);
 
-    // TODO SERVER-101271 re-enable timeseries PBT testing.
+    // TODO SERVER-103381 re-enable timeseries PBT testing.
     // Run the property with a TS collection.
     // testProperty(propFn,
     //              {experimentColl},

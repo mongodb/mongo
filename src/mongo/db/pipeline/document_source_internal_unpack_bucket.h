@@ -421,9 +421,14 @@ private:
     bool _unpackToBson = false;
 
     bool _optimizedEndOfPipeline = false;
-    bool _triedInternalizeProject = false;
-    bool _triedLastpointRewrite = false;
-    bool _triedLimitPushDown = false;
+
+    // These variables are only used to prevent infinite loops when we step backwards to optimize
+    // $match. These values do not guarantee that optimizations have only run once. Even with these
+    // values optimizations can happen twice (once on mongos and once on mongod) and all
+    // optimizations must be correct when run multiple times.
+    bool _triedInternalizeProjectLocally = false;
+    bool _triedLastpointRewriteLocally = false;
+    bool _triedLimitPushDownLocally = false;
 
     // The $project or $addFields stages which we have tried to apply the computed meta project push
     // down optimization to.

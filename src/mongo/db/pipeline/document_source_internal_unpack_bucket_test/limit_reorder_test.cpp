@@ -71,6 +71,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // Test that when there are multiple limits in a row, they are merged into one taking the smallest
@@ -86,6 +89,8 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForMultipleLimits) {
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // Test that the stages after $limit are also preserved.
@@ -101,6 +106,8 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {'_id': 2}}"), serialized[3]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // Test that limit is not pushed down if it comes after match.
@@ -117,6 +124,8 @@ TEST_F(InternalUnpackBucketLimitReorderTest, NoOptimizeForMatchBeforeLimit) {
     ASSERT(serialized[0].hasField("$match"));
     ASSERT(serialized[1].hasField("$_internalUnpackBucket"));
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // Test that the sort that was pushed up absorbs the limit, while preserving the original limit.
@@ -141,6 +150,8 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSort) {
     auto firstSort = dynamic_cast<DocumentSourceSort*>(container.begin()->get());
     ASSERT(firstSort->hasLimit());
     ASSERT_EQ(2, *firstSort->getLimit());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // Test for sort with multiple limits in increasing limit values.
@@ -162,6 +173,8 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimit
     auto firstSort = dynamic_cast<DocumentSourceSort*>(container.begin()->get());
     ASSERT(firstSort->hasLimit());
     ASSERT_EQ(5, *firstSort->getLimit());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // Test for sort with multiple limits in decreasing limit values. In this case, the last limit
@@ -184,6 +197,8 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimit
     auto firstSort = dynamic_cast<DocumentSourceSort*>(container.begin()->get());
     ASSERT(firstSort->hasLimit());
     ASSERT_EQ(2, *firstSort->getLimit());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 }  // namespace

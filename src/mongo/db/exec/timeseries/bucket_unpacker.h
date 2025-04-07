@@ -273,6 +273,18 @@ public:
         return providesField(field) && !_spec.fieldIsComputed(field);
     }
 
+    bool removedMetaFieldFromFieldSet() const {
+        return (_includeMetaField && behavior() == BucketSpec::Behavior::kInclude) ||
+            (!_includeMetaField && getMetaField() && behavior() == BucketSpec::Behavior::kExclude);
+    }
+
+    bool hasIncludeExcludeFields() const {
+        // We remove the metaField from the fieldSet and set the '_includeMetaField' flag to enable
+        // more push downs in 'eraseMetaFromFieldSetAndDetermineIncludeMeta', but the metaField
+        // should still be considered in the fieldSet when enabling optimizations.
+        return !_spec.fieldSet().empty() || removedMetaFieldFromFieldSet();
+    }
+
     void setBucketSpec(BucketSpec&& bucketSpec);
     void setIncludeMinTimeAsMetadata();
     void setIncludeMaxTimeAsMetadata();
@@ -311,6 +323,10 @@ private:
     bool _includeTimeField{false};
 
     // A flag used to mark that a bucket's metadata value should be materialized in measurements.
+    // The value is determined by the behavior of the unpacker and if the metadata was included in
+    // the field set. If the unpacking behavior is 'kExclude' this value is true if metadata was not
+    // in the field set. If the unpacking behavior is 'kInclude' this value is true if the metadata
+    // field is inside the field set.
     bool _includeMetaField{false};
 
     // A flag used to mark that a bucket's min time should be materialized as metadata.

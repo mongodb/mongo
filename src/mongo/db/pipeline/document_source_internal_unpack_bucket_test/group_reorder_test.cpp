@@ -144,6 +144,9 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {
         "{$_internalUnpackBucket: { include: ['a', 'b'], timeField: 't', metaField: 'meta1', "
         "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 // The following tests confirms the $group rewrite applies when the _id field is a field path
@@ -234,6 +237,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldOverwrittenDoes
     ASSERT_BSONOBJ_EQ(expectedAddFieldsStage, serialized[0]);
     ASSERT_BSONOBJ_EQ(expectedUpackStage, serialized[1]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[2]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
@@ -445,6 +451,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative) {
         "'meta1', bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative1) {
@@ -461,6 +470,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative1) {
         "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative) {
@@ -478,6 +490,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             "'meta1', bucketMaxSpanSeconds: 3600}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
     // This rewrite does not apply because _id.m2 references a field. Moreover, the
     // original group spec remains unchanged even though we were able to rewrite _id.m1.
@@ -498,6 +513,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             "'meta1', bucketMaxSpanSeconds: 3600}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
     // When there is no metaField, any field path prevents rewriting the $group stage.
     {
@@ -514,6 +532,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
 
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
     // When there is no metaField, any field path prevents rewriting the $group stage, even if the
     // field path starts with $$CURRENT.
@@ -536,6 +557,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             fromjson("{$group: {_id: {g0: {$toUpper: [ '$x' ] }}, accmin: {$min: '$meta1.f1'}}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(wantGroupSpecObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
     // When there is no metaField, any field path prevents rewriting the $group stage, even if the
     // field path starts with $$ROOT.
@@ -557,6 +581,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             "bucketMaxSpanSeconds: 3600}}");
         ASSERT_BSONOBJ_EQ(optimizedUnpackSpec, serialized[0]);
         ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
 }
 
@@ -579,6 +606,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
             "'meta1', bucketMaxSpanSeconds: 3600}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(serializedGroup, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
     // The rewrite does not apply because bucketMaxSpanSeconds is too large.
     {
@@ -601,6 +631,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
             "{$min: '$a'}}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(serializedGroupObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
     // The rewrite does not apply because $dateTrunc is not on the timeField.
     {
@@ -623,6 +656,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
             "{$min: '$a'}}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(serializedGroupObj, serialized[1]);
+
+        // Remake the pipeline and optimize again to ensure no rewrites are expected.
+        makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
     }
 }
 
@@ -641,6 +677,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsNegative
         "'meta1', bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNegative) {
@@ -658,6 +697,29 @@ TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNegative) {
         "'meta1', bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNotMetaNegative) {
+    auto projectSpec = fromjson("{$project: {'_id' : 0, 'meta1': 1}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$x'}}");
+
+    auto serialized = makeAndOptimizePipeline(getExpCtx(),
+                                              {projectSpec, groupSpecObj},
+                                              3600 /* bucketMaxSpanSeconds */,
+                                              false /* fixedBuckets */);
+    ASSERT_EQ(2, serialized.size());
+
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['meta1'],  timeField: 't', metaField: "
+        "'meta1', bucketMaxSpanSeconds: 3600}}");
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, ProjectBeforeGroupAccessSubFieldPositive) {
@@ -675,6 +737,9 @@ TEST_F(InternalUnpackBucketGroupReorder, ProjectBeforeGroupAccessSubFieldPositiv
         "'meta1', bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, ExclusionProjectBeforeGroupPositive) {
@@ -695,6 +760,9 @@ TEST_F(InternalUnpackBucketGroupReorder, ExclusionProjectBeforeGroupPositive) {
     auto expectedGroupStage =
         fromjson("{$group: {_id: {m1: '$meta.m1'}, accmin: {$min: '$control.min.v'}}}");
     ASSERT_BSONOBJ_EQ(expectedGroupStage, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, ComputedMetaFieldNegative) {
@@ -715,6 +783,9 @@ TEST_F(InternalUnpackBucketGroupReorder, ComputedMetaFieldNegative) {
         "{$_internalUnpackBucket: { include: ['_id', 't'],  timeField: 't', metaField: 'meta1', "
         "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['t']}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+
+    // Remake the pipeline and optimize again to ensure no rewrites are expected.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 }  // namespace
