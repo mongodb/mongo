@@ -14,6 +14,9 @@ filters:
   - "query_settings.yml":
     approvers:
       - 10gen/query-execution-query-settings
+  - "query_shape_hash_stability.yml":
+    approvers:
+      - 10gen/query-execution-query-settings
   - "repeat_queries.yml":
     approvers:
       - 10gen/query-optimization-plan-cache

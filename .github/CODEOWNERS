@@ -78,6 +78,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/query_settings.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/overrides/**/query_shape_hash_stability.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/repeat_queries.yml @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/stepdown_primary_change_streams.yml @10gen/query-execution-change-streams @svc-auto-approve-bot
 
