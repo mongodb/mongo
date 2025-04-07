@@ -47,6 +47,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncation.h"
@@ -765,7 +766,11 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = KeyFormat::String;
-    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(nss);
+    bool isReplSet = getGlobalReplSettings().isReplSet();
+    bool shouldRecoverFromOplogAsStandalone =
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    wtTableConfig.logEnabled =
+        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     const StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
                                                     NamespaceStringUtil::serializeForCatalog(nss),
@@ -790,7 +795,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.keyFormat = KeyFormat::String;
     params.overwrite = false;
     params.inMemory = false;
-    params.isLogged = WiredTigerUtil::useTableLogging(nss);
+    params.isLogged =
+        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     params.isChangeCollection = false;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;

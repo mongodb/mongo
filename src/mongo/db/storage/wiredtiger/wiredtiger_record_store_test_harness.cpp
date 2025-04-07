@@ -41,6 +41,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -83,6 +84,8 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
             : std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(),
                                                                  repl::ReplSettings()));
     _engine->notifyStorageStartupRecoveryComplete();
+    _isReplSet = getGlobalReplSettings().isReplSet();
+    _shouldRecoverFromOplogAsStandalone = repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
@@ -97,7 +100,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = keyFormat;
-    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(nss);
+    wtTableConfig.logEnabled =
+        WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
     StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
                                                     NamespaceStringUtil::serializeForCatalog(nss),
@@ -120,7 +124,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     params.overwrite = collOptions.clusteredIndex ? false : true;
     params.inMemory = false;
-    params.isLogged = WiredTigerUtil::useTableLogging(nss);
+    params.isLogged =
+        WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
     params.isChangeCollection = nss.isChangeCollection();
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
@@ -156,7 +161,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = KeyFormat::Long;
-    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(oplogNss);
+    wtTableConfig.logEnabled =
+        WiredTigerUtil::useTableLogging(oplogNss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
     StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
         std::string{kWiredTigerEngineName},
         NamespaceStringUtil::serializeForCatalog(oplogNss),

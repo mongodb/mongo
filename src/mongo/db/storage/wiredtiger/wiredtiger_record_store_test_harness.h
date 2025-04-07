@@ -92,5 +92,7 @@ private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
     std::unique_ptr<WiredTigerKVEngine> _engine;
+    bool _isReplSet;
+    bool _shouldRecoverFromOplogAsStandalone;
 };
 }  // namespace mongo

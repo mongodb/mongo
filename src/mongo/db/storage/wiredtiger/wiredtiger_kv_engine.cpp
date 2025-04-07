@@ -1442,8 +1442,13 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = keyFormat;
-    wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(nss);
     wtTableConfig.extraCreateOptions = _rsOptions;
+    bool isReplSet = getGlobalReplSettings().isReplSet();
+    bool shouldRecoverFromOplogAsStandalone =
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    wtTableConfig.logEnabled =
+        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
+
     StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(_canonicalName,
                                                     NamespaceStringUtil::serializeForCatalog(nss),
@@ -1613,12 +1618,15 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             .inMemory = _wtConfig.inMemory,
             .isLogged =
                 [&] {
+                    bool isReplSet = getGlobalReplSettings().isReplSet();
+                    bool shouldRecoverFromOplogAsStandalone =
+                        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
                     if (!nss.isEmpty()) {
-                        return WiredTigerUtil::useTableLogging(nss);
+                        return WiredTigerUtil::useTableLogging(
+                            nss, isReplSet, shouldRecoverFromOplogAsStandalone);
                     }
                     fassert(8423353, ident.startsWith("internal-"));
-                    return !getGlobalReplSettings().isReplSet() &&
-                        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+                    return !isReplSet && !shouldRecoverFromOplogAsStandalone;
                 }(),
             .isChangeCollection = nss.isChangeCollection(),
             .sizeStorer = _sizeStorer.get(),
@@ -1662,13 +1670,16 @@ Status WiredTigerKVEngine::createSortedDataInterface(RecoveryUnit& ru,
                 .str();
     }
 
-    StatusWith<std::string> result =
-        WiredTigerIndex::generateCreateString(_canonicalName,
-                                              _indexOptions,
-                                              collIndexOptions,
-                                              NamespaceStringUtil::serializeForCatalog(nss),
-                                              indexConfig,
-                                              WiredTigerUtil::useTableLogging(nss));
+    bool isReplSet = getGlobalReplSettings().isReplSet();
+    bool shouldRecoverFromOplogAsStandalone =
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
+        _canonicalName,
+        _indexOptions,
+        collIndexOptions,
+        NamespaceStringUtil::serializeForCatalog(nss),
+        indexConfig,
+        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone));
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -1720,33 +1731,40 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
     const IndexConfig& config) {
     invariant(collOptions.uuid);
 
+    bool isReplSet = getGlobalReplSettings().isReplSet();
+    bool shouldRecoverFromOplogAsStandalone =
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+
     if (config.isIdIndex) {
         invariant(!collOptions.clusteredIndex);
-        return std::make_unique<WiredTigerIdIndex>(opCtx,
-                                                   _uri(ident),
-                                                   *collOptions.uuid,
-                                                   ident,
-                                                   config,
-                                                   WiredTigerUtil::useTableLogging(nss));
+        return std::make_unique<WiredTigerIdIndex>(
+            opCtx,
+            _uri(ident),
+            *collOptions.uuid,
+            ident,
+            config,
+            WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone));
     }
     auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
     if (config.unique) {
-        return std::make_unique<WiredTigerIndexUnique>(opCtx,
-                                                       _uri(ident),
-                                                       *collOptions.uuid,
-                                                       ident,
-                                                       keyFormat,
-                                                       config,
-                                                       WiredTigerUtil::useTableLogging(nss));
+        return std::make_unique<WiredTigerIndexUnique>(
+            opCtx,
+            _uri(ident),
+            *collOptions.uuid,
+            ident,
+            keyFormat,
+            config,
+            WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone));
     }
 
-    return std::make_unique<WiredTigerIndexStandard>(opCtx,
-                                                     _uri(ident),
-                                                     *collOptions.uuid,
-                                                     ident,
-                                                     keyFormat,
-                                                     config,
-                                                     WiredTigerUtil::useTableLogging(nss));
+    return std::make_unique<WiredTigerIndexStandard>(
+        opCtx,
+        _uri(ident),
+        *collOptions.uuid,
+        ident,
+        keyFormat,
+        config,
+        WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone));
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(OperationContext* opCtx,

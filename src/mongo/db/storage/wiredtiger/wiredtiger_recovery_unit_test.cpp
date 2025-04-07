@@ -113,7 +113,11 @@ public:
         WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
             getWiredTigerTableConfigFromStartupOptions();
         wtTableConfig.keyFormat = KeyFormat::Long;
-        wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(nss);
+        bool isReplSet = getGlobalReplSettings().isReplSet();
+        bool shouldRecoverFromOplogAsStandalone =
+            repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+        wtTableConfig.logEnabled =
+            WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
             std::string{kWiredTigerEngineName},
             NamespaceStringUtil::serializeForCatalog(nss),
@@ -138,7 +142,8 @@ public:
         params.keyFormat = KeyFormat::Long;
         params.overwrite = true;
         params.inMemory = false;
-        params.isLogged = WiredTigerUtil::useTableLogging(nss);
+        params.isLogged =
+            WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
         params.isChangeCollection = nss.isChangeCollection();
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;

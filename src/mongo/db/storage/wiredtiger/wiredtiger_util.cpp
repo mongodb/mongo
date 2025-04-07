@@ -35,7 +35,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/snapshot_window_options_gen.h"
@@ -821,7 +820,9 @@ void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
     }
 }
 
-bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
+bool WiredTigerUtil::useTableLogging(const NamespaceString& nss,
+                                     bool isReplSet,
+                                     bool shouldRecoverFromOplogAsStandalone) {
     if (storageGlobalParams.forceDisableTableLogging) {
         invariant(TestingProctor::instance().isEnabled());
         LOGV2(6825405, "Table logging disabled", logAttrs(nss));
@@ -831,8 +832,7 @@ bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
     // We only turn off logging in the case of:
     // 1) Replication is enabled (the typical deployment), or
     // 2) We're running as a standalone with recoverFromOplogAsStandalone=true
-    const bool journalWritesBecauseStandalone = !getGlobalReplSettings().isReplSet() &&
-        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    const bool journalWritesBecauseStandalone = !isReplSet && !shouldRecoverFromOplogAsStandalone;
     if (journalWritesBecauseStandalone) {
         return true;
     }

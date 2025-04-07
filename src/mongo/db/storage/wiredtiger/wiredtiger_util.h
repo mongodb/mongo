@@ -283,7 +283,9 @@ public:
                                      boost::optional<StringData> indexName,
                                      ValidateResultsIf& validationResult);
 
-    static bool useTableLogging(const NamespaceString& nss);
+    static bool useTableLogging(const NamespaceString& nss,
+                                bool isReplSet,
+                                bool shouldRecoverFromOplogAsStandalone);
 
     static Status setTableLogging(WiredTigerSession& session, const std::string& uri, bool on);
 
