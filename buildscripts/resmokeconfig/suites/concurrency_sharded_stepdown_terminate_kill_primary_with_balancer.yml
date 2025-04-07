@@ -62,9 +62,6 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
-    # TODO: SERVER-102111 Update write path in sharded cluster doesn't promote WCOS with WCE to top level.
-    - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/*.js
-
   exclude_with_any_tags:
     - requires_standalone
     - assumes_balancer_off

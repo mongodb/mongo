@@ -76,9 +76,6 @@ selector:
     - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_with_resharding.js
     - jstests/concurrency/fsm_workloads/crud/reshard_collection_crud_ops.js
 
-    # TODO: SERVER-102111 Update write path in sharded cluster doesn't promote WCOS with WCE to top level.
-    - jstests/concurrency/fsm_workloads/updateOne_without_shard_key/*.js
-
   exclude_with_any_tags:
     - requires_standalone
     - requires_non_retryable_writes
