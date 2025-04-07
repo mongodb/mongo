@@ -4,6 +4,7 @@
  *   temp_disabled_embedded_router_uncategorized,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
+ *   requires_fcv_80,
  * ]
  *
  * Tests that when a load-balanced client disconnects, its in-progress transactions are aborted
@@ -33,8 +34,10 @@ function setupShardedCollection(st, dbName, collName) {
 function startTxn(host, dbName, collName, countdownLatch, appName) {
     jsTestLog("Starting transaction on alternate thread.");
     const newMongo = new Mongo(`mongodb://${host}/?appName=${appName}`);
+    assert.commandWorked(newMongo.adminCommand(
+        {configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}));
     assert.commandWorked(
-        newMongo.adminCommand({configureFailPoint: "clientIsFromLoadBalancer", mode: "alwaysOn"}));
+        newMongo.adminCommand({configureFailPoint: "clientIsLoadBalancedPeer", mode: "alwaysOn"}));
     // We manually generate a logical session and send it to the server explicitly, to prevent
     // the shell from making its own logical session object which will attempt to explicitly
     // abort the transaction on disconnection. In this way, we simulate a "hard partition"
@@ -114,6 +117,8 @@ assert.soon(() => {
 });
 
 assert.commandWorked(
-    admin.adminCommand({configureFailPoint: "clientIsFromLoadBalancer", mode: "off"}));
+    admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}));
+assert.commandWorked(
+    admin.adminCommand({configureFailPoint: "clientIsLoadBalancedPeer", mode: "off"}));
 
 st.stop();

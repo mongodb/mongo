@@ -42,6 +42,13 @@ public:
 
     void appendStats(BSONObjBuilder* bob) const;
 
+    /**
+     * Increments and decrements the count of total Load Balanced connections.
+     * Currently only implemented in asio_session_manager.
+     */
+    void incrementLBConnections();
+    void decrementLBConnections();
+
 protected:
     std::string getClientThreadName(const Session&) const override;
     void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override;
