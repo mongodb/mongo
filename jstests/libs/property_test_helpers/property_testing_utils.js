@@ -49,13 +49,20 @@ function createColl(coll, isTS = false) {
  */
 const okIndexCreationErrorCodes = [
     // Index already exists.
-    85,
+    ErrorCodes.IndexOptionsConflict,
     // Overlapping fields and path collisions in wildcard projection.
     31249,
     31250,
     7246200,
     7246204,
     7246208,
+    // For partial index filters, we can sometimes go over the depth limit of the filter. It's
+    // difficult to control the exact depth of the filters generated without sacrificing lots of
+    // interesting cases, so instead we allow this error.
+    ErrorCodes.CannotCreateIndex,
+    // Error code when creating specific partial indexes on time-series, for example when the
+    // predicate is `{a: {$in: [null]}}`
+    5916301,
 ];
 
 /*

@@ -26,7 +26,7 @@ const mFieldModel = fc.record({m1: scalarArb, m2: scalarArb});
 const arrayFieldElementArb = oneof(scalarArb, fc.array(scalarArb, {maxLength: 2}), mFieldModel);
 const arrayFieldModel = fc.array(arrayFieldElementArb, {maxLength: 5});
 
-export const defaultDocModel = fc.record({
+const defaultDocModel = fc.record({
     _id: intArb,
     t: dateArb,
     m: mFieldModel,
@@ -36,4 +36,36 @@ export const defaultDocModel = fc.record({
 });
 // `defaultDocModel` and `timeseriesDocModel` may diverge later. By exporting two models, we make it
 // clear these models are separate so existing tests don't rely on behavior specific to `docModel`.
-export const timeseriesDocModel = defaultDocModel;
+const timeseriesDocModel = defaultDocModel;
+
+// Maximum number of documents that our collection model can generate.
+const kMaxNumDocs = 250;
+
+// An array of [0...249] to label our documents with.
+const docIds = [];
+for (let i = 0; i < kMaxNumDocs; i++) {
+    docIds.push(i);
+}
+const uniqueIdsArb = fc.shuffledSubarray(docIds, {minLength: kMaxNumDocs, maxLength: kMaxNumDocs});
+
+export function getDocsModel(isTS) {
+    const docModel = isTS ? timeseriesDocModel : defaultDocModel;
+    // The size=+2 argument tells fc.array to generate array sizes closer to the max than the min.
+    // This way the average number of documents produced is >100, which means our queries will be
+    // less likely to produce empty results. The size argument does not affect minimization. On
+    // failure, fast-check will still minimize down to 1 document if possible.
+    // These docs are 'unlabeled' because we have not assigned them unique _ids yet.
+    const unlabeledDocsModel =
+        fc.array(docModel, {minLength: 1, maxLength: kMaxNumDocs, size: '+2'});
+    // Now label the docs with unique _ids.
+    return fc.record({unlabeledDocs: unlabeledDocsModel, _ids: uniqueIdsArb})
+        .map(({unlabeledDocs, _ids}) => {
+            // We can run into issues with fast-check if we mutate generated values.
+            // We'll make new docs and add _id to it.
+            return unlabeledDocs.map((oldDoc, ix) => {
+                // Make sure our unique _id overwrites the original doc _id, by
+                // putting it last in the list.
+                return Object.assign({}, oldDoc, {_id: _ids[ix]});
+            });
+        });
+}

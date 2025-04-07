@@ -40,6 +40,7 @@ selector:
     # causing a > 1 hour runtime. Exclude the tests below to keep the suite runtime reasonable.
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
+    - jstests/core/query/partial_index_pbt.js
     - jstests/core/index/express_pbt.js
     - jstests/core/query/explain/is_cached_is_true_for_one_plan_pbt.js
 

@@ -23,9 +23,9 @@ function makeSimpleConditionArb(leafArb, allowedSimpleComparisons) {
     // Weigh arbitraries with less conditions higher. An arbitrary with one condition is the most
     // common, with two is less common, three is rare.
     // Three conditions is likely to always be false or have one condition be redundant, like
-    // `{$gt: 5, $lte 10, $gte: 6}`. But we include it for completeness.
-    return oneof({arbitrary: makeSimpleConditionHelper(1 /* numConditions */), weight: 5},
-                 {arbitrary: makeSimpleConditionHelper(2 /* numConditions */), weight: 3},
+    // `{$gt: 5, $lte: 10, $gte: 6}`. But we include it for completeness.
+    return oneof({arbitrary: makeSimpleConditionHelper(1 /* numConditions */), weight: 10},
+                 {arbitrary: makeSimpleConditionHelper(2 /* numConditions */), weight: 5},
                  {arbitrary: makeSimpleConditionHelper(3 /* numConditions */), weight: 1});
 }
 
@@ -149,4 +149,23 @@ export function getMatchArb(allowOrTypes = true) {
                              allowNin: allowOrTypes
                          }).predicate;
     return fc.record({$match: predicateArb});
+}
+
+// Partial filter expressions are allowed a limited depth, and the operators listed here:
+// https://www.mongodb.com/docs/manual/core/index-partial/#create-a-partial-index
+export function getPartialFilterPredicateArb({leafArb = leafParameterArb} = {}) {
+    return getMatchPredicateSpec({
+               leafArb,
+               maxDepth: 2,
+               // TODO SERVER-102825 reenable $or
+               allowOrs: false,
+               allowNors: false,
+               allowNot: false,
+               // $ne not allowed
+               allowedSimpleComparisons: simpleComparators.filter(c => c !== '$ne'),
+               allowIn: true,
+               allowNin: false,
+               allowedExistsArgs: [true]
+           })
+        .predicate;
 }

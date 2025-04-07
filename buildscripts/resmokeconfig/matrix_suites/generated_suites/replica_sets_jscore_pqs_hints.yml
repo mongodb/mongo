@@ -84,6 +84,7 @@ selector:
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
+    - jstests/core/query/partial_index_pbt.js
     - jstests/core/index/geo/geo6.js
     - jstests/core/index/index_check6.js
     - jstests/core/index/index_diag.js

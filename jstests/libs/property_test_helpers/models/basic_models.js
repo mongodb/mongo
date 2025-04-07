@@ -31,7 +31,10 @@ const nullByte =
 const charArb = oneof(fc.base64(), fc.unicode(), fc.ascii(), nullByte).filter(c => c !== '$');
 const stringArb = fc.stringOf(charArb, {maxLength: 3});
 
-const kMinDate = ISODate("0000-01-01T00:00:00Z");
+// ValidateCollections fails if a partial index with a filter involving Date(year=0) exists. This
+// year=0 behavior is accepted as a part of the PyMongo BSON library. To avoid false positives with
+// the ValidateCollections hook, we make the minimum date year=1
+const kMinDate = ISODate("0001-01-01T00:00:00Z");
 const kMaxDate = ISODate("9999-12-31T23:59:59.999Z");
 export const dateArb = oneof(
     fc.date({min: new Date(-1), max: new Date(1)}),      // tiny

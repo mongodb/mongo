@@ -2,7 +2,10 @@
  * Fast-check models for indexes.
  * See property_test_helpers/README.md for more detail on the design.
  */
-import {fieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {fieldArb, scalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    getPartialFilterPredicateArb
+} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -68,8 +71,28 @@ const simpleIndexDefArb = arrayOfSingleIndexDefsArb.map(arrayOfIndexDefs => {
     }
     return fullDef;
 });
-const simpleIndexOptionsArb = fc.constantFrom({}, {sparse: true});
-const simpleIndexModel = fc.record({def: simpleIndexDefArb, options: simpleIndexOptionsArb});
+
+const emptyOptionsArb = fc.constant({});
+
+// Generates an index option for partial filters. Since predicate models by default have a list of
+// parameters at their leaves, we specify we want a single scalar at the leaves.
+const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: scalarArb}).map(pred => {
+    return {partialFilterExpression: pred};
+});
+
+/*
+ * A b-tree index model.
+ */
+function getSimpleIndexModel({allowPartialIndexes, allowSparse}) {
+    const options = [emptyOptionsArb];
+    if (allowSparse) {
+        options.push(fc.constant({sparse: true}));
+    }
+    if (allowPartialIndexes) {
+        options.push(partialFilterOptionArb);
+    }
+    return fc.record({def: simpleIndexDefArb, options: oneof(...options)});
+}
 
 /*
  * Hashed indexes
@@ -86,11 +109,16 @@ const hashedIndexDefArb =
             // Can't create hashed index on array field.
             return !Object.keys(fullDef).includes('array');
         });
-const hashedIndexModel = fc.record({def: hashedIndexDefArb, options: fc.constant({})});
+
+function getHashedIndexModel(allowPartialIndexes) {
+    const optionsArb =
+        allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
+    return fc.record({def: hashedIndexDefArb, options: optionsArb});
+}
 
 // This models wildcard indexes where the wildcard field is at the top-level, like "$**" rather than
 // "a.$**". These definitions are allowed to specify a `wildcardProjection` in the index options.
-const wildcardOptionsArb = fc.record({
+const wildcardProjectionOptionsArb = fc.record({
     wildcardProjection: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}).map(fields => {
         const options = {};
         for (const field of fields) {
@@ -100,8 +128,10 @@ const wildcardOptionsArb = fc.record({
     })
 });
 
-// Generate a simple index definition, a position into that definition, and replace the key at the
-// position with '$**'.
+/*
+ * Generate a simple index definition, a position into that definition, and replace the key at the
+ * position with '$**'.
+ */
 const fullWildcardDefArb = fc.record({
                                  indexDef: simpleIndexDefArb,
                                  wcIx: fc.integer({min: 0, max: 4})
@@ -125,23 +155,6 @@ const dottedWildcardDefArb = fc.record({
     return replaceKeyValAtPosition(indexDef, wcIx, {newKey: wcFieldName});
 });
 
-// A wildcard index can be at the top-level (fullWildcardDef) or on a field (dottedWildcardDef).
-const wildcardIndexModel =
-    oneof(fc.record({def: fullWildcardDefArb, options: wildcardOptionsArb}),
-          fc.record({def: dottedWildcardDefArb, options: fc.constant({}, wildcardOptionsArb)}))
-        .filter(({def, options}) => {
-            // Wildcard indexes are not allowed to be multikey.
-            return !Object.keys(def).includes('array');
-        });
-
-// Map to an object with the definition and options, so it's more clear what each object is.
-export const defaultIndexModel = oneof(
-    simpleIndexModel,
-    wildcardIndexModel,
-    // TODO SERVER-99889 reenable testing for hashed indexes.
-    // hashedIndexModel
-);
-
 function isMultikey(indexDef) {
     for (const field of Object.keys(indexDef)) {
         if (field === 'array') {
@@ -150,11 +163,62 @@ function isMultikey(indexDef) {
     }
     return false;
 }
-// Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
-export const timeseriesIndexModel = simpleIndexModel.filter(({def, options}) => {
-    // Filter out any indexes that won't work for time-series.
-    if (options.sparse || isMultikey(def)) {
-        return false;
+
+/*
+ * A wildcard index can be at the top-level (fullWildcardDef) or on a field (dottedWildcardDef).
+ */
+function getWildCardIndexModel(allowPartialIndexes) {
+    // Full wildcard options contain a wildcard projection, and possibly a partial filter if partial
+    // indexes are allowed.
+    let fullWcOptionsArb;
+    if (allowPartialIndexes) {
+        fullWcOptionsArb = fc.record({
+                                 wcOptions: wildcardProjectionOptionsArb,
+                                 partialFilterOptions: fc.option(partialFilterOptionArb, {nil: {}})
+                             }).map(({wcOptions, partialFilterOptions}) => {
+            return Object.assign({}, wcOptions, partialFilterOptions);
+        });
+    } else {
+        fullWcOptionsArb = wildcardProjectionOptionsArb;
     }
-    return true;
-});
+    const fullWcModel = fc.record({def: fullWildcardDefArb, options: fullWcOptionsArb});
+
+    // Dotted wildcard indexes don't allow wildcard projection options, but can be partial if that's
+    // allowed.
+    const dottedWcOptionsArb =
+        allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
+    const dottedWcModel = fc.record({def: dottedWildcardDefArb, options: dottedWcOptionsArb});
+
+    return oneof(fullWcModel, dottedWcModel).filter(({def, options}) => {
+        // Wildcard indexes are not allowed to be multikey.
+        return !isMultikey(def);
+    });
+}
+
+/*
+ * `getIndexModel` and `getTimeSeriesIndexModel` return index models for their respective collection
+ * types. Takes arguments to allow or disallow partial indexes and sparse indexes.
+ *
+ * Partial indexes are disabled by default because they tend to lead to indexes not being used. It's
+ * unlikely for a query to begin with a $match that is a subset of a partial index filter just by
+ * coincidence. With partial indexes being generated, we're more likely to not find an index to use
+ * and fall back to a collscan which is a less interesting case to test.
+ *
+ * Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
+ */
+export function getIndexModel({allowPartialIndexes = false, allowSparse = true} = {}) {
+    return oneof(
+        getSimpleIndexModel({allowPartialIndexes, allowSparse}),
+        getWildCardIndexModel(allowPartialIndexes),
+        // TODO SERVER-99889 reenable testing for hashed indexes.
+        // getHashedIndexModel(allowPartialIndexes)
+    );
+}
+export function getTimeSeriesIndexModel({allowPartialIndexes = false} = {}) {
+    // TODO SERVER-102738 support more time-series index types.
+    const simpleIndexModel = getSimpleIndexModel({allowPartialIndexes, allowSparse: false});
+    return simpleIndexModel.filter(({def, options}) => {
+        // Filter out multikey indexes.
+        return !isMultikey(def);
+    });
+}
