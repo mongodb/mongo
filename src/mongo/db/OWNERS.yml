@@ -249,7 +249,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "traffic*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-optimization
   - "vector_clock*":
     approvers:
       - 10gen/server-catalog-and-routing

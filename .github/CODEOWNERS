@@ -1430,7 +1430,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/list*idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/shard_id* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/shard_role* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/**/traffic* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/**/traffic* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/vector_clock* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/version_context* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/server_lifecycle_monitor* @10gen/server-programmability @svc-auto-approve-bot
