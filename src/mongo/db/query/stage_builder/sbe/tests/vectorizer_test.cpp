@@ -4335,6 +4335,166 @@ TEST(VectorizerTest, ConvertMult) {
         ASSERT_TRUE(processed.expr.has_value());
         assertArithmeticOperationScalarScalar(opStr, processed);
     }
+
+    {
+        auto treeBlocks = make<NaryOp>(
+            op, ABTVector{make<Variable>("var1"), make<Variable>("var2"), make<Variable>("var3")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var1"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var3"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlocks, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockBlockBlock(fnStr, processed);
+    }
+
+    {
+        auto treeBlockScalarScalar = make<NaryOp>(
+            op, ABTVector{make<Variable>("var"), Constant::int32(9), Constant::int32(20)});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlockScalarScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockScalarScalar(fnStr, opStr, processed);
+    }
+
+    {
+        auto treeScalarBlockScalar = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), make<Variable>("var"), Constant::int32(20)});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarBlockScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarBlockScalar(fnStr, processed);
+    }
+
+    {
+        auto treeScalarScalarBlock = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), Constant::int32(20), make<Variable>("var")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarScalarBlock, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarScalarBlock(fnStr, processed);
+    }
+
+    {
+        auto treeScalarScalarScalar = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), Constant::int32(20), Constant::int32(100)});
+
+        Vectorizer::VariableTypes bindings;
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarScalarScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarScalarScalar(opStr, processed);
+    }
+
+    {
+        auto treeBlockBlockScalar = make<NaryOp>(
+            op, ABTVector{make<Variable>("var1"), make<Variable>("var2"), Constant::int32(9)});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlockBlockScalar, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockBlockScalar(fnStr, processed);
+    }
+
+    {
+        auto treeScalarBlockBlock = make<NaryOp>(
+            op, ABTVector{Constant::int32(9), make<Variable>("var1"), make<Variable>("var2")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeScalarBlockBlock, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationScalarBlockBlock(fnStr, processed);
+    }
+
+    {
+        auto treeBlockScalarBlock = make<NaryOp>(
+            op, ABTVector{make<Variable>("var1"), Constant::int32(9), make<Variable>("var2")});
+
+        Vectorizer::VariableTypes bindings;
+        bindings.emplace(
+            "var"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        bindings.emplace(
+            "var2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            treeBlockScalarBlock, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        assertArithmeticOperationBlockScalarBlock(fnStr, processed);
+    }
 }
 
 TEST(VectorizerTest, ConvertDiv) {

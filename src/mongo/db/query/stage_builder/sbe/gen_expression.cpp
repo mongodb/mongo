@@ -2361,7 +2361,8 @@ public:
         auto arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
-        if (arity < kArgumentCountForBinaryTree) {
+        if (arity < kArgumentCountForBinaryTree ||
+            feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
             visitFast(expr);
             return;
         }
@@ -2446,11 +2447,7 @@ public:
             makeBooleanOpTree(optimizer::Operations::Or, std::move(checkExprsNull));
         auto checkNumberAllArguments =
             makeBooleanOpTree(optimizer::Operations::And, std::move(checkExprsNumber));
-        auto multiplication = std::accumulate(
-            names.begin() + 1, names.end(), makeVariable(names.front()), [](auto&& acc, auto&& ex) {
-                return optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Mult, std::move(acc), makeVariable(ex));
-            });
+        auto multiplication = makeNaryOp(optimizer::Operations::Mult, std::move(variables));
 
         auto multiplyExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},

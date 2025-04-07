@@ -337,9 +337,11 @@ public:
 
         // Math operations.
         add,
+        mul,
     };
 
     EPrimNary(Op op, std::vector<std::unique_ptr<EExpression>> args) : _op(op) {
+        tassert(10217100, "Expected at least two operands", args.size() >= 2);
         _nodes.reserve(args.size());
         for (auto&& arg : args) {
             _nodes.emplace_back(std::move(arg));
@@ -376,7 +378,7 @@ public:
         // Math operations.
         add,  // TODO: remove with SERVER-100579
         sub,
-        mul,
+        mul,  // TODO: remove with SERVER-100579
         div,
 
         // Comparison operations. These operations support taking a third "collator" arg.

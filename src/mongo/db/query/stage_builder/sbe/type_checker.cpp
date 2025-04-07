@@ -397,6 +397,15 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         }
         return TypeSignature::kNumericType.include(sig.intersect(TypeSignature::kDateTimeType))
             .include(sig.intersect(TypeSignature::kNothingType));
+    } else if (op.op() == optimizer::Operations::Mult) {
+        // The signature of the Mult is numeric plus Nothing.
+
+        TypeSignature sig = {};
+        for (auto& node : op.nodes()) {
+            TypeSignature nodeType = node.visit(*this, false);
+            sig = sig.include(nodeType);
+        }
+        return TypeSignature::kNumericType.include(sig.intersect(TypeSignature::kNothingType));
     }
     return TypeSignature::kAnyScalarType;
 }

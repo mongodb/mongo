@@ -294,6 +294,9 @@ vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
             case EPrimNary::add:
                 code.appendAdd(lhsParam, rhsParam);
                 break;
+            case EPrimNary::mul:
+                code.appendMul(lhsParam, rhsParam);
+                break;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -324,6 +327,9 @@ std::vector<DebugPrinter::Block> EPrimNary::debugPrint() const {
                     break;
                 case EPrimNary::add:
                     ret.emplace_back("+");
+                    break;
+                case EPrimNary::mul:
+                    ret.emplace_back("*");
                     break;
                 default:
                     MONGO_UNREACHABLE;

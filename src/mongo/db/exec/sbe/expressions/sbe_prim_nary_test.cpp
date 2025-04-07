@@ -279,4 +279,56 @@ TEST_F(SBEPrimNaryTest, NaryAdd) {
     }
 }
 
+TEST_F(SBEPrimNaryTest, NaryMult) {
+    auto& os = gctx->outStream();
+
+    std::vector<std::unique_ptr<value::ViewOfValueAccessor>> accessors;
+    value::SlotVector slotIds;
+
+    int depth = 3;
+    int numSlots = 1 << depth;
+    for (int i = 0; i < numSlots; i++) {
+        accessors.emplace_back(std::make_unique<value::ViewOfValueAccessor>());
+        accessors.back()->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(i + 1));
+        slotIds.push_back(bindAccessor(accessors.back().get()));
+    }
+
+    auto expr = makeNaryExpr(EPrimNary::Op::mul, slotIds);
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    {
+        auto [tag, val] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, val);
+
+        TypedValue expected = makeInt64(40320);
+        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+    }
+
+    for (int idx = 0; idx < numSlots; ++idx) {
+        accessors[idx]->reset(value::TypeTags::Nothing, 0);
+
+        auto [tag, val] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, val);
+
+        TypedValue expected = makeNothing();
+        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        accessors[idx]->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(idx + 1));
+    }
+
+    for (int idx = 0; idx < numSlots; ++idx) {
+        accessors[idx]->reset(value::TypeTags::NumberDouble,
+                              value::bitcastFrom<double>(static_cast<double>(idx + 1)));
+
+        auto [tag, val] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, val);
+
+        TypedValue expected = makeDouble(40320.0);
+        ASSERT_THAT(std::make_pair(tag, val), ValueEq(expected));
+        accessors[idx]->reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(idx + 1));
+    }
+}
+
 }  // namespace mongo::sbe

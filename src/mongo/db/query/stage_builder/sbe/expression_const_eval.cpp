@@ -463,29 +463,44 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
             }
             break;
         }
-        case optimizer::Operations::Add: {
+        case optimizer::Operations::Add:
+        case optimizer::Operations::Mult: {
             auto it = args.begin();
-            if (!it->cast<optimizer::Constant>()) {
-                return;
-            }
-            it++;
-            for (; it < args.end(); it++) {
-                optimizer::ABT& rhs = *it;
-                auto rhsConst = rhs.cast<optimizer::Constant>();
-                if (!rhsConst) {
-                    break;
+            if (it->cast<optimizer::Constant>()) {
+                it++;
+                for (; it < args.end(); it++) {
+                    optimizer::ABT& rhs = *it;
+                    auto rhsConst = rhs.cast<optimizer::Constant>();
+                    if (!rhsConst) {
+                        break;
+                    }
+                    optimizer::ABT& lhs = *(it - 1);
+                    auto lhsConst = lhs.cast<optimizer::Constant>();
+
+                    auto [lhsTag, lhsValue] = lhsConst->get();
+                    auto [rhsTag, rhsValue] = rhsConst->get();
+
+                    auto performOp = [&](sbe::value::TypeTags lhsTag,
+                                         sbe::value::Value lhsValue,
+                                         sbe::value::TypeTags rhsTag,
+                                         sbe::value::Value rhsValue) {
+                        switch (op.op()) {
+                            case optimizer::Operations::Add:
+                                return sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
+                            case optimizer::Operations::Mult:
+                                return sbe::value::genericMul(lhsTag, lhsValue, rhsTag, rhsValue);
+                            default:
+                                MONGO_UNREACHABLE;
+                        }
+                    };
+
+                    auto [_, resultType, resultValue] =
+                        performOp(lhsTag, lhsValue, rhsTag, rhsValue);
+                    swapAndUpdate(rhs,
+                                  optimizer::make<optimizer::Constant>(resultType, resultValue));
                 }
-                optimizer::ABT& lhs = *(it - 1);
-                auto lhsConst = lhs.cast<optimizer::Constant>();
-
-                auto [lhsTag, lhsValue] = lhsConst->get();
-                auto [rhsTag, rhsValue] = rhsConst->get();
-
-                auto [_, resultType, resultValue] =
-                    sbe::value::genericAdd(lhsTag, lhsValue, rhsTag, rhsValue);
-                swapAndUpdate(rhs, optimizer::make<optimizer::Constant>(resultType, resultValue));
+                args.erase(args.begin(), it - 1);
             }
-            args.erase(args.begin(), it - 1);
             invariant(args.size() > 0);
             if (args.size() == 1) {
                 swapAndUpdate(n, std::exchange(args[0], optimizer::make<optimizer::Blackhole>()));

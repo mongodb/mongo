@@ -521,6 +521,7 @@ Vectorizer::Tree Vectorizer::vectorizeNaryHelper(const optimizer::NaryOp& op, si
         case optimizer::Operations::Or:
             return vectorizeLogicalOp(op.op(), lhsNode, rhsNode);
         case optimizer::Operations::Add:
+        case optimizer::Operations::Mult:
             return vectorizeArithmeticOp(op.op(), lhsNode, rhsNode);
         default:
             MONGO_UNREACHABLE;
@@ -531,7 +532,8 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
     switch (op.op()) {
         case optimizer::Operations::And:
         case optimizer::Operations::Or:
-        case optimizer::Operations::Add: {
+        case optimizer::Operations::Add:
+        case optimizer::Operations::Mult: {
             return vectorizeNaryHelper(op, 0);
         }
         default:

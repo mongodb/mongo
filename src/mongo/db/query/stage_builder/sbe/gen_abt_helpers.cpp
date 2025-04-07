@@ -118,9 +118,6 @@ optimizer::ABT makeBinaryOp(optimizer::Operations binaryOp,
 optimizer::ABT makeNaryOp(optimizer::Operations op, optimizer::ABTVector args) {
     tassert(10199700, "Expected at least one argument", !args.empty());
     if (feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
-        if (args.size() == 1) {
-            return std::move(args[0]);
-        }
         return optimizer::make<optimizer::NaryOp>(op, std::move(args));
     } else {
         return std::accumulate(
