@@ -16,10 +16,10 @@ export const $config = (function() {
     const shardedCollName = i => `sharded_${i}`;
     const unshardedCollName = i => `unsharded_${i}`;
     // The config transition suites involve moving unsharded collections in and out of the config
-    // server. Having up to 50 unsharded collections to move may make this test take too long to run
+    // server. Having up to 48 unsharded collections to move may make this test take too long to run
     // and get killed by resmoke.
-    const collCount = TestData.shardsAddedRemoved ? 8 : 50;
-    const threadCount = 10;
+    const collCount = TestData.shardsAddedRemoved ? 8 : 48;
+    const threadCount = 8;
     const collPerThread = collCount / threadCount;
     const timeField = 'time';
     const metaField = 'meta';
