@@ -115,30 +115,6 @@ StringMap<double> extractAndValidateWeights(
     return weights;
 }
 
-// TODO (SERVER-100209): Save $rankFusion/$scoreFusion output score to { $meta: "score" }. After
-// doing so, this method (findScorePath) can be eliminated.
-/**
- * Returns the appropriate scorePath to use as the input score for any given scored selection
- * pipeline.
- */
-BSONObj findScorePath(const Pipeline& pipeline) {
-    auto sources = pipeline.getSources();
-    auto firstStageName = sources.front()->getSourceName();
-    BSONObj scorePath;
-    if (firstStageName == DocumentSourceVectorSearch::kStageName ||
-        firstStageName == DocumentSourceSearch::kStageName ||
-        std::any_of(sources.begin(), sources.end(), hybrid_scoring_util::isScoreStage)) {
-        // The "score" metadata field works as an alias for all 3 metadata score fields:
-        // searchScore, vectorSearchScore, score.
-        scorePath = BSON("$meta" << "score");
-    } else {
-        // Scores are saved as "score" on documents outputted by $rankFusion and $scoreFusion
-        // stages.
-        scorePath = BSONObj("$score");
-    }
-    return scorePath;
-}
-
 /**
  * Builds and returns an $addFields stage, like the following:
  * {$addFields:
@@ -487,10 +463,10 @@ parseAndValidateScoredSelectionPipelines(const BSONElement& elem,
                     << "$scoreFusion pipeline names must be unique, but found duplicate name '"
                     << inputName << "'.",
                 !inputPipelines.contains(inputName));
-        BSONObj scorePath = findScorePath(*pipeline);
+        BSONObj scorePath = BSON("$meta" << "score");
 
         // Input pipeline has been validated; save it in the resulting maps.
-        scorePaths[inputName] = findScorePath(*pipeline);
+        scorePaths[inputName] = BSON("$meta" << "score");
         inputPipelines[inputName] = std::move(pipeline);
     }
     return {std::move(inputPipelines), std::move(scorePaths)};
