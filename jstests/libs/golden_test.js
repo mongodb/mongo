@@ -1,17 +1,25 @@
 export function tojsonOnelineSortKeys(x) {
-    let indent = " ";
-    let nolint = true;
-    let depth = undefined;
-    let sortKeys = true;
-    return tojson(x, indent, nolint, depth, sortKeys);
+    return tojson(x, " " /*indent*/, true /*nolint*/, undefined /*depth*/, true /*sortKeys*/);
 }
 
-// Takes an array of documents.
-// - Discards the field ordering, by recursively sorting the fields of each object.
-// - Discards the result-set ordering by sorting the array of normalized documents.
+export function tojsonMultiLineSortKeys(x) {
+    return tojson(
+        x, undefined /*indent*/, false /*nolint*/, undefined /*depth*/, true /*sortKeys*/);
+}
+
+// Takes an array of documents ('result').
+// If `shouldSort` is true:
+//    - Discards the field ordering, by recursively sorting the fields of each object.
+//    - Discards the result-set ordering by sorting the array of normalized documents.
 // Returns a string.
-export function normalize(result) {
-    return result.map(d => tojsonOnelineSortKeys(d)).sort().join('\n') + '\n';
+export function normalizeArray(result, shouldSort = true) {
+    if (!Array.isArray(result)) {
+        throw Error("The result is not an array: " + tojson(result));
+    }
+
+    const normalizedResults = shouldSort ? result.map(d => tojsonOnelineSortKeys(d)).sort()
+                                         : result.map(d => tojsononeline(d));
+    return normalizedResults.join('\n') + '\n';
 }
 
 // Takes an array or cursor, and prints a normalized version of it.
@@ -31,13 +39,5 @@ export function show(cursorOrArray) {
         }
     }
 
-    print(normalize(cursorOrArray));
-}
-
-// Run any set-up necessary for a golden jstest.
-// This function should be called from the suite definition, so that individual tests don't need
-// to remember to call it. This function should not be called from any libs/*.js file, because
-// it's surprising if load() has side effects (besides defining JS functions / values).
-export function beginGoldenTest() {
-    _openGoldenData(jsTestName());
+    print(normalizeArray(cursorOrArray));
 }
