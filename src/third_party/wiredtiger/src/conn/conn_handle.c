@@ -33,7 +33,7 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     TAILQ_INIT(&conn->pfqh);                  /* Pre-fetch reference list */
 
     /* Random numbers. */
-    __wt_random_init(&session->rnd);
+    __wt_session_rng_init_once(session);
 
     /* Configuration. */
     WT_RET(__wt_conn_config_init(session));

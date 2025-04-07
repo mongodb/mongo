@@ -152,7 +152,7 @@ thread_insert_race(void *arg)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
 
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     /* Wait until all the threads are ready to go. */
     (void)__wt_atomic_add64(&ready_counter, 1);

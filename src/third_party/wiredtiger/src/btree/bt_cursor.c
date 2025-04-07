@@ -706,7 +706,7 @@ __cursor_reposition_timing_stress(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     if (FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_EVICT_REPOSITION) &&
-      __wt_random(&session->rnd) % 10 == 0)
+      __wt_random(&session->rnd_random) % 10 == 0)
         return (true);
 
     return (false);

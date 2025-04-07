@@ -98,7 +98,7 @@ thread_ckpt_run(void *arg)
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool first_ckpt;
 
-    __wt_random_init(&rnd);
+    __wt_random_init_default(&rnd);
 
     conn = (WT_CONNECTION *)arg;
     /* Keep a separate file with the records we wrote for checking. */
@@ -306,7 +306,7 @@ main(int argc, char *argv[])
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
     testutil_recreate_dir(home);
 
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
     if (rand_time) {
         timeout = __wt_random(&rnd) % MAX_TIME;
         if (timeout < MIN_TIME)

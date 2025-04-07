@@ -261,7 +261,7 @@ workload_compact(const char *home, const char *table_config)
     testutil_check(wiredtiger_open(home, &event_handler, conn_config, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     /* Create and populate table. Checkpoint the data after that. */
     testutil_check(session->create(session, uri1, table_config));
@@ -346,7 +346,7 @@ populate(WT_SESSION *session, uint64_t start, uint64_t end)
 
     uint64_t i, str_len, val;
 
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     str_len = sizeof(data_str) / sizeof(data_str[0]);
     for (i = 0; i < str_len - 1; i++)

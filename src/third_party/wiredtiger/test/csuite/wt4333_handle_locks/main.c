@@ -172,7 +172,7 @@ wthread(void *arg)
     memset(cursor_list, 0, sizeof(cursor_list));
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     for (next = 0; !done;) {
         if (++next == WT_ELEMENTS(cursor_list))
@@ -201,7 +201,7 @@ vthread(void *arg)
     memset(cursor_list, 0, sizeof(cursor_list));
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     for (next = 0; !done;) {
         if (++next == WT_ELEMENTS(cursor_list))
@@ -357,7 +357,7 @@ run(int argc, char *argv[])
     bool default_home, preserve;
 
     (void)testutil_set_progname(argv);
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
 
     default_home = true;
     preserve = false;

@@ -336,7 +336,7 @@ main(int argc, char *argv[])
     (void)testutil_set_progname(argv);
     custom_die = trace_die;
 
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
     modify_repl_init();
 
     no_checkpoint = no_eviction = preserve = false;

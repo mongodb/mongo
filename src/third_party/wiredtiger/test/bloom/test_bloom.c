@@ -234,7 +234,7 @@ populate_entries(void)
     uint32_t i, j;
     uint8_t **entries;
 
-    __wt_random_init_seed(NULL, &g.rand);
+    __wt_random_init_default(&g.rand);
 
     entries = dcalloc(g.c_ops, sizeof(uint8_t *));
 

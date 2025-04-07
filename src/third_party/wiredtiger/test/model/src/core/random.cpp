@@ -37,7 +37,7 @@ namespace model {
  */
 random::random(uint64_t seed) noexcept
 {
-    __wt_random_init_custom_seed(&_random_state, seed);
+    __wt_random_init_seed(&_random_state, seed);
 }
 
 /*

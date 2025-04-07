@@ -136,7 +136,7 @@ thread_run(void *arg)
     char large[128 * 1024];
     bool columnar_table;
 
-    __wt_random_init(&rnd);
+    __wt_random_init_default(&rnd);
     for (i = 0; i < MAX_RECORD_FILES; i++)
         memset(fname[i], 0, sizeof(fname[i]));
     memset(buf, 0, sizeof(buf));
@@ -734,7 +734,7 @@ main(int argc, char *argv[])
             testutil_lazyfs_setup(&lazyfs, home);
 
         /* Set up the rest of the test. */
-        __wt_random_init_seed(NULL, &rnd);
+        __wt_random_init_default(&rnd);
         if (rand_time) {
             timeout = __wt_random(&rnd) % MAX_TIME;
             if (timeout < MIN_TIME)

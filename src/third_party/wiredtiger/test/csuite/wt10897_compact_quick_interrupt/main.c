@@ -106,7 +106,7 @@ populate(WT_SESSION *session, uint64_t start, uint64_t end)
 
     uint64_t i, str_len, val;
 
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     str_len = sizeof(data_str) / sizeof(data_str[0]);
     for (i = 0; i < str_len - 1; i++)

@@ -22,7 +22,7 @@
 TEST_CASE("Block session: __block_ext_alloc", "[block_session_ext]")
 {
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
-    __wt_random_init(&session->get_wt_session_impl()->rnd);
+    __wt_random_init_default(&session->get_wt_session_impl()->rnd_random);
 
     WT_EXT *ext = nullptr;
     REQUIRE(__ut_block_ext_alloc(session->get_wt_session_impl(), &ext) == 0);

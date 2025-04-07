@@ -360,7 +360,7 @@ get_dir_num_files(const std::string &dir)
  * This function generates a random table name which is alphanumeric and 5 chars long.
  */
 static void
-gen_random_table_name(char *name, workgen_random_state volatile *rand_state)
+gen_random_table_name(char *name, workgen_random_state *rand_state)
 {
     ASSERT(name != NULL);
 

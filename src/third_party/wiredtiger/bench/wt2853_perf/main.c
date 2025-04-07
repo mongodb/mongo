@@ -232,7 +232,7 @@ thread_insert(void *arg)
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
     __wt_seconds((WT_SESSION_IMPL *)session, &prevtime);
 
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &maincur));

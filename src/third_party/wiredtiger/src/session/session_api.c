@@ -2421,8 +2421,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * problem because sessions are long-lived and will diverge into different parts of the value
      * space, and what we care about are small values, that is, the low-order bits.
      */
-    if (WT_SESSION_FIRST_USE(session_ret))
-        __wt_random_init(&session_ret->rnd);
+    __wt_session_rng_init_once(session_ret);
 
     __wt_event_handler_set(
       session_ret, event_handler == NULL ? session->event_handler : event_handler);

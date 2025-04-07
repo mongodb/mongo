@@ -170,7 +170,7 @@ modify_run(TEST_OPTS *opts)
     verbose = opts->verbose;
 
     /* Initialize the RNG. */
-    __wt_random_init_seed(session, &rnd);
+    __wt_random_init(session, &rnd);
 
     /* Set up replacement information. */
     modify_repl_init();

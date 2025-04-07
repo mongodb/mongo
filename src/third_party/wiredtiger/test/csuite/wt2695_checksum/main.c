@@ -91,7 +91,7 @@ main(int argc, char *argv[])
       "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
 
     /* Initialize the RNG. */
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
 
     /* Allocate aligned memory for the data. */
     data = dcalloc(DATASIZE, sizeof(uint8_t));

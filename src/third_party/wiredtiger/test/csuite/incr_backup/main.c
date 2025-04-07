@@ -748,7 +748,7 @@ main(int argc, char *argv[])
         rnd.v = 123456789;
         run_test(working_dir, &rnd, preserve);
 
-        __wt_random_init_seed(NULL, &rnd);
+        __wt_random_init_default(&rnd);
         run_test(working_dir, &rnd, preserve);
     } else {
         rnd.v = seed_param;

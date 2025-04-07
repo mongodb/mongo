@@ -324,7 +324,7 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
     char tscfg[64];
 
     retry_attempts = 0;
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
 
     testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%d", commit_ts);
@@ -366,7 +366,7 @@ populate(WT_SESSION *session, const char *uri)
 
     printf("Populating table...\n");
 
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+    __wt_random_init((WT_SESSION_IMPL *)session, &rnd);
 
     str_len = sizeof(data_str) / sizeof(data_str[0]);
     for (i = 0; i < str_len - 1; i++)

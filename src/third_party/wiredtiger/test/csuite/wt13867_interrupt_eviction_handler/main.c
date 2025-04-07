@@ -125,7 +125,7 @@ populate(WT_SESSION *session, uint64_t count)
     WT_RAND_STATE rnd;
 
     /* Use a static seed for better reproducible results. */
-    __wt_random_init_custom_seed(&rnd, 0);
+    __wt_random_init_seed(&rnd, 0);
 
     uint64_t str_len = sizeof(data_str) / sizeof(data_str[0]);
     for (uint64_t i = 0; i < str_len - 1; i++)

@@ -172,7 +172,7 @@ do_config_run(TEST_OPTS *opts, u_int variant, bool check, uint64_t *nsec)
     init_data = impls[variant].init_data;
 
     /* Initialize the RNG. */
-    __wt_random_init(&rnd);
+    __wt_random_init_default(&rnd);
 
     __wt_epoch(NULL, &before);
     for (i = 0; i < N_CALLS; ++i) {

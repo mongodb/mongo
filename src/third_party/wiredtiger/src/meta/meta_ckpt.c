@@ -1220,7 +1220,7 @@ __ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
          * versions of WiredTiger
          */
         if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_BACKUP_RENAME) &&
-          !F_ISSET(blk, WT_CKPT_BLOCK_MODS_RENAME) && __wt_random(&session->rnd) % 10 == 0)
+          !F_ISSET(blk, WT_CKPT_BLOCK_MODS_RENAME) && __wt_random(&session->rnd_random) % 10 == 0)
             skip_rename = true;
 
         WT_RET(__wt_raw_to_hex(session, blk->bitstring.data, blk->bitstring.size, &bitstring));

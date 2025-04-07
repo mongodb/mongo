@@ -50,7 +50,7 @@ test_random(bool verbose)
     i = 0;
     count = 0;
 
-    __wt_random_init(&rnd);
+    __wt_random_init_default(&rnd);
 
     if (verbose)
         printf("%2s  %11s  %10s\n", "#", "count", "random");

@@ -1530,7 +1530,7 @@ __evict_walk_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p
      * from the list in that case.
      */
     if (conn->dhandle_count < conn->dh_hash_size / 4) {
-        rnd_dh = __wt_random(&session->rnd) % conn->dhandle_count;
+        rnd_dh = __wt_random(&session->rnd_random) % conn->dhandle_count;
         dhandle = TAILQ_FIRST(&conn->dhqh);
         for (; rnd_dh > 0; rnd_dh--)
             dhandle = TAILQ_NEXT(dhandle, q);
@@ -1542,14 +1542,14 @@ __evict_walk_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p
      * Keep picking up a random bucket until we find one that is not empty.
      */
     do {
-        rnd_bucket = __wt_random(&session->rnd) & (conn->dh_hash_size - 1);
+        rnd_bucket = __wt_random(&session->rnd_random) & (conn->dh_hash_size - 1);
     } while ((dh_bucket_count = conn->dh_bucket_count[rnd_bucket]) == 0);
 
     /* We can't pick up an empty bucket with a non zero bucket count. */
     WT_ASSERT(session, !TAILQ_EMPTY(&conn->dhhash[rnd_bucket]));
 
     /* Pick a random dhandle in the chosen bucket. */
-    rnd_dh = __wt_random(&session->rnd) % dh_bucket_count;
+    rnd_dh = __wt_random(&session->rnd_random) % dh_bucket_count;
     dhandle = TAILQ_FIRST(&conn->dhhash[rnd_bucket]);
     for (; rnd_dh > 0; rnd_dh--)
         dhandle = TAILQ_NEXT(dhandle, hashq);
@@ -2181,7 +2181,7 @@ rand_next:
                 /* Ensure internal pages indexes remain valid */
                 WT_WITH_PAGE_INDEX(session,
                   ret = __wt_random_descent(
-                    session, &btree->evict_ref, WT_READ_EVICT_READ_FLAGS, &session->rnd));
+                    session, &btree->evict_ref, WT_READ_EVICT_READ_FLAGS, &session->rnd_random));
                 if (ret != WT_RESTART)
                     break;
                 WT_STAT_CONN_INCR(session, eviction_walk_restart);

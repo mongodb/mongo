@@ -2886,7 +2886,7 @@ start_threads(WTPERF *wtperf, WORKLOAD *workp, WTPERF_THREAD *base, u_int num,
         /*
          * We don't want the threads executing in lock-step, seed each one differently.
          */
-        __wt_random_init_seed(NULL, &thread->rnd);
+        __wt_random_init(NULL, &thread->rnd);
 
         /*
          * Every thread gets a key/data buffer because we don't bother to distinguish between

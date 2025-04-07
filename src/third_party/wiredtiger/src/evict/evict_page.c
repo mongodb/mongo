@@ -914,7 +914,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
         if (!WT_SESSION_BTREE_SYNC(session) &&
           (F_ISSET(evict, WT_EVICT_CACHE_SCRUB) ||
             (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE) &&
-              __wt_random(&session->rnd) % 3 == 0)))
+              __wt_random(&session->rnd_random) % 3 == 0)))
             LF_SET(WT_REC_SCRUB);
     }
 

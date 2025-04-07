@@ -40,7 +40,7 @@ testutil_random(WT_RAND_STATE *rnd)
     if (rnd != NULL) {
         return __wt_random(rnd);
     } else {
-        __wt_random_init_seed(NULL, &rnd_inner); /* The session argument is not required. */
+        __wt_random_init_default(&rnd_inner); /* The session argument is not required. */
         return __wt_random(&rnd_inner);
     }
 }
@@ -98,7 +98,7 @@ testutil_random_init(WT_RAND_STATE *rnd, uint64_t *seedp, uint32_t n)
          * time on some systems, and that leaves us with the same random seed. So we factor in a "n"
          * value from the caller to get up to 4 different random seeds.
          */
-        __wt_random_init_seed(NULL, rnd);
+        __wt_random_init_default(rnd);
         shift = 8 * (n % 4);
         *seedp = ((rnd->v >> shift) & 0xffffff);
     }

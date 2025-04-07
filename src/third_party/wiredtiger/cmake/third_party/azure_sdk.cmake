@@ -23,7 +23,7 @@ elseif (IMPORT_AZURE_SDK_EXTERNAL)
         azure-sdk
         PREFIX azure-sdk-cpp
         GIT_REPOSITORY      https://github.com/Azure/azure-sdk-for-cpp.git
-        GIT_TAG             azure-storage-blobs_12.2.0
+        GIT_TAG             azure-storage-blobs_12.10.0
         CMAKE_ARGS
             -DBUILD_SHARED_LIBS=ON
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON

@@ -224,7 +224,7 @@ do_ops(void *args)
     WT_RAND_STATE rnd;
     time_t now, start;
 
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
     (void)time(&start);
     (void)time(&now);
 

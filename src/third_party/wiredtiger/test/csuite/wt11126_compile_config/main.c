@@ -247,7 +247,7 @@ do_config_run(WT_SESSION *session, uint32_t variant, const char *compiled,
     bool roundup_prepared, roundup_read, no_timestamp;
 
     /* Initialize the RNG. */
-    __wt_random_init(&rnd);
+    __wt_random_init_default(&rnd);
 
     __wt_epoch(NULL, &before);
     for (i = 0; i < N_CALLS; ++i) {

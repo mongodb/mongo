@@ -26,7 +26,7 @@ TEST_CASE("Block session: __wti_block_ext_prealloc with null block manager", "[b
     {
         WT_BLOCK_MGR_SESSION *bms = nullptr;
 
-        __wt_random_init(&session->get_wt_session_impl()->rnd);
+        __wt_random_init_default(&session->get_wt_session_impl()->rnd_random);
 
         REQUIRE(__wti_block_ext_prealloc(session->get_wt_session_impl(), 0) == 0);
         bms = static_cast<WT_BLOCK_MGR_SESSION *>(session->get_wt_session_impl()->block_manager);

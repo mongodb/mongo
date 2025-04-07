@@ -172,7 +172,7 @@ op_bulk_unique(void *arg)
 
     args = (TEST_PER_THREAD_OPTS *)arg;
     opts = args->testopts;
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
@@ -287,7 +287,7 @@ op_create_unique(void *arg)
 
     args = (TEST_PER_THREAD_OPTS *)arg;
     opts = args->testopts;
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
@@ -328,7 +328,7 @@ op_drop(void *arg)
 
     args = (TEST_PER_THREAD_OPTS *)arg;
     opts = args->testopts;
-    __wt_random_init_seed(NULL, &rnd);
+    __wt_random_init_default(&rnd);
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 

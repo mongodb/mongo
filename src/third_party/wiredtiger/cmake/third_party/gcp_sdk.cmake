@@ -30,13 +30,14 @@ elseif(IMPORT_GCP_SDK_EXTERNAL)
         gcp-sdk
         PREFIX gcp-sdk-cpp
         GIT_REPOSITORY https://github.com/googleapis/google-cloud-cpp.git
-        GIT_TAG v2.6.0
+        GIT_TAG v2.36.0
         CMAKE_ARGS
             -DBUILD_SHARED_LIBS=ON
             -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/gcp-sdk-cpp/install
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
             -DGOOGLE_CLOUD_CPP_ENABLE=storage
             -DGOOGLE_CLOUD_CPP_ENABLE_EXAMPLES=OFF
+            -DGOOGLE_CLOUD_CPP_WITH_MOCKS=OFF
             -DBUILD_TESTING=OFF
         BUILD_ALWAYS FALSE
         BUILD_BYPRODUCTS

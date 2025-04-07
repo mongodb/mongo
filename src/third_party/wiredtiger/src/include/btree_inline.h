@@ -1988,7 +1988,8 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
         probability = 0xe6666665; /* ~90% of the value of uint32 max. */
 #endif
 
-    for (depth = 1; depth < WT_SKIP_MAXDEPTH && __wt_random(&session->rnd) < probability; depth++)
+    for (depth = 1; depth < WT_SKIP_MAXDEPTH && __wt_random(&session->rnd_skiplist) < probability;
+         depth++)
         ;
     return (depth);
 }

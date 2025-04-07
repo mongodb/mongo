@@ -264,7 +264,7 @@ __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session)
      * means we'll hit the maximum roughly every 1K calls.
      */
     for (i = 0;;)
-        if (__wt_random(&session->rnd) & 0x1 || ++i > max)
+        if (__wt_random(&session->rnd_random) & 0x1 || ++i > max)
             break;
 
     if (i == 0)
@@ -292,7 +292,7 @@ __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
     /* Assert that the given probability is sane. */
     WT_ASSERT(session, probability <= 10 * WT_THOUSAND);
 
-    return (__wt_random(&session->rnd) % (10 * WT_THOUSAND) <= probability);
+    return (__wt_random(&session->rnd_random) % (10 * WT_THOUSAND) <= probability);
 }
 
 /*

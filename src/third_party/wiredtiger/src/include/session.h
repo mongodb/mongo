@@ -323,13 +323,19 @@ struct __wt_session_impl {
  * All of the following fields live at the end of the structure so it's easier to clear everything
  * but the fields that persist.
  */
-#define WT_SESSION_CLEAR_SIZE (offsetof(WT_SESSION_IMPL, rnd))
+#define WT_SESSION_CLEAR_SIZE (offsetof(WT_SESSION_IMPL, rnd_random))
 
     /*
      * The random number state persists past session close because we don't want to repeatedly use
-     * the same values for skiplist depth when the application isn't caching sessions.
+     * the same values. This RNG is used for general purpose random number generation.
      */
-    wt_shared WT_RAND_STATE rnd; /* Random number generation state */
+    wt_shared WT_RAND_STATE rnd_random;
+    /*
+     * The random number state persists past session close because we don't want to repeatedly use
+     * the same values for skiplist depth when the application isn't caching sessions. This RNG
+     * supposedly uses a specially crafted seed suitable for skiplists.
+     */
+    wt_shared WT_RAND_STATE rnd_skiplist;
 
     /*
      * Hash tables are allocated lazily as sessions are used to keep the size of this structure from

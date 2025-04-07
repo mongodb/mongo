@@ -189,7 +189,7 @@ reader(void *arg)
     id = (int)(uintptr_t)arg;
     s = &run_info[id];
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
-    __wt_random_init(&s->rnd);
+    __wt_random_init_default(&s->rnd);
 
     printf(" read thread %2d starting: tid: %s, file: %s\n", id, tid, s->name);
 
@@ -277,7 +277,7 @@ writer(void *arg)
     id = (int)(uintptr_t)arg;
     s = &run_info[id];
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
-    __wt_random_init(&s->rnd);
+    __wt_random_init_default(&s->rnd);
 
     printf("write thread %2d starting: tid: %s, file: %s\n", id, tid, s->name);
 

@@ -68,7 +68,8 @@ WT_BLOCK_MGR_SESSION *
 mock_session::setup_block_manager_session()
 {
     // Initialize rnd state because block manager requires it.
-    __wt_random_init(&_session_impl->rnd);
+    __wt_random_init_default(&_session_impl->rnd_random);
+    __wt_random_init_default(&_session_impl->rnd_skiplist);
     utils::throw_if_non_zero(
       __wt_calloc(nullptr, 1, sizeof(WT_BLOCK_MGR_SESSION), &_session_impl->block_manager));
     _session_impl->block_manager_cleanup = __ut_block_manager_session_cleanup;
