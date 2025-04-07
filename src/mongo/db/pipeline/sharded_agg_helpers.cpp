@@ -842,8 +842,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
         targetedCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
 
-    auto shardCommand =
-        genericTransformForShards(std::move(targetedCmd), expCtx, explain, std::move(readConcern));
+    auto shardCommand = CommandHelpers::filterCommandRequestForPassthrough(
+        genericTransformForShards(std::move(targetedCmd), expCtx, explain, std::move(readConcern)));
 
     // Apply RW concern to the final shard command.
     return applyReadWriteConcern(expCtx->getOperationContext(),
