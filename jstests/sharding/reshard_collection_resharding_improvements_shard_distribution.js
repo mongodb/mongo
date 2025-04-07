@@ -3,6 +3,8 @@
  *
  * @tags: [
  *  requires_fcv_72,
+ *  # This test asserts specific chunk placements.
+ *  assumes_balancer_off,
  * ]
  */
 
