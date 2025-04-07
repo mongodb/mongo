@@ -974,10 +974,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             aggExState.getOpCtx(),
             aggExState.getOriginalNss(),
             [&]() {
-                uassert(8472502, "Failed computing query shape", deferredShape());
+                uassertStatusOKWithContext(deferredShape->getStatus(),
+                                           "Failed to compute query shape");
                 return std::make_unique<query_stats::AggKey>(expCtx,
                                                              requestForQueryStats,
-                                                             std::move(*deferredShape),
+                                                             std::move(deferredShape->getValue()),
                                                              std::move(pipelineInvolvedNamespaces),
                                                              collectionType);
             },

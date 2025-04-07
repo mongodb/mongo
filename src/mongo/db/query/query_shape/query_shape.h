@@ -43,7 +43,7 @@ namespace mongo::query_shape {
 
 class Shape;
 
-using DeferredQueryShape = DeferredFn<std::unique_ptr<Shape>>;
+using DeferredQueryShape = DeferredFn<StatusWith<std::unique_ptr<Shape>>>;
 using QueryShapeHash = SHA256Block;
 
 /**

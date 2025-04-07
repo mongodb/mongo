@@ -283,13 +283,14 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
     // key hash (thus metrics won't be tracked for this query).
     ASSERT_DOES_NOT_THROW(([&]() {
-        if (auto findShape =
-                shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx)) {
+        auto statusWithShape =
+            shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        if (statusWithShape.isOK()) {
             query_stats::registerRequest(opCtx.get(), nss, [&]() {
                 return std::make_unique<query_stats::FindKey>(
                     expCtx,
                     *parsedFind->findCommandRequest,
-                    std::move(findShape),
+                    std::move(statusWithShape.getValue()),
                     query_shape::CollectionType::kCollection);
             });
         }

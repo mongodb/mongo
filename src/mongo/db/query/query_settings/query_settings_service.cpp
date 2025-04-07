@@ -447,13 +447,13 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnRouter(
             // Force shape computation and early exit with empty settings if shape computation has
             // failed.
             const auto& shapePtr = deferredShape();
-            if (!shapePtr) {
+            if (!shapePtr.isOK()) {
                 return QuerySettings();
             }
 
             // Compute the QueryShapeHash and store it in CurOp.
             auto* opCtx = expCtx->getOperationContext();
-            QueryShapeHash hash = shapePtr->sha256Hash(opCtx, kSerializationContext);
+            QueryShapeHash hash = shapePtr.getValue()->sha256Hash(opCtx, kSerializationContext);
             setQueryShapeHash(opCtx, hash);
 
             // Return the found query settings or an empty one.

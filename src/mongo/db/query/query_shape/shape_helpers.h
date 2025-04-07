@@ -37,7 +37,7 @@
 namespace mongo::shape_helpers {
 
 template <typename T, typename Request, typename... Args>
-std::unique_ptr<T> tryMakeShape(Request&& request, Args&&... args) {
+StatusWith<std::unique_ptr<T>> tryMakeShape(Request&& request, Args&&... args) {
     try {
         return std::make_unique<T>(std::forward<Request>(request), std::forward<Args>(args)...);
     } catch (const DBException& ex) {
@@ -47,7 +47,7 @@ std::unique_ptr<T> tryMakeShape(Request&& request, Args&&... args) {
                       "command"_attr = redact(request.toBSON()).toString(),
                       "error"_attr = ex.toString());
 #undef MONGO_LOGV2_DEFAULT_COMPONENT
-        return nullptr;
+        return ex.toStatus();
     }
 }
 

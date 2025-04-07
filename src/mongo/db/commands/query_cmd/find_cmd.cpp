@@ -218,11 +218,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // would alter the query shape.
     if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
         query_stats::registerRequest(opCtx, nss, [&]() {
-            uassert(8472501, "Failed computing query shape", deferredShape());
+            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::FindKey>(
                 expCtx,
                 *parsedRequest->findCommandRequest,
-                std::move(*deferredShape),
+                std::move(deferredShape->getValue()),
                 collOrViewAcquisition.getCollectionType());
         });
 

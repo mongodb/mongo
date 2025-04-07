@@ -160,9 +160,11 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !verbosity.has_value()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
-            uassert(8472506, "Failed computing query shape", deferredShape());
+            uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::DistinctKey>(
-                expCtx, *parsedDistinct->distinctCommandRequest, std::move(*deferredShape));
+                expCtx,
+                *parsedDistinct->distinctCommandRequest,
+                std::move(deferredShape->getValue()));
         });
     }
 

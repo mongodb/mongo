@@ -382,9 +382,12 @@ public:
                     expCtx->getOperationContext(), expCtx->getNamespaceString(), [&]() {
                         // This callback is either never invoked or invoked immediately within
                         // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        uassert(8472504, "Failed computing query shape", deferredShape());
+                        uassertStatusOKWithContext(deferredShape->getStatus(),
+                                                   "Failed to compute query shape");
                         return std::make_unique<query_stats::FindKey>(
-                            expCtx, *parsedFind->findCommandRequest, std::move(*deferredShape));
+                            expCtx,
+                            *parsedFind->findCommandRequest,
+                            std::move(deferredShape->getValue()));
                     });
             }
 

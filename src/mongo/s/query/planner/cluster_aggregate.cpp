@@ -457,9 +457,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             opCtx,
             nsStruct.executionNss,
             [&]() {
-                uassert(8472505, "Failed computing query shape", deferredShape());
-                return std::make_unique<query_stats::AggKey>(
-                    expCtx, request, std::move(*deferredShape), std::move(involvedNamespaces));
+                uassertStatusOKWithContext(deferredShape->getStatus(),
+                                           "Failed to compute query shape");
+                return std::make_unique<query_stats::AggKey>(expCtx,
+                                                             request,
+                                                             std::move(deferredShape->getValue()),
+                                                             std::move(involvedNamespaces));
             },
             hasChangeStream);
     }
