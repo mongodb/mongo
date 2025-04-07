@@ -921,10 +921,7 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     for (auto&& field : spec.fieldSet()) {
         fields.emplace_back(opts.serializeFieldPathFromString(field));
     }
-    if (((_bucketUnpacker.includeMetaField() &&
-          _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude) ||
-         (!_bucketUnpacker.includeMetaField() &&
-          _bucketUnpacker.behavior() == BucketSpec::Behavior::kExclude && spec.metaField())) &&
+    if (_bucketUnpacker.removedMetaFieldFromFieldSet() &&
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
                   *spec.metaField()) == spec.computedMetaProjFields().cend())
@@ -1175,8 +1172,9 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
-    if (std::next(itr) == container->end() || !_bucketUnpacker.bucketSpec().fieldSet().empty()) {
-        // There is no project to internalize or there are already fields being included/excluded.
+    if (std::next(itr) == container->end() || _bucketUnpacker.hasIncludeExcludeFields()) {
+        // There is no project to internalize or there are already fields being included/excluded,
+        // which means we've already internalized a project.
         return {BSONObj{}, false};
     }
 
@@ -1927,9 +1925,9 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // documents we return from limit, hence we don't want to push limit.
     // If _triedLimitPushDown is true, we have already done a limit push down and don't want to
     // push again to avoid an infinite loop.
-    if (!_eventFilter && !_triedLimitPushDown) {
+    if (!_eventFilter && !_triedLimitPushDownLocally) {
         if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get()); limitPtr) {
-            _triedLimitPushDown = true;
+            _triedLimitPushDownLocally = true;
             container->insert(itr, DocumentSourceLimit::create(getContext(), limitPtr->getLimit()));
             return container->begin();
         }
@@ -1949,7 +1947,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // also invalidate the control block summaries. The optimizations below this check may assume
     // that the bucket fields and the control block is still valid.
     //
-    bool hasAlreadyAbsorbedProjectSpec = !_bucketUnpacker.bucketSpec().fieldSet().empty() ||
+    bool hasAlreadyAbsorbedProjectSpec = _bucketUnpacker.hasIncludeExcludeFields() ||
         !_bucketUnpacker.bucketSpec().computedMetaProjFields().empty();
 
     {
@@ -1975,9 +1973,9 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     }
 
     // Attempt to optimize last-point type queries.
-    if (!hasAlreadyAbsorbedProjectSpec && !_triedLastpointRewrite && !_eventFilter &&
+    if (!hasAlreadyAbsorbedProjectSpec && !_triedLastpointRewriteLocally && !_eventFilter &&
         optimizeLastpoint(itr, container)) {
-        _triedLastpointRewrite = true;
+        _triedLastpointRewriteLocally = true;
         // If we are able to rewrite the aggregation, give the resulting pipeline a chance to
         // perform further optimizations.
         return container->begin();
@@ -2070,10 +2068,10 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Attempt to build a $project based on dependency analysis or extract one from the pipeline. We
     // can internalize the result so we can handle projections during unpacking.
-    if (!_triedInternalizeProject) {
+    if (!_triedInternalizeProjectLocally) {
         if (auto [project, isInclusion] = extractOrBuildProjectToInternalize(itr, container);
             !project.isEmpty()) {
-            _triedInternalizeProject = true;
+            _triedInternalizeProjectLocally = true;
             internalizeProject(project, isInclusion);
 
             // We may have removed a $project after this stage, so we try to optimize this stage

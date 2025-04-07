@@ -78,6 +78,8 @@ TEST_F(OptimizePipeline, MixedMatchPushedDown) {
                                "metaField: \"myMeta\", bucketMaxSpanSeconds: 3600, "
                                "eventFilter: { a: { $lte: 4 } } } }"),
                       stages[1].getDocument().toBson());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 TEST_F(OptimizePipeline, MetaMatchPushedDown) {
@@ -95,6 +97,8 @@ TEST_F(OptimizePipeline, MetaMatchPushedDown) {
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$gte: 0}}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, MixedMatchOr) {
@@ -141,6 +145,8 @@ TEST_F(OptimizePipeline, MixedMatchOr) {
                                "eventFilter: { $and: [ { x: { $lte: 1 } }, { $or: [ { "
                                "\"myMeta.a\": { $gt: 1 } }, { y: { $lt: 1 } } ] } ] } } }"),
                       stages[1].getDocument().toBson());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 TEST_F(OptimizePipeline, MixedMatchOnlyMetaMatchPushedDown) {
@@ -165,6 +171,8 @@ TEST_F(OptimizePipeline, MixedMatchOnlyMetaMatchPushedDown) {
                                "metaField: \"myMeta\", bucketMaxSpanSeconds: 3600, "
                                "eventFilter: { a: { $type: [ 2 ] } } } }"),
                       serialized[1]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
@@ -193,6 +201,8 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
                                "metaField: \"myMeta\", bucketMaxSpanSeconds: 3600, "
                                "eventFilter: { a: { $lte: 4 } } } }"),
                       stages[1].getDocument().toBson());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
@@ -223,6 +233,7 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
                                "eventFilter: { a: { $lte: 4 } } } }"),
                       stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {sortKey: {a: 1}}}"), stages[2].getDocument().toBson());
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 TEST_F(OptimizePipeline, MetaMatchThenCountPushedDown) {
@@ -300,6 +311,7 @@ TEST_F(OptimizePipeline, SortThenMixedMatchPushedDown) {
                                "metaField: \"myMeta\", bucketMaxSpanSeconds: 3600, "
                                "eventFilter: { a: { $gte: 5 } } } }"),
                       serialized[2]);
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, MetaMatchThenSortPushedDown) {
@@ -368,6 +380,8 @@ TEST_F(OptimizePipeline, MixedMatchThenProjectPushedDown) {
         stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$project: {_id: true, x: true}}"),
                       stages[2].getDocument().toBson());
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 
@@ -420,6 +434,8 @@ TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
         kComparator.compare(fromjson("{$project: {_id: true, a: true, myMeta: true, x: true}}"),
                             stages[2].getDocument().toBson()),
         0);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 TEST_F(OptimizePipeline, ProjectWithRenameThenMixedMatchPushedDown) {
@@ -451,6 +467,7 @@ TEST_F(OptimizePipeline, ProjectWithRenameThenMixedMatchPushedDown) {
         stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$project: {_id: true, a: true, myMeta: '$y'}}"),
                       stages[2].getDocument().toBson());
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), pipeline->serializeToBson());
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDown) {
@@ -565,6 +582,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenMatchPushedDown) {
                                "computedMetaProjFields: [ 'y' ]}}"),
                       serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {y: {$gt: 'abc'}}}"), serialized[2]);
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, MetaSortThenProjectPushedDown) {
@@ -723,6 +741,44 @@ TEST_F(OptimizePipeline, ComputedProjectThenProjectPushDown) {
         serialized[2]);
 }
 
+TEST_F(OptimizePipeline, DoubleInclusionMetaProjectPushDown) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
+                            "'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$project: {myMeta: 1, _id: 0}}"),
+                   fromjson("{$project: {_id: 0, time: 1}}")),
+        getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['myMeta'], timeField: 'time', metaField: "
+                 "'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {time: true, _id: false}}"), serialized[1]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
+}
+
+TEST_F(OptimizePipeline, ExcludeMetaProjectPushDown) {
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: ['myMeta'], timeField: 'time', metaField: "
+        "'myMeta', bucketMaxSpanSeconds: 3600}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(unpackSpec, fromjson("{$project: {_id: 0, time: 1}}")), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(unpackSpec, serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {time: true, _id: false}}"), serialized[1]);
+
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
+}
+
 TEST_F(OptimizePipeline, AddFieldsOfShadowingMetaPushedDown) {
     auto pipeline = Pipeline::parse(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
@@ -834,6 +890,7 @@ TEST_F(OptimizePipeline, PushDownAddFieldsDoNotInternalizeProjection) {
         kComparator.compare(fromjson("{$project: {_id: true, x: true, device: true, z: true}}"),
                             serialized[3]),
         0);
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, InternalizeProjectAndPushdownAddFields) {
@@ -975,6 +1032,7 @@ TEST_F(OptimizePipeline, PushdownMatchAndAddFields) {
                  "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}"),
         serialized[2]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {z: {$add : ['$x', '$y']}}}"), serialized[3]);
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, MatchWithGeoWithinOnMeasurementsPushedDownUsingInternalBucketGeoWithin) {
@@ -1005,6 +1063,7 @@ TEST_F(OptimizePipeline, MatchWithGeoWithinOnMeasurementsPushedDownUsingInternal
                  "eventFilter: { loc: { $geoWithin: { $geometry: { type: \"Polygon\", coordinates: "
                  "[ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ] } } } } } }"),
         serialized[1]);
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, MatchWithGeoWithinOnMetaFieldIsPushedDown) {
@@ -1116,6 +1175,7 @@ TEST_F(OptimizePipeline, StreamingGroupIsEnabledWhenPossible) {
         "'hour'}}}, symbol: '$myMeta.symbol'}, 'sum': {$sum: '$tradeAmount'}, "
         "'$monotonicIdFields': ['hour']}}");
     ASSERT_BSONOBJ_EQ(streamingGroupSpecObj, serialized.back());
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
@@ -1161,6 +1221,7 @@ TEST_F(OptimizePipeline, ComputedMetaProjFieldsAreNotInInclusionProjection) {
                  "metaField: "
                  "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['time']}}"),
         serialized[0]);
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(OptimizePipeline, ComputedMetaProjectFieldsAfterInclusionGetsAddedToIncludes) {

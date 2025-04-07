@@ -62,6 +62,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
     ASSERT_EQ(2, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{ $sort: {'meta.a': 1, 'meta.b': -1} }"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
@@ -79,6 +82,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
     ASSERT_EQ(2, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}"), serialized[1]);
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
@@ -111,6 +117,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
     // additional stage. The container from pipeline->getSources(), on the other hand, preserves the
     // original pipeline with limit absorbed into sort. Therefore, there should only be 4 stages
     ASSERT_EQ(4, container.size());
+
+    // Optimize the optimized pipeline again. We do not expect anymore rewrites to happen.
+    makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
