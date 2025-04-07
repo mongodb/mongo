@@ -5746,7 +5746,7 @@ let additionalCRUDOps = {
     },
 };
 
-function stopSecondaries(cluster, clusterType) {
+export function stopSecondaries(cluster, clusterType) {
     if (clusterType == "rs") {
         assert.eq(cluster.nodeList().length, 3);
 
@@ -5774,7 +5774,7 @@ function stopSecondaries(cluster, clusterType) {
     }
 }
 
-function restartSecondaries(cluster, clusterType) {
+export function restartSecondaries(cluster, clusterType) {
     if (clusterType == "rs") {
         // Restart the secondary
         cluster.restart(cluster.getSecondaries()[0]);
@@ -5797,7 +5797,7 @@ function restartSecondaries(cluster, clusterType) {
  * reported in the WriteConcernErrors field, but some commands nest the WCE and other actually
  * return the error as a top-level command error.
  */
-function assertHasWCE(res, cmd) {
+export function assertHasWCE(res, cmd) {
     try {
         assertWriteConcernError(res);
     } catch (e) {
