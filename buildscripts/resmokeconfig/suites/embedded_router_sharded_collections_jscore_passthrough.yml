@@ -38,12 +38,8 @@ selector:
     - jstests/core/**/list_indexes_non_existent_ns.js
     - jstests/core/**/mr_preserve_indexes.js
 
-    # TODO SERVER-29449: Re-enable once 'executionStats.nReturned' is correct for sharded queries
-    # with a limit or for distinct commands.
+    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain/explain1.js
-    - jstests/core/**/explain4.js
-    - jstests/core/**/sortk.js
 
     # TODO SERVER-32563: The implementation of explain for the count command is incorrect on sharded
     # collections.

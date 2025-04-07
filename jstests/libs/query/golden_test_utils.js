@@ -4,7 +4,52 @@
 
 import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 import {code, codeOneLine, line, linebreak, subSection} from "jstests/libs/pretty_md.js";
-import {formatExplainRoot, getEngine} from "jstests/libs/query/analyze_plan.js";
+import {
+    formatExplainRoot,
+    getEngine,
+    getStableExecutionStats
+} from "jstests/libs/query/analyze_plan.js";
+
+/**
+ * Takes a collection and a cursor for a find query. Outputs the query, results and
+ * a summary of the explain to markdown. By default the results will be sorted, but the original
+ * order can be kept by setting `shouldSortResults` to false.
+ */
+export function outputFindPlanAndResults(cursor, expected, shouldSortResults = true) {
+    const results = cursor.toArray();
+    const explain = cursor.explain("executionStats");
+    const executionStages = explain.executionStats.executionStages;
+
+    // Verify expected results
+    const actualReturned = results.length;
+    assert.eq(executionStages.stage, expected.stage);
+    assert.eq(actualReturned, explain.executionStats.nReturned);
+    assert.eq(actualReturned, executionStages.nReturned);
+
+    if (expected.limit !== undefined) {
+        assert.eq(executionStages.limitAmount, expected.limit);
+    }
+    if (expected.skip !== undefined) {
+        assert.eq(executionStages.skipAmount, expected.skip);
+    }
+
+    // Get stable fields from executionStats section of explain output
+    const flatPlan = getStableExecutionStats(explain);
+
+    subSection("Query");
+    code(tojson(cursor._convertToCommand()));
+
+    subSection("Results");
+    code(normalizeArray(results, shouldSortResults));
+
+    subSection("Summarized explain executionStats");
+    if (!explain.hasOwnProperty("shards")) {
+        line("Execution Engine: " + getEngine(explain));
+    }
+    code(tojsonMultiLineSortKeys(flatPlan));
+
+    linebreak();
+}
 
 /**
  * Takes a collection and an aggregation pipeline. Outputs the pipeline, the aggregation results and

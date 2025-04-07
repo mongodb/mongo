@@ -265,7 +265,9 @@ void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
 void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>& shardResponses,
                                     const char* mongosStageName,
                                     long long millisElapsed,
-                                    BSONObjBuilder* out) {
+                                    BSONObjBuilder* out,
+                                    boost::optional<int64_t> limit,
+                                    boost::optional<int64_t> skip) {
     auto firstShardResponseData = shardResponses[0].swResponse.getValue().data;
     if (!firstShardResponseData.hasField("executionStats")) {
         // The shards don't have execution stats info. Bail out without adding anything
@@ -276,7 +278,8 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
     BSONObjBuilder executionStatsBob(out->subobjStart("executionStats"));
 
     // Collect summary stats from the shards.
-    long long nReturned = 0;
+    auto multipleShards = shardResponses.size() > 1;
+    long long totalNReturned = 0;
     long long keysExamined = 0;
     long long docsExamined = 0;
     long long totalChildMillis = 0;
@@ -284,7 +287,7 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
         auto responseData = shardResponses[i].swResponse.getValue().data;
         BSONObj execStats = responseData["executionStats"].Obj();
         if (execStats.hasField("nReturned")) {
-            nReturned += execStats["nReturned"].numberLong();
+            totalNReturned += execStats["nReturned"].numberLong();
         }
         if (execStats.hasField("totalKeysExamined")) {
             keysExamined += execStats["totalKeysExamined"].numberLong();
@@ -298,7 +301,19 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
     }
 
     // Fill in top-level stats.
-    executionStatsBob.appendNumber("nReturned", nReturned);
+    long long finalNReturned = totalNReturned;
+    // If the query has targeted multiple shards, the overall nReturned value should reflect the
+    // final limit + skip that are applied router-side on the results returned from the shards.
+    if (multipleShards) {
+        if (skip) {
+            finalNReturned = std::max(finalNReturned - *skip, 0LL);
+        }
+        if (limit) {
+            finalNReturned = std::min(finalNReturned, static_cast<long long>(*limit));
+        }
+    }
+
+    executionStatsBob.appendNumber("nReturned", finalNReturned);
     executionStatsBob.appendNumber("executionTimeMillis", millisElapsed);
     executionStatsBob.appendNumber("totalKeysExamined", keysExamined);
     executionStatsBob.appendNumber("totalDocsExamined", docsExamined);
@@ -308,7 +323,15 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
 
     // Info for the root mongos stage.
     executionStagesBob.append("stage", mongosStageName);
-    executionStatsBob.appendNumber("nReturned", nReturned);
+    executionStatsBob.appendNumber("nReturned", finalNReturned);
+    if (multipleShards) {
+        if (limit) {
+            executionStatsBob.appendNumber("limitAmount", static_cast<long long>(*limit));
+        }
+        if (skip) {
+            executionStatsBob.appendNumber("skipAmount", static_cast<long long>(*skip));
+        }
+    }
     executionStatsBob.appendNumber("executionTimeMillis", millisElapsed);
     executionStatsBob.appendNumber("totalKeysExamined", keysExamined);
     executionStatsBob.appendNumber("totalDocsExamined", docsExamined);
@@ -396,7 +419,9 @@ Status ClusterExplain::buildExplainResult(
     const char* mongosStageName,
     long long millisElapsed,
     const BSONObj& command,
-    BSONObjBuilder* out) {
+    BSONObjBuilder* out,
+    boost::optional<int64_t> limit,
+    boost::optional<int64_t> skip) {
     // Explain only succeeds if all shards support the explain command.
     try {
         ClusterExplain::validateShardResponses(shardResponses);
@@ -405,7 +430,7 @@ Status ClusterExplain::buildExplainResult(
     }
 
     buildPlannerInfo(expCtx->getOperationContext(), shardResponses, mongosStageName, out);
-    buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
+    buildExecStats(shardResponses, mongosStageName, millisElapsed, out, limit, skip);
     explain_common::generateQueryShapeHash(expCtx->getOperationContext(), out);
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(expCtx, out);

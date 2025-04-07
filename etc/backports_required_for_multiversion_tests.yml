@@ -901,6 +901,12 @@ last-lts:
       ticket: SERVER-102543
     - test_file: jstests/core_sharding/resharding/reshard_collection_atlas_log_ingestion.js
       ticket: SERVER-100421
+    - test_file: jstests/core/query/explain/explain1.js
+      ticket: SERVER-29449
+    - test_file: jstests/core/query/explain/explain4.js
+      ticket: SERVER-29449
+    - test_file: jstests/core/query/sort/sortk.js
+      ticket: SERVER-29449
     - test_file: jstests/sharding/reshard_collection_cache_size.js
       ticket: SERVER-100264
     - test_file: jstests/core/index/express_pbt.js

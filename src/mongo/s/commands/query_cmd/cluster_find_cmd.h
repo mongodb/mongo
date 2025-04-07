@@ -276,6 +276,8 @@ public:
                 auto numShards = getTargetedShardsForCanonicalQuery(cq, cri).size();
                 // When forwarding the command to multiple shards, need to transform it by adjusting
                 // query parameters such as limits and sorts.
+                auto userLimit = _cmdRequest->getLimit();
+                auto userSkip = _cmdRequest->getSkip();
                 if (numShards > 1) {
                     _cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(cq));
                 }
@@ -311,7 +313,9 @@ public:
                                                                    mongosStageName,
                                                                    millisElapsed,
                                                                    _request.body,
-                                                                   &bodyBuilder));
+                                                                   &bodyBuilder,
+                                                                   userLimit,
+                                                                   userSkip));
 
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 retryOnViewError(opCtx,

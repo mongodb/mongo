@@ -87,7 +87,9 @@ public:
         const char* mongosStageName,
         long long millisElapsed,
         const BSONObj& command,
-        BSONObjBuilder* out);
+        BSONObjBuilder* out,
+        boost::optional<int64_t> limit = boost::none,
+        boost::optional<int64_t> skip = boost::none);
 
 
     //
@@ -129,7 +131,9 @@ private:
     static void buildExecStats(const std::vector<AsyncRequestsSender::Response>& shardResponses,
                                const char* mongosStageName,
                                long long millisElapsed,
-                               BSONObjBuilder* out);
+                               BSONObjBuilder* out,
+                               boost::optional<int64_t> limit,
+                               boost::optional<int64_t> skip);
 };
 
 }  // namespace mongo

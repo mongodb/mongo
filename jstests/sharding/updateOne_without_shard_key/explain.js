@@ -361,8 +361,8 @@ function validateResponse(res, testCase, verbosity) {
             assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldUpsert, 1);
             assert.eq(res.executionStats.inputStage.nReturned, 0);
         } else {
-            // TODO SERVER-29449: Properly report explain results for sharded queries with a
-            // limit. assert.eq(res.executionStats.nReturned, 1);
+            // TODO SERVER-103345: Properly report explain results for sharded writes.
+            // assert.eq(res.executionStats.nReturned, 1);
             if (testCase.opType === "DELETE") {
                 // We use a dummy _id target document for the Write Phase which should not match any
                 // existing documents in the collection. This will at least preserve the query plan,

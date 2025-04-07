@@ -547,6 +547,67 @@ export function getExecutionStats(root) {
 }
 
 /**
+ * Extract the high-level stable fields from the root. These include fields such as "stage",
+ * "nReturned", and "totalDocsExamined" that should remain the same across runs. Unstable
+ * measurement fields such as "executionTimeMillis" and "totalChildMillis" are excluded, as are more
+ * detailed fields.
+ */
+export function extractStableExecutionFieldsSummary(root) {
+    if (!root)
+        return undefined;
+
+    const stableKeys = [
+        "stage",
+        "nReturned",
+        "limitAmount",
+        "skipAmount",
+        "isEOF",
+        "totalDocsExamined",
+        "totalKeysExamined"
+    ];
+    const stable = {};
+
+    for (const key of stableKeys) {
+        if (key in root) {
+            stable[key] = root[key];
+        }
+    }
+
+    const input = extractStableExecutionFieldsSummary(root.inputStage);
+    if (input) {
+        stable.inputStage = input;
+    }
+
+    return stable;
+}
+
+/**
+ * Get high-level stable fields from the executionStats section of explain from the root
+ * executionStages field and any nested executionStages objects.
+ */
+export function getStableExecutionStats(explain) {
+    const execStats = explain.executionStats;
+    const topLevel = execStats.executionStages;
+
+    const stableFields = extractStableExecutionFieldsSummary(topLevel);
+
+    if (topLevel.shards) {
+        const sortedShards =
+            [...topLevel.shards].sort((a, b) => a.shardName.localeCompare(b.shardName));
+
+        stableFields.shards = sortedShards.map(
+            shard => ({
+                nReturned: shard.nReturned,
+                totalDocsExamined: shard.totalDocsExamined,
+                totalKeysExamined: shard.totalKeysExamined,
+                executionStages: extractStableExecutionFieldsSummary(shard.executionStages),
+            }));
+    }
+
+    return [{executionStages: stableFields}];
+}
+
+/**
  * Returns the winningPlan.queryPlan of each shard in the explain in a list.
  */
 export function getShardQueryPlans(root) {
