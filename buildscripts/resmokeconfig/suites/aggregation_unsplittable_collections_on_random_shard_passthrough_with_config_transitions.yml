@@ -121,6 +121,9 @@ selector:
     - assumes_balancer_off
     - assumes_no_track_upon_creation
     - assumes_stable_shard_list
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
 
 executor:
   archive:

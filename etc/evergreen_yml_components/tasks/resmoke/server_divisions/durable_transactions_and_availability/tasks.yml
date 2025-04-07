@@ -1854,6 +1854,34 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
+    name: config_fuzzer_concurrency_sharded_replication_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "concurrency",
+        "config_fuzzer",
+        "default",
+        "large",
+        "sharded",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: concurrency_sharded_replication_with_balancer
+          resmoke_args: >-
+            --fuzzMongodConfigs=normal
+            --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
+            --excludeWithAnyTags=does_not_support_config_fuzzer
+          use_xlarge_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
     name: config_fuzzer_concurrency_simultaneous_replication_gen
     tags:
       [

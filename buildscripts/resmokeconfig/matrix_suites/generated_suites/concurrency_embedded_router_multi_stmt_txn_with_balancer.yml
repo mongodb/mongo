@@ -77,7 +77,7 @@ selector:
     - does_not_support_transactions
     - assumes_unsharded_collection
     - requires_timeseries
-    - uses_getmore_outside_of_transaction
+    - assumes_no_implicit_cursor_exhaustion
     - temp_disabled_embedded_router_uncategorized
   roots:
     - jstests/concurrency/fsm_workloads/**/*.js

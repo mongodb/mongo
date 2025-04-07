@@ -66,6 +66,7 @@ selector:
     - requires_profiling
     - assumes_unsharded_collection
     - requires_getmore
+    - assumes_no_implicit_cursor_exhaustion
     - temp_disabled_embedded_router_uncategorized
   roots:
     - jstests/concurrency/fsm_workloads/**/*.js

@@ -14,6 +14,8 @@
  *  incompatible_with_concurrency_simultaneous,
  *  requires_getmore,
  *  uses_getmore_outside_of_transaction,
+ *  # This test relies on aggregations returning specific batch-sized responses.
+ *  assumes_no_implicit_cursor_exhaustion,
  * ]
  *
  */

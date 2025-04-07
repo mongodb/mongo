@@ -14,6 +14,8 @@
  *   does_not_support_causal_consistency,
  *   # Does not support multiplanning, because it stashes results beyond batchSize.
  *   does_not_support_multiplanning_single_solutions,
+ *   # This test relies on aggregations returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

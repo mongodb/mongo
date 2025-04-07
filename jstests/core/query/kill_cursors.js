@@ -9,6 +9,8 @@
 //   # "CursorNotFound."
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
+//   # This test relies on find commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 var cmdRes;

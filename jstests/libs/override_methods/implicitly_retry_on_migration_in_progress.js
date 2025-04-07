@@ -5,73 +5,106 @@
 
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
-// These are all commands that can return BackgroundOperationInProgress error codes.
-const commandsToRetry = new Set([
-    "createIndexes",
-    "moveCollection",
-    "reshardCollection",
-    "unshardCollection",
-]);
+// Values in msecs.
+const kRetryTimeout = 10 * 60 * 1000;
+const kIntervalBetweenRetries = 50;
 
-// Commands known not to work with migrations so tests can fail immediately with a clear error.
-const kDisallowedCommandsInsideTxns = [];
-const kDisallowedCommandsOutsideTxns = ["getMore"];
+function _runAndExhaustQueryWithRetryUponMigration(
+    conn, commandName, commandObj, func, makeFuncArgs) {
+    const kQueryRetryableErrors = [
+        ErrorCodes.ReshardCollectionInProgress,
+        ErrorCodes.ConflictingOperationInProgress,
+        ErrorCodes.QueryPlanKilled
+    ];
 
-const kTimeout = 10 * 60 * 1000;
-const kInterval = 50;  // milliseconds
+    let queryResponse;
+    let attempt = 0;
+    const collName = commandObj[commandName];
+    const lsid = commandObj['lsid'];
 
-// Make it easier to understand whether or not returns from the assert.soon are being retried.
-const kNoRetry = true;
-const kRetry = false;
+    assert.soon(
+        () => {
+            attempt++;
+            queryResponse = func.apply(conn, makeFuncArgs(commandObj));
+            let latestBatchResponse = queryResponse;
+            while (latestBatchResponse.ok === 1 && latestBatchResponse.cursor &&
+                   latestBatchResponse.cursor.id != 0) {
+                // Exhaust the cursor returned by the command and return to the test a single batch
+                // containing all the results.
+                const getMoreCommandObj = {
+                    getMore: latestBatchResponse.cursor.id,
+                    collection: collName,
+                    lsid: lsid,
+                };
+                latestBatchResponse = func.apply(conn, makeFuncArgs(getMoreCommandObj));
 
-function hasConflictingMigrationpInProgress(res) {
-    // Only these are retryable.
-    return res.code === ErrorCodes.ReshardCollectionInProgress ||
-        res.code === ErrorCodes.ConflictingOperationInProgress;
+                if (latestBatchResponse.ok === 1) {
+                    queryResponse.cursor.firstBatch.push(...latestBatchResponse.cursor.nextBatch);
+                    queryResponse.cursor.id = NumberLong(0);
+                } else {
+                    jsTest.log(`An error occurred while attempting to exhaust the results of ${
+                        commandName} at attempt ${attempt}: ${tojson(latestBatchResponse)}`);
+                }
+            }
+
+            let stopRetrying = false;
+            if (latestBatchResponse.ok === 1) {
+                stopRetrying = true;
+            } else if (!kQueryRetryableErrors.includes(latestBatchResponse.code)) {
+                // Non-retryable error detected; forward the response to the test.
+                stopRetrying = true;
+                queryResponse = latestBatchResponse;
+            }
+
+            return stopRetrying;
+        },
+        () => "Timed out while retrying command '" + tojson(commandObj) +
+            "', response: " + tojson(queryResponse),
+        kRetryTimeout,
+        kIntervalBetweenRetries);
+
+    return queryResponse;
 }
 
-// function runCommandWithRetries(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
-function runCommandWithMigrationRetries(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
-    if (typeof commandObj !== "object" || commandObj === null) {
-        return func.apply(conn, makeFuncArgs(commandObj));
-    }
+function _runCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs) {
+    // These are all commands that can return BackgroundOperationInProgress error codes.
+    const kRetryableCommands = new Set([
+        "createIndexes",
+        "moveCollection",
+        "reshardCollection",
+        "unshardCollection",
+    ]);
 
-    const inTransaction = commandObj.hasOwnProperty("autocommit");
-    const disallowedCommands =
-        inTransaction ? kDisallowedCommandsInsideTxns : kDisallowedCommandsOutsideTxns;
+    const kCommandRetryableErrors =
+        [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.ConflictingOperationInProgress];
 
-    if (disallowedCommands.includes(commandName)) {
-        throw new Error(`Cowardly refusing to run command ${
-            (inTransaction
-                 ? "inside"
-                 : "outside")} of transaction with random moveCollection in the background ${
-            tojson(commandObj)}`);
-    }
+    const kNoRetry = true;
+    const kRetry = false;
 
-    let res;
+    let commandResponse;
     let attempt = 0;
 
     assert.soon(
         () => {
             attempt++;
 
-            res = func.apply(conn, makeFuncArgs(commandObj));
-            if (res.ok === 1) {
+            commandResponse = func.apply(conn, makeFuncArgs(commandObj));
+            if (commandResponse.ok === 1) {
                 return kNoRetry;
             }
 
             // Commands that are not in the allowlist should never fail with this error code.
-            if (!commandsToRetry.has(commandName)) {
+            if (!kRetryableCommands.has(commandName)) {
                 return kNoRetry;
             }
 
             let message = "Retrying the " + commandName +
                 " command because a migration operation is in progress (attempt " + attempt +
-                "): " + tojson(res);
+                "): " + tojson(commandResponse);
 
             // This handles the retry case when run against a standalone, replica set, or mongos
             // where both shards returned the same response.
-            if (hasConflictingMigrationpInProgress(res)) {
+            if (kCommandRetryableErrors.includes(commandResponse.code)) {
                 jsTestLog(message);
                 return kRetry;
             }
@@ -80,10 +113,33 @@ function runCommandWithMigrationRetries(conn, dbName, commandName, commandObj, f
             return kNoRetry;
         },
         () => "Timed out while retrying command '" + tojson(commandObj) +
-            "', response: " + tojson(res),
-        kTimeout,
-        kInterval);
-    return res;
+            "', response: " + tojson(commandResponse),
+        kRetryTimeout,
+        kIntervalBetweenRetries);
+
+    return commandResponse;
 }
 
-OverrideHelpers.overrideRunCommand(runCommandWithMigrationRetries);
+function runCommandWithRetryUponMigration(
+    conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+    const kQueryCommands = ['find', 'aggregate', 'listIndexes'];
+
+    if (typeof commandObj !== "object" || commandObj === null) {
+        return func.apply(conn, makeFuncArgs(commandObj));
+    }
+
+    const inTransaction = commandObj.hasOwnProperty("autocommit");
+
+    if (!inTransaction && kQueryCommands.includes(commandName)) {
+        return _runAndExhaustQueryWithRetryUponMigration(
+            conn, commandName, commandObj, func, makeFuncArgs);
+    } else {
+        // The expectation for tests running under this override method is that they cannot issue a
+        // 'getMore' request, since any cursor-generating request should be served through
+        // _runAndExhaustQueryWithRetryUponMigration().
+        assert(commandName !== 'getMore' || inTransaction, 'Unexpected getMore received');
+        return _runCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs);
+    }
+}
+
+OverrideHelpers.overrideRunCommand(runCommandWithRetryUponMigration);

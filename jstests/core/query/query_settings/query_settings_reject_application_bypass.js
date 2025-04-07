@@ -11,6 +11,8 @@
 //   does_not_support_transactions,
 //   requires_fcv_80,
 //   simulate_mongoq_incompatible,
+//   # This test relies on aggregations returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 //
 
