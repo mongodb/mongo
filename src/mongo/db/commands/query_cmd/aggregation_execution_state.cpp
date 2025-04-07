@@ -670,6 +670,8 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .collUUID(getUUID())
                       .mongoProcessInterface(MongoProcessInterface::create(_aggExState.getOpCtx()))
                       .mayDbProfile(CurOp::get(_aggExState.getOpCtx())->dbProfileLevel() > 0)
+                      .ns(_aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
+                                                        : _aggExState.getExecutionNss())
                       .resolvedNamespace(uassertStatusOK(_aggExState.resolveInvolvedNamespaces()))
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .collationMatchesDefault(collationMatchesDefault)

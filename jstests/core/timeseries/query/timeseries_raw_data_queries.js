@@ -47,6 +47,11 @@ crudTest(() => {
         ],
         {rawData: true});
     assert.eq(agg.toArray().length, 1);
+
+    assert.eq(coll.aggregate([{$indexStats: {}}, {$match: {name: "m_1_t_1"}}], {rawData: true})
+                  .toArray()[0]
+                  .key,
+              {meta: 1, "control.min.t": 1, "control.max.t": 1});
 });
 
 // count()
