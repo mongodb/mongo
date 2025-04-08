@@ -719,7 +719,8 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
                 return true;
             }
         }
-        return false;
+        // Do not return here and fallthrough to cases below. The LHS may be a $or which requires
+        // its own recursive calls to verify.
     }
 
     if (rhs->matchType() == MatchExpression::AND) {

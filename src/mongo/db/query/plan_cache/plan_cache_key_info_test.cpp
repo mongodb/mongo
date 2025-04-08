@@ -323,13 +323,10 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyPartialIndexDisjunction) {
     unique_ptr<CanonicalQuery> conjSingleFieldOverlap(canonicalize("{f: {$gt: 2, $lt: 12}}"));
     ASSERT_EQ(makeKey(*conjSingleFieldOverlap, indexCores).getIndexabilityDiscriminators(), "(0)");
 
-    // Although this query is technically a subset of the partial filter, the logic to determine
-    // such ('isSubsetOf' in the code) is conservative in how it compares certain shapes of
-    // expression trees.
     unique_ptr<CanonicalQuery> disjSingleFieldBothSatisfy(
         canonicalize("{$or: [{f: {$eq: -1}}, {f: {$gt: 10}}]}"));
     ASSERT_EQ(makeKey(*disjSingleFieldBothSatisfy, indexCores).getIndexabilityDiscriminators(),
-              "(0)");
+              "(1)");
 
     unique_ptr<CanonicalQuery> disjSingleFieldNotSubset(
         canonicalize("{$or: [{f: {$eq: 2}}, {f: {$eq: 11}}]}"));

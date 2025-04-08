@@ -836,6 +836,23 @@ TEST(ExpressionAlgoIsSubsetOf, IsSubsetOfComplexRHSExpression) {
     }
 }
 
+TEST(ExpressionAlgoIsSubsetOf, IsSubsetOfRHSDisjunction) {
+    ParsedMatchExpressionForTest rhs("{$or: [{a: 1}, {a: {$gt: 20}}]}");
+    {
+        ParsedMatchExpressionForTest lhs("{$or: [{a: 1}, {a: {$gt: 20}}], b: 5}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
+    }
+    {
+        ParsedMatchExpressionForTest lhs("{$or: [{a: 1}, {a: {$gt: 30}}]}");
+        ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
+    }
+    {
+        // {a: 11, b: 5} is a document which satisfies this predicate but not the rhs.
+        ParsedMatchExpressionForTest lhs("{$or: [{a: 1}, {a: {$gt: 10}}], b: 5}");
+        ASSERT_FALSE(expression::isSubsetOf(lhs.get(), rhs.get()));
+    }
+}
+
 TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

@@ -18,7 +18,7 @@ import {
     assertNoFetchFilter,
     assertStagesForExplainOfCommand,
     getWinningPlanFromExplain,
-    isCollscan,
+    isIxscan,
 } from "jstests/libs/query/analyze_plan.js";
 
 function flagVal(n) {
@@ -216,10 +216,6 @@ fetchFilter = {
 };
 assertFetchFilter({coll: coll, predicate: predicate, expectedFilter: fetchFilter, nReturned: 23});
 
-// Possible optimization: the following query could use a bounded index scan on 'a' and remove the
-// $or sub-predicate as it is covered by the partial index filter. Currently, the index is not
-// considered and a collection scan is used instead.
 const exp =
     coll.find({$and: [{a: {$gte: 90}}, {$or: [{b: {$gte: 80}}, {flag: "true"}]}]}).explain();
-assert(isCollscan(db, exp),
-       "Expected collection scan, got " + tojson(getWinningPlanFromExplain(exp)));
+assert(isIxscan(db, getWinningPlanFromExplain(exp)), "Expected index scan, got " + tojson(exp));
