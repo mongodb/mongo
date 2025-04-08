@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed, wait
 from datetime import datetime
 from typing import Any, TypedDict
 
+import pyzstd
 import typer  # nicer error dump on exceptions
 import yaml
 from progressbar import ProgressBar, progressbar
@@ -119,7 +120,7 @@ def worker(paths: list[bytes]):
         except IndexError:
             return list(all_decls.values())
 
-        with open(path) as f:
+        with pyzstd.ZstdFile(path, read_size=2 * 1024 * 1024) as f:
             merge_decls(json.loads(f.read()))
 
 
@@ -129,7 +130,7 @@ def main(
     generate_yaml: bool = False,
 ):
     timer = Timer()
-    paths = glob.glob(b"bazel-bin/**/*.mod_scanner_decls.json", recursive=True)
+    paths = glob.glob(b"bazel-bin/**/*.mod_scanner_decls.json.zst", recursive=True)
     num_paths = len(paths)
     timer.mark("globbed")
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import re
 
 import yaml
 
@@ -11,8 +10,10 @@ except ImportError:
     # from yaml import Loader, Dumper
 
 import dataclasses
+import functools
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +21,7 @@ from glob import glob
 from pathlib import Path  # if you haven't already done so
 from typing import NoReturn
 
+import pyzstd
 from codeowners import CodeOwners
 
 file = Path(__file__).resolve()
@@ -689,7 +691,15 @@ def main():
         find_usages(mod_for_file(top_level.location.file), top_level)
     timer.mark("found usages")
 
-    with open(out_from_env or "decls.yaml", "w") as f:
+    out_file_name = out_from_env if out_from_env else "decls.yaml"
+    if out_file_name.endswith(".zst"):
+        uncompressed_file_name = out_file_name[: -len(".zst")]
+        open_func = functools.partial(pyzstd.ZstdFile, write_size=2 * 1024 * 1024)
+    else:
+        uncompressed_file_name = out_file_name
+        open_func = open
+
+    with open_func(out_file_name, "wb") as f:
         out = [dict(d.__dict__) for d in decls.values() if d.mod not in skip_mods]
         for decl in out:
             # del decl["spelling"]
@@ -709,10 +719,10 @@ def main():
             out = list(filter(lambda d: d["used_from"], out))
 
         timer.mark("processed")
-        if f.name.endswith(".json"):
-            json.dump(out, f)
+        if uncompressed_file_name.endswith(".json"):
+            f.write(json.dumps(out).encode())
         else:
-            assert f.name.endswith(".yaml")
+            assert out_file_name.endswith(".yaml")
             yaml.dump(out, f, Dumper=Dumper)
         timer.mark("dumped")
 

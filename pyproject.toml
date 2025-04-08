@@ -124,6 +124,7 @@ progressbar2 = { version = "^4.4.2", markers = "platform_machine != 's390x' and 
 textual = {extras = ["syntax"], version = "^1.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 tree-sitter = { version = "^0.24.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 tree-sitter-cpp = { version = "^0.23.4", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+pyzstd = { version =  "^0.16.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 
 [tool.poetry.group.platform.dependencies]
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }

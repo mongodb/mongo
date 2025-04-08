@@ -20,7 +20,7 @@ def _run_mod_scan(
 
     # specify the output file - twice
     outfile = ctx.actions.declare_file(
-        "mod_scanner/" + infile.path + "." + discriminator + ".mod_scanner_decls.json",
+        "mod_scanner/" + infile.path + "." + discriminator + ".mod_scanner_decls.json.zst",
     )
     unused_inputs = ctx.actions.declare_file(
         "mod_scanner/" + infile.path + "." + discriminator + ".mod_scanner.unused_inputs",

@@ -26,5 +26,9 @@ py_binary(
             "codeowners",
             group = "modules_poc",
         ),
+        dependency(
+            "pyzstd",
+            group = "modules_poc",
+        ),
     ],
 )
