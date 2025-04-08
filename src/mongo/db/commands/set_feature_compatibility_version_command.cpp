@@ -163,24 +163,6 @@ MONGO_FAIL_POINT_DEFINE(setFCVPauseAfterReadingConfigDropPedingDBs);
  */
 Lock::ResourceMutex commandMutex("setFCVCommandMutex");
 
-/**
- * Deletes the persisted default read/write concern document.
- */
-void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
-    DBDirectClient client(opCtx);
-    const auto commandResponse = client.runCommand([&] {
-        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigSettingsNamespace);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
-            entry.setMulti(false);
-            return entry;
-        }()});
-        return deleteOp.serialize();
-    }());
-    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
-}
-
 void abortAllReshardCollection(OperationContext* opCtx) {
     auto reshardingCoordinatorService = checked_cast<ReshardingCoordinatorService*>(
         repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
