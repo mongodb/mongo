@@ -39,15 +39,70 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/timer.h"
+
 
 namespace mongo {
+
+// Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
+// that an operation is holding back replication by causing oplog holes to remain open for
+// unusual amounts of time.
+class OplogSlotTimeContext {
+    int64_t _batchCount = 0;
+    Timer _timer;
+    AtomicWord<int64_t> _totalOplogSlotDurationMicros;
+
+public:
+    /**
+     * Increment number of allocated slot batches(via getNextOpTimes) within single unit of work
+     * resets timer on first batch
+     */
+    void incBatchCount() {
+        if (!_batchCount++) {
+            _timer.reset();
+        }
+    }
+
+    /**
+     * Decrement number of allocated slot batches(happens when batch is committed/rolled back)
+     * update duration on last batch
+     */
+    void decBatchCount() {
+        if (!--_batchCount) {
+            _totalOplogSlotDurationMicros.fetchAndAdd(
+                durationCount<Microseconds>(_timer.elapsed()));
+            // no need to reset timer here, will be reset in subsequent increment
+        }
+    }
+
+    /**
+     * Retrieves total number of Microseconds there was an existing unit of work within same
+     * operation context
+     */
+    Microseconds getTotalMicros() const {
+        return Microseconds(_totalOplogSlotDurationMicros.loadRelaxed());
+    }
+
+    auto getBatchCount() const {
+        return _batchCount;
+    }
+
+    const auto& getTimer() const {
+        return _timer;
+    }
+
+    void setTickSource(TickSource* ts) {
+        _timer = Timer(ts);
+    }
+};
+
 
 /**
  * This structure contains per-service-context state related to the oplog.
  */
 class LocalOplogInfo {
 public:
-    static Microseconds getTotalOplogSlotDurationMicros(OperationContext* opCtx);
+    static OplogSlotTimeContext& getOplogSlotTimeContext(OperationContext* opCtx);
     static LocalOplogInfo* get(ServiceContext& service);
     static LocalOplogInfo* get(ServiceContext* service);
     static LocalOplogInfo* get(OperationContext* opCtx);

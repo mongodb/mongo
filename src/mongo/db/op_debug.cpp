@@ -251,7 +251,8 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("placementVersionRefreshDuration", placementVersionRefreshMillis);
     }
 
-    if (auto totalOplogSlotDurationMicros = LocalOplogInfo::getTotalOplogSlotDurationMicros(opCtx);
+    if (auto totalOplogSlotDurationMicros =
+            LocalOplogInfo::getOplogSlotTimeContext(opCtx).getTotalMicros();
         totalOplogSlotDurationMicros > Microseconds::zero()) {
         pAttrs->add("totalOplogSlotDuration", totalOplogSlotDurationMicros);
     }
@@ -674,7 +675,8 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_OPTIONAL(b, "estimatedCardinality", estimatedCardinality);
 
-    if (auto totalOplogSlotDurationMicros = LocalOplogInfo::getTotalOplogSlotDurationMicros(opCtx);
+    if (auto totalOplogSlotDurationMicros =
+            LocalOplogInfo::getOplogSlotTimeContext(opCtx).getTotalMicros();
         totalOplogSlotDurationMicros > Microseconds::zero()) {
         b.appendNumber("totalOplogSlotDurationMicros",
                        durationCount<Microseconds>(totalOplogSlotDurationMicros));
@@ -1041,7 +1043,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 
     addIfNeeded("totalOplogSlotDurationMicros", [](auto field, auto args, auto& b) {
         if (auto totalOplogSlotDurationMicros =
-                LocalOplogInfo::getTotalOplogSlotDurationMicros(args.opCtx);
+                LocalOplogInfo::getOplogSlotTimeContext(args.opCtx).getTotalMicros();
             totalOplogSlotDurationMicros > Microseconds::zero()) {
             b.appendNumber(field, durationCount<Microseconds>(totalOplogSlotDurationMicros));
         }
