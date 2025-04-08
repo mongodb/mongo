@@ -155,6 +155,45 @@ DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
     return _currentBatch.dequeue();
 }
 
+bool DocumentSourceCursor::pullDataFromExecutor(OperationContext* opCtx) {
+    PlanExecutor::ExecState state;
+    Document resultObj;
+
+    while ((state = _exec->getNextDocument(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
+        boost::optional<BSONObj> resumeToken;
+        if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
+            resumeToken = _exec->getPostBatchResumeToken();
+        _currentBatch.enqueue(transformDoc(std::move(resultObj)), std::move(resumeToken));
+
+        // As long as we're waiting for inserts, we shouldn't do any batching at this level we
+        // need the whole pipeline to see each document to see if we should stop waiting.
+        bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
+        if (batchCountFull || _currentBatch.memUsageBytes() > _batchSizeBytes ||
+            awaitDataState(opCtx).shouldWaitForInserts) {
+            // Double the size for next batch when batch is full.
+            if (batchCountFull && overflow::mul(_batchSizeCount, 2, &_batchSizeCount)) {
+                _batchSizeCount = 0;  // Go unlimited if we overflow.
+            }
+            // Return false indicating the executor should not be destroyed.
+            return false;
+        }
+    }
+
+    tassert(10271304, "Expected PlanExecutor to be EOF", state == PlanExecutor::IS_EOF);
+
+    // Keep the inner PlanExecutor alive if the cursor is tailable, since more results may
+    // become available in the future, or if we are tracking the latest oplog resume inforation,
+    // since we will need to retrieve the resume information the executor observed before
+    // hitting EOF.
+    if (_resumeTrackingType != ResumeTrackingType::kNone || pExpCtx->isTailableAwaitData()) {
+        return false;
+    }
+
+    // Return true indicating the executor should be destroyed.
+    return true;
+}
+
+
 void DocumentSourceCursor::loadBatch() {
     if (!_exec || _exec->isDisposed()) {
         // No more documents.
@@ -172,86 +211,55 @@ void DocumentSourceCursor::loadBatch() {
         },
         _exec->nss());
 
-    PlanExecutor::ExecState state;
-    Document resultObj;
-
     tassert(5565800,
             "Expected PlanExecutor to use an external lock policy",
             _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
 
-    // Restore the TransactionResources for this ShardRole collection acquisition. On destruction of
-    // this object, the TransactionResources will be stashed back.
-    tassert(
-        10096100, "Expected _transactionResourcesStasher to exist", _transactionResourcesStasher);
-    HandleTransactionResourcesFromStasher handleTransactionResourcesFromStasher(
-        opCtx, _transactionResourcesStasher.get());
+    // Acquire catalog resources and ensure they are released at the end of this block.
+    _catalogResourceHandle->acquire(opCtx, *_exec);
+    ON_BLOCK_EXIT([&]() { _catalogResourceHandle->release(); });
 
-    if (!shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
-        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
-            opCtx, _exec->nss(), true));
-    }
-
+    _catalogResourceHandle->checkCanServeReads(opCtx, *_exec);
     RestoreContext restoreContext(nullptr);
-    _exec->restoreState(restoreContext);
 
     try {
-        ON_BLOCK_EXIT([&] {
-            recordPlanSummaryStats();
-            try {
-                // At any given time only one operation can own the entirety of resources used by a
-                // multi-document transaction. As we can perform a remote call during the query
-                // execution we will check in the session to avoid deadlocks. If we don't release
-                // the storage engine resources used here then we could have two operations
-                // interacting with resources of a session at the same time. This will leave the
-                // plan in the saved state as a side-effect.
-                _exec->releaseAllAcquiredResources();
-            } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
-                // The storage engine can throw a WriteConflict when releasing resources, as the
-                // operation is failing anyways it's fine to swallow the exception here since
-                // otherwise it will crash the server.
-            } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
-                // The storage engine can also technically throw a TemporarilyUnavailable when
-                // releasing resources, as the operation is failing anyways it's fine to swallow the
-                // exception here since otherwise it will crash the server.
-            }
-        });
+        // As soon as we call restoreState(), the executor may hold onto storage engine
+        // resources. This includes cases where restoreState() throws an exception. We must
+        // guarantee that if an exception is thrown, the executor is cleaned up, along with
+        // references to storage engine resources, before the catalog resources are released.  This
+        // is done in the 'catch' block below.
+        _exec->restoreState(restoreContext);
 
-        while ((state = _exec->getNextDocument(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
-            boost::optional<BSONObj> resumeToken;
-            if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
-                resumeToken = _exec->getPostBatchResumeToken();
-            _currentBatch.enqueue(transformDoc(std::move(resultObj)), std::move(resumeToken));
+        const bool shouldDestroyExec = pullDataFromExecutor(opCtx);
 
-            // As long as we're waiting for inserts, we shouldn't do any batching at this level we
-            // need the whole pipeline to see each document to see if we should stop waiting.
-            bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
-            if (batchCountFull || _currentBatch.memUsageBytes() > _batchSizeBytes ||
-                awaitDataState(opCtx).shouldWaitForInserts) {
-                // Double the size for next batch when batch is full.
-                if (batchCountFull && overflow::mul(_batchSizeCount, 2, &_batchSizeCount)) {
-                    _batchSizeCount = 0;  // Go unlimited if we overflow.
-                }
-                return;
-            }
-        }
+        recordPlanSummaryStats();
 
-        invariant(state == PlanExecutor::IS_EOF);
+        // At any given time only one operation can own the entirety of resources used by a
+        // multi-document transaction. As we can perform a remote call during the query
+        // execution we will check in the session to avoid deadlocks. If we don't release the
+        // storage engine resources used here then we could have two operations interacting with
+        // resources of a session at the same time. This will leave the plan in the saved state
+        // as a side-effect.
+        _exec->releaseAllAcquiredResources();
 
-        // Keep the inner PlanExecutor alive if the cursor is tailable, since more results may
-        // become available in the future, or if we are tracking the latest oplog resume inforation,
-        // since we will need to retrieve the resume information the executor observed before
-        // hitting EOF.
-        if (_resumeTrackingType != ResumeTrackingType::kNone || pExpCtx->isTailableAwaitData()) {
+        if (!shouldDestroyExec) {
             return;
         }
     } catch (...) {
         // Record error details before re-throwing the exception.
         _execStatus = exceptionToStatus().withContext("Error in $cursor stage");
+
+        // '_exec' must be cleaned up before the catalog resources are freed. Since '_exec' is a
+        // member variable, and the catalog resources are maintained via a ScopeGuard within this
+        // function, by default, the catalog resources will be released first. In order to get
+        // around this, we dispose of '_exec' here.
+        doDispose();
+
         throw;
     }
 
     // If we got here, there won't be any more documents and we no longer need our PlanExecutor, so
-    // destroy it.
+    // destroy it, but leave our current batch intact.
     cleanupExecutor();
 }
 
@@ -399,14 +407,13 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 DocumentSourceCursor::DocumentSourceCursor(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
-        transactionResourcesStasher,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const intrusive_ptr<ExpressionContext>& pCtx,
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType)
     : DocumentSource(kStageName, pCtx),
       _currentBatch(cursorType),
-      _transactionResourcesStasher(transactionResourcesStasher),
+      _catalogResourceHandle(catalogResourceHandle),
       _exec(std::move(exec)),
       _resumeTrackingType(resumeTrackingType),
       _queryFramework(_exec->getQueryFramework()) {
@@ -420,8 +427,6 @@ DocumentSourceCursor::DocumentSourceCursor(
     tassert(10240803,
             "Expected enclosed executor to use ShardRole",
             _exec->usesCollectionAcquisitions());
-    tassert(
-        10096101, "Expected _transactionResourcesStasher to exist", _transactionResourcesStasher);
 
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();
@@ -479,14 +484,13 @@ void DocumentSourceCursor::initializeBatchSizeCounts() {
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
-        transactionResourcesStasher,
+    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType) {
     intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(collections,
                                                                         std::move(exec),
-                                                                        transactionResourcesStasher,
+                                                                        catalogResourceHandle,
                                                                         pExpCtx,
                                                                         cursorType,
                                                                         resumeTrackingType));

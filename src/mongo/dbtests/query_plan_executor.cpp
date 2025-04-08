@@ -246,10 +246,12 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
         MultipleCollectionAccessor collections(collection);
         auto transactionResourcesStasher =
             make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        auto catalogResourceHandle =
+            make_intrusive<DSCursorCatalogResourceHandle>(transactionResourcesStasher);
         auto cursorSource =
             DocumentSourceCursor::create(collections,
                                          std::move(innerExec),
-                                         transactionResourcesStasher,
+                                         catalogResourceHandle,
                                          _expCtx,
                                          DocumentSourceCursor::CursorType::kRegular);
         auto pipeline = Pipeline::create({cursorSource}, _expCtx);

@@ -73,6 +73,16 @@ namespace mongo {
  */
 class DocumentSourceCursor : public DocumentSource {
 public:
+    /**
+     * Interface for acquiring and releasing catalog resources needed for DS Cursor.
+     */
+    class CatalogResourceHandle : public RefCountable {
+    public:
+        virtual void acquire(OperationContext*, const PlanExecutor&) = 0;
+        virtual void release() = 0;
+        virtual void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) = 0;
+    };
+
     static constexpr StringData kStageName = "$cursor"_sd;
 
     /**
@@ -100,8 +110,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         const MultipleCollectionAccessor& collections,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
-            transactionResourcesStasher,
+        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         CursorType cursorType,
         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
@@ -192,14 +201,12 @@ public:
     }
 
 protected:
-    DocumentSourceCursor(
-        const MultipleCollectionAccessor& collections,
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
-            transactionResourcesStasher,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        CursorType cursorType,
-        ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
+    DocumentSourceCursor(const MultipleCollectionAccessor& collections,
+                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                         const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         CursorType cursorType,
+                         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
 
     GetNextResult doGetNext() final;
 
@@ -309,6 +316,9 @@ private:
      */
     void loadBatch();
 
+    /**
+     * Records stats about the plan used by '_exec' into '_stats'.
+     */
     void recordPlanSummaryStats();
 
     /**
@@ -333,14 +343,17 @@ private:
      */
     void initializeBatchSizeCounts();
 
+    /**
+     * Helper function that reads data out of the underlying executor and into the current
+     * batch. Returns a boolean indicating whether the executor can be destroyed.
+     */
+    bool pullDataFromExecutor(OperationContext* opCtx);
+
     // Batches results returned from the underlying PlanExecutor.
     Batch _currentBatch;
 
-    // The stasher for the ShardRole::TransactionResources associated with the _exec. Must be
-    // unstashed before executing _exec, and stashed back before returning control to the next
-    // stage.
-    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
-        _transactionResourcesStasher;
+    // Handle on catalog state that can be acquired and released during loadBatch().
+    boost::intrusive_ptr<CatalogResourceHandle> _catalogResourceHandle;
 
     // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
     // collection lock.
@@ -379,6 +392,38 @@ private:
     size_t _batchSizeCount = 0;
     // The size limit in bytes of each batch.
     size_t _batchSizeBytes = 0;
+};
+
+class DSCursorCatalogResourceHandle : public DocumentSourceCursor::CatalogResourceHandle {
+public:
+    DSCursorCatalogResourceHandle(
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher)
+        : _transactionResourcesStasher(std::move(stasher)) {
+        tassert(10096101,
+                "Expected _transactionResourcesStasher to exist",
+                _transactionResourcesStasher);
+    }
+
+    void acquire(OperationContext* opCtx, const PlanExecutor& exec) override {
+        tassert(10271302, "Expected resources to be absent", !_resources);
+        _resources.emplace(opCtx, _transactionResourcesStasher.get());
+    }
+
+    void release() override {
+        _resources.reset();
+    }
+
+    void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
+        if (!shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
+            uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
+                opCtx, exec.nss(), true));
+        }
+    }
+
+private:
+    boost::optional<HandleTransactionResourcesFromStasher> _resources;
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
+        _transactionResourcesStasher;
 };
 
 }  // namespace mongo

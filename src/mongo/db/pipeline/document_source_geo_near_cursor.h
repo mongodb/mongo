@@ -67,7 +67,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceGeoNearCursor> create(
         const MultipleCollectionAccessor&,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&,
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&,
         const boost::intrusive_ptr<ExpressionContext>&,
         boost::optional<FieldPath> distanceField,
         boost::optional<FieldPath> locationField = boost::none,
@@ -79,7 +79,7 @@ private:
     DocumentSourceGeoNearCursor(
         const MultipleCollectionAccessor&,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&,
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&,
         const boost::intrusive_ptr<ExpressionContext>&,
         boost::optional<FieldPath> distanceField,
         boost::optional<FieldPath> locationField,

@@ -180,8 +180,10 @@ protected:
 
             auto transactionResourcesStasher =
                 make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+            auto catalogResourceHandle =
+                make_intrusive<DSCursorCatalogResourceHandle>(transactionResourcesStasher);
             PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-                colls, kNss, &request, pipeline.get(), transactionResourcesStasher);
+                colls, kNss, &request, pipeline.get(), catalogResourceHandle);
 
             // Stash the ShardRole resources.
             stashTransactionResourcesFromOperationContext(operationContext(),

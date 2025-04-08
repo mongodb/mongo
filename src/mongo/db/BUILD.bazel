@@ -3979,6 +3979,7 @@ mongo_cc_unit_test(
         "keypattern_test.cpp",
         "multi_key_path_tracker_test.cpp",
         "update_index_data_test.cpp",
+        "//src/mongo/db/pipeline:document_source_cursor_test.cpp",
     ],
     tags = ["mongo_unittest_fourth_group"],
     target_compatible_with = select({
@@ -3994,6 +3995,7 @@ mongo_cc_unit_test(
         "//src/mongo/client:read_preference",
         "//src/mongo/db:collection_index_usage_tracker",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/util:clock_source_mock",
         "//src/third_party/asio-master:asio",

@@ -696,11 +696,12 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
 
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(sharedStasher);
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(holder,
                                                           expCtx->getNamespaceString(),
                                                           resolvedAggRequest,
                                                           pipeline.get(),
-                                                          sharedStasher,
+                                                          catalogResourceHandle,
                                                           shardFilterPolicy);
 
     // Stash resources to free locks.

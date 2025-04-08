@@ -675,11 +675,12 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
     } else {
         // Complete creation of the initial $cursor stage, if needed.
         auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(sharedStasher);
         PipelineD::attachInnerQueryExecutorToPipeline(aggCatalogState.getCollections(),
                                                       attachCallback,
                                                       std::move(executor),
                                                       pipeline.get(),
-                                                      sharedStasher);
+                                                      catalogResourceHandle);
 
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
         // Any pipeline that relies on calls to mongot requires additional setup.

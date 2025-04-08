@@ -96,7 +96,7 @@ public:
         const MultipleCollectionAccessor&,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
         Pipeline*,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&)>;
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&)>;
 
     /**
      * A tuple to represent the result of query executors, includes a main executor, its pipeline
@@ -150,8 +150,8 @@ public:
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
-            transactionResourcesStasher);
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
+            catalogResourceHandle);
 
     /**
      * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
@@ -166,7 +166,7 @@ public:
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        const boost::intrusive_ptr<DocumentSourceCursor::CatalogResourceHandle>&
             transactionResourcesStasher,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 

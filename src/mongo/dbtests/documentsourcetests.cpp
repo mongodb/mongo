@@ -122,6 +122,25 @@ public:
     }
 
 protected:
+    intrusive_ptr<DocumentSourceCursor> makeAndInitializeCursor(
+        const MultipleCollectionAccessor& collections,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec) {
+        auto transactionResourcesStasher =
+            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        auto catalogResourceHandle =
+            make_intrusive<DSCursorCatalogResourceHandle>(transactionResourcesStasher);
+
+        auto cursor = DocumentSourceCursor::create(collections,
+                                                   std::move(exec),
+                                                   catalogResourceHandle,
+                                                   _ctx,
+                                                   DocumentSourceCursor::CursorType::kRegular);
+
+        // Stash the ShardRole resources.
+        stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());
+        return cursor;
+    }
+
     void createSource(boost::optional<BSONObj> hint = boost::none) {
         // clean up first if this was called before
         _source.reset();
@@ -142,16 +161,7 @@ protected:
                                                     std::move(cq),
                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                     QueryPlannerParams::RETURN_OWNED_DATA));
-        auto transactionResourcesStasher =
-            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-        _source = DocumentSourceCursor::create(MultipleCollectionAccessor(*_coll),
-                                               std::move(exec),
-                                               transactionResourcesStasher,
-                                               _ctx,
-                                               DocumentSourceCursor::CursorType::kRegular);
-
-        // Stash the ShardRole resources.
-        stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());
+        _source = makeAndInitializeCursor(MultipleCollectionAccessor(*_coll), std::move(exec));
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {
@@ -385,18 +395,9 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
         planExecutor->saveState();
 
-        auto transactionResourcesStasher =
-            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
 
-        auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(coll),
-                                                   std::move(planExecutor),
-                                                   transactionResourcesStasher,
-                                                   ctx(),
-                                                   DocumentSourceCursor::CursorType::kRegular);
-
-        // Stash the ShardRole resources.
-        stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());
-
+        auto cursor =
+            makeAndInitializeCursor(MultipleCollectionAccessor(coll), std::move(planExecutor));
         return cursor;
     }();
 
@@ -443,17 +444,9 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
         // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
         planExecutor->saveState();
 
-        auto transactionResourcesStasher =
-            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        auto cursor =
+            makeAndInitializeCursor(MultipleCollectionAccessor(coll), std::move(planExecutor));
 
-        auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(coll),
-                                                   std::move(planExecutor),
-                                                   transactionResourcesStasher,
-                                                   ctx(),
-                                                   DocumentSourceCursor::CursorType::kRegular);
-
-        // Stash the ShardRole resources.
-        stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());
         return cursor;
     }();
 
@@ -510,17 +503,8 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
         // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
         planExecutor->saveState();
 
-        auto transactionResourcesStasher =
-            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-
-        auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(coll),
-                                                   std::move(planExecutor),
-                                                   transactionResourcesStasher,
-                                                   ctx(),
-                                                   DocumentSourceCursor::CursorType::kRegular);
-
-        // Stash the ShardRole resources.
-        stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());
+        auto cursor =
+            makeAndInitializeCursor(MultipleCollectionAccessor(coll), std::move(planExecutor));
         return cursor;
     }();
 
@@ -563,17 +547,8 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
         // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
         planExecutor->saveState();
 
-        auto transactionResourcesStasher =
-            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-
-        auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(coll),
-                                                   std::move(planExecutor),
-                                                   transactionResourcesStasher,
-                                                   ctx(),
-                                                   DocumentSourceCursor::CursorType::kRegular);
-
-        // Stash the ShardRole resources.
-        stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());
+        auto cursor =
+            makeAndInitializeCursor(MultipleCollectionAccessor(coll), std::move(planExecutor));
         return cursor;
     }();
 
