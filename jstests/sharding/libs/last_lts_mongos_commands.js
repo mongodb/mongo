@@ -12,29 +12,15 @@ const commandsRemovedFromMongosSinceLastLTS = [
 // listCommands output of a last LTS version mongos. We will allow these commands to have a test
 // defined without always existing on the mongos being used.
 const commandsAddedToMongosSinceLastLTS = [
-    "abortReshardCollection",
-    "appendOplogNote",
-    "cleanupReshardCollection",
-    "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
     "createSearchIndexes",
     "dropSearchIndex",
-    "fsyncUnlock",
     "getClusterParameter",
     "listSearchIndexes",
     "moveRange",
-    "reshardCollection",
-    "rotateCertificates",
-    "setAllowMigrations",
     "setClusterParameter",
-    "setProfilingFilterGlobally",  // TODO SERVER-73305
     "setUserWriteBlockMode",
-    "testDeprecation",
-    "testDeprecationInVersion2",
     "testInternalTransactions",
-    "testRemoval",
-    "testVersions1And2",
-    "testVersion2",
     "updateSearchIndex",
 ];
