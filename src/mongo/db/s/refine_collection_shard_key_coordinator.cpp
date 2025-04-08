@@ -69,6 +69,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -235,7 +236,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kRemoteIndexValidation,
-            [this, anchor = shared_from_this(), executor] {
+            [this, token, anchor = shared_from_this(), executor] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -255,13 +256,23 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 }
 
                 const auto& ns = nss();
-                auto catalogCache = Grid::get(opCtx)->catalogCache();
+                auto const shardsWithData = getShardsWithDataForCollection(opCtx, ns);
 
-                // From this point on considering a steady state cluster, we do another refresh, in
-                // case a migration committed before the previous command in order to get a fresh
-                // routing data.
-                const auto _ =
-                    uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, ns));
+                // fetch the collection metadata and install it on each shard
+                if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    LOGV2_INFO(
+                        10303102,
+                        "Fetching and installing collection and chunks metadata on all shards",
+                        "ns"_attr = ns);
+
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::sendFetchCollMetadataToShards(
+                        opCtx, ns, shardsWithData, session, executor, token);
+                }
+
+                auto catalogCache = Grid::get(opCtx)->catalogCache();
 
                 shardVersionRetry(
                     opCtx,
@@ -279,7 +290,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                             opCtx,
                             ns.dbName(),
                             validateRequest.toBSON(),
-                            getShardsWithDataForCollection(opCtx, ns),
+                            shardsWithData,
                             **executor,
                             uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns)),
                             true /* throwOnError */);

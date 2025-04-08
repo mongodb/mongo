@@ -339,6 +339,18 @@ void commitDropDatabaseMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
+ *  Sends the `_shardsvrFetchCollMetadata` command to specified target shards.
+ * Each shard will fetch the authoritative collection and chunk metadata for the given namespace
+ * `nss` from the config server and persist it locally in its own shard catalog.
+ */
+void sendFetchCollMetadataToShards(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const std::vector<ShardId>& shardIds,
+                                   const OperationSessionInfo& osi,
+                                   const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                   const CancellationToken& token);
+
+/**
  * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * authoritativeness.
  */

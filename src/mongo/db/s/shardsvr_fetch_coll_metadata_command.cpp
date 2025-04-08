@@ -31,7 +31,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -62,6 +64,10 @@ public:
         return Command::AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
@@ -73,8 +79,14 @@ public:
             // Ensure interruption on step down/up
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
+            // Check command write concern
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+
+            // Assert that the command is running in a retryable write context.
+            uassert(10303100,
+                    "_shardsvrFetchCollMetadata expected to be called within a retryable write",
+                    TransactionParticipant::get(opCtx));
 
             const auto nss = ns();
 
@@ -83,30 +95,20 @@ public:
                     "_shardsvrFetchCollMetadata can only run when migrations are disabled",
                     !sharding_ddl_util::checkAllowMigrations(opCtx, nss));
 
-            // Fetch the collection and chunk metadata from the config server.
             auto collAndChunks = _fetchCollectionAndChunks(opCtx, nss);
 
-            // Persist the collection metadata locally.
-            const auto serializedNs =
-                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+            _persistMetadataLocally(opCtx, nss, collAndChunks);
 
-            DBDirectClient dbClient(opCtx);
-            dbClient.update(NamespaceString::kConfigShardCatalogCollectionsNamespace,
-                            BSON(CollectionType::kNssFieldName << serializedNs),
-                            collAndChunks.first.toBSON(),
-                            true /* upsert */,
-                            false /* multi */);
+            LOGV2_INFO(10140202, "Persisted metadata locally on shard", "ns"_attr = nss);
 
-            // Persist chunk metadata locally.
-            for (const auto& chunk : collAndChunks.second) {
-                dbClient.update(NamespaceString::kConfigShardCatalogChunksNamespace,
-                                BSON(ChunkType::name() << chunk.getName()),
-                                chunk.toConfigBSON(),
-                                true /* upsert */,
-                                false /* multi */);
-            }
-
-            LOGV2(10140202, "Persisted metadata locally on shard", "ns"_attr = nss);
+            // Since no write happened on this txnNumber, we need to make a dummy write so that
+            // secondaries can be aware of this txn.
+            DBDirectClient client(opCtx);
+            client.update(NamespaceString::kServerConfigurationNamespace,
+                          BSON("_id" << Request::kCommandName),
+                          BSON("$inc" << BSON("count" << 1)),
+                          true /* upsert */,
+                          false /* multi */);
         }
 
     private:
@@ -137,6 +139,63 @@ public:
 
             return Grid::get(opCtx)->catalogClient()->getCollectionAndChunks(
                 opCtx, nss, ChunkVersion::IGNORED(), readConcern);
+        }
+
+        void _persistMetadataLocally(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            const std::pair<CollectionType, std::vector<ChunkType>>& collAndChunks) {
+            auto newClient = opCtx->getServiceContext()
+                                 ->getService(ClusterRole::ShardServer)
+                                 ->makeClient("ShardsvrFetchCollMetadata");
+            AlternativeClientRegion acr(newClient);
+            auto newOpCtx =
+                CancelableOperationContext(cc().makeOperationContext(),
+                                           opCtx->getCancellationToken(),
+                                           Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+            auto newOpCtxPtr = newOpCtx.get();
+
+            DBDirectClient dbClient(newOpCtxPtr);
+
+            // Persist Collection Metadata
+            write_ops::UpdateCommandRequest collUpdateReq(
+                NamespaceString::kConfigShardCatalogCollectionsNamespace);
+            {
+                write_ops::UpdateOpEntry entry;
+                const auto serializedNs =
+                    NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+                entry.setQ(BSON(CollectionType::kNssFieldName << serializedNs));
+                entry.setU(collAndChunks.first.toBSON());
+                entry.setUpsert(true);
+                entry.setMulti(false);
+                collUpdateReq.setUpdates({std::move(entry)});
+            }
+
+            collUpdateReq.setWriteConcern(defaultMajorityWriteConcern());
+            write_ops::checkWriteErrors(dbClient.update(collUpdateReq));
+
+            // Persist Chunk Metadata
+            const auto chunks = collAndChunks.second;
+            if (chunks.empty()) {
+                LOGV2_INFO(10303101, "No chunk metadata to persist", "ns"_attr = nss);
+                return;
+            }
+            write_ops::UpdateCommandRequest chunkUpdateReq(
+                NamespaceString::kConfigShardCatalogChunksNamespace);
+            std::vector<write_ops::UpdateOpEntry> chunkUpdates;
+            chunkUpdates.reserve(chunks.size());
+
+            for (const auto& chunk : chunks) {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(ChunkType::name() << chunk.getName()));
+                entry.setU(chunk.toConfigBSON());
+                entry.setUpsert(true);
+                entry.setMulti(false);
+                chunkUpdates.push_back(std::move(entry));
+            }
+            chunkUpdateReq.setUpdates(std::move(chunkUpdates));
+            chunkUpdateReq.setWriteConcern(defaultMajorityWriteConcern());
+            write_ops::checkWriteErrors(dbClient.update(chunkUpdateReq));
         }
     };
 };

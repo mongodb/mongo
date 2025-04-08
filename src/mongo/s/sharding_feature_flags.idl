@@ -174,7 +174,8 @@ feature_flags:
                   for collections and chunks metadata."
     cpp_varname: feature_flags::gShardAuthoritativeCollMetadata
     default: false
-    shouldBeFCVGated: false
+    shouldBeFCVGated: true
+    enable_on_transitional_fcv: false
   # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
   featureFlagSessionsCollectionCoordinatorOnConfigServer:
     description: Feature flag for running the shard collection coordinator on the config server for
