@@ -6,20 +6,25 @@
  * To use raw operations in a test without excluding it
  * from multiversion suites, use the following pattern:
  * ```javascript
- *   import {getRawTimeseriesColl, kRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
+ *   import {
+ *     getTimeseriesCollForRawOps,
+ *	   kRawOperationSpec,
+ *	 } from "jstests/libs/raw_operation_utils.js";
  *
- *   const bucketsColl = getRawTimeseriesColl(db, coll);
+ *   const bucketsColl = getTimeseriesCollForRawOps(db, coll);
  *   let rawBucketsDocs = bucketsColl.find().rawData().toArray();
- *   let rawBucketsDocs = bucketsColl.aggregate([{$match: {}}], kRawOperationSpec).toArray();
+ *   let rawBucketsDocs = bucketsColl.aggregate(
+ *                                [{$match: {}}],
+ (                                kRawOperationSpec).toArray();
  * ```
  * This approach ensures the code works correctly even in versions that
  * do not support raw operations. Specifically:
  * - In versions where raw operations are supported:
- *    - `getRawTimeseriesColl` acts as a no-op and simply returns the original `coll`.
+ *    - `getTimeseriesCollForRawOps` acts as a no-op and simply returns the original `coll`.
  *    - `rawData()` and `kRawOperationSpec` effectively add the `rawData` parameter
  *       to the operation.
  *  - On the other hand, in versions where raw operations are not supported:
- *    - `getRawTimeseriesColl` returns the underlying `system.buckets` collection.
+ *    - `getTimeseriesCollForRawOps` returns the underlying `system.buckets` collection.
  *    - `rawData()` and `kRawOperationSpec` act as no-ops and do not attach any
  *      parameter to the operation.
  */
@@ -64,7 +69,7 @@ export const kRawOperationSpec = kIsRawOperationSupported ? {[kRawOperationField
  *
  * When rawData is not supported this function returns the underlying system.buckets collection.
  */
-export function getRawTimeseriesColl(db, coll) {
+export function getTimeseriesCollForRawOps(db, coll) {
     jsTest.log(`Receinved parameter '${tojson(coll)}' (${typeof coll})`);
     if (kIsRawOperationSupported) {
         return coll;

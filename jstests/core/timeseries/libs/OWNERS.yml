@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-timeseries
+  - "viewless_timeseries_util.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "timeseries.js":
     approvers:
       - 10gen/server-collection-write-path

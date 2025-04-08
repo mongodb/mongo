@@ -45,6 +45,13 @@ export function getTimeseriesBucketsColl(coll) {
             tojson(coll)}' (${typeof coll})`);
 }
 
+export function getTimeseriesCollForDDLOps(db, coll) {
+    if (areViewlessTimeseriesEnabled(db)) {
+        return coll;
+    }
+    return getTimeseriesBucketsColl(coll);
+}
+
 /**
  * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
  * FixtureHelpers::isSharded on the given collection.
