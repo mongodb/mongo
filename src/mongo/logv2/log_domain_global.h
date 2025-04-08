@@ -56,7 +56,7 @@ public:
         std::string filePath;
         RotationMode fileRotationMode{RotationMode::kRename};
         OpenMode fileOpenMode{OpenMode::kTruncate};
-        LogTimestampFormat timestampFormat{LogTimestampFormat::kISO8601UTC};
+        LogTimestampFormat timestampFormat{LogTimestampFormat::kISO8601Local};
         bool syslogEnabled{false};
         int syslogFacility{-1};  // invalid facility by default, must be set
         LogFormat format{LogFormat::kDefault};
