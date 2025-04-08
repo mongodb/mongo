@@ -73,8 +73,9 @@ typedef std::pair<CollectionMetadata, boost::optional<ShardingIndexesCatalogCach
  * See the comments for CollectionShardingState for more information on how this class fits in the
  * sharding architecture.
  */
-class CollectionShardingRuntime final : public CollectionShardingState,
-                                        public Decorable<CollectionShardingRuntime> {
+class MONGO_MOD_USE_REPLACEMENT(CollectionShardingState) CollectionShardingRuntime final
+    : public CollectionShardingState,
+      public Decorable<CollectionShardingRuntime> {
     CollectionShardingRuntime(const CollectionShardingRuntime&) = delete;
     CollectionShardingRuntime& operator=(const CollectionShardingRuntime&) = delete;
 

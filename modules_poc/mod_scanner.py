@@ -95,24 +95,33 @@ DETAIL_REGEX = re.compile(r"(detail|internal)s?$")
 
 def get_visibility(c: Cursor, scanning_parent=False):
     if is_tu(c):
-        return "UNKNOWN"  # break recursion
+        return ("UNKNOWN", None)  # break recursion
 
-    prefix = "mongo::mod::"
-    shallow = "shallow::"
     if c.has_attrs():
         for child in c.get_children():
             if child.kind != CursorKind.ANNOTATE_ATTR:
                 continue
-            attr = child.spelling
-            if not attr.startswith(prefix):
+            terms = child.spelling.split("::")
+            if not (len(terms) >= 3 and terms.pop(0) == "mongo" and terms.pop(0) == "mod"):
                 continue
-            attr = attr[len(prefix) :]
-            if attr.startswith(shallow):
+            if terms[0] == "shallow":
+                terms.pop(0)
+                assert terms
                 if scanning_parent:
                     continue  # shallow doesn't apply to children
-                attr = attr[len(shallow) :]
-            assert attr in ("public", "private", "unfortunately_public")
-            return attr
+            attr = terms.pop(0)
+            if terms:
+                alt = "::".join(terms)
+                assert attr in ("use_replacement",)
+            else:
+                alt = None
+                assert attr in (
+                    "public",
+                    "private",
+                    "file_private",
+                    "needs_replacement",
+                )
+            return (attr, alt)
 
     # Some rules for implicitly private decls
     # TODO: Unfortunately these rules are violated on 64 declarations,
@@ -216,6 +225,7 @@ class Decl:
     defined: bool
     spelling: str
     visibility: str
+    alt: str
     sem_par: str
     lex_par: str
     used_from: dict[str, set[str]] = dataclasses.field(default_factory=dict, compare=False)
@@ -225,6 +235,7 @@ class Decl:
 
     @staticmethod
     def from_cursor(c: Cursor, mod=None):
+        vis, alt = get_visibility(c)
         return Decl(
             display_name=fully_qualified(c),
             spelling=c.spelling,
@@ -235,7 +246,8 @@ class Decl:
             kind=c.kind.name,
             mod=mod or mod_for_file(c.location.file),
             defined=c.is_definition(),
-            visibility=get_visibility(c),
+            visibility=vis,
+            alt=alt,
             sem_par=c.semantic_parent.get_usr(),
             lex_par=c.lexical_parent.get_usr(),
         )

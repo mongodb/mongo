@@ -62,6 +62,7 @@ class Decl:
     defined: bool
     spelling: str
     visibility: str
+    alt: str
     sem_par: str
     lex_par: str
     used_from: Usages

@@ -263,7 +263,7 @@ public:
      * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
      * chained to the resulting Future may run in unexpected places.
      */
-    MONGO_MOD_UNFORTUNATELY_PUB Future<T> unsafeToInlineFuture() && noexcept;
+    MONGO_MOD_NEEDS_REPLACEMENT Future<T> unsafeToInlineFuture() && noexcept;
 
 private:
     friend class Promise<T>;
@@ -1031,7 +1031,7 @@ public:
      * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
      * chained to the resulting Future may run in unexpected places.
      */
-    MONGO_MOD_UNFORTUNATELY_PUB Future<T> unsafeToInlineFuture() const noexcept {
+    MONGO_MOD_NEEDS_REPLACEMENT Future<T> unsafeToInlineFuture() const noexcept {
         return Future<T>(toFutureImpl());
     }
 

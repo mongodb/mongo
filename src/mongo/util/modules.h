@@ -35,10 +35,20 @@
 #define MONGO_MOD_PUB MONGO_MOD_ATTR_(public)
 
 /** Marks a declaration and everything inside as unfortunately public to other modules */
-#define MONGO_MOD_UNFORTUNATELY_PUB MONGO_MOD_ATTR_(unfortunately_public)
+#define MONGO_MOD_NEEDS_REPLACEMENT MONGO_MOD_ATTR_(needs_replacement)
+#define MONGO_MOD_USE_REPLACEMENT(replacement) MONGO_MOD_ATTR_(use_replacement::replacement)
+
+/**
+ * Marks a declaration and everything inside it public. Should only be used for things that should
+ * be private, but can't be marked so due to limitations with the scanner.
+ */
+#define MONGO_MOD_PUB_FOR_TECHNICAL_REASONS MONGO_MOD_ATTR_(public)
 
 /** Marks a declaration and everything inside as private from other modules */
 #define MONGO_MOD_PRIVATE MONGO_MOD_ATTR_(private)
+
+/** Stronger form of private, restricts usage to the same family of h, cpp, and test.cpp files. */
+#define MONGO_MOD_FILE_PRIVATE MONGO_MOD_ATTR_(file_private)
 
 /**
  * Marks a declaration as public but not the insides,
@@ -50,7 +60,9 @@
  * Marks a declaration as unfortunately public but not the insides,
  * eg to allow fine-grained control over a class.
  */
-#define MONGO_MOD_SHALLOW_UNFORTUNATELY_PUB MONGO_MOD_ATTR_(shallow::unfortunately_public)
+#define MONGO_MOD_SHALLOW_NEEDS_REPLACEMENT MONGO_MOD_ATTR_(shallow::needs_replacement)
+#define MONGO_MOD_SHALLOW_USE_REPLACEMENT(replacement) \
+    MONGO_MOD_ATTR_(shallow::use_replacement::replacement)
 
 //
 // Implementation details for MONGO_MOD macros
