@@ -272,10 +272,8 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
             }
         })
         .then(_buildPhaseHandler(
-            Phase::kSetClusterParameter, [this, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            Phase::kSetClusterParameter,
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 // Get cluster parameter value stored on disk.
                 const auto persistedClusterParameter = _getPersistedClusterParameter(opCtx);
 

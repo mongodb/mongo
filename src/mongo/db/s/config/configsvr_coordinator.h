@@ -190,7 +190,7 @@ protected:
 
     template <typename Func>
     auto _buildPhaseHandler(const Phase& newPhase, Func&& handlerFn)
-    requires(std::is_invocable_r_v<void, Func>)
+    requires(std::is_invocable_r_v<void, Func, OperationContext*>)
     {
         return [=, this] {
             const auto& currPhase = _doc.getPhase();
@@ -203,7 +203,10 @@ protected:
                 // Persist the new phase if this is the first time we are executing it.
                 _enterPhase(newPhase);
             }
-            return handlerFn();
+
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            return handlerFn(opCtx);
         };
     }
 

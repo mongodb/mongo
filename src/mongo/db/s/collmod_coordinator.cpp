@@ -313,11 +313,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
         })
         .then([this, executor = executor, anchor = shared_from_this()] {
             _buildPhaseHandler(
-                Phase::kFreezeMigrations, [this, executor = executor, anchor = shared_from_this()] {
-                    auto opCtxHolder = cc().makeOperationContext();
-                    auto* opCtx = opCtxHolder.get();
-                    getForwardableOpMetadata().setOn(opCtx);
-
+                Phase::kFreezeMigrations,
+                [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                     _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
                     if (_collInfo->isTracked) {
@@ -331,11 +328,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kBlockShards,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
@@ -356,12 +349,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kUpdateConfig,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 collModBeforeConfigServerUpdate.pauseWhileSet();
-
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
@@ -381,11 +370,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 }
             }))
         .then(_buildPhaseHandler(
-            Phase::kUpdateShards, [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            Phase::kUpdateShards,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 

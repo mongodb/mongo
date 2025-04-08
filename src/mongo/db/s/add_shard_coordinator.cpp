@@ -52,10 +52,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kCheckLocalPreconditions,
-            [this, _ = shared_from_this()]() {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            [this, _ = shared_from_this()](auto* opCtx) {
                 // TODO(SERVER-97816): Remove this call after old add shard path does not exist
                 // anymore
                 topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
@@ -75,10 +72,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
         .onError([](const Status& status) { return status; })
         .then(_buildPhaseHandler(
             Phase::kCheckShardPreconditions,
-            [this, &token, _ = shared_from_this(), executor]() {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            [this, &token, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
 
                 try {
@@ -129,10 +123,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kPrepareNewShard,
             [this, _ = shared_from_this()] { return !_doc.getIsConfigShard(); },
-            [this, _ = shared_from_this(), executor]() {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            [this, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
 
                 // (Generic FCV reference): These FCV checks should exist across LTS binary
@@ -165,10 +156,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
-            [this, _ = shared_from_this(), executor]() {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            [this, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
 
                 auto dbList = topology_change_helpers::getDBNamesListFromReplicaSet(
@@ -250,18 +238,12 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kCleanup,
-            [this, _ = shared_from_this(), executor]() {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            [this, _ = shared_from_this(), executor](auto* opCtx) {
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
                     opCtx, _getTargeter(opCtx), **executor);
             }))
         .then(_buildPhaseHandler(Phase::kFinal,
-                                 [this, _ = shared_from_this()]() {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-
+                                 [this, _ = shared_from_this()](auto* opCtx) {
                                      // If we reach the final phase that means we added a shard (or
                                      // was already added).
                                      // If we were not able to add anything then an assert should

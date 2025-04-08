@@ -246,7 +246,8 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
         });
 }
 
-bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
+bool doRenameOperation(OperationContext* opCtx,
+                       const CleanupStructuredEncryptionDataState& state,
                        boost::optional<UUID>* newEcocRenameUuid,
                        FLECompactESCDeleteSet* escDeleteSet,
                        ECStats* escStats) {
@@ -255,11 +256,10 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
 
     const auto& ecocNss = state.getEcocNss();
     const auto& ecocRenameNss = state.getEcocRenameNss();
-    auto opCtx = cc().makeOperationContext();
 
     bool needRename, needEcocCreate, needCleanup;
 
-    checkRequiredOperation(state, opCtx.get(), &needRename, &needEcocCreate, &needCleanup);
+    checkRequiredOperation(state, opCtx, &needRename, &needEcocCreate, &needCleanup);
 
     *newEcocRenameUuid = state.getEcocRenameUuid();
 
@@ -274,7 +274,7 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
                     .getMaxCompactionSize();
 
             *escDeleteSet =
-                readRandomESCNonAnchorIds(opCtx.get(), state.getEscNss(), memoryLimit, escStats);
+                readRandomESCNonAnchorIds(opCtx, state.getEscNss(), memoryLimit, escStats);
         }
 
         // Perform the rename so long as the target namespace does not exist.
@@ -283,7 +283,7 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
         cmd.setCollectionUUID(state.getEcocUuid().value());
         cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
-        uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
+        uassertStatusOK(doRunCommand(opCtx, DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();
     }
 
@@ -294,14 +294,15 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
         }
 
         // Create the new ECOC collection
-        createQEClusteredStateCollection(opCtx.get(), ecocNss);
+        createQEClusteredStateCollection(opCtx, ecocNss);
     }
 
     // returns whether we can skip the remaining phases of cleanup
     return !needCleanup;
 }
 
-FLECleanupESCDeleteQueue doCleanupOperation(const CleanupStructuredEncryptionDataState& state,
+FLECleanupESCDeleteQueue doCleanupOperation(OperationContext* opCtx,
+                                            const CleanupStructuredEncryptionDataState& state,
                                             const FLECompactESCDeleteSet& escDeleteSet,
                                             ECStats* escStats,
                                             ECOCStats* ecocStats) {
@@ -321,7 +322,6 @@ FLECleanupESCDeleteQueue doCleanupOperation(const CleanupStructuredEncryptionDat
     namespaces.escNss = state.getEscNss();
     namespaces.ecocNss = state.getEcocNss();
     namespaces.ecocRenameNss = state.getEcocRenameNss();
-    auto opCtx = cc().makeOperationContext();
     CleanupStructuredEncryptionData request(namespaces.edcNss, state.getCleanupTokens());
 
     auto pqMemLimit =
@@ -330,7 +330,7 @@ FLECleanupESCDeleteQueue doCleanupOperation(const CleanupStructuredEncryptionDat
             ->getValue(boost::none)
             .getMaxAnchorCompactionSize();
 
-    auto pq = processFLECleanup(opCtx.get(),
+    auto pq = processFLECleanup(opCtx,
                                 request,
                                 &getTransactionWithRetriesForMongoS,
                                 namespaces,
@@ -349,12 +349,13 @@ FLECleanupESCDeleteQueue doCleanupOperation(const CleanupStructuredEncryptionDat
             ->getValue(boost::none)
             .getMaxESCEntriesPerCompactionDelete();
 
-    cleanupESCNonAnchors(opCtx.get(), namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);
+    cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);
 
     return pq;
 }
 
-void doAnchorRemovalOperation(const CleanupStructuredEncryptionDataState& state,
+void doAnchorRemovalOperation(OperationContext* opCtx,
+                              const CleanupStructuredEncryptionDataState& state,
                               FLECleanupESCDeleteQueue& pq,
                               ECStats* escStats) {
     LOGV2_DEBUG(7647915,
@@ -367,11 +368,10 @@ void doAnchorRemovalOperation(const CleanupStructuredEncryptionDataState& state,
         return;
     }
 
-    auto opCtx = cc().makeOperationContext();
     auto escNss = state.getEscNss();
 
     doAnchorCleanupWithUpdatedCollectionState(
-        opCtx.get(),
+        opCtx,
         escNss,
         pq,
         "anchor deletes phase of queryable encryption cleanup coordinator"_sd,
@@ -383,7 +383,7 @@ void doAnchorRemovalOperation(const CleanupStructuredEncryptionDataState& state,
     }
 }
 
-void doDropOperation(const CleanupStructuredEncryptionDataState& state) {
+void doDropOperation(OperationContext* opCtx, const CleanupStructuredEncryptionDataState& state) {
     LOGV2_DEBUG(
         7647918, 1, "Queryable Encryption cleanup entered drop phase", "state"_attr = state);
 
@@ -392,13 +392,12 @@ void doDropOperation(const CleanupStructuredEncryptionDataState& state) {
         return;
     }
 
-    auto opCtx = cc().makeOperationContext();
-    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto catalog = CollectionCatalog::get(opCtx);
     auto ecocCompactNss = state.getEcocRenameNss();
-    auto ecocCompactUuid = catalog->lookupUUIDByNSS(opCtx.get(), ecocCompactNss);
+    auto ecocCompactUuid = catalog->lookupUUIDByNSS(opCtx, ecocCompactNss);
 
     if (ecocCompactUuid) {
-        dropQEStateCollection(opCtx.get(), ecocCompactNss, state.getEcocRenameUuid());
+        dropQEStateCollection(opCtx, ecocCompactNss, state.getEcocRenameUuid());
     } else {
         LOGV2_DEBUG(7647921,
                     1,
@@ -459,50 +458,53 @@ ExecutorFuture<void> CleanupStructuredEncryptionDataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kRenameEcocForCleanup,
-                                 [this, anchor = shared_from_this()]() {
-                                     // if this was resumed from an interrupt, the _escDeleteSet
-                                     // might not be empty, so clear it.
-                                     _escDeleteSet.clear();
+        .then(_buildPhaseHandler(
+            Phase::kRenameEcocForCleanup,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                // if this was resumed from an interrupt, the _escDeleteSet
+                // might not be empty, so clear it.
+                _escDeleteSet.clear();
 
-                                     ECStats phaseEscStats;
-                                     boost::optional<UUID> ecocRenameUuid;
+                ECStats phaseEscStats;
+                boost::optional<UUID> ecocRenameUuid;
 
-                                     bool skipCleanup = doRenameOperation(
-                                         _doc, &ecocRenameUuid, &_escDeleteSet, &phaseEscStats);
+                bool skipCleanup =
+                    doRenameOperation(opCtx, _doc, &ecocRenameUuid, &_escDeleteSet, &phaseEscStats);
 
-                                     updateCleanupStats(ECOCStats{}, phaseEscStats);
+                updateCleanupStats(ECOCStats{}, phaseEscStats);
 
-                                     stdx::lock_guard lg(_docMutex);
-                                     _doc.setSkipCleanup(skipCleanup);
-                                     _doc.setEcocRenameUuid(ecocRenameUuid);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kCleanupStructuredEncryptionData,
-                                 [this, anchor = shared_from_this()]() {
-                                     ECStats phaseEscStats;
-                                     ECOCStats phaseEcocStats;
+                stdx::lock_guard lg(_docMutex);
+                _doc.setSkipCleanup(skipCleanup);
+                _doc.setEcocRenameUuid(ecocRenameUuid);
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kCleanupStructuredEncryptionData,
+            [this, anchor = shared_from_this()](auto* opCtx) {
+                ECStats phaseEscStats;
+                ECOCStats phaseEcocStats;
 
-                                     _escAnchorDeleteQueue = doCleanupOperation(
-                                         _doc, _escDeleteSet, &phaseEscStats, &phaseEcocStats);
-                                     updateCleanupStats(phaseEcocStats, phaseEscStats);
-                                 }))
+                _escAnchorDeleteQueue =
+                    doCleanupOperation(opCtx, _doc, _escDeleteSet, &phaseEscStats, &phaseEcocStats);
+                updateCleanupStats(phaseEcocStats, phaseEscStats);
+            }))
         .then(_buildPhaseHandler(Phase::kDeleteAnchors,
-                                 [this, anchor = shared_from_this()]() {
+                                 [this, anchor = shared_from_this()](auto* opCtx) {
                                      ECStats phaseEscStats;
 
                                      doAnchorRemovalOperation(
-                                         _doc, _escAnchorDeleteQueue, &phaseEscStats);
+                                         opCtx, _doc, _escAnchorDeleteQueue, &phaseEscStats);
                                      updateCleanupStats(ECOCStats{}, phaseEscStats);
                                  }))
-        .then(_buildPhaseHandler(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
-            ECStats phaseEscStats = _doc.getEscStats().value_or(ECStats{});
-            ECOCStats phaseEcocStats = _doc.getEcocStats().value_or(ECOCStats{});
+        .then(_buildPhaseHandler(
+            Phase::kDropTempCollection, [this, anchor = shared_from_this()](auto* opCtx) {
+                ECStats phaseEscStats = _doc.getEscStats().value_or(ECStats{});
+                ECOCStats phaseEcocStats = _doc.getEcocStats().value_or(ECOCStats{});
 
-            _response = CleanupStructuredEncryptionDataCommandReply(
-                CleanupStats(phaseEcocStats, phaseEscStats));
+                _response = CleanupStructuredEncryptionDataCommandReply(
+                    CleanupStats(phaseEcocStats, phaseEscStats));
 
-            doDropOperation(_doc);
-        }));
+                doDropOperation(opCtx, _doc);
+            }));
 }
 
 }  // namespace mongo

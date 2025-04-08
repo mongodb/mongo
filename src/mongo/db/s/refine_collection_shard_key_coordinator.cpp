@@ -236,11 +236,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kRemoteIndexValidation,
-            [this, token, anchor = shared_from_this(), executor] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
                     _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
@@ -298,11 +294,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kBlockCrud,
-            [this, token, anchor = shared_from_this(), executor] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
                     _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
@@ -340,11 +332,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
-            [this, token, anchor = shared_from_this(), executor] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
                     _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
@@ -379,11 +367,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kReleaseCritSec,
-            [this, token, anchor = shared_from_this(), executor] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
                     _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
@@ -404,11 +388,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kResumeMigrations,
-            [this, token, anchor = shared_from_this(), executor] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 notifyChangeStreamsOnRefineCollectionShardKeyComplete(
                     opCtx, nss(), _doc.getNewShardKey(), _doc.getOldKey().get(), *_doc.getUuid());
                 {

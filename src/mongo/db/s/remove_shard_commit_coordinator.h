@@ -78,7 +78,7 @@ private:
 
     // Joins migrations on the config server if we are transitioning from dedicated and checks
     // if there are range deletions to wait for.
-    void _joinMigrationsAndCheckRangeDeletions();
+    void _joinMigrationsAndCheckRangeDeletions(OperationContext* opCtx);
 
     // Stops ongoing ddl operations (excluding topology changes) and waits for any ongoing
     // coordinators to complete.

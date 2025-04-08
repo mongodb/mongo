@@ -178,16 +178,16 @@ void checkRequiredOperation(const CompactionState& state,
 }
 
 template <class CompactionState>
-bool doRenameOperation(const CompactionState& state,
+bool doRenameOperation(OperationContext* opCtx,
+                       const CompactionState& state,
                        boost::optional<UUID>* newEcocRenameUuid,
                        FLECompactESCDeleteSet* escDeleteSet,
                        ECStats* escStats) {
     const auto& ecocNss = state.getEcocNss();
     const auto& ecocRenameNss = state.getEcocRenameNss();
-    auto opCtx = cc().makeOperationContext();
 
     bool needRename, needCreate, needCompact;
-    checkRequiredOperation(state, opCtx.get(), &needRename, &needCreate, &needCompact);
+    checkRequiredOperation(state, opCtx, &needRename, &needCreate, &needCompact);
 
     *newEcocRenameUuid = state.getEcocRenameUuid();
 
@@ -203,7 +203,7 @@ bool doRenameOperation(const CompactionState& state,
                     .getMaxCompactionSize();
 
             *escDeleteSet =
-                readRandomESCNonAnchorIds(opCtx.get(), state.getEscNss(), memoryLimit, escStats);
+                readRandomESCNonAnchorIds(opCtx, state.getEscNss(), memoryLimit, escStats);
         }
 
         // Perform the rename so long as the target namespace does not exist.
@@ -212,7 +212,7 @@ bool doRenameOperation(const CompactionState& state,
         cmd.setCollectionUUID(state.getEcocUuid().value());
         cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 
-        uassertStatusOK(doRunCommand(opCtx.get(), DatabaseName::kAdmin, cmd));
+        uassertStatusOK(doRunCommand(opCtx, DatabaseName::kAdmin, cmd));
         *newEcocRenameUuid = state.getEcocUuid();
     }
 
@@ -230,7 +230,7 @@ bool doRenameOperation(const CompactionState& state,
             std::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
         createCmd.setCreateCollectionRequest(std::move(request));
         createCmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
-        auto status = doRunCommand(opCtx.get(), ecocNss.dbName(), createCmd);
+        auto status = doRunCommand(opCtx, ecocNss.dbName(), createCmd);
         if (!status.isOK()) {
             if (status != ErrorCodes::NamespaceExists) {
                 uassertStatusOK(status);
@@ -251,7 +251,8 @@ bool doRenameOperation(const CompactionState& state,
     return !needCompact;
 }
 
-void doCompactOperation(const CompactStructuredEncryptionDataState& state,
+void doCompactOperation(OperationContext* opCtx,
+                        const CompactStructuredEncryptionDataState& state,
                         const FLECompactESCDeleteSet& escDeleteSet,
                         ECStats* escStats,
                         ECOCStats* ecocStats) {
@@ -265,13 +266,12 @@ void doCompactOperation(const CompactStructuredEncryptionDataState& state,
     namespaces.escNss = state.getEscNss();
     namespaces.ecocNss = state.getEcocNss();
     namespaces.ecocRenameNss = state.getEcocRenameNss();
-    auto opCtx = cc().makeOperationContext();
     CompactStructuredEncryptionData request(namespaces.edcNss, state.getCompactionTokens());
     request.setEncryptionInformation(state.getEncryptionInformation());
     request.setAnchorPaddingFactor(state.getAnchorPaddingFactor());
 
     processFLECompactV2(
-        opCtx.get(), request, &getTransactionWithRetriesForMongoS, namespaces, escStats, ecocStats);
+        opCtx, request, &getTransactionWithRetriesForMongoS, namespaces, escStats, ecocStats);
 
     if (MONGO_unlikely(fleCompactHangBeforeESCCleanup.shouldFail())) {
         LOGV2(7472702, "Hanging due to fleCompactHangBeforeESCCleanup fail point");
@@ -284,11 +284,11 @@ void doCompactOperation(const CompactStructuredEncryptionDataState& state,
             ->getValue(boost::none)
             .getMaxESCEntriesPerCompactionDelete();
 
-    cleanupESCNonAnchors(opCtx.get(), namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);
+    cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);
 }
 
 template <class State>
-void doDropOperation(const State& state) {
+void doDropOperation(OperationContext* opCtx, const State& state) {
     if (state.getSkipCompact()) {
         LOGV2_DEBUG(6517006, 1, "Skipping drop of temporary encrypted compaction collection");
         return;
@@ -298,10 +298,9 @@ void doDropOperation(const State& state) {
             "Cannot drop temporary encrypted compaction collection due to missing collection UUID",
             state.getEcocRenameUuid().has_value());
 
-    auto opCtx = cc().makeOperationContext();
-    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto catalog = CollectionCatalog::get(opCtx);
     auto ecocNss = state.getEcocRenameNss();
-    auto ecocUuid = catalog->lookupUUIDByNSS(opCtx.get(), ecocNss);
+    auto ecocUuid = catalog->lookupUUIDByNSS(opCtx, ecocNss);
 
     if (!ecocUuid) {
         LOGV2_DEBUG(
@@ -319,7 +318,7 @@ void doDropOperation(const State& state) {
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
     cmd.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
-    uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.dbName(), cmd));
+    uassertStatusOK(doRunCommand(opCtx, ecocNss.dbName(), cmd));
 }
 
 }  // namespace
@@ -355,14 +354,14 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(Phase::kRenameEcocForCompact,
-                                 [this, anchor = shared_from_this()]() {
+                                 [this, anchor = shared_from_this()](auto* opCtx) {
                                      // if this was resumed from an interrupt, the _escDeleteSet
                                      // might not be empty, so clear it.
                                      _escDeleteSet.clear();
                                      _escStats = ECStats();
 
                                      _skipCompact = doRenameOperation(
-                                         _doc, &_ecocRenameUuid, &_escDeleteSet, &_escStats);
+                                         opCtx, _doc, &_ecocRenameUuid, &_escDeleteSet, &_escStats);
 
                                      stdx::lock_guard lg{_docMutex};
                                      _doc.setSkipCompact(_skipCompact);
@@ -371,11 +370,11 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                                  }))
         .then(_buildPhaseHandler(
             Phase::kCompactStructuredEncryptionData,
-            [this, anchor = shared_from_this()]() {
+            [this, anchor = shared_from_this()](auto* opCtx) {
                 _escStats = _doc.getEscStats().value_or(ECStats{});
                 _ecocStats = _doc.getEcocStats().value_or(ECOCStats{});
 
-                doCompactOperation(_doc, _escDeleteSet, &_escStats, &_ecocStats);
+                doCompactOperation(opCtx, _doc, _escDeleteSet, &_escStats, &_ecocStats);
 
                 FLEStatusSection::get().updateCompactionStats(CompactStats(_ecocStats, _escStats));
 
@@ -383,17 +382,19 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                 _doc.setEscStats(_escStats);
                 _doc.setEcocStats(_ecocStats);
             }))
-        .then(_buildPhaseHandler(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
-            _escStats = _doc.getEscStats().value_or(ECStats{});
-            _ecocStats = _doc.getEcocStats().value_or(ECOCStats{});
-            _response =
-                CompactStructuredEncryptionDataCommandReply(CompactStats(_ecocStats, _escStats));
-            doDropOperation(_doc);
-            if (MONGO_unlikely(fleCompactHangAfterDropTempCollection.shouldFail())) {
-                LOGV2(7472705, "Hanging due to fleCompactHangAfterDropTempCollection fail point");
-                fleCompactHangAfterDropTempCollection.pauseWhileSet();
-            }
-        }));
+        .then(_buildPhaseHandler(
+            Phase::kDropTempCollection, [this, anchor = shared_from_this()](auto* opCtx) {
+                _escStats = _doc.getEscStats().value_or(ECStats{});
+                _ecocStats = _doc.getEcocStats().value_or(ECOCStats{});
+                _response = CompactStructuredEncryptionDataCommandReply(
+                    CompactStats(_ecocStats, _escStats));
+                doDropOperation(opCtx, _doc);
+                if (MONGO_unlikely(fleCompactHangAfterDropTempCollection.shouldFail())) {
+                    LOGV2(7472705,
+                          "Hanging due to fleCompactHangAfterDropTempCollection fail point");
+                    fleCompactHangAfterDropTempCollection.pauseWhileSet();
+                }
+            }));
 }
 
 }  // namespace mongo

@@ -70,12 +70,15 @@ private:
 
     void _checkPreconditions();
 
-    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    void _enterCriticalSection(OperationContext* opCtx,
+                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                const CancellationToken& token);
 
-    void _commitUntrackCollection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _commitUntrackCollection(OperationContext* opCtx,
+                                  std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    void _exitCriticalSection(OperationContext* opCtx,
+                              std::shared_ptr<executor::ScopedTaskExecutor> executor,
                               const CancellationToken& token);
 
     void _fireAndForgetRefresh();

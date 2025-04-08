@@ -148,29 +148,32 @@ private:
 
     // Check the command arguments passed and validate that the collection has not been tracked from
     // another request.
-    void _checkPreconditions();
+    void _checkPreconditions(OperationContext* opCtx);
 
     // Enter to the critical section on the coordinator for the namespace and its buckets namespace.
     // Only blocks writes.
-    void _enterWriteCriticalSectionOnCoordinator();
+    void _enterWriteCriticalSectionOnCoordinator(OperationContext* opCtx);
 
     // Translate the request parameters and persist them in the coordinator document.
-    void _translateRequestParameters();
+    void _translateRequestParameters(OperationContext* opCtx);
 
     // Enter to the critical section on the coordinator for the namespace and its buckets namespace.
     // Only blocks writes. Additionally, checks if the collection is empty and sets the
     // collectionExistsAndIsEmpty parameter on the coordiantor document.
     void _enterWriteCriticalSectionOnDataShardAndCheckCollectionEmpty(
+        OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& token);
 
     // Clone the indexes from the data shard to the coordinator. This ensures that the coordinator
     // has the most up to date indexes.
-    void _syncIndexesOnCoordinator(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    void _syncIndexesOnCoordinator(OperationContext* opCtx,
+                                   const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                    const CancellationToken& token);
 
     // Ensure that the collection is created locally and build the shard key index if necessary.
     void _createCollectionOnCoordinator(
+        OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& token);
 
@@ -184,7 +187,8 @@ private:
         CriticalSectionBlockTypeEnum blockType);
 
     // Enter to the critical section on all the shards. Blocks writes and reads.
-    void _enterCriticalSection(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    void _enterCriticalSection(OperationContext* opCtx,
+                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                const CancellationToken& token);
 
     // Fetches the collection options and indexes from the specified shard.
@@ -193,18 +197,21 @@ private:
 
     // Broadcast create collection to the other shards.
     void _createCollectionOnParticipants(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Commits the create collection operation to the sharding catalog within a transaction.
-    void _commitOnShardingCatalog(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    void _commitOnShardingCatalog(OperationContext* opCtx,
+                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Ensure that the change stream event gets emitted and install the new filtering metadata.
-    void _setPostCommitMetadata(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    void _setPostCommitMetadata(OperationContext* opCtx,
+                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Exit from the critical section on all the shards, unblocking reads and writes. On the
     // participant shards, it is set to clear the filtering metadata after exiting the critical
     // section.
-    void _exitCriticalSection(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    void _exitCriticalSection(OperationContext* opCtx,
+                              const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                               const CancellationToken& token);
 
     // Exit critical sections on participant shards.

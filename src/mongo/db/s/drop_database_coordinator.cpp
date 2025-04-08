@@ -356,11 +356,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kDrop,
-            [this, token, dbNss, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, dbNss, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no

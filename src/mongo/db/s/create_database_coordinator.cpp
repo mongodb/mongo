@@ -195,22 +195,16 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 _checkPreconditions();
             }
         })
-        .then(_buildPhaseHandler(Phase::kEnterCriticalSectionOnPrimary,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     checkIfDropPendingDB(opCtx, nss().dbName());
-                                     _setupPrimaryShard(opCtx);
-                                     _enterCriticalSection(opCtx, executor, token);
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kEnterCriticalSectionOnPrimary,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                checkIfDropPendingDB(opCtx, nss().dbName());
+                _setupPrimaryShard(opCtx);
+                _enterCriticalSection(opCtx, executor, token);
+            }))
         .then(_buildPhaseHandler(
             Phase::kCommitOnShardingCatalog,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 auto db = _commitClusterCatalog(opCtx);
 
                 if (_doc.getAuthoritativeMetadataAccessLevel() >=
@@ -226,11 +220,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kExitCriticalSectionOnPrimary,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                const auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& dbName = nss().dbName();
                 // Populates the result if the coordinator was rebuilt after the commit phase.
                 if (!_result.is_initialized()) {

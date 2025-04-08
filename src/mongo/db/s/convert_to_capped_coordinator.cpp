@@ -229,11 +229,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kAcquireCriticalSectionOnCoordinator,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
                     opCtx,
                     nss(),
@@ -262,11 +258,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kDropCollectionOnShardsNotOwningData,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (_doc.getOriginalCollection().has_value()) {
                     // Drop collection form any shard that is not db primary and does not owning
                     // data (getting rid of possible stale incarnations due to SERVER-87010).
@@ -295,11 +287,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kAcquireCriticalSectionOnDataShard,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
                     _enterCriticalSectionOnDataShard(
                         opCtx, executor, token, CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -307,10 +295,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kConvertCollectionToCappedOnDataShard,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 logConvertToCappedOnChangelog(opCtx, nss(), _doc.getSize(), true /* start */);
 
                 if (MONGO_unlikely(convertToCappedFailBeforeCappingTheCollection.shouldFail())) {
@@ -338,11 +323,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kConvertCollectionToCappedOnCoordinator,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 // The collection must be updated also on the DBPrimary shard in case the
                 // dataShard is not the DBPrimary shard.
                 if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
@@ -351,11 +332,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kUpdateShardingCatalog,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto [localCollUuid, defaultCollator] = [&]() {
                     auto collection = acquireCollectionMaybeLockFree(
                         opCtx,
@@ -406,24 +383,16 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 logConvertToCappedOnChangelog(
                     opCtx, nss(), _doc.getSize(), false /* end */, localCollUuid);
             }))
-        .then(_buildPhaseHandler(Phase::kReleaseCriticalSectionOnDataShard,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     if (*_doc.getDataShard() !=
-                                         ShardingState::get(opCtx)->shardId()) {
-                                         _exitCriticalSectionOnDataShard(opCtx, executor, token);
-                                     }
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kReleaseCriticalSectionOnDataShard,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
+                    _exitCriticalSectionOnDataShard(opCtx, executor, token);
+                }
+            }))
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSectionOnCoordinator,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx,
                     nss(),

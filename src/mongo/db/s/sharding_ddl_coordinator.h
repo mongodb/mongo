@@ -354,13 +354,13 @@ protected:
     virtual StringData serializePhase(const Phase& phase) const = 0;
 
     std::function<void()> _buildPhaseHandler(const Phase& newPhase,
-                                             std::function<void()>&& handlerFn) {
+                                             std::function<void(OperationContext*)>&& handlerFn) {
         return _buildPhaseHandler(newPhase, []() { return true; }, std::move(handlerFn));
     }
 
     std::function<void()> _buildPhaseHandler(const Phase& newPhase,
                                              std::function<bool()>&& shouldExecute,
-                                             std::function<void()>&& handlerFn) {
+                                             std::function<void(OperationContext*)>&& handlerFn) {
         return [=, this] {
             // Do not execute the phase if the passed in condition is not met.
             if (!shouldExecute()) {
@@ -377,7 +377,11 @@ protected:
                 // Persist the new phase if this is the first time we are executing it.
                 _enterPhase(newPhase);
             }
-            return handlerFn();
+
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            this->getForwardableOpMetadata().setOn(opCtx);
+            return handlerFn(opCtx);
         };
     }
 

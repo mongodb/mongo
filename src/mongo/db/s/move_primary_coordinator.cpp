@@ -234,11 +234,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(  //
             Phase::kClone,
-            [this, anchor = shared_from_this()] {
-                const auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, anchor = shared_from_this()](auto* opCtx) {
                 const auto& toShardId = _doc.getToShardId();
 
                 if (!_firstExecution) {
@@ -287,20 +283,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 // synchronization mechanism can be replaced using a critical section.
                 blockWrites(opCtx);
             }))
-        .then(_buildPhaseHandler(Phase::kCatchup,
-                                 [this, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     blockWrites(opCtx);
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kCatchup,
+            [this, anchor = shared_from_this()](auto* opCtx) { blockWrites(opCtx); }))
         .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, token, executor, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
+                                 [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
                                      if (!_firstExecution) {
                                          // Perform a noop write on the recipient in order to
                                          // advance the txnNumber for this coordinator's logical
@@ -322,11 +309,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                  }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                const auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 invariant(_doc.getDatabaseVersion());
                 const auto& preCommitDbVersion = *_doc.getDatabaseVersion();
 
@@ -349,20 +332,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 logChange(opCtx, "commit");
             }))
-        .then(_buildPhaseHandler(Phase::kClean,
-                                 [this, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     dropStaleDataOnDonor(opCtx);
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kClean,
+            [this, anchor = shared_from_this()](auto* opCtx) { dropStaleDataOnDonor(opCtx); }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
-                                 [this, token, executor, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
+                                 [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
                                      if (!_firstExecution) {
                                          // Perform a noop write on the recipient in order to
                                          // advance the txnNumber for this coordinator's logical

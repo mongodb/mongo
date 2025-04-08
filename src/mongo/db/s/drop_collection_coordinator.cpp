@@ -207,22 +207,20 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 _checkPreconditionsAndSaveArgumentsOnDoc();
         })
         .then(_buildPhaseHandler(Phase::kFreezeCollection,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     _freezeMigrations(executor);
-                                 }))
+                                 [this, executor = executor, anchor = shared_from_this()](
+                                     auto* opCtx) { _freezeMigrations(opCtx, executor); }))
 
-        .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _enterCriticalSection(executor, token);
-                                 }))
+        .then(
+            _buildPhaseHandler(Phase::kEnterCriticalSection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _enterCriticalSection(opCtx, executor, token); }))
         .then(_buildPhaseHandler(Phase::kDropCollection,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     _commitDropCollection(executor);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kReleaseCriticalSection,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _exitCriticalSection(executor, token);
-                                 }));
+                                 [this, executor = executor, anchor = shared_from_this()](
+                                     auto* opCtx) { _commitDropCollection(opCtx, executor); }))
+        .then(
+            _buildPhaseHandler(Phase::kReleaseCriticalSection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _exitCriticalSection(opCtx, executor, token); }));
 }
 
 void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
@@ -264,11 +262,7 @@ void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
 }
 
 void DropCollectionCoordinator::_freezeMigrations(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     BSONObjBuilder logChangeDetail;
     if (_doc.getCollInfo()) {
         logChangeDetail.append("collectionUUID", _doc.getCollInfo()->getUuid().toBSON());
@@ -285,12 +279,10 @@ void DropCollectionCoordinator::_freezeMigrations(
 }
 
 void DropCollectionCoordinator::_enterCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     LOGV2_DEBUG(7038100, 2, "Acquiring critical section", logAttrs(nss()));
-
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
 
     ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
     blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -308,11 +300,7 @@ void DropCollectionCoordinator::_enterCriticalSection(
 }
 
 void DropCollectionCoordinator::_commitDropCollection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const auto collIsSharded = bool(_doc.getCollInfo());
 
     LOGV2_DEBUG(5390504, 2, "Dropping collection", logAttrs(nss()), "sharded"_attr = collIsSharded);
@@ -393,12 +381,10 @@ void DropCollectionCoordinator::_commitDropCollection(
 }
 
 void DropCollectionCoordinator::_exitCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     LOGV2_DEBUG(7038102, 2, "Releasing critical section", logAttrs(nss()));
-
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
 
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);

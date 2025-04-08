@@ -1472,84 +1472,86 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
             if (_doc.getPhase() < Phase::kEnterWriteCriticalSectionOnCoordinator) {
-                _checkPreconditions();
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+                _checkPreconditions(opCtx);
             }
         })
         .then(_buildPhaseHandler(
             Phase::kEnterWriteCriticalSectionOnCoordinator,
-            [this, anchor = shared_from_this()] {  // NOLINT
-                _enterWriteCriticalSectionOnCoordinator();
+            [this, anchor = shared_from_this()](auto* opCtx) {  // NOLINT
+                _enterWriteCriticalSectionOnCoordinator(opCtx);
 
                 try {
                     // check again the precoditions
-                    _checkPreconditions();
+                    _checkPreconditions(opCtx);
                 } catch (ExceptionFor<ErrorCodes::RequestAlreadyFulfilled>& ex) {
                     LOGV2(8119050,
                           "Found that collection already exists with matching option after taking "
                           "the collection critical section");
-                    auto opCtxHolder = cc().makeOperationContext();
-                    auto* opCtx = opCtxHolder.get();
                     exitCriticalSectionsOnCoordinator(
                         opCtx, _firstExecution, _critSecReason, originalNss());
                     throw ex;
                 }
             }))
         .then(_buildPhaseHandler(Phase::kTranslateRequestParameters,
-                                 [this, anchor = shared_from_this()] {  // NOLINT
-                                     _translateRequestParameters();
-                                 }))
-        .then(_buildPhaseHandler(Phase::kEnterWriteCSOnDataShardAndCheckEmpty,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     // This phase enters the write critical section on the data
-                                     // shard if the collection already exists to prevent the
-                                     // collection from becoming empty/non-empty after this check.
-                                     // We then check if the collection and persist this on the
-                                     // coordinator document to be used while creating initial
-                                     // chunks for the collection.
-                                     _enterWriteCriticalSectionOnDataShardAndCheckCollectionEmpty(
-                                         executor, token);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kSyncIndexesOnCoordinator,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     // TODO (SERVER-87268) skip this phase if the collection does
-                                     // not exist.
-
-                                     // If the collection exists and is located on a
-                                     // shard other than the coordinator, the indexes on the
-                                     // coordinator may be inaccurate since index modification
-                                     // commands are only executed on shards that own data for a
-                                     // collection. In this phase, we sync the indexes on the
-                                     // coordinator with those on the data shard so that we can
-                                     // trust the list of indexes on the coordinator. This allows us
-                                     // to create the shard key index locally and send the full list
-                                     // of indexes to participant shards from the coordinator.
-                                     _syncIndexesOnCoordinator(executor, token);
+                                 [this, anchor = shared_from_this()](auto* opCtx) {  // NOLINT
+                                     _translateRequestParameters(opCtx);
                                  }))
         .then(_buildPhaseHandler(
-            Phase::kCreateCollectionOnCoordinator,
-            [this, token, executor = executor, anchor = shared_from_this()] {  // NOLINT
-                _createCollectionOnCoordinator(executor, token);
+            Phase::kEnterWriteCSOnDataShardAndCheckEmpty,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                // This phase enters the write critical section on the data
+                // shard if the collection already exists to prevent the
+                // collection from becoming empty/non-empty after this check.
+                // We then check if the collection and persist this on the
+                // coordinator document to be used while creating initial
+                // chunks for the collection.
+                _enterWriteCriticalSectionOnDataShardAndCheckCollectionEmpty(
+                    opCtx, executor, token);
             }))
-        .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _enterCriticalSection(executor, token);
+        .then(_buildPhaseHandler(
+            Phase::kSyncIndexesOnCoordinator,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                // TODO (SERVER-87268) skip this phase if the collection does
+                // not exist.
+
+                // If the collection exists and is located on a
+                // shard other than the coordinator, the indexes on the
+                // coordinator may be inaccurate since index modification
+                // commands are only executed on shards that own data for a
+                // collection. In this phase, we sync the indexes on the
+                // coordinator with those on the data shard so that we can
+                // trust the list of indexes on the coordinator. This allows us
+                // to create the shard key index locally and send the full list
+                // of indexes to participant shards from the coordinator.
+                _syncIndexesOnCoordinator(opCtx, executor, token);
+            }))
+        .then(_buildPhaseHandler(Phase::kCreateCollectionOnCoordinator,
+                                 [this, token, executor = executor, anchor = shared_from_this()](
+                                     auto* opCtx) {  // NOLINT
+                                     _createCollectionOnCoordinator(opCtx, executor, token);
                                  }))
-        .then(_buildPhaseHandler(Phase::kCreateCollectionOnParticipants,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     _createCollectionOnParticipants(executor);
-                                 }))
+        .then(
+            _buildPhaseHandler(Phase::kEnterCriticalSection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _enterCriticalSection(opCtx, executor, token); }))
+        .then(_buildPhaseHandler(
+            Phase::kCreateCollectionOnParticipants,
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _createCollectionOnParticipants(opCtx, executor);
+            }))
         .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     _commitOnShardingCatalog(executor);
-                                 }))
+                                 [this, executor = executor, anchor = shared_from_this()](
+                                     auto* opCtx) { _commitOnShardingCatalog(opCtx, executor); }))
         .then(_buildPhaseHandler(Phase::kSetPostCommitMetadata,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     _setPostCommitMetadata(executor);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kExitCriticalSection,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _exitCriticalSection(executor, token);
-                                 }))
+                                 [this, executor = executor, anchor = shared_from_this()](
+                                     auto* opCtx) { _setPostCommitMetadata(opCtx, executor); }))
+        .then(
+            _buildPhaseHandler(Phase::kExitCriticalSection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _exitCriticalSection(opCtx, executor, token); }))
         .then([this, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
@@ -1642,11 +1644,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
         });
 }
 
-void CreateCollectionCoordinator::_checkPreconditions() {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+void CreateCollectionCoordinator::_checkPreconditions(OperationContext* opCtx) {
     checkCommandArguments(opCtx, _request, originalNss());
 
     // Perform a preliminary check on whether the request may resolve into a no-op before acquiring
@@ -1697,20 +1695,12 @@ void CreateCollectionCoordinator::_checkPreconditions() {
     }
 }
 
-void CreateCollectionCoordinator::_enterWriteCriticalSectionOnCoordinator() {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+void CreateCollectionCoordinator::_enterWriteCriticalSectionOnCoordinator(OperationContext* opCtx) {
     logStartCreateCollection(opCtx, _request, originalNss());
     enterCriticalSectionsOnCoordinator(opCtx, _critSecReason, originalNss());
 }
 
-void CreateCollectionCoordinator::_translateRequestParameters() {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* opCtx) {
     // In case timeseries options are already in the local catalog, they must be used. After the
     // checkPrecoditions phase we have the guarantee for the request's timeseries options to be
     // either empty or identical to the local catalog's ones.
@@ -1761,10 +1751,9 @@ void CreateCollectionCoordinator::_translateRequestParameters() {
 }
 
 void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckCollectionEmpty(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     // If the collection does not exist then we know that it is empty and there is no need to take
     // the write critical section on the data shard because the critical section on the coordinator
     // will prevent new collection creations.
@@ -1804,11 +1793,9 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
 }
 
 void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     // If the collection does not exist or the current data shard is the coordinator, then the
     // indexes on the coordinator will already be accurate.
     bool collectionExists = [&] {
@@ -1862,14 +1849,12 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
 }
 
 void CreateCollectionCoordinator::_createCollectionOnCoordinator(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     tassert(8728400,
             "Expecting translated request params to not be empty.",
             _doc.getTranslatedRequestParams());
-
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
 
     ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
 
@@ -1946,11 +1931,9 @@ void CreateCollectionCoordinator::_enterCriticalSectionOnShards(
 }
 
 void CreateCollectionCoordinator::_enterCriticalSection(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
     }
@@ -2022,11 +2005,7 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
 }
 
 void CreateCollectionCoordinator::_createCollectionOnParticipants(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
 
@@ -2048,14 +2027,10 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
 }
 
 void CreateCollectionCoordinator::_commitOnShardingCatalog(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     tassert(8728401,
             "Expecting translated request params to not be empty.",
             _doc.getTranslatedRequestParams());
-
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
 
     if (MONGO_unlikely(hangBeforeCommitOnShardingCatalog.shouldFail())) {
         LOGV2(8363100, "Hanging due to hangBeforeCommitOnShardingCatalog fail point");
@@ -2133,11 +2108,7 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
 }
 
 void CreateCollectionCoordinator::_setPostCommitMetadata(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
 
@@ -2198,11 +2169,9 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
 }
 
 void CreateCollectionCoordinator::_exitCriticalSection(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
     }

@@ -330,9 +330,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kBlockCRUDAndSnapshotRangeDeletions,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
+            [this, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = _doc.getFromNss();
                 const auto& toNss = _doc.getTo();
 
@@ -366,10 +364,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kRenameLocalAndRestoreRangeDeletions,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                _doc.getForwardableOpMetadata().setOn(opCtx);
+            [this, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = _doc.getFromNss();
                 const auto& toNss = _doc.getTo();
 
@@ -397,9 +392,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kDeleteFromRangeDeletions,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
+            [this, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = _doc.getFromNss();
                 const auto& toNss = _doc.getTo();
 
@@ -431,9 +424,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
+            [this, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = _doc.getFromNss();
                 const auto& toNss = _doc.getTo();
 

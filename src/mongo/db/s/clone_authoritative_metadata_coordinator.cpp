@@ -52,21 +52,11 @@ ExecutorFuture<void> CloneAuthoritativeMetadataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(Phase::kGetDatabasesToClone,
-                                 [this, anchor = shared_from_this()] {
-                                     auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     _prepareDbsToClone(opCtx);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kClone, [this, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
-
-            _clone(opCtx);
-        }));
+        .then(_buildPhaseHandler(
+            Phase::kGetDatabasesToClone,
+            [this, anchor = shared_from_this()](auto* opCtx) { _prepareDbsToClone(opCtx); }))
+        .then(_buildPhaseHandler(
+            Phase::kClone, [this, anchor = shared_from_this()](auto* opCtx) { _clone(opCtx); }));
 }
 
 void CloneAuthoritativeMetadataCoordinator::_prepareDbsToClone(OperationContext* opCtx) {

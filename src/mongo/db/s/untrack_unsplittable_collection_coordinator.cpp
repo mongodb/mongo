@@ -95,11 +95,9 @@ void UntrackUnsplittableCollectionCoordinator::_checkPreconditions() {
 }
 
 void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     auto service = ShardingRecoveryService::get(opCtx);
     service->acquireRecoverableCriticalSectionBlockWrites(
         opCtx,
@@ -117,11 +115,8 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
 }
 
 void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     tassert(8631102, "There must be a collection stored in the document", _doc.getOptCollType());
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
 
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
@@ -173,11 +168,9 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
 }
 
 void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     // Force a refresh of the filtering metadata to clean up the data structure held by the
     // CollectionShardingRuntime (Note also that this code is indirectly used to notify to secondary
     // nodes to clear their filtering information).
@@ -208,18 +201,17 @@ ExecutorFuture<void> UntrackUnsplittableCollectionCoordinator::_runImpl(
                 _checkPreconditions();
             }
         })
-        .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _enterCriticalSection(executor, token);
-                                 }))
+        .then(
+            _buildPhaseHandler(Phase::kEnterCriticalSection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _enterCriticalSection(opCtx, executor, token); }))
         .then(_buildPhaseHandler(Phase::kCommit,
-                                 [this, executor = executor, token, anchor = shared_from_this()] {
-                                     _commitUntrackCollection(executor);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kReleaseCriticalSection,
-                                 [this, token, executor = executor, anchor = shared_from_this()] {
-                                     _exitCriticalSection(executor, token);
-                                 }))
+                                 [this, executor = executor, token, anchor = shared_from_this()](
+                                     auto* opCtx) { _commitUntrackCollection(opCtx, executor); }))
+        .then(
+            _buildPhaseHandler(Phase::kReleaseCriticalSection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _exitCriticalSection(opCtx, executor, token); }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
                 return Status::OK();

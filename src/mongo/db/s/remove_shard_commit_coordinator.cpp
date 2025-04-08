@@ -44,11 +44,7 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
-            [this, executor = executor, anchor = shared_from_this()] {
-                const auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 // TODO(SERVER-97816): Remove this call once 9.0 becomes lastLTS.
                 topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
@@ -58,39 +54,28 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kJoinMigrationsAndCheckRangeDeletions,
             [this, anchor = shared_from_this()] { return _doc.getIsTransitionToDedicated(); },
-            [this, executor = executor, anchor = shared_from_this()] {
-                _joinMigrationsAndCheckRangeDeletions();
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _joinMigrationsAndCheckRangeDeletions(opCtx);
             }))
-        .then(_buildPhaseHandler(Phase::kStopDDLsAndCleanupData,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     _stopDDLOperations(opCtx);
-                                     _checkShardIsEmpty(opCtx);
-                                     if (_doc.getIsTransitionToDedicated()) {
-                                         _dropLocalCollections(opCtx);
-                                     }
-                                 }))
+        .then(_buildPhaseHandler(
+            Phase::kStopDDLsAndCleanupData,
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _stopDDLOperations(opCtx);
+                _checkShardIsEmpty(opCtx);
+                if (_doc.getIsTransitionToDedicated()) {
+                    _dropLocalCollections(opCtx);
+                }
+            }))
         .then(_buildPhaseHandler(Phase::kCommit,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     _commitRemoveShard(opCtx, executor);
-                                 }))
-        .then(_buildPhaseHandler(Phase::kResumeDDLs,
-                                 [this, executor = executor, anchor = shared_from_this()] {
-                                     const auto opCtxHolder = cc().makeOperationContext();
-                                     auto* opCtx = opCtxHolder.get();
-                                     getForwardableOpMetadata().setOn(opCtx);
-
-                                     _resumeDDLOperations(opCtx);
-                                     _updateClusterCardinalityParameterIfNeeded(opCtx);
-                                     _finalizeShardRemoval(opCtx);
-                                 }))
+                                 [this, executor = executor, anchor = shared_from_this()](
+                                     auto* opCtx) { _commitRemoveShard(opCtx, executor); }))
+        .then(_buildPhaseHandler(
+            Phase::kResumeDDLs,
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _resumeDDLOperations(opCtx);
+                _updateClusterCardinalityParameterIfNeeded(opCtx);
+                _finalizeShardRemoval(opCtx);
+            }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (status == ErrorCodes::RequestAlreadyFulfilled) {
                 return Status::OK();
@@ -148,11 +133,7 @@ void RemoveShardCommitCoordinator::_setReplicaSetNameOnDocument(OperationContext
     _doc.setReplicaSetName(shard->getConnString().getReplicaSetName());
 }
 
-void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions() {
-    auto opCtxHolder = cc().makeOperationContext();
-    auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
-
+void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions(OperationContext* opCtx) {
     topology_change_helpers::joinMigrations(opCtx);
     // The config server may be added as a shard again, so we locally drop its drained
     // sharded collections to enable that without user intervention. But we have to wait for

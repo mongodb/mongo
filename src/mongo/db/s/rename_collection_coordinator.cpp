@@ -824,11 +824,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
-            [this, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();
 
@@ -1001,11 +997,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kFreezeMigrations,
-            [this, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();
 
@@ -1040,11 +1032,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kBlockCrudAndRename,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, session, **executor);
@@ -1088,11 +1076,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kRenameMetadata,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 // Remove the query sampling configuration documents for the source and destination
                 // collections, if they exist.
                 {
@@ -1142,11 +1126,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
-            [this, token, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getNewSession(opCtx), **executor);
@@ -1182,32 +1162,29 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         defaultMajorityWriteConcernDoNotUse()));
                 }
             }))
-        .then(_buildPhaseHandler(Phase::kSetResponse, [this, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
+        .then(_buildPhaseHandler(
+            Phase::kSetResponse, [this, anchor = shared_from_this()](auto* opCtx) {
+                // Retrieve the new collection version
+                const auto& cm = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                        opCtx, _request.getTo()));
+                auto placementVersion =
+                    cm.hasRoutingTable() ? cm.getVersion() : ChunkVersion::UNSHARDED();
+                _response = RenameCollectionResponse(ShardVersionFactory::make(
+                    std::move(placementVersion), boost::none /* IndexVersion */));
 
-            // Retrieve the new collection version
-            const auto& cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
-                    opCtx, _request.getTo()));
-            auto placementVersion =
-                cm.hasRoutingTable() ? cm.getVersion() : ChunkVersion::UNSHARDED();
-            _response = RenameCollectionResponse(ShardVersionFactory::make(
-                std::move(placementVersion), boost::none /* IndexVersion */));
-
-            ShardingLogging::get(opCtx)->logChange(
-                opCtx,
-                "renameCollection.end",
-                nss(),
-                BSON("source" << NamespaceStringUtil::serialize(
-                                     nss(), SerializationContext::stateDefault())
-                              << "destination"
-                              << NamespaceStringUtil::serialize(
-                                     _request.getTo(), SerializationContext::stateDefault())),
-                defaultMajorityWriteConcernDoNotUse());
-            LOGV2(5460504, "Collection renamed", logAttrs(nss()));
-        }));
+                ShardingLogging::get(opCtx)->logChange(
+                    opCtx,
+                    "renameCollection.end",
+                    nss(),
+                    BSON("source" << NamespaceStringUtil::serialize(
+                                         nss(), SerializationContext::stateDefault())
+                                  << "destination"
+                                  << NamespaceStringUtil::serialize(
+                                         _request.getTo(), SerializationContext::stateDefault())),
+                    defaultMajorityWriteConcernDoNotUse());
+                LOGV2(5460504, "Collection renamed", logAttrs(nss()));
+            }));
 }
 
 }  // namespace mongo

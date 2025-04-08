@@ -111,14 +111,18 @@ private:
 
     void _checkPreconditionsAndSaveArgumentsOnDoc();
 
-    void _freezeMigrations(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _freezeMigrations(OperationContext* opCtx,
+                           std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    void _enterCriticalSection(OperationContext* opCtx,
+                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                const CancellationToken& token);
 
-    void _commitDropCollection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _commitDropCollection(OperationContext* opCtx,
+                               std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    void _exitCriticalSection(OperationContext* opCtx,
+                              std::shared_ptr<executor::ScopedTaskExecutor> executor,
                               const CancellationToken& token);
 };
 

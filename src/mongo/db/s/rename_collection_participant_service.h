@@ -179,7 +179,11 @@ private:
                 // Persist the new phase if this is the first time we are executing it.
                 _enterPhase(newPhase);
             }
-            return handlerFn();
+
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            _doc.getForwardableOpMetadata().setOn(opCtx);
+            return handlerFn(opCtx);
         };
     }
 
