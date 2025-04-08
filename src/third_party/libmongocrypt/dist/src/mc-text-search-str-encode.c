@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#include "mc-fle2-encryption-placeholder-private.h"
 #include "mc-str-encode-string-sets-private.h"
 #include "mc-text-search-str-encode-private.h"
 #include "mongocrypt-buffer-private.h"
+#include "mongocrypt-crypto-private.h"
 #include "mongocrypt.h"
 #include "unicode/fold.h"
 #include <bson/bson.h>
@@ -245,4 +247,78 @@ void mc_str_encode_sets_destroy(mc_str_encode_sets_t *sets) {
     mc_affix_set_destroy(sets->prefix_set);
     mc_substring_set_destroy(sets->substring_set);
     bson_free(sets);
+}
+
+bool mc_text_search_str_query(const mc_FLE2TextSearchInsertSpec_t *spec,
+                              _mongocrypt_buffer_t *out,
+                              mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(spec);
+    BSON_ASSERT_PARAM(out);
+
+    if (spec->len > MAX_ENCODE_BYTE_LEN) {
+        CLIENT_ERR("StrQuery: String passed in was too long: String was %" PRIu32 " bytes, but max is %d bytes",
+                   spec->len,
+                   MAX_ENCODE_BYTE_LEN);
+        return false;
+    }
+
+    _mongocrypt_buffer_init(out);
+    if (!bson_utf8_validate(spec->v, spec->len, false /* allow_null */)) {
+        CLIENT_ERR("StrQuery: String passed in was not valid UTF-8");
+        return false;
+    }
+
+    uint32_t folded_codepoint_len = 0;
+
+    if (spec->casef || spec->diacf) {
+        char *folded_str;
+        size_t folded_str_bytes_len;
+        if (!unicode_fold(spec->v,
+                          spec->len,
+                          (spec->casef * kUnicodeFoldToLower) | (spec->diacf * kUnicodeFoldRemoveDiacritics),
+                          &folded_str,
+                          &folded_str_bytes_len,
+                          status)) {
+            return false;
+        }
+        _mongocrypt_buffer_copy_from_string_as_bson_value(out, folded_str, (int)folded_str_bytes_len);
+        folded_codepoint_len = mc_get_utf8_codepoint_length(folded_str, (uint32_t)folded_str_bytes_len);
+        bson_free(folded_str);
+    } else {
+        _mongocrypt_buffer_copy_from_string_as_bson_value(out, spec->v, (int)spec->len);
+        folded_codepoint_len = mc_get_utf8_codepoint_length(spec->v, spec->len);
+    }
+
+    if (spec->substr.set || spec->suffix.set || spec->prefix.set) {
+        uint32_t min = 0, max = 0;
+        if (spec->substr.set) {
+            min = spec->substr.value.lb;
+            max = spec->substr.value.ub;
+        } else if (spec->suffix.set) {
+            min = spec->suffix.value.lb;
+            max = spec->suffix.value.ub;
+        } else {
+            min = spec->prefix.value.lb;
+            max = spec->prefix.value.ub;
+        }
+        if (folded_codepoint_len == 0) {
+            CLIENT_ERR("StrQuery: string value cannot be empty for substring, suffix, or prefix queries");
+            return false;
+        }
+        if (folded_codepoint_len > max) {
+            CLIENT_ERR("StrQuery: string value was longer than the maximum query length "
+                       "for this field after folding -- folded codepoint len: %u, max query len: %u",
+                       folded_codepoint_len,
+                       max);
+            return false;
+        }
+        if (folded_codepoint_len < min) {
+            CLIENT_ERR("StrQuery: string value was shorter than the minimum query length "
+                       "for this field after folding -- folded codepoint len: %u, min query len: %u",
+                       folded_codepoint_len,
+                       min);
+            return false;
+        }
+    }
+    return true;
 }

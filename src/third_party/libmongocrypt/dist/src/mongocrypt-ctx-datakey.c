@@ -469,7 +469,8 @@ static bool _finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
     if (!(_stmt)) {                                                                                                    \
         bson_destroy(&key_doc);                                                                                        \
         return _mongocrypt_ctx_fail_w_msg(ctx, "unable to construct BSON doc");                                        \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
     dkctx = (_mongocrypt_ctx_datakey_t *)ctx;
 

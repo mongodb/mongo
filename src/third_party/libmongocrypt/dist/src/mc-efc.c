@@ -78,8 +78,7 @@ _parse_supported_query_types(bson_iter_t *iter, supported_query_type_flags *out,
 }
 
 /* _parse_field parses and prepends one field document to efc->fields. */
-static bool
-_parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t *status, bool use_range_v2) {
+static bool _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t *status) {
     supported_query_type_flags query_types = SUPPORTS_NO_QUERIES;
     bson_iter_t field_iter;
 
@@ -141,8 +140,8 @@ _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t 
         }
     }
 
-    if (query_types & SUPPORTS_RANGE_PREVIEW_DEPRECATED_QUERIES && use_range_v2) {
-        // When rangev2 is enabled ("range") error if "rangePreview" is included.
+    if (query_types & SUPPORTS_RANGE_PREVIEW_DEPRECATED_QUERIES) {
+        // Error if the removed "rangePreview" is included.
         // This check is intended to give an easier-to-understand earlier error.
         CLIENT_ERR("Cannot use field '%s' with 'rangePreview' queries. 'rangePreview' is unsupported. Use 'range' "
                    "instead. 'range' is not compatible with 'rangePreview' and requires recreating the collection.",
@@ -163,8 +162,7 @@ _parse_field(mc_EncryptedFieldConfig_t *efc, bson_t *field, mongocrypt_status_t 
 
 bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc,
                                    const bson_t *efc_bson,
-                                   mongocrypt_status_t *status,
-                                   bool use_range_v2) {
+                                   mongocrypt_status_t *status) {
     bson_iter_t iter;
 
     BSON_ASSERT_PARAM(efc);
@@ -189,7 +187,7 @@ bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc,
         if (!mc_iter_document_as_bson(&iter, &field, status)) {
             return false;
         }
-        if (!_parse_field(efc, &field, status, use_range_v2)) {
+        if (!_parse_field(efc, &field, status)) {
             return false;
         }
         // The first element of efc->fields contains the newly parsed field.

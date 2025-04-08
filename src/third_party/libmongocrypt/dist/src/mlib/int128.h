@@ -502,7 +502,7 @@ static mlib_constexpr_fn mlib_int128_divmod_result mlib_int128_divmod(mlib_int12
             u[2] |= (uint32_t)(numer.r.lo >> (64 - d));
             u[4] |= (uint32_t)(numer.r.hi >> (64 - d));
             v[2] |= (uint32_t)(denom.r.lo >> (64 - d));
-        };
+        }
 
         uint32_t q[2] = {0};
         if (has_three) {

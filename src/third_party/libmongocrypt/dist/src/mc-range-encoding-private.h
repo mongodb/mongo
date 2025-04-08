@@ -97,8 +97,7 @@ bool mc_canUsePrecisionModeDouble(double min,
  * `out`. Returns false and sets `status` on error. */
 bool mc_getTypeInfoDouble(mc_getTypeInfoDouble_args_t args,
                           mc_OSTType_Double *out,
-                          mongocrypt_status_t *status,
-                          bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                          mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 /**
@@ -131,11 +130,10 @@ bool mc_canUsePrecisionModeDecimal(mc_dec128 min,
  */
 bool mc_getTypeInfoDecimal128(mc_getTypeInfoDecimal128_args_t args,
                               mc_OSTType_Decimal128 *out,
-                              mongocrypt_status_t *status,
-                              bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                              mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 #endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 extern const int64_t mc_FLERangeSparsityDefault;
 
-int32_t trimFactorDefault(size_t maxlen, mc_optional_int32_t trimFactor, bool use_range_v2);
+int32_t trimFactorDefault(size_t maxlen, mc_optional_int32_t trimFactor);
 #endif /* MC_RANGE_ENCODING_PRIVATE_H */

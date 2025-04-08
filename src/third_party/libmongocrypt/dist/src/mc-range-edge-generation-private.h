@@ -53,7 +53,7 @@ typedef struct {
 
 // mc_getEdgesInt32 implements the Edge Generation algorithm described in
 // SERVER-67751 for int32_t.
-mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *status, bool use_range_v2);
+mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *status);
 
 typedef struct {
     int64_t value;
@@ -65,7 +65,7 @@ typedef struct {
 
 // mc_getEdgesInt64 implements the Edge Generation algorithm described in
 // SERVER-67751 for int64_t.
-mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *status, bool use_range_v2);
+mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *status);
 
 typedef struct {
     double value;
@@ -78,7 +78,7 @@ typedef struct {
 
 // mc_getEdgesDouble implements the Edge Generation algorithm described in
 // SERVER-67751 for double.
-mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t *status, bool use_range_v2);
+mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t *status);
 
 #if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 typedef struct {
@@ -89,7 +89,7 @@ typedef struct {
     mc_optional_int32_t trimFactor;
 } mc_getEdgesDecimal128_args_t;
 
-mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status, bool use_range_v2);
+mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status);
 #endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 BSON_STATIC_ASSERT2(ull_is_u64, sizeof(uint64_t) == sizeof(unsigned long long));

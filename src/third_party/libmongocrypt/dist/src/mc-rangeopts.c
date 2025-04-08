@@ -32,15 +32,17 @@
             CLIENT_ERR(ERROR_PREFIX "Unexpected duplicate field '" #Name "'");                                         \
             return false;                                                                                              \
         }                                                                                                              \
-        has_##Name = true;
+        has_##Name = true;                                                                                             \
+    ((void)0)
 
 #define END_IF_FIELD                                                                                                   \
     continue;                                                                                                          \
-    }
+    }                                                                                                                  \
+    else((void)0)
 
 #define ERROR_PREFIX "Error parsing RangeOpts: "
 
-bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2, mongocrypt_status_t *status) {
+bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, mongocrypt_status_t *status) {
     bson_iter_t iter = {0};
     bool has_min = false, has_max = false, has_sparsity = false, has_precision = false, has_trimFactor = false;
     BSON_ASSERT_PARAM(ro);
@@ -59,26 +61,33 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
         const char *field = bson_iter_key(&iter);
         BSON_ASSERT(field);
 
-        IF_FIELD(min)
-        ro->min.set = true;
-        ro->min.value = iter;
-        END_IF_FIELD
+        IF_FIELD(min);
+        {
+            ro->min.set = true;
+            ro->min.value = iter;
+        }
+        END_IF_FIELD;
 
-        IF_FIELD(max)
-        ro->max.set = true;
-        ro->max.value = iter;
-        END_IF_FIELD
+        IF_FIELD(max);
+        {
+            ro->max.set = true;
+            ro->max.value = iter;
+        }
+        END_IF_FIELD;
 
-        IF_FIELD(sparsity)
-        if (!BSON_ITER_HOLDS_INT64(&iter)) {
-            CLIENT_ERR(ERROR_PREFIX "Expected int64 for sparsity, got: %s",
-                       mc_bson_type_to_string(bson_iter_type(&iter)));
-            return false;
-        };
-        ro->sparsity = bson_iter_int64(&iter);
-        END_IF_FIELD
+        IF_FIELD(sparsity);
+        {
+            if (!BSON_ITER_HOLDS_INT64(&iter)) {
+                CLIENT_ERR(ERROR_PREFIX "Expected int64 for sparsity, got: %s",
+                           mc_bson_type_to_string(bson_iter_type(&iter)));
+                return false;
+            }
+            ro->sparsity = bson_iter_int64(&iter);
+        }
+        END_IF_FIELD;
 
-        IF_FIELD(precision) {
+        IF_FIELD(precision);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'precision' must be an int32");
                 return false;
@@ -90,14 +99,15 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
             }
             ro->precision = OPT_I32(val);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(trimFactor) {
+        IF_FIELD(trimFactor);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "Expected int32 for trimFactor, got: %s",
                            mc_bson_type_to_string(bson_iter_type(&iter)));
                 return false;
-            };
+            }
             int32_t val = bson_iter_int32(&iter);
             if (val < 0) {
                 CLIENT_ERR(ERROR_PREFIX "'trimFactor' must be non-negative");
@@ -105,7 +115,7 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
             }
             ro->trimFactor = OPT_I32(val);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
         CLIENT_ERR(ERROR_PREFIX "Unrecognized field: '%s'", field);
         return false;
@@ -116,7 +126,7 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
     // applies to double/decimal128.
     // Do not error if trimFactor is not present. It is optional.
 
-    if (!has_sparsity && use_range_v2) {
+    if (!has_sparsity) {
         ro->sparsity = mc_FLERangeSparsityDefault;
     }
 
@@ -187,11 +197,6 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
     }
 
     if (ro->trimFactor.set) {
-        if (!use_range_v2) {
-            // Once `use_range_v2` is default true, this block may be removed.
-            CLIENT_ERR(ERROR_PREFIX "'trimFactor' is not supported for QE range v1");
-            return false;
-        }
         // At this point, we do not know the type of the field if min and max are unspecified. Wait to
         // validate the value of trimFactor.
     }
@@ -205,7 +210,6 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
 bool mc_RangeOpts_to_FLE2RangeInsertSpec(const mc_RangeOpts_t *ro,
                                          const bson_t *v,
                                          bson_t *out,
-                                         bool use_range_v2,
                                          mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(ro);
     BSON_ASSERT_PARAM(v);
@@ -244,10 +248,8 @@ bool mc_RangeOpts_to_FLE2RangeInsertSpec(const mc_RangeOpts_t *ro,
         }
     }
 
-    if (use_range_v2) {
-        if (!mc_RangeOpts_appendTrimFactor(ro, bson_iter_type(&v_iter), "trimFactor", &child, status, use_range_v2)) {
-            return false;
-        }
+    if (!mc_RangeOpts_appendTrimFactor(ro, bson_iter_type(&v_iter), "trimFactor", &child, status)) {
+        return false;
     }
     if (!bson_append_document_end(out, &child)) {
         CLIENT_ERR(ERROR_PREFIX "Error appending to BSON");
@@ -371,11 +373,8 @@ bool mc_RangeOpts_appendMax(const mc_RangeOpts_t *ro,
 
 // Used to calculate max trim factor. Returns the number of bits required to represent any number in
 // the domain.
-static bool mc_getNumberOfBits(const mc_RangeOpts_t *ro,
-                               bson_type_t valueType,
-                               uint32_t *bitsOut,
-                               mongocrypt_status_t *status,
-                               bool use_range_v2) {
+static bool
+mc_getNumberOfBits(const mc_RangeOpts_t *ro, bson_type_t valueType, uint32_t *bitsOut, mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(ro);
     BSON_ASSERT_PARAM(bitsOut);
 
@@ -442,7 +441,7 @@ static bool mc_getNumberOfBits(const mc_RangeOpts_t *ro,
         }
         mc_getTypeInfoDouble_args_t args = {value, rmin, rmax, prec};
         mc_OSTType_Double out;
-        if (!mc_getTypeInfoDouble(args, &out, status, use_range_v2)) {
+        if (!mc_getTypeInfoDouble(args, &out, status)) {
             return false;
         }
         *bitsOut = 64 - (uint32_t)mc_count_leading_zeros_u64(out.max);
@@ -461,7 +460,7 @@ static bool mc_getNumberOfBits(const mc_RangeOpts_t *ro,
         }
         mc_getTypeInfoDecimal128_args_t args = {value, rmin, rmax, prec};
         mc_OSTType_Decimal128 out;
-        if (!mc_getTypeInfoDecimal128(args, &out, status, use_range_v2)) {
+        if (!mc_getTypeInfoDecimal128(args, &out, status)) {
             return false;
         }
         *bitsOut = 128 - (uint32_t)mc_count_leading_zeros_u128(out.max);
@@ -479,8 +478,7 @@ bool mc_RangeOpts_appendTrimFactor(const mc_RangeOpts_t *ro,
                                    bson_type_t valueType,
                                    const char *fieldName,
                                    bson_t *out,
-                                   mongocrypt_status_t *status,
-                                   bool use_range_v2) {
+                                   mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(ro);
     BSON_ASSERT_PARAM(fieldName);
     BSON_ASSERT_PARAM(out);
@@ -492,7 +490,7 @@ bool mc_RangeOpts_appendTrimFactor(const mc_RangeOpts_t *ro,
     }
 
     uint32_t nbits;
-    if (!mc_getNumberOfBits(ro, valueType, &nbits, status, use_range_v2)) {
+    if (!mc_getNumberOfBits(ro, valueType, &nbits, status)) {
         return false;
     }
     // if nbits = 0, we want to allow trim factor = 0.

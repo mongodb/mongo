@@ -349,7 +349,8 @@ bool mc_makeRangeFindPlaceholder(mc_makeRangeFindPlaceholder_args_t *args,
     if (!(stmt)) {                                                                                                     \
         CLIENT_ERR("error appending BSON for placeholder");                                                            \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
     // create edgesInfo.
 
@@ -428,7 +429,8 @@ bool mc_FLE2RangeFindDriverSpec_to_placeholders(mc_FLE2RangeFindDriverSpec_t *sp
     if (!(stmt)) {                                                                                                     \
         CLIENT_ERR("error transforming BSON for FLE2RangeFindDriverSpec: %s", #stmt);                                  \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
     TRY(bson_iter_init_find(&posInf, &infDoc, "p"));
     TRY(bson_iter_init_find(&negInf, &infDoc, "n"));

@@ -62,8 +62,7 @@ protected:
 
 private:
     EncryptedBinDataType encryptedBinDataType() const override {
-        // TODO SERVER-101128: Update to the correct EncryptedBinDataType once it is added.
-        return EncryptedBinDataType::kPlaceholder;
+        return EncryptedBinDataType::kFLE2FindTextPayload;
     }
 };
 

@@ -15,6 +15,7 @@
  */
 
 #include "mc-efc-private.h"
+#include "mc-fle-blob-subtype-private.h"
 #include "mc-fle2-rfds-private.h"
 #include "mc-tokens-private.h"
 #include "mongocrypt-ciphertext-private.h"
@@ -40,7 +41,6 @@ static bool _mongo_op_collinfo(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) 
         _mongocrypt_ctx_fail(ctx);
         return false;
     }
-    CRYPT_TRACEF(&ectx->parent.crypt->log, "constructed: %s\n", tmp_json(filter));
     _mongocrypt_buffer_steal_from_bson(&ectx->list_collections_filter, &filter);
     out->data = ectx->list_collections_filter.data;
     out->len = ectx->list_collections_filter.len;
@@ -575,7 +575,8 @@ fail_create_cmd:
 static bool _mongocrypt_fle2_insert_update_find(mc_fle_blob_subtype_t subtype) {
     return (subtype == MC_SUBTYPE_FLE2InsertUpdatePayload) || (subtype == MC_SUBTYPE_FLE2InsertUpdatePayloadV2)
         || (subtype == MC_SUBTYPE_FLE2FindEqualityPayload) || (subtype == MC_SUBTYPE_FLE2FindEqualityPayloadV2)
-        || (subtype == MC_SUBTYPE_FLE2FindRangePayload) || (subtype == MC_SUBTYPE_FLE2FindRangePayloadV2);
+        || (subtype == MC_SUBTYPE_FLE2FindRangePayload) || (subtype == MC_SUBTYPE_FLE2FindRangePayloadV2)
+        || (subtype == MC_SUBTYPE_FLE2FindTextPayload);
 }
 
 static bool
@@ -609,7 +610,7 @@ _marking_to_bson_value(void *ctx, _mongocrypt_marking_t *marking, bson_value_t *
     } else if (!_mongocrypt_serialize_ciphertext(&ciphertext, &serialized_ciphertext)) {
         CLIENT_ERR("malformed ciphertext");
         goto fail;
-    };
+    }
 
     /* ownership of serialized_ciphertext is transferred to caller. */
     out->value_type = BSON_TYPE_BINARY;
@@ -672,7 +673,6 @@ typedef struct {
 // must omit the "encryptionInformation" field when sent to mongod / mongos.
 static moe_result must_omit_encryptionInformation(const char *command_name,
                                                   const bson_t *command,
-                                                  bool use_range_v2,
                                                   const mc_EncryptedFieldConfig_t *efc,
                                                   mongocrypt_status_t *status) {
     // eligible_commands may omit encryptionInformation if the command does not
@@ -697,12 +697,10 @@ static moe_result must_omit_encryptionInformation(const char *command_name,
         // - Server 8.0 requires `encryptionInformation` if "range" fields are referenced. Otherwise ignores.
         // Only send `encryptionInformation` if "range" fields are present to support both server versions.
         bool uses_range_fields = false;
-        if (use_range_v2) {
-            for (const mc_EncryptedField_t *ef = efc->fields; ef != NULL; ef = ef->next) {
-                if (ef->supported_queries & SUPPORTS_RANGE_QUERIES) {
-                    uses_range_fields = true;
-                    break;
-                }
+        for (const mc_EncryptedField_t *ef = efc->fields; ef != NULL; ef = ef->next) {
+            if (ef->supported_queries & SUPPORTS_RANGE_QUERIES) {
+                uses_range_fields = true;
+                break;
             }
         }
         return (moe_result){.ok = true, .must_omit = !uses_range_fields};
@@ -819,7 +817,7 @@ static bool _fle2_append_compactionTokens(mongocrypt_t *crypt,
 
         const _mongocrypt_buffer_t *ecoct_buf = mc_ECOCToken_get(ecoct);
 
-        if (crypt->opts.use_range_v2 && (ptr->supported_queries & SUPPORTS_RANGE_QUERIES)) {
+        if ((ptr->supported_queries & SUPPORTS_RANGE_QUERIES)) {
             // Append the document {ecoc: <ECOCToken>, anchorPaddingToken: <AnchorPaddingTokenRoot>}
             esct = mc_ESCToken_new(crypto, cl1t, status);
             if (!esct) {
@@ -1140,11 +1138,7 @@ static bool _fle2_finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
     const mc_EncryptedFieldConfig_t *target_efc =
         mc_schema_broker_get_encryptedFields(ectx->sb, ectx->target_coll, NULL);
 
-    moe_result result = must_omit_encryptionInformation(command_name,
-                                                        &converted,
-                                                        ctx->crypt->opts.use_range_v2,
-                                                        target_efc,
-                                                        ctx->status);
+    moe_result result = must_omit_encryptionInformation(command_name, &converted, target_efc, ctx->status);
     if (!result.ok) {
         bson_destroy(&converted);
         return _mongocrypt_ctx_fail(ctx);
@@ -1312,10 +1306,8 @@ static bool _fle2_finalize_explicit(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *
     if (ctx->opts.query_type.set) {
         switch (ctx->opts.query_type.value) {
         case MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED:
-            if (ctx->crypt->opts.use_range_v2) {
-                _mongocrypt_ctx_fail_w_msg(ctx, "Cannot use rangePreview query type with Range V2");
-                goto fail;
-            }
+            _mongocrypt_ctx_fail_w_msg(ctx, "Cannot use rangePreview query type with Range V2");
+            goto fail;
         // fallthrough
         case MONGOCRYPT_QUERY_TYPE_RANGE:
         case MONGOCRYPT_QUERY_TYPE_EQUALITY: marking.u.fle2.type = MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_FIND; break;
@@ -1329,10 +1321,8 @@ static bool _fle2_finalize_explicit(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *
     case MONGOCRYPT_INDEX_TYPE_EQUALITY: marking.u.fle2.algorithm = MONGOCRYPT_FLE2_ALGORITHM_EQUALITY; break;
     case MONGOCRYPT_INDEX_TYPE_NONE: marking.u.fle2.algorithm = MONGOCRYPT_FLE2_ALGORITHM_UNINDEXED; break;
     case MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW_DEPRECATED:
-        if (ctx->crypt->opts.use_range_v2) {
-            _mongocrypt_ctx_fail_w_msg(ctx, "Cannot use rangePreview index type with Range V2");
-            goto fail;
-        }
+        _mongocrypt_ctx_fail_w_msg(ctx, "Cannot use rangePreview index type with Range V2");
+        goto fail;
         // fallthrough
     case MONGOCRYPT_INDEX_TYPE_RANGE: marking.u.fle2.algorithm = MONGOCRYPT_FLE2_ALGORITHM_RANGE; break;
     default:
@@ -1355,11 +1345,7 @@ static bool _fle2_finalize_explicit(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *
 
         // RangeOpts with query_type is handled above.
         BSON_ASSERT(!ctx->opts.query_type.set);
-        if (!mc_RangeOpts_to_FLE2RangeInsertSpec(&ctx->opts.rangeopts.value,
-                                                 &old_v,
-                                                 &new_v,
-                                                 ctx->crypt->opts.use_range_v2,
-                                                 ctx->status)) {
+        if (!mc_RangeOpts_to_FLE2RangeInsertSpec(&ctx->opts.rangeopts.value, &old_v, &new_v, ctx->status)) {
             _mongocrypt_ctx_fail(ctx);
             goto fail;
         }
@@ -2416,9 +2402,6 @@ bool mongocrypt_ctx_encrypt_init(mongocrypt_ctx_t *ctx, const char *db, int32_t 
     ctx->vtable.cleanup = _cleanup;
     ectx->bypass_query_analysis = ctx->crypt->opts.bypass_query_analysis;
     ectx->sb = mc_schema_broker_new();
-    if (ctx->crypt->opts.use_range_v2) {
-        mc_schema_broker_use_rangev2(ectx->sb);
-    }
 
     if (!cmd || !cmd->data) {
         return _mongocrypt_ctx_fail_w_msg(ctx, "invalid command");

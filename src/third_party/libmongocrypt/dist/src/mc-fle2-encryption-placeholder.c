@@ -31,11 +31,13 @@
             CLIENT_ERR(ERROR_PREFIX "Duplicate field '" #Name "' in placeholder bson");                                \
             goto fail;                                                                                                 \
         }                                                                                                              \
-        has_##Name = true;
+        has_##Name = true;                                                                                             \
+    ((void)0)
 
 #define END_IF_FIELD                                                                                                   \
     continue;                                                                                                          \
-    }
+    }                                                                                                                  \
+    else((void)0)
 
 #define CHECK_HAS(Name)                                                                                                \
     if (!has_##Name) {                                                                                                 \
@@ -45,7 +47,8 @@
 
 // Common logic for parsing int32 greater than zero
 #define IF_FIELD_INT32_GT0_PARSE(Name, Dest, Iter)                                                                     \
-    IF_FIELD(Name) {                                                                                                   \
+    IF_FIELD(Name);                                                                                                    \
+    {                                                                                                                  \
         if (!BSON_ITER_HOLDS_INT32(&Iter)) {                                                                           \
             CLIENT_ERR(ERROR_PREFIX "'" #Name "' must be an int32");                                                   \
             goto fail;                                                                                                 \
@@ -86,7 +89,8 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
         const char *field = bson_iter_key(&iter);
         BSON_ASSERT(field);
 
-        IF_FIELD(t) {
+        IF_FIELD(t);
+        {
             int32_t type;
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "invalid marking, 't' must be an int32");
@@ -99,9 +103,10 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
             }
             out->type = (mongocrypt_fle2_placeholder_type_t)type;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(a) {
+        IF_FIELD(a);
+        {
             int32_t algorithm;
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "invalid marking, 'a' must be an int32");
@@ -115,30 +120,32 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
             }
             out->algorithm = (mongocrypt_fle2_encryption_algorithm_t)algorithm;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(ki) {
+        IF_FIELD(ki);
+        {
             if (!_mongocrypt_buffer_from_uuid_iter(&out->index_key_id, &iter)) {
                 CLIENT_ERR(ERROR_PREFIX "index key id must be a UUID");
                 goto fail;
             }
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(ku) {
+        IF_FIELD(ku);
+        {
             if (!_mongocrypt_buffer_from_uuid_iter(&out->user_key_id, &iter)) {
                 CLIENT_ERR(ERROR_PREFIX "user key id must be a UUID");
                 goto fail;
             }
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(v) {
-            memcpy(&out->v_iter, &iter, sizeof(bson_iter_t));
-        }
-        END_IF_FIELD
+        IF_FIELD(v);
+        memcpy(&out->v_iter, &iter, sizeof(bson_iter_t));
+        END_IF_FIELD;
 
-        IF_FIELD(cm) {
+        IF_FIELD(cm);
+        {
             if (!BSON_ITER_HOLDS_INT64(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "invalid marking, 'cm' must be an int64");
                 goto fail;
@@ -148,9 +155,10 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
                 goto fail;
             }
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(s) {
+        IF_FIELD(s);
+        {
             if (!BSON_ITER_HOLDS_INT64(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "invalid marking, 's' must be an int64");
                 goto fail;
@@ -160,7 +168,7 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
                 goto fail;
             }
         }
-        END_IF_FIELD
+        END_IF_FIELD;
     }
 
     CHECK_HAS(t)
@@ -176,7 +184,6 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
     return true;
 
 fail:
-    mc_FLE2EncryptionPlaceholder_cleanup(out);
     return false;
 }
 
@@ -224,7 +231,6 @@ bool mc_validate_sparsity(int64_t sparsity, mongocrypt_status_t *status) {
 
 static bool mc_FLE2RangeFindSpecEdgesInfo_parse(mc_FLE2RangeFindSpecEdgesInfo_t *out,
                                                 const bson_iter_t *in,
-                                                bool use_range_v2,
                                                 mongocrypt_status_t *status) {
     bson_iter_t iter;
     bool has_lowerBound = false, has_lbIncluded = false, has_upperBound = false, has_ubIncluded = false,
@@ -245,45 +251,44 @@ static bool mc_FLE2RangeFindSpecEdgesInfo_parse(mc_FLE2RangeFindSpecEdgesInfo_t 
         const char *field = bson_iter_key(&iter);
         BSON_ASSERT(field);
 
-        IF_FIELD(lowerBound) {
-            out->lowerBound = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(lowerBound);
+        out->lowerBound = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(lbIncluded) {
+        IF_FIELD(lbIncluded);
+        {
             if (!BSON_ITER_HOLDS_BOOL(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'lbIncluded' must be a bool");
                 goto fail;
             }
             out->lbIncluded = bson_iter_bool(&iter);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(upperBound) {
-            out->upperBound = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(upperBound);
+        out->upperBound = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(ubIncluded) {
+        IF_FIELD(ubIncluded);
+        {
             if (!BSON_ITER_HOLDS_BOOL(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'ubIncluded' must be a bool");
                 goto fail;
             }
             out->ubIncluded = bson_iter_bool(&iter);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(indexMin) {
-            out->indexMin = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(indexMin);
+        out->indexMin = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(indexMax) {
-            out->indexMax = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(indexMax);
+        out->indexMax = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(precision) {
+        IF_FIELD(precision);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'precision' must be an int32");
                 goto fail;
@@ -296,9 +301,10 @@ static bool mc_FLE2RangeFindSpecEdgesInfo_parse(mc_FLE2RangeFindSpecEdgesInfo_t 
 
             out->precision = OPT_I32(val);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(trimFactor) {
+        IF_FIELD(trimFactor);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'trimFactor' must be an int32");
                 goto fail;
@@ -311,7 +317,7 @@ static bool mc_FLE2RangeFindSpecEdgesInfo_parse(mc_FLE2RangeFindSpecEdgesInfo_t 
 
             out->trimFactor = OPT_I32(val);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
     }
 
     CHECK_HAS(lowerBound)
@@ -323,11 +329,6 @@ static bool mc_FLE2RangeFindSpecEdgesInfo_parse(mc_FLE2RangeFindSpecEdgesInfo_t 
     // Do not error if precision is not present. Precision optional and only
     // applies to double/decimal128.
 
-    if (!use_range_v2 && out->trimFactor.set) {
-        CLIENT_ERR(ERROR_PREFIX "'trimFactor' is not supported for QE range v1");
-        return false;
-    }
-
     return true;
 
 fail:
@@ -337,10 +338,7 @@ fail:
 #undef ERROR_PREFIX
 #define ERROR_PREFIX "Error parsing FLE2RangeFindSpec: "
 
-bool mc_FLE2RangeFindSpec_parse(mc_FLE2RangeFindSpec_t *out,
-                                const bson_iter_t *in,
-                                bool use_range_v2,
-                                mongocrypt_status_t *status) {
+bool mc_FLE2RangeFindSpec_parse(mc_FLE2RangeFindSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(out);
     BSON_ASSERT_PARAM(in);
 
@@ -359,24 +357,27 @@ bool mc_FLE2RangeFindSpec_parse(mc_FLE2RangeFindSpec_t *out,
         const char *field = bson_iter_key(&iter);
         BSON_ASSERT(field);
 
-        IF_FIELD(edgesInfo) {
-            if (!mc_FLE2RangeFindSpecEdgesInfo_parse(&out->edgesInfo.value, &iter, use_range_v2, status)) {
+        IF_FIELD(edgesInfo);
+        {
+            if (!mc_FLE2RangeFindSpecEdgesInfo_parse(&out->edgesInfo.value, &iter, status)) {
                 goto fail;
             }
             out->edgesInfo.set = true;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(payloadId) {
+        IF_FIELD(payloadId);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'payloadId' must be an int32");
                 goto fail;
             }
             out->payloadId = bson_iter_int32(&iter);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(firstOperator) {
+        IF_FIELD(firstOperator);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'firstOperator' must be an int32");
                 goto fail;
@@ -390,9 +391,10 @@ bool mc_FLE2RangeFindSpec_parse(mc_FLE2RangeFindSpec_t *out,
             }
             out->firstOperator = (mc_FLE2RangeOperator_t)first_op;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(secondOperator) {
+        IF_FIELD(secondOperator);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'secondOperator' must be an int32");
                 goto fail;
@@ -406,7 +408,7 @@ bool mc_FLE2RangeFindSpec_parse(mc_FLE2RangeFindSpec_t *out,
             }
             out->secondOperator = (mc_FLE2RangeOperator_t)second_op;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
     }
 
     // edgesInfo is optional. Do not require it.
@@ -422,10 +424,7 @@ fail:
 #undef ERROR_PREFIX
 #define ERROR_PREFIX "Error parsing FLE2RangeInsertSpec: "
 
-bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
-                                  const bson_iter_t *in,
-                                  bool use_range_v2,
-                                  mongocrypt_status_t *status) {
+bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(out);
     BSON_ASSERT_PARAM(in);
 
@@ -444,22 +443,20 @@ bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
         const char *field = bson_iter_key(&iter);
         BSON_ASSERT(field);
 
-        IF_FIELD(v) {
-            out->v = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(v);
+        out->v = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(min) {
-            out->min = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(min);
+        out->min = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(max) {
-            out->max = iter;
-        }
-        END_IF_FIELD
+        IF_FIELD(max);
+        out->max = iter;
+        END_IF_FIELD;
 
-        IF_FIELD(precision) {
+        IF_FIELD(precision);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'precision' must be an int32");
                 goto fail;
@@ -471,9 +468,10 @@ bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
             }
             out->precision = OPT_I32(val);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(trimFactor) {
+        IF_FIELD(trimFactor);
+        {
             if (!BSON_ITER_HOLDS_INT32(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'trimFactor' must be an int32");
                 goto fail;
@@ -485,7 +483,7 @@ bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
             }
             out->trimFactor = OPT_I32(val);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
     }
 
     CHECK_HAS(v)
@@ -493,11 +491,6 @@ bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
     CHECK_HAS(max)
     // Do not error if precision is not present. Precision optional and only
     // applies to double/decimal128.
-
-    if (!use_range_v2 && out->trimFactor.set) {
-        CLIENT_ERR(ERROR_PREFIX "'trimFactor' is not supported for QE range v1");
-        return false;
-    }
 
     return true;
 
@@ -509,9 +502,9 @@ fail:
 
 #define ERROR_PREFIX "Error parsing FLE2SubstringInsertSpec: "
 
-static bool mc_FLE2SubstringInsertSpec_parse(mc_FLE2SubstringInsertSpec_t *out,
-                                             const bson_iter_t *in,
-                                             mongocrypt_status_t *status) {
+bool mc_FLE2SubstringInsertSpec_parse(mc_FLE2SubstringInsertSpec_t *out,
+                                      const bson_iter_t *in,
+                                      mongocrypt_status_t *status) {
     bson_iter_t iter;
     bool has_mlen = false, has_ub = false, has_lb = false;
     BSON_ASSERT_PARAM(out);
@@ -551,8 +544,7 @@ fail:
 
 #define ERROR_PREFIX "Error parsing FLE2SuffixInsertSpec: "
 
-static bool
-mc_FLE2SuffixInsertSpec_parse(mc_FLE2SuffixInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
+bool mc_FLE2SuffixInsertSpec_parse(mc_FLE2SuffixInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
     bson_iter_t iter;
     bool has_ub = false, has_lb = false;
 
@@ -587,8 +579,7 @@ fail:
 
 #define ERROR_PREFIX "Error parsing FLE2PrefixInsertSpec: "
 
-static bool
-mc_FLE2PrefixInsertSpec_parse(mc_FLE2PrefixInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
+bool mc_FLE2PrefixInsertSpec_parse(mc_FLE2PrefixInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
     bson_iter_t iter;
     bool has_ub = false, has_lb = false;
     BSON_ASSERT_PARAM(out);
@@ -644,7 +635,8 @@ bool mc_FLE2TextSearchInsertSpec_parse(mc_FLE2TextSearchInsertSpec_t *out,
         const char *field = bson_iter_key(&iter);
         BSON_ASSERT(field);
 
-        IF_FIELD(v) {
+        IF_FIELD(v);
+        {
             out->v = bson_iter_utf8(&iter, &out->len);
             if (!out->v) {
                 CLIENT_ERR(ERROR_PREFIX "unsupported BSON type: %s for text search",
@@ -653,59 +645,60 @@ bool mc_FLE2TextSearchInsertSpec_parse(mc_FLE2TextSearchInsertSpec_t *out,
             }
             out->v_iter = iter;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(casef) {
+        IF_FIELD(casef);
+        {
             if (!BSON_ITER_HOLDS_BOOL(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'casef' must be a bool");
                 goto fail;
             }
             out->casef = bson_iter_bool(&iter);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(diacf) {
+        IF_FIELD(diacf);
+        {
             if (!BSON_ITER_HOLDS_BOOL(&iter)) {
                 CLIENT_ERR(ERROR_PREFIX "'diacf' must be a bool");
                 goto fail;
             }
             out->diacf = bson_iter_bool(&iter);
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(substr) {
+        IF_FIELD(substr);
+        {
             if (!mc_FLE2SubstringInsertSpec_parse(&out->substr.value, &iter, status)) {
                 goto fail;
             }
             out->substr.set = true;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(suffix) {
+        IF_FIELD(suffix);
+        {
             if (!mc_FLE2SuffixInsertSpec_parse(&out->suffix.value, &iter, status)) {
                 goto fail;
             }
             out->suffix.set = true;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
 
-        IF_FIELD(prefix) {
+        IF_FIELD(prefix);
+        {
             if (!mc_FLE2PrefixInsertSpec_parse(&out->prefix.value, &iter, status)) {
                 goto fail;
             }
             out->prefix.set = true;
         }
-        END_IF_FIELD
+        END_IF_FIELD;
     }
 
     CHECK_HAS(v)
     CHECK_HAS(casef)
     CHECK_HAS(diacf)
-    // one of substr/suffix/prefix must be set
-    if (!(has_substr || has_suffix || has_prefix)) {
-        CLIENT_ERR(ERROR_PREFIX "Must have a substring, suffix, or prefix index specification");
-        goto fail;
-    }
+
     return true;
 
 fail:

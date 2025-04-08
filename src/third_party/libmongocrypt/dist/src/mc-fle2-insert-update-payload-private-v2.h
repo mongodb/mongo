@@ -158,9 +158,7 @@ const _mongocrypt_buffer_t *mc_FLE2InsertUpdatePayloadV2_decrypt(_mongocrypt_cry
 
 bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 
-bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload,
-                                                    bson_t *out,
-                                                    bool use_range_v2);
+bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 
 bool mc_FLE2InsertUpdatePayloadV2_serializeForTextSearch(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 

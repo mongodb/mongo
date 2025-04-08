@@ -279,7 +279,8 @@ kmip_reader_has_data (kmip_reader_t *reader)
 #define CHECK_REMAINING_BUFFER_AND_RET(read_size)   \
    if ((reader->pos + (read_size)) > reader->len) { \
       return false;                                 \
-   }
+   } else                                           \
+      ((void)0)
 
 bool
 kmip_reader_read_u8 (kmip_reader_t *reader, uint8_t *value)
@@ -346,7 +347,8 @@ kmip_reader_read_bytes (kmip_reader_t *reader, uint8_t **ptr, size_t length)
 #define CHECK_AND_RET(x) \
    if (!(x)) {           \
       return false;      \
-   }
+   } else                \
+      ((void)0)
 
 bool
 kmip_reader_read_tag (kmip_reader_t *reader, kmip_tag_type_t *tag)

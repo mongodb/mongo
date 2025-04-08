@@ -101,7 +101,7 @@ typedef struct {
 
 void mc_FLE2FindRangePayloadV2_init(mc_FLE2FindRangePayloadV2_t *payload);
 
-bool mc_FLE2FindRangePayloadV2_serialize(const mc_FLE2FindRangePayloadV2_t *payload, bson_t *out, bool use_range_v2);
+bool mc_FLE2FindRangePayloadV2_serialize(const mc_FLE2FindRangePayloadV2_t *payload, bson_t *out);
 
 void mc_FLE2FindRangePayloadV2_cleanup(mc_FLE2FindRangePayloadV2_t *payload);
 

@@ -50,7 +50,7 @@
 
 #define CMP(x, y) cmp (x, y)
 #define swap(a, b)   \
-   {                 \
+   if (1) {          \
       s = b;         \
       i = size;      \
       do {           \
@@ -59,7 +59,8 @@
          *s++ = tmp; \
       } while (--i); \
       a -= size;     \
-   }
+   } else            \
+      ((void)0)
 
 void
 insertionsort (unsigned char *a, size_t n, size_t size, cmp_t cmp)

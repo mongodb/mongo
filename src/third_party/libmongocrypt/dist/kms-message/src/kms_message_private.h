@@ -140,6 +140,7 @@ kms_set_error (char *error, size_t size, const char *fmt, ...);
    if (!(stmt)) {                             \
       fprintf (stderr, "%s failed\n", #stmt); \
       abort ();                               \
-   }
+   } else                                     \
+       ((void)0)
 
 #endif /* KMS_MESSAGE_PRIVATE_H */

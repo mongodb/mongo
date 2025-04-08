@@ -50,16 +50,10 @@ struct mc_schema_broker_t {
     char *db; // Database shared by all schemas.
     mc_schema_entry_t *ll;
     size_t ll_len;
-    bool use_range_v2;
 };
 
 mc_schema_broker_t *mc_schema_broker_new(void) {
     return bson_malloc0(sizeof(mc_schema_broker_t));
-}
-
-void mc_schema_broker_use_rangev2(mc_schema_broker_t *sb) {
-    BSON_ASSERT_PARAM(sb);
-    sb->use_range_v2 = true;
 }
 
 bool mc_schema_broker_request(mc_schema_broker_t *sb, const char *db, const char *coll, mongocrypt_status_t *status) {
@@ -208,7 +202,6 @@ static inline bool mc_schema_entry_satisfy_from_collinfo(mc_schema_entry_t *se,
                                                          const bson_t *collinfo,
                                                          const char *coll,
                                                          const char *db,
-                                                         bool use_range_v2,
                                                          mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(se);
     BSON_ASSERT_PARAM(collinfo);
@@ -255,7 +248,7 @@ static inline bool mc_schema_entry_satisfy_from_collinfo(mc_schema_entry_t *se,
             return false;
         }
 
-        if (!mc_EncryptedFieldConfig_parse(&se->encryptedFields.efc, &se->encryptedFields.bson, status, use_range_v2)) {
+        if (!mc_EncryptedFieldConfig_parse(&se->encryptedFields.efc, &se->encryptedFields.bson, status)) {
             return false;
         }
         se->encryptedFields.set = true;
@@ -351,7 +344,7 @@ bool mc_schema_broker_satisfy_from_collinfo(mc_schema_broker_t *sb,
         }
     }
 
-    if (!mc_schema_entry_satisfy_from_collinfo(se, collinfo, coll, sb->db, sb->use_range_v2, status)) {
+    if (!mc_schema_entry_satisfy_from_collinfo(se, collinfo, coll, sb->db, status)) {
         return false;
     }
 
@@ -426,10 +419,7 @@ bool mc_schema_broker_satisfy_from_encryptedFieldsMap(mc_schema_broker_t *sb,
                 goto loop_fail;
             }
 
-            if (!mc_EncryptedFieldConfig_parse(&it->encryptedFields.efc,
-                                               &it->encryptedFields.bson,
-                                               status,
-                                               sb->use_range_v2)) {
+            if (!mc_EncryptedFieldConfig_parse(&it->encryptedFields.efc, &it->encryptedFields.bson, status)) {
                 goto loop_fail;
             }
 
@@ -473,7 +463,7 @@ bool mc_schema_broker_satisfy_from_cache(mc_schema_broker_t *sb,
             goto loop_skip;
         }
 
-        if (!mc_schema_entry_satisfy_from_collinfo(it, collinfo, sb->db, it->coll, sb->use_range_v2, status)) {
+        if (!mc_schema_entry_satisfy_from_collinfo(it, collinfo, sb->db, it->coll, status)) {
             goto loop_fail;
         }
 

@@ -22,7 +22,8 @@
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 void mc_FLE2TagAndEncryptedMetadataBlock_init(mc_FLE2TagAndEncryptedMetadataBlock_t *metadata) {
     BSON_ASSERT_PARAM(metadata);

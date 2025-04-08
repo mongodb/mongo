@@ -29,19 +29,22 @@
 #define CHECK_AND_RETURN(cond)                                                                                         \
     if (!(cond)) {                                                                                                     \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 #define CHECK_AND_RETURN_STATUS(cond, msg)                                                                             \
     if (!(cond)) {                                                                                                     \
         CLIENT_ERR(msg);                                                                                               \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 #define CHECK_AND_RETURN_KB_STATUS(cond)                                                                               \
     if (!(cond)) {                                                                                                     \
         _mongocrypt_key_broker_status(kb, status);                                                                     \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 static bool _replace_FLE2IndexedEncryptedValue_with_plaintext(void *ctx,
                                                               _mongocrypt_buffer_t *in,

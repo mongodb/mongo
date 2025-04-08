@@ -27,7 +27,8 @@
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 struct _mc_FLE2IndexedEqualityEncryptedValue_t {
     _mongocrypt_buffer_t S_KeyId;
@@ -98,7 +99,8 @@ bool mc_FLE2IndexedEncryptedValue_write(_mongocrypt_crypto_t *crypto,
 #define CHECK_AND_GOTO(x)                                                                                              \
     if (!(x)) {                                                                                                        \
         goto cleanup;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
     bool ok = false;
 
@@ -164,7 +166,8 @@ static bool mc_fle2IndexedEncryptedValue_encrypt(_mongocrypt_crypto_t *crypto,
 #define CHECK_AND_GOTO(x)                                                                                              \
     if (!(x)) {                                                                                                        \
         goto cleanup;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
     const _mongocrypt_value_encryption_algorithm_t *fle2alg = _mcFLE2Algorithm();
     bool ok = false;

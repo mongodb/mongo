@@ -17,6 +17,7 @@
 #include <bson/bson.h>
 
 #include "mc-fle2-find-equality-payload-private.h"
+#include "mc-parse-utils-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt.h"
 
@@ -47,23 +48,7 @@ void mc_FLE2FindEqualityPayload_cleanup(mc_FLE2FindEqualityPayload_t *payload) {
 
 #define PARSE_BINARY(Name, Dest)                                                                                       \
     IF_FIELD(Name) {                                                                                                   \
-        bson_subtype_t subtype;                                                                                        \
-        uint32_t len;                                                                                                  \
-        const uint8_t *data;                                                                                           \
-        if (bson_iter_type(&iter) != BSON_TYPE_BINARY) {                                                               \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata, got: %d", (int)bson_iter_type(&iter));               \
-            goto fail;                                                                                                 \
-        }                                                                                                              \
-        bson_iter_binary(&iter, &subtype, &len, &data);                                                                \
-        if (subtype != BSON_SUBTYPE_BINARY) {                                                                          \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata subtype %d, got: %d",                                 \
-                       BSON_SUBTYPE_BINARY,                                                                            \
-                       (int)subtype);                                                                                  \
-            goto fail;                                                                                                 \
-        }                                                                                                              \
-        if (!_mongocrypt_buffer_copy_from_binary_iter(&out->Dest, &iter)) {                                            \
-            CLIENT_ERR("Unable to create mongocrypt buffer for BSON binary "                                           \
-                       "field in '" #Name "'");                                                                        \
+        if (!parse_bindata(BSON_SUBTYPE_BINARY, &iter, &out->Dest, status)) {                                          \
             goto fail;                                                                                                 \
         }                                                                                                              \
     }                                                                                                                  \
@@ -73,7 +58,8 @@ void mc_FLE2FindEqualityPayload_cleanup(mc_FLE2FindEqualityPayload_t *payload) {
     if (!has_##Name) {                                                                                                 \
         CLIENT_ERR("Missing field '" #Name "' in payload");                                                            \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 bool mc_FLE2FindEqualityPayload_parse(mc_FLE2FindEqualityPayload_t *out,
                                       const bson_t *in,
@@ -116,14 +102,14 @@ bool mc_FLE2FindEqualityPayload_parse(mc_FLE2FindEqualityPayload_t *out,
 
     return true;
 fail:
-    mc_FLE2FindEqualityPayload_cleanup(out);
     return false;
 }
 
 #define PAYLOAD_APPEND_BINDATA(name, value)                                                                            \
     if (!_mongocrypt_buffer_append(&(value), out, name, -1)) {                                                         \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 bool mc_FLE2FindEqualityPayload_serialize(const mc_FLE2FindEqualityPayload_t *payload, bson_t *out) {
     BSON_ASSERT_PARAM(payload);

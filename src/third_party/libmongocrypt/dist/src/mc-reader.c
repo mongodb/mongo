@@ -21,7 +21,8 @@
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 #define CHECK_REMAINING_BUFFER_AND_RET(read_size)                                                                      \
     if ((reader->pos + (read_size)) > reader->len) {                                                                   \
@@ -31,7 +32,8 @@
                    reader->pos + (read_size),                                                                          \
                    reader->len);                                                                                       \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 void mc_reader_init(mc_reader_t *reader, const uint8_t *ptr, uint64_t len, const char *parser_name) {
     BSON_ASSERT_PARAM(reader);

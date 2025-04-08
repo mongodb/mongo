@@ -55,7 +55,7 @@ BSON_STATIC_ASSERT2(alignof_mc_RangeOpts_t,
  *    "trimFactor": Optional<Int32>,
  * }
  */
-bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2, mongocrypt_status_t *status);
+bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, mongocrypt_status_t *status);
 
 /*
  * mc_RangeOpts_to_FLE2RangeInsertSpec creates a placeholder value to be
@@ -76,7 +76,6 @@ bool mc_RangeOpts_parse(mc_RangeOpts_t *ro, const bson_t *in, bool use_range_v2,
 bool mc_RangeOpts_to_FLE2RangeInsertSpec(const mc_RangeOpts_t *ro,
                                          const bson_t *v,
                                          bson_t *out,
-                                         bool use_range_v2,
                                          mongocrypt_status_t *status);
 
 /* mc_RangeOpts_appendMin appends the minimum value of the range for a given
@@ -104,8 +103,7 @@ bool mc_RangeOpts_appendTrimFactor(const mc_RangeOpts_t *ro,
                                    bson_type_t valueType,
                                    const char *fieldName,
                                    bson_t *out,
-                                   mongocrypt_status_t *status,
-                                   bool use_range_v2);
+                                   mongocrypt_status_t *status);
 
 void mc_RangeOpts_cleanup(mc_RangeOpts_t *ro);
 

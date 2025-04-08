@@ -17,6 +17,7 @@
 #include <bson/bson.h>
 
 #include "mc-fle2-insert-update-payload-private-v2.h"
+#include "mc-parse-utils-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-util-private.h" // mc_bson_type_to_string
 #include "mongocrypt.h"
@@ -133,21 +134,7 @@ void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payloa
 
 #define PARSE_BINDATA(Name, Type, Dest)                                                                                \
     IF_FIELD(Name) {                                                                                                   \
-        bson_subtype_t subtype;                                                                                        \
-        uint32_t len;                                                                                                  \
-        const uint8_t *data;                                                                                           \
-        if (bson_iter_type(&iter) != BSON_TYPE_BINARY) {                                                               \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata, got: %d", (int)bson_iter_type(&iter));               \
-            goto fail;                                                                                                 \
-        }                                                                                                              \
-        bson_iter_binary(&iter, &subtype, &len, &data);                                                                \
-        if (subtype != Type) {                                                                                         \
-            CLIENT_ERR("Field '" #Name "' expected to be bindata subtype %d, got: %d", Type, (int)subtype);            \
-            goto fail;                                                                                                 \
-        }                                                                                                              \
-        if (!_mongocrypt_buffer_copy_from_binary_iter(&out->Dest, &iter)) {                                            \
-            CLIENT_ERR("Unable to create mongocrypt buffer for BSON binary "                                           \
-                       "field in '" #Name "'");                                                                        \
+        if (!parse_bindata(Type, &iter, &out->Dest, status)) {                                                         \
             goto fail;                                                                                                 \
         }                                                                                                              \
     }                                                                                                                  \
@@ -159,7 +146,8 @@ void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payloa
     if (!has_##Name) {                                                                                                 \
         CLIENT_ERR("Missing field '" #Name "' in payload");                                                            \
         goto fail;                                                                                                     \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
                                         const _mongocrypt_buffer_t *in,
@@ -300,14 +288,14 @@ bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
 
     return true;
 fail:
-    mc_FLE2InsertUpdatePayloadV2_cleanup(out);
     return false;
 }
 
 #define IUPS_APPEND_BINDATA(dst, name, subtype, value)                                                                 \
     if (!_mongocrypt_buffer_append(&(value), dst, name, -1)) {                                                         \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out) {
     BSON_ASSERT_PARAM(out);
@@ -330,9 +318,7 @@ bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t
     return true;
 }
 
-bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload,
-                                                    bson_t *out,
-                                                    bool use_range_v2) {
+bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out) {
     BSON_ASSERT_PARAM(out);
     BSON_ASSERT_PARAM(payload);
 
@@ -376,34 +362,32 @@ bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePay
         return false;
     }
 
-    if (use_range_v2) {
-        // Encode parameters that were used to generate the payload.
-        BSON_ASSERT(payload->sparsity.set);
-        if (!BSON_APPEND_INT64(out, "sp", payload->sparsity.value)) {
+    // Encode parameters that were used to generate the payload.
+    BSON_ASSERT(payload->sparsity.set);
+    if (!BSON_APPEND_INT64(out, "sp", payload->sparsity.value)) {
+        return false;
+    }
+
+    // Precision may be unset.
+    if (payload->precision.set) {
+        if (!BSON_APPEND_INT32(out, "pn", payload->precision.value)) {
             return false;
         }
+    }
 
-        // Precision may be unset.
-        if (payload->precision.set) {
-            if (!BSON_APPEND_INT32(out, "pn", payload->precision.value)) {
-                return false;
-            }
-        }
+    BSON_ASSERT(payload->trimFactor.set);
+    if (!BSON_APPEND_INT32(out, "tf", payload->trimFactor.value)) {
+        return false;
+    }
 
-        BSON_ASSERT(payload->trimFactor.set);
-        if (!BSON_APPEND_INT32(out, "tf", payload->trimFactor.value)) {
-            return false;
-        }
+    BSON_ASSERT(payload->indexMin.value_type != BSON_TYPE_EOD);
+    if (!BSON_APPEND_VALUE(out, "mn", &payload->indexMin)) {
+        return false;
+    }
 
-        BSON_ASSERT(payload->indexMin.value_type != BSON_TYPE_EOD);
-        if (!BSON_APPEND_VALUE(out, "mn", &payload->indexMin)) {
-            return false;
-        }
-
-        BSON_ASSERT(payload->indexMax.value_type != BSON_TYPE_EOD);
-        if (!BSON_APPEND_VALUE(out, "mx", &payload->indexMax)) {
-            return false;
-        }
+    BSON_ASSERT(payload->indexMax.value_type != BSON_TYPE_EOD);
+    if (!BSON_APPEND_VALUE(out, "mx", &payload->indexMax)) {
+        return false;
     }
 
     return true;

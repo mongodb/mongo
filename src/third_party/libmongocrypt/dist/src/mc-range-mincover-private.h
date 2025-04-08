@@ -53,8 +53,7 @@ typedef struct {
 // mc_getMincoverInt32 implements the Mincover Generation algorithm described in
 // SERVER-68600 for int32_t.
 mc_mincover_t *mc_getMincoverInt32(mc_getMincoverInt32_args_t args,
-                                   mongocrypt_status_t *status,
-                                   bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                                   mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 typedef struct {
     int64_t lowerBound;
@@ -70,8 +69,7 @@ typedef struct {
 // mc_getMincoverInt64 implements the Mincover Generation algorithm described in
 // SERVER-68600 for int64_t.
 mc_mincover_t *mc_getMincoverInt64(mc_getMincoverInt64_args_t args,
-                                   mongocrypt_status_t *status,
-                                   bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                                   mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 typedef struct {
     double lowerBound;
@@ -88,8 +86,7 @@ typedef struct {
 // mc_getMincoverDouble implements the Mincover Generation algorithm described
 // in SERVER-68600 for double.
 mc_mincover_t *mc_getMincoverDouble(mc_getMincoverDouble_args_t args,
-                                    mongocrypt_status_t *status,
-                                    bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                                    mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
 typedef struct {
@@ -106,8 +103,7 @@ typedef struct {
 // mc_getMincoverDecimal128 implements the Mincover Generation algorithm
 // described in SERVER-68600 for Decimal128 (as mc_dec128).
 mc_mincover_t *mc_getMincoverDecimal128(mc_getMincoverDecimal128_args_t args,
-                                        mongocrypt_status_t *status,
-                                        bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                                        mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 #endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT
 
 #endif /* MC_RANGE_MINCOVER_PRIVATE_H */

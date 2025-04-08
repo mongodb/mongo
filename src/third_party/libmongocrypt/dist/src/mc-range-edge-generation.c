@@ -35,11 +35,8 @@ int32_t mc_edges_get_used_trimFactor(const mc_edges_t *edges) {
     return edges->usedTrimFactor;
 }
 
-static mc_edges_t *mc_edges_new(const char *leaf,
-                                size_t sparsity,
-                                mc_optional_int32_t opt_trimFactor,
-                                mongocrypt_status_t *status,
-                                bool use_range_v2) {
+static mc_edges_t *
+mc_edges_new(const char *leaf, size_t sparsity, mc_optional_int32_t opt_trimFactor, mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(leaf);
     if (sparsity < 1) {
         CLIENT_ERR("sparsity must be 1 or larger");
@@ -47,7 +44,7 @@ static mc_edges_t *mc_edges_new(const char *leaf,
     }
 
     const size_t leaf_len = strlen(leaf);
-    const int32_t trimFactor = trimFactorDefault(leaf_len, opt_trimFactor, use_range_v2);
+    const int32_t trimFactor = trimFactorDefault(leaf_len, opt_trimFactor);
     if (trimFactor != 0 && mc_cmp_greater_equal_su(trimFactor, leaf_len)) {
         // We append a total of leaf_len + 1 (for the root) - trimFactor edges. When this number is equal to 1, we
         // degenerate into equality, which is not desired, so trimFactor must be less than leaf_len.
@@ -163,7 +160,7 @@ mc_bitstring mc_convert_to_bitstring_u128(mlib_int128 i) {
     return ret;
 }
 
-mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
+mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *status) {
     mc_OSTType_Int32 got;
     if (!mc_getTypeInfo32((mc_getTypeInfo32_args_t){.value = args.value, .min = args.min, .max = args.max},
                           &got,
@@ -179,11 +176,11 @@ mc_edges_t *mc_getEdgesInt32(mc_getEdgesInt32_args_t args, mongocrypt_status_t *
     mc_bitstring valueBin = mc_convert_to_bitstring_u32(got.value);
     size_t offset = mc_count_leading_zeros_u32(got.max);
     const char *leaf = valueBin.str + offset;
-    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status, use_range_v2);
+    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status);
     return ret;
 }
 
-mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
+mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *status) {
     mc_OSTType_Int64 got;
     if (!mc_getTypeInfo64((mc_getTypeInfo64_args_t){.value = args.value, .min = args.min, .max = args.max},
                           &got,
@@ -199,19 +196,18 @@ mc_edges_t *mc_getEdgesInt64(mc_getEdgesInt64_args_t args, mongocrypt_status_t *
     mc_bitstring valueBin = mc_convert_to_bitstring_u64(got.value);
     size_t offset = mc_count_leading_zeros_u64(got.max);
     const char *leaf = valueBin.str + offset;
-    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status, use_range_v2);
+    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status);
     return ret;
 }
 
-mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
+mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t *status) {
     mc_OSTType_Double got;
     if (!mc_getTypeInfoDouble((mc_getTypeInfoDouble_args_t){.value = args.value,
                                                             .min = args.min,
                                                             .max = args.max,
                                                             .precision = args.precision},
                               &got,
-                              status,
-                              use_range_v2)) {
+                              status)) {
         return NULL;
     }
 
@@ -223,12 +219,12 @@ mc_edges_t *mc_getEdgesDouble(mc_getEdgesDouble_args_t args, mongocrypt_status_t
     mc_bitstring valueBin = mc_convert_to_bitstring_u64(got.value);
     size_t offset = mc_count_leading_zeros_u64(got.max);
     const char *leaf = valueBin.str + offset;
-    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status, use_range_v2);
+    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status);
     return ret;
 }
 
 #if MONGOCRYPT_HAVE_DECIMAL128_SUPPORT()
-mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status, bool use_range_v2) {
+mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_status_t *status) {
     mc_OSTType_Decimal128 got;
     if (!mc_getTypeInfoDecimal128(
             (mc_getTypeInfoDecimal128_args_t){
@@ -238,8 +234,7 @@ mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_
                 .precision = args.precision,
             },
             &got,
-            status,
-            use_range_v2)) {
+            status)) {
         return NULL;
     }
 
@@ -248,7 +243,7 @@ mc_edges_t *mc_getEdgesDecimal128(mc_getEdgesDecimal128_args_t args, mongocrypt_
     mc_bitstring bits = mc_convert_to_bitstring_u128(got.value);
     size_t offset = mc_count_leading_zeros_u128(got.max);
     const char *leaf = bits.str + offset;
-    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status, use_range_v2);
+    mc_edges_t *ret = mc_edges_new(leaf, args.sparsity, args.trimFactor, status);
     return ret;
 }
 #endif // MONGOCRYPT_HAVE_DECIMAL128_SUPPORT

@@ -118,8 +118,6 @@ typedef struct {
     bool use_need_mongo_collinfo_with_db_state;
     bool bypass_query_analysis;
 
-    // Use the Queryable Encryption Range V2 protocol.
-    bool use_range_v2;
 } _mongocrypt_opts_t;
 
 void _mongocrypt_opts_kms_providers_cleanup(_mongocrypt_opts_kms_providers_t *kms_providers);

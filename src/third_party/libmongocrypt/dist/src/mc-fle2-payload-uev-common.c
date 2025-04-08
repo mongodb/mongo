@@ -21,7 +21,8 @@
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 bool _mc_FLE2UnindexedEncryptedValueCommon_parse(const _mongocrypt_buffer_t *buf,
                                                  uint8_t *fle_blob_subtype,

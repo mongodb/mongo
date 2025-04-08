@@ -67,7 +67,6 @@ bool _mongocrypt_marking_to_ciphertext(void *ctx,
 
 mc_mincover_t *mc_get_mincover_from_FLE2RangeFindSpec(mc_FLE2RangeFindSpec_t *findSpec,
                                                       size_t sparsity,
-                                                      mongocrypt_status_t *status,
-                                                      bool use_range_v2) MONGOCRYPT_WARN_UNUSED_RESULT;
+                                                      mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #endif /* MONGOCRYPT_MARKING_PRIVATE_H */

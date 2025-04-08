@@ -32,7 +32,8 @@
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 mc_FLE2IndexedEncryptedValueV2_t *mc_FLE2IndexedEncryptedValueV2_new(void) {
     return bson_malloc0(sizeof(mc_FLE2IndexedEncryptedValueV2_t));

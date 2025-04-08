@@ -136,6 +136,18 @@ static mongocrypt_kms_ctx_t *_next_kms_ctx_encrypt(mongocrypt_ctx_t *ctx) {
     mongocrypt_ctx_t *dkctx = NULL;
 
     BSON_ASSERT_PARAM(ctx);
+    /* Check if any need retry */
+    {
+        _mongocrypt_ctx_rmd_datakey_t *it = rmdctx->datakeys;
+        while (it != NULL) {
+            _mongocrypt_ctx_datakey_t *dkctx = (_mongocrypt_ctx_datakey_t *)it->dkctx;
+            if (dkctx->kms.should_retry) {
+                dkctx->kms.should_retry = false; // Reset retry state.
+                return &dkctx->kms;
+            }
+            it = it->next;
+        }
+    }
 
     /* No more datakey contexts requiring KMS. */
     if (!rmdctx->datakeys_iter) {

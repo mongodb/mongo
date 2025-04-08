@@ -21,7 +21,8 @@
 #define CHECK_AND_RETURN(x)                                                                                            \
     if (!(x)) {                                                                                                        \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 #define CHECK_REMAINING_BUFFER_AND_RET(write_size)                                                                     \
     if ((write_size) > writer->len - writer->pos) {                                                                    \
@@ -30,7 +31,8 @@
                    (writer->len - writer->pos),                                                                        \
                    (uint64_t)(write_size));                                                                            \
         return false;                                                                                                  \
-    }
+    } else                                                                                                             \
+        ((void)0)
 
 void mc_writer_init(mc_writer_t *writer, uint8_t *ptr, uint64_t len, const char *parser_name) {
     BSON_ASSERT_PARAM(writer);
