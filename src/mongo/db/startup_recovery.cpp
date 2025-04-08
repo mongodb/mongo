@@ -88,6 +88,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -661,6 +662,30 @@ void startupRepair(OperationContext* opCtx,
         quickExit(ExitCode::abrupt);
     }
 
+    auto invalidateReplConfigIfNeeded = [opCtx]() {
+        // If the config doesn't exist, don't invalidate anything. If this node were originally
+        // part of a replica set but lost its config due to a repair, it would automatically
+        // perform a resync. If this node is a standalone, this would lead to a confusing error
+        // message if it were added to a replica set later on.
+        auto storage = repl::StorageInterface::get(opCtx);
+        auto swConfig = storage->findSingleton(opCtx, NamespaceString::kSystemReplSetNamespace);
+        if (!swConfig.isOK()) {
+            return;
+        }
+        auto config = swConfig.getValue();
+        if (config.hasField(repl::ReplSetConfig::kRepairedFieldName)) {
+            return;
+        }
+        BSONObjBuilder configBuilder(config);
+        configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
+        fassert(7101800,
+                storage->putSingleton(opCtx,
+                                      NamespaceString::kSystemReplSetNamespace,
+                                      {configBuilder.obj(), Timestamp{}}));
+
+        JournalFlusher::get(opCtx)->waitForJournalFlush();
+    };
+
     // Repair, restore, and initialize the featureCompatibilityVersion document before allowing
     // repair to potentially rebuild indexes on the remaining collections. This ensures any
     // FCV-dependent features are rebuilt properly. Note that we don't try to prevent
@@ -668,8 +693,10 @@ void startupRepair(OperationContext* opCtx,
     // document.
     // If we fail to load the FCV document due to upgrade problems, we need to abort the repair in
     // order to allow downgrading to older binary versions.
-    ScopeGuard abortRepairOnFCVErrors(
-        [&] { StorageRepairObserver::get(opCtx->getServiceContext())->onRepairDone(opCtx); });
+    ScopeGuard abortRepairOnFCVErrors([&] {
+        StorageRepairObserver::get(opCtx->getServiceContext())
+            ->onRepairDone(opCtx, invalidateReplConfigIfNeeded);
+    });
 
     auto catalog = CollectionCatalog::get(opCtx);
     if (auto fcvColl = catalog->lookupCollectionByNamespace(
@@ -733,7 +760,7 @@ void startupRepair(OperationContext* opCtx,
     }
 
     auto repairObserver = StorageRepairObserver::get(opCtx->getServiceContext());
-    repairObserver->onRepairDone(opCtx);
+    repairObserver->onRepairDone(opCtx, invalidateReplConfigIfNeeded);
     if (repairObserver->getModifications().size() > 0) {
         const auto& mods = repairObserver->getModifications();
         for (const auto& mod : mods) {

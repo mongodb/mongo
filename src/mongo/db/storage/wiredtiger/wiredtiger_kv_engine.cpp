@@ -678,7 +678,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         if (_inRepairMode) {
             // In case this process was started with `--repair`, remove the "repair incomplete"
             // file.
-            StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(nullptr);
+            StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(nullptr, {});
         }
         LOGV2_FATAL_NOTRACE(
             4671205,

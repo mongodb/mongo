@@ -92,6 +92,8 @@
 namespace mongo {
 namespace {
 
+void callbackMock() {}
+
 TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();
 
@@ -710,7 +712,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
 
     ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
-    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
+    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 #endif
@@ -735,7 +737,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
 
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
-    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
+    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
     ASSERT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
@@ -772,7 +774,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), orphanNs));
 
-    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
+    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 

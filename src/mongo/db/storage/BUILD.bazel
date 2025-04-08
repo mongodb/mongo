@@ -174,9 +174,6 @@ mongo_cc_library(
         ":storage_file_util",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
-        "//src/mongo/db/repl:replica_set_messages",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:storage_interface",
-        "//src/mongo/db/storage:journal_flusher",
     ],
 )
 
@@ -683,7 +680,6 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:shard_role",
         "//src/mongo/db:startup_recovery",
-        "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/catalog:collection_options",

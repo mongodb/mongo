@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 

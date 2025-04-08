@@ -39,21 +39,12 @@
 #include <boost/filesystem/operations.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/errno_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -102,13 +93,15 @@ void StorageRepairObserver::invalidatingModification(const std::string& descript
     _modifications.emplace_back(Modification::invalidating(description));
 }
 
-void StorageRepairObserver::onRepairDone(OperationContext* opCtx) {
+void StorageRepairObserver::onRepairDone(OperationContext* opCtx,
+                                         const InvalidateReplConfigCallback& cb) {
     invariant(_repairState == RepairState::kIncomplete);
 
     // This ordering is important. The incomplete file should only be removed once the
     // replica set configuration has been invalidated successfully.
     if (isDataInvalidated()) {
-        _invalidateReplConfigIfNeeded(opCtx);
+        invariant(opCtx && cb);
+        cb();
     }
     _removeRepairIncompleteFile();
 
@@ -149,30 +142,6 @@ void StorageRepairObserver::_removeRepairIncompleteFile() {
                             "error"_attr = ec.message());
     }
     fassertNoTrace(50927, fsyncParentDirectory(_repairIncompleteFilePath));
-}
-
-void StorageRepairObserver::_invalidateReplConfigIfNeeded(OperationContext* opCtx) {
-    // If the config doesn't exist, don't invalidate anything. If this node were originally part of
-    // a replica set but lost its config due to a repair, it would automatically perform a resync.
-    // If this node is a standalone, this would lead to a confusing error message if it were
-    // added to a replica set later on.
-    auto storage = repl::StorageInterface::get(opCtx);
-    auto swConfig = storage->findSingleton(opCtx, NamespaceString::kSystemReplSetNamespace);
-    if (!swConfig.isOK()) {
-        return;
-    }
-    auto config = swConfig.getValue();
-    if (config.hasField(repl::ReplSetConfig::kRepairedFieldName)) {
-        return;
-    }
-    BSONObjBuilder configBuilder(config);
-    configBuilder.append(repl::ReplSetConfig::kRepairedFieldName, true);
-    fassert(7101800,
-            storage->putSingleton(opCtx,
-                                  NamespaceString::kSystemReplSetNamespace,
-                                  {configBuilder.obj(), Timestamp{}}));
-
-    JournalFlusher::get(opCtx)->waitForJournalFlush();
 }
 
 }  // namespace mongo
