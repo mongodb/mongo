@@ -268,9 +268,9 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
 
 let testCases = {
     _clusterQueryWithoutShardKey:
-        {skip: "executed locally on a mongos (not sent to any remote node)"},
+        {skip: "executed locally on a mongos (not sent to any remote node)", conditional: true},
     _clusterWriteWithoutShardKey:
-        {skip: "executed locally on a mongos (not sent to any remote node)"},
+        {skip: "executed locally on a mongos (not sent to any remote node)", conditional: true},
     _getAuditConfigGeneration: {skip: "not on a user database", conditional: true},
     _hashBSONElement: {skip: "executes locally on mongos (not sent to any remote node)"},
     _isSelf: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -538,7 +538,7 @@ let testCases = {
     },
     flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
     fsync: {skip: "broadcast to all shards"},
-    fsyncUnlock: {skip: "broadcast to all shards"},
+    fsyncUnlock: {skip: "broadcast to all shards", conditional: true},
     getAuditConfig: {skip: "not on a user database", conditional: true},
     getClusterParameter: {skip: "always targets the config server"},
     getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -770,7 +770,7 @@ let testCases = {
     testRemoval: {skip: "executes locally on mongos (not sent to any remote node)"},
     testVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},
     testVersions1And2: {skip: "executes locally on mongos (not sent to any remote node)"},
-    transitionFromDedicatedConfigServer: {skip: "not on a user database"},
+    transitionFromDedicatedConfigServer: {skip: "not on a user database", conditional: true},
     transitionToDedicatedConfigServer: {skip: "not on a user database"},
     unshardCollection: {skip: "does not forward command to primary shard"},
     untrackUnshardedCollection: {skip: "does not forward command to primary shard"},
