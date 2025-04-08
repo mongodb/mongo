@@ -20,14 +20,19 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kTestName = jsTestName();
 
-// Used to generate unique appnames
+// Counter for genAppName().
 let id = 0;
 
-function getCurOpCount(client, id) {
+// Generate a unique appName.
+function genAppName() {
+    return kTestName + id++;
+}
+
+function getCurOpCount(client, appName) {
     return client.getDB("admin")
         .aggregate([
             {$currentOp: {localOps: true}},
-            {$match: {appName: kTestName + id}},
+            {$match: {appName: {$eq: appName}}},
         ])
         .itcount();
 }
@@ -38,7 +43,7 @@ function getCurOpCount(client, id) {
 // expectCleanUp - whether or not to expect the operation to be cleaned up on network failure.
 //
 // Returns false if the op was gone from current op
-function check(client, pre, post, {expectCleanUp}) {
+function check(client, pre, post, {appName, expectCleanUp, expectedNumKilled}) {
     const interval = 200;
     const timeout = 10000;
     const socketTimeout = 5000;
@@ -48,12 +53,16 @@ function check(client, pre, post, {expectCleanUp}) {
     const msg = "operation " + (expectCleanUp ? "" : "not ") + "cleaned up on client disconnect.";
 
     // Make a socket which will timeout
-    id++;
-    let conn =
-        new Mongo(`mongodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${kTestName}${id}`);
+    let conn = new Mongo(`mongodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${appName}`);
 
     // Make sure it works at all
     assert.commandWorked(conn.adminCommand({ping: 1}));
+
+    // Measure 'killedDueToClientDisconnect' before and after.
+    const getNumKilled = () => client.getDB("admin")
+                                   .runCommand({serverStatus: 1})
+                                   .metrics.operation.killedDueToClientDisconnect;
+    const numKilledBefore = getNumKilled();
 
     try {
         // Make sure that whatever operation we ran had a network error
@@ -69,57 +78,52 @@ function check(client, pre, post, {expectCleanUp}) {
 
         if (expectCleanUp) {
             assert.soon(() => {
-                return (getCurOpCount(client, id) == 0);
+                return (getCurOpCount(client, appName) == 0);
             }, msg, timeout, interval);
         } else {
             sleep(timeout);
-            assert.gt(getCurOpCount(client, id), 0);
+            assert.gt(getCurOpCount(client, appName), 0);
         }
     } finally {
         post();
     }
+
+    const numKilledAfter = getNumKilled();
+    const actualNumKilled = numKilledAfter - numKilledBefore;
+    assert.eq(
+        actualNumKilled,
+        expectedNumKilled,
+        `Expected to see ${
+            expectedNumKilled} operation(s) recorded as killedDueToClientDisconnect, but got ${
+            actualNumKilled}`);
 }
 
-function runWithCuropFailPointEnabled(client, failPointName) {
-    return function(entry) {
-        entry[0](client,
-                 function(client) {
-                     configureFailPoint(client, failPointName, {shouldCheckForInterrupt: true});
-                     entry[1](client);
-                 },
-                 function() {
-                     configureFailPoint(client, failPointName, {}, "off");
-                 });
-    };
-}
-
-function runWithCmdFailPointEnabled(client) {
-    return function(entry) {
-        const failPointName = "waitInCommandMarkKillOnClientDisconnect";
-
-        entry[0](client,
-                 function(client) {
-                     configureFailPoint(client, failPointName, {appName: kTestName + id});
-                     entry[1](client);
-                 },
-                 function() {
-                     configureFailPoint(client, failPointName, {}, "off");
-                 });
-    };
-}
-
-function checkClosedEarly(client, pre, post) {
-    check(client, pre, post, {expectCleanUp: true});
-}
-
-function checkNotClosedEarly(client, pre, post) {
-    check(client, pre, post, {expectCleanUp: false});
-}
-
-function runCommand(cmd) {
-    return function(client) {
-        assert.commandWorked(client.getDB(kTestName).runCommand(cmd));
-    };
+function runCommandWithFailPointEnabled({
+    failPointName,
+    failPointData,
+    client,
+    appName,
+    command,
+    expectClosedEarly,
+    expectedNumKilled
+}) {
+    check(client,
+          function(client) {
+              configureFailPoint(client, failPointName, failPointData);
+              if (typeof command === 'function') {
+                  command();
+              } else {
+                  assert.commandWorked(client.getDB(kTestName).runCommand(command));
+              }
+          },
+          function() {
+              configureFailPoint(client, failPointName, {}, "off");
+          },
+          {
+              appName,
+              expectCleanUp: expectClosedEarly,
+              expectedNumKilled,
+          });
 }
 
 // Test that an operation that completes but whose client disconnects before the
@@ -159,89 +163,166 @@ function runTests(client) {
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 2}));
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 3}));
 
-    [[checkClosedEarly, runCommand({find: "test", filter: {}})],
-     [
-         checkClosedEarly,
-         runCommand({
-             find: "test",
-             filter: {
-                 $where: function() {
-                     sleep(100000);
-                 }
-             }
-         })
-     ],
-     [
-         checkClosedEarly,
-         runCommand({
-             find: "test",
-             filter: {
-                 $where: function() {
-                     while (true) {
-                     }
-                 }
-             }
-         })
-     ],
-    ].forEach(runWithCuropFailPointEnabled(client, "waitInFindBeforeMakingBatch"));
+    runCommandWithFailPointEnabled({
+        failPointName: "waitInFindBeforeMakingBatch",
+        failPointData: {shouldCheckForInterrupt: true},
+        client,
+        appName: genAppName(),
+        expectClosedEarly: true,
+        expectedNumKilled: 1,
+        command: {find: "test", filter: {}},
+    });
+    runCommandWithFailPointEnabled({
+        failPointName: "waitInFindBeforeMakingBatch",
+        failPointData: {shouldCheckForInterrupt: true},
+        client,
+        appName: genAppName(),
+        expectClosedEarly: true,
+        expectedNumKilled: 1,
+        command: {
+            find: "test",
+            filter: {
+                $where: function() {
+                    sleep(100000);
+                }
+            }
+        },
+    });
+    runCommandWithFailPointEnabled({
+        failPointName: "waitInFindBeforeMakingBatch",
+        failPointData: {shouldCheckForInterrupt: true},
+        client,
+        appName: genAppName(),
+        expectClosedEarly: true,
+        expectedNumKilled: 1,
+        command: {
+            find: "test",
+            filter: {
+                $where: function() {
+                    while (true) {
+                    }
+                }
+            }
+        }
+    });
 
     // After SERVER-39475, re-enable these tests and add negative testing for $out cursors.
     const serverSupportsEarlyDisconnectOnGetMore = false;
     if (serverSupportsEarlyDisconnectOnGetMore) {
-        [[
-            checkClosedEarly,
-            function(client) {
-                let result = assert.commandWorked(
-                    client.getDB(kTestName).runCommand({find: "test", filter: {}, batchSize: 0}));
-                assert.commandWorked(client.getDB(kTestName).runCommand(
-                    {getMore: result.cursor.id, collection: "test"}));
-            }
-        ]].forEach(runWithCuropFailPointEnabled(client,
-                                                "waitAfterPinningCursorBeforeGetMoreBatch"));
+        runCommandWithFailPointEnabled({
+            failPointName: "waitAfterPinningCursorBeforeGetMoreBatch",
+            failPointData: {shouldCheckForInterrupt: true},
+            client,
+            appName: genAppName(),
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: (client) => {
+                const testDB = client.getDB(kTestName);
+                const result = assert.commandWorked(
+                    testDB.runCommand({find: "test", filter: {}, batchSize: 0}));
+                assert.commandWorked(
+                    testDB.runCommand({getMore: result.cursor.id, collection: "test"}));
+            },
+        });
     }
 
-    [[checkClosedEarly, runCommand({aggregate: "test", pipeline: [], cursor: {}})],
-     [checkNotClosedEarly, runCommand({aggregate: "test", pipeline: [{$out: "out"}], cursor: {}})],
-    ].forEach(runWithCmdFailPointEnabled(client));
-
-    [[checkClosedEarly, runCommand({count: "test"})],
-     [checkClosedEarly, runCommand({distinct: "test", key: "x"})],
-     [checkClosedEarly, runCommand({hello: 1})],
-     [checkClosedEarly, runCommand({listCollections: 1})],
-     [checkClosedEarly, runCommand({listIndexes: "test"})],
-    ].forEach(runWithCmdFailPointEnabled(client));
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: {aggregate: "test", pipeline: [], cursor: {}},
+        });
+    }
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: false,
+            expectedNumKilled: 0,
+            command: {aggregate: "test", pipeline: [{$out: "out"}], cursor: {}},
+        });
+    }
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: {count: "test"},
+        });
+    }
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: {distinct: "test", key: "x"},
+        });
+    }
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: {hello: 1},
+        });
+    }
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: {listCollections: 1},
+        });
+    }
+    {
+        const appName = genAppName();
+        runCommandWithFailPointEnabled({
+            failPointName: "waitInCommandMarkKillOnClientDisconnect",
+            failPointData: {appName},
+            client,
+            appName,
+            expectClosedEarly: true,
+            expectedNumKilled: 1,
+            command: {listIndexes: "test"},
+        });
+    }
 
     testUnsendableCompletedResponsesCounted(client);
 }
 
-// Just counts the # of commands we send in an exection of runTests that should be
-// killed due to disconnected client.
-const numThatShouldCloseEarly = 9;
-
 {
     let proc = MongoRunner.runMongod();
-    let admin = proc.getDB("admin");
-    let beforeServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
     assert.neq(proc, null);
     runTests(proc);
-    let afterServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
-    // Ensure that we report the operations killed due to client disconnect in serverStatus.
-    assert.eq(
-        beforeServerStatusMetrics.operation.killedDueToClientDisconnect + numThatShouldCloseEarly,
-        afterServerStatusMetrics.operation.killedDueToClientDisconnect);
     MongoRunner.stopMongod(proc);
 }
 
 {
     let st = new ShardingTest({mongo: 1, config: 1, shards: 1});
-    let admin = st.s0.getDB("admin");
-    let beforeServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
     runTests(st.s0);
-    let afterServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
-    // Ensure that we report the operations killed due to client disconnect in serverStatus on
-    // mongos.
-    assert.eq(
-        beforeServerStatusMetrics.operation.killedDueToClientDisconnect + numThatShouldCloseEarly,
-        afterServerStatusMetrics.operation.killedDueToClientDisconnect);
     st.stop();
 }
