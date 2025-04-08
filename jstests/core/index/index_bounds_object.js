@@ -2,6 +2,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_non_retryable_writes,
+//   requires_fcv_82,
 // ]
 import {
     assertCoveredQueryAndCount,

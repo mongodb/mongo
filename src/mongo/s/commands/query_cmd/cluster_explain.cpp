@@ -283,6 +283,8 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
     long long keysExamined = 0;
     long long docsExamined = 0;
     long long totalChildMillis = 0;
+    long long totalNCounted = 0;
+    auto appendNCounted = false;
     for (size_t i = 0; i < shardResponses.size(); i++) {
         auto responseData = shardResponses[i].swResponse.getValue().data;
         BSONObj execStats = responseData["executionStats"].Obj();
@@ -298,18 +300,29 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
         if (execStats.hasField("executionTimeMillis")) {
             totalChildMillis += execStats["executionTimeMillis"].numberLong();
         }
+        if (execStats.hasField("executionStages")) {
+            BSONObj stage = execStats["executionStages"].Obj();
+            if (stage.hasField("nCounted")) {
+                totalNCounted += stage["nCounted"].numberLong();
+                appendNCounted = true;
+            }
+        }
     }
 
     // Fill in top-level stats.
     long long finalNReturned = totalNReturned;
     // If the query has targeted multiple shards, the overall nReturned value should reflect the
-    // final limit + skip that are applied router-side on the results returned from the shards.
+    // final limit + skip that are applied router-side on the results returned from the shards. The
+    // same is true for the nCounted value for the count command.
     if (multipleShards) {
         if (skip) {
             finalNReturned = std::max(finalNReturned - *skip, 0LL);
+            totalNCounted = std::max(totalNCounted - *skip, 0LL);
         }
+
         if (limit) {
             finalNReturned = std::min(finalNReturned, static_cast<long long>(*limit));
+            totalNCounted = std::min(totalNCounted, static_cast<long long>(*limit));
         }
     }
 
@@ -324,6 +337,9 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
     // Info for the root mongos stage.
     executionStagesBob.append("stage", mongosStageName);
     executionStatsBob.appendNumber("nReturned", finalNReturned);
+    if (appendNCounted) {
+        executionStatsBob.appendNumber("nCounted", totalNCounted);
+    }
     if (multipleShards) {
         if (limit) {
             executionStatsBob.appendNumber("limitAmount", static_cast<long long>(*limit));

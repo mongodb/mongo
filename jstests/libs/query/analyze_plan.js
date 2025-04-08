@@ -558,6 +558,7 @@ export function extractStableExecutionFieldsSummary(root) {
 
     const stableKeys = [
         "stage",
+        "nCounted",
         "nReturned",
         "limitAmount",
         "skipAmount",
@@ -1011,17 +1012,16 @@ export function assertExplainCount({explainResults, expectedCount}) {
     // SHARD_MERGE stages, with COUNT as the root stage on each shard. If explaining directly on the
     // shard, then COUNT is the root stage.
     if ("SINGLE_SHARD" == execStages.stage || "SHARD_MERGE" == execStages.stage) {
-        let totalCounted = 0;
         for (let shardExplain of execStages.shards) {
             const countStage = shardExplain.executionStages;
             assert(countStage.stage === "COUNT" || countStage.stage === "RECORD_STORE_FAST_COUNT",
                    `Root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT. ` +
                        `The actual plan is: ${tojson(explainResults)}`);
-            totalCounted += countStage.nCounted;
         }
-        assert.eq(totalCounted,
+
+        assert.eq(execStages.nCounted,
                   expectedCount,
-                  assert.eq(totalCounted, expectedCount, "wrong count result"));
+                  assert.eq(execStages.nCounted, expectedCount, "wrong count result"));
     } else {
         assert(execStages.stage === "COUNT" || execStages.stage === "RECORD_STORE_FAST_COUNT",
                `Root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT. ` +

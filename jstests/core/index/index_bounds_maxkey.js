@@ -5,6 +5,7 @@
 //   # This test expects particular plans, creating unanticipated indexes can lead to generating
 //   # unexpected plans.
 //   assumes_no_implicit_index_creation,
+//   requires_fcv_82,
 // ]
 import {assertCoveredQueryAndCount} from "jstests/libs/query/analyze_plan.js";
 

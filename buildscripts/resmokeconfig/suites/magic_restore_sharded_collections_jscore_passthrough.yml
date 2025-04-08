@@ -42,10 +42,6 @@ selector:
     - jstests/core/**/mr_preserve_indexes.js
     # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
     - jstests/core/**/distinct_index1.js
-    # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
-    # incorrect on sharded collections.
-    - jstests/core/**/explain/explain_count.js
-    - jstests/core/**/explain_server_params.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js

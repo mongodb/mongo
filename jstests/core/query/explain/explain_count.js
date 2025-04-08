@@ -1,9 +1,12 @@
 // Test running explains on count commands.
 //
-// @tags: [requires_fastcount]
+// @tags: [
+//    requires_fastcount,
+//    requires_fcv_82,
+// ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {assertExplainCount, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {assertExplainCount, getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 var collName = "jstests_explain_count";
 var t = db[collName];
@@ -29,16 +32,20 @@ function checkCountScanIndexExplain(explain, startKey, endKey, startInclusive, e
  * fast. Assumes that the shard key is part of the index.
  */
 function checkShardingFilterIndexScanExplain(explain, keyName, bounds) {
-    var filterStage = getPlanStage(explain.executionStats.executionStages, "SHARDING_FILTER");
+    const filterStages = getPlanStages(explain.executionStats.executionStages, "SHARDING_FILTER");
+    assert.gt(filterStages.length, 0, "No SHARDING_FILTER stage found");
 
-    assert.eq(filterStage.stage, "SHARDING_FILTER");
-    const ixScanStage = filterStage.inputStage;
-    assert.eq(ixScanStage.stage, "IXSCAN");
-    assert("indexBounds" in ixScanStage);
+    for (const filterStage of filterStages) {
+        assert.eq(filterStage.stage, "SHARDING_FILTER", filterStage);
+        const ixScanStage = filterStage.inputStage;
 
-    assert.eq(ixScanStage.indexBounds[keyName].length, 1);
-    const expectedBoundsArr = JSON.parse(ixScanStage.indexBounds[keyName][0]);
-    assert.eq(expectedBoundsArr, bounds);
+        assert.eq(ixScanStage.stage, "IXSCAN");
+        assert("indexBounds" in ixScanStage);
+
+        assert.eq(ixScanStage.indexBounds[keyName].length, 1);
+        const expectedBoundsArr = JSON.parse(ixScanStage.indexBounds[keyName][0]);
+        assert.eq(expectedBoundsArr, bounds);
+    }
 }
 
 /**

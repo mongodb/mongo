@@ -1078,4 +1078,22 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
         listIndexesCmd,
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
 }
+
+StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<int64_t> limit,
+                                                              boost::optional<int64_t> skip) {
+    boost::optional<int64_t> newLimit;
+    if (limit) {
+        long long newLimitVal;
+        if (overflow::add(*limit, skip.value_or(0), &newLimitVal)) {
+            return Status(ErrorCodes::Overflow,
+                          str::stream() << "sum of limit and skip cannot be represented as "
+                                           "a 64-bit integer, limit: "
+                                        << *limit << ", skip: " << skip.value_or(0));
+        }
+
+        newLimit = newLimitVal;
+    }
+
+    return newLimit;
+}
 }  // namespace mongo

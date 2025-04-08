@@ -378,6 +378,13 @@ public:
         const auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
+        // Create an RAII object that prints the collection's shard key in the case of a tassert
+        // or crash.
+        ScopedDebugInfo shardKeyDiagnostics(
+            "ShardKeyDiagnostics",
+            diagnostic_printers::ShardKeyDiagnosticPrinter{
+                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
+
         {
             // This scope is used to end the use of the builder
             // whether or not we convert to a view-less timeseries
@@ -398,14 +405,23 @@ public:
         BSONObj targetingQuery = countRequest.getQuery();
         BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
 
-        const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON(), verbosity);
+        auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nss);
+        auto numShards =
+            getTargetedShardsForQuery(expCtx, cri, targetingQuery, targetingCollation).size();
+        auto userLimit = countRequest.getLimit();
+        auto userSkip = countRequest.getSkip();
+        if (numShards > 1) {
+            // If there is a limit, we forward the sum of the limit and skip.
+            auto swNewLimit =
+                addLimitAndSkipForShards(countRequest.getLimit(), countRequest.getSkip());
+            if (!swNewLimit.isOK()) {
+                return swNewLimit.getStatus();
+            }
+            countRequest.setLimit(swNewLimit.getValue());
+            countRequest.setSkip(boost::none);
+        }
 
-        // Create an RAII object that prints the collection's shard key in the case of a tassert
-        // or crash.
-        ScopedDebugInfo shardKeyDiagnostics(
-            "ShardKeyDiagnostics",
-            diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
+        const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON(), verbosity);
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;
@@ -451,13 +467,14 @@ public:
             ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
         auto bodyBuilder = result->getBodyBuilder();
-        return ClusterExplain::buildExplainResult(
-            ExpressionContext::makeBlankExpressionContext(opCtx, nss),
-            shardResponses,
-            mongosStageName,
-            millisElapsed,
-            originalCmdObj,
-            &bodyBuilder);
+        return ClusterExplain::buildExplainResult(expCtx,
+                                                  shardResponses,
+                                                  mongosStageName,
+                                                  millisElapsed,
+                                                  originalCmdObj,
+                                                  &bodyBuilder,
+                                                  userLimit,
+                                                  userSkip);
     }
 
 private:

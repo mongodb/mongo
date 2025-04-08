@@ -11,21 +11,14 @@ import {
 } from "jstests/libs/query/analyze_plan.js";
 
 /**
- * Takes a collection and a cursor for a find query. Outputs the query, results and
- * a summary of the explain to markdown. By default the results will be sorted, but the original
- * order can be kept by setting `shouldSortResults` to false.
+ * Helper that ensures limit and/or skip appear in the explain output if specified. Also prints out
+ * common explain output for queries that specify limit/skip.
  */
-export function outputFindPlanAndResults(cursor, expected, shouldSortResults = true) {
-    const results = cursor.toArray();
-    const explain = cursor.explain("executionStats");
+function outputCommonPlanAndResults({querySection, resultsSection, explain, expected}) {
     const executionStages = explain.executionStats.executionStages;
 
     // Verify expected results
-    const actualReturned = results.length;
     assert.eq(executionStages.stage, expected.stage);
-    assert.eq(actualReturned, explain.executionStats.nReturned);
-    assert.eq(actualReturned, executionStages.nReturned);
-
     if (expected.limit !== undefined) {
         assert.eq(executionStages.limitAmount, expected.limit);
     }
@@ -37,10 +30,10 @@ export function outputFindPlanAndResults(cursor, expected, shouldSortResults = t
     const flatPlan = getStableExecutionStats(explain);
 
     subSection("Query");
-    code(tojson(cursor._convertToCommand()));
+    code(querySection);
 
     subSection("Results");
-    code(normalizeArray(results, shouldSortResults));
+    code(resultsSection);
 
     subSection("Summarized explain executionStats");
     if (!explain.hasOwnProperty("shards")) {
@@ -49,6 +42,41 @@ export function outputFindPlanAndResults(cursor, expected, shouldSortResults = t
     code(tojsonMultiLineSortKeys(flatPlan));
 
     linebreak();
+}
+
+/**
+ * Takes a collection and a cursor for a find query. Outputs the query, results and a summary of the
+ * explain to markdown. By default the results will be sorted, but the original order can be kept by
+ * setting `shouldSortResults` to false.
+ */
+export function outputFindPlanAndResults(cursor, expected, shouldSortResults = true) {
+    const results = cursor.toArray();
+    const explain = cursor.explain("executionStats");
+    const executionStages = explain.executionStats.executionStages;
+
+    const actualReturned = results.length;
+    assert.eq(actualReturned, explain.executionStats.nReturned);
+    assert.eq(actualReturned, executionStages.nReturned);
+
+    outputCommonPlanAndResults({
+        querySection: tojson(cursor._convertToCommand()),
+        resultsSection: normalizeArray(results, shouldSortResults),
+        explain,
+        expected
+    });
+}
+
+/**
+ * Takes a count command, explain output, expected explain fields, and count result. Outputs the
+ * query, results and a summary of the explain to markdown.
+ */
+export function outputCountPlanAndResults(cmdObj, explain, expected, actualCount) {
+    const executionStages = explain.executionStats.executionStages;
+
+    assert.eq(actualCount, executionStages.nCounted);
+
+    outputCommonPlanAndResults(
+        {querySection: tojson(cmdObj), resultsSection: actualCount, explain, expected});
 }
 
 /**

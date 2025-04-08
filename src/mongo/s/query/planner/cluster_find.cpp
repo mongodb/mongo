@@ -868,18 +868,9 @@ StatusWith<std::unique_ptr<FindCommandRequest>> ClusterFind::transformQueryForSh
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
 
     // If there is a limit, we forward the sum of the limit and the skip.
-    boost::optional<int64_t> newLimit;
-    if (findCommand.getLimit()) {
-        long long newLimitValue;
-        if (overflow::add(
-                *findCommand.getLimit(), findCommand.getSkip().value_or(0), &newLimitValue)) {
-            return Status(
-                ErrorCodes::Overflow,
-                str::stream()
-                    << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
-                    << *findCommand.getLimit() << ", skip: " << findCommand.getSkip().value_or(0));
-        }
-        newLimit = newLimitValue;
+    auto swNewLimit = addLimitAndSkipForShards(findCommand.getLimit(), findCommand.getSkip());
+    if (!swNewLimit.isOK()) {
+        return swNewLimit.getStatus();
     }
 
     // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
@@ -907,7 +898,7 @@ StatusWith<std::unique_ptr<FindCommandRequest>> ClusterFind::transformQueryForSh
     std::unique_ptr<FindCommandRequest> newQR = std::make_unique<FindCommandRequest>(findCommand);
     newQR->setProjection(newProjection);
     newQR->setSkip(boost::none);
-    newQR->setLimit(newLimit);
+    newQR->setLimit(swNewLimit.getValue());
 
     // Even if the client sends us singleBatch=true, we may need to retrieve
     // multiple batches from a shard in order to return the single requested batch to the client.

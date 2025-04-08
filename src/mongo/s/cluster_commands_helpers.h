@@ -480,4 +480,11 @@ CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
     OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri);
 
+/**
+ * Utility that safely calculates the sum of a limit and skip so it can be forwarded to the shards.
+ * In a sharded cluster, each shard will apply the sum individually, and the final limit and skip
+ * will be performed router-side.
+ */
+StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<int64_t> limit,
+                                                              boost::optional<int64_t> skip);
 }  // namespace mongo

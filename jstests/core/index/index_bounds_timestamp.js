@@ -3,14 +3,10 @@
 // inclusiveness and exactness.
 // @tags: [
 //   assumes_read_concern_local,
+//   requires_fcv_82,
 // ]
 
-import {
-    assertExplainCount,
-    getWinningPlanFromExplain,
-    isCollscan,
-    isIndexOnly
-} from "jstests/libs/query/analyze_plan.js";
+import {assertExplainCount, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 // Setup the test collection.
 let coll = db.index_bounds_timestamp;
