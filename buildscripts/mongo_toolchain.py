@@ -82,7 +82,7 @@ def _run_command(cmd: str) -> str:
 
 def _fetch_bazel_toolchain(version: str) -> None:
     try:
-        _run_command(f"bazel build @mongo_toolchain_{version}//:all")
+        _run_command(f"bazel build --config=local @mongo_toolchain_{version}//:all")
     except subprocess.CalledProcessError as e:
         raise MongoToolchainNotFoundError(
             f"Failed to fetch bazel toolchain: `{e.cmd}` exited with code {e.returncode}"
