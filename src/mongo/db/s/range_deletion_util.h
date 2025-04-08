@@ -178,5 +178,15 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const UUID& collectionUuid,
                                              const ChunkRange& range,
                                              const UUID& migrationId);
+
+
+/**
+ * Updates each document in the `config.rangeDeletions` collection by setting the
+ * `preMigrationShardVersion` field to the default value `ChunkVersion::IGNORED()`, but only for
+ * documents where the field is not already set.
+ *
+ * TODO SERVER-103046: Remove once 9.0 becomes last lts.
+ */
+void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx);
 }  // namespace rangedeletionutil
 }  // namespace mongo

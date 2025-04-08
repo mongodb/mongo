@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -725,6 +726,27 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                           "simulate an error response when initiating range deletion on recipient");
             }
         });
+}
+
+// TODO SERVER-103046: Remove once 9.0 becomes last lts.
+void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    write_ops::UpdateCommandRequest update(NamespaceString::kRangeDeletionNamespace);
+
+    update.setUpdates({[&]() {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON(RangeDeletionTask::kPreMigrationShardVersionFieldName
+                        << BSON("$exists" << false)));
+        BSONObjBuilder builder;
+        ChunkVersion::IGNORED().serialize(RangeDeletionTask::kPreMigrationShardVersionFieldName,
+                                          &builder);
+        entry.setU(
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << builder.obj())));
+        entry.setMulti(true);
+        return entry;
+    }()});
+    update.getWriteCommandRequestBase().setOrdered(false);
+    write_ops::checkWriteErrors(client.update(update));
 }
 }  // namespace rangedeletionutil
 }  // namespace mongo

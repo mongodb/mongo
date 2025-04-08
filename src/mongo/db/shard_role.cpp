@@ -1583,8 +1583,12 @@ void restoreTransactionResourcesToOperationContext(
                 // * The parameter terminateSecondaryReadsOnOrphanCleanup is enabled.
                 // * The feature flag featureFlagTerminateSecondaryReadsUponRangeDeletion is
                 // enabled.
+                // (Ignore FCV check): It will always check if the feature flag
+                // TerminateSecondaryReadsUponRangeDeletion is enabled on the current binary to
+                // terminate the read query.
                 if (acquiredCollection.ownershipFilter &&
-                    feature_flags::gTerminateSecondaryReadsUponRangeDeletion.isEnabled() &&
+                    feature_flags::gTerminateSecondaryReadsUponRangeDeletion
+                        .isEnabledAndIgnoreFCVUnsafe() &&
                     terminateSecondaryReadsOnOrphanCleanup.load() &&
                     (prerequisites.readConcern.getLevel() !=
                          repl::ReadConcernLevel::kSnapshotReadConcern &&

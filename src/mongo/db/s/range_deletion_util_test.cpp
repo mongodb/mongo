@@ -645,4 +645,39 @@ TEST_F(RenameRangeDeletionsTest, TestInvalidUUID) {
     ASSERT_EQ(results, 0);
     ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range, wrongUuid));
 }
+
+/**
+ * Test helper functions to set and unset preMigrationShardVersion field for Upgrade/Downgrade.
+ *
+ * TODO SERVER-103046: Remove once 9.0 becomes last lts.
+ */
+TEST_F(RangeDeleterTest, PreMigrationShardVersionUpgradeDowngradeTest) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("two"), uuid, 10, 20));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("three"), uuid, 40, 50));
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    store.forEach(opCtx, BSONObj(), [&](const RangeDeletionTask& rangeDeletionTask) {
+        ASSERT_FALSE(rangeDeletionTask.getPreMigrationShardVersion().has_value());
+        return true;
+    });
+
+    rangedeletionutil::setPreMigrationShardVersionOnRangeDeletionTasks(opCtx);
+    store.forEach(opCtx, BSONObj(), [&](const RangeDeletionTask& rangeDeletionTask) {
+        ASSERT(rangeDeletionTask.getPreMigrationShardVersion().has_value());
+        ASSERT_EQ(ChunkVersion::IGNORED(), rangeDeletionTask.getPreMigrationShardVersion().get());
+        return true;
+    });
+}
 }  // namespace mongo

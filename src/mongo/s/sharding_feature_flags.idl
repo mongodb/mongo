@@ -170,7 +170,7 @@ feature_flags:
     enable_on_transitional_fcv: true
   # TODO (SERVER-89169): remove once 9.0 becomes last LTS.
   featureFlagShardAuthoritativeCollMetadata:
-    description: "Feature flag to enable the authoritative model for storing shard-local information 
+    description: "Feature flag to enable the authoritative model for storing shard-local information
                   for collections and chunks metadata."
     cpp_varname: feature_flags::gShardAuthoritativeCollMetadata
     default: false
@@ -186,8 +186,9 @@ feature_flags:
   featureFlagTerminateSecondaryReadsUponRangeDeletion:
     description: "Feature flag to enable the termination of secondary reads due to range deletions."
     cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
-    default: true 
-    shouldBeFCVGated: false
+    default: true
+    version: 8.2
+    shouldBeFCVGated: true
   # TODO (SERVER-99655): remove this feature flag
   featureFlagSnapshotFCVInDDLCoordinators:
     description: "Feature flag to enable snapshotting of the operation FCV at the start of DDL operations."
