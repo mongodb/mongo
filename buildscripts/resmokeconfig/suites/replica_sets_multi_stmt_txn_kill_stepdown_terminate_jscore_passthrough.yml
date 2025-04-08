@@ -217,7 +217,7 @@ selector:
     - jstests/core/**/shell_connection_strings.js
 
     # Does not support tojson of command objects.
-    - jstests/core/**/query/SERVER-23626.js
+    - jstests/core/**/query/function_prototype_bson_type.js
 
     # Examines _id of upserted document.
     - jstests/core/**/find_and_modify_new_upsert_sort.js

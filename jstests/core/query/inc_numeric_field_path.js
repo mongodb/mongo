@@ -1,5 +1,5 @@
 
-let t = db.server5346;
+let t = db[jsTestName()];
 t.drop();
 
 let x = {_id: 1, versions: {}};

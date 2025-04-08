@@ -4,7 +4,7 @@
 //   assumes_read_concern_local,
 // ]
 
-var t = db.jstests_server14747;
+var t = db[jsTestName()];
 
 t.drop();
 t.createIndex({a: 1, b: 1});

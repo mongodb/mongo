@@ -78,7 +78,7 @@ selector:
     # update with $ modifiers can sometimes change field ordering
     - jstests/core/query/update/update_multi5.js
     - jstests/core/query/update/upsert_and.js
-    - jstests/core/query/server1470.js
+    - jstests/core/query/dbref_upsert.js
     - jstests/core/query/rename/rename_operator_missing_source.js
 
     # requires parameter not supported by override

@@ -1,4 +1,4 @@
-var t = db.jstests_server22053;
+var t = db[jsTestName()];
 
 /* eslint-disable no-sparse-arrays */
 var s0 = [, , 3, , , 6];

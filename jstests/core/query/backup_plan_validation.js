@@ -1,7 +1,7 @@
 // Validation test for SERVER-14753. Note that the issue under test is a memory leak, so this
 // test would only be expected to fail when run under address sanitizer.
 
-var t = db.jstests_server14753;
+var t = db[jsTestName()];
 
 t.drop();
 t.createIndex({a: 1});

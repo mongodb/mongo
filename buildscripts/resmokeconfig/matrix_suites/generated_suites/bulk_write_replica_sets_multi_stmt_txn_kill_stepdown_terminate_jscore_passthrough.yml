@@ -213,7 +213,7 @@ selector:
     - jstests/core/**/find_and_modify_fields.js
     - jstests/core/**/find_and_modify_positional_new_remove.js
     - jstests/core/**/project_with_collation.js
-    - jstests/core/**/query/SERVER-23626.js
+    - jstests/core/**/query/function_prototype_bson_type.js
     - jstests/core/**/find_and_modify_new_upsert_sort.js
     - jstests/core/**/upsert_shell.js
     - jstests/core/timeseries/write/timeseries_delete_hint.js

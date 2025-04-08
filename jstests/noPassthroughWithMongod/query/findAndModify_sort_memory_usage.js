@@ -6,7 +6,7 @@
 // in the sharding passthrough (because mongos does not have this parameter), and cannot run in the
 // parallel suite (because the change of the parameter value would interfere with other tests).
 
-var coll = db.find_and_modify_server16469;
+var coll = db[jsTestName()];
 coll.drop();
 
 // Set the internal sort memory limit to 1MB.

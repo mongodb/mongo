@@ -4,7 +4,7 @@
 //   simulate_atlas_proxy_incompatible,
 // ]
 
-var t = db.jstests_server23626;
+var t = db[jsTestName()];
 
 t.mycoll.drop();
 assert.commandWorked(t.mycoll.insert({_id: 0, a: Date.prototype}));

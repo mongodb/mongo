@@ -6,7 +6,7 @@ rst.startSet();
 rst.initiate();
 
 const dbName = "test";
-const collName = "validate";
+const collName = jsTestName();
 
 const primary = rst.getPrimary();
 const db = primary.getDB(dbName);

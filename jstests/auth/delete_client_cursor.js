@@ -8,7 +8,7 @@
  * @tags: [requires_persistence]
  */
 
-var baseName = 'jstests_auth_server4892';
+var baseName = jsTestName();
 var dbpath = MongoRunner.dataPath + baseName;
 resetDbpath(dbpath);
 var mongodCommonArgs = {

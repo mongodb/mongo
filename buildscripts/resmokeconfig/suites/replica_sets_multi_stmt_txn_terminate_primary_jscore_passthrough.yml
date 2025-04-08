@@ -218,7 +218,7 @@ selector:
     - jstests/core/**/project_with_collation.js
 
     # Does not support tojson of command objects.
-    - jstests/core/**/query/SERVER-23626.js
+    - jstests/core/**/query/function_prototype_bson_type.js
 
     # Reads from system.views.
     - jstests/core/catalog/views/views_drop.js

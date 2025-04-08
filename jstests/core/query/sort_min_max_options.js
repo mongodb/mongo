@@ -4,7 +4,7 @@
 //   requires_getmore,
 // ]
 
-var t = db.server9547;
+var t = db[jsTestName()];
 t.drop();
 
 for (var i = 0; i < 10; i++) {

@@ -6,7 +6,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const name = "server54064";
+const name = jsTestName();
 const replSet = new ReplSetTest({
     name: name,
     nodes: 2,

@@ -241,7 +241,7 @@ selector:
     - jstests/core/**/cursora.js
 
     # Does not support tojson of command objects.
-    - jstests/core/**/query/SERVER-23626.js
+    - jstests/core/**/query/function_prototype_bson_type.js
 
     # Assumes no orphan documents.
     - jstests/core/index/indexu.js

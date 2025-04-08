@@ -1,6 +1,6 @@
 // Regression test for SERVER-13516 crash
 
-var t = db.jstests_pop_server_13516;
+var t = db[jsTestName()];
 t.drop();
 
 var id = NumberInt(0);

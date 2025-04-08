@@ -1,7 +1,7 @@
 // {multi: true} upsert requires specifying the full shard key.
 // @tags: [assumes_unsharded_collection, requires_multi_updates, requires_non_retryable_writes]
 
-let t = db.server1470;
+let t = db[jsTestName()];
 t.drop();
 
 let q = {"name": "first", "pic": {"$ref": "foo", "$id": ObjectId("4c48d04cd33a5a92628c9af6")}};

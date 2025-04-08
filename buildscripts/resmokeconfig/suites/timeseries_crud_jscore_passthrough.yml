@@ -202,7 +202,7 @@ selector:
     - jstests/core/query/sort/sortk.js # singleBatch
     - jstests/core/query/return_key.js # returnKey
     - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js # Not first stage in pipeline
-    - jstests/core/query/server9547.js # max
+    - jstests/core/query/sort_min_max_options.js # max
     - jstests/core/query/single_batch.js # singleBatch
     - jstests/core/query/testminmax.js # min
     # Different field ordering.

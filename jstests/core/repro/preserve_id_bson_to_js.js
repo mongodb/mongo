@@ -2,7 +2,7 @@
 //
 // @tags: [requires_fastcount]
 
-let t = db.server9385;
+let t = db[jsTestName()];
 t.drop();
 
 t.insert({_id: 1, x: 1});

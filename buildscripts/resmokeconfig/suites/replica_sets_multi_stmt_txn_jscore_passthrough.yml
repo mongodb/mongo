@@ -213,7 +213,7 @@ selector:
     - jstests/core/**/cursora.js
 
     # Does not support tojson of command objects.
-    - jstests/core/**/query/SERVER-23626.js
+    - jstests/core/**/query/function_prototype_bson_type.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

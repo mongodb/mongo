@@ -89,7 +89,7 @@ selector:
     - jstests/core/query/and/and2.js
     - jstests/core/query/cursor/getmore_invalidated_documents.js
     - jstests/core/query/explain/explain_multi_plan.js
-    - jstests/core/query/inc/inc-SERVER-7446.js
+    - jstests/core/query/inc/inc_negative_overflow.js
     - jstests/core/query/inc/inc3.js
     - jstests/core/query/pull/pull.js
     - jstests/core/query/pull/pull2.js
@@ -105,7 +105,7 @@ selector:
     - jstests/core/query/set/set_type_change.js
     - jstests/core/query/sort/sort_with_update_between_getmores.js
     - jstests/core/query/unset/unset2.js
-    - jstests/core/query/server1470.js
+    - jstests/core/query/dbref_upsert.js
     - jstests/core/shell/shell_writeconcern.js
     - jstests/core/write/autoid.js
     - jstests/core/query/batch_write/batch_write_collation_estsize.js

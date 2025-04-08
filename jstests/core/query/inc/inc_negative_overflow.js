@@ -1,4 +1,4 @@
-var c = db.incSERVER7446;
+var c = db[jsTestName()];
 
 // A 32 bit overflow spills to 64 bits
 c.drop();

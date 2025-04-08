@@ -1,5 +1,5 @@
 
-let t = db.server7756;
+let t = db[jsTestName()];
 t.drop();
 
 t.save({a: [{1: 'x'}, 'y']});

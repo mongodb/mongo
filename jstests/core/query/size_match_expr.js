@@ -3,7 +3,7 @@
 //   requires_getmore,
 // ]
 
-const coll = db.server50762;
+const coll = db[jsTestName()];
 coll.drop();
 
 // Test $size when it's nested inside $and/$or.
