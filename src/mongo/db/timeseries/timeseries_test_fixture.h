@@ -66,6 +66,8 @@ protected:
         std::initializer_list<std::pair<NamespaceString*, UUID*>> collectionMetadata,
         std::function<BSONObj()> makeTimeseriesOptionsForCreateFn);
 
+    virtual void validateCollectionsHelper(const std::vector<NamespaceString>& collections);
+
     void _assertCollWithMetaField(const NamespaceString& ns,
                                   std::vector<BSONObj> batchOfMeasurements) const;
 

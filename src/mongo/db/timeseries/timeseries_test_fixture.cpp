@@ -52,6 +52,8 @@
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
+#include "mongo/db/validate/collection_validation.h"
+#include "mongo/db/validate/validate_results.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
@@ -66,6 +68,22 @@ void TimeseriesTestFixture::setUpCollectionsHelper(
             BSON("create" << ns->coll() << "timeseries" << makeTimeseriesOptionsForCreateFn())));
         AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
         *uuid = autoColl.getCollection()->uuid();
+    }
+}
+
+void TimeseriesTestFixture::validateCollectionsHelper(
+    const std::vector<NamespaceString>& collections) {
+    ValidateResults validateResults;
+    for (const NamespaceString& nss : collections) {
+        ASSERT_OK(CollectionValidation::validate(
+            _opCtx,
+            nss,
+            CollectionValidation::ValidationOptions{
+                /*mode=*/CollectionValidation::ValidateMode::kForegroundFull,
+                /*repairMode=*/CollectionValidation::RepairMode::kNone,
+                /*logDiagnostics=*/false},
+            &validateResults));
+        ASSERT(validateResults.isValid());
     }
 }
 
@@ -115,6 +133,10 @@ void TimeseriesTestFixture::setUp() {
     _opCtx = operationContext();
     _bucketCatalog = &bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
 
+    // Enables us to do data integrity checks on reopening and insert.
+    gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.store(true);
+    gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening.store(true);
+
     // Create all collections with meta fields.
     setUpCollectionsHelper(
         std::initializer_list<std::pair<NamespaceString*, UUID*>>{{&_ns1, &_uuid1},
@@ -149,6 +171,9 @@ void TimeseriesTestFixture::tearDown() {
     addCollectionExecutionGauges(global, _bucketCatalog->globalExecutionStats);
 
     ASSERT_EQ(0, execStatsToBSON(global).woCompare(execStatsToBSON(accumulated)));
+
+    // Validate all collections.
+    validateCollectionsHelper(getNamespaceStrings());
 
     CatalogTestFixture::tearDown();
 }
