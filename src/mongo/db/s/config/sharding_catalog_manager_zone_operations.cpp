@@ -221,13 +221,10 @@ Status checkHashedShardKeyRange(const ChunkRange& range, const KeyPattern& shard
 Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData timeField) {
     const std::string controlTimeField =
         timeseries::kControlMinFieldNamePrefix.toString() + timeField;
-    if (range.getMin().getField(controlTimeField).type() != MinKey) {
-        return {
-            ErrorCodes::InvalidOptions,
-            str::stream()
-                << "time field cannot be specified in the zone range for time-series collections"};
-    }
-    if (range.getMax().getField(controlTimeField).type() != MinKey) {
+    const BSONElement minRangeControlTimeField = range.getMin().getField(controlTimeField);
+    const BSONElement maxRangeControlTimeField = range.getMax().getField(controlTimeField);
+    if ((minRangeControlTimeField && minRangeControlTimeField.type() != MinKey) ||
+        (maxRangeControlTimeField && maxRangeControlTimeField.type() != MinKey)) {
         return {
             ErrorCodes::InvalidOptions,
             str::stream()

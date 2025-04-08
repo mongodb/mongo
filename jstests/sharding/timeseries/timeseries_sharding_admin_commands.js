@@ -60,11 +60,94 @@ function assertRangeMatch(savedRange, paramRange) {
     });
 }
 
+const zoneShardingTestCases = [
+    // For time-series collections sharded by metaField + timeField, updating a zone range on the
+    // time field other than MinKey -> MinKey prevents sharding. This is necessary to ensure that we
+    // never write measurements into a shard outside of a zone range.
+    {
+        shardKey: {[metaField]: 1, [timeField]: 1},
+        index: {[metaField]: 1, [timeField]: 1},
+        min: {[metaField]: 1, [controlTimeField]: 1},
+        max: {[metaField]: 10, [controlTimeField]: 10},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: false,
+    },
+    {
+        shardKey: {[metaField]: 1, [timeField]: 1},
+        index: {[metaField]: 1, [timeField]: 1},
+        min: {[metaField]: 1, [controlTimeField]: 1},
+        max: {[metaField]: 10, [controlTimeField]: MaxKey},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: false,
+    },
+    {
+        shardKey: {[metaField]: 1, [timeField]: 1},
+        index: {[metaField]: 1, [timeField]: 1},
+        min: {[metaField]: 1, [controlTimeField]: MinKey},
+        max: {[metaField]: 10, [controlTimeField]: 10},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: false,
+    },
+    {
+        shardKey: {[metaField]: 1, [timeField]: 1},
+        index: {[metaField]: 1, [timeField]: 1},
+        min: {[metaField]: 1, [controlTimeField]: MinKey},
+        max: {[metaField]: 10, [controlTimeField]: MaxKey},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: false,
+    },
+    {
+        shardKey: {[metaField]: 1, [timeField]: 1},
+        index: {[metaField]: 1, [timeField]: 1},
+        min: {[metaField]: 1, [controlTimeField]: MinKey},
+        max: {[metaField]: 10, [controlTimeField]: MinKey},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: true,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: true,
+    },
+    {
+        shardKey: {[timeField]: 1},
+        index: {[timeField]: 1},
+        min: {[controlTimeField]: 1},
+        max: {[controlTimeField]: 10},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: false,
+    },
+    // Updating a zone with a metaField range works for time-series collections sharded on metaField
+    {
+        shardKey: {[metaField]: 1, [timeField]: 1},
+        index: {[metaField]: 1, [timeField]: 1},
+        min: {[metaField]: 1},
+        max: {[metaField]: 10},
+        // Sharding a collection fails if the predefined zones don't exactly match the shard key,
+        // but not vice versa. Note this behavior applies to all collections, not just time-series.
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: false,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: true,
+    },
+    {
+        shardKey: {[metaField]: 1},
+        index: {[metaField]: 1},
+        min: {[metaField]: 1},
+        max: {[metaField]: 10},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: true,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: true,
+    },
+    {
+        shardKey: {[metaField + ".xyz"]: 1},
+        index: {[metaField + ".xyz"]: 1},
+        min: {[metaField + ".xyz"]: 1},
+        max: {[metaField + ".xyz"]: 10},
+        worksWhenUpdatingZoneKeyRangeBeforeSharding: true,
+        worksWhenUpdatingZoneKeyRangeAfterSharding: true,
+    },
+];
+
 // Check updateZoneKeyRange with range other than MinKey -> MinKey on the time field prevents
 // sharding. The last successful call will shard the collection.
 (function checkUpdateZoneKeyRangeCommandBeforeSharding() {
-    function check(min, max, success) {
-        createTimeSeriesColl({index: {[metaField]: 1, [timeField]: 1}});
+    for (const testCase of zoneShardingTestCases) {
+        jsTest.log(`Running test case, updating zones before sharding: ${tojsononeline(testCase)}`);
+        const {shardKey, index, min, max, worksWhenUpdatingZoneKeyRangeBeforeSharding} = testCase;
+        createTimeSeriesColl({index: index});
         assert.commandWorked(
             mongo.s0.adminCommand({updateZoneKeyRange: bucketNss, min: min, max: max, zone: zone}));
         const tag = mongo.s0.getDB('config').tags.findOne({ns: bucketNss});
@@ -72,10 +155,10 @@ function assertRangeMatch(savedRange, paramRange) {
         assertRangeMatch(tag.max, max);
         const result = mongo.s0.adminCommand({
             shardCollection: viewNss,
-            key: {[metaField]: 1, [timeField]: 1},
+            key: shardKey,
             timeseries: {timeField: timeField, metaField: metaField}
         });
-        if (success) {
+        if (worksWhenUpdatingZoneKeyRangeBeforeSharding) {
             assert.commandWorked(result);
         } else {
             assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
@@ -85,32 +168,18 @@ function assertRangeMatch(savedRange, paramRange) {
         assert.eq(0, mongo.s0.getDB('config').tags.find({ns: bucketNss}).count());
         dropTimeSeriesColl();
     }
-    check(
-        {[metaField]: 1, [controlTimeField]: 1}, {[metaField]: 10, [controlTimeField]: 10}, false);
-    check({[metaField]: 1, [controlTimeField]: 1},
-          {[metaField]: 10, [controlTimeField]: MaxKey},
-          false);
-    check({[metaField]: 1, [controlTimeField]: MinKey},
-          {[metaField]: 10, [controlTimeField]: 10},
-          false);
-    check({[metaField]: 1, [controlTimeField]: MinKey},
-          {[metaField]: 10, [controlTimeField]: MaxKey},
-          false);
-    check({[metaField]: 1, [controlTimeField]: MinKey},
-          {[metaField]: 10, [controlTimeField]: MinKey},
-          true);
-    check({[metaField]: 1}, {[metaField]: 10}, false);
 })();
 
 // Check updateZoneKeyRange rejects range other than MinKey -> MinKey on the time field after
 // sharding.
 (function checkUpdateZoneKeyRangeAfterSharding() {
-    function check(min, max, success) {
-        createTimeSeriesColl(
-            {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
+    for (const testCase of zoneShardingTestCases) {
+        jsTest.log(`Running test case, updating zones after sharding: ${tojsononeline(testCase)}`);
+        const {shardKey, index, min, max, worksWhenUpdatingZoneKeyRangeAfterSharding} = testCase;
+        createTimeSeriesColl({index: index, shardKey: shardKey});
         const result =
             mongo.s0.adminCommand({updateZoneKeyRange: bucketNss, min: min, max: max, zone: zone});
-        if (success) {
+        if (worksWhenUpdatingZoneKeyRangeAfterSharding) {
             assert.commandWorked(result);
             const tag = mongo.s0.getDB('config').tags.findOne({ns: bucketNss});
             assertRangeMatch(tag.min, min);
@@ -123,21 +192,6 @@ function assertRangeMatch(savedRange, paramRange) {
         }
         dropTimeSeriesColl();
     }
-    check(
-        {[metaField]: 1, [controlTimeField]: 1}, {[metaField]: 10, [controlTimeField]: 10}, false);
-    check({[metaField]: 1, [controlTimeField]: 1},
-          {[metaField]: 10, [controlTimeField]: MaxKey},
-          false);
-    check({[metaField]: 1, [controlTimeField]: MinKey},
-          {[metaField]: 10, [controlTimeField]: 10},
-          false);
-    check({[metaField]: 1, [controlTimeField]: MinKey},
-          {[metaField]: 10, [controlTimeField]: MaxKey},
-          false);
-    check({[metaField]: 1, [controlTimeField]: MinKey},
-          {[metaField]: 10, [controlTimeField]: MinKey},
-          true);
-    check({[metaField]: 1}, {[metaField]: 10}, true);
 })();
 
 // Check shardingState commands returns the expected collection info about buckets & view nss.
