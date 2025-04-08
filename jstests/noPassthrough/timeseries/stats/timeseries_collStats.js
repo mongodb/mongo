@@ -7,7 +7,6 @@
  *   requires_getmore,
  * ]
  */
-// TODO(SERVER-102525): Re-enable test.
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
@@ -44,8 +43,8 @@ const clearCollection = function() {
     expectedStats.numBucketUpdates = 0;
     expectedStats.numBucketsOpenedDueToMetadata = 0;
     expectedStats.numBucketsClosedDueToCount = 0;
-    // expectedStats.numBucketsClosedDueToSize = 0;
-    // expectedStats.numBucketsClosedDueToTimeForward = 0;
+    expectedStats.numBucketsClosedDueToSize = 0;
+    expectedStats.numBucketsClosedDueToTimeForward = 0;
     expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
     expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
     expectedStats.numBucketsArchivedDueToTimeBackward = 0;
@@ -53,11 +52,11 @@ const clearCollection = function() {
     expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
     expectedStats.numBucketsClosedDueToCachePressure = 0;
     expectedStats.numBucketsFetched = 0;
-    // expectedStats.numBucketsQueried = 0;
+    expectedStats.numBucketsQueried = 0;
     expectedStats.numBucketFetchesFailed = 0;
-    // expectedStats.numBucketQueriesFailed = 0;
+    expectedStats.numBucketQueriesFailed = 0;
     TimeseriesTest.checkBucketReopeningsFailedCounters(expectedStats, {});
-    // expectedStats.numDuplicateBucketsReopened = 0;
+    expectedStats.numDuplicateBucketsReopened = 0;
     expectedStats.numCommits = 0;
     expectedStats.numWaits = 0;
     expectedStats.numMeasurementsCommitted = 0;
@@ -123,7 +122,7 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted += 3;
 expectedStats.avgNumMeasurementsPerCommit = 3;
-// expectedStats.numBucketQueriesFailed++;
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 assert.commandWorked(
@@ -134,7 +133,7 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
 expectedStats.avgNumMeasurementsPerCommit = 2;
-// expectedStats.numBucketQueriesFailed++;
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 assert.commandWorked(
@@ -160,7 +159,7 @@ expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
 expectedStats.numBucketsArchivedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
-// expectedStats.numBucketQueriesFailed++;
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements.
@@ -176,7 +175,9 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-// expectedStats.numBucketQueriesFailed++;
+expectedStats.numBucketsQueried++;
+expectedStats.numBucketQueriesFailed++;
+expectedStats.numDuplicateBucketsReopened++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements. We change the order twice of fields in the
@@ -196,7 +197,9 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-// expectedStats.numBucketQueriesFailed++;
+expectedStats.numBucketsQueried++;
+expectedStats.numBucketQueriesFailed++;
+expectedStats.numDuplicateBucketsReopened++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 125kB on the measurements stored in the 'data' field.
@@ -213,12 +216,12 @@ assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
 expectedStats.numBucketsOpenedDueToMetadata++;
-// expectedStats.numBucketsClosedDueToSize++;
+expectedStats.numBucketsClosedDueToSize++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-// expectedStats.numBucketQueriesFailed++;
+expectedStats.numBucketQueriesFailed += 2;
 checkCollStats();
 
 // Assumes the measurements in each bucket span at most one hour (based on the time field).
@@ -234,12 +237,12 @@ assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
 expectedStats.numBucketsOpenedDueToMetadata++;
-// expectedStats.numBucketsClosedDueToTimeForward++;
+expectedStats.numBucketsClosedDueToTimeForward++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-// expectedStats.numBucketQueriesFailed += 1;
+expectedStats.numBucketQueriesFailed += 1;
 checkCollStats();
 
 numDocs = 70;
@@ -264,7 +267,7 @@ const testIdleBucketExpiry = function(docFn) {
         expectedStats.numMeasurementsCommitted++;
         expectedStats.avgNumMeasurementsPerCommit =
             Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-        // expectedStats.numBucketQueriesFailed++;
+        expectedStats.numBucketQueriesFailed++;
         checkCollStats();
 
         shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;

@@ -58,8 +58,7 @@ assert.eq(stats.timeseries.numBucketInserts, 3, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numCommits, 3, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
-// TODO(SERVER-102525): Re-enable check after timeseries write path integration.
-// assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
+assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
 TimeseriesTest.checkBucketReopeningsFailedCounters(
     stats.timeseries, {numBucketReopeningsFailedDueToCompressionFailure: 1});
 
@@ -77,8 +76,7 @@ assert.eq(stats.timeseries.numBucketInserts, 4, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numCommits, 4, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
-// TODO(SERVER-102525): Re-enable check after timeseries write path integration.
-// assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
+assert.eq(stats.timeseries.numBucketQueriesFailed, 2, tojson(stats.timeseries));
 TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {
     numBucketReopeningsFailedDueToCompressionFailure: 1,
     numBucketReopeningsFailedDueToMarkedFrozen: 1
