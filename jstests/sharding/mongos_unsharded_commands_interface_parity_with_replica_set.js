@@ -91,9 +91,12 @@ function joinFilteringMetadataRefresh(db, collName, mongoConfig) {
     }
 }
 
-function removeTimestamp(res) {
+function removeInconsistentFields(res) {
     if (res.hasOwnProperty("readTimestamp")) {
         delete res["readTimestamp"];
+    }
+    if (res.hasOwnProperty("repairMode")) {
+        delete res["repairMode"];
     }
 }
 
@@ -113,7 +116,7 @@ const tests = [
             {
                 shortDescription: "Runs validate expecting an error.",
                 command: {validate: "x"},
-                modifyCommandResult: removeTimestamp,
+                modifyCommandResult: removeInconsistentFields,
                 skipSetup: true,
                 expectedError: ErrorCodes.NamespaceNotFound,
             },
@@ -124,18 +127,18 @@ const tests = [
                     joinFilteringMetadataRefresh(db, "x", mongoConfig);
                 },
                 command: {validate: "x"},
-                modifyCommandResult: removeTimestamp,
+                modifyCommandResult: removeInconsistentFields,
                 skipSetup: true,
             },
             {
                 shortDescription: "Runs validate without optional fields.",
                 command: {validate: "x"},
-                modifyCommandResult: removeTimestamp,
+                modifyCommandResult: removeInconsistentFields,
             },
             {
                 shortDescription: "Runs validate with full: true.",
                 command: {validate: "x", full: true},
-                modifyCommandResult: removeTimestamp,
+                modifyCommandResult: removeInconsistentFields,
             },
         ]
     },
