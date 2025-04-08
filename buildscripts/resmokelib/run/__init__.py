@@ -1401,18 +1401,6 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
-            "--setShellParameters",
-            dest="mongo_set_parameters",
-            action="append",
-            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-            help=(
-                "Passes one or more --setParameter options to all mongo shell processes"
-                " started by resmoke.py. The argument is specified as bracketed YAML -"
-                " i.e. JSON with support for single quoted and unquoted keys."
-            ),
-        )
-
-        parser.add_argument(
             "--numClientsPerFixture",
             type=int,
             dest="num_clients_per_fixture",

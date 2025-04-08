@@ -349,7 +349,6 @@ def mongo_shell_program(
     mongod_set_parameters = test_data.get("setParameters", {}).copy()
     mongos_set_parameters = test_data.get("setParametersMongos", {}).copy()
     mongocryptd_set_parameters = test_data.get("setParametersMongocryptd", {}).copy()
-    mongo_set_parameters = test_data.get("setParametersMongo", {}).copy()
 
     feature_flag_dict = {}
     if config.ENABLED_FEATURE_FLAGS is not None:
@@ -373,9 +372,6 @@ def mongo_shell_program(
         mongocryptd_set_parameters.update(utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS))
         mongocryptd_set_parameters.update(feature_flag_dict)
 
-    if config.MONGO_SET_PARAMETERS is not None:
-        mongo_set_parameters.update(utils.load_yaml(config.MONGO_SET_PARAMETERS))
-
     fixturelib = FixtureLib()
     mongod_launcher = standalone.MongodLauncher(fixturelib)
 
@@ -395,7 +391,6 @@ def mongo_shell_program(
     test_data["setParameters"] = mongod_set_parameters
     test_data["setParametersMongos"] = mongos_set_parameters
     test_data["setParametersMongocryptd"] = mongocryptd_set_parameters
-    test_data["setShellParameters"] = mongo_set_parameters
 
     if "configShard" not in test_data and config.CONFIG_SHARD is not None:
         test_data["configShard"] = True
@@ -505,10 +500,6 @@ def mongo_shell_program(
 
         if "host" in kwargs:
             kwargs.pop("host")
-
-    for key in mongo_set_parameters:
-        val = str(mongo_set_parameters[key])
-        args.append("--setShellParameter=" + key + "=" + val)
 
     # if featureFlagQETextSearchPreview is enabled in setParameter, enable it in the shell also
     # TODO: SERVER-65769 remove once FF is enabled by default
