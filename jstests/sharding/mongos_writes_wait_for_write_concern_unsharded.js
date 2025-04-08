@@ -7,6 +7,8 @@
  * does_not_support_stepdowns,
  * multiversion_incompatible,
  * uses_transactions,
+ * tsan_incompatible,
+ * requires_persistence,
  * ]
  *
  */
@@ -17,7 +19,20 @@ import {
     checkWriteConcernBehaviorForAllCommands
 } from "jstests/libs/write_concern_all_commands.js";
 
-var st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
+const overrideInternalWriteConcernTimeout = {
+    setParameter: {
+        'failpoint.overrideInternalWriteConcernTimeout':
+            tojson({mode: 'alwaysOn', data: {wtimeoutMillis: 5000}})
+    }
+};
+const stOtherOptions = {
+    mongosOptions: overrideInternalWriteConcernTimeout,
+    rsOptions: overrideInternalWriteConcernTimeout,
+    configOptions: overrideInternalWriteConcernTimeout,
+    enableBalancer: false
+};
+
+var st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
 
 assert.commandWorked(
     st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
