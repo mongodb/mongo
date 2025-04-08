@@ -271,6 +271,23 @@ ExpressionContextBuilder& ExpressionContextBuilder::initialPostBatchResumeToken(
     return *this;
 }
 
+std::ostream& operator<<(std::ostream& os, SbeCompatibility sbeCompat) {
+    switch (sbeCompat) {
+#define CASE_SBE_COMPAT_OSTREAM(sbeCompat) \
+    case sbeCompat: {                      \
+        os << #sbeCompat;                  \
+        return os;                         \
+    }
+        CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::notCompatible)
+        CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::requiresSbeFull)
+        CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::requiresTrySbe)
+        CASE_SBE_COMPAT_OSTREAM(SbeCompatibility::noRequirements)
+#undef CASE_SBE_COMPAT_OSTREAM
+    }
+    tasserted(10230203, "missing case in 'operator<<' for 'SbeCompatibility'");
+    return os;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::sbeCompatibility(
     SbeCompatibility sbeCompatibility) {
     params.sbeCompatibility = sbeCompatibility;

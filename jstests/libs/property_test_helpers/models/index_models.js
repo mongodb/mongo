@@ -207,12 +207,9 @@ function getWildCardIndexModel(allowPartialIndexes) {
  * Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
  */
 export function getIndexModel({allowPartialIndexes = false, allowSparse = true} = {}) {
-    return oneof(
-        getSimpleIndexModel({allowPartialIndexes, allowSparse}),
-        getWildCardIndexModel(allowPartialIndexes),
-        // TODO SERVER-99889 reenable testing for hashed indexes.
-        // getHashedIndexModel(allowPartialIndexes)
-    );
+    return oneof(getSimpleIndexModel({allowPartialIndexes, allowSparse}),
+                 getWildCardIndexModel(allowPartialIndexes),
+                 getHashedIndexModel(allowPartialIndexes));
 }
 export function getTimeSeriesIndexModel({allowPartialIndexes = false} = {}) {
     // TODO SERVER-102738 support more time-series index types.

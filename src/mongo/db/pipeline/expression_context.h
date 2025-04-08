@@ -103,6 +103,8 @@ enum struct SbeCompatibility {
     noRequirements,
 };
 
+std::ostream& operator<<(std::ostream& os, SbeCompatibility sbeCompat);
+
 struct ResolvedNamespace {
     ResolvedNamespace() = default;
     ResolvedNamespace(NamespaceString ns,

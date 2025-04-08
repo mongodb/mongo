@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/namespace_string.h"
@@ -127,42 +128,4 @@ bool isSortSbeCompatible(const SortPattern& sortPattern) {
             !sbe::MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
     });
 }
-
-bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery& cq) {
-    auto expCtx = cq.getExpCtxRaw();
-
-    // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
-    if (!expCtx || expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
-        expCtx->getSbePipelineCompatibility() == SbeCompatibility::notCompatible ||
-        (collection && isIdHackEligibleQuery(collection, cq))) {
-        return false;
-    }
-
-    const auto* proj = cq.getProj();
-    if (proj && (proj->requiresMatchDetails() || proj->containsElemMatch())) {
-        return false;
-    }
-
-    const auto& nss = cq.nss();
-
-    const auto isTimeseriesColl = collection && collection->isTimeseriesCollection();
-
-    auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
-    if ((!feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() ||
-         queryKnob.getSbeDisableTimeSeriesForOp()) &&
-        isTimeseriesColl) {
-        return false;
-    }
-
-    // Queries against the oplog or a change collection are not supported. Also queries on the inner
-    // side of a $lookup are not considered for SBE except search queries.
-    if ((expCtx->getInLookup() && !cq.isSearchQuery()) || nss.isOplog() ||
-        nss.isChangeCollection() || !cq.metadataDeps().none()) {
-        return false;
-    }
-
-    const auto& sortPattern = cq.getSortPattern();
-    return !sortPattern || isSortSbeCompatible(*sortPattern);
-}
-
 }  // namespace mongo

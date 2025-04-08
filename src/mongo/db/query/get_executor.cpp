@@ -1155,6 +1155,120 @@ void setCurOpQueryFramework(const PlanExecutor* executor) {
 }
 }  // namespace
 
+/**
+ * Returns true iff 'descriptor' has fields A and B where all of the following hold
+ *
+ *   - A is a path prefix of B
+ *   - A is a hashed field in the index
+ *   - B is a non-hashed field in the index
+ *
+ * TODO SERVER-99889 this is a workaround for an SBE stage builder bug.
+ */
+bool indexHasHashedPathPrefixOfNonHashedPath(const IndexDescriptor* descriptor) {
+    boost::optional<StringData> hashedPath;
+    for (const auto& elt : descriptor->keyPattern()) {
+        if (elt.valueStringDataSafe() == "hashed") {
+            // Indexes may only contain one hashed field.
+            hashedPath = elt.fieldNameStringData();
+            break;
+        }
+    }
+    if (hashedPath == boost::none) {
+        // No hashed fields in the index.
+        return false;
+    }
+    // Check if 'hashedPath' is a path prefix for any field in the index.
+    for (const auto& elt : descriptor->keyPattern()) {
+        if (expression::isPathPrefixOf(hashedPath.get(), elt.fieldNameStringData())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns true if 'collection' has an index that contains two fields, one of which is a path prefix
+ * of the other, where the prefix field is hashed. Indexes can only contain one hashed field.
+ *
+ * TODO SERVER-99889: At the time of writing, there is a bug in the SBE stage builders that
+ * constructs ExpressionFieldPaths over hashed values. This leads to wrong query results.
+ *
+ * The bug arises for covered index scans where a path P is a non-hashed path in the index and a
+ * strict prefix P' of P is a hashed path in the index.
+ */
+bool collectionHasIndexWithHashedPathPrefixOfNonHashedPath(const CollectionPtr& collection,
+                                                           ExpressionContext* expCtx) {
+    const IndexCatalog* indexCatalog = collection->getIndexCatalog();
+    tassert(10230200, "'CollectionPtr' does not have an 'IndexCatalog'", indexCatalog);
+    OperationContext* opCtx = expCtx->getOperationContext();
+    tassert(10230201, "'ExpressionContext' does not have an 'OperationContext'", opCtx);
+    std::unique_ptr<IndexCatalog::IndexIterator> indexIter =
+        indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    while (indexIter->more()) {
+        const IndexCatalogEntry* entry = indexIter->next();
+        if (indexHasHashedPathPrefixOfNonHashedPath(entry->descriptor())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Checks if the given query can be executed with the SBE engine based on the canonical query.
+ *
+ * This method determines whether the query may be compatible with SBE based only on high-level
+ * information from the canonical query, before query planning has taken place (such as ineligible
+ * expressions or collections).
+ *
+ * If this method returns true, query planning should be done, followed by another layer of
+ * validation to make sure the query plan can be executed with SBE. If it returns false, SBE query
+ * planning can be short-circuited as it is already known that the query is ineligible for SBE.
+ */
+
+bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery& cq) {
+    auto expCtx = cq.getExpCtxRaw();
+
+    // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
+    if (!expCtx || expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
+        expCtx->getSbePipelineCompatibility() == SbeCompatibility::notCompatible ||
+        (collection && isIdHackEligibleQuery(collection, cq))) {
+        return false;
+    }
+
+    const auto* proj = cq.getProj();
+    if (proj && (proj->requiresMatchDetails() || proj->containsElemMatch())) {
+        return false;
+    }
+
+    const auto& nss = cq.nss();
+
+    const auto isTimeseriesColl = collection && collection->isTimeseriesCollection();
+
+    auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
+    if ((!feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() ||
+         queryKnob.getSbeDisableTimeSeriesForOp()) &&
+        isTimeseriesColl) {
+        return false;
+    }
+
+    // Queries against the oplog or a change collection are not supported. Also queries on the inner
+    // side of a $lookup are not considered for SBE except search queries.
+    if ((expCtx->getInLookup() && !cq.isSearchQuery()) || nss.isOplog() ||
+        nss.isChangeCollection() || !cq.metadataDeps().none()) {
+        return false;
+    }
+
+
+    // Queries against collections with a particular shape of compound hashed indexes are not
+    // supported.
+    if (collection && collectionHasIndexWithHashedPathPrefixOfNonHashedPath(collection, expCtx)) {
+        return false;
+    }
+
+    const auto& sortPattern = cq.getSortPattern();
+    return !sortPattern || isSortSbeCompatible(*sortPattern);
+}
+
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
