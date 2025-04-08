@@ -1381,22 +1381,32 @@ const wcCommandsTests = {
     enableSharding: {
         targetConfigServer: true,
         noop: {
-            // Sharding already enabled
+            // Database creation only acknowledged by the config primary node
             req: {enableSharding: dbName},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.getDB().runCommand({dropDatabase: 1}));
-                assert.commandWorked(coll.getDB().adminCommand({enableSharding: dbName}));
-                assert.eq(
-                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding no
                 // longer override user provided writeConcern
                 cluster.configRS.stop(secondariesRunning[0]);
+
+                // `enableSharding` throws the WCE as top-level error when majority WC is not
+                // available
+                assert.commandFailedWithCode(coll.getDB().adminCommand({enableSharding: dbName}),
+                                             ErrorCodes.WriteConcernTimeout);
+
+                // The database exists on the config primary node
+                assert.eq(coll.getDB()
+                              .getSiblingDB("config")
+                              .databases
+                              .find({_id: dbName},
+                                    {},  // project
+                                    {readConcern: {level: 1}, $readPreference: {mode: 'primary'}})
+                              .itcount(),
+                          1);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(
-                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
                 cluster.configRS.restart(secondariesRunning[0]);
             },
@@ -1406,6 +1416,8 @@ const wcCommandsTests = {
             // Basic enable sharding
             req: {enableSharding: dbName},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
+                assert.eq(
+                    coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
                 assert.commandWorked(coll.getDB().runCommand({dropDatabase: 1}));
                 assert.eq(
                     coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 0);
@@ -5930,12 +5942,9 @@ function shouldSkipTestCase(
 
         // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
         // upgrade procedure will not proactively shard the sessions collection.
-
-        // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
             (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-             command == "dropIndexes" || command == "setFeatureCompatibilityVersion" ||
-             command == "enableSharding")) {
+             command == "dropIndexes" || command == "setFeatureCompatibilityVersion")) {
             jsTestLog("Skipping " + command + " test for no-op case.");
             return true;
         }
