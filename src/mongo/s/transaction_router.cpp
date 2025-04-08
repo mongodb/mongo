@@ -263,7 +263,6 @@ public:
     boost::optional<repl::ReadConcernArgs> readConcern;
     boost::optional<ShardVersion> shardVersion;
     boost::optional<DatabaseVersion> databaseVersion;
-    bool bulkWriteRequest = false;
 };
 
 /**
@@ -287,10 +286,6 @@ StrippedFields stripReadConcernAndShardAndDbVersions(const BSONObj& cmdObj,
         } else if (elem.fieldNameStringData() == DatabaseVersion::kDatabaseVersionField) {
             strippedFields.databaseVersion = DatabaseVersion(elem.embeddedObject());
             continue;
-        }
-
-        if (elem.fieldNameStringData() == BulkWriteCommandRequest::kCommandName) {
-            strippedFields.bulkWriteRequest = true;
         }
 
         if (cmdWithoutReadConcernBuilder) {
@@ -317,32 +312,6 @@ void setPlacementConflictTimeToDatabaseVersionIfNeeded(
     } else if (placementConflictTimeForNonSnapshotReadConcern) {
         databaseVersion.setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
     }
-}
-
-void appendPlacementConflictTimeToBulkWrite(bool hasTxnCreatedAnyDatabase,
-                                            boost::optional<LogicalTime> placementConflictTime,
-                                            BSONObjBuilder* cmdBob) {
-    auto bsonObj = cmdBob->asTempObj().copy();
-    cmdBob->resetToEmpty();
-    auto opMsgRequest = OpMsgRequestBuilder::create(
-        auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, bsonObj);
-    auto request = BulkWriteCommandRequest::parse(IDLParserContext{"bulkWrite"}, opMsgRequest);
-
-    for (auto& nsInfo : request.getNsInfo()) {
-        auto shardVersion = nsInfo.getShardVersion();
-        auto dbVersion = nsInfo.getDatabaseVersion();
-        if (dbVersion) {
-            setPlacementConflictTimeToDatabaseVersionIfNeeded(
-                placementConflictTime, hasTxnCreatedAnyDatabase, *dbVersion);
-            nsInfo.setDatabaseVersion(dbVersion);
-        }
-        if (shardVersion) {
-            shardVersion->setPlacementConflictTime(*placementConflictTime);
-            nsInfo.setShardVersion(shardVersion);
-        }
-    }
-
-    request.serialize(cmdBob);
 }
 
 }  // namespace
@@ -597,16 +566,6 @@ BSONObj TransactionRouter::appendFieldsForContinueTransaction(
     BSONObjBuilder cmdBob;
     const auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
 
-    // The bulkWrite requires the shard and database versions on an internal field for
-    // every write operation, which has different layout compared to a standard command and it
-    // requires special handling. The builder contains the bulkWrite stripped from the input
-    // bson object.
-    if (strippedFields.bulkWriteRequest) {
-        if (placementConflictTimeForNonSnapshotReadConcern) {
-            appendPlacementConflictTimeToBulkWrite(
-                hasTxnCreatedAnyDatabase, placementConflictTimeForNonSnapshotReadConcern, &cmdBob);
-        }
-    }
     if (auto shardVersion = strippedFields.shardVersion) {
         if (placementConflictTimeForNonSnapshotReadConcern) {
             shardVersion->setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
@@ -624,6 +583,7 @@ BSONObj TransactionRouter::appendFieldsForContinueTransaction(
         BSONObjBuilder dbvBuilder(cmdBob.subobjStart(DatabaseVersion::kDatabaseVersionField));
         databaseVersion->serialize(&dbvBuilder);
     }
+
     return cmdBob.obj();
 }
 
@@ -2467,17 +2427,6 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
                              txnLevelReadConcern,
                              atClusterTimeForSnapshotReadConcern,
                              placementConflictTimeForNonSnapshotReadConcern);
-
-    // The bulkWrite requires the shard and database versions on an internal field for
-    // every write operation, which has different layout compared to a standard command and it
-    // requires special handling. The builder contains the bulkWrite stripped from the input
-    // bson object.
-    if (strippedFields.bulkWriteRequest) {
-        if (placementConflictTimeForNonSnapshotReadConcern) {
-            appendPlacementConflictTimeToBulkWrite(
-                hasTxnCreatedAnyDatabase, placementConflictTimeForNonSnapshotReadConcern, &cmdBob);
-        }
-    }
 
     if (finalReadConcern.isSpecified()) {
         finalReadConcern.appendInfo(&cmdBob);
