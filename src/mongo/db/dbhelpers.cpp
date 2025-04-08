@@ -179,8 +179,9 @@ bool Helpers::findById(OperationContext* opCtx,
     }
 
     const IndexCatalogEntry* entry = catalog->getEntry(desc);
+    // TODO(SERVER-103399): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto recordId = entry->accessMethod()->asSortedData()->findSingle(
-        opCtx, CollectionPtr(collection), entry, query["_id"].wrap());
+        opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), entry, query["_id"].wrap());
     if (recordId.isNull())
         return false;
     result = collection->docFor(opCtx, recordId).value();

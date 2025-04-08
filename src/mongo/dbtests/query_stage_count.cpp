@@ -95,11 +95,12 @@ const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest(
 
 class CountStageTest {
 public:
+    // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CountStageTest()
         : _dbLock(&_opCtx, nss().dbName(), MODE_X),
           _ctx(&_opCtx, nss()),
           _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build()),
-          _coll(nullptr) {}
+          _coll(CollectionPtr::CollectionPtr_UNSAFE(nullptr)) {}
 
     virtual ~CountStageTest() {}
 
@@ -118,7 +119,8 @@ public:
                                                       << "x_1"
                                                       << "v" << 1))
             .status_with_transitional_ignore();
-        _coll = CollectionPtr(coll);
+        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _coll = CollectionPtr::CollectionPtr_UNSAFE(coll);
 
         for (int i = 0; i < kDocuments; i++) {
             insert(BSON(GENOID << "x" << i));

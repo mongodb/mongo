@@ -171,11 +171,13 @@ public:
                                         Collection* collection,
                                         IndexDescriptor&& descriptor,
                                         CreateIndexEntryFlags) override {
-        auto entry = std::make_shared<IndexCatalogEntryMock>(opCtx,
-                                                             CollectionPtr(collection),
-                                                             "" /* ident */,
-                                                             std::move(descriptor),
-                                                             false /* isFrozen */);
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        auto entry =
+            std::make_shared<IndexCatalogEntryMock>(opCtx,
+                                                    CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                                    "" /* ident */,
+                                                    std::move(descriptor),
+                                                    false /* isFrozen */);
 
         auto save = entry.get();
         _indexEntries.add(std::move(entry));

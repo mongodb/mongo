@@ -133,14 +133,18 @@ public:
         auto collectionCatalog = CollectionCatalog::get(opCtx);
 
         CollectionPtr collection = [&]() {
-            if (CollectionPtr collection = CollectionPtr(
+            // TODO(SERVER-103401): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            if (CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
                     collectionCatalog->lookupCollectionByNamespace(opCtx, collectionNss))) {
                 return collection;
             }
 
             // Check if this is a time-series collection.
             auto bucketsNs = collectionNss.makeTimeseriesBucketsNamespace();
-            if (CollectionPtr collection = CollectionPtr(
+            // TODO(SERVER-103401): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            if (CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
                     collectionCatalog->lookupCollectionByNamespace(opCtx, bucketsNs))) {
                 return collection;
             }

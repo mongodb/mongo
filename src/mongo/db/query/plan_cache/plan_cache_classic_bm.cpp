@@ -363,7 +363,8 @@ void BM_PlanCacheClassic(benchmark::State& state) {
 
     auto collection =
         std::make_shared<CollectionMock>(UUID::gen(), kNss, std::make_unique<IndexCatalogMock>());
-    auto collectionPtr = CollectionPtr(collection.get());
+    // TODO(SERVER-103405): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection.get());
     auto collectionsAccessor = MultipleCollectionAccessor(collectionPtr);
 
     // If there is an index specified, add it to the IndexCatalogMock.

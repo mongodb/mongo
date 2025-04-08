@@ -125,8 +125,12 @@ Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
     auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     OpDebug* const nullOpDebug = nullptr;
-    ASSERT_OK(collection_internal::insertDocument(
-        opCtx, CollectionPtr(coll), InsertStatement(data), nullOpDebug, false));
+    // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    ASSERT_OK(collection_internal::insertDocument(opCtx,
+                                                  CollectionPtr::CollectionPtr_UNSAFE(coll),
+                                                  InsertStatement(data),
+                                                  nullOpDebug,
+                                                  false));
 }
 
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {

@@ -121,8 +121,10 @@ public:
     }
 
     CollectionPtr getCollection() {
-        return CollectionPtr(CollectionCatalog::get(operationContext())
-                                 ->lookupCollectionByUUID(operationContext(), *_collectionUUID));
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        return CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(operationContext())
+                ->lookupCollectionByUUID(operationContext(), *_collectionUUID));
     }
 
     CollectionWriter getCollectionWriter() {

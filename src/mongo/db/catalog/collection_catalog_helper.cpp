@@ -112,7 +112,10 @@ void forEachCollectionFromDb(OperationContext* opCtx,
 
             if (catalog->lookupNSSByUUID(opCtx, uuid) == nss) {
                 // Success: locked the namespace and the UUID still maps to it.
-                collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid));
+                // TODO(SERVER-103398): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                collection = CollectionPtr::CollectionPtr_UNSAFE(
+                    catalog->lookupCollectionByUUID(opCtx, uuid));
                 invariant(collection);
                 break;
             }

@@ -161,7 +161,9 @@ private:
     inline std::map<NamespaceString, CollectionPtr> _getSecondaryAcquisitions() const {
         std::map<NamespaceString, CollectionPtr> collMap;
         for (const auto& [nss, acq] : _secondaryAcq) {
-            collMap.emplace(nss, CollectionPtr{acq.getCollectionPtr().get()});
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            collMap.emplace(nss, CollectionPtr::CollectionPtr_UNSAFE(acq.getCollectionPtr().get()));
         }
         return collMap;
     }
@@ -183,9 +185,13 @@ private:
     inline CollectionPtr _lookupCollectionAcquisitionAndGetCollPtr(
         const NamespaceString& nss) const {
         if (nss == _mainAcq->nss()) {
-            return CollectionPtr{_mainAcq->getCollectionPtr().get()};
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            return CollectionPtr::CollectionPtr_UNSAFE(_mainAcq->getCollectionPtr().get());
         } else if (auto itr = _secondaryAcq.find(nss); itr != _secondaryAcq.end()) {
-            return CollectionPtr{itr->second.getCollectionPtr().get()};
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            return CollectionPtr::CollectionPtr_UNSAFE(itr->second.getCollectionPtr().get());
         }
         tasserted(
             10096102,
@@ -210,7 +216,9 @@ private:
 
     inline CollectionPtr _lookupCollectionAutoGetters(const NamespaceString& nss) const {
         if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
-            return CollectionPtr{_mainColl->get()};
+            // TODO(SERVER-103403): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            return CollectionPtr::CollectionPtr_UNSAFE(_mainColl->get());
         } else if (auto itr = _secondaryColls.find(nss);
                    itr != _secondaryColls.end() && itr->second) {
             auto timestamp =
@@ -218,7 +226,8 @@ private:
             return CollectionPtr{CollectionCatalog::get(_opCtx)->establishConsistentCollection(
                 _opCtx, NamespaceStringOrUUID{nss.dbName(), *itr->second}, timestamp)};
         }
-        return CollectionPtr{nullptr};
+        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        return CollectionPtr::CollectionPtr_UNSAFE(nullptr);
     }
 
     // Shard role api collection access.

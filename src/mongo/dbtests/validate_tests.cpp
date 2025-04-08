@@ -206,7 +206,8 @@ public:
 
     // Helper to refetch the Collection from the catalog in order to see any changes made to it
     CollectionPtr coll() const {
-        return CollectionPtr(
+        // TODO(SERVER-103401): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        return CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss));
     }
 

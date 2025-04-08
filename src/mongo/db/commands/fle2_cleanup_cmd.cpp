@@ -214,8 +214,9 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
                                AutoGetCollection::Options{}.secondaryNssOrUUIDs(
                                    secondaryNss.cbegin(), secondaryNss.cend()));
         auto catalog = CollectionCatalog::get(opCtx);
-        auto ecocCompact =
-            CollectionPtr(catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
+        // TODO(SERVER-103402): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        auto ecocCompact = CollectionPtr::CollectionPtr_UNSAFE(
+            catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
 
         // Early exit if there's no ECOC
         if (!ecoc && !ecocCompact) {

@@ -80,7 +80,9 @@ void IndexBuildsCoordinatorTest::createCollectionWithDuplicateDocs(OperationCont
 
 // Helper to refetch the Collection from the catalog in order to see any changes made to it
 CollectionPtr coll(OperationContext* opCtx, const NamespaceString& nss) {
-    return CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    return CollectionPtr::CollectionPtr_UNSAFE(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
 }
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueEnforce) {

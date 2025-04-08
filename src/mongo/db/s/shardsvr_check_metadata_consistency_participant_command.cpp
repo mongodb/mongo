@@ -265,7 +265,10 @@ public:
                             if (!coll) {
                                 continue;
                             }
-                            localCatalogCollections.emplace_back(CollectionPtr(coll));
+                            // TODO(SERVER-103398): Investigate usage validity of
+                            // CollectionPtr::CollectionPtr_UNSAFE
+                            localCatalogCollections.emplace_back(
+                                CollectionPtr::CollectionPtr_UNSAFE(coll));
                         }
                         std::sort(localCatalogCollections.begin(),
                                   localCatalogCollections.end(),
@@ -295,7 +298,10 @@ public:
 
                         if (auto coll =
                                 collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
-                            localCatalogCollections.emplace_back(CollectionPtr(coll));
+                            // TODO(SERVER-103398): Investigate usage validity of
+                            // CollectionPtr::CollectionPtr_UNSAFE
+                            localCatalogCollections.emplace_back(
+                                CollectionPtr::CollectionPtr_UNSAFE(coll));
                         }
 
                         return collCatalogSnapshot;

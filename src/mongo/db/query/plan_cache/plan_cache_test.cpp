@@ -2182,7 +2182,8 @@ protected:
         _queryTestServiceContext = std::make_unique<QueryTestServiceContext>();
         _operationContext = _queryTestServiceContext->makeOperationContext();
         _collection = std::make_unique<CollectionMock>(_nss);
-        _collectionPtr = CollectionPtr(_collection.get());
+        // TODO(SERVER-103405): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(_collection.get());
     }
 
     void tearDown() override {

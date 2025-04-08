@@ -496,12 +496,14 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                 return Status::OK();
             }
 
+            // TODO(SERVER-103398): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
             ret = renameCollectionAndDropTarget(opCtx,
                                                 db,
                                                 sourceColl->uuid(),
                                                 source,
                                                 target,
-                                                CollectionPtr(targetColl),
+                                                CollectionPtr::CollectionPtr_UNSAFE(targetColl),
                                                 options,
                                                 renameOpTimeFromApplyOps);
         }

@@ -124,7 +124,8 @@ std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
     }();
 
     if (auto coll = collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
-        localCatalogCollections.emplace_back(CollectionPtr(coll));
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        localCatalogCollections.emplace_back(CollectionPtr::CollectionPtr_UNSAFE(coll));
     }
     return localCatalogCollections;
 }

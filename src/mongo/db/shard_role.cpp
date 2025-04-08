@@ -1414,7 +1414,8 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
             // same instance of the ns.
             acquiredCollection->prerequisites.uuid = collection->uuid();
         }
-        acquiredCollection->collectionPtr = CollectionPtr(collection);
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        acquiredCollection->collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(7653800,
                     1,
@@ -1468,7 +1469,9 @@ PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* o
         // We detach the pointer here. This is safe to do since we do not dereference it while
         // yielded. This will only be used by the restore to check if the collection has appeared
         // suddenly.
-        acquisition.collectionPtr = CollectionPtr{acquisition.collectionPtr.get()};
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        acquisition.collectionPtr =
+            CollectionPtr::CollectionPtr_UNSAFE(acquisition.collectionPtr.get());
     }
 
     return PreparedForYieldToken{};
@@ -1535,8 +1538,10 @@ void restoreTransactionResourcesToOperationContext(
             // this is safe to do since the collections will have passed a appearance after restore
             // check.
             for (auto& acquiredCollection : transactionResources.acquiredCollections) {
+                // TODO(SERVER-103398): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
                 acquiredCollection.collectionPtr =
-                    CollectionPtr{acquiredCollection.collectionPtr.get()};
+                    CollectionPtr::CollectionPtr_UNSAFE(acquiredCollection.collectionPtr.get());
             }
         });
 

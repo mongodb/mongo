@@ -285,8 +285,11 @@ ViewsForDatabase loadViewsForDatabase(OperationContext* opCtx,
                                       const DatabaseName& dbName) {
     ViewsForDatabase viewsForDb;
     auto systemDotViews = NamespaceString::makeSystemDotViewsNamespace(dbName);
-    if (auto status = viewsForDb.reload(
-            opCtx, CollectionPtr(catalog.lookupCollectionByNamespace(opCtx, systemDotViews)));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    if (auto status =
+            viewsForDb.reload(opCtx,
+                              CollectionPtr::CollectionPtr_UNSAFE(
+                                  catalog.lookupCollectionByNamespace(opCtx, systemDotViews)));
         !status.isOK()) {
         LOGV2_WARNING_OPTIONS(20326,
                               {logv2::LogTag::kStartupWarnings},
@@ -897,7 +900,9 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
     assertViewCatalogValid(viewsForDb);
-    CollectionPtr systemViews(_lookupSystemViews(opCtx, viewName.dbName()));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr systemViews =
+        CollectionPtr::CollectionPtr_UNSAFE(_lookupSystemViews(opCtx, viewName.dbName()));
 
     ViewsForDatabase writable{viewsForDb};
     auto status = writable.insert(
@@ -952,8 +957,9 @@ Status CollectionCatalog::modifyView(
     auto systemViews = _lookupSystemViews(opCtx, viewName.dbName());
 
     ViewsForDatabase writable{viewsForDb};
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto status = writable.update(opCtx,
-                                  CollectionPtr(systemViews),
+                                  CollectionPtr::CollectionPtr_UNSAFE(systemViews),
                                   viewName,
                                   viewOn,
                                   pipeline,
@@ -992,7 +998,9 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     {
         IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.dbName());
 
-        CollectionPtr systemViews(_lookupSystemViews(opCtx, viewName.dbName()));
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr systemViews =
+            CollectionPtr::CollectionPtr_UNSAFE(_lookupSystemViews(opCtx, viewName.dbName()));
 
         ViewsForDatabase writable{viewsForDb};
         writable.remove(opCtx, systemViews, viewName);

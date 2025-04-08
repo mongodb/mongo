@@ -92,7 +92,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              long long size,
                              bool temp,
                              const boost::optional<UUID>& targetUUID) {
-    CollectionPtr fromCollection(
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr fromCollection = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss));
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -131,7 +132,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss, options, BSONObj()));
     }
 
-    CollectionPtr toCollection(
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr toCollection = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
     invariant(toCollection);  // we created above
 

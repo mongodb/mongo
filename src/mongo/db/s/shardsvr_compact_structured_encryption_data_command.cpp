@@ -156,7 +156,9 @@ public:
                     compact.setEcocUuid(ecocColl->uuid());
                 }
                 auto catalog = CollectionCatalog::get(opCtx);
-                auto ecocTempColl = CollectionPtr(
+                // TODO(SERVER-103398): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                auto ecocTempColl = CollectionPtr::CollectionPtr_UNSAFE(
                     catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
                 if (ecocTempColl) {
                     compact.setEcocRenameUuid(ecocTempColl->uuid());

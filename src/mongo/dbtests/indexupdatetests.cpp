@@ -335,11 +335,14 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                ASSERT_OK(collection_internal::insertDocument(_opCtx,
-                                                              CollectionPtr(coll),
-                                                              InsertStatement(BSON("_id" << i)),
-                                                              nullOpDebug,
-                                                              true));
+                // TODO(SERVER-103400): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                ASSERT_OK(
+                    collection_internal::insertDocument(_opCtx,
+                                                        CollectionPtr::CollectionPtr_UNSAFE(coll),
+                                                        InsertStatement(BSON("_id" << i)),
+                                                        nullOpDebug,
+                                                        true));
             }
             wunit.commit();
             // Request an interrupt.

@@ -107,7 +107,8 @@ protected:
                                        stdx::unordered_set<std::string> expectedFilteredNames) {
         // Create collection.
         auto collection = std::make_unique<CollectionMock>(nss);
-        auto collectionPtr = CollectionPtr(collection.get());
+        // TODO(SERVER-103405): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection.get());
 
         // Retrieve query settings decoration.
         auto& querySettings = *QuerySettingsDecoration::get(collectionPtr->getSharedDecorations());

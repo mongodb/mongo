@@ -953,7 +953,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
 
     ReadSourceScope readSourceScope(opCtx, readSource);
 
-    CollectionPtr coll(
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value()));
     coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
 
@@ -1083,14 +1084,22 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                indexCatalogEntry->setMultikey(
-                    opCtx, CollectionPtr(collection), {}, multikeyPaths.value());
+                // TODO(SERVER-103400): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                indexCatalogEntry->setMultikey(opCtx,
+                                               CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                               {},
+                                               multikeyPaths.value());
             }
 
             multikeyPaths = interceptor->getSkippedRecordTracker()->getMultikeyPaths();
             if (multikeyPaths) {
-                indexCatalogEntry->setMultikey(
-                    opCtx, CollectionPtr(collection), {}, multikeyPaths.value());
+                // TODO(SERVER-103400): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                indexCatalogEntry->setMultikey(opCtx,
+                                               CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                               {},
+                                               multikeyPaths.value());
             }
         }
 
@@ -1101,8 +1110,12 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // MultikeyPaths into IndexCatalogEntry::setMultikey here.
         const auto& bulkBuilder = _indexes[i].bulk;
         if (bulkBuilder->isMultikey()) {
-            indexCatalogEntry->setMultikey(
-                opCtx, CollectionPtr(collection), {}, bulkBuilder->getMultikeyPaths());
+            // TODO(SERVER-103400): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            indexCatalogEntry->setMultikey(opCtx,
+                                           CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                           {},
+                                           bulkBuilder->getMultikeyPaths());
         }
     }
 
@@ -1125,7 +1138,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         }
     }
 
-    CollectionQueryInfo::get(collection).clearQueryCache(opCtx, CollectionPtr(collection));
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionQueryInfo::get(collection)
+        .clearQueryCache(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection));
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext*, boost::optional<Timestamp>) { _buildIsCleanedUp = true; });
 

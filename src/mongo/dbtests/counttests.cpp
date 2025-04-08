@@ -87,7 +87,9 @@ public:
 
             wunit.commit();
 
-            _collection = CollectionPtr(collection);
+            // TODO(SERVER-103409): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            _collection = CollectionPtr::CollectionPtr_UNSAFE(collection);
         }
     }
 

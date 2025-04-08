@@ -229,8 +229,10 @@ private:
  */
 class DocumentSourceChangeStreamMock : public DocumentSourceMock {
 public:
+    // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     DocumentSourceChangeStreamMock(const boost::intrusive_ptr<ExpressionContextForTest>& expCtx)
-        : DocumentSourceMock({}, expCtx), _collectionPtr(&_collection) {
+        : DocumentSourceMock({}, expCtx),
+          _collectionPtr(CollectionPtr::CollectionPtr_UNSAFE(&_collection)) {
         _filterExpr = BSON("ns" << kTestNs);
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
         _params.assertTsHasNotFallenOff = Timestamp(0);

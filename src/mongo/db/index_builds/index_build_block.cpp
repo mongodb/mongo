@@ -82,7 +82,8 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
-    auto desc = getEntry(opCtx, CollectionPtr(collection))->descriptor();
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    auto desc = getEntry(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection))->descriptor();
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
     CollectionIndexUsageTrackerDecoration::write(collection)
         .registerIndex(desc->indexName(),

@@ -880,9 +880,10 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     }
 
     // Find an oplog entry optime <= truncateAfterTimestamp.
+    // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto truncateAfterOpTimeAndWallTime =
         _storageInterface->findOplogOpTimeLessThanOrEqualToTimestamp(
-            opCtx, CollectionPtr(oplogCollection), truncateAfterTimestamp);
+            opCtx, CollectionPtr::CollectionPtr_UNSAFE(oplogCollection), truncateAfterTimestamp);
     if (!truncateAfterOpTimeAndWallTime) {
         LOGV2_FATAL_NOTRACE(40296,
                             "Reached end of oplog looking for an oplog entry lte to "

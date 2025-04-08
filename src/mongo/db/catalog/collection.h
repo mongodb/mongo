@@ -840,8 +840,9 @@ private:
     friend class CollectionCatalog;  // The catalog is the main source for consistent collections as
                                      // part of establishing a consistent collection with the WT
                                      // snapshot.
-    // TODO SERVER-100333: See if we can tighten up CollectionPtr to not be able to create this
-    // class.
+
+    // TODO(SERVER-103415): revisit this friendship after creating a non-const ctor for
+    // CollectionPtr
     friend class CollectionPtr;  // CollectionPtr can manually construct a consistent collection in
                                  // order to maintain compatibility with legacy usages.
     friend class LockedCollectionYieldRestore;  // Locked collections implicitly guarantee that the
@@ -883,14 +884,13 @@ public:
     // on context.
     CollectionPtr() = default;
     explicit CollectionPtr(ConsistentCollection collection);
-    // TODO SERVER-100333: Replace this with a non-const version. Fully owned collections are safe
-    // to use since they are not consistent with any snapshot by definition as they are being
-    // committed.
+
+    // TODO SERVER-103415: Remove this unsafe function
     [[deprecated(
-        "This constructor is in the process of being replaced with the much safer "
-        "ConsistentCollection one. Please try to avoid using it as it could lead to an "
-        "inconsistent CollectionPtr in the event of a WT snapshot yield if stored without "
-        "care")]] explicit CollectionPtr(const Collection* coll);
+        "This function is deprecated as the Collection* could go stale. Please use the "
+        "CollectionPtr(ConsistentCollection collection) constructor through the acquisition API "
+        "instead.")]] static CollectionPtr
+    CollectionPtr_UNSAFE(const Collection* coll);
 
     CollectionPtr(const CollectionPtr&) = delete;
     CollectionPtr(CollectionPtr&&);
@@ -942,6 +942,15 @@ public:
     }
 
 private:
+    // TODO SERVER-103415: Replace this with a non-const version and make it public. Fully owned
+    // collections are safe to use since they are not consistent with any snapshot by definition as
+    // they are being committed.
+    [[deprecated(
+        "This constructor is in the process of being replaced with the much safer "
+        "ConsistentCollection one. Please try to avoid using it as it could lead to an "
+        "inconsistent CollectionPtr in the event of a WT snapshot yield if stored without "
+        "care")]] explicit CollectionPtr(const Collection* coll);
+
     // These members needs to be mutable so the yield/restore interface can be const. We don't want
     // yield/restore to require a non-const instance when it otherwise could be const.
     mutable ConsistentCollection _collection;

@@ -2565,7 +2565,9 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
         replState->setPostFailureState(ex.toStatus());
         // Hold reference to the catalog for collection lookup without locks to be safe.
         auto catalog = CollectionCatalog::get(opCtx);
-        CollectionPtr collection(catalog->lookupCollectionByUUID(opCtx, replState->collectionUUID));
+        // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
+            catalog->lookupCollectionByUUID(opCtx, replState->collectionUUID));
         invariant(collection,
                   str::stream() << "Collection with UUID " << replState->collectionUUID
                                 << " should exist because an index build is in progress: "
@@ -2887,7 +2889,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // is called. The collection can be renamed, but it is OK for the name to be stale just for
     // logging purposes.
     auto catalog = CollectionCatalog::get(opCtx);
-    CollectionPtr collection(catalog->lookupCollectionByUUID(opCtx, replState->collectionUUID));
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
+        catalog->lookupCollectionByUUID(opCtx, replState->collectionUUID));
     invariant(collection,
               str::stream() << "Collection with UUID " << replState->collectionUUID
                             << " should exist because an index build is in progress: "
@@ -3106,7 +3110,8 @@ CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeys
     // storage engines if they're missing.
     invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
-    CollectionPtr collection(
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID));
     invariant(collection);
     collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));

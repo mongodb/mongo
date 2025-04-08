@@ -137,7 +137,8 @@ void setUpObservers(ServiceContext* serviceContext,
 
 void BM_OnUpdate(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
-    CollectionPtr collptr(&coll);
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr collptr = CollectionPtr::CollectionPtr_UNSAFE(&coll);
     CollectionUpdateArgs cuArgs(BSON("_id" << "whatever"
                                            << "stmtid"
                                            << "oldstuff"));
@@ -180,7 +181,8 @@ BENCHMARK(BM_OnUpdate_System)->MinTime(10.0);
 
 void BM_OnInserts(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
-    CollectionPtr collptr(&coll);
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    const auto collptr = CollectionPtr::CollectionPtr_UNSAFE(&coll);
     MONGO_COMPILER_DIAGNOSTIC_PUSH
     MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     std::vector<InsertStatement> statements(1,
@@ -230,7 +232,8 @@ BENCHMARK(BM_OnInserts_System)->MinTime(10.0);
 
 void BM_onDelete(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
-    CollectionPtr collptr(&coll);
+    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    const auto collptr = CollectionPtr::CollectionPtr_UNSAFE(&coll);
     BSONObj const doc = BSON("_id" << "whatever"
                                    << "key"
                                    << "value");

@@ -332,7 +332,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // fully committed entry. As a result, if the UUID->NSS mappping was incorrect we'd detect it as
     // part of this NSS resolution.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-    _coll = CollectionPtr(catalog->lookupCollectionByNamespace(opCtx, _resolvedNss));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _coll = CollectionPtr::CollectionPtr_UNSAFE(
+        catalog->lookupCollectionByNamespace(opCtx, _resolvedNss));
     _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
 
     if (_coll) {
@@ -469,7 +471,8 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisitio
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    _storedCollection = CollectionPtr(
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _acquisition->nss()));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
@@ -488,8 +491,9 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    _storedCollection =
-        CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
+        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [opCtx, uuid]() {
@@ -502,8 +506,9 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    _storedCollection =
-        CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
@@ -532,27 +537,34 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& a
         // new write unit of work is opened.
         shard_role_details::getRecoveryUnit(opCtx)->registerChange(
             [&](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
-                autoCollection._coll = CollectionPtr(autoCollection._coll.get());
+                // TODO(SERVER-103398): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                autoCollection._coll =
+                    CollectionPtr::CollectionPtr_UNSAFE(autoCollection._coll.get());
                 autoCollection._coll.makeYieldable(
                     opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
             },
             [&autoCollection,
              originalCollection = autoCollection._coll.get()](OperationContext* opCtx) {
-                autoCollection._coll = CollectionPtr(originalCollection);
+                // TODO(SERVER-103398): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(originalCollection);
                 autoCollection._coll.makeYieldable(
                     opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
             });
 
         // Set to writable collection. We are no longer yieldable.
-        autoCollection._coll = CollectionPtr(writableColl);
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(writableColl);
 
         return writableColl;
     };
 }
 
+// TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
 CollectionWriter::CollectionWriter(Collection* writableCollection)
     : _collection(&_storedCollection),
-      _storedCollection(writableCollection),
+      _storedCollection(CollectionPtr::CollectionPtr_UNSAFE(writableCollection)),
       _writableCollection(writableCollection),
       _managed(false) {}
 
@@ -602,7 +614,9 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                 });
 
             if (usingStoredCollection) {
-                _storedCollection = CollectionPtr(_writableCollection);
+                // TODO(SERVER-103398): Investigate usage validity of
+                // CollectionPtr::CollectionPtr_UNSAFE
+                _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(_writableCollection);
             }
         }
     }
@@ -663,7 +677,8 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
 
     _stashedCatalog = CollectionCatalog::get(opCtx);
     _oplogInfo = LocalOplogInfo::get(opCtx);
-    _oplog = CollectionPtr(
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _oplog = CollectionPtr::CollectionPtr_UNSAFE(
         _stashedCatalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace));
 }
 
@@ -692,7 +707,8 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
                 ResourceId(ResourceType::RESOURCE_TENANT, tenantId), LockMode::MODE_IX));
     auto changeCollectionPtr = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
         opCtx, changeCollectionNamespaceString);
-    _changeCollection = CollectionPtr(changeCollectionPtr);
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _changeCollection = CollectionPtr::CollectionPtr_UNSAFE(changeCollectionPtr);
     _changeCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _changeCollection));
 }
 

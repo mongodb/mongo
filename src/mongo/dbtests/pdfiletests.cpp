@@ -79,7 +79,7 @@ protected:
         return NamespaceString::createNamespaceString_forTest("unittests.pdfiletests.Insert");
     }
     CollectionPtr collection() {
-        return CollectionPtr(
+        return CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
     }
 
@@ -95,10 +95,11 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
-        CollectionPtr coll(
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
-            coll = CollectionPtr(_context.db()->createCollection(&_opCtx, nss()));
+            coll = CollectionPtr::CollectionPtr_UNSAFE(
+                _context.db()->createCollection(&_opCtx, nss()));
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;

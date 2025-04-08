@@ -732,7 +732,8 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
 
     int numRestoreCalls = 0;
 
-    CollectionPtr coll(&beforeYield);
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(&beforeYield);
     coll.makeYieldable(operationContext(), [&](OperationContext*, boost::optional<UUID>) {
         ++numRestoreCalls;
         return makeConsistentCollection(&afterYield);

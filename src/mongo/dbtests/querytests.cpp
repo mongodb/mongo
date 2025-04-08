@@ -139,12 +139,17 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
-            CollectionPtr collection(
+            // TODO(SERVER-103409): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
                 CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
             if (collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            collection = CollectionPtr(_database->createCollection(&_opCtx, nss()));
+            // TODO(SERVER-103409): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            collection =
+                CollectionPtr::CollectionPtr_UNSAFE(_database->createCollection(&_opCtx, nss()));
             wunit.commit();
             _collection = std::move(collection);
         }
@@ -198,7 +203,8 @@ protected:
             wunit.commit();
         }
         abortOnExit.dismiss();
-        _collection = CollectionPtr(collection.get().get());
+        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _collection = CollectionPtr::CollectionPtr_UNSAFE(collection.get().get());
     }
 
     void insert(const char* s) {
@@ -271,8 +277,10 @@ public:
                 _collection = CollectionPtr();
                 db->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection =
-                CollectionPtr(db->createCollection(&_opCtx, nss(), CollectionOptions(), false));
+            // TODO(SERVER-103409): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            _collection = CollectionPtr::CollectionPtr_UNSAFE(
+                db->createCollection(&_opCtx, nss(), CollectionOptions(), false));
             wunit.commit();
         }
         ASSERT(_collection);

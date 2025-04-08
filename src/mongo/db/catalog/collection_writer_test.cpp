@@ -85,8 +85,10 @@ protected:
     }
 
     CollectionPtr lookupCollectionFromCatalog() {
-        return CollectionPtr(CollectionCatalog::get(operationContext())
-                                 ->lookupCollectionByNamespace(operationContext(), kNss));
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        return CollectionPtr::CollectionPtr_UNSAFE(
+            CollectionCatalog::get(operationContext())
+                ->lookupCollectionByNamespace(operationContext(), kNss));
     }
 
     const Collection* lookupCollectionFromCatalogForRead() {

@@ -427,8 +427,13 @@ void logStartup(OperationContext* opCtx) {
     }
     invariant(collection);
 
-    uassertStatusOK(collection_internal::insertDocument(
-        opCtx, CollectionPtr(collection), InsertStatement(o), nullptr /* OpDebug */, false));
+    // TODO(SERVER-103406): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    uassertStatusOK(
+        collection_internal::insertDocument(opCtx,
+                                            CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                            InsertStatement(o),
+                                            nullptr /* OpDebug */,
+                                            false));
     wunit.commit();
 }
 

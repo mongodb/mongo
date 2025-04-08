@@ -48,7 +48,9 @@ static const NamespaceString nss =
 
 PlanCacheKey makeClassicKey(const CanonicalQuery& cq) {
     CollectionMock coll(nss);
-    return plan_cache_key_factory::make<PlanCacheKey>(cq, CollectionPtr(&coll));
+    // TODO(SERVER-103405): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    return plan_cache_key_factory::make<PlanCacheKey>(cq,
+                                                      CollectionPtr::CollectionPtr_UNSAFE(&coll));
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWithMissingQueryField) {

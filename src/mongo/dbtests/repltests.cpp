@@ -181,10 +181,13 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         WriteUnitOfWork wuow(&_opCtx);
 
-        CollectionPtr c(
+        // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr c = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!c) {
-            c = CollectionPtr(ctx.db()->createCollection(&_opCtx, nss()));
+            // TODO(SERVER-103411): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            c = CollectionPtr::CollectionPtr_UNSAFE(ctx.db()->createCollection(&_opCtx, nss()));
         }
 
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
@@ -249,11 +252,14 @@ protected:
         Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, nss());
         Database* db = ctx.db();
-        CollectionPtr coll(
+        // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
             WriteUnitOfWork wunit(&_opCtx);
-            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
+            // TODO(SERVER-103411): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
             wunit.commit();
         }
 
@@ -355,10 +361,13 @@ protected:
         OldClientContext ctx(&_opCtx, nss());
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
-        CollectionPtr coll(
+        // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
-            coll = CollectionPtr(db->createCollection(&_opCtx, nss()));
+            // TODO(SERVER-103411): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            coll = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(&_opCtx, nss()));
         }
 
         auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())

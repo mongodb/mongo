@@ -5108,7 +5108,8 @@ CollectionPtr SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& r
             str::stream() << "No collection found that matches namespace '"
                           << nss.toStringForErrorMsg() << "'",
             coll != CollectionPtr::null);
-    return CollectionPtr{coll.get()};
+    // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    return CollectionPtr::CollectionPtr_UNSAFE(coll.get());
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree

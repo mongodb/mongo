@@ -217,9 +217,10 @@ Status createIndexOnCollection(OperationContext* opCtx,
         index.unique(unique);
         index.version(int(IndexConfig::kLatestIndexVersion));
         auto removeIndexBuildsToo = false;
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         auto indexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,
-            CollectionPtr(collection),
+            CollectionPtr::CollectionPtr_UNSAFE(collection),
             uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(
                 opCtx, std::vector<BSONObj>{index.toBSON()})),
             removeIndexBuildsToo);

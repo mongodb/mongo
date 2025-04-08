@@ -236,7 +236,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     // which may have changed when we released the collection lock temporarily.
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-    CollectionPtr coll(
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss));
 
     // Even if the collection doesn't exist, UUID mismatches must return an error.
@@ -296,7 +297,8 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         // disk state, which may have changed when we released the collection lock temporarily.
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-        coll = CollectionPtr(
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID));
 
         // Even if the collection doesn't exist, UUID mismatches must return an error.
@@ -343,7 +345,8 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
                                   DropCollectionSystemCollectionMode systemCollectionMode,
                                   DropReply* reply) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
-    CollectionPtr coll(
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName));
 
     // Even if the collection doesn't exist, UUID mismatches must return an error.
@@ -633,7 +636,8 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
             return Status::OK();
         }
 
-        CollectionPtr coll(
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName));
 
         DropReply unusedReply;
@@ -662,7 +666,9 @@ void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName) {
         if (nss.isSystem())
             continue;
 
-        CollectionPtr coll(catalog->lookupCollectionByNamespace(opCtx, nss));
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        CollectionPtr coll =
+            CollectionPtr::CollectionPtr_UNSAFE(catalog->lookupCollectionByNamespace(opCtx, nss));
         if (!coll)
             continue;
 

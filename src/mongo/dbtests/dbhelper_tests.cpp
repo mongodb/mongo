@@ -161,8 +161,8 @@ public:
         CollectionPtr collection1;
         {
             WriteUnitOfWork wuow(opCtx1.get());
-            collection1 =
-                CollectionPtr(db->createCollection(opCtx1.get(), nss, CollectionOptions(), true));
+            collection1 = CollectionPtr::CollectionPtr_UNSAFE(
+                db->createCollection(opCtx1.get(), nss, CollectionOptions(), true));
             ASSERT_TRUE(collection1);
             ASSERT_TRUE(
                 collection_internal::insertDocument(
@@ -284,9 +284,10 @@ private:
                 ASSERT(collection2);
 
                 BSONObj res;
-                ASSERT_THROWS(Helpers::findByIdAndNoopUpdate(
-                                  opCtx2, CollectionPtr(collection2), idQuery, res),
-                              WriteConflictException);
+                ASSERT_THROWS(
+                    Helpers::findByIdAndNoopUpdate(
+                        opCtx2, CollectionPtr::CollectionPtr_UNSAFE(collection2), idQuery, res),
+                    WriteConflictException);
             }
 
             wuow1.commit();

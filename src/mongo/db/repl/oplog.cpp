@@ -259,7 +259,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // Check if collection exists.
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, indexNss.dbName());
-    auto indexCollection = CollectionPtr(
+    // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    auto indexCollection = CollectionPtr::CollectionPtr_UNSAFE(
         db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to create index due to missing collection: "
@@ -1337,7 +1338,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
     NamespaceString requestNss;
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
-        const auto collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid.value()));
+        // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        const auto collection = CollectionPtr::CollectionPtr_UNSAFE(
+            catalog->lookupCollectionByUUID(opCtx, uuid.value()));
         if (!collection && inStableRecovery) {
             repl::OplogApplication::checkOnOplogFailureForRecovery(
                 opCtx,

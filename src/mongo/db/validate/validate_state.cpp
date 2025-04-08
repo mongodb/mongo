@@ -181,7 +181,9 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
         _catalog = CollectionCatalog::get(opCtx);
-        _collection = CollectionPtr(_catalog->lookupCollectionByNamespace(opCtx, _nss));
+        // TODO(SERVER-103401): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _collection =
+            CollectionPtr::CollectionPtr_UNSAFE(_catalog->lookupCollectionByNamespace(opCtx, _nss));
     }
 
     if (!_collection) {
@@ -203,7 +205,10 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
                 CollectionPtr(_catalog->establishConsistentCollection(opCtx, _nss, _validateTs));
         } else {
             _collectionLock.emplace(opCtx, _nss, MODE_X);
-            _collection = CollectionPtr(_catalog->lookupCollectionByNamespace(opCtx, _nss));
+            // TODO(SERVER-103401): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            _collection = CollectionPtr::CollectionPtr_UNSAFE(
+                _catalog->lookupCollectionByNamespace(opCtx, _nss));
         }
 
         if (!_collection) {

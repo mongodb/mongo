@@ -1208,7 +1208,9 @@ void _cloneCollectionIndexesAndOptions(
             collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         }
 
-        auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(CollectionPtr(collection));
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        auto indexSpecs =
+            checkEmptyOrGetMissingIndexesFromDonor(CollectionPtr::CollectionPtr_UNSAFE(collection));
         if (!indexSpecs.empty()) {
             WriteUnitOfWork wunit(opCtx);
             CollectionWriter collWriter(opCtx, collection->uuid());

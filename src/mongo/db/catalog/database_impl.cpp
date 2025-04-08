@@ -776,11 +776,14 @@ Collection* DatabaseImpl::_createCollection(
         if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
             optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
             auto* ic = collection->getIndexCatalog();
+            // TODO(SERVER-103398): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
             fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
                 opCtx,
                 collection,
-                !idIndex.isEmpty() ? idIndex
-                                   : ic->getDefaultIdIndexSpec(CollectionPtr(collection))));
+                !idIndex.isEmpty()
+                    ? idIndex
+                    : ic->getDefaultIdIndexSpec(CollectionPtr::CollectionPtr_UNSAFE(collection))));
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,
@@ -792,13 +795,15 @@ Collection* DatabaseImpl::_createCollection(
 
     hangBeforeLoggingCreateCollection.pauseWhileSet();
 
-    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(opCtx,
-                                                                    CollectionPtr(collection),
-                                                                    nss,
-                                                                    optionsWithUUID,
-                                                                    fullIdIndexSpec,
-                                                                    createOplogSlot,
-                                                                    fromMigrate);
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
+        opCtx,
+        CollectionPtr::CollectionPtr_UNSAFE(collection),
+        nss,
+        optionsWithUUID,
+        fullIdIndexSpec,
+        createOplogSlot,
+        fromMigrate);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
     // the storage timestamp for the index creation is after the storage timestamp for the

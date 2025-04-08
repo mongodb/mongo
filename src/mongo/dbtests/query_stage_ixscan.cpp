@@ -88,7 +88,8 @@ public:
 
         _ctx.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
         _coll = _ctx.db()->createCollection(&_opCtx, nss());
-        _collPtr = CollectionPtr(_coll);
+        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        _collPtr = CollectionPtr::CollectionPtr_UNSAFE(_coll);
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,
@@ -102,8 +103,12 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            &_opCtx, CollectionPtr(_coll), InsertStatement(doc), nullOpDebug, false));
+        // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        ASSERT_OK(collection_internal::insertDocument(&_opCtx,
+                                                      CollectionPtr::CollectionPtr_UNSAFE(_coll),
+                                                      InsertStatement(doc),
+                                                      nullOpDebug,
+                                                      false));
         wunit.commit();
     }
 

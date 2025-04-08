@@ -288,7 +288,10 @@ public:
             collectionToUUIDMap.emplace(collNss.coll().toString(), collection->uuid());
 
             // Compute the hash for this collection.
-            std::string hash = _hashCollection(opCtx, CollectionPtr(collection), excludeRecordIds);
+            // TODO(SERVER-103401): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            std::string hash = _hashCollection(
+                opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), excludeRecordIds);
 
             collectionToHashMap[collNss.coll().toString()] = hash;
 

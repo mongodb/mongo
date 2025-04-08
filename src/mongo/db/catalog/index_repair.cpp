@@ -134,15 +134,18 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
             // CheckRecordId set to 'On' because we need _unindexKeys to confirm the record id of
             // this document matches the record id of the element it tries to unindex. This avoids
             // wrongly unindexing a document with the same _id.
-            collection_internal::deleteDocument(opCtx,
-                                                CollectionPtr(originalCollection),
-                                                kUninitializedStmtId,
-                                                dupRecord,
-                                                nullptr /* opDebug */,
-                                                false /* fromMigrate */,
-                                                false /* noWarn */,
-                                                collection_internal::StoreDeletedDoc::Off,
-                                                CheckRecordId::On);
+            // TODO(SERVER-103399): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            collection_internal::deleteDocument(
+                opCtx,
+                CollectionPtr::CollectionPtr_UNSAFE(originalCollection),
+                kUninitializedStmtId,
+                dupRecord,
+                nullptr /* opDebug */,
+                false /* fromMigrate */,
+                false /* noWarn */,
+                collection_internal::StoreDeletedDoc::Off,
+                CheckRecordId::On);
 
             wuow.commit();
             return docSize;

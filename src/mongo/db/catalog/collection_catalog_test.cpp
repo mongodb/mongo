@@ -89,9 +89,10 @@ namespace {
  */
 class CollectionCatalogTest : public ServiceContextMongoDTest {
 public:
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CollectionCatalogTest()
         : nss(NamespaceString::createNamespaceString_forTest("testdb", "testcol")),
-          col(nullptr),
+          col(CollectionPtr::CollectionPtr_UNSAFE(nullptr)),
           colUUID(UUID::gen()),
           nextUUID(UUID::gen()),
           prevUUID(UUID::gen()) {
@@ -111,7 +112,8 @@ public:
         globalLock.emplace(opCtx.get());
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(colUUID, nss);
-        col = CollectionPtr(collection.get());
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+        col = CollectionPtr::CollectionPtr_UNSAFE(collection.get());
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), collection, boost::none);
 
@@ -152,8 +154,12 @@ public:
             std::shared_ptr<Collection> fooColl = std::make_shared<CollectionMock>(fooNss);
             std::shared_ptr<Collection> barColl = std::make_shared<CollectionMock>(barNss);
 
-            dbMap["foo"].insert(std::make_pair(fooColl->uuid(), fooColl.get()));
-            dbMap["bar"].insert(std::make_pair(barColl->uuid(), barColl.get()));
+            // TODO(SERVER-103398): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            dbMap["foo"].insert(std::make_pair(fooColl->uuid(),
+                                               CollectionPtr::CollectionPtr_UNSAFE(fooColl.get())));
+            dbMap["bar"].insert(std::make_pair(barColl->uuid(),
+                                               CollectionPtr::CollectionPtr_UNSAFE(barColl.get())));
 
             catalog.registerCollection(opCtx.get(), fooColl, boost::none);
             catalog.registerCollection(opCtx.get(), barColl, boost::none);
@@ -386,7 +392,9 @@ TEST_F(CollectionCatalogTest, InsertAfterLookup) {
 }
 
 TEST_F(CollectionCatalogTest, OnDropCollection) {
-    CollectionPtr yieldableColl(catalog.lookupCollectionByUUID(opCtx.get(), colUUID));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr yieldableColl =
+        CollectionPtr::CollectionPtr_UNSAFE(catalog.lookupCollectionByUUID(opCtx.get(), colUUID));
     ASSERT(yieldableColl);
     ASSERT_EQUALS(yieldableColl, col);
 
@@ -428,9 +436,12 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(uuid, oldNss);
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), std::move(collShared), boost::none);
-    CollectionPtr yieldableColl(catalog.lookupCollectionByUUID(opCtx.get(), uuid));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    CollectionPtr yieldableColl =
+        CollectionPtr::CollectionPtr_UNSAFE(catalog.lookupCollectionByUUID(opCtx.get(), uuid));
     ASSERT(yieldableColl);
-    ASSERT_EQUALS(yieldableColl, CollectionPtr(collection));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    ASSERT_EQUALS(yieldableColl, CollectionPtr::CollectionPtr_UNSAFE(collection));
 
     // Make the CollectionPtr yieldable by setting yield impl
     yieldableColl.makeYieldable(opCtx.get(),
@@ -449,7 +460,8 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
     // Before renaming collection, confirm that the CollectionPtr can be restored successfully.
     yieldableColl.restore();
     ASSERT(yieldableColl);
-    ASSERT_EQUALS(yieldableColl, CollectionPtr(collection));
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    ASSERT_EQUALS(yieldableColl, CollectionPtr::CollectionPtr_UNSAFE(collection));
 
     // Reset CollectionPtr for post-rename restore test.
     yieldableColl.yield();
@@ -961,8 +973,9 @@ public:
 
         auto writableColl = collection.getWritableCollection(opCtx);
 
+        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         StatusWith<BSONObj> statusWithSpec = writableColl->getIndexCatalog()->prepareSpecForCreate(
-            opCtx, CollectionPtr(writableColl), indexSpec, boost::none);
+            opCtx, CollectionPtr::CollectionPtr_UNSAFE(writableColl), indexSpec, boost::none);
         uassertStatusOK(statusWithSpec.getStatus());
         indexSpec = statusWithSpec.getValue();
 
