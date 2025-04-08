@@ -170,9 +170,6 @@ BatchedDeleteStage::BatchedDeleteStage(
     tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
             _params->isMulti);
-    tassert(6303801,
-            "batched deletions do not support the 'fromMigrate' parameter",
-            !_params->fromMigrate);
     tassert(6303802,
             "batched deletions do not support the 'returnDelete' parameter",
             !_params->returnDeleted);
@@ -376,33 +373,35 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
         auto workingSetMemberID = _stagedDeletesBuffer.at(*bufferOffset);
         WorkingSetMember* member = _ws->get(workingSetMemberID);
 
-        using write_stage_common::PreWriteFilter;
-        const PreWriteFilter::Action action = [&]() {
-            // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
-            // Different documents may have different snapshots.
-            const bool docStillMatches = ensureStillMatchesAndUpdateStats(
-                collectionPtr(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
+        bool writeToOrphan = _params->fromMigrate;
+        if (!_params->fromMigrate) {
+            using write_stage_common::PreWriteFilter;
+            const PreWriteFilter::Action action = [&]() {
+                // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
+                // Different documents may have different snapshots.
+                const bool docStillMatches = ensureStillMatchesAndUpdateStats(
+                    collectionPtr(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
 
-            // Warning: if docStillMatches is false, the WSM's underlying Document/BSONObj is no
-            // longer valid.
-            if (!docStillMatches) {
-                return PreWriteFilter::Action::kSkip;
+                // Warning: if docStillMatches is false, the WSM's underlying Document/BSONObj is no
+                // longer valid.
+                if (!docStillMatches) {
+                    return PreWriteFilter::Action::kSkip;
+                }
+
+                // Determine whether the document being deleted is owned by this shard, and the
+                // action to undertake if it isn't.
+                return _preWriteFilter.computeActionAndLogSpecialCases(
+                    member->doc.value(), "batched delete"_sd, collectionPtr()->ns());
+            }();
+
+            // Skip the document, as it either no longer exists, or has been filtered by the
+            // PreWriteFilter.
+            if (action == PreWriteFilter::Action::kSkip) {
+                recordsToSkip->insert(workingSetMemberID);
+                continue;
             }
-
-            // Determine whether the document being deleted is owned by this shard, and the action
-            // to undertake if it isn't.
-            return _preWriteFilter.computeActionAndLogSpecialCases(
-                member->doc.value(), "batched delete"_sd, collectionPtr()->ns());
-        }();
-
-        // Skip the document, as it either no longer exists, or has been filtered by the
-        // PreWriteFilter.
-        if (action == PreWriteFilter::Action::kSkip) {
-            recordsToSkip->insert(workingSetMemberID);
-            continue;
+            writeToOrphan = action == PreWriteFilter::Action::kWriteAsFromMigrate;
         }
-
-        bool writeToOrphan = action == PreWriteFilter::Action::kWriteAsFromMigrate;
 
         auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());
         Snapshotted<Document> memberDoc = member->doc;
