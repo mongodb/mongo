@@ -745,20 +745,18 @@ void initializeShardingAwarenessAndLoadGlobalSettings(OperationContext* opCtx,
                                                       const ShardIdentity& shardIdentity,
                                                       BSONObjBuilder* startupTimeElapsedBuilder) {
     {
-        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
-            opCtx->getServiceContext()->getFastClockSource(),
-            "Initialize information needed to make a mongod instance shard aware",
-            startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::initializeFromShardIdentity,
+                                       startupTimeElapsedBuilder);
         Lock::GlobalWrite lk(opCtx);
         ShardingInitializationMongoD::get(opCtx)->initializeFromShardIdentity(opCtx, shardIdentity);
     }
 
     {
         // Config servers can't always perform remote reads here, so they use a local client.
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Load global settings from config server",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::loadGlobalSettings,
+                                       startupTimeElapsedBuilder);
         auto catalogClient = serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)
             ? ShardingCatalogManager::get(opCtx)->localCatalogClient()
             : Grid::get(opCtx)->catalogClient();
