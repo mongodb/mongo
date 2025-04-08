@@ -11,6 +11,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -63,7 +64,7 @@ TimeseriesTest.run((insert) => {
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
         // When the collection is sharded, there is 1 extra index for the shard key.
-        const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) + 1;
+        const numExtraIndexes = (isShardedTimeseries(coll) ? 1 : 0) + 1;
         {
             const indexes = bucketsColl.getIndexes();
             assert.eq(numExtraIndexes,
@@ -93,7 +94,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
         // If our index backs the shard key and the collection is sharded, only 'numExtraIndexes'
         // will appear.
-        const updateForNewBehavior = FixtureHelpers.isSharded(bucketsColl) && isBackingShardKey;
+        const updateForNewBehavior = isShardedTimeseries(coll) && isBackingShardKey;
         const numIndexesToCheck = updateForNewBehavior ? numExtraIndexes : 1 + numExtraIndexes;
         assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(spec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
@@ -281,7 +282,7 @@ TimeseriesTest.run((insert) => {
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
                          'failed to create index: ' + tojson({not_metadata: 1}));
-    const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) + 1;
+    const numExtraIndexes = (isShardedTimeseries(coll) ? 1 : 0) + 1;
     assert.eq(
         1 + numExtraIndexes, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
     assert.eq(0 + numExtraIndexes, coll.getIndexes().length, tojson(coll.getIndexes()));

@@ -11,6 +11,7 @@
  * ]
  */
 
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getWinningPlanFromExplain, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
@@ -23,7 +24,7 @@ coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
-const shardKeyIndexCount = FixtureHelpers.isSharded(bucketsColl) ? 1 : 0;
+const shardKeyIndexCount = isShardedTimeseries(coll) ? 1 : 0;
 
 assert.commandWorked(coll.insert({
     timestamp: ISODate(),

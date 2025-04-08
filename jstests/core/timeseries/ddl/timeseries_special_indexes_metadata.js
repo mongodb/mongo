@@ -15,6 +15,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
@@ -99,7 +100,7 @@ TimeseriesTest.run((insert) => {
         const keys = timeseriesListIndexesCursor.firstBatch.map(d => d.key);
         // The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
         let expectedKeys = [{mm: 1, tm: 1}];
-        if (FixtureHelpers.isSharded(bucketscoll)) {
+        if (isShardedTimeseries(timeseriescoll)) {
             expectedKeys.push({tm: 1});
         }
         expectedKeys.push(timeseriesIndexSpec);

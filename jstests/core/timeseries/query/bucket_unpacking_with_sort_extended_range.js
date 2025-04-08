@@ -19,6 +19,10 @@
  *     requires_getmore,
  * ]
  */
+import {
+    getTimeseriesBucketsColl,
+    isShardedTimeseries
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
@@ -55,15 +59,15 @@ assert.commandWorked(collIndexed.createIndex({'t': 1}));
 jsTestLog(collIndexed.getIndexes());
 jsTestLog(bucketsIndexed.getIndexes());
 
-for (const collection of [buckets, bucketsIndexed]) {
-    if (FixtureHelpers.isSharded(collection) && nonConfigShards.length >= 2) {
+for (const collection of [coll, collIndexed]) {
+    if (isShardedTimeseries(collection) && nonConfigShards.length >= 2) {
         // Split and move data to create an interesting scenario: we have some data on each shard,
         // but all the extended-range data is on a non-primary shard. This means view resolution is
         // unaware of the extended-range data, because that happens on the primary shard.
 
         const [shardName0, shardName1] = nonConfigShards;
 
-        const collName = collection.getFullName();
+        const collName = getTimeseriesBucketsColl(collection).getFullName();
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
         // So this goes on the primary shard, and everything else goes on the non-primary.
         assert.commandWorked(sh.splitAt(collName, {'control.min.t': ISODate('2000-01-01')}));
@@ -138,7 +142,7 @@ function checkAgainstReferenceBoundedSortUnexpected(
     const options = hint ? {hint: hint} : {};
 
     const plan = collection.explain().aggregate(pipeline, options);
-    if (FixtureHelpers.isSharded(buckets) && nonConfigShards.length >= 2) {
+    if (isShardedTimeseries(collection) && nonConfigShards.length >= 2) {
         // With a sharded collection, some shards might not have any extended-range data,
         // so they might still use $_internalBoundedSort. But we know at least one
         // shard has extended-range data, so we know at least one shard has to

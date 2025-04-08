@@ -1,7 +1,10 @@
 // Helper functions for testing time-series collections.
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
-import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    getTimeseriesBucketsColl,
+    isShardedTimeseries,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -288,7 +291,7 @@ export var TimeseriesTest = class {
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
         const db = coll.getDB();
         const buckets = getTimeseriesBucketsColl(coll);
-        if (FixtureHelpers.isSharded(buckets)) {
+        if (isShardedTimeseries(coll)) {
             const timeFieldName =
                 db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
 

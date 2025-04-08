@@ -14,6 +14,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getAggPlanStage,
@@ -124,7 +125,7 @@ const generateTest = (useHint) => {
         const timeDate = ISODate('2005-01-01 00:00:00.000Z');
 
         // Test ascending and descending index on timeField.
-        if (!FixtureHelpers.isSharded(bucketsColl)) {
+        if (!isShardedTimeseries(coll)) {
             // Skip if the collection is implicitly sharded: it may use the implicitly created
             // index.
             testQueryUsesIndex({[timeFieldName]: {$lte: timeDate}}, 2, {[timeFieldName]: 1});
@@ -136,7 +137,7 @@ const generateTest = (useHint) => {
         testQueryUsesIndex({[metaFieldName]: {$lt: 3}}, 2, {[metaFieldName]: -1});
 
         // Test compound indexes on metaField and timeField.
-        if (!FixtureHelpers.isSharded(bucketsColl)) {
+        if (!isShardedTimeseries(coll)) {
             // Skip if the collection is implicitly sharded: it may use the implicitly created
             // index.
             testQueryUsesIndex(
@@ -202,7 +203,7 @@ const generateTest = (useHint) => {
                            {sparse: true});
 
         // Test compound indexes on timeField and subfields of metaField.
-        if (!FixtureHelpers.isSharded(bucketsColl)) {
+        if (!isShardedTimeseries(coll)) {
             // Skip if the collection is implicitly sharded: it may use the implicitly created
             // index.
             testQueryUsesIndex({[metaFieldName + '.a']: {$gte: 2}},

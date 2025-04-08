@@ -11,6 +11,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run(() => {
@@ -29,7 +30,7 @@ TimeseriesTest.run(() => {
     // If the collection is sharded, we expect an implicitly-created index on time. This index will
     // be the same index as the result of createIndex({timeField: 1}). Therefore we cannot create
     // nor drop an identical index with a different name.
-    if (!FixtureHelpers.isSharded(bucketsColl)) {
+    if (!isShardedTimeseries(coll)) {
         assert.commandWorked(
             coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
         TimeseriesTest.verifyAndDropIndex(

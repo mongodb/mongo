@@ -23,6 +23,7 @@
  * ]
  */
 
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
@@ -644,7 +645,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     let extraIndexesForSharding = {'control.min.time': 1, 'control.max.time': 1};
 
     assert.sameMembers(buckets.getIndexKeys(),
-                       FixtureHelpers.isSharded(buckets)
+                       isShardedTimeseries(coll)
                            ? [{'data.loc': '2dsphere_bucket'}, extraIndexesForSharding]
                            : [{'data.loc': '2dsphere_bucket'}]);
 

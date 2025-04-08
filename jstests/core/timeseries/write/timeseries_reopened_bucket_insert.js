@@ -14,6 +14,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -655,7 +656,7 @@ const checkIfBucketReopened = function(
     // If the collection is sharded, there will be an index on control.min.time that can satisfy the
     // reopening query, otherwise we can do some further tests. With moveCollection running in the
     // background, when buckets are closed and reopened may change.
-    if (!FixtureHelpers.isSharded(bucketsColl) && !TestData.runningWithBalancer) {
+    if (!isShardedTimeseries(coll) && !TestData.runningWithBalancer) {
         // Create a partial index on time.
         assert.commandWorked(coll.createIndex(
             {[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));

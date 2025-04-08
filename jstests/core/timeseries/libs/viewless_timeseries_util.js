@@ -4,10 +4,12 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export function areViewlessTimeseriesEnabled(db) {
     return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
 }
+
 /**
  * Given a collection return its corresponding buckets collection.
  *
@@ -41,4 +43,13 @@ export function getTimeseriesBucketsColl(coll) {
     throw new Error(
         `Invalid parameter. 'coll' must be a collection (DBCollection) or the collection name (string). Receinved parameter '${
             tojson(coll)}' (${typeof coll})`);
+}
+
+/**
+ * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
+ * FixtureHelpers::isSharded on the given collection.
+ */
+export function isShardedTimeseries(coll) {
+    return FixtureHelpers.isSharded(coll) ||
+        FixtureHelpers.isSharded(getTimeseriesBucketsColl(coll));
 }

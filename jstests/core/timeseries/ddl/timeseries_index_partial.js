@@ -12,6 +12,7 @@
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
  * ]
  */
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
@@ -48,7 +49,7 @@ function resetCollection(collation) {
     assert.commandWorked(
         db.createCollection(coll.getName(), addCollation(createTimeseriesSpec, collation)));
 
-    if (FixtureHelpers.isSharded(buckets)) {
+    if (isShardedTimeseries(coll)) {
         const extraBucketIndexesShardedSpec = {
             "v": 2,
             "key": {"control.min.time": 1, "control.max.time": 1},
@@ -205,7 +206,7 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         check({a: {$lt: 999}, [timeField]: {$gte: t2}});
 
         // Drop the index, so it doesn't interfere with other tests.
-        if (!FixtureHelpers.isSharded(buckets)) {
+        if (!isShardedTimeseries(coll)) {
             assert.commandWorked(coll.dropIndex({[timeField]: 1}));
         }
     }

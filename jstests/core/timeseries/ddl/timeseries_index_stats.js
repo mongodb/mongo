@@ -15,6 +15,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -48,7 +49,7 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(coll.createIndex(indexKey, {name: indexName}),
                              'failed to create index: ' + indexName + ': ' + tojson(indexKey));
     }
-    if (FixtureHelpers.isSharded(bucketsColl)) {
+    if (isShardedTimeseries(coll)) {
         // Expect one additional index, created implicitly when the collection was implicitly
         // sharded.
         const shardIndexName = 'tm_1';
