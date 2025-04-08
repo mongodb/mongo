@@ -85,9 +85,10 @@ StorageEngine::LastShutdownState initializeStorageEngine(
         invariant(!service->getStorageEngine());
 
     if ((initFlags & StorageEngineInitFlags::kAllowNoLockFile) == StorageEngineInitFlags{}) {
-        SectionScopedTimer scopedTimer(service->getFastClockSource(),
-                                       TimedSectionId::createLockFile,
-                                       startupTimeElapsedBuilder);
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(),
+            "Create storage engine lock file in the data directory",
+            startupTimeElapsedBuilder);
         createLockFile(service);
     }
 
@@ -149,17 +150,19 @@ StorageEngine::LastShutdownState initializeStorageEngine(
 
     std::unique_ptr<StorageEngineMetadata> metadata;
     if ((initFlags & StorageEngineInitFlags::kSkipMetadataFile) == StorageEngineInitFlags{}) {
-        SectionScopedTimer scopedTimer(service->getFastClockSource(),
-                                       TimedSectionId::getStorageEngineMetadata,
-                                       startupTimeElapsedBuilder);
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(service->getFastClockSource(),
+                                                "Get metadata describing storage engine",
+                                                startupTimeElapsedBuilder);
         metadata = StorageEngineMetadata::forPath(dbpath);
     }
 
     // Validate options in metadata against current startup options.
     if (metadata.get()) {
-        SectionScopedTimer scopedTimer(service->getFastClockSource(),
-                                       TimedSectionId::validateMetadata,
-                                       startupTimeElapsedBuilder);
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(),
+            "Validate options in metadata against current startup options",
+            startupTimeElapsedBuilder);
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
     }
 
@@ -176,9 +179,8 @@ StorageEngine::LastShutdownState initializeStorageEngine(
 
     auto& lockFile = StorageEngineLockFile::get(service);
     {
-        SectionScopedTimer scopedTimer(service->getFastClockSource(),
-                                       TimedSectionId::createStorageEngine,
-                                       startupTimeElapsedBuilder);
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(), "Create storage engine", startupTimeElapsedBuilder);
         if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
             auto storageEngine = std::unique_ptr<StorageEngine>(
                 factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
@@ -194,17 +196,18 @@ StorageEngine::LastShutdownState initializeStorageEngine(
     }
 
     if (lockFile) {
-        SectionScopedTimer scopedTimer(
-            service->getFastClockSource(), TimedSectionId::writePID, startupTimeElapsedBuilder);
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(), "Write current PID to file", startupTimeElapsedBuilder);
         uassertStatusOK(lockFile->writePid());
     }
 
     // Write a new metadata file if it is not present.
     if (!metadata.get() &&
         (initFlags & StorageEngineInitFlags::kSkipMetadataFile) == StorageEngineInitFlags{}) {
-        SectionScopedTimer scopedTimer(service->getFastClockSource(),
-                                       TimedSectionId::writeNewMetadata,
-                                       startupTimeElapsedBuilder);
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(service->getFastClockSource(),
+                                                "Write a new metadata for storage engine",
+                                                startupTimeElapsedBuilder);
         metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
         metadata->setStorageEngine(factory->getCanonicalName().toString());
         metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));

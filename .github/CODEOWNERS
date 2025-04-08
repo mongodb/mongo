@@ -1611,7 +1611,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_period_utils* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_run_tracker.h @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_stage* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
-/src/mongo/db/exec/**/scoped_timer* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/exec/express/OWNERS.yml
 /src/mongo/db/exec/express/**/* @10gen/query-execution-classic-engine @svc-auto-approve-bot
