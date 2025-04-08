@@ -63,6 +63,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -509,6 +510,8 @@ void updateRequestCheckFunction(const VersionContext& vCtx,
                 "Cannot perform an update on a time-series collection that does not have a "
                 "metaField",
                 options.getMetaField());
+
+        timeseriesCounters.incrementMetaUpdate();
 
         request->setQuery(timeseries::translateQuery(request->getQuery(), *metaField));
         auto modification = uassertStatusOK(

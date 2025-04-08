@@ -712,6 +712,55 @@ private:
     StringMap<Counter64*> _counters;
 };
 
+class TimeseriesCounters {
+public:
+    TimeseriesCounters() = default;
+    TimeseriesCounters(TimeseriesCounters&) = delete;
+    TimeseriesCounters& operator=(const TimeseriesCounters&) = delete;
+
+    void incrementDirectDeleted() {
+        directDeleted.incrementRelaxed();
+    }
+
+    void incrementDirectUpdated() {
+        directUpdated.incrementRelaxed();
+    }
+
+    void incrementMeasurementDelete() {
+        measurementDelete.incrementRelaxed();
+    }
+
+    void incrementMeasurementUpdate() {
+        measurementUpdate.incrementRelaxed();
+    }
+
+    void incrementMetaDelete() {
+        metaDelete.incrementRelaxed();
+    }
+
+    void incrementMetaUpdate() {
+        metaUpdate.incrementRelaxed();
+    }
+
+    // Number of direct writes to bucket documents from all kinds of external and internal
+    // operations. Only counts operations that commit a write to storage.
+    Counter64& directDeleted = *MetricBuilder<Counter64>{"timeseries.directDeleted"};
+    Counter64& directUpdated = *MetricBuilder<Counter64>{"timeseries.directUpdated"};
+
+    // Number of user deletes performed at measurement level.
+    Counter64& measurementDelete = *MetricBuilder<Counter64>{"timeseries.measurementDelete"};
+
+    // Number of user updates.
+    Counter64& measurementUpdate = *MetricBuilder<Counter64>{"timeseries.measurementUpdate"};
+
+    // Number of user deletes performed at bucket level.
+    Counter64& metaDelete = *MetricBuilder<Counter64>{"timeseries.metaDelete"};
+
+    // Number of user updates performed at bucket level.
+    Counter64& metaUpdate = *MetricBuilder<Counter64>{"timeseries.metaUpdate"};
+};
+extern TimeseriesCounters timeseriesCounters;
+
 class ValidatorCounters {
 public:
     ValidatorCounters() {

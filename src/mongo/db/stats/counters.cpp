@@ -376,6 +376,7 @@ GroupCounters groupCounters;
 SetWindowFieldsCounters setWindowFieldsCounters;
 GraphLookupCounters graphLookupCounters;
 TextOrCounters textOrCounters;
+TimeseriesCounters timeseriesCounters;
 PlanCacheCounters planCacheCounters;
 FastPathQueryCounters fastPathQueryCounters;
 

@@ -44,6 +44,7 @@
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
@@ -130,6 +131,11 @@ Status ParsedDelete::parseRequest() {
         // internal match expression. We do not need to track the internal match expression counters
         // and so we stop the counters.
         _expCtx->stopExpressionCounters();
+
+        if (_request->getMulti() && !getResidualExpr()) {
+            // The command is performing a time-series meta delete.
+            timeseriesCounters.incrementMetaDelete();
+        }
 
         // At least, the bucket-level filter must contain the closed bucket filter.
         tassert(7542400, "Bucket-level filter must not be null", queryExprs->_bucketExpr);

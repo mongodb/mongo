@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
@@ -109,6 +110,7 @@ void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
+        timeseriesCounters.incrementDirectUpdated();
         auto mixedSchema = [&args] {
             auto result = args.coll->doesTimeseriesBucketsDocContainMixedSchemaData(
                 args.updateArgs->updatedDoc);
@@ -150,6 +152,8 @@ void TimeSeriesOpObserver::onDelete(OperationContext* opCtx,
     if (!options.has_value()) {
         return;
     }
+
+    timeseriesCounters.incrementDirectDeleted();
 
     timeseries::bucket_catalog::handleDirectWrite(
         *shard_role_details::getRecoveryUnit(opCtx),

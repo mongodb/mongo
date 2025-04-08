@@ -60,6 +60,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
@@ -138,6 +139,10 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
     if (_params.isUpdate) {
         _sideBucketCatalog = std::make_unique<timeseries::bucket_catalog::BucketCatalog>(
             1, getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes);
+        timeseriesCounters.incrementMeasurementUpdate();
+    } else {
+        // The command is performing a time-series measurement delete.
+        timeseriesCounters.incrementMeasurementDelete();
     }
 }
 
