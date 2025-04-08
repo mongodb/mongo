@@ -4,7 +4,6 @@
 // coverage and allow us to run on same- and mixed-version suites, we allow these commands to have a
 // test defined without always existing on the servers being used.
 const commandsRemovedFromMongosSinceLastLTS = [
-    "repairShardedCollectionChunksHistory",
     // last-continuos
     "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
     "getLastError",
@@ -17,41 +16,17 @@ const commandsRemovedFromMongosSinceLastLTS = [
 const commandsAddedToMongosSinceLastLTS = [
     "_clusterQueryWithoutShardKey",
     "_clusterWriteWithoutShardKey",
-    "abortReshardCollection",
     "analyze",
     "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
-    "appendOplogNote",
     "bulkWrite",
     "checkMetadataConsistency",
-    "cleanupReshardCollection",
-    "commitReshardCollection",
-    "compactStructuredEncryptionData",
-    "configureCollectionBalancing",
     "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "coordinateCommitTransaction",
-    "createSearchIndexes",
-    "dropSearchIndex",
-    "fsyncUnlock",
-    "getClusterParameter",
     "getQueryableEncryptionCountInfo",
-    "listSearchIndexes",
     "mergeAllChunksOnShard",
-    "moveRange",
     "oidcListKeys",
     "oidcRefreshKeys",
     "resetPlacementHistory",
-    "reshardCollection",
-    "rotateCertificates",
-    "setAllowMigrations",
-    "setClusterParameter",
-    "setUserWriteBlockMode",
-    "testDeprecation",
-    "testDeprecationInVersion2",
-    "testInternalTransactions",
-    "testRemoval",
-    "testVersions1And2",
-    "testVersion2",
     "transitionFromDedicatedConfigServer",
     "transitionToDedicatedConfigServer",
-    "updateSearchIndex",
 ];
