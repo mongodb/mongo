@@ -281,7 +281,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --config=local
       evergreen_remote_exec: on
     run_on:
       - amazon2023.3-xlarge
@@ -299,7 +298,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --config=local
       evergreen_remote_exec: on
     run_on:
       - amazon2023.3-arm64-xlarge
@@ -320,7 +318,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --config=local
         --thin_lto=True
         --compiler_type=clang
         --keep_going
@@ -342,7 +339,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --config=local
         --bolt=True
         --linkopt=-Wl,--emit-relocs
     run_on:
@@ -361,7 +357,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --release=True
-        --config=local
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -438,14 +433,10 @@ buildvariants:
     expansions:
       <<: *sys_perf_compile_expansions
       compile_variant: amazon2023-x86-streams-compile
-      compile_flags: >-
-        --ssl
-        MONGO_DISTMOD=amazon2023
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --remote-exec-release
-        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        --streams-release-build
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --streams_release_build=True
     run_on:
       - amazon2023.3-xlarge
     tasks:
