@@ -34,5 +34,9 @@ py_library(
             "opentelemetry-exporter-otlp-proto-common",
             group = "testing",
         ),
+        dependency(
+            "shrub-py",
+            group = "testing",
+        ),
     ],
 )

@@ -29,6 +29,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./bazel/OWNERS.yml
 /bazel/**/* @10gen/devprod-build @svc-auto-approve-bot
 
+# The following patterns are parsed from ./bazel/resmoke/OWNERS.yml
+/bazel/resmoke/**/* @10gen/devprod-correctness @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildfarm/OWNERS.yml
 /buildfarm/**/* @10gen/devprod-build @svc-auto-approve-bot
 

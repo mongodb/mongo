@@ -1,0 +1,35 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+genrule(
+    name = "resmoke_mongo_version",
+    srcs = [],
+    outs = [".resmoke_mongo_version.yml"],
+    cmd = """
+    echo mongo_version: $(MONGO_VERSION) > $@
+    """,
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "off_feature_flags",
+    srcs = [],
+    outs = ["off_feature_flags.txt"],
+    cmd = """
+    grep ^off_feature_flags bazel-out/volatile-status.txt | cut -d' ' -f2- | tr ' ' '\n'  > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "in_evergreen",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "in_evergreen_enabled",
+    flag_values = {
+        "//bazel/resmoke:in_evergreen": "True",
+    },
+)

@@ -381,3 +381,10 @@ mongo_install(
         "//src/mongo/db/query/search/mongotmock",
     ],
 )
+
+filegroup(
+    name = "installed-dist-test",
+    srcs = glob([
+        "dist-test/**",
+    ]),
+)

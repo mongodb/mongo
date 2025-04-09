@@ -499,6 +499,13 @@ class TestRunner(Subcommand):
             )
             return
 
+        if not os.path.exists(config.EVERGREEN_PROJECT_CONFIG_PATH):
+            self._resmoke_logger.warning(
+                "Skipping local invocation because the Evergreen config '%s' does not exist.",
+                config.EVERGREEN_PROJECT_CONFIG_PATH,
+            )
+            return
+
         evg_conf = parse_evergreen_file(config.EVERGREEN_PROJECT_CONFIG_PATH)
 
         suite = self._get_suites()[0]

@@ -34,6 +34,7 @@ from buildscripts.util.read_config import read_config_file
 
 BASE_16_TO_INT = 16
 COLLECTOR_ENDPOINT = "otel-collector.prod.corp.mongodb.com:443"
+BAZEL_GENERATED_OFF_FEATURE_FLAGS = "bazel/resmoke/off_feature_flags.txt"
 
 
 def validate_and_update_config(parser, args, should_configure_otel=True):
@@ -321,7 +322,10 @@ be invoked as either:
             # These logging messages start with # becuase the output of this file must produce
             # valid yaml. This comments out these print statements when the output is parsed.
             print("# Fetching feature flags...")
-            all_ff = gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
+            if os.path.exists(BAZEL_GENERATED_OFF_FEATURE_FLAGS):
+                all_ff = process_feature_flag_file(BAZEL_GENERATED_OFF_FEATURE_FLAGS)
+            else:
+                all_ff = gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
             print("# Fetched feature flags...")
         else:
             all_ff = []
@@ -843,8 +847,8 @@ def _tags_from_list(tags_list):
 
 def _update_symbolizer_secrets():
     """Open `expansions.yml`, get values for symbolizer secrets and update their values inside config.py ."""
-    if not _config.EVERGREEN_TASK_ID:
-        # not running on Evergreen
+    if not _config.EVERGREEN_TASK_ID or _config.SKIP_SYMBOLIZATION:
+        # not running on Evergreen or explicitly skipping symbolization
         return
     yml_data = utils.load_yaml_file(_config.EXPANSIONS_FILE)
     _config.SYMBOLIZER_CLIENT_SECRET = yml_data.get("symbolizer_client_secret")

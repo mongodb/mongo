@@ -1478,6 +1478,24 @@ functions:
     - *f_expansions_write
     - *bazel_coverage_sh
 
+  "bazel test sh": &bazel_test_sh
+    command: subprocess.exec
+    display_name: "bazel test sh"
+    type: test
+    params:
+      binary: bash
+      continue_on_err: true
+      add_expansions_to_env: true
+      args:
+        - "src/evergreen/bazel_test.sh"
+
+  "run resmoke suite with bazel":
+    - *f_expansions_write
+    - *bazel_test_sh
+    - command: attach.results
+      params:
+        file_location: report.json
+
   "generate version expansions": &generate_version_expansions
     command: subprocess.exec
     display_name: "generate version expansions"

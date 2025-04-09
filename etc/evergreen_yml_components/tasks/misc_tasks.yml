@@ -1096,6 +1096,24 @@ tasks:
             --verbose_failures
             --instrumentation_filter="^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams[/:]"
 
+  # Experimental task running the jscore suite bazel target. To be removed with SERVER-103537.
+  - name: bazel_test_jscore
+    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "git get project and add git tag"
+      - func: "do setup"
+      - func: "get engflow creds"
+      - func: "run resmoke suite with bazel"
+        vars:
+          target: //buildscripts/resmokeconfig:core
+          args: >-
+            --config=no-remote-exec
+            --test_output=all
+            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --//bazel/resmoke:in_evergreen
+
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
