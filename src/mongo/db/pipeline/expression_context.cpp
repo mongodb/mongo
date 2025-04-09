@@ -471,6 +471,7 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
       _collator(std::move(_params.collator)),
       _documentComparator(_collator.getCollator()),
       _valueComparator(_collator.getCollator()),
+      _interruptChecker(this),
       _featureFlagStreams([](const VersionContext& vCtx) {
           return gFeatureFlagStreams.isEnabledUseLastLTSFCVWhenUninitialized(
               vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
@@ -533,13 +534,6 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionCo
         .letParameters(shapifiedLet)
         .blankExpressionContext(true)
         .build();
-}
-
-void ExpressionContext::checkForInterruptSlow() {
-    // This check could be expensive, at least in relative terms, so don't check every time.
-    invariant(getOperationContext());
-    _interruptCounter = kInterruptCheckPeriod;
-    getOperationContext()->checkForInterrupt();
 }
 
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
@@ -615,7 +609,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     expCtx->_querySettings = _querySettings;
 
-    // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
+    // Note that we intentionally skip copying the state of '_interruptChecker' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
 
     return expCtx;

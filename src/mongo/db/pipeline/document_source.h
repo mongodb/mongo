@@ -442,9 +442,7 @@ public:
         ++_commonStats.works;
 
         GetNextResult next = doGetNext();
-        if (next.isAdvanced()) {
-            ++_commonStats.advanced;
-        }
+        _commonStats.advanced += static_cast<unsigned>(next.isAdvanced());
         return next;
     }
 

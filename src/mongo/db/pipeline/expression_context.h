@@ -74,6 +74,7 @@
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/version_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -152,7 +153,6 @@ public:
 
         friend class ExpressionContext;
 
-
         boost::intrusive_ptr<ExpressionContext> _expCtx;
 
         std::shared_ptr<CollatorInterface> _originalCollator;
@@ -202,10 +202,8 @@ public:
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
      * this aggregation pipeline has been interrupted.
      */
-    void checkForInterrupt() {
-        if (--_interruptCounter == 0) {
-            checkForInterruptSlow();
-        }
+    MONGO_COMPILER_ALWAYS_INLINE void checkForInterrupt() {
+        _interruptChecker.checkForInterrupt();
     }
 
     /**
@@ -332,7 +330,7 @@ public:
                 str::stream() << "No resolved namespace provided for " << nss.toStringForErrorMsg(),
                 it != _params.resolvedNamespaces.end());
         return it->second;
-    };
+    }
 
     /**
      * Returns true if there are no namespaces in the query other than the namespace the query was
@@ -484,7 +482,7 @@ public:
      */
     void stopExpressionCounters();
 
-    bool expressionCountersAreActive() {
+    bool expressionCountersAreActive() const {
         return static_cast<bool>(_expressionCounters);
     }
 
@@ -864,7 +862,7 @@ public:
     }
 
     // Returns true if we've received a TemporarilyUnavailableException.
-    bool getTemporarilyUnavailableException() {
+    bool getTemporarilyUnavailableException() const {
         return _gotTemporarilyUnavailableException;
     }
 
@@ -910,7 +908,7 @@ public:
         _collator.setIgnore();
     }
 
-    bool getIgnoreCollator() {
+    bool getIgnoreCollator() const {
         return _collator.getIgnore();
     }
 
@@ -960,7 +958,6 @@ public:
     bool isRankFusion() const {
         return _params.isRankFusion;
     }
-
 
 protected:
     struct ExpressionContextParams {
@@ -1093,14 +1090,44 @@ protected:
      */
     ExpressionContext(ExpressionContextParams&& config);
 
-    static const int kInterruptCheckPeriod = 128;
-
     friend class CollatorStash;
     friend class ExpressionContextBuilder;
 
-    // Performs the heavy work of checking whether an interrupt has occurred. Should only be called
-    // when _interruptCounter has been decremented to zero.
-    void checkForInterruptSlow();
+    /**
+     * Internal helper class that keeps track of how many times we called 'checkForInterrupt()', and
+     * only performs an actual check for interrupts every x calls. This is a performance
+     * optimization to reduce the cost of interrupt checking.
+     */
+    class InterruptChecker {
+        InterruptChecker(const InterruptChecker&) = delete;
+        InterruptChecker& operator=(const InterruptChecker&) = delete;
+
+    public:
+        explicit InterruptChecker(ExpressionContext* expCtx) : _expressionContext(expCtx) {}
+
+        MONGO_COMPILER_ALWAYS_INLINE void checkForInterrupt() {
+            if (--_tick == 0) {
+                // Perform the actual, slow check.
+                checkForInterruptSlow();
+            }
+        }
+
+    private:
+        // Performs the heavy work of checking whether an interrupt has occurred. For performance
+        // reasons, this should only be called every now and then.
+        MONGO_COMPILER_NOINLINE void checkForInterruptSlow() {
+            _tick = kInterruptCheckPeriod;
+
+            invariant(_expressionContext->getOperationContext());
+            _expressionContext->getOperationContext()->checkForInterrupt();
+        }
+
+        static constexpr int kInterruptCheckPeriod = 128;
+
+        ExpressionContext* _expressionContext;
+        int _tick = kInterruptCheckPeriod;
+    };
+
 
     // Class responsible for tracking the collator used for comparisons. Specifically, this
     // collator enforces the following contract:
@@ -1155,15 +1182,15 @@ protected:
     // A map from namespace to the resolved namespace, in case any views are involved.
     ResolvedNamespaceMap _resolvedNamespaces;
 
-    int _interruptCounter = kInterruptCheckPeriod;
+private:
+    std::unique_ptr<ExpressionCounters> _expressionCounters;
+    bool _gotTemporarilyUnavailableException = false;
 
     bool _isCappedDelete = false;
 
     bool _requiresTimeseriesExtendedRangeSupport = false;
 
-private:
-    std::unique_ptr<ExpressionCounters> _expressionCounters;
-    bool _gotTemporarilyUnavailableException = false;
+    InterruptChecker _interruptChecker;
 
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).
