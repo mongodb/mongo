@@ -27,23 +27,23 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_parsing_validators.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/document_source_parsing_validators.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/storage_stats_spec.idl"
-  - "mongo/db/pipeline/document_source_coll_stats.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/storage_stats_spec.idl"
+    - "mongo/db/pipeline/document_source_coll_stats.idl"
 
 structs:
-  DocumentSourceInternalAllCollectionStatsSpec:
-    description: Specification for an $_internalAllCollectionStats stage.
-    strict: true
-    query_shape_component: true
-    fields:
-      stats:
-        description: Specification for a $collStats stage.
-        type: DocumentSourceCollStatsSpec
-        optional: true
-        query_shape: literal
+    DocumentSourceInternalAllCollectionStatsSpec:
+        description: Specification for an $_internalAllCollectionStats stage.
+        strict: true
+        query_shape_component: true
+        fields:
+            stats:
+                description: Specification for a $collStats stage.
+                type: DocumentSourceCollStatsSpec
+                optional: true
+                query_shape: literal

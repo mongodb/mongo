@@ -27,58 +27,58 @@
 #
 
 global:
-  cpp_namespace: "mongo::commands_test_example"
+    cpp_namespace: "mongo::commands_test_example"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 commands:
-  exampleIncrement:
-    description: "increment an integer (TypedCommand example)"
-    command_name: exampleIncrement
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-      i: int
-  exampleVoid:
-    description: "no return, just side effects"
-    command_name: exampleVoid
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-      i: int
-  exampleVoidNeverAllowedOnSecondary:
-    description: "Similar to exampleVoid, but is not allowed to run on secondaries."
-    command_name: exampleVoidNeverAllowedOnSecondary
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-      i: int
-  exampleVoidAlwaysAllowedOnSecondary:
-    description: "Similar to exampleVoid, but is always allowed to run on secondaries."
-    command_name: exampleVoidAlwaysAllowedOnSecondary
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-      i: int
-  exampleVoidAllowedOnSecondaryIfOptedIn:
-    description: "Similar to exampleVoid, but is allowed secondaries if opted in."
-    command_name: exampleVoidAllowedOnSecondaryIfOptedIn
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-      i: int
-  exampleMinimal:
-    description: "like exampleIncrement, but use MinimalInvocationBase"
-    command_name: exampleMinimal
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-      i: int
+    exampleIncrement:
+        description: "increment an integer (TypedCommand example)"
+        command_name: exampleIncrement
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            i: int
+    exampleVoid:
+        description: "no return, just side effects"
+        command_name: exampleVoid
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            i: int
+    exampleVoidNeverAllowedOnSecondary:
+        description: "Similar to exampleVoid, but is not allowed to run on secondaries."
+        command_name: exampleVoidNeverAllowedOnSecondary
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            i: int
+    exampleVoidAlwaysAllowedOnSecondary:
+        description: "Similar to exampleVoid, but is always allowed to run on secondaries."
+        command_name: exampleVoidAlwaysAllowedOnSecondary
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            i: int
+    exampleVoidAllowedOnSecondaryIfOptedIn:
+        description: "Similar to exampleVoid, but is allowed secondaries if opted in."
+        command_name: exampleVoidAllowedOnSecondaryIfOptedIn
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            i: int
+    exampleMinimal:
+        description: "like exampleIncrement, but use MinimalInvocationBase"
+        command_name: exampleMinimal
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            i: int
 
 structs:
-  exampleIncrementReply:
-    description: "reply to exampleIncrement"
-    is_command_reply: true
-    fields:
-      iPlusOne: int
+    exampleIncrementReply:
+        description: "reply to exampleIncrement"
+        is_command_reply: true
+        fields:
+            iPlusOne: int

@@ -28,7 +28,7 @@
 global:
     cpp_namespace: "mongo::auth"
     cpp_includes:
-    - "mongo/db/auth/sasl_payload.h"
+        - "mongo/db/auth/sasl_payload.h"
 
 imports:
     - "mongo/db/basic_types.idl"

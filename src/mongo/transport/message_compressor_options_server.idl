@@ -31,8 +31,8 @@ global:
 
 configs:
     "net.compression.compressors":
-        description: 'Comma-separated list of compressors to use for network messages'
-        source: [ cli, ini, yaml ]
+        description: "Comma-separated list of compressors to use for network messages"
+        source: [cli, ini, yaml]
         arg_vartype: String
         short_name: networkMessageCompressors
-        default: 'snappy,zstd,zlib'
+        default: "snappy,zstd,zlib"

@@ -41,7 +41,7 @@ feature_flags:
         default: false
         shouldBeFCVGated: false
     featureFlagEgressGrpcForSearch:
-         description: "Feature flag to use egress gRPC for search communication"
-         cpp_varname: gEgressGrpcForSearch
-         default: true
-         shouldBeFCVGated: false
+        description: "Feature flag to use egress gRPC for search communication"
+        cpp_varname: gEgressGrpcForSearch
+        default: true
+        shouldBeFCVGated: false

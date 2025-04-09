@@ -55,7 +55,7 @@ structs:
         fields:
             _id:
                 type: uuid
-                description: Unique identifier for the operation. 
+                description: Unique identifier for the operation.
                 cpp_name: id
             updateCommand:
                 type: object_owned
@@ -64,8 +64,8 @@ structs:
                 cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection being updated."
-            isUpsert: 
-                type: bool 
+            isUpsert:
+                type: bool
                 description: "Indicates a multi update with upsert: true."
                 default: false
 
@@ -97,7 +97,7 @@ structs:
 
     MultiUpdateCoordinatorDocument:
         description: State document for MultiUpdateCoordinator.
-        strict: false        
+        strict: false
         inline_chained_structs: true
         chained_structs:
             MultiUpdateCoordinatorMetadata: metadata

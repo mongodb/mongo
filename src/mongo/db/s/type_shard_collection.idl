@@ -51,7 +51,7 @@
 #          "uuid" : UUID,
 #          "state" : CoordinatorState<kInitialized>,
 #          // Only populated if the coordinator has encountered an error.
-#          "abortReason": BSONObj   
+#          "abortReason": BSONObj
 #          // Only populated if this collection is the original sharded collection.
 #          "donorFields" : {
 #              "reshardingKey" : {
@@ -82,8 +82,9 @@ imports:
 
 structs:
     ShardCollectionTypeBase:
-        description: "Represents the layout and contents of documents contained in the shard 
-                      server's config.cache.collections collection."
+        description:
+            "Represents the layout and contents of documents contained in the shard
+            server's config.cache.collections collection."
         strict: false
         fields:
             _id:
@@ -93,8 +94,9 @@ structs:
                 optional: false
             uuid:
                 type: uuid
-                description: "The UUID that will be used to create the local collection on each of
-                              the shards which have chunks."
+                description:
+                    "The UUID that will be used to create the local collection on each of
+                    the shards which have chunks."
                 optional: false
             key:
                 cpp_name: keyPattern
@@ -103,35 +105,39 @@ structs:
                 optional: false
             defaultCollation:
                 type: object_owned
-                description: "Optional collection default collation. If missing or set to the empty
-                              BSON, implies simple collation."
+                description:
+                    "Optional collection default collation. If missing or set to the empty
+                    BSON, implies simple collation."
                 default: BSONObj()
             unique:
                 type: bool
                 description: "Uniqueness of the sharding key."
                 optional: false
             reshardingFields:
-                description: "Resharding-related fields. Only set when this collection is either the
-                              original collection undergoing a resharding operation or this
-                              collection is the temporary resharding collection."
+                description:
+                    "Resharding-related fields. Only set when this collection is either the
+                    original collection undergoing a resharding operation or this
+                    collection is the temporary resharding collection."
                 type: TypeCollectionReshardingFields
                 optional: true
             allowMigrations:
                 cpp_name: pre50CompatibleAllowMigrations
                 type: bool
-                description: "Whether this collection allows chunks to move. It is required by
-                              almost all DDL operations in order to guarantee that the set of
-                              shards, which comprise a collection will not change.
+                description:
+                    "Whether this collection allows chunks to move. It is required by
+                    almost all DDL operations in order to guarantee that the set of
+                    shards, which comprise a collection will not change.
 
-                              If the flag is not present it defaults to true.
+                    If the flag is not present it defaults to true.
 
-                              It must be optional and not present when running in FCV 4.4, because
-                              binaries prior to 5.0 use strict parsing and will fail."
+                    It must be optional and not present when running in FCV 4.4, because
+                    binaries prior to 5.0 use strict parsing and will fail."
                 optional: true
             timeseriesFields:
                 type: TypeCollectionTimeseriesFields
-                description: "Time-series collection fields. Only set when this is a time-series
-                              buckets collection."
+                description:
+                    "Time-series collection fields. Only set when this is a time-series
+                    buckets collection."
                 optional: true
 
             # What follows below are fields which control DDL operations on the collection object
@@ -142,36 +148,41 @@ structs:
                 optional: true
             refreshing:
                 type: bool
-                description: "Set by primaries and used by shard secondaries to safely refresh chunk
-                              metadata. Indicates whether the chunks collection is current being
-                              updated, which means read results won't provide a complete view of the
-                              chunk metadata."
+                description:
+                    "Set by primaries and used by shard secondaries to safely refresh chunk
+                    metadata. Indicates whether the chunks collection is current being
+                    updated, which means read results won't provide a complete view of the
+                    chunk metadata."
                 optional: true
             epoch:
                 type: objectid
-                description: "Uniquely identifies this instance of the collection, in case of
-                              drop/create or shard key refine."
+                description:
+                    "Uniquely identifies this instance of the collection, in case of
+                    drop/create or shard key refine."
                 optional: false
             timestamp:
                 type: timestamp
-                description: "Uniquely identifies this incarnation of the collection. Only changes
-                              in case of drop and create, or shard key refine.
-                              This field will store the ClusterTime of the Config Server when the
-                              collection was created or it's shard key last refined. Because
-                              timestamps are comparable, we are able to define a total order in time
-                              in the collection. This field will replace Epoch, which are not
-                              comparable."
+                description:
+                    "Uniquely identifies this incarnation of the collection. Only changes
+                    in case of drop and create, or shard key refine.
+                    This field will store the ClusterTime of the Config Server when the
+                    collection was created or it's shard key last refined. Because
+                    timestamps are comparable, we are able to define a total order in time
+                    in the collection. This field will replace Epoch, which are not
+                    comparable."
             lastRefreshedCollectionVersion:
                 type: timestamp
                 cpp_name: lastRefreshedCollectionMajorMinorVersion
-                description: "Set by primaries and used by shard secondaries to safely refresh chunk
-                              metadata. Indicates the collection version of the last complete chunk
-                              metadata refresh, and is used to indicate if a refresh occurred if the
-                              value is different than when the caller last checked -- because
-                              'refreshing' will be false both before and after a refresh occurs."
+                description:
+                    "Set by primaries and used by shard secondaries to safely refresh chunk
+                    metadata. Indicates the collection version of the last complete chunk
+                    metadata refresh, and is used to indicate if a refresh occurred if the
+                    value is different than when the caller last checked -- because
+                    'refreshing' will be false both before and after a refresh occurs."
                 optional: true
             unsplittable:
                 type: optionalBool
-                description: "Flag that identifies whether the collection is splittable in multiple 
-                            chunks. If unsplittable, the collection is always equivalent to a 1 
-                            chunk collection."
+                description:
+                    "Flag that identifies whether the collection is splittable in multiple
+                    chunks. If unsplittable, the collection is always equivalent to a 1
+                    chunk collection."

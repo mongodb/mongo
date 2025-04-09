@@ -46,9 +46,9 @@ commands:
                 description: "Size of the oplog in MB"
                 type: safeDouble
                 optional: true
-                validator: { gte: 990, lte: 1073741824 } # gte 990MB; lte 1PB (in MB)
+                validator: {gte: 990, lte: 1073741824} # gte 990MB; lte 1PB (in MB)
             minRetentionHours:
                 description: "Minimum number of hours to preserve oplog entry."
                 type: safeDouble
                 optional: true
-                validator: { gte: 0 } 
+                validator: {gte: 0}

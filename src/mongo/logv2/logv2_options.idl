@@ -35,7 +35,7 @@ imports:
 server_parameters:
     redactEncryptedFields:
         description: "Enables redaction of encrypted fields in BSON Objects, defaults to on"
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_class:
             name: RedactEncryptedFields
             override_set: true

@@ -35,32 +35,32 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-  cleanupReshardCollection:
-    description: "The public cleanupReshardCollection command on mongos."
-    command_name: cleanupReshardCollection
-    strict: true
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    cleanupReshardCollection:
+        description: "The public cleanupReshardCollection command on mongos."
+        command_name: cleanupReshardCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-  _configsvrCleanupReshardCollection:
-    command_name: _configsvrCleanupReshardCollection
-    cpp_name: ConfigsvrCleanupReshardCollection
-    description: "The internal cleanupReshardCollection command on the config server."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    _configsvrCleanupReshardCollection:
+        command_name: _configsvrCleanupReshardCollection
+        cpp_name: ConfigsvrCleanupReshardCollection
+        description: "The internal cleanupReshardCollection command on the config server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-  _shardsvrCleanupReshardCollection:
-    command_name: _shardsvrCleanupReshardCollection
-    cpp_name: ShardsvrCleanupReshardCollection
-    description: "The internal cleanupReshardCollection command on the shard server."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      reshardingUUID:
-        type: uuid
-        description: "Identifier for a resharding operation."
+    _shardsvrCleanupReshardCollection:
+        command_name: _shardsvrCleanupReshardCollection
+        cpp_name: ShardsvrCleanupReshardCollection
+        description: "The internal cleanupReshardCollection command on the shard server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            reshardingUUID:
+                type: uuid
+                description: "Identifier for a resharding operation."

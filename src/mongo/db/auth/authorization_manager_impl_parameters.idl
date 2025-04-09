@@ -26,20 +26,20 @@
 # it in the license file.
 
 global:
-  cpp_namespace: mongo
-  cpp_includes:
-    - mongo/db/auth/authorization_manager_impl.h
-    - mongo/db/auth/authorization_router_impl.h
+    cpp_namespace: mongo
+    cpp_includes:
+        - mongo/db/auth/authorization_manager_impl.h
+        - mongo/db/auth/authorization_router_impl.h
 
 imports:
-  - mongo/db/basic_types.idl
+    - mongo/db/basic_types.idl
 
 server_parameters:
-  authorizationManagerCacheSize:
-    description: >
-      Element count limit on the AuthorizationManager's user handle cache, stored within its AuthorizationRouter.
-    set_at:
-      - startup
-    cpp_varname: authorizationRouterCacheSize
-    default: 100
-    redact: false
+    authorizationManagerCacheSize:
+        description: >
+            Element count limit on the AuthorizationManager's user handle cache, stored within its AuthorizationRouter.
+        set_at:
+            - startup
+        cpp_varname: authorizationRouterCacheSize
+        default: 100
+        redact: false

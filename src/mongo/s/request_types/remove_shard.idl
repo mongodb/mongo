@@ -80,22 +80,22 @@ structs:
 commands:
     removeShard:
         command_name: removeShard
-        command_alias: removeshard 
+        command_alias: removeshard
         description: "The public removeShard command on mongos"
-        cpp_name: RemoveShard 
+        cpp_name: RemoveShard
         namespace: type
         type: shard_id
         api_version: ""
         strict: false
         chained_structs:
             RemoveShardRequestBase: RemoveShardRequestBase
-    
+
     _configsvrRemoveShard:
-        command_name: _configsvrRemoveShard 
+        command_name: _configsvrRemoveShard
         description: "The internal removeShard command on config server"
         cpp_name: ConfigSvrRemoveShard
         namespace: type
-        type: shard_id 
+        type: shard_id
         api_version: ""
         strict: false
         chained_structs:

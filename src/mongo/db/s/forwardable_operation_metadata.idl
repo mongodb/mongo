@@ -28,15 +28,15 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes: 
+    cpp_includes:
         - "mongo/rpc/metadata/audit_user_attrs.h"
         - "mongo/rpc/metadata/audit_client_attrs.h"
 
 imports:
-     - "mongo/db/basic_types.idl"
-     - "mongo/db/version_context.idl"
-     - "mongo/rpc/metadata/audit_attrs.idl"
-     - "mongo/rpc/metadata/audit_metadata.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/version_context.idl"
+    - "mongo/rpc/metadata/audit_attrs.idl"
+    - "mongo/rpc/metadata/audit_metadata.idl"
 
 structs:
     ForwardableOperationMetadataBase:
@@ -60,10 +60,11 @@ structs:
                 description: "Whether this operation is allowed to bypass user write blocking."
             rawData:
                 type: optionalBool
-                description: "Whether to use the raw underlying data format. When being run on a
-                              collection type that stores its data in a different format from that
-                              in which users interact with, this means that the command will operate
-                              directly on the format in which it is stored."
+                description:
+                    "Whether to use the raw underlying data format. When being run on a
+                    collection type that stores its data in a different format from that
+                    in which users interact with, this means that the command will operate
+                    directly on the format in which it is stored."
             validatedTenancyScopeToken:
                 type: string
                 description: "Token used to validate and create a new ValidatedTenancyScope."
@@ -71,6 +72,6 @@ structs:
             versionContext:
                 type: version_context
                 description: "Snapshot of the FCV used by the operation,
-                              which ensures that feature flag checks are stable through its execution."
+                    which ensures that feature flag checks are stable through its execution."
                 # TODO SERVER-99655: make non-optional once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
                 optional: true

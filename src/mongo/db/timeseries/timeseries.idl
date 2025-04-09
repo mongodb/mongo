@@ -35,19 +35,21 @@ imports:
 
 server_parameters:
     "performTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening":
-        description: "Whether or not to perform data integrity checks when inserting measurements
-                      into compressed time-series buckets that are reopened. On by default, can be
-                      turned off for a performance boost."
-        set_at: [ startup, runtime ]
+        description:
+            "Whether or not to perform data integrity checks when inserting measurements
+            into compressed time-series buckets that are reopened. On by default, can be
+            turned off for a performance boost."
+        set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<bool>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening"
         default: true
         redact: false
 
     "performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert":
-        description: "Whether or not to perform data integrity checks when inserting measurements
-                      into compressed time-series buckets."
-        set_at: [ startup, runtime ]
+        description:
+            "Whether or not to perform data integrity checks when inserting measurements
+            into compressed time-series buckets."
+        set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<bool>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"
         default: false
@@ -55,82 +57,86 @@ server_parameters:
 
     "timeseriesBucketMaxCount":
         description: "Maximum number of measurements to store in a single bucket"
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: "std::int32_t"
         cpp_varname: "gTimeseriesBucketMaxCount"
         default: 1000
         # TODO SERVER-100659: Remove this upper bound limitation when reopen is more robust to large number of measurements
-        validator: { gte: 1, lte: 20000 }
+        validator: {gte: 1, lte: 20000}
         redact: false
 
     "timeseriesBucketMaxSize":
         description: "Maximum size in bytes of measurements to store together in a single bucket"
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: "std::int32_t"
         cpp_varname: "gTimeseriesBucketMaxSize"
         default: 128000 # 125KB
-        validator: { gte: 1 }
+        validator: {gte: 1}
         redact: false
 
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
-        description: "The threshold in percentage of system memory or bytes for bucket catalog memory
-                      usage above which idle buckets will be expired. If set to a number between 1-100,
-                      the threshold will be interpreted as a percentage of system memory.
-                      If set to a number larger than 100 it will be interpreted as a number of bytes
-                      for the threshold. If set to zero or a non-positive number it will automatically be
-                      over-written to be the default value, a certain percentage of system memory."
-        set_at: [ startup, runtime ]
+        description:
+            "The threshold in percentage of system memory or bytes for bucket catalog memory
+            usage above which idle buckets will be expired. If set to a number between 1-100,
+            the threshold will be interpreted as a percentage of system memory.
+            If set to a number larger than 100 it will be interpreted as a number of bytes
+            for the threshold. If set to zero or a non-positive number it will automatically be
+            over-written to be the default value, a certain percentage of system memory."
+        set_at: [startup, runtime]
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
         default: 5
         redact: false
 
     "timeseriesSideBucketCatalogMemoryUsageThreshold":
-        description: "The threshold in bytes for side bucket catalog memory usage above which idle
-                      buckets will be expired."
-        set_at: [ startup, runtime ]
+        description:
+            "The threshold in bytes for side bucket catalog memory usage above which idle
+            buckets will be expired."
+        set_at: [startup, runtime]
         cpp_varname: "gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes"
         default: 104857600 # 100 MB
         redact: false
 
     "timeseriesIdleBucketExpiryMaxCountPerAttempt":
         description: "The maximum number of buckets that may be closed due to expiry at each attempt"
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: "std::int32_t"
         cpp_varname: "gTimeseriesIdleBucketExpiryMaxCountPerAttempt"
-        default:  3
-        validator: { gte: 2 }
+        default: 3
+        validator: {gte: 2}
         redact: false
 
     "timeseriesBucketMinCount":
         description: "Time-series buckets that need to be closed due to size
-                      (timeseriesBucketMaxSize) but haven't crossed this threshold are considered to
-                      contain large measurements, and will be kept open to improve bucketing
-                      performance. These buckets will be closed when they reach the threshold or if
-                      the bucket is close to the max BSON size limit. Setting this to 1 disables
-                      this behaviour."
-        set_at: [ startup ]
+            (timeseriesBucketMaxSize) but haven't crossed this threshold are considered to
+            contain large measurements, and will be kept open to improve bucketing
+            performance. These buckets will be closed when they reach the threshold or if
+            the bucket is close to the max BSON size limit. Setting this to 1 disables
+            this behaviour."
+        set_at: [startup]
         cpp_vartype: "std::int32_t"
         cpp_varname: "gTimeseriesBucketMinCount"
-        default:  10
-        validator: { gte: 1 }
+        default: 10
+        validator: {gte: 1}
         redact: false
 
     "timeseriesBucketMinSize":
-        description: "If there is high memory pressure on the system, we will lower the maximum
-                      size (in bytes) of measurements we pack into buckets. This value represents
-                      the absolute lowest size we will limit buckets to."
-        set_at: [ startup, runtime ]
+        description:
+            "If there is high memory pressure on the system, we will lower the maximum
+            size (in bytes) of measurements we pack into buckets. This value represents
+            the absolute lowest size we will limit buckets to."
+        set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<int>"
         cpp_varname: "gTimeseriesBucketMinSize"
         default: 5120 # 5KB
-        validator: { gte: 1 }
+        validator: {gte: 1}
         redact: false
 
     "timeseriesInsertMaxRetriesOnDuplicates":
-        description: "In rare cases due to collision from OID generation, we will retry inserting
-                      those bucket documents automatically for a limited number of times. This value
-                      represents the number of retries we would perform."
-        set_at: [ startup, runtime ]
+        description:
+            "In rare cases due to collision from OID generation, we will retry inserting
+            those bucket documents automatically for a limited number of times. This value
+            represents the number of retries we would perform."
+        set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<int>"
         cpp_varname: "gTimeseriesInsertMaxRetriesOnDuplicates"
         default: 32
@@ -138,10 +144,11 @@ server_parameters:
         redact: false
 
     "timeseriesLargeMeasurementThreshold":
-        description: "When an element in a measurement is larger than the threshold (in bytes) when
-                      being inserted into a bucket, we use the element's uncompressed size towards
-                      the bucket size limit."
-        set_at: [ startup, runtime ]
+        description:
+            "When an element in a measurement is larger than the threshold (in bytes) when
+            being inserted into a bucket, we use the element's uncompressed size towards
+            the bucket size limit."
+        set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<int>"
         cpp_varname: "gTimeseriesLargeMeasurementThreshold"
         default: 32
@@ -150,8 +157,9 @@ server_parameters:
 
 enums:
     BucketGranularity:
-        description: "Describes a time-series collection's expected interval between subsequent
-                      measurements"
+        description:
+            "Describes a time-series collection's expected interval between subsequent
+            measurements"
         type: string
         values:
             Seconds: "seconds"
@@ -165,18 +173,20 @@ structs:
         query_shape_component: true
         fields:
             timeField:
-                description: "The name of the top-level field to be used for time. Inserted
-                              documents must have this field, and the field must be of the BSON UTC
-                              datetime type (0x9)"
+                description:
+                    "The name of the top-level field to be used for time. Inserted
+                    documents must have this field, and the field must be of the BSON UTC
+                    datetime type (0x9)"
                 type: string
                 stability: stable
                 query_shape: anonymize
                 validator:
                     callback: "validateTimeAndMetaField"
             metaField:
-                description: "The name of the top-level field describing the series. This field is
-                              used to group related data and may be of any BSON type. This may not
-                              be \"_id\" or the same as 'timeField'."
+                description:
+                    'The name of the top-level field describing the series. This field is
+                    used to group related data and may be of any BSON type. This may not
+                    be "_id" or the same as ''timeField''.'
                 type: string
                 optional: true
                 stability: stable
@@ -190,19 +200,20 @@ structs:
                 stability: stable
                 query_shape: parameter
             bucketRoundingSeconds:
-                description: "Used to determine the minimum time boundary when opening a new bucket
-                              by rounding the first timestamp down to the next multiple of this
-                              value. Specified in seconds."
+                description:
+                    "Used to determine the minimum time boundary when opening a new bucket
+                    by rounding the first timestamp down to the next multiple of this
+                    value. Specified in seconds."
                 type: safeInt
                 optional: true
-                validator: { gte: 1, lte: 31536000 }
+                validator: {gte: 1, lte: 31536000}
                 stability: stable
                 query_shape: literal
             bucketMaxSpanSeconds:
                 description: "The maximum range of time values for a bucket, in seconds"
                 type: safeInt
                 optional: true
-                validator: { gte: 1, lte: 31536000 }
+                validator: {gte: 1, lte: 31536000}
                 stability: stable
                 query_shape: literal
 
@@ -218,9 +229,9 @@ structs:
                 optional: true
                 type: safeInt
                 stability: unstable
-                validator: { gte: 1, lte: 31536000 }
+                validator: {gte: 1, lte: 31536000}
             bucketMaxSpanSeconds:
                 optional: true
                 type: safeInt
                 stability: unstable
-                validator: { gte: 1, lte: 31536000 }
+                validator: {gte: 1, lte: 31536000}

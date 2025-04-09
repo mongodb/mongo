@@ -33,24 +33,23 @@ global:
 
 configs:
     help:
-        description: 'Display help'
+        description: "Display help"
         arg_vartype: Switch
     connectionString:
         description: The connection string associated with the test fixture
-                     that this integration test should run against.
+            that this integration test should run against.
         arg_vartype: String
-        default: 'localhost:27017'
+        default: "localhost:27017"
     suite:
-        description: 'Test suite name. Specify --suite more than once to run multiple suites.'
+        description: "Test suite name. Specify --suite more than once to run multiple suites."
         arg_vartype: StringVector
     filter:
-        description: 'Test case name filter. Specify a regex partial-matching the test names.'
+        description: "Test case name filter. Specify a regex partial-matching the test names."
         arg_vartype: String
     fileNameFilter:
-        description: 'Filter test cases by source file name by partial-matching regex.'
+        description: "Filter test cases by source file name by partial-matching regex."
         arg_vartype: String
     useEgressGRPC:
         description: Whether or not the integration test is configured to use gRPC.
         arg_vartype: Bool
         default: false
-

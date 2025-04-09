@@ -33,48 +33,52 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
-
 structs:
     NamespacePlacementType:
-        description: "Represents the layout and contents of documents contained in the 
-                      config.placementHistory collection.
-                      Each document encodes placement information (at shard granularity) on a given 
-                      namespace at a specific point in time."
+        description:
+            "Represents the layout and contents of documents contained in the
+            config.placementHistory collection.
+            Each document encodes placement information (at shard granularity) on a given
+            namespace at a specific point in time."
         strict: false
         fields:
             nss:
                 type: namespacestring
                 description: "The namespace (database or full collection name)
-                              referenced by this object."
+                    referenced by this object."
             uuid:
                 cpp_name: uuid
                 type: uuid
-                description: "When nss references a collection, this field stores the uuid assigned
-                              to such collection at the time of its creation."
+                description:
+                    "When nss references a collection, this field stores the uuid assigned
+                    to such collection at the time of its creation."
                 optional: true
             timestamp:
                 type: timestamp
-                description: "The point in time at which this version of NamespacePlacementType 
-                              for 'nss' has been generated."
+                description:
+                    "The point in time at which this version of NamespacePlacementType
+                    for 'nss' has been generated."
             shards:
                 type: array<shard_id>
-                description: "The list of shard IDs containing one of more chunks of 'nss' 
-                              at time 'timestamp' (may be empty)."
+                description:
+                    "The list of shard IDs containing one of more chunks of 'nss'
+                    at time 'timestamp' (may be empty)."
 
     HistoricalPlacement:
-        description: "Result of the placement search query at a point in time over the 
-                    config.placementHistory"
+        description:
+            "Result of the placement search query at a point in time over the
+            config.placementHistory"
         strict: false
         fields:
             shards:
                 type: array<shard_id>
-                description: "The set of shard IDs containing data on the requested nss/cluster at 
-                            the point in time"
+                description:
+                    "The set of shard IDs containing data on the requested nss/cluster at
+                    the point in time"
             isExact:
                 type: bool
-                description: "When true, the returned list of shards is an accurate recording of 
-                            the placement info at the requested point in time. 
-                            When false, the result value represents an approximation based on 
-                            a present/past reading of config.shards"
-
-
+                description:
+                    "When true, the returned list of shards is an accurate recording of
+                    the placement info at the requested point in time.
+                    When false, the result value represents an approximation based on
+                    a present/past reading of config.shards"

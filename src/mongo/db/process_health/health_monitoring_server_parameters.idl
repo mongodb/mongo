@@ -83,7 +83,7 @@ structs:
             interval:
                 type: int
                 optional: false
-                validator: { gt: 0 }
+                validator: {gt: 0}
 
     HealthObserverIntervals:
         description: "A struct representing the interval in milliseconds for each health observer."
@@ -93,21 +93,21 @@ structs:
                 description: "Array of health observer intervals settings"
                 type: array<HealthObserverIntervalSetting>
                 optional: true
-            
+
     HealthObserverProgressMonitorConfig:
-        description: "A struct representing configuration for health observer liveness checks." 
+        description: "A struct representing configuration for health observer liveness checks."
         strict: true
         fields:
             interval:
                 description: "Interval between liveness checks in milliseconds."
                 type: int
                 default: 1000
-                validator: { gt: 0 }
+                validator: {gt: 0}
             deadline:
                 description: "Deadline for liveness checks, after which process should exit, in seconds."
                 type: int
                 default: 300
-                validator: { gt: 0 }
+                validator: {gt: 0}
 
 server_parameters:
     healthMonitoringIntensities:

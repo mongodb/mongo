@@ -27,79 +27,79 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/visitors/docs_needed_bounds.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/visitors/docs_needed_bounds.idl"
 
 structs:
-  MongotQueryViewInfo:
-      description: >-
-        If the query is on a sharded view, mongos will use this struct to serialize the view information before sending the requests to the shards. The document sources specific to mongot stages also hold this struct to retain the view information necessary to perform mongot-indexed view logic during query execution.
-      strict: true
-      fields:
-          viewNss: 
-              description: >-
-                  Atlas requires just the name of the view. However, when mongos serializes the view information, 
-                  we need to include the entire NSS in order to add the corresponding view pipeline to the 
-                  resolvedNamespaces dict on the expression context.
-              type: namespacestring
-              optional: false
-          effectivePipeline:
-              description: >-
-                  An array of agg stages gathered from the current and associated views. This field is only required for 
-                  createSearchIndexes commands, though it is being added to all search index command requests for easier debugability.
-              type: array<object>
-              optional: false
-  InternalSearchMongotRemoteSpec:
-    description: Specification for a $_internalSearchMongotRemote stage given in the full, explicit format.
-    # Because the specification is internal only, we permit extra fields. This avoids some upgrade/downngrade
-    # concerns where a router may send a command to a node with fields not known by the node.
-    strict: false
-    fields:
-      mongotQuery:
-        description: The remote text search query.
-        optional: false
-        type: object_owned
-      metadataMergeProtocolVersion:
-        description: The mongot protocol version.
-        optional: true
-        type: int
-      mergingPipeline:
-        description: An optional pipeline to apply to the collection being unioned.
-        optional: true
-        type: array<object>
-      # TODO SERVER-92576 We may be able to remove limit alongside docsRequested.
-      limit:
-        description: A limit copied from the merging part of the pipeline.
-        optional: true
-        type: long
-      requiresSearchSequenceToken:
-        description: "If true, mongot must return a searchSequenceToken with each document to allow the user to paginate results."
-        default: false
-        type: bool
-      sortSpec:
-        description: "The sort specification for this query."
-        optional: true
-        type: object
-      mongotDocsRequested:
-        description: "The number of documents that mongod requests mongot should return; mongot can choose to return more."
-        optional: true
-        type: long
-      requiresSearchMetaCursor:
+    MongotQueryViewInfo:
         description: >-
-          Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable. If false, we will
-          ignore the metadata cursor returned from mongot and not establish a search metadata pipeline.
-        default: true
-        type: bool
-      docsNeededBounds:
-        description: Bounds to describe the minimum and maximum number of documents needed from mongot to satisfy the overall query.
-        optional: true
-        type: DocsNeededBounds
-      view:
-        description: >-
-          For requests on views over sharded collections, mongos must serialize the view NSS, the view name and pipeline as part of
-          the mongot stage.
-        optional: true
-        type: MongotQueryViewInfo
+            If the query is on a sharded view, mongos will use this struct to serialize the view information before sending the requests to the shards. The document sources specific to mongot stages also hold this struct to retain the view information necessary to perform mongot-indexed view logic during query execution.
+        strict: true
+        fields:
+            viewNss:
+                description: >-
+                    Atlas requires just the name of the view. However, when mongos serializes the view information, 
+                    we need to include the entire NSS in order to add the corresponding view pipeline to the 
+                    resolvedNamespaces dict on the expression context.
+                type: namespacestring
+                optional: false
+            effectivePipeline:
+                description: >-
+                    An array of agg stages gathered from the current and associated views. This field is only required for 
+                    createSearchIndexes commands, though it is being added to all search index command requests for easier debugability.
+                type: array<object>
+                optional: false
+    InternalSearchMongotRemoteSpec:
+        description: Specification for a $_internalSearchMongotRemote stage given in the full, explicit format.
+        # Because the specification is internal only, we permit extra fields. This avoids some upgrade/downngrade
+        # concerns where a router may send a command to a node with fields not known by the node.
+        strict: false
+        fields:
+            mongotQuery:
+                description: The remote text search query.
+                optional: false
+                type: object_owned
+            metadataMergeProtocolVersion:
+                description: The mongot protocol version.
+                optional: true
+                type: int
+            mergingPipeline:
+                description: An optional pipeline to apply to the collection being unioned.
+                optional: true
+                type: array<object>
+            # TODO SERVER-92576 We may be able to remove limit alongside docsRequested.
+            limit:
+                description: A limit copied from the merging part of the pipeline.
+                optional: true
+                type: long
+            requiresSearchSequenceToken:
+                description: "If true, mongot must return a searchSequenceToken with each document to allow the user to paginate results."
+                default: false
+                type: bool
+            sortSpec:
+                description: "The sort specification for this query."
+                optional: true
+                type: object
+            mongotDocsRequested:
+                description: "The number of documents that mongod requests mongot should return; mongot can choose to return more."
+                optional: true
+                type: long
+            requiresSearchMetaCursor:
+                description: >-
+                    Flag indicating whether or not the total user pipeline references the $$SEARCH_META variable. If false, we will
+                    ignore the metadata cursor returned from mongot and not establish a search metadata pipeline.
+                default: true
+                type: bool
+            docsNeededBounds:
+                description: Bounds to describe the minimum and maximum number of documents needed from mongot to satisfy the overall query.
+                optional: true
+                type: DocsNeededBounds
+            view:
+                description: >-
+                    For requests on views over sharded collections, mongos must serialize the view NSS, the view name and pipeline as part of
+                    the mongot stage.
+                optional: true
+                type: MongotQueryViewInfo

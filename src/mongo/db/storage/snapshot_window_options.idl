@@ -27,17 +27,17 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  minSnapshotHistoryWindowInSeconds:
-    description: "Minimum snapshot history to keep, in seconds"
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: minSnapshotHistoryWindowInSeconds
-    default: 300
-    validator: { gte: 0 }
-    redact: false
+    minSnapshotHistoryWindowInSeconds:
+        description: "Minimum snapshot history to keep, in seconds"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: minSnapshotHistoryWindowInSeconds
+        default: 300
+        validator: {gte: 0}
+        redact: false

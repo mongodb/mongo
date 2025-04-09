@@ -39,7 +39,7 @@ server_parameters:
             knob.
         cpp_vartype: AtomicWord<bool>
         cpp_varname: internalQueryAlwaysMergeOnPrimaryShard
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         default: false
         redact: false
 
@@ -51,7 +51,7 @@ server_parameters:
             of merging on mongoS will always do so.
         cpp_vartype: AtomicWord<bool>
         cpp_varname: internalQueryProhibitMergingOnMongoS
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         default: false
         redact: false
 
@@ -61,6 +61,6 @@ server_parameters:
             False by default, so the queries run with exchanges.
         cpp_vartype: AtomicWord<bool>
         cpp_varname: internalQueryDisableExchange
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         default: false
         redact: false

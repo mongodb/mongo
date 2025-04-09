@@ -29,18 +29,18 @@
 global:
     cpp_namespace: "mongo"
     configs:
-        source: [ cli, ini ]
+        source: [cli, ini]
         initializer:
             register: addMongodLegacyOptions
 
 configs:
     #
-    # The following are legacy options that are disallowed in the JSON config file	
+    # The following are legacy options that are disallowed in the JSON config file
     #
 
-    # This is a deprecated option that we are supporting for backwards compatibility	
-    # The first value for this option can be either 'dbpath' or 'run'.	
-    # If it is 'dbpath', mongod prints the dbpath and exits.  Any extra values are ignored.	
+    # This is a deprecated option that we are supporting for backwards compatibility
+    # The first value for this option can be either 'dbpath' or 'run'.
+    # If it is 'dbpath', mongod prints the dbpath and exits.  Any extra values are ignored.
     # If it is 'run', mongod runs normally.  Providing extra values is an error.
     command:
         description: Command
@@ -48,7 +48,7 @@ configs:
         hidden: true
         positional: 1-3
     cacheSize:
-        description: 'Cache size (in MB) for rec store'
+        description: "Cache size (in MB) for rec store"
         arg_vartype: Long
         hidden: true
 
@@ -69,4 +69,3 @@ configs:
         description: DEPRECATED
         arg_vartype: Switch
         hidden: true
- 

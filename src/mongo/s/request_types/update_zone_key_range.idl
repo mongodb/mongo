@@ -32,7 +32,7 @@ global:
         - "mongo/s/request_types/update_zone_key_range_serialization.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     StringOrNull:

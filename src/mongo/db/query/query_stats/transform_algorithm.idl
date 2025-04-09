@@ -26,12 +26,12 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 enums:
-  TransformAlgorithm:
-    description: "The type of algorithm to be used for the transformIdentifiers field of $queryStats."
-    type: string
-    values:
-      kHmacSha256: "hmac-sha-256"
-      kNone: "none"
+    TransformAlgorithm:
+        description: "The type of algorithm to be used for the transformIdentifiers field of $queryStats."
+        type: string
+        values:
+            kHmacSha256: "hmac-sha-256"
+            kNone: "none"

@@ -42,4 +42,3 @@ types:
         serializer: "mongo::WriteConcernOptions::toBSON"
         deserializer: "mongo::WriteConcernOptions::deserializerForIDL"
         is_view: false
-

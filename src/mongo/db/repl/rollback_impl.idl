@@ -50,7 +50,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gRollbackTimeLimitSecs
         default:
-            expr: '60 * 60 * 24' # Default 1 day
+            expr: "60 * 60 * 24" # Default 1 day
         validator:
             gt: 0
         redact: false

@@ -31,46 +31,45 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-
-  LogicalSessionCacheStats:
-    description: "A struct representing the section of the server status
-                  command with information about the logical session cache"
-    strict: true
-    fields:
-      activeSessionsCount:
-        type: int
-        default: 0
-      sessionsCollectionJobCount:
-        type: int
-        default: 0
-      lastSessionsCollectionJobDurationMillis:
-        type: int
-        default: 0
-      lastSessionsCollectionJobTimestamp:
-        type: date
-      lastSessionsCollectionJobEntriesRefreshed:
-        type: int
-        default: 0
-      lastSessionsCollectionJobEntriesEnded:
-        type: int
-        default: 0
-      lastSessionsCollectionJobCursorsClosed:
-        type: int
-        default: 0
-      transactionReaperJobCount:
-        type: int
-        default: 0
-      lastTransactionReaperJobDurationMillis:
-        type: int
-        default: 0
-      lastTransactionReaperJobTimestamp:
-        type: date
-      lastTransactionReaperJobEntriesCleanedUp:
-        type: int
-        default: 0
+    LogicalSessionCacheStats:
+        description: "A struct representing the section of the server status
+            command with information about the logical session cache"
+        strict: true
+        fields:
+            activeSessionsCount:
+                type: int
+                default: 0
+            sessionsCollectionJobCount:
+                type: int
+                default: 0
+            lastSessionsCollectionJobDurationMillis:
+                type: int
+                default: 0
+            lastSessionsCollectionJobTimestamp:
+                type: date
+            lastSessionsCollectionJobEntriesRefreshed:
+                type: int
+                default: 0
+            lastSessionsCollectionJobEntriesEnded:
+                type: int
+                default: 0
+            lastSessionsCollectionJobCursorsClosed:
+                type: int
+                default: 0
+            transactionReaperJobCount:
+                type: int
+                default: 0
+            lastTransactionReaperJobDurationMillis:
+                type: int
+                default: 0
+            lastTransactionReaperJobTimestamp:
+                type: date
+            lastTransactionReaperJobEntriesCleanedUp:
+                type: int
+                default: 0

@@ -27,34 +27,34 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  CurrentOpSpec:
-    description: Specification for a $currentOp stage.
-    strict: true
-    fields:
-      allUsers:
-        description: Determines whether we will report ops belonging to all users or those belonging to the current user.
-        type: optionalBool
-      idleConnections:
-        description: If false, only reports on active ops. It true, also reports on idle connections. 
-        type: optionalBool
-      idleCursors:
-        description: If false, only reports on active cursors. If true, also reports on idle cursors. 
-        type: optionalBool
-      idleSessions:
-        description: If false, only reports on active sessions. If true, also reports on idle sessions.
-        type: optionalBool
-      localOps:
-        description: Determines whether we will only report ops running locally on mongos or only those running on shards.
-        type: optionalBool
-      truncateOps:
-        description: Determines whether the output should be truncated. Internal, only allowed when the server is in test mode.
-        type: optionalBool
-      targetAllNodes:
-        description: Determines whether we will retrieve operations from all members of each shard in a cluster.
-        type: optionalBool
+    CurrentOpSpec:
+        description: Specification for a $currentOp stage.
+        strict: true
+        fields:
+            allUsers:
+                description: Determines whether we will report ops belonging to all users or those belonging to the current user.
+                type: optionalBool
+            idleConnections:
+                description: If false, only reports on active ops. It true, also reports on idle connections.
+                type: optionalBool
+            idleCursors:
+                description: If false, only reports on active cursors. If true, also reports on idle cursors.
+                type: optionalBool
+            idleSessions:
+                description: If false, only reports on active sessions. If true, also reports on idle sessions.
+                type: optionalBool
+            localOps:
+                description: Determines whether we will only report ops running locally on mongos or only those running on shards.
+                type: optionalBool
+            truncateOps:
+                description: Determines whether the output should be truncated. Internal, only allowed when the server is in test mode.
+                type: optionalBool
+            targetAllNodes:
+                description: Determines whether we will retrieve operations from all members of each shard in a cluster.
+                type: optionalBool

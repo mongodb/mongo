@@ -32,12 +32,12 @@ global:
     cpp_namespace: "mongo"
 
 server_parameters:
-  changeStreamOptions:
-    description: "Cluster server parameter for change stream options"
-    set_at: cluster
-    omit_in_ftdc: false
-    cpp_class:
-      name: ChangeStreamOptionsParameter
-      override_set: true
-      override_validate: true
-    redact: false
+    changeStreamOptions:
+        description: "Cluster server parameter for change stream options"
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_class:
+            name: ChangeStreamOptionsParameter
+            override_set: true
+            override_validate: true
+        redact: false

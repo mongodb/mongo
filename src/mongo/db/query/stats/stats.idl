@@ -81,7 +81,7 @@ structs:
                 type: double
             sampleRate:
                 type: double
-                validator: { gte: 0.0, lte: 1.0 }
+                validator: {gte: 0.0, lte: 1.0}
             trueCount:
                 type: long
             falseCount:

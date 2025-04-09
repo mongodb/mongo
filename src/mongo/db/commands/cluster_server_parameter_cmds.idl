@@ -27,7 +27,7 @@
 #
 
 global:
-    cpp_namespace: "mongo"  
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -48,7 +48,7 @@ commands:
         namespace: type
         type: object
         strict: false
-    
+
     getClusterParameter:
         description: "Retrieves the in-memory value of the specified cluster server parameter(s)"
         command_name: getClusterParameter
@@ -59,9 +59,9 @@ commands:
             variant: [string, array<string>]
         fields:
             omitInFTDC:
-                description: >- 
+                description: >-
                     Indicates that getClusterParameter should omit any CSPs with omitInFTDC=true
                 type: bool
-                default: false 
+                default: false
         reply_type: GetClusterParameterReply
-        strict: false 
+        strict: false

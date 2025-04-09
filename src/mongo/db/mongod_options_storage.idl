@@ -32,8 +32,8 @@ global:
         - "mongo/db/mongod_options.h"
         - "mongo/db/storage/storage_options.h"
     configs:
-        section: 'Storage options'
-        source: [ yaml, cli, ini ]
+        section: "Storage options"
+        source: [yaml, cli, ini]
         initializer:
             register: addMongodStorageOptions
 
@@ -44,7 +44,7 @@ server_parameters:
             server will perform replication recovery up to and including the provided timestamp. The
             parameter should be passed in as a JSON string with the following format:
             {timestamp: Timestamp(123, 456)}.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: std::string
         cpp_varname: recoverToOplogTimestamp
         redact: false
@@ -54,8 +54,8 @@ server_parameters:
         description: >-
             Whether all queries must use indexes.
             If true, MongoDB will not execute queries that require a table scan and will return an error.
-        set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.noTableScan'
+        set_at: [startup, runtime]
+        cpp_varname: "storageGlobalParams.noTableScan"
         redact: false
 
     allowDocumentsGreaterThanMaxUserSize:
@@ -68,47 +68,47 @@ server_parameters:
             were already validated on the source cluster, making the inserts safe. Note that the
             node must be in standalone mode to enable this parameter, and the documents must still
             be less than the 16mb + 16kb maximum internal BSON size.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: bool
         cpp_varname: gAllowDocumentsGreaterThanMaxUserSize
         default: false
         redact: false
 
     validateDbName:
-        description: 'Run validation on this db'
-        set_at: [ startup ]
+        description: "Run validation on this db"
+        set_at: [startup]
         cpp_vartype: std::string
         cpp_varname: gValidateDbName
         default: ""
         redact: false
 
     validateCollectionName:
-        description: 'Run validation on this collection'
-        set_at: [ startup ]
+        description: "Run validation on this collection"
+        set_at: [startup]
         cpp_vartype: std::string
         cpp_varname: gValidateCollectionName
         default: ""
         redact: false
 
 configs:
-    'storage.engine':
-        description: 'What storage engine to use - defaults to wiredTiger if no data files present'
+    "storage.engine":
+        description: "What storage engine to use - defaults to wiredTiger if no data files present"
         short_name: storageEngine
         arg_vartype: String
 
-    'storage.dbPath':
+    "storage.dbPath":
         description:
-            expr: 'storageDBPathDescription()'
+            expr: "storageDBPathDescription()"
             is_constexpr: false
         short_name: dbpath
         arg_vartype: String
 
-    'storage.directoryPerDB':
-        description: 'Each database will be stored in a separate directory'
+    "storage.directoryPerDB":
+        description: "Each database will be stored in a separate directory"
         short_name: directoryperdb
         arg_vartype: Switch
 
-    'storage.queryableBackupMode':
+    "storage.queryableBackupMode":
         description: >-
             Enables queryable backup mode which starts the storage engine in read/write mode to
             allow for replication recovery. After replication recovery the server above the
@@ -117,7 +117,7 @@ configs:
         arg_vartype: Switch
         hidden: true
 
-    'storage.groupCollections':
+    "storage.groupCollections":
         description: >-
             Group collections - if true the storage engine may group
             collections within a database into a shared record store
@@ -127,38 +127,38 @@ configs:
 
     # This config has a setParameter alias in storage_paramaters.idl. To resolve the conflict, the
     # default is encoded the StorageGlobalParams.
-    'storage.syncPeriodSecs':
-        description: 'Seconds between disk syncs'
+    "storage.syncPeriodSecs":
+        description: "Seconds between disk syncs"
         short_name: syncdelay
         arg_vartype: Double
         validator:
             gte: 0.0
-            lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
+            lte: {expr: "StorageGlobalParams::kMaxSyncdelaySecs"}
 
     # This config has a setParameter alias in storage_paramaters.idl. To resolve the conflict, the
     # default is encoded the StorageGlobalParams.
-    'storage.journal.commitIntervalMs':
-        description: 'how often to group/batch commit (ms)'
-        short_name: 'journalCommitInterval'
+    "storage.journal.commitIntervalMs":
+        description: "how often to group/batch commit (ms)"
+        short_name: "journalCommitInterval"
         arg_vartype: Int
         validator:
             gte: 1
-            lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+            lte: {expr: "StorageGlobalParams::kMaxJournalCommitIntervalMs"}
 
     upgrade:
-        description: 'Upgrade db if needed'
+        description: "Upgrade db if needed"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
 
     repair:
-        description: 'Run repair on all dbs'
+        description: "Run repair on all dbs"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
 
     validate:
-        description: 'Run validation on all collections'
+        description: "Run validation on all collections"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
 
     restore:
         description: >-
@@ -166,10 +166,10 @@ configs:
             handling collections with missing data files, allowing database renames, skipping oplog
             entries for collections not restored and more.
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
 
-    'storage.oplogMinRetentionHours':
-        description: 'Minimum number of hours to preserve in the oplog. Default is 0 (turned off). Fractions are allowed (e.g. 1.5 hours)'
+    "storage.oplogMinRetentionHours":
+        description: "Minimum number of hours to preserve in the oplog. Default is 0 (turned off). Fractions are allowed (e.g. 1.5 hours)"
         short_name: oplogMinRetentionHours
         arg_vartype: Double
         default: 0.0

@@ -130,8 +130,9 @@ structs:
                 description: "New ID for the renamed collection in case of renaming across DBs."
                 optional: true
             allowEncryptedCollectionRename:
-                description: "Encrypted Collection renames are usually disallowed to minimize user error.
-                              C2C needs to do the renames to replicate create collection."
+                description:
+                    "Encrypted Collection renames are usually disallowed to minimize user error.
+                    C2C needs to do the renames to replicate create collection."
                 type: bool
                 optional: true
 

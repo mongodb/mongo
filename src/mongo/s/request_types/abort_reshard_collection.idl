@@ -36,55 +36,55 @@ imports:
     - "mongo/s/resharding/common_types.idl"
 
 commands:
-  abortReshardCollection:
-    description: "The public abortReshardCollection command on mongos."
-    command_name: abortReshardCollection
-    strict: true
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    abortReshardCollection:
+        description: "The public abortReshardCollection command on mongos."
+        command_name: abortReshardCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-  _configsvrAbortReshardCollection:
-    command_name: _configsvrAbortReshardCollection
-    cpp_name: ConfigsvrAbortReshardCollection
-    description: "The internal abortReshardCollection command on the config server."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      provenance:
-        type: ReshardingProvenance
-        description: "The source operation that called this resharding operation."
-        optional: true
+    _configsvrAbortReshardCollection:
+        command_name: _configsvrAbortReshardCollection
+        cpp_name: ConfigsvrAbortReshardCollection
+        description: "The internal abortReshardCollection command on the config server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            provenance:
+                type: ReshardingProvenance
+                description: "The source operation that called this resharding operation."
+                optional: true
 
-  _shardsvrAbortReshardCollection:
-    command_name: _shardsvrAbortReshardCollection
-    cpp_name: ShardsvrAbortReshardCollection
-    description: "The internal command used by resharding coordinator to abort participants."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: uuid
-    reply_type: OkReply
-    fields:
-      userCanceled:
-        type: bool
-        optional: false
-        description: "Determines whether the resharding opertion was user aborted."
+    _shardsvrAbortReshardCollection:
+        command_name: _shardsvrAbortReshardCollection
+        cpp_name: ShardsvrAbortReshardCollection
+        description: "The internal command used by resharding coordinator to abort participants."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: uuid
+        reply_type: OkReply
+        fields:
+            userCanceled:
+                type: bool
+                optional: false
+                description: "Determines whether the resharding opertion was user aborted."
 
-  abortMoveCollection:
-    description: "The public command on mongos that aborts a moveCollection commmand."
-    command_name: abortMoveCollection
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    abortMoveCollection:
+        description: "The public command on mongos that aborts a moveCollection commmand."
+        command_name: abortMoveCollection
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-  abortUnshardCollection:
-    description: "The public command on mongos that aborts a unshardCollection commmand."
-    command_name: abortUnshardCollection
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    abortUnshardCollection:
+        description: "The public command on mongos that aborts a unshardCollection commmand."
+        command_name: abortUnshardCollection
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring

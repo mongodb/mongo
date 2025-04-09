@@ -46,8 +46,9 @@ enums:
 
 structs:
     IndexCatalogType:
-        description: "Represents the layout and contents of documents contained in the 
-                    config.shard.indexes and config.csrs.indexes collections"
+        description:
+            "Represents the layout and contents of documents contained in the
+            config.shard.indexes and config.csrs.indexes collections"
         strict: false
         fields:
             name:
@@ -67,8 +68,9 @@ structs:
                 description: "UUID of the collection"
             indexCollectionUUID:
                 type: uuid
-                description: "UUID of the collection which backs this index. If there
-                            is not indexCollectionUUID then the index is not global."
+                description:
+                    "UUID of the collection which backs this index. If there
+                    is not indexCollectionUUID then the index is not global."
                 optional: true
 
     IndexOptionsType:
@@ -114,7 +116,7 @@ structs:
             lastmod:
                 type: timestamp
                 description: "Final timestamp of the index version"
-    
+
     ShardingIndexCatalogReplaceEntryBase:
         description: "Oplog entry format for replace operation"
         strict: false

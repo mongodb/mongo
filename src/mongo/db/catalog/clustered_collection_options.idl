@@ -50,16 +50,16 @@ structs:
         strict: true
         fields:
             v:
-                description: 'Index spec version'
+                description: "Index spec version"
                 type: safeInt
                 default: 2
                 stability: stable
             key:
-                description: 'Key to index on'
+                description: "Key to index on"
                 type: object_owned
                 stability: stable
             name:
-                description: 'Descriptive name for the index'
+                description: "Descriptive name for the index"
                 type: string
                 optional: true
                 stability: stable
@@ -74,9 +74,9 @@ structs:
             indexSpec:
                 type: ClusteredIndexSpec
             legacyFormat:
-                description: 'Legacy format means the clustered information was specified as
-                             {clusteredIndex: true} and the cluster key defaults to _id. This should
-                             only be supported for certain internal collections (e.g: time-series
-                             buckets collections)'
+                description:
+                    "Legacy format means the clustered information was specified as
+                    {clusteredIndex: true} and the cluster key defaults to _id. This should
+                    only be supported for certain internal collections (e.g: time-series
+                    buckets collections)"
                 type: safeBool
-

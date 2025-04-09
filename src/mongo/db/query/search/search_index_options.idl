@@ -27,24 +27,24 @@
 #
 
 global:
-    cpp_namespace: 'mongo'
+    cpp_namespace: "mongo"
     cpp_includes:
-      - 'mongo/db/query/search/search_index_options.h'
+        - "mongo/db/query/search/search_index_options.h"
 
 server_parameters:
     searchIndexManagementHostAndPort:
-        description: 'Search index management host address'
-        set_at: [ startup ]
-        default: ''
-        cpp_varname: 'globalSearchIndexParams.host'
+        description: "Search index management host address"
+        set_at: [startup]
+        default: ""
+        cpp_varname: "globalSearchIndexParams.host"
         validator:
-            callback: 'SearchIndexParams::onValidateHost'
+            callback: "SearchIndexParams::onValidateHost"
         redact: false
 
     skipAuthenticationToSearchIndexManagementServer:
-        description: 'Skip authentication for mongod->search-index-server connections, even if auth is enabled on mongod'
-        set_at: [ startup ]
-        cpp_varname: 'globalSearchIndexParams.skipAuthToSearchIndexServer'
+        description: "Skip authentication for mongod->search-index-server connections, even if auth is enabled on mongod"
+        set_at: [startup]
+        cpp_varname: "globalSearchIndexParams.skipAuthToSearchIndexServer"
         # The search index server doesn't support our authentication protocol at this time,
         # so this is `true` by default.
         default: true

@@ -37,7 +37,7 @@ imports:
 server_parameters:
     sessionWriteConcernTimeoutSystemMillis:
         description: Controls the write concern timeout (in milliseconds) for the refresh or removal of items from the session collection.
-        set_at:  [startup, runtime]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gSessionWriteConcernTimeoutSystemMillis
         default: 60000
@@ -53,7 +53,7 @@ server_parameters:
             names can be quite large (we enforce a max 10k limit for usernames used with sessions).
             At a default of 1000 elements, a 16mb payload gives us a budget of 16000 bytes per user, which we should
             comfortably be able to stay under, even with 10k user names. so we do not form requests larger than the 16mb limit.
-        set_at:  [startup, runtime]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gSessionMaxBatchSize
         default: 1000

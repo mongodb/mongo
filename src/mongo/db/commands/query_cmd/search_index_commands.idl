@@ -101,12 +101,12 @@ commands:
             complex:
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: createSearchIndexes
+                      resource_pattern: exact_namespace
+                      action_type: createSearchIndexes
         strict: true
         fields:
             indexes:
-                description: 'Search indexes to be created'
+                description: "Search indexes to be created"
                 type: array<IndexDefinition>
                 optional: false
 
@@ -121,8 +121,8 @@ commands:
             complex:
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: dropSearchIndex
+                      resource_pattern: exact_namespace
+                      action_type: dropSearchIndex
         strict: true
         fields:
             name:
@@ -145,8 +145,8 @@ commands:
             complex:
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: updateSearchIndex
+                      resource_pattern: exact_namespace
+                      action_type: updateSearchIndex
         strict: true
         fields:
             name:
@@ -173,8 +173,8 @@ commands:
             complex:
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: listSearchIndexes
+                      resource_pattern: exact_namespace
+                      action_type: listSearchIndexes
         strict: true
         fields:
             name:

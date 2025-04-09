@@ -27,10 +27,10 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     ExampleEnum:

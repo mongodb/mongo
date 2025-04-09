@@ -31,49 +31,52 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/client/read_preference.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/client/read_preference.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  ReadPrefOps:
-    description: "A struct containing the number of internal and external operations
-    using a particular read preference"
-    strict: true
-    fields:
-      internal:
-        type: long
-        default: 0
-      external:
-        type: long
-        default: 0
+    ReadPrefOps:
+        description: >-
+            A struct containing the number of internal and external operations
+            using a particular read preference"
+        strict: true
+        fields:
+            internal:
+                type: long
+                default: 0
+            external:
+                type: long
+                default: 0
 
-  ReadPrefDoc:
-    description: "A struct defining the metrics sub-document, with counters for each read
-    preference metric"
-    strict: true
-    fields:
-      primary:
-        type: ReadPrefOps
-      primaryPreferred:
-        type: ReadPrefOps
-      secondary:
-        type: ReadPrefOps
-      secondaryPreferred:
-        type: ReadPrefOps
-      nearest:
-        type: ReadPrefOps
-      tagged:
-        type: ReadPrefOps
+    ReadPrefDoc:
+        description: >-
+            A struct defining the metrics sub-document, with counters for each read
+            preference metric
+        strict: true
+        fields:
+            primary:
+                type: ReadPrefOps
+            primaryPreferred:
+                type: ReadPrefOps
+            secondary:
+                type: ReadPrefOps
+            secondaryPreferred:
+                type: ReadPrefOps
+            nearest:
+                type: ReadPrefOps
+            tagged:
+                type: ReadPrefOps
 
-  ReadPreferenceMetricsDoc:
-    description: "A struct defining the overall read preference metrics document. The document has
-    two sub-documents, outlining whether the read preference executed while the node was a primary or a secondary"
-    strict: true
-    fields:
-      executedOnPrimary:
-        type: ReadPrefDoc
-      executedOnSecondary:
-        type: ReadPrefDoc
+    ReadPreferenceMetricsDoc:
+        description: >-
+            A struct defining the overall read preference metrics document. The document has
+            two sub-documents, outlining whether the read preference executed while the node was a primary or a secondary
+        strict: true
+        fields:
+            executedOnPrimary:
+                type: ReadPrefDoc
+            executedOnSecondary:
+                type: ReadPrefDoc

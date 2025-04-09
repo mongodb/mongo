@@ -47,16 +47,16 @@ imports:
 types:
     BulkWriteReplyItem:
         bson_serialization_type: object
-        description: "Structure used to report a single reply resulting from a batch write
-                      command."
+        description:
+            "Structure used to report a single reply resulting from a batch write
+            command."
         cpp_type: "mongo::BulkWriteReplyItem"
         serializer: "mongo::BulkWriteReplyItem::serialize"
-        deserializer: "mongo::BulkWriteReplyItem::parse" 
+        deserializer: "mongo::BulkWriteReplyItem::parse"
         # Deserializer uses getOwned.
         is_view: false
 
 structs:
-
     BulkWriteInsertOp:
         description: "A struct representing inserts in the 'bulkWrite' command."
         strict: true
@@ -64,7 +64,7 @@ structs:
             insert:
                 description: "Insert command which references the namespace index in 'nsInfo'."
                 type: safeInt
-                validator: { gte: 0 }
+                validator: {gte: 0}
                 stability: stable
             document:
                 description: "The document to insert into the given collection"
@@ -78,40 +78,45 @@ structs:
             update:
                 description: "Update command which references the namespace index in 'nsInfo'."
                 type: safeInt
-                validator: { gte: 0 }
+                validator: {gte: 0}
                 stability: stable
             filter:
-                description: "The query that matches documents to update. Uses the same query
-                              selectors as used in the 'find' operation."
+                description:
+                    "The query that matches documents to update. Uses the same query
+                    selectors as used in the 'find' operation."
                 type: object
                 stability: stable
             sort:
-                description: "Determines which document the operation modifies if the query selects
-                              multiple documents."
+                description:
+                    "Determines which document the operation modifies if the query selects
+                    multiple documents."
                 type: object
                 optional: true
                 stability: unstable
             multi:
-                description: "If true, updates all documents that meet the query criteria. If false,
-                              limits the update to one document which meets the query criteria." 
+                description:
+                    "If true, updates all documents that meet the query criteria. If false,
+                    limits the update to one document which meets the query criteria."
                 type: bool
                 default: false
                 stability: stable
             updateMods:
-                description:  "Set of modifications to apply."
+                description: "Set of modifications to apply."
                 type: update_modification
                 stability: stable
             upsert:
-                description: "If true, perform an insert if no documents match the query. If both
-                              upsert and multi are true and no documents match the query, the update
-                              operation inserts only a single document."
+                description:
+                    "If true, perform an insert if no documents match the query. If both
+                    upsert and multi are true and no documents match the query, the update
+                    operation inserts only a single document."
                 type: bool
                 default: false
                 stability: stable
             upsertSupplied:
-                description: "Only applicable when upsert is true. If set, and if no documents match
-                              the query, the update subsystem will insert the document supplied as
-                              'constants.new' rather than generating a new document from the update spec."
+                description:
+                    "Only applicable when upsert is true. If set, and if no documents match
+                    the query, the update subsystem will insert the document supplied as
+                    'constants.new' rather than generating a new document from the update spec."
                 type: optionalBool
                 stability: internal
             arrayFilters:
@@ -125,8 +130,9 @@ structs:
                 default: mongo::BSONObj()
                 stability: stable
             constants:
-                description: "Specifies constant values that can be referred to in the pipeline
-                              performing a custom update."
+                description:
+                    "Specifies constant values that can be referred to in the pipeline
+                    performing a custom update."
                 type: object
                 optional: true
                 stability: stable
@@ -141,8 +147,9 @@ structs:
                 optional: true
                 stability: internal
             $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
-                description: "Set to true if shard key updates are allowed without the full shard
-                              key in the query."
+                description:
+                    "Set to true if shard key updates are allowed without the full shard
+                    key in the query."
                 type: optionalBool
                 cpp_name: allowShardKeyUpdatesWithoutFullShardKeyInQuery
                 stability: internal
@@ -155,16 +162,18 @@ structs:
                 description: "Delete command which references the namespace index in 'nsInfo'."
                 cpp_name: deleteCommand # `delete` is a C++ keyword.
                 type: safeInt
-                validator: { gte: 0 }
+                validator: {gte: 0}
                 stability: stable
             filter:
-                description: "The query that matches documents to delete. Uses the same query
-                              selectors as used in the 'find' operation."
+                description:
+                    "The query that matches documents to delete. Uses the same query
+                    selectors as used in the 'find' operation."
                 type: object
                 stability: stable
             multi:
-                description: "If true, deletes all documents that meet the query criteria. If false,
-                              limits the delete to one document which meets the query criteria." 
+                description:
+                    "If true, deletes all documents that meet the query criteria. If false,
+                    limits the delete to one document which meets the query criteria."
                 type: bool
                 default: false
                 stability: stable
@@ -223,20 +232,23 @@ structs:
                 optional: true
                 stability: unstable
             isTimeseriesNamespace:
-                description: "This flag is set to true when the command was originally sent to
-                              mongos on the time-series view, but got rewritten to target
-                              time-series buckets namespace before being sent to shards."
+                description:
+                    "This flag is set to true when the command was originally sent to
+                    mongos on the time-series view, but got rewritten to target
+                    time-series buckets namespace before being sent to shards."
                 type: optionalBool
                 stability: internal
             shardVersion:
-                description: "The shard version of the collection. This is to be attached by
-                              mongos before being sent to a shard."
+                description:
+                    "The shard version of the collection. This is to be attached by
+                    mongos before being sent to a shard."
                 type: shard_version
                 optional: true
                 stability: internal
             databaseVersion:
-                description: "The database version of the collection. This is to be attached by
-                              mongos before being sent to a shard."
+                description:
+                    "The database version of the collection. This is to be attached by
+                    mongos before being sent to a shard."
                 type: database_version
                 optional: true
                 stability: internal
@@ -291,15 +303,17 @@ structs:
                 optional: true
                 stability: stable
             retriedStmtIds:
-                description: "The statement numbers for the write statements that had already been
-                              executed, thus were not executed by this command."
+                description:
+                    "The statement numbers for the write statements that had already been
+                    executed, thus were not executed by this command."
                 type: array<int>
                 optional: true
                 stability: unstable
             writeConcernError:
-                description: "WriteConcernError returned when this command was run. In case multiple
-                              errors were returned from various shards, the errors are concatenated
-                              in the error message."
+                description:
+                    "WriteConcernError returned when this command was run. In case multiple
+                    errors were returned from various shards, the errors are concatenated
+                    in the error message."
                 type: BulkWriteWriteConcernError
                 optional: true
                 stability: unstable
@@ -316,7 +330,8 @@ commands:
             simple:
                 privilege:
                     resource_pattern: exact_namespace
-                    action_type: [bypassDocumentValidation, find, insert, update, remove]
+                    action_type:
+                        [bypassDocumentValidation, find, insert, update, remove]
         reply_type: BulkWriteCommandReply
         fields:
             ops:
@@ -335,16 +350,18 @@ commands:
                 optional: true
                 stability: stable
             bypassDocumentValidation:
-                description: "Enables the operation to bypass document validation. This lets you
-                              write documents that do not meet the validation requirements."
+                description:
+                    "Enables the operation to bypass document validation. This lets you
+                    write documents that do not meet the validation requirements."
                 type: safeBool
                 default: false
                 stability: stable
             ordered:
-                description: "If true, then when a write statement fails, the bulkWrite command returns
-                              without executing the remaining statements. If false, then statements
-                              are allowed to be executed in parallel and if a statement fails,
-                              continue with the remaining statements, if any."
+                description:
+                    "If true, then when a write statement fails, the bulkWrite command returns
+                    without executing the remaining statements. If false, then statements
+                    are allowed to be executed in parallel and if a statement fails,
+                    continue with the remaining statements, if any."
                 type: bool
                 default: true
                 stability: stable
@@ -369,27 +386,29 @@ commands:
                 default: false
                 stability: stable
             bypassEmptyTsReplacement:
-                description: "Only applicable for inserts and replacement updates. If set to true,
-                              any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
-                              be replaced by the current time and instead will be preserved as-is."
+                description:
+                    "Only applicable for inserts and replacement updates. If set to true,
+                    any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
+                    be replaced by the current time and instead will be preserved as-is."
                 type: optionalBool
                 stability: unstable
             $_originalQuery:
-                description: "The original write query. This is used for updateOne/deleteOne
-                              without shard key during the write phase of the two phase protocol in
-                              order to make sure the shard key query analysis stores the correct
-                              client query."
+                description:
+                    "The original write query. This is used for updateOne/deleteOne
+                    without shard key during the write phase of the two phase protocol in
+                    order to make sure the shard key query analysis stores the correct
+                    client query."
                 type: object
                 optional: true
                 cpp_name: originalQuery
                 stability: internal
             $_originalCollation:
-                description: "The original write query. This is used for updateOne/deleteOne
-                              without shard key during the write phase of the two phase protocol in
-                              order to make sure the shard key query analysis stores the correct
-                              client collation."
+                description:
+                    "The original write query. This is used for updateOne/deleteOne
+                    without shard key during the write phase of the two phase protocol in
+                    order to make sure the shard key query analysis stores the correct
+                    client collation."
                 type: object
                 optional: true
                 cpp_name: originalCollation
                 stability: internal
-

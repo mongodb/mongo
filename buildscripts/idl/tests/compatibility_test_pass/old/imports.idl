@@ -34,8 +34,9 @@ imports:
 
 structs:
     ImportedStableNewFieldReply:
-        description: "This reply contains a field that is unstable in the old command but is
-                      stable in the new command."
+        description:
+            "This reply contains a field that is unstable in the old command but is
+            stable in the new command."
         fields:
             stableNewField:
                 type: string

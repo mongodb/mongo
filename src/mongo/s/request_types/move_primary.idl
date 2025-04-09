@@ -58,7 +58,7 @@ commands:
         strict: false
         chained_structs:
             MovePrimaryRequestBase: MovePrimaryRequestBase
-    
+
     changePrimary:
         command_name: changePrimary
         description: The public changePrimary command on mongos

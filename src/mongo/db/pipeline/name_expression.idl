@@ -44,4 +44,3 @@ types:
         deserializer: mongo::NameExpression::parseFromBSON
         # NameExpression's members are owned or non-view.
         is_view: false
-

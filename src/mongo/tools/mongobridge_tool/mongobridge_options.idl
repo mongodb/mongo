@@ -27,40 +27,40 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  configs:
-    source: [ cli]
-  cpp_includes:
-    - "mongo/tools/mongobridge_tool/mongobridge_options.h"
+    cpp_namespace: "mongo"
+    configs:
+        source: [cli]
+    cpp_includes:
+        - "mongo/tools/mongobridge_tool/mongobridge_options.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 configs:
-  help:
-    description: "show this usage information"
-    short_name: help
-    arg_vartype: Switch
+    help:
+        description: "show this usage information"
+        short_name: help
+        arg_vartype: Switch
 
-  port:
-    description: "port to listen on for MongoDB messages"
-    short_name: port
-    arg_vartype: Int
-    cpp_varname: mongoBridgeGlobalParams.port
+    port:
+        description: "port to listen on for MongoDB messages"
+        short_name: port
+        arg_vartype: Int
+        cpp_varname: mongoBridgeGlobalParams.port
 
-  seed:
-    description: "random seed to use"
-    short_name: seed
-    arg_vartype: Long
+    seed:
+        description: "random seed to use"
+        short_name: seed
+        arg_vartype: Long
 
-  dest:
-    description: "URI of remote MongoDB process"
-    short_name: dest
-    arg_vartype: String
-    cpp_varname: mongoBridgeGlobalParams.destUri
+    dest:
+        description: "URI of remote MongoDB process"
+        short_name: dest
+        arg_vartype: String
+        cpp_varname: mongoBridgeGlobalParams.destUri
 
-  vebose:
-    description: "log more verbose output"
-    short_name: verbose
-    arg_vartype: String
-    implicit: "v"
+    vebose:
+        description: "log more verbose output"
+        short_name: verbose
+        arg_vartype: String
+        implicit: "v"

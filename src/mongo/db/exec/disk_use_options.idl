@@ -27,17 +27,18 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
 
 server_parameters:
-  allowDiskUseByDefault:
-    description: "Allow queries which exceed their memory budget to spill to disk. This option can
-    be overriden at the per-query level."
-    set_at: [ startup, runtime ]
-    cpp_varname: "allowDiskUseByDefault"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    on_update: plan_cache_util::clearSbeCacheOnParameterChange
-    redact: false
+    allowDiskUseByDefault:
+        description: >-
+            Allow queries which exceed their memory budget to spill to disk. This option can
+            be overriden at the per-query level.
+        set_at: [startup, runtime]
+        cpp_varname: "allowDiskUseByDefault"
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false

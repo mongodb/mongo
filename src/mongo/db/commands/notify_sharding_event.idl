@@ -1,5 +1,4 @@
-
- # Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2022-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -27,7 +26,6 @@
 # it in the license file.
 #
 
-
 global:
     cpp_namespace: "mongo"
     cpp_includes:
@@ -39,7 +37,6 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 structs:
-
     CollectionResharded:
         description: "Event describing the details of a committing reshardCollection operation."
         strict: false
@@ -55,7 +52,7 @@ structs:
                 type: uuid
             sourceKey:
                 description: "The original shard key of the collection
-                              (defined as optional for retro compatibility)."
+                    (defined as optional for retro compatibility)."
                 type: object_owned
                 optional: true
             unique:
@@ -76,15 +73,16 @@ structs:
             provenance:
                 type: ReshardingProvenance
                 description: "The type of user/system request that originated
-                              the commit of this reshardCollection."
+                    the commit of this reshardCollection."
                 optional: true
 
 commands:
     _shardsvrNotifyShardingEvent:
         command_name: _shardsvrNotifyShardingEvent
         cpp_name: ShardsvrNotifyShardingEventRequest
-        description: "Internal command to be invoked by the config server to notify a shard
-                      of an event concerning the shard itself or the whole cluster."
+        description:
+            "Internal command to be invoked by the config server to notify a shard
+            of an event concerning the shard itself or the whole cluster."
         namespace: ignored
         api_version: ""
         strict: false
@@ -93,9 +91,9 @@ commands:
             eventType:
                 type: string
                 description: "The type of sharding event"
-                validator: { callback: "notify_sharding_event::validateEventType" }
+                validator:
+                    {callback: "notify_sharding_event::validateEventType"}
             details:
                 type: object_owned
                 description: "A descriptor of the sharding event
-                             (to be serialized and interpreted based on the value of eventType)."
-
+                    (to be serialized and interpreted based on the value of eventType)."

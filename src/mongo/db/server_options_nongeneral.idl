@@ -32,34 +32,34 @@ global:
         - "mongo/db/server_options.h"
         - "mongo/db/server_options_base.h"
     configs:
-        section: 'General options'
-        source: [ cli, ini, yaml ]
+        section: "General options"
+        source: [cli, ini, yaml]
         initializer:
             register: addNonGeneralServerOptions
 
 # These are the general options that are supported by mongod and mongos but not cryptd.
 configs:
-    'net.bindIp':
-        description: 'Comma separated list of ip addresses to listen on - localhost by default'
+    "net.bindIp":
+        description: "Comma separated list of ip addresses to listen on - localhost by default"
         short_name: bind_ip
         arg_vartype: String
-    'net.bindIpAll':
-        description: 'Bind to all ip addresses'
+    "net.bindIpAll":
+        description: "Bind to all ip addresses"
         short_name: bind_ip_all
         arg_vartype: Switch
         canonicalize: canonicalizeNetBindIpAll
-        conflicts: 'net.bindIp'
+        conflicts: "net.bindIp"
 
     noauth:
-        description: 'Run without security'
+        description: "Run without security"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         conflicts:
             - auth
-            - 'security.keyFile'
-            - 'security.transitionToAuth'
+            - "security.keyFile"
+            - "security.transitionToAuth"
             - clusterAuthMode
-    'security.transitionToAuth':
+    "security.transitionToAuth":
         description: >-
             For rolling access control upgrade. Attempt to authenticate over outgoing
             connections and proceed regardless of success. Accept incoming connections
@@ -68,17 +68,17 @@ configs:
         arg_vartype: Switch
         conflicts: noauth
 
-    'operationProfiling.slowOpThresholdMs':
-        description: 'Value of slow for profile and console log'
+    "operationProfiling.slowOpThresholdMs":
+        description: "Value of slow for profile and console log"
         short_name: slowms
         arg_vartype: Int
         default: 100
-    'operationProfiling.slowOpSampleRate':
-        description: 'Fraction of slow ops to include in the profile and console log'
+    "operationProfiling.slowOpSampleRate":
+        description: "Fraction of slow ops to include in the profile and console log"
         short_name: slowOpSampleRate
         arg_vartype: Double
         default: 1.0
-    'operationProfiling.filter':
-        description: 'Query predicate to control which operations are logged and profiled'
+    "operationProfiling.filter":
+        description: "Query predicate to control which operations are logged and profiled"
         short_name: profileFilter
         arg_vartype: String

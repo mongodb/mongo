@@ -26,21 +26,19 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_hybrid_scoring_input_util.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/document_source_hybrid_scoring_input_util.h"
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/aggregate_command.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/aggregate_command.idl"
 structs:
-
-  RankFusionInputSpec:
-    description: Specification for the 'input' argument to $rankFusion.
-    strict: true
-    fields:
-      pipelines:
-        description: Map (name -> ranked pipeline) of inputs. Each pipeline must be operating on the same collection.
-        type: object_owned
-        optional: false
-        validator:
-            {callback: "validatePipelinesObject"}
+    RankFusionInputSpec:
+        description: Specification for the 'input' argument to $rankFusion.
+        strict: true
+        fields:
+            pipelines:
+                description: Map (name -> ranked pipeline) of inputs. Each pipeline must be operating on the same collection.
+                type: object_owned
+                optional: false
+                validator: {callback: "validatePipelinesObject"}

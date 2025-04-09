@@ -29,8 +29,8 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-  - "mongo/crypto/sha1_block.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/crypto/sha1_block.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     keysCollectionDocumentBase:

@@ -27,7 +27,7 @@
 #
 
 global:
-    cpp_namespace: 'mongo'
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -40,7 +40,7 @@ structs:
             name:
                 description: "The name of the view"
                 type: string
-                optional: false          
+                optional: false
             effectivePipeline:
                 description: >-
                     An array of agg stages gathered from the current and associated views. 

@@ -61,8 +61,9 @@ structs:
             parentLsid:
                 cpp_name: parentSessionId
                 type: LogicalSessionId
-                description: "If this transaction is a retryable internal transaction, stores the id
-                              of the parent session for the session the transaction belongs to."
+                description:
+                    "If this transaction is a retryable internal transaction, stores the id
+                    of the parent session for the session the transaction belongs to."
                 optional: true
             txnNum:
                 type: TxnNumber
@@ -77,12 +78,14 @@ structs:
                 optional: true
             lastWriteOpTime:
                 type: optime
-                description: "The optime timestamp component of the last write on this
-                              transaction."
+                description:
+                    "The optime timestamp component of the last write on this
+                    transaction."
             lastWriteDate:
                 type: date
-                description: "Wall clock time of the last write which happened on on this
-                              transaction."
+                description:
+                    "Wall clock time of the last write which happened on on this
+                    transaction."
             state:
                 type: DurableTxnState
                 optional: true # Retryable writes do not have a state field.

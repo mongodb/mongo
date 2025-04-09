@@ -27,26 +27,26 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/namespace_string.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/namespace_string.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  NamespaceSpec:
-    description: A document used to specify a namespace.
-    strict: true
-    generate_comparison_operators : true
-    fields:
-      db:
-        type: database_name
-        optional: true
-        stability: unstable
-        description: The database field for this namespace.
-      coll:
-        type: string
-        optional: true
-        stability: unstable
-        description: The collection field for this namespace.
+    NamespaceSpec:
+        description: A document used to specify a namespace.
+        strict: true
+        generate_comparison_operators: true
+        fields:
+            db:
+                type: database_name
+                optional: true
+                stability: unstable
+                description: The database field for this namespace.
+            coll:
+                type: string
+                optional: true
+                stability: unstable
+                description: The collection field for this namespace.

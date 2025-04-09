@@ -27,34 +27,36 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/s/analyze_shard_key_common.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/s/analyze_shard_key_common.idl"
 
 structs:
-  refreshQueryAnalyzerConfigurationResponse:
-    description: "The response for the '_refreshQueryAnalyzerConfiguration' command."
-    strict: false
-    fields:
-      configurations:
-          type: array<CollectionQueryAnalyzerConfiguration>
+    refreshQueryAnalyzerConfigurationResponse:
+        description: "The response for the '_refreshQueryAnalyzerConfiguration' command."
+        strict: false
+        fields:
+            configurations:
+                type: array<CollectionQueryAnalyzerConfiguration>
 
 commands:
-  _refreshQueryAnalyzerConfiguration:
-    description: "The command for refreshing the query analyzer configurations for all collections."
-    command_name: _refreshQueryAnalyzerConfiguration
-    cpp_name: RefreshQueryAnalyzerConfiguration
-    strict: false
-    namespace: ignored
-    api_version: ""
-    fields:
-      name:
-        description: "The unique identifier for the sampler (i.e. mongos or mongod), must be set to
-                     its connection string."
-        type: string
-      numQueriesExecutedPerSecond:
-        description: "The exponential moving average of the number of queries that the sampler
-                      executes per second."
-        type: double
+    _refreshQueryAnalyzerConfiguration:
+        description: "The command for refreshing the query analyzer configurations for all collections."
+        command_name: _refreshQueryAnalyzerConfiguration
+        cpp_name: RefreshQueryAnalyzerConfiguration
+        strict: false
+        namespace: ignored
+        api_version: ""
+        fields:
+            name:
+                description:
+                    "The unique identifier for the sampler (i.e. mongos or mongod), must be set to
+                    its connection string."
+                type: string
+            numQueriesExecutedPerSecond:
+                description:
+                    "The exponential moving average of the number of queries that the sampler
+                    executes per second."
+                type: double

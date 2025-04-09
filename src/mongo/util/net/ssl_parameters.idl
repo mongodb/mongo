@@ -27,202 +27,202 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/util/net/ssl_options.h"
-    - "mongo/util/net/ssl_parameters.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/net/ssl_options.h"
+        - "mongo/util/net/ssl_parameters.h"
 
 imports:
     - "mongo/crypto/sha256_block.idl"
     - "mongo/db/auth/auth_types.idl"
 
 structs:
-  TLSCATrust:
-    description: "An individual record mapping the sha256 fingerprint of one X.509 Certificate Authority file to the list of MongoDB RoleName identities which that CA may grant to a client certificate"
-    strict: true
-    fields:
-        sha256: sha256BlockHex
-        roles: array<RoleName>
+    TLSCATrust:
+        description: "An individual record mapping the sha256 fingerprint of one X.509 Certificate Authority file to the list of MongoDB RoleName identities which that CA may grant to a client certificate"
+        strict: true
+        fields:
+            sha256: sha256BlockHex
+            roles: array<RoleName>
 
-  ClusterAuthX509Override:
-    description: >- 
-      Stores either attributes to be checked in a certificate's subject OR a value to be checked 
-      if a certificate contains the mongodbClusterMembership extension. This should only be
-      populated when net.tls.clusterAuthX509 is being updated via the recommended rolling restart
-      procedure.
-    strict: true
-    fields:
-        attributes: 
-            type: string
-            optional: true
-        extensionValue: 
-            type: string
-            optional: true
+    ClusterAuthX509Override:
+        description: >-
+            Stores either attributes to be checked in a certificate's subject OR a value to be checked 
+            if a certificate contains the mongodbClusterMembership extension. This should only be
+            populated when net.tls.clusterAuthX509 is being updated via the recommended rolling restart
+            procedure.
+        strict: true
+        fields:
+            attributes:
+                type: string
+                optional: true
+            extensionValue:
+                type: string
+                optional: true
 
 server_parameters:
-  opensslDiffieHellmanParameters:
-    description: "OpenSSL Diffie-Hellman parameters"
-    set_at: startup
-    cpp_varname: "sslGlobalParams.sslPEMTempDHParam"
-    redact: false
+    opensslDiffieHellmanParameters:
+        description: "OpenSSL Diffie-Hellman parameters"
+        set_at: startup
+        cpp_varname: "sslGlobalParams.sslPEMTempDHParam"
+        redact: false
 
-  suppressNoTLSPeerCertificateWarning:
-    description: "Do not display a warning when client fails to send a TLS certificate"
-    set_at: startup
-    cpp_varname: "sslGlobalParams.suppressNoTLSPeerCertificateWarning"
-    redact: false
+    suppressNoTLSPeerCertificateWarning:
+        description: "Do not display a warning when client fails to send a TLS certificate"
+        set_at: startup
+        cpp_varname: "sslGlobalParams.suppressNoTLSPeerCertificateWarning"
+        redact: false
 
-  tlsWithholdClientCertificate:
-    deprecated_name: "sslWithholdClientCertificate"
-    description: "Do not send a client certificate when establishing intra-cluster connections"
-    set_at: startup
-    cpp_varname: "sslGlobalParams.tlsWithholdClientCertificate"
-    redact: false
+    tlsWithholdClientCertificate:
+        deprecated_name: "sslWithholdClientCertificate"
+        description: "Do not send a client certificate when establishing intra-cluster connections"
+        set_at: startup
+        cpp_varname: "sslGlobalParams.tlsWithholdClientCertificate"
+        redact: false
 
-  ocspEnabled:
-    description: "Enable OCSP"
-    set_at: startup
-    default: true
-    cpp_vartype: bool
-    cpp_varname: "tlsOCSPEnabled"
-    redact: false
+    ocspEnabled:
+        description: "Enable OCSP"
+        set_at: startup
+        default: true
+        cpp_vartype: bool
+        cpp_varname: "tlsOCSPEnabled"
+        redact: false
 
-  ocspCacheSize:
-    description: "Maximum number of entries in the OCSP Cache"
-    set_at: startup
-    default: 300
-    cpp_vartype: std::int32_t
-    cpp_varname: "tlsOCSPCacheSize"
-    validator:
-      gt: 0
-    redact: false
+    ocspCacheSize:
+        description: "Maximum number of entries in the OCSP Cache"
+        set_at: startup
+        default: 300
+        cpp_vartype: std::int32_t
+        cpp_varname: "tlsOCSPCacheSize"
+        validator:
+            gt: 0
+        redact: false
 
-  ocspStaplingRefreshPeriodSecs:
-    description: "Interval at which the OCSP response will be refreshed"
-    set_at: startup
-    cpp_vartype: long long
-    deprecated_name: ocspValidationRefreshPeriodSecs
-    default: -1
-    cpp_varname: "kOCSPStaplingRefreshPeriodSecs"
-    validator:
-      gte: 1
-    redact: false
+    ocspStaplingRefreshPeriodSecs:
+        description: "Interval at which the OCSP response will be refreshed"
+        set_at: startup
+        cpp_vartype: long long
+        deprecated_name: ocspValidationRefreshPeriodSecs
+        default: -1
+        cpp_varname: "kOCSPStaplingRefreshPeriodSecs"
+        validator:
+            gte: 1
+        redact: false
 
-  tlsOCSPVerifyTimeoutSecs:
-    description: >-
-        How long the http client should wait before timing out
-        when fetching OCSP Responses for peer certificate
-    set_at: startup
-    cpp_vartype: int
-    default: 4
-    cpp_varname: "gTLSOCSPVerifyTimeoutSecs"
-    validator:
-      gte: 1
-    redact: false
+    tlsOCSPVerifyTimeoutSecs:
+        description: >-
+            How long the http client should wait before timing out
+            when fetching OCSP Responses for peer certificate
+        set_at: startup
+        cpp_vartype: int
+        default: 4
+        cpp_varname: "gTLSOCSPVerifyTimeoutSecs"
+        validator:
+            gte: 1
+        redact: false
 
-  tlsOCSPStaplingTimeoutSecs:
-    description: >-
-        How long the http client should wait before timing out
-        when fetching OCSP Responses for stapling. If not set,
-        value is taken  from tlsClientOCSPTimeoutSecs
-    set_at: startup
-    cpp_vartype: int
-    default: -1
-    cpp_varname: "gTLSOCSPStaplingTimeoutSecs"
-    validator:
-      gte: 1
-    redact: false
+    tlsOCSPStaplingTimeoutSecs:
+        description: >-
+            How long the http client should wait before timing out
+            when fetching OCSP Responses for stapling. If not set,
+            value is taken  from tlsClientOCSPTimeoutSecs
+        set_at: startup
+        cpp_vartype: int
+        default: -1
+        cpp_varname: "gTLSOCSPStaplingTimeoutSecs"
+        validator:
+            gte: 1
+        redact: false
 
-  tlsOCSPSlowResponderWarningSecs:
-    description: >-
-       How long to wait for an OCSP response before logging a
-       warning message indicating that the responder is slow.
-    set_at: startup
-    cpp_vartype: int
-    default: 5
-    cpp_varname: "gTLSOCSPSlowResponderWarningSecs"
-    validator:
-      gte: 1
-    redact: false
+    tlsOCSPSlowResponderWarningSecs:
+        description: >-
+            How long to wait for an OCSP response before logging a
+            warning message indicating that the responder is slow.
+        set_at: startup
+        cpp_vartype: int
+        default: 5
+        cpp_varname: "gTLSOCSPSlowResponderWarningSecs"
+        validator:
+            gte: 1
+        redact: false
 
-  opensslCipherConfig:
-    description: "Cipher configuration string for OpenSSL based TLS connections"
-    set_at: startup
-    cpp_varname: "sslGlobalParams.sslCipherConfig"
-    validator:
-      callback: "validateOpensslCipherConfig"
-    redact: false
+    opensslCipherConfig:
+        description: "Cipher configuration string for OpenSSL based TLS connections"
+        set_at: startup
+        cpp_varname: "sslGlobalParams.sslCipherConfig"
+        validator:
+            callback: "validateOpensslCipherConfig"
+        redact: false
 
-  opensslCipherSuiteConfig:
-    description: "Cipher configuration string for OpenSSL based connections that use TLS 1.3 or newer ONLY"
-    set_at: startup
-    cpp_varname: "sslGlobalParams.sslCipherSuiteConfig"
-    redact: false
+    opensslCipherSuiteConfig:
+        description: "Cipher configuration string for OpenSSL based connections that use TLS 1.3 or newer ONLY"
+        set_at: startup
+        cpp_varname: "sslGlobalParams.sslCipherSuiteConfig"
+        redact: false
 
-  disableNonTLSConnectionLogging:
-    deprecated_name: "disableNonSSLConnectionLogging"
-    description: "Suppress logging of warnings when non-SSL connections are accepted in preferSSL mode"
-    set_at: startup
-    cpp_varname: "sslGlobalParams.disableNonSSLConnectionLogging"
-    validator:
-      callback: "validateDisableNonTLSConnectionLogging"
-    on_update: "onUpdateDisableNonTLSConnectionLogging"
-    redact: false
+    disableNonTLSConnectionLogging:
+        deprecated_name: "disableNonSSLConnectionLogging"
+        description: "Suppress logging of warnings when non-SSL connections are accepted in preferSSL mode"
+        set_at: startup
+        cpp_varname: "sslGlobalParams.disableNonSSLConnectionLogging"
+        validator:
+            callback: "validateDisableNonTLSConnectionLogging"
+        on_update: "onUpdateDisableNonTLSConnectionLogging"
+        redact: false
 
-  sslMode:
-    description: "Transition from allowSSL to preferSSL, or from preferSSL to requireSSL"
-    set_at: runtime
-    cpp_class: SSLModeServerParameter
-    redact: false
+    sslMode:
+        description: "Transition from allowSSL to preferSSL, or from preferSSL to requireSSL"
+        set_at: runtime
+        cpp_class: SSLModeServerParameter
+        redact: false
 
-  tlsMode:
-    description: "Transition from allowTLS to preferTLS, or from preferTLS to requireTLS"
-    set_at: runtime
-    cpp_class: TLSModeServerParameter
-    redact: false
+    tlsMode:
+        description: "Transition from allowTLS to preferTLS, or from preferTLS to requireTLS"
+        set_at: runtime
+        cpp_class: TLSModeServerParameter
+        redact: false
 
-  tlsX509ClusterAuthDNOverride:
-    description: "Distinguished name to use for cluster membership"
-    set_at: [startup, runtime]
-    cpp_class: ClusterAuthDNOverrideParameter
-    redact: false
+    tlsX509ClusterAuthDNOverride:
+        description: "Distinguished name to use for cluster membership"
+        set_at: [startup, runtime]
+        cpp_class: ClusterAuthDNOverrideParameter
+        redact: false
 
-  tlsX509ExpirationWarningThresholdDays:
-    description: >-
-        If a client connects to the server using an X509 certificate expiring in less
-        than the configured number of days, a warning will be emitted to the server logs.
-        Set this value to 0 to disable the warning.
-    set_at: startup
-    cpp_vartype: std::int32_t
-    cpp_varname: "tlsX509ExpirationWarningThresholdDays"
-    default: 30
-    validator:
-        gte: 0
-    redact: false
+    tlsX509ExpirationWarningThresholdDays:
+        description: >-
+            If a client connects to the server using an X509 certificate expiring in less
+            than the configured number of days, a warning will be emitted to the server logs.
+            Set this value to 0 to disable the warning.
+        set_at: startup
+        cpp_vartype: std::int32_t
+        cpp_varname: "tlsX509ExpirationWarningThresholdDays"
+        default: 30
+        validator:
+            gte: 0
+        redact: false
 
-  tlsCATrusts:
-    description: >-
-        Specify by fingerprint the certificate authorities which are allowed to
-        accept role authorizations from an X509 certificate and the specific roles
-        they are allowed to impart.
-    set_at: startup
-    cpp_class:
-        name: TLSCATrustsSetParameter
-        override_set: true
-    condition:
-        preprocessor: 'defined(__linux__)'
-    redact: false
+    tlsCATrusts:
+        description: >-
+            Specify by fingerprint the certificate authorities which are allowed to
+            accept role authorizations from an X509 certificate and the specific roles
+            they are allowed to impart.
+        set_at: startup
+        cpp_class:
+            name: TLSCATrustsSetParameter
+            override_set: true
+        condition:
+            preprocessor: "defined(__linux__)"
+        redact: false
 
-  tlsClusterAuthX509Override:
-    description: >-
-        Distinguished name attributes + values that are checked against client certificate subject
-        DNs to determine cluster membership OR a value that is checked against the client
-        certificate's extension for OID 1.3.6.1.4.1.34601.2.1.2. This is expected to be used ONLY
-        when a user seeks to start using the net.tls.clusterAuthX509.attributes OR
-        net.tls.clusterAuthX509.extensionValue config options for peer node identification via X.509
-        intracluster auth.
-    set_at: startup
-    cpp_class: 
-        name: ClusterAuthX509OverrideParameter
-        override_set: true
-    redact: false
+    tlsClusterAuthX509Override:
+        description: >-
+            Distinguished name attributes + values that are checked against client certificate subject
+            DNs to determine cluster membership OR a value that is checked against the client
+            certificate's extension for OID 1.3.6.1.4.1.34601.2.1.2. This is expected to be used ONLY
+            when a user seeks to start using the net.tls.clusterAuthX509.attributes OR
+            net.tls.clusterAuthX509.extensionValue config options for peer node identification via X.509
+            intracluster auth.
+        set_at: startup
+        cpp_class:
+            name: ClusterAuthX509OverrideParameter
+            override_set: true
+        redact: false

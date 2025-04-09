@@ -35,28 +35,28 @@ imports:
 
 structs:
     ConnectionStatusReplyAuthInfo:
-        description: 'Currently authenticated users and roles, and optional privileges'
+        description: "Currently authenticated users and roles, and optional privileges"
         fields:
             authenticatedUsers:
-                description: 'Currently authenticated users'
+                description: "Currently authenticated users"
                 type: array<UserName>
             authenticatedUserRoles:
-                description: 'Currently held roles for authenticated users'
+                description: "Currently held roles for authenticated users"
                 type: array<RoleName>
             authenticatedUserPrivileges:
-                description: 'Currently authorized privileges across granted roles'
+                description: "Currently authorized privileges across granted roles"
                 type: array<ParsedPrivilege>
                 optional: true
 
     ConnectionStatusReply:
-        description: 'Reply to connectionStatus command'
+        description: "Reply to connectionStatus command"
         is_command_reply: true
         fields:
             authInfo:
-                description: 'Authenticated users and roles'
+                description: "Authenticated users and roles"
                 type: ConnectionStatusReplyAuthInfo
             uuid:
-                description: 'UUID of the current client'
+                description: "UUID of the current client"
                 type: uuid
 
 commands:
@@ -69,7 +69,6 @@ commands:
         reply_type: ConnectionStatusReply
         fields:
             showPrivileges:
-                description: 'Return detailed privileges'
+                description: "Return detailed privileges"
                 type: safeBool
                 default: false
-

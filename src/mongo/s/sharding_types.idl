@@ -74,4 +74,3 @@ types:
         deserializer: "mongo::ShardVersion::parse"
         # ShardVersion has only non view members.
         is_view: false
-

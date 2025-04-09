@@ -3,8 +3,8 @@
 global:
     cpp_namespace: "mongo::awsIam"
     configs:
-        section: 'AWS IAM Options'
-        source: [ cli ]
+        section: "AWS IAM Options"
+        source: [cli]
     cpp_includes:
         - mongo/client/sasl_aws_client_options.h
 

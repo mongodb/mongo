@@ -27,43 +27,43 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/admission/ingress_admission_controller.h"
-    - "mongo/db/server_options.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/admission/ingress_admission_controller.h"
+        - "mongo/db/server_options.h"
 
 server_parameters:
-  ingressAdmissionControlEnabled:
-    description: Controls whether ingress admission control mechanism is enabled.
-    set_at: [ startup, runtime ]
-    cpp_varname: gIngressAdmissionControlEnabled
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    redact: false
-  ingressAdmissionControllerTicketPoolSize:
-    description: >-
-        Controls the maximum number of tickets in the ingress admission control ticket pool. Note
-        that setting this parameter to 0 will block all incoming operations that are subject to
-        ingress admission control.
-    set_at: [ startup, runtime ]
-    cpp_varname: gIngressAdmissionControllerTicketPoolSize
-    cpp_vartype: AtomicWord<int32_t>
-    on_update: IngressAdmissionController::onUpdateTicketPoolSize
-    # Setting the pool size equal to the max connections default means it is
-    # effectively infinite. See maxIncomingConnections in server_options_general.idl
-    default: { expr: 'static_cast<int>(DEFAULT_MAX_CONN)' }
-    validator: { gte: 0 }
-    redact: false
-  ingressAdmissionControllerMaxQueueDepth:
-    description: >-
-        Controls the maximum number of operations waiting for admission in the ingress admission control.
-        Setting this parameter will not apply to operations that are already waiting for a ticket.
-    set_at: [ startup, runtime ]
-    cpp_varname: gIngressAdmissionControllerMaxQueueDepth
-    cpp_vartype: Atomic<std::int32_t>
-    on_update: IngressAdmissionController::onUpdateMaxQueueDepth
-    # Setting the max queue depth equal to the max connections default means it is
-    # effectively infinite. See maxIncomingConnections in server_options_general.idl
-    default: { expr: 'TicketHolder::kDefaultMaxQueueDepth' }
-    validator: { gte: 0 }
-    redact: false
+    ingressAdmissionControlEnabled:
+        description: Controls whether ingress admission control mechanism is enabled.
+        set_at: [startup, runtime]
+        cpp_varname: gIngressAdmissionControlEnabled
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+    ingressAdmissionControllerTicketPoolSize:
+        description: >-
+            Controls the maximum number of tickets in the ingress admission control ticket pool. Note
+            that setting this parameter to 0 will block all incoming operations that are subject to
+            ingress admission control.
+        set_at: [startup, runtime]
+        cpp_varname: gIngressAdmissionControllerTicketPoolSize
+        cpp_vartype: AtomicWord<int32_t>
+        on_update: IngressAdmissionController::onUpdateTicketPoolSize
+        # Setting the pool size equal to the max connections default means it is
+        # effectively infinite. See maxIncomingConnections in server_options_general.idl
+        default: {expr: "static_cast<int>(DEFAULT_MAX_CONN)"}
+        validator: {gte: 0}
+        redact: false
+    ingressAdmissionControllerMaxQueueDepth:
+        description: >-
+            Controls the maximum number of operations waiting for admission in the ingress admission control.
+            Setting this parameter will not apply to operations that are already waiting for a ticket.
+        set_at: [startup, runtime]
+        cpp_varname: gIngressAdmissionControllerMaxQueueDepth
+        cpp_vartype: Atomic<std::int32_t>
+        on_update: IngressAdmissionController::onUpdateMaxQueueDepth
+        # Setting the max queue depth equal to the max connections default means it is
+        # effectively infinite. See maxIncomingConnections in server_options_general.idl
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false

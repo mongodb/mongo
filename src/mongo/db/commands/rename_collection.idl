@@ -56,18 +56,19 @@ commands:
                 stability: stable
             dropTarget:
                 description: >-
-                  If true or a UUID, mongod will drop the target of renameCollection prior to
-                  renaming the collection. A UUID is the expected UUID of the target collection to
-                  be dropped.
+                    If true or a UUID, mongod will drop the target of renameCollection prior to
+                    renaming the collection. A UUID is the expected UUID of the target collection to
+                    be dropped.
                 type:
-                  variant: [bool, uuid]
+                    variant: [bool, uuid]
                 default: false
                 stability: stable
             # stayTemp is an internal attribute, which is intentionally undocumented and
-            # not part of the stable API. 
+            # not part of the stable API.
             stayTemp:
-                description: "If true, the original collection will remain temp if it was temp
-                before the rename."
+                description:
+                    "If true, the original collection will remain temp if it was temp
+                    before the rename."
                 type: bool
                 default: false
                 stability: internal

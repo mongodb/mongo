@@ -27,20 +27,20 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/client/read_preference.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/read_preference.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/client/read_preference.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/client/read_preference.idl"
 
 types:
-  readPreference:
-    description: "Represents the read preference of a command."
-    bson_serialization_type: object
-    cpp_type: ReadPreferenceSetting
-    serializer: ReadPreferenceSetting::toInnerBSON
-    deserializer: ReadPreferenceSetting::fromInnerBSONForIDL
-    # Deserializer uses getOwned.
-    is_view: false
+    readPreference:
+        description: "Represents the read preference of a command."
+        bson_serialization_type: object
+        cpp_type: ReadPreferenceSetting
+        serializer: ReadPreferenceSetting::toInnerBSON
+        deserializer: ReadPreferenceSetting::fromInnerBSONForIDL
+        # Deserializer uses getOwned.
+        is_view: false

@@ -26,47 +26,47 @@
 # it in the license file.
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/idl/cluster_server_parameter.idl"
-  - "mongo/db/query/query_feature_flags.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/db/query/query_feature_flags.idl"
 
 global:
-  cpp_namespace: mongo
-  cpp_includes:
-    - "mongo/db/query/query_feature_flags_gen.h"
+    cpp_namespace: mongo
+    cpp_includes:
+        - "mongo/db/query/query_feature_flags_gen.h"
 
 structs:
-  InternalSearchOptions:
-    description: Clusterwide options for tuning internal search heuristics.
-    strict: false
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      oversubscriptionFactor:
-        description: >-
-            Specifies the factor by which we buffer the starting batchSize sent to mongot whenever
-            the storedSource option is false, to anticipate documents returned by mongot that may
-            have been orphaned and will be discarded by the $_internalSearchIdLookup stage.
-        type: double
-        # The Search team previously ran tests to determine 1.064 as the optimal default value.
-        default: 1.064
-        validator:
-          gte: 1.0
-      batchSizeGrowthFactor:
-        description: Specifies the factor by which the batchSize sent to mongot increases per batch.
-        type: double
-        default: 1.50
-        validator:
-          gte: 1.0
+    InternalSearchOptions:
+        description: Clusterwide options for tuning internal search heuristics.
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            oversubscriptionFactor:
+                description: >-
+                    Specifies the factor by which we buffer the starting batchSize sent to mongot whenever
+                    the storedSource option is false, to anticipate documents returned by mongot that may
+                    have been orphaned and will be discarded by the $_internalSearchIdLookup stage.
+                type: double
+                # The Search team previously ran tests to determine 1.064 as the optimal default value.
+                default: 1.064
+                validator:
+                    gte: 1.0
+            batchSizeGrowthFactor:
+                description: Specifies the factor by which the batchSize sent to mongot increases per batch.
+                type: double
+                default: 1.50
+                validator:
+                    gte: 1.0
 
 server_parameters:
-  internalSearchOptions:
-    description: Clusterwide options for tuning internal search heuristics.
-    set_at: cluster
-    cpp_varname: internalSearchOptions
-    cpp_vartype: InternalSearchOptions
-    condition:
-      min_fcv: 8.1
-    redact: false
-    omit_in_ftdc: false
+    internalSearchOptions:
+        description: Clusterwide options for tuning internal search heuristics.
+        set_at: cluster
+        cpp_varname: internalSearchOptions
+        cpp_vartype: InternalSearchOptions
+        condition:
+            min_fcv: 8.1
+        redact: false
+        omit_in_ftdc: false

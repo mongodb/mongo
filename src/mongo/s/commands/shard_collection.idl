@@ -27,75 +27,75 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/timeseries/timeseries.idl"
-  - "mongo/s/sharding_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/timeseries/timeseries.idl"
+    - "mongo/s/sharding_types.idl"
 
 structs:
-  ShardCollectionRequest:
-      description: "The base request to shard a collection"
-      strict: false
-      fields:
-        key:
-          type: object
-          description: "The index specification document to use as the shard key."
-        unique:
-          type: bool
-          description: "Whether the shard key index should enforce a unique constraint"
-          default: false
-        # TODO SERVER-83006: remove deprecated numInitialChunks parameter.
-        numInitialChunks:
-          type: safeInt64
-          description: >-
-            The number of chunks to create initially when sharding an empty collection with a hashed
-            shard key.
-          default: 0
-        presplitHashedZones:
-          type: bool
-          description: >-
-            True if the chunks should be pre-split based on the existing zones when sharding a
-            collection with hashed shard key.
-          default: false
-        implicitlyCreateIndex:
-          description: "Creates an index on the shard key pattern if the collection is empty."
-          type: optionalBool
-        enforceUniquenessCheck:
-          description: >-
-            Controls whether this command verifies that any unique indexes are prefixed by the shard
-            key pattern if unique is true. If true then it will verify and if false then it won't.
-          type: optionalBool
+    ShardCollectionRequest:
+        description: "The base request to shard a collection"
+        strict: false
+        fields:
+            key:
+                type: object
+                description: "The index specification document to use as the shard key."
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint"
+                default: false
+            # TODO SERVER-83006: remove deprecated numInitialChunks parameter.
+            numInitialChunks:
+                type: safeInt64
+                description: >-
+                    The number of chunks to create initially when sharding an empty collection with a hashed
+                    shard key.
+                default: 0
+            presplitHashedZones:
+                type: bool
+                description: >-
+                    True if the chunks should be pre-split based on the existing zones when sharding a
+                    collection with hashed shard key.
+                default: false
+            implicitlyCreateIndex:
+                description: "Creates an index on the shard key pattern if the collection is empty."
+                type: optionalBool
+            enforceUniquenessCheck:
+                description: >-
+                    Controls whether this command verifies that any unique indexes are prefixed by the shard
+                    key pattern if unique is true. If true then it will verify and if false then it won't.
+                type: optionalBool
 
-  ShardCollection:
-    description: "The public shardCollection command."
-    strict: false
-    inline_chained_structs: true
-    chained_structs:
-      ShardCollectionRequest: ShardCollectionRequest
-    fields:
-      shardCollection:
-        type: namespacestring
-        description: "The namespace of the collection to shard in the form <database>.<collection>."
-        optional: true
-      shardcollection:
-          type: namespacestring
-          description: >-
-            Same as the previous field, but refers to the deprecated version of this command's name.
-          optional: true
-      collation:
-        type: object
-        description: "The collation to use for the shard key index."
-        optional: true
-      timeseries:
-        description: "The options to create the time-series collection with."
-        type: TimeseriesOptions
-        optional: true
-      collectionUUID:
-        description: "The expected UUID of the collection."
-        type: uuid
-        optional: true
+    ShardCollection:
+        description: "The public shardCollection command."
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ShardCollectionRequest: ShardCollectionRequest
+        fields:
+            shardCollection:
+                type: namespacestring
+                description: "The namespace of the collection to shard in the form <database>.<collection>."
+                optional: true
+            shardcollection:
+                type: namespacestring
+                description: >-
+                    Same as the previous field, but refers to the deprecated version of this command's name.
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+            timeseries:
+                description: "The options to create the time-series collection with."
+                type: TimeseriesOptions
+                optional: true
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true
 
 commands:
     # Temporary command to run shardCollection with unsplittable=true and track unsharded
@@ -110,15 +110,15 @@ commands:
         namespace: concatenate_with_db
         api_version: ""
         fields:
-              timeseries:
+            timeseries:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions
                 optional: true
-              collectionUUID:
+            collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
                 optional: true
-              dataShard:
+            dataShard:
                 description: "If set, the data for the collection will reside on the specified shard."
                 type: shard_id
                 optional: true

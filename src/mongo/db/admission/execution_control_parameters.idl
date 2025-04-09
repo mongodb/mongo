@@ -27,105 +27,105 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/admission/ticketholder_manager.h"
-    - "mongo/db/admission/concurrency_adjustment_validator.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/admission/ticketholder_manager.h"
+        - "mongo/db/admission/concurrency_adjustment_validator.h"
 
 enums:
-  StorageEngineConcurrencyAdjustmentAlgorithm:
-    description: "Algorithm for adjusting the number of concurrent storage engine transactions"
-    type: string
-    # 'kFixedConcurrentTransactions': Number of concurrent transactions are controlled by
-    # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
-    # not be adjusted automatically based on overall system throughput.
-    #
-    # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
-    # increasing or decreasing concurrency in the storage engine, based on system throughput.
-    values:
-      kFixedConcurrentTransactions: "fixedConcurrentTransactions"
-      kThroughputProbing: "throughputProbing"
+    StorageEngineConcurrencyAdjustmentAlgorithm:
+        description: "Algorithm for adjusting the number of concurrent storage engine transactions"
+        type: string
+        # 'kFixedConcurrentTransactions': Number of concurrent transactions are controlled by
+        # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
+        # not be adjusted automatically based on overall system throughput.
+        #
+        # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
+        # increasing or decreasing concurrency in the storage engine, based on system throughput.
+        values:
+            kFixedConcurrentTransactions: "fixedConcurrentTransactions"
+            kThroughputProbing: "throughputProbing"
 
 server_parameters:
-  storageEngineConcurrentWriteTransactions:
-    description: "Storage Engine Concurrent Write Transactions"
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int32_t>
-    cpp_varname: gConcurrentWriteTransactions
-    on_update: "admission::TicketHolderManager::updateConcurrentWriteTransactions"
-    deprecated_name:
-      - wiredTigerConcurrentWriteTransactions
-    # Default value being 0 on startup means we're allowing the underlying storage engines 
-    # to use their default values. Updating it to 0 again after startup does not use the default value.
-    # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
-    # storageEngineConcurrencyAdjustmentAlgorithm.
-    default: 0
-    validator:
-      callback: "admission::TicketHolderManager::validateConcurrentWriteTransactions"
-    redact: false
+    storageEngineConcurrentWriteTransactions:
+        description: "Storage Engine Concurrent Write Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentWriteTransactions
+        on_update: "admission::TicketHolderManager::updateConcurrentWriteTransactions"
+        deprecated_name:
+            - wiredTigerConcurrentWriteTransactions
+        # Default value being 0 on startup means we're allowing the underlying storage engines
+        # to use their default values. Updating it to 0 again after startup does not use the default value.
+        # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
+        # storageEngineConcurrencyAdjustmentAlgorithm.
+        default: 0
+        validator:
+            callback: "admission::TicketHolderManager::validateConcurrentWriteTransactions"
+        redact: false
 
-  storageEngineConcurrentReadTransactions:
-    description: "Storage Engine Concurrent Read Transactions"
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int32_t>
-    cpp_varname: gConcurrentReadTransactions
-    on_update: "admission::TicketHolderManager::updateConcurrentReadTransactions"
-    deprecated_name:
-      - wiredTigerConcurrentReadTransactions
-    # Default value being 0 on startup means we're allowing the underlying storage engines 
-    # to use their default values. Updating it to 0 again after startup does not use the default value.
-    # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
-    # storageEngineConcurrencyAdjustmentAlgorithm.
-    default: 0
-    validator:
-      callback: "admission::TicketHolderManager::validateConcurrentReadTransactions"
-    redact: false
+    storageEngineConcurrentReadTransactions:
+        description: "Storage Engine Concurrent Read Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentReadTransactions
+        on_update: "admission::TicketHolderManager::updateConcurrentReadTransactions"
+        deprecated_name:
+            - wiredTigerConcurrentReadTransactions
+        # Default value being 0 on startup means we're allowing the underlying storage engines
+        # to use their default values. Updating it to 0 again after startup does not use the default value.
+        # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
+        # storageEngineConcurrencyAdjustmentAlgorithm.
+        default: 0
+        validator:
+            callback: "admission::TicketHolderManager::validateConcurrentReadTransactions"
+        redact: false
 
-  storageEngineReadMaxQueueDepth:
-    description: >-
-        Controls the maximum number of read transactions waiting in queue for a thread to be free.
-        Setting this number to 0 will not allow any transaction above the max conccurency amount.
-        Reducing this value will only affect new enqueued read transactions
-    set_at: [ startup, runtime ]
-    cpp_vartype: Atomic<std::int32_t>
-    cpp_varname: gReadMaxQueueDepth
-    on_update: "admission::TicketHolderManager::updateReadMaxQueueDepth"
-    default: { expr: 'TicketHolder::kDefaultMaxQueueDepth' }
-    validator: { gte: 0 }
-    redact: false
+    storageEngineReadMaxQueueDepth:
+        description: >-
+            Controls the maximum number of read transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max conccurency amount.
+            Reducing this value will only affect new enqueued read transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gReadMaxQueueDepth
+        on_update: "admission::TicketHolderManager::updateReadMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
 
-  storageEngineWriteMaxQueueDepth:
-    description: >-
-        Controls the maximum number of write transactions waiting in queue for a thread to be free.
-        Setting this number to 0 will not allow any transaction above the max conccurency amount.
-        Reducing this value will only affect new enqueued write transactions
-    set_at: [ startup, runtime ]
-    cpp_vartype: Atomic<std::int32_t>
-    cpp_varname: gWriteMaxQueueDepth
-    on_update: "admission::TicketHolderManager::updateWriteMaxQueueDepth"
-    default: { expr: 'TicketHolder::kDefaultMaxQueueDepth' }
-    validator: { gte: 0 }
-    redact: false
+    storageEngineWriteMaxQueueDepth:
+        description: >-
+            Controls the maximum number of write transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max conccurency amount.
+            Reducing this value will only affect new enqueued write transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gWriteMaxQueueDepth
+        on_update: "admission::TicketHolderManager::updateWriteMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
 
-  storageEngineConcurrencyAdjustmentAlgorithm:
-    description: >-
-      The algorithm to be used for adjusting the number of concurrent storage engine transactions.
-    set_at: startup
-    cpp_vartype: std::string
-    cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
-    default: "throughputProbing"
-    validator:
-      callback: validateConcurrencyAdjustmentAlgorithm
-    redact: false
+    storageEngineConcurrencyAdjustmentAlgorithm:
+        description: >-
+            The algorithm to be used for adjusting the number of concurrent storage engine transactions.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
+        default: "throughputProbing"
+        validator:
+            callback: validateConcurrencyAdjustmentAlgorithm
+        redact: false
 
-  storageEngineConcurrencyAdjustmentIntervalMillis:
-    description: >-
-      The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
-      not set to fixedConcurrentTransactions.
-    set_at: startup
-    cpp_vartype: int32_t
-    cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
-    default: 100
-    validator:
-      gte: 10
-    redact: false
+    storageEngineConcurrencyAdjustmentIntervalMillis:
+        description: >-
+            The interval in milliseconds in which to run the concurrency adjustment algorithm, if it is
+            not set to fixedConcurrentTransactions.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gStorageEngineConcurrencyAdjustmentIntervalMillis
+        default: 100
+        validator:
+            gte: 10
+        redact: false

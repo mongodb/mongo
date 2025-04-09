@@ -32,8 +32,8 @@ global:
         - "mongo/db/server_options.h"
         - "mongo/db/server_options_base.h"
     configs:
-        section: 'General options'
-        source: [ cli, ini, yaml ]
+        section: "General options"
+        source: [cli, ini, yaml]
         initializer:
             register: addBaseServerOptionDefinitions
 
@@ -72,37 +72,37 @@ configs:
     #     Sharding:       |
     #       verbosity: 5  | 5 (for Sharding only, 0 for default)
     verbose:
-        description: 'Be more verbose (include multiple times for more verbosity e.g. -vvvvv)'
+        description: "Be more verbose (include multiple times for more verbosity e.g. -vvvvv)"
         single_name: v
         arg_vartype: String
-        source: [ cli, ini ]
+        source: [cli, ini]
         implicit: v
     # vv-vvvvvvvvvvvv defined in server_options_base.cpp
 
-    'systemLog.verbosity':
-        description: 'Set verbose level'
+    "systemLog.verbosity":
+        description: "Set verbose level"
         arg_vartype: Int
         source: yaml
 
     # systemLog.component.*.verbosity defined in server_options_base.cpp
 
-    'systemLog.quiet':
-        description: 'Quieter output'
+    "systemLog.quiet":
+        description: "Quieter output"
         short_name: quiet
         arg_vartype: Switch
     logpath:
         # Cannot roll into systemLog.path because canonicalization also sets systemLog.destination.
-        description: 'Log file to send write to instead of stdout - has to be a file, not directory'
-        source: [ cli, ini ]
+        description: "Log file to send write to instead of stdout - has to be a file, not directory"
+        source: [cli, ini]
         arg_vartype: String
         conflicts: syslog
-    'systemLog.path':
-        description: 'Log file to send write to instead of stdout - has to be a file, not directory'
+    "systemLog.path":
+        description: "Log file to send write to instead of stdout - has to be a file, not directory"
         source: yaml
         arg_vartype: String
         conflicts: syslog
-    'systemLog.destination':
-        description: 'Destination of system log output.  (syslog/file)'
+    "systemLog.destination":
+        description: "Destination of system log output.  (syslog/file)"
         arg_vartype: String
         source: yaml
         hidden: true
@@ -112,38 +112,38 @@ configs:
     syslog:
         description: "Log to system's syslog facility instead of file or stdout"
         arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts: 'systemLog.path'
+        source: [cli, ini]
+        conflicts: "systemLog.path"
         condition:
-            preprocessor: '!defined(_WIN32)'
-    'systemLog.syslogFacility':
-        description: 'syslog facility used for mongodb syslog message'
+            preprocessor: "!defined(_WIN32)"
+    "systemLog.syslogFacility":
+        description: "syslog facility used for mongodb syslog message"
         short_name: syslogFacility
         arg_vartype: String
         condition:
-            preprocessor: '!defined(_WIN32)'
-    'systemLog.logAppend':
-        description: 'Append to logpath instead of over-writing'
+            preprocessor: "!defined(_WIN32)"
+    "systemLog.logAppend":
+        description: "Append to logpath instead of over-writing"
         short_name: logappend
         arg_vartype: Switch
-    'systemLog.logRotate':
-        description: 'Set the log rotation behavior (rename|reopen)'
+    "systemLog.logRotate":
+        description: "Set the log rotation behavior (rename|reopen)"
         short_name: logRotate
         arg_vartype: String
-    'systemLog.timeStampFormat':
+    "systemLog.timeStampFormat":
         description: Desired format for timestamps in log messages. One of iso8601-utc or iso8601-local
         short_name: timeStampFormat
         arg_vartype: String
 
     setParameter:
-        description: 'Set a configurable parameter'
+        description: "Set a configurable parameter"
         arg_vartype: StringMap
         duplicate_behavior: append
 
     # -vvvvv
 
-    'systemLog.traceAllExceptions':
-        description: 'Log stack traces for every exception'
+    "systemLog.traceAllExceptions":
+        description: "Log stack traces for every exception"
         short_name: traceExceptions
         arg_vartype: Switch
         hidden: true

@@ -32,7 +32,7 @@ server_parameters:
     numInitialSyncAttempts:
         description: <-
             Number of attempts to make at replica set initial synchronization.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: numInitialSyncAttempts
         default: 10
@@ -42,7 +42,7 @@ server_parameters:
         description: <-
             Reduce the downtime after the primary steps down from either the
             rs.stepDown() method or the replSetStepDown command.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableElectionHandoff
         default: true
@@ -51,7 +51,7 @@ server_parameters:
     shutdownTimeoutMillisForSignaledShutdown:
         description: <-
             The time taken for stepdown and quiesce mode at shutdown in response to SIGTERM.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: shutdownTimeoutMillisForSignaledShutdown
         default: 15000
@@ -62,7 +62,7 @@ server_parameters:
     periodicNoopIntervalSecs:
         description: <-
             Number of seconds between noop writer writes.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: AtomicWord<int>
         cpp_varname: periodicNoopIntervalSecs
         default: 10

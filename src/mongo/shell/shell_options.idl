@@ -27,200 +27,199 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-  - "mongo/client/sasl_oidc_client_params.h"
-  - "mongo/shell/shell_options.h"
-  - "mongo/shell/shell_utils.h"
-  configs:
-    source: [ cli, ini, yaml ]
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/sasl_oidc_client_params.h"
+        - "mongo/shell/shell_options.h"
+        - "mongo/shell/shell_utils.h"
+    configs:
+        source: [cli, ini, yaml]
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 configs:
-  "ipv6":
-    description: "enable IPv6 support (disabled by default)"
-    arg_vartype: Switch
-  "host":
-    description: "server to connect to"
-    arg_vartype: String
-  "port":
-    description: "port to connect to"
-    arg_vartype: String
+    "ipv6":
+        description: "enable IPv6 support (disabled by default)"
+        arg_vartype: Switch
+    "host":
+        description: "server to connect to"
+        arg_vartype: String
+    "port":
+        description: "port to connect to"
+        arg_vartype: String
 
-  "help":
-    short_name: "help"
-    single_name: h
-    description: "show this usage information"
-    arg_vartype: Switch
-  "version":
-    description: "show version information"
-    arg_vartype: Switch
-  "verbose":
-    description: "increase verbosity"
-    arg_vartype: Switch
-  "shell":
-    description: "run the shell after executing files"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.runShell
-  "nodb":
-    description: "don't connect to mongod on startup - no 'db address' arg expected"
-    arg_vartype: Switch
-  "norc":
-    description: "will not run the \".mongorc.js\" file on start up"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.norc
-  "quiet":
-    description: "be less chatty"
-    arg_vartype: Switch
-  "eval":
-    description: "evaluate javascript"
-    arg_vartype: String
-    cpp_varname: shellGlobalParams.script
+    "help":
+        short_name: "help"
+        single_name: h
+        description: "show this usage information"
+        arg_vartype: Switch
+    "version":
+        description: "show version information"
+        arg_vartype: Switch
+    "verbose":
+        description: "increase verbosity"
+        arg_vartype: Switch
+    "shell":
+        description: "run the shell after executing files"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.runShell
+    "nodb":
+        description: "don't connect to mongod on startup - no 'db address' arg expected"
+        arg_vartype: Switch
+    "norc":
+        description: 'will not run the ".mongorc.js" file on start up'
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.norc
+    "quiet":
+        description: "be less chatty"
+        arg_vartype: Switch
+    "eval":
+        description: "evaluate javascript"
+        arg_vartype: String
+        cpp_varname: shellGlobalParams.script
 
-  "apiVersion":
-    description: "set the MongoDB API version"
-    arg_vartype: String
-    cpp_varname: shellGlobalParams.apiVersion
-  "apiStrict":
-    description: "disable all features not included in the MongoDB Stable API"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.apiStrict
-  "apiDeprecationErrors":
-    description: "disable all features deprecated in the MongoDB Stable API"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.apiDeprecationErrors
-  "objcheck":
-    description: "inspect client data for validity on receipt"
-    arg_vartype: Switch
-    source: [ cli, ini ]
-    conflicts: "noobjcheck"
-    hidden: true
-  "noobjcheck":
-    description: "do NOT inspect client data for validity on receipt (DEFAULT)"
-    arg_vartype: Switch
-    source: [ cli, ini ]
-    conflicts: "objcheck"
-    hidden: true
-  "crashOnInvalidBSONError":
-    description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
-    arg_vartype: Switch
-    source: [ cli, ini ]
-    hidden: true
-  "initializerShuffleSeed":
-      description: "Sets random seed used to shuffle initializers (for testing)"
-      arg_vartype: Unsigned
-      source: [ cli ]
-      hidden: true
-  
-  "disableJavaScriptJIT":
-    description: "disable the Javascript Just In Time compiler"
-    arg_vartype: Switch
-    conflicts: "enableJavaScriptJIT"
-  "enableJavaScriptJIT":
-    description: "enable the Javascript Just In Time compiler"
-    arg_vartype: Switch
-    conflicts: "disableJavaScriptJIT"
+    "apiVersion":
+        description: "set the MongoDB API version"
+        arg_vartype: String
+        cpp_varname: shellGlobalParams.apiVersion
+    "apiStrict":
+        description: "disable all features not included in the MongoDB Stable API"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.apiStrict
+    "apiDeprecationErrors":
+        description: "disable all features deprecated in the MongoDB Stable API"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.apiDeprecationErrors
+    "objcheck":
+        description: "inspect client data for validity on receipt"
+        arg_vartype: Switch
+        source: [cli, ini]
+        conflicts: "noobjcheck"
+        hidden: true
+    "noobjcheck":
+        description: "do NOT inspect client data for validity on receipt (DEFAULT)"
+        arg_vartype: Switch
+        source: [cli, ini]
+        conflicts: "objcheck"
+        hidden: true
+    "crashOnInvalidBSONError":
+        description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
+        arg_vartype: Switch
+        source: [cli, ini]
+        hidden: true
+    "initializerShuffleSeed":
+        description: "Sets random seed used to shuffle initializers (for testing)"
+        arg_vartype: Unsigned
+        source: [cli]
+        hidden: true
 
-  "disableJavaScriptProtection":
-    description: "allow automatic JavaScript function marshalling"
-    arg_vartype: Switch
-    conflicts: "enableJavaScriptProtection"
-  "enableJavaScriptProtection":
-    description: "disable automatic JavaScript function marshalling (defaults to true)"
-    arg_vartype: Switch
-    conflicts: "disableJavaScriptProtection"
-    hidden: true
+    "disableJavaScriptJIT":
+        description: "disable the Javascript Just In Time compiler"
+        arg_vartype: Switch
+        conflicts: "enableJavaScriptJIT"
+    "enableJavaScriptJIT":
+        description: "enable the Javascript Just In Time compiler"
+        arg_vartype: Switch
+        conflicts: "disableJavaScriptJIT"
 
-  "nokillop":
-    # For testing, kill op will also be disabled automatically if the tests starts a mongo program.
-    description: "nokillop"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.nokillop
-    hidden: true
-  "autokillop":
-    # For testing, will kill op without prompting.
-    description: "autokillop"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.autoKillOp
-    hidden: true
+    "disableJavaScriptProtection":
+        description: "allow automatic JavaScript function marshalling"
+        arg_vartype: Switch
+        conflicts: "enableJavaScriptProtection"
+    "enableJavaScriptProtection":
+        description: "disable automatic JavaScript function marshalling (defaults to true)"
+        arg_vartype: Switch
+        conflicts: "disableJavaScriptProtection"
+        hidden: true
 
-  "retryWrites":
-    description: "automatically retry write operations upon transient network errors"
-    arg_vartype: Switch
-    cpp_varname: shellGlobalParams.shouldRetryWrites
-  "disableImplicitSessions":
-    description: "do not automatically create and use implicit sessions"
-    arg_vartype: Switch
-  "jsHeapLimitMB":
-    description: "set the js scope's heap size limit"
-    arg_vartype: Int
+    "nokillop":
+        # For testing, kill op will also be disabled automatically if the tests starts a mongo program.
+        description: "nokillop"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.nokillop
+        hidden: true
+    "autokillop":
+        # For testing, will kill op without prompting.
+        description: "autokillop"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.autoKillOp
+        hidden: true
 
-  "setShellParameter":
-    description: "Set a configurable parameter"
-    arg_vartype: StringMap
-    duplicate_behavior: append
-    hidden: true
+    "retryWrites":
+        description: "automatically retry write operations upon transient network errors"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.shouldRetryWrites
+    "disableImplicitSessions":
+        description: "do not automatically create and use implicit sessions"
+        arg_vartype: Switch
+    "jsHeapLimitMB":
+        description: "set the js scope's heap size limit"
+        arg_vartype: Int
 
-  # Positional Arguments.
-  "dbaddress":
-    description: "dbaddress"
-    arg_vartype: String
-    hidden: true
-    positional: 1
-  "files":
-    description: "files"
-    arg_vartype: StringVector
-    hidden: true
-    positional: "2-"
+    "setShellParameter":
+        description: "Set a configurable parameter"
+        arg_vartype: StringMap
+        duplicate_behavior: append
+        hidden: true
 
-  # Authentication Options.
-  "username":
-    section: "Authentication Options"
-    short_name: "username"
-    single_name: u
-    description: "username for authentication"
-    arg_vartype: String
-  "password":
-    section: "Authentication Options"
-    short_name: "password"
-    single_name: p
-    description: "password for authentication"
-    arg_vartype: String
-    implicit: ""
-    redact: true
-  "authenticationDatabase":
-    section: "Authentication Options"
-    description: "user source (defaults to dbname)"
-    arg_vartype: String
-    default: ""
-  "authenticationMechanism":
-    section: "Authentication Options"
-    description: "authentication mechanism"
-    arg_vartype: String
-  "gssapiServiceName":
-    section: "Authentication Options"
-    description: "Service name to use when authenticating using GSSAPI/Kerberos"
-    arg_vartype: String
-    default: mongodb
-  "gssapiHostName":
-    section: "Authentication Options"
-    description: "Remote host name to use for purpose of GSSAPI/Kerberos authentication"
-    arg_vartype: String
+    # Positional Arguments.
+    "dbaddress":
+        description: "dbaddress"
+        arg_vartype: String
+        hidden: true
+        positional: 1
+    "files":
+        description: "files"
+        arg_vartype: StringVector
+        hidden: true
+        positional: "2-"
 
-  oidcAccessToken:
-    description: >-
-      If set, the shell will pass this token to the server for any user that tries
-      authenticating with the MONGODB-OIDC mechanism. This will bypass the device authorization
-      grant flow.
-    source: cli
-    arg_vartype: String
-    cpp_varname: oidcClientGlobalParams.oidcAccessToken
+    # Authentication Options.
+    "username":
+        section: "Authentication Options"
+        short_name: "username"
+        single_name: u
+        description: "username for authentication"
+        arg_vartype: String
+    "password":
+        section: "Authentication Options"
+        short_name: "password"
+        single_name: p
+        description: "password for authentication"
+        arg_vartype: String
+        implicit: ""
+        redact: true
+    "authenticationDatabase":
+        section: "Authentication Options"
+        description: "user source (defaults to dbname)"
+        arg_vartype: String
+        default: ""
+    "authenticationMechanism":
+        section: "Authentication Options"
+        description: "authentication mechanism"
+        arg_vartype: String
+    "gssapiServiceName":
+        section: "Authentication Options"
+        description: "Service name to use when authenticating using GSSAPI/Kerberos"
+        arg_vartype: String
+        default: mongodb
+    "gssapiHostName":
+        section: "Authentication Options"
+        description: "Remote host name to use for purpose of GSSAPI/Kerberos authentication"
+        arg_vartype: String
 
-  "idleSessionTimeout":
-    description: "Terminate the Shell session if it's been idle for this many seconds"
-    arg_vartype: Int
-    default: 0
-    validator: {gte: 0}
+    oidcAccessToken:
+        description: >-
+            If set, the shell will pass this token to the server for any user that tries
+            authenticating with the MONGODB-OIDC mechanism. This will bypass the device authorization
+            grant flow.
+        source: cli
+        arg_vartype: String
+        cpp_varname: oidcClientGlobalParams.oidcAccessToken
 
+    "idleSessionTimeout":
+        description: "Terminate the Shell session if it's been idle for this many seconds"
+        arg_vartype: Int
+        default: 0
+        validator: {gte: 0}

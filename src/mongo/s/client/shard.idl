@@ -32,7 +32,7 @@ server_parameters:
     internalProhibitShardOperationRetry:
         description: >-
             Prohibit retrying shard operations.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         default: false
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gInternalProhibitShardOperationRetry
@@ -55,5 +55,5 @@ server_parameters:
         # Default to 30 seconds
         default: 30000
         validator:
-          gte: 0
+            gte: 0
         redact: false

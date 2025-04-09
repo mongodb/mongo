@@ -32,7 +32,7 @@ global:
         - "mongo/db/mongod_options_sharding.h"
         - "mongo/db/server_options.h"
     configs:
-        section: 'Sharding options'
+        section: "Sharding options"
         initializer:
             register: addMongodShardingOptions
 
@@ -42,16 +42,16 @@ configs:
             Assigns the config-server role to this node in a sharded cluster. The default listening
             port is 27019 and the default database directory is /data/configdb.
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         conflicts: shardsvr
     shardsvr:
         description: >-
             Assigns the shard-server role to this node in a sharded cluster. The default listening
             port is 27018.
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         conflicts: configsvr
-    'sharding.clusterRole':
+    "sharding.clusterRole":
         description: >-
             Assigns a role to this node in a sharded cluster. Possible values are:
             "configsvr": Assigns the config-server role. The default listening port is 27019.
@@ -60,21 +60,21 @@ configs:
         source: yaml
         validator:
             callback: validateShardingClusterRoleSetting
-    'sharding._overrideShardIdentity':
+    "sharding._overrideShardIdentity":
         description: >-
             Overrides the shardIdentity document settings stored in the local storage with
             a MongoDB Extended JSON document in string format.
         arg_vartype: String
         source: yaml
         conflicts: configsvr
-        requires: 'storage.queryableBackupMode'
+        requires: "storage.queryableBackupMode"
     routerPort:
         description: >-
             Assigns the router role to this node in a sharded cluster, and results in listening to a
             dedicated port (27016 by default) to serve routing requests.
         arg_vartype: Int
-        source: [ cli, ini ]
-        validator: { gte: 0, lte: 65535 }
+        source: [cli, ini]
+        validator: {gte: 0, lte: 65535}
         implicit:
             expr: static_cast<int>(mongo::ServerGlobalParams::RouterPort)
     maintenanceMode:
@@ -83,15 +83,15 @@ configs:
             sharding components. This allows for performing maintenance on this node. To skip 
             setting up just sharding components use --maintenanceMode=replicaSet. To skip setting 
             up both sharding and replication components use --maintenanceMode=standalone.
-        arg_vartype: String 
-        source: [ cli, ini ]
+        arg_vartype: String
+        source: [cli, ini]
         conflicts: [configsvr, shardsvr]
         validator:
             callback: validateMaintenanceModeSetting
-    'net.routerPort':
+    "net.routerPort":
         description: >-
             Assigns the router role to this node in a sharded cluster, and results in listening to a
             dedicated port to serve routing requests.
         source: yaml
         arg_vartype: Int
-        validator: { gte: 0, lte: 65535 }
+        validator: {gte: 0, lte: 65535}

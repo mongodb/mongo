@@ -26,7 +26,6 @@
 # it in the license file.
 #
 
-
 global:
     cpp_namespace: "mongo"
 

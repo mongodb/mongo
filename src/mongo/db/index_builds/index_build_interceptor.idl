@@ -27,37 +27,39 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  maxIndexBuildDrainBatchSize:
-    description: "Limits the number of keys that a hybrid index build on one collection will apply
-    per batch during the drain phase. A higher value prevents the operation for yielding locks and
-    storage engine resources."
-    set_at:
-      - runtime
-      - startup
-    cpp_varname: maxIndexBuildDrainBatchSize
-    cpp_vartype: AtomicWord<int>
-    default: 1000
-    validator:
-      gte: 1
-    redact: false
+    maxIndexBuildDrainBatchSize:
+        description: >-
+            Limits the number of keys that a hybrid index build on one collection will apply
+            per batch during the drain phase. A higher value prevents the operation for yielding locks and
+            storage engine resources.
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: maxIndexBuildDrainBatchSize
+        cpp_vartype: AtomicWord<int>
+        default: 1000
+        validator:
+            gte: 1
+        redact: false
 
-  maxIndexBuildDrainMemoryUsageMegabytes:
-    description: "Limits the amount of memory that a hybrid index build on one collection may
-    consume during the drain phase. A higher value will exert more cache pressure on the storage
-    engine."
-    set_at:
-      - runtime
-      - startup
-    cpp_varname: maxIndexBuildDrainMemoryUsageMegabytes
-    cpp_vartype: AtomicWord<int>
-    default: 16
-    validator:
-      gte: 16
-      lt: 2048
-    redact: false
+    maxIndexBuildDrainMemoryUsageMegabytes:
+        description: >-
+            Limits the amount of memory that a hybrid index build on one collection may
+            consume during the drain phase. A higher value will exert more cache pressure on the storage
+            engine.
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: maxIndexBuildDrainMemoryUsageMegabytes
+        cpp_vartype: AtomicWord<int>
+        default: 16
+        validator:
+            gte: 16
+            lt: 2048
+        redact: false

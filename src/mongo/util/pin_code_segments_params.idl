@@ -27,17 +27,17 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
-  lockCodeSegmentsInMemory:
-    description: >-
-      When enabled, the server will attempt to call mlock() on all memory ranges corresponding
-      to the process code segments (including shared libraries) on startup. If any call to mlock()
-      fails, the server will terminate. When disabled, the server will not attempt to pin any code
-      segments in memory. This feature is only available on Linux.
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: gLockCodeSegmentsInMemory
-    default: false
-    redact: false
+    lockCodeSegmentsInMemory:
+        description: >-
+            When enabled, the server will attempt to call mlock() on all memory ranges corresponding
+            to the process code segments (including shared libraries) on startup. If any call to mlock()
+            fails, the server will terminate. When disabled, the server will not attempt to pin any code
+            segments in memory. This feature is only available on Linux.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gLockCodeSegmentsInMemory
+        default: false
+        redact: false

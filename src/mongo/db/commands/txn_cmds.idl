@@ -34,27 +34,31 @@ imports:
 
 structs:
     AdditionalParticipantInfo:
-        description: "Contains information about a participant added to the transaction by
-                      another participant"
+        description:
+            "Contains information about a participant added to the transaction by
+            another participant"
         strict: false
         fields:
             shardId:
                 description: "The name of the shard that was added as a participant"
                 type: shard_id
             readOnly:
-                description: "True if the shard has the transaction in progress but has not done a
-                              write for it"
+                description:
+                    "True if the shard has the transaction in progress but has not done a
+                    write for it"
                 optional: true
                 type: bool
 
     TxnResponseMetadata:
-        description: "Contains fields a participant attaches in responses to successful transaction
-                      statements"
+        description:
+            "Contains fields a participant attaches in responses to successful transaction
+            statements"
         strict: false
         fields:
             readOnly:
-                description: "True if the shard has the transaction in progress but has not done a
-                              write for it"
+                description:
+                    "True if the shard has the transaction in progress but has not done a
+                    write for it"
                 optional: true
                 type: bool
             additionalParticipants:
@@ -80,14 +84,16 @@ structs:
             commitTimestamp:
                 type: timestamp
                 optional: true
-                description: "Specifies the timestamp at which the multi-document transaction should
-                              be committed.  Required for prepared transactions, not permitted for
-                              unprepared ones."
+                description:
+                    "Specifies the timestamp at which the multi-document transaction should
+                    be committed.  Required for prepared transactions, not permitted for
+                    unprepared ones."
             count:
                 type: long
                 optional: true
-                description: "The number of in-transaction operations applied in a transaction.
-                              This field is required only for unprepared transactions."
+                description:
+                    "The number of in-transaction operations applied in a transaction.
+                    This field is required only for unprepared transactions."
 
     AbortTransactionOplogObject:
         description: A document representing the 'o' field of an 'abortTransaction' oplog entry.
@@ -108,14 +114,16 @@ commands:
             none: true
         fields:
             commitTimestamp:
-                description: "Timestamp at which to commit the transaction. Required for prepared
-                              transactions and illegal for non-prepared ones."
+                description:
+                    "Timestamp at which to commit the transaction. Required for prepared
+                    transactions and illegal for non-prepared ones."
                 optional: true
                 type: timestamp
                 stability: stable
             recoveryToken:
-                description: "A mongos that doesn't know about this transaction can attempt to make
-                              progress on commit by processing using the info in the recoveryToken."
+                description:
+                    "A mongos that doesn't know about this transaction can attempt to make
+                    progress on commit by processing using the info in the recoveryToken."
                 optional: true
                 type: TxnRecoveryToken
                 stability: stable
@@ -132,8 +140,9 @@ commands:
             none: true
         fields:
             recoveryToken:
-                description: "A mongos that doesn't know about this transaction can attempt to make
-                              progress on abort by processing using the info in the recoveryToken."
+                description:
+                    "A mongos that doesn't know about this transaction can attempt to make
+                    progress on abort by processing using the info in the recoveryToken."
                 optional: true
                 type: TxnRecoveryToken
                 stability: stable

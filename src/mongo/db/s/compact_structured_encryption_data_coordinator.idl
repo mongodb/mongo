@@ -47,7 +47,8 @@ enums:
 
 structs:
     CompactStructuredEncryptionDataState:
-        description: "Represents the state of the compactStructuredEncryptionData pipeline
+        description:
+            "Represents the state of the compactStructuredEncryptionData pipeline
             for protocol version 2"
         strict: false
         chained_structs:

@@ -37,7 +37,7 @@ global:
 
 configs:
     help:
-        description: 'Show this usage information'
+        description: "Show this usage information"
         arg_vartype: Switch
         single_name: h
     dbpath:
@@ -45,53 +45,52 @@ configs:
             db data path for this test run. NOTE: the contents of this
             directory will be overwritten if it already exists
         arg_vartype: String
-        default: '/tmp/unittest'
+        default: "/tmp/unittest"
     debug:
-        description: 'Run tests with verbose output'
+        description: "Run tests with verbose output"
         arg_vartype: Switch
     list:
-        description: 'List available test suites'
+        description: "List available test suites"
         arg_vartype: Switch
         single_name: l
     filter:
-        description: 'String substring filter on test name'
+        description: "String substring filter on test name"
         arg_vartype: String
         single_name: f
-        cpp_varname: 'frameworkGlobalParams.filter'
+        cpp_varname: "frameworkGlobalParams.filter"
     verbose:
         description: Verbose
         arg_vartype: Switch
         single_name: v
     seed:
-        description: 'Random number seed'
+        description: "Random number seed"
         arg_vartype: UnsignedLongLong
-        cpp_varname: 'frameworkGlobalParams.seed'
+        cpp_varname: "frameworkGlobalParams.seed"
     runs:
-        description: 'Number of times to run each test'
+        description: "Number of times to run each test"
         arg_vartype: Int
-        cpp_varname: 'frameworkGlobalParams.runsPerTest'
+        cpp_varname: "frameworkGlobalParams.runsPerTest"
     perfHist:
-        description: 'Number of back runs of perf stats to display'
+        description: "Number of back runs of perf stats to display"
         arg_vartype: Unsigned
-        cpp_varname: 'frameworkGlobalParams.perfHist'
+        cpp_varname: "frameworkGlobalParams.perfHist"
     "storage.engine":
-        description: 'What storage engine to use'
+        description: "What storage engine to use"
         arg_vartype: String
         short_name: storageEngine
         default: wiredTiger
     enableFlowControl:
-        description: 'Whether Flow Control is enabled'
+        description: "Whether Flow Control is enabled"
         arg_vartype: Bool
         short_name: flowControl
         default: true
     setParameter:
-        description: 'Set a configurable parameter'
+        description: "Set a configurable parameter"
         arg_vartype: StringMap
         duplicate_behavior: append
     suites:
-        description: 'Test suites to run'
+        description: "Test suites to run"
         arg_vartype: StringVector
-        cpp_varname: 'frameworkGlobalParams.suites'
+        cpp_varname: "frameworkGlobalParams.suites"
         hidden: true
-        positional: '1-'
-
+        positional: "1-"

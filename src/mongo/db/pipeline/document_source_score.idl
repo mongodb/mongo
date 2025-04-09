@@ -26,37 +26,37 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
-  ScoreNormalizeFunction:
-    description: Normalize function options
-    type: string
-    values:
-      kNone : "none"
-      kSigmoid : "sigmoid"
-      kMinMaxScaler : "minMaxScaler"
+    ScoreNormalizeFunction:
+        description: Normalize function options
+        type: string
+        values:
+            kNone: "none"
+            kSigmoid: "sigmoid"
+            kMinMaxScaler: "minMaxScaler"
 
 structs:
-  ScoreSpec:
-    description: Specification for a $score stage.
-    strict: true
-    fields:
-      score:
-        description: Computes new value and reports it in score details metadata
-        type: IDLAnyType
-        optional: false
-      normalizeFunction:
-        description: Type of score normalization function (none, sigmoid, minMaxScaler)
-        type: ScoreNormalizeFunction
-        default: "kSigmoid"
-      weight:
-        description: Number to multiply the 'score' expression by, after normalization
-        type: safeDouble
-        default: 1.0
-        validator:
-          lte: 1.0
-          gte: 0.0
+    ScoreSpec:
+        description: Specification for a $score stage.
+        strict: true
+        fields:
+            score:
+                description: Computes new value and reports it in score details metadata
+                type: IDLAnyType
+                optional: false
+            normalizeFunction:
+                description: Type of score normalization function (none, sigmoid, minMaxScaler)
+                type: ScoreNormalizeFunction
+                default: "kSigmoid"
+            weight:
+                description: Number to multiply the 'score' expression by, after normalization
+                type: safeDouble
+                default: 1.0
+                validator:
+                    lte: 1.0
+                    gte: 0.0

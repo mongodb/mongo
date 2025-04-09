@@ -26,7 +26,7 @@
 # it in the license file.
 
 imports:
-  - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
 
 global:
     cpp_namespace: mongo
@@ -34,27 +34,29 @@ global:
         - "mongo/db/server_feature_flags_gen.h"
 
 structs:
-  DefaultMaxTimeMSParam:
-    description: "Cluster-wide default maxTimeMS used in query operations. When set to 0, operations
-                  will not time out. If a query specifies an explicit 'maxTimeMS' value, it will
-                  overrides this global default."
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      readOperations:
-        type: safeInt64
-        default: 0
-        validator:
-          gte: 0
+    DefaultMaxTimeMSParam:
+        description:
+            "Cluster-wide default maxTimeMS used in query operations. When set to 0, operations
+            will not time out. If a query specifies an explicit 'maxTimeMS' value, it will
+            overrides this global default."
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            readOperations:
+                type: safeInt64
+                default: 0
+                validator:
+                    gte: 0
 
 server_parameters:
-  defaultMaxTimeMS:
-    description: "Cluster-wide default maxTimeMS used in query operations. When set to 0, operations
-                  will not time out. If a query specifies an explicit 'maxTimeMS' value, it will
-                  overrides this global default."
-    set_at: cluster
-    omit_in_ftdc: false
-    cpp_vartype: DefaultMaxTimeMSParam
-    cpp_varname: defaultMaxTimeMS
-    redact: false
+    defaultMaxTimeMS:
+        description:
+            "Cluster-wide default maxTimeMS used in query operations. When set to 0, operations
+            will not time out. If a query specifies an explicit 'maxTimeMS' value, it will
+            overrides this global default."
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: DefaultMaxTimeMSParam
+        cpp_varname: defaultMaxTimeMS
+        redact: false

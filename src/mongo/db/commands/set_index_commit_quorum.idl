@@ -48,11 +48,13 @@ commands:
         fields:
             indexNames:
                 type: array<string>
-                description: "an array of all index names matching a single prior createIndexes
-                              request."
+                description:
+                    "an array of all index names matching a single prior createIndexes
+                    request."
             commitQuorum:
                 type: CommitQuorum
-                description: "commitQuorum can be set to the same values as writeConcern.w and
-                              indicates how many and/or which replica set members must be ready to
-                              commit the index build before the primary will proceed to commit the
-                              index build."
+                description:
+                    "commitQuorum can be set to the same values as writeConcern.w and
+                    indicates how many and/or which replica set members must be ready to
+                    commit the index build before the primary will proceed to commit the
+                    index build."

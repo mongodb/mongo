@@ -34,8 +34,9 @@ imports:
 
 feature_flags:
     featureFlagPauseMigrationsDuringMultiUpdatesAvailable:
-        description: "Feature flag indicating whether or not the pauseMigrationsDuringMultiUpdates
-        cluster parameter is available."
+        description:
+            "Feature flag indicating whether or not the pauseMigrationsDuringMultiUpdates
+            cluster parameter is available."
         cpp_varname: gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
         default: true
         version: 8.0

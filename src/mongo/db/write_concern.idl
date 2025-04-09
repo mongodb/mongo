@@ -57,8 +57,9 @@ types:
 
 structs:
     WriteConcernIdl:
-        description: "An object representing a write concern document, used only for mapping to
-                      and from BSON."
+        description:
+            "An object representing a write concern document, used only for mapping to
+            and from BSON."
         strict: true
         fields:
             w:

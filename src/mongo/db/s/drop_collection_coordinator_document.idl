@@ -78,4 +78,3 @@ structs:
                 type: uuid
                 description: "The expected UUID of the collection, only set and used in C2C replication."
                 optional: true
-

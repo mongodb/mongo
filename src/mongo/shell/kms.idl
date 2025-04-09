@@ -44,61 +44,59 @@ structs:
     localKMS:
         description: "Local KMS config"
         fields:
-          key: bindata_generic
+            key: bindata_generic
 
     kmsProviders:
-      description: "Supported KMS Providers"
-      strict: true
-      fields:
-        local:
-          type: localKMS
-          optional: true
+        description: "Supported KMS Providers"
+        strict: true
+        fields:
+            local:
+                type: localKMS
+                optional: true
 
     clientSideFLEOptions:
         description: "FLE Options inputted through the Mongo constructor in the shell"
         fields:
-          keyVaultClient: #Parsed as a JSHandleValue, not through IDL
-            type: void
-            ignore: true
-          keyVaultNamespace:
-            type: string
-          kmsProviders: kmsProviders
-          schemaMap:
-            type: object
-            optional: true
-          bypassAutoEncryption:
-            type: bool
-            optional: true
+            keyVaultClient: #Parsed as a JSHandleValue, not through IDL
+                type: void
+                ignore: true
+            keyVaultNamespace:
+                type: string
+            kmsProviders: kmsProviders
+            schemaMap:
+                type: object
+                optional: true
+            bypassAutoEncryption:
+                type: bool
+                optional: true
 
     localMasterKey:
         description: "Local KMS Key Store Description"
         fields:
-          provider:
-            type: string
-            default: '"local"'
+            provider:
+                type: string
+                default: '"local"'
 
     localMasterKeyAndMaterial:
         description: "Local KMS Key Material Description"
         fields:
-          keyMaterial:
-            type: bindata_generic
-          masterKey:
-            type: localMasterKey
+            keyMaterial:
+                type: bindata_generic
+            masterKey:
+                type: localMasterKey
 
     keyStoreRecord:
         description: "A V0 Key Store Record"
         fields:
-          _id: uuid
-          keyMaterial: bindata_generic
-          creationDate: date
-          updateDate: date
-          status: int
-          version:
-            type: long
-            default: 0
-          masterKey: object
-          keyAltNames:
-              type: array<string>
-              ignore: true
-
-
+            _id: uuid
+            keyMaterial: bindata_generic
+            creationDate: date
+            updateDate: date
+            status: int
+            version:
+                type: long
+                default: 0
+            masterKey: object
+            keyAltNames:
+                type: array<string>
+                ignore: true

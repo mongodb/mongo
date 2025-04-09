@@ -30,9 +30,9 @@
 # parameters are not represented in the structre.
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/namespace_string.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/namespace_string.h"
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"
@@ -55,8 +55,9 @@ types:
         is_view: false
     object_owned_nonempty_serialize:
         bson_serialization_type: any
-        description: "An owned BSONObj, which gets serialized only when the BSON is not empty.
-        The object is ignored if empty, null or missing."
+        description: >-
+            An owned BSONObj, which gets serialized only when the BSON is not empty.
+            The object is ignored if empty, null or missing.
         cpp_type: "mongo::BSONObj"
         serializer: "::mongo::serializeBSONWhenNotEmpty"
         deserializer: "::mongo::parseOwnedBSON"
@@ -64,187 +65,196 @@ types:
         is_view: false
 
 commands:
-  find:
-    cpp_name: FindCommandRequestBase
-    command_name: find
-    description: "A struct representing the find command"
-    strict: true
-    namespace: concatenate_with_db_or_uuid
-    api_version: "1"
-    access_check:
-        complex:
-            - check: is_authorized_to_parse_namespace_element
-            - privilege:
-                resource_pattern: exact_namespace
-                action_type: find
-            - privilege:
-                resource_pattern: cluster
-                action_type: useUUID
-    reply_type: CursorInitialReply
-    fields:
-      filter:
-        description: "The query predicate. If unspecified, then all documents in the collection
-        will match the predicate."
-        type: object_owned_nonempty_serialize
-        stability: stable
-      projection:
-        description: "The projection specification to determine which fields to include in the
-        returned documents."
-        type: object_owned_nonempty_serialize
-        stability: stable
-      sort:
-        description: "The sort specification for the ordering of the results."
-        type: object_owned_nonempty_serialize
-        stability: stable
-      hint:
-        description: "Specify either the index name as a string or the index key pattern. If
-        specified, then the query system will only consider plans using the hinted index."
-        type: indexHint
-        default: mongo::BSONObj()
-        stability: stable
-      querySettings:
-        description: "Query settings for the given query"
-        type: QuerySettings
-        optional: true
-        stability: internal
-      collation:
-        description: "Specifies the collation to use for the operation."
-        type: object_owned_nonempty_serialize
-        stability: stable
-      skip:
-        description: "Number of documents to skip."
-        type: safeInt64
-        optional: true
-        validator: { gte: 0 }
-        stability: stable
-      limit:
-        description: "The maximum number of documents to return."
-        type: safeInt64
-        optional: true
-        validator: { gte: 0 }
-        stability: stable
-      batchSize:
-        description: "The number of documents to return in the first batch."
-        type: safeInt64
-        optional: true
-        validator: { gte: 0 }
-        stability: stable
-      singleBatch:
-        description: "Determines whether to close the cursor after the first batch."
-        type: optionalBool
-        stability: stable
-      allowDiskUse:
-        description: "Use allowDiskUse to allow MongoDB to use temporary files on disk to store
-        data exceeding the 100 megabyte memory limit while processing a blocking sort operation."
-        type: optionalBool
-        stability: stable
-      min:
-        description: "The inclusive lower bound for a specific index."
-        type: object_owned_nonempty_serialize
-        stability: unstable
-      max:
-        description: "The exclusive upper bound for a specific index."
-        type: object_owned_nonempty_serialize
-        stability: unstable
-      returnKey:
-        description: "If true, returns only the index keys in the resulting documents."
-        type: optionalBool
-        stability: unstable
-      showRecordId:
-        description: "Determines whether to return the record identifier for each document."
-        type: optionalBool
-        stability: unstable
-      tailable:
-        description: "Returns a tailable cursor for a capped collections."
-        type: optionalBool
-        stability: unstable
-      oplogReplay:
-        description: "Deprecated. An internal command for replaying a replica set’s oplog."
-        type: boolNoOpSerializer
-        optional: true
-        stability: unstable
-      noCursorTimeout:
-        description: "Prevents the server from timing out idle cursors after an inactivity period."
-        type: optionalBool
-        stability: unstable
-      awaitData:
-        description: "Use in conjunction with the tailable option to block a getMore command on the
-        cursor temporarily if at the end of data rather than returning no data."
-        type: optionalBool
-        stability: unstable
-      allowPartialResults:
-        description: "For queries against a sharded collection, allows the command (or subsequent
-        getMore commands) to return partial results, rather than an error, if one or more queried
-        shards are unavailable."
-        type: optionalBool
-        stability: stable
-      let:
-        description: "Allows user defined variables to be used inside $expr."
-        type: object_owned
-        optional: true
-        stability: stable
-      term:
-        description: "Internal usage only. Currently used by the replication system."
-        type: safeInt64
-        optional: true
-        stability: unstable
-      readOnce:
-        description: "Deprecated. Used to inform the server whether this operation intends to
-        perform reads that do not need to keep data in the storage engine cache."
-        type: optionalBool
-        stability: unstable
-      $_requestResumeToken:
-        description: "Internal usage only. This flag is currently used by the replication system to
-        request a resumeToken. If the client requested a resume token and we are scanning the
-        oplog, return timestamp-based tokens. Otherwise, returns generic RecordId-based tokens."
-        cpp_name: requestResumeToken
-        type: optionalBool
-        stability: unstable
-      $_resumeAfter:
-        description: "Internal usage only. If present, the collection scan will seek to the exact
-        RecordId, or return KeyNotFound if it does not exist. Must only be set on forward collection
-        scans. This field cannot be used in conjunction with 'min', 'max', or '$_startAt', and is
-        not valid on views, or on mongos."
-        cpp_name: resumeAfter
-        type: object_owned_nonempty_serialize
-        default: mongo::BSONObj()
-        stability: unstable
-      $_startAt:
-        description: "Internal usage only. If present, the collection scan will seek to the exact
-        RecordId, or the next available RecordId if it does not exist. Must only be set on forward
-        collection scans. This field cannot be used in conjunction with 'min', 'max', or
-        '$_resumeAfter', and is not valid on views, or on mongos."
-        cpp_name: startAt
-        type: object_owned_nonempty_serialize
-        default: mongo::BSONObj()
-        stability: internal
-      runtimeConstants:
-        description: "A collection of values that do not change once computed."
-        cpp_name: legacyRuntimeConstants
-        type: LegacyRuntimeConstants
-        optional: true
-        stability: unstable
-      collectionUUID:
-        description: "The expected UUID of the collection."
-        type: uuid
-        optional: true
-        stability: unstable
-      encryptionInformation:
-        description: "Encryption Information schema and other tokens for CRUD commands"
-        type: EncryptionInformation
-        optional: true
-        stability: unstable
-      mirrored:
-        description: "Indicates whether the operation is a mirrored read"
-        type: optionalBool
-        stability: unstable
-      sampleId:
-        description: "The unique sample id for the operation if it has been chosen for sampling."
-        type: uuid
-        optional: true
-        stability: unstable
-      includeQueryStatsMetrics:
-        description: "Determines whether or not to include query stats metrics in the response."
-        type: optionalBool
-        stability: internal
-
+    find:
+        cpp_name: FindCommandRequestBase
+        command_name: find
+        description: "A struct representing the find command"
+        strict: true
+        namespace: concatenate_with_db_or_uuid
+        api_version: "1"
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                      resource_pattern: exact_namespace
+                      action_type: find
+                - privilege:
+                      resource_pattern: cluster
+                      action_type: useUUID
+        reply_type: CursorInitialReply
+        fields:
+            filter:
+                description: >-
+                    The query predicate. If unspecified, then all documents in the collection
+                    will match the predicate.
+                type: object_owned_nonempty_serialize
+                stability: stable
+            projection:
+                description: >-
+                    The projection specification to determine which fields to include in the
+                    returned documents.
+                type: object_owned_nonempty_serialize
+                stability: stable
+            sort:
+                description: "The sort specification for the ordering of the results."
+                type: object_owned_nonempty_serialize
+                stability: stable
+            hint:
+                description: >-
+                    Specify either the index name as a string or the index key pattern. If
+                    specified, then the query system will only consider plans using the hinted index.
+                type: indexHint
+                default: mongo::BSONObj()
+                stability: stable
+            querySettings:
+                description: "Query settings for the given query"
+                type: QuerySettings
+                optional: true
+                stability: internal
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object_owned_nonempty_serialize
+                stability: stable
+            skip:
+                description: "Number of documents to skip."
+                type: safeInt64
+                optional: true
+                validator: {gte: 0}
+                stability: stable
+            limit:
+                description: "The maximum number of documents to return."
+                type: safeInt64
+                optional: true
+                validator: {gte: 0}
+                stability: stable
+            batchSize:
+                description: "The number of documents to return in the first batch."
+                type: safeInt64
+                optional: true
+                validator: {gte: 0}
+                stability: stable
+            singleBatch:
+                description: "Determines whether to close the cursor after the first batch."
+                type: optionalBool
+                stability: stable
+            allowDiskUse:
+                description: >-
+                    Use allowDiskUse to allow MongoDB to use temporary files on disk to store
+                    data exceeding the 100 megabyte memory limit while processing a blocking sort operation."
+                type: optionalBool
+                stability: stable
+            min:
+                description: "The inclusive lower bound for a specific index."
+                type: object_owned_nonempty_serialize
+                stability: unstable
+            max:
+                description: "The exclusive upper bound for a specific index."
+                type: object_owned_nonempty_serialize
+                stability: unstable
+            returnKey:
+                description: "If true, returns only the index keys in the resulting documents."
+                type: optionalBool
+                stability: unstable
+            showRecordId:
+                description: "Determines whether to return the record identifier for each document."
+                type: optionalBool
+                stability: unstable
+            tailable:
+                description: "Returns a tailable cursor for a capped collections."
+                type: optionalBool
+                stability: unstable
+            oplogReplay:
+                description: "Deprecated. An internal command for replaying a replica set’s oplog."
+                type: boolNoOpSerializer
+                optional: true
+                stability: unstable
+            noCursorTimeout:
+                description: "Prevents the server from timing out idle cursors after an inactivity period."
+                type: optionalBool
+                stability: unstable
+            awaitData:
+                description: >-
+                    Use in conjunction with the tailable option to block a getMore command on the
+                    cursor temporarily if at the end of data rather than returning no data."
+                type: optionalBool
+                stability: unstable
+            allowPartialResults:
+                description: >-
+                    For queries against a sharded collection, allows the command (or subsequent
+                    getMore commands) to return partial results, rather than an error, if one or more queried
+                    shards are unavailable.
+                type: optionalBool
+                stability: stable
+            let:
+                description: "Allows user defined variables to be used inside $expr."
+                type: object_owned
+                optional: true
+                stability: stable
+            term:
+                description: "Internal usage only. Currently used by the replication system."
+                type: safeInt64
+                optional: true
+                stability: unstable
+            readOnce:
+                description: >-
+                    Deprecated. Used to inform the server whether this operation intends to
+                    perform reads that do not need to keep data in the storage engine cache.
+                type: optionalBool
+                stability: unstable
+            $_requestResumeToken:
+                description: >-
+                    Internal usage only. This flag is currently used by the replication system to
+                    request a resumeToken. If the client requested a resume token and we are scanning the
+                    oplog, return timestamp-based tokens. Otherwise, returns generic RecordId-based tokens.
+                cpp_name: requestResumeToken
+                type: optionalBool
+                stability: unstable
+            $_resumeAfter:
+                description: >-
+                    Internal usage only. If present, the collection scan will seek to the exact
+                    RecordId, or return KeyNotFound if it does not exist. Must only be set on forward collection
+                    scans. This field cannot be used in conjunction with 'min', 'max', or '$_startAt', and is
+                    not valid on views, or on mongos.
+                cpp_name: resumeAfter
+                type: object_owned_nonempty_serialize
+                default: mongo::BSONObj()
+                stability: unstable
+            $_startAt:
+                description: >-
+                    Internal usage only. If present, the collection scan will seek to the exact
+                    RecordId, or the next available RecordId if it does not exist. Must only be set on forward
+                    collection scans. This field cannot be used in conjunction with 'min', 'max', or
+                    '$_resumeAfter', and is not valid on views, or on mongos.
+                cpp_name: startAt
+                type: object_owned_nonempty_serialize
+                default: mongo::BSONObj()
+                stability: internal
+            runtimeConstants:
+                description: "A collection of values that do not change once computed."
+                cpp_name: legacyRuntimeConstants
+                type: LegacyRuntimeConstants
+                optional: true
+                stability: unstable
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true
+                stability: unstable
+            encryptionInformation:
+                description: "Encryption Information schema and other tokens for CRUD commands"
+                type: EncryptionInformation
+                optional: true
+                stability: unstable
+            mirrored:
+                description: "Indicates whether the operation is a mirrored read"
+                type: optionalBool
+                stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: unstable
+            includeQueryStatsMetrics:
+                description: "Determines whether or not to include query stats metrics in the response."
+                type: optionalBool
+                stability: internal

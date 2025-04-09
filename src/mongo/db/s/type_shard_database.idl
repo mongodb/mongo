@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/s/catalog/types_validators.h" 
+        - "mongo/s/catalog/types_validators.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -37,8 +37,9 @@ imports:
 
 structs:
     ShardDatabaseTypeBase:
-        description: "Represents the layout and contents of documents contained in the shard 
-                      server's config.cache.databases collection."
+        description:
+            "Represents the layout and contents of documents contained in the shard
+            server's config.cache.databases collection."
         strict: false
         fields:
             _id:

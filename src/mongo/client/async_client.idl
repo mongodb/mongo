@@ -27,17 +27,17 @@
 #
 
 global:
-   cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
-  connectionAcquisitionToWireLoggingRate:
-    description: >-
-        The rate at which egress connection metrics below a certain time threshold will be logged at
-        info level. This only applies for the 'network.totalConnectionAcquiredToWireMillis'
-        server status metric.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<double>
-    cpp_varname: gConnectionAcquisitionToWireLoggingRate
-    default: 0.05
-    validator: { gte: 0.0, lte: 1.0 }
-    redact: false
+    connectionAcquisitionToWireLoggingRate:
+        description: >-
+            The rate at which egress connection metrics below a certain time threshold will be logged at
+            info level. This only applies for the 'network.totalConnectionAcquiredToWireMillis'
+            server status metric.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gConnectionAcquisitionToWireLoggingRate
+        default: 0.05
+        validator: {gte: 0.0, lte: 1.0}
+        redact: false

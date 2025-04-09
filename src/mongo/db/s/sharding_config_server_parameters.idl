@@ -36,7 +36,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: minNumChunksForSessionsCollection
         default: 1024
-        validator: { gte: 1, lte: 1000000 }
+        validator: {gte: 1, lte: 1000000}
         redact: false
 
     chunkDefragmentationThrottlingMS:
@@ -47,7 +47,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: chunkDefragmentationThrottlingMS
         validator:
-          gte: 0
+            gte: 0
         default: 1000
         redact: false
 
@@ -66,7 +66,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: autoMergerThrottlingMS
         validator:
-          gte: 0
+            gte: 0
         default: 15000 # 15 seconds
         redact: false
 
@@ -97,7 +97,7 @@ server_parameters:
             The amount of time in seconds that the config server should wait before removing the
             key documents fetched from a replica set when it gets added to the cluster
             as a shard.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gNewShardExistingClusterTimeKeysExpirationSecs
         default:
@@ -108,9 +108,9 @@ server_parameters:
 
     enableShardedIndexConsistencyCheck:
         description: >-
-          Enable the periodic sharded index consistency check on the config server's primary.
-          The count of sharded collections with inconsistent indexes is exposed via the
-          'shardedIndexConsistency' section in the serverStatus output.
+            Enable the periodic sharded index consistency check on the config server's primary.
+            The count of sharded collections with inconsistent indexes is exposed via the
+            'shardedIndexConsistency' section in the serverStatus output.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableShardedIndexConsistencyCheck
@@ -118,7 +118,7 @@ server_parameters:
         redact: false
 
     shardedIndexConsistencyCheckIntervalMS:
-        description: 'Time interval in milliseconds between subsequent index checks.'
+        description: "Time interval in milliseconds between subsequent index checks."
         set_at: [startup]
         cpp_vartype: int
         cpp_varname: shardedIndexConsistencyCheckIntervalMS

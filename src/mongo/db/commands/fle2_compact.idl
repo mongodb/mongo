@@ -43,7 +43,7 @@ structs:
             stats: CompactStats
 
 commands:
-    compactStructuredEncryptionData :
+    compactStructuredEncryptionData:
         description: "Parser for the 'compactStructuredEncryptionData' command"
         command_name: compactStructuredEncryptionData
         api_version: ""

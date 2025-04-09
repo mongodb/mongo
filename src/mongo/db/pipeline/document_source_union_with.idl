@@ -27,22 +27,22 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/aggregate_command.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/aggregate_command.idl"
 
 structs:
-  UnionWithSpec:
-    description: Specification for a $unionWith stage given in the full, explicit format.
-    strict: true
-    fields:
-      coll:
-        description: The collection to union with.
-        optional: true
-        type: string
-      pipeline:
-        description: An optional pipeline to apply to the collection being unioned.
-        optional: true
-        type: pipeline
+    UnionWithSpec:
+        description: Specification for a $unionWith stage given in the full, explicit format.
+        strict: true
+        fields:
+            coll:
+                description: The collection to union with.
+                optional: true
+                type: string
+            pipeline:
+                description: An optional pipeline to apply to the collection being unioned.
+                optional: true
+                type: pipeline

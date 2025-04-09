@@ -29,27 +29,27 @@
 # SHA512Block type
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/crypto/sha512_block.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/crypto/sha512_block.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
-  sha512Block:
-    bson_serialization_type: bindata
-    bindata_subtype: generic
-    description: "A fixed-size byte array that holds the result of a SHA512 computation"
-    cpp_type: mongo::SHA512Block
-    serializer: "mongo::SHA512Block::toCDR"
-    deserializer: "mongo::SHA512Block::fromBinData"
-    is_view: false
+    sha512Block:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: "A fixed-size byte array that holds the result of a SHA512 computation"
+        cpp_type: mongo::SHA512Block
+        serializer: "mongo::SHA512Block::toCDR"
+        deserializer: "mongo::SHA512Block::fromBinData"
+        is_view: false
 
-  sha512BlockHex:
-    bson_serialization_type: string
-    description: "A fixed size hex string representing a SHA512 computation"
-    cpp_type: mongo::SHA512Block
-    serializer: "mongo::SHA512Block::toHexString"
-    deserializer: "mongo::SHA512Block::fromHexString"
-    is_view: false
+    sha512BlockHex:
+        bson_serialization_type: string
+        description: "A fixed size hex string representing a SHA512 computation"
+        cpp_type: mongo::SHA512Block
+        serializer: "mongo::SHA512Block::toHexString"
+        deserializer: "mongo::SHA512Block::fromHexString"
+        is_view: false

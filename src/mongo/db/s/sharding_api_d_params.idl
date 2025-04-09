@@ -31,22 +31,22 @@ global:
 server_parameters:
     metadataRefreshInTransactionMaxWaitMS:
         description: >-
-          Maximum time in milliseconds to wait on a blocking operation when refreshing the filtering 
-          metadata within a transaction.
+            Maximum time in milliseconds to wait on a blocking operation when refreshing the filtering 
+            metadata within a transaction.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: metadataRefreshInTransactionMaxWaitMS
         deprecated_name: metadataRefreshInTransactionMaxWaitBehindCritSecMS
         validator:
-          gte: 0
+            gte: 0
         default: 500
         redact: false
 
     directConnectionChecksWithSingleShard:
         description: >-
-          Controls whether warnings should be emitted for direct connection operations when there is
-          only a single shard in the cluster. Will have no effect on the behavior in clusters with
-          two or more shards.
+            Controls whether warnings should be emitted for direct connection operations when there is
+            only a single shard in the cluster. Will have no effect on the behavior in clusters with
+            two or more shards.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: directConnectionChecksWithSingleShard

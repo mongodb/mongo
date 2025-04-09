@@ -27,46 +27,45 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  ClientTLSParameters:
-    description: "Parser for TLS parameters passed to 'new Mongo()' in jstests"
-    strict: true
-    fields:
-      certificateKeyFile:
-        description: "PEM certificate/key file for TLS"
-        type: string
-        optional: true
-      certificateKeyFilePassword:
-        description: "Password for key in PEM file for TLS"
-        type: string
-        optional: true
-      CAFile:
-        description: "Certificate Authority file for TLS"
-        type: string
-        optional: true
-      CRLFile:
-        description: "Certificate Revocation List file for TLS"
-        type: string
-        optional: true
-      allowInvalidHostnames:
-        description: "Allow connections to servers with non-matching hostnames"
-        type: bool
-        default: false
-      allowInvalidCertificates:
-        description: "Allow connections to servers with invalid certificates"
-        type: bool
-        default: false
-      certificateSelector:
-        description: "TLS Certificate in system store"
-        type: string
-        optional: true
-      disabledProtocols:
-        description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2,TLS1_3]"
-        type: string
-        optional: true
-
+    ClientTLSParameters:
+        description: "Parser for TLS parameters passed to 'new Mongo()' in jstests"
+        strict: true
+        fields:
+            certificateKeyFile:
+                description: "PEM certificate/key file for TLS"
+                type: string
+                optional: true
+            certificateKeyFilePassword:
+                description: "Password for key in PEM file for TLS"
+                type: string
+                optional: true
+            CAFile:
+                description: "Certificate Authority file for TLS"
+                type: string
+                optional: true
+            CRLFile:
+                description: "Certificate Revocation List file for TLS"
+                type: string
+                optional: true
+            allowInvalidHostnames:
+                description: "Allow connections to servers with non-matching hostnames"
+                type: bool
+                default: false
+            allowInvalidCertificates:
+                description: "Allow connections to servers with invalid certificates"
+                type: bool
+                default: false
+            certificateSelector:
+                description: "TLS Certificate in system store"
+                type: string
+                optional: true
+            disabledProtocols:
+                description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2,TLS1_3]"
+                type: string
+                optional: true

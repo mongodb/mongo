@@ -36,259 +36,260 @@ imports:
     - "mongo/s/resharding/common_types.idl"
 
 structs:
-  ShardsvrReshardingDonorFetchFinalCollectionStatsResponse:
-      description: "Response for the _shardsvrReshardingDonorFetchFinalCollectionStats command."
-      is_command_reply: true
-      strict: false
-      fields:
-        documentsDelta:
-          type: safeInt64
-          description: "The change in the number of documents since the provided cloneTimestamp."
-
+    ShardsvrReshardingDonorFetchFinalCollectionStatsResponse:
+        description: "Response for the _shardsvrReshardingDonorFetchFinalCollectionStats command."
+        is_command_reply: true
+        strict: false
+        fields:
+            documentsDelta:
+                type: safeInt64
+                description: "The change in the number of documents since the provided cloneTimestamp."
 
 commands:
-  reshardCollection:
-    description: "The public reshardCollection command on mongos."
-    command_name: reshardCollection
-    strict: true
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      key:
-        type: object
-        description: "The index specification document to use as the new shard key."
-        optional: false
-      unique:
-        type: bool
-        description: "Whether the shard key index should enforce a unique constraint."
-        optional: true
-      numInitialChunks:
-        type: safeInt64
-        description: "The number of chunks to create initially."
-        optional: true
-      collation:
-        type: object
-        description: "The collation to use for the shard key index."
-        optional: true
-      zones:
-        type: array<ReshardingZoneType>
-        description: "The zones for the new shard key."
-        optional: true
-      _presetReshardedChunks:
-        type: array<ReshardedChunk>
-        description: "Mapping of chunk ranges. This is only for testing purposes."
-        optional: true
-      collectionUUID:
+    reshardCollection:
+        description: "The public reshardCollection command on mongos."
+        command_name: reshardCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            key:
+                type: object
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint."
+                optional: true
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially."
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+            zones:
+                type: array<ReshardingZoneType>
+                description: "The zones for the new shard key."
+                optional: true
+            _presetReshardedChunks:
+                type: array<ReshardedChunk>
+                description: "Mapping of chunk ranges. This is only for testing purposes."
+                optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+            shardDistribution:
+                type: array<ShardKeyRange>
+                description: "The key ranges for the new shard key. This should be continuous and complete."
+                optional: true
+            forceRedistribution:
+                type: bool
+                description: "Whether initiate reshardCollection if the shardKey doesn't change."
+                optional: true
+            reshardingUUID:
+                type: uuid
+                description: >-
+                    "A user-provided identifier used to identify this resharding operation for
+                    retryability purposes."
+                optional: true
+            performVerification:
+                type: bool
+                description: "Whether to perform data comparison verification."
+                optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    uuid to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."
+            numSamplesPerChunk:
+                type: safeInt64
+                description: "The number of documents to sample on new chunks"
+                optional: true
+
+    _configsvrReshardCollection:
+        command_name: _configsvrReshardCollection
+        cpp_name: ConfigsvrReshardCollection
+        description: "The internal reshardCollection command on the config server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            key:
+                type: object
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint."
+                optional: true
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially."
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+            zones:
+                type: array<ReshardingZoneType>
+                description: "The zones associated with the new shard key."
+                optional: true
+            _presetReshardedChunks:
+                type: array<ReshardedChunk>
+                description: >-
+                    "Mapping of chunk ranges to be used as the initial split output. This is only for
+                    testing purposes."
+                optional: true
+            shardDistribution:
+                type: array<ShardKeyRange>
+                description: "The key ranges for the new shard key. This should be continuous and complete."
+                optional: true
+            forceRedistribution:
+                type: bool
+                description: "Whether initiate reshardCollection if the shardKey doesn't change."
+                optional: true
+            reshardingUUID:
+                type: uuid
+                description: >-
+                    "A user-provided identifier used to identify this resharding operation for
+                    retryability purposes."
+                optional: true
+            provenance:
+                type: ReshardingProvenance
+                description: "The source operation that called this resharding operation."
+                optional: true
+            performVerification:
+                type: bool
+                description: "Whether to perform data comparison verification."
+                optional: true
+            recipientOplogBatchTaskCount:
+                type: long
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into, so that it may be applied
+                    concurrently by multiple threads on the recipient."
+                optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    uuid to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."
+            numSamplesPerChunk:
+                type: safeInt64
+                description: "The number of documents to sample on new chunks"
+                optional: true
+
+    moveCollection:
+        description: "The public command on mongos that moves one unsharded collection from source to destination shard."
+        command_name: moveCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            toShard:
+                type: shard_id
+                description: "The id specification of the destination shard."
+                optional: false
+            performVerification:
+                type: bool
+                description: "Whether to perform data comparison verification."
+                optional: true
+            oplogBatchApplierTaskCount:
+                type: safeInt64
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into,
+                    so that it may be applied concurrently by multiple threads on the recipient."
+                validator:
+                    gte: 1
+                    lte: 256
+                optional: true
+
+    unshardCollection:
+        description: "The public command on mongos to unshard a sharded collection."
+        command_name: unshardCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            toShard:
+                type: shard_id
+                description: "The id specification of the destination shard. If empty, we will pick the emptiest shard."
+                optional: true
+            performVerification:
+                type: bool
+                description: "Whether to perform data comparison verification."
+                optional: true
+            oplogBatchApplierTaskCount:
+                type: safeInt64
+                description: >-
+                    "The number of subtasks to divide a single oplog batch into,
+                    so that it may be applied concurrently by multiple threads on the recipient."
+                validator:
+                    gte: 1
+                    lte: 256
+                optional: true
+
+    _shardsvrReshardingDonorStartChangeStreamsMonitor:
+        command_name: _shardsvrReshardingDonorStartChangeStreamsMonitor
+        cpp_name: ShardsvrReshardingDonorStartChangeStreamsMonitor
+        description:
+            "The internal command for making a resharding donor shard start monitoring the
+            changes in the collection being resharded between the start of
+            the cloning phase and the start of the critical section."
+        namespace: type
+        type: namespacestring
+        reply_type: OkReply
+        api_version: ""
+        strict: false
+        fields:
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for the resharding operation."
+            cloneTimestamp:
+                type: timestamp
+                description: "The clone timestamp for the resharding operation."
+
+    _shardsvrReshardingDonorFetchFinalCollectionStats:
+        command_name: _shardsvrReshardingDonorFetchFinalCollectionStats
+        cpp_name: ShardsvrReshardingDonorFetchFinalCollectionStats
+        description:
+            "The internal command for querying a resharding donor shard for the changes in
+            the number of documents in the collection being resharded between the start of
+            the cloning phase and the start of the critical section."
+        namespace: type
+        type: namespacestring
+        reply_type: ShardsvrReshardingDonorFetchFinalCollectionStatsResponse
+        api_version: ""
+        strict: false
+        fields:
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for the resharding operation."
+
+    _shardsvrReshardRecipientClone:
+        description: "The internal recipient clone command."
+        command_name: _shardsvrReshardRecipientClone
+        cpp_name: ShardsvrReshardRecipientClone
         type: uuid
-        description: "The expected UUID of the collection."
-        optional: true
-      shardDistribution:
-        type: array<ShardKeyRange>
-        description: "The key ranges for the new shard key. This should be continuous and complete."
-        optional: true
-      forceRedistribution:
-        type: bool
-        description: "Whether initiate reshardCollection if the shardKey doesn't change."
-        optional: true
-      reshardingUUID:
-        type: uuid
-        description: >-
-            "A user-provided identifier used to identify this resharding operation for
-            retryability purposes."
-        optional: true
-      performVerification:
-        type: bool
-        description: "Whether to perform data comparison verification."
-        optional: true
-      relaxed:
-        type: optionalBool
-        description: >-
-          "Runs the cloner aggregation without specifying a collection
-          uuid to avoid errors in a scenario where the collection UUIDs
-          are inconsistent among shards."
-      numSamplesPerChunk:
-        type: safeInt64
-        description: "The number of documents to sample on new chunks"
-        optional: true
-
-  _configsvrReshardCollection:
-    command_name: _configsvrReshardCollection
-    cpp_name: ConfigsvrReshardCollection
-    description: "The internal reshardCollection command on the config server."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      key:
-        type: object
-        description: "The index specification document to use as the new shard key."
-        optional: false
-      unique:
-        type: bool
-        description: "Whether the shard key index should enforce a unique constraint."
-        optional: true
-      numInitialChunks:
-        type: safeInt64
-        description: "The number of chunks to create initially."
-        optional: true
-      collation:
-        type: object
-        description: "The collation to use for the shard key index."
-        optional: true
-      zones:
-        type: array<ReshardingZoneType>
-        description: "The zones associated with the new shard key."
-        optional: true
-      _presetReshardedChunks:
-        type: array<ReshardedChunk>
-        description: >-
-          "Mapping of chunk ranges to be used as the initial split output. This is only for
-          testing purposes."
-        optional: true
-      shardDistribution:
-        type: array<ShardKeyRange>
-        description: "The key ranges for the new shard key. This should be continuous and complete."
-        optional: true
-      forceRedistribution:
-        type: bool
-        description: "Whether initiate reshardCollection if the shardKey doesn't change."
-        optional: true
-      reshardingUUID:
-        type: uuid
-        description: >-
-            "A user-provided identifier used to identify this resharding operation for
-            retryability purposes."
-        optional: true
-      provenance:
-        type: ReshardingProvenance
-        description: "The source operation that called this resharding operation."
-        optional: true
-      performVerification:
-        type: bool
-        description: "Whether to perform data comparison verification."
-        optional: true
-      recipientOplogBatchTaskCount:
-        type: long
-        description: >-
-          "The number of subtasks to divide a single oplog batch into, so that it may be applied
-          concurrently by multiple threads on the recipient."
-        optional: true
-      relaxed:
-        type: optionalBool
-        description: >-
-          "Runs the cloner aggregation without specifying a collection
-          uuid to avoid errors in a scenario where the collection UUIDs
-          are inconsistent among shards."
-      numSamplesPerChunk:
-        type: safeInt64
-        description: "The number of documents to sample on new chunks"
-        optional: true
-
-  moveCollection:
-    description: "The public command on mongos that moves one unsharded collection from source to destination shard."
-    command_name: moveCollection
-    strict: true
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      toShard:
-        type: shard_id
-        description: "The id specification of the destination shard."
-        optional: false
-      performVerification:
-        type: bool
-        description: "Whether to perform data comparison verification."
-        optional: true
-      oplogBatchApplierTaskCount:
-        type: safeInt64
-        description: >-
-          "The number of subtasks to divide a single oplog batch into,
-          so that it may be applied concurrently by multiple threads on the recipient."
-        validator:
-            gte: 1
-            lte: 256
-        optional: true
-
-  unshardCollection:
-    description: "The public command on mongos to unshard a sharded collection."
-    command_name: unshardCollection
-    strict: true
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      toShard:
-        type: shard_id
-        description: "The id specification of the destination shard. If empty, we will pick the emptiest shard."
-        optional: true
-      performVerification:
-        type: bool
-        description: "Whether to perform data comparison verification."
-        optional: true
-      oplogBatchApplierTaskCount:
-        type: safeInt64
-        description: >-
-          "The number of subtasks to divide a single oplog batch into,
-          so that it may be applied concurrently by multiple threads on the recipient."
-        validator:
-            gte: 1
-            lte: 256
-        optional: true
-
-  _shardsvrReshardingDonorStartChangeStreamsMonitor:
-      command_name: _shardsvrReshardingDonorStartChangeStreamsMonitor
-      cpp_name: ShardsvrReshardingDonorStartChangeStreamsMonitor
-      description: "The internal command for making a resharding donor shard start monitoring the
-                    changes in the collection being resharded between the start of
-                    the cloning phase and the start of the critical section."
-      namespace: type
-      type: namespacestring
-      reply_type: OkReply
-      api_version: ""
-      strict: false
-      fields:
-        reshardingUUID:
-          type: uuid
-          description: "The UUID for the resharding operation."
-        cloneTimestamp:
-          type: timestamp
-          description: "The clone timestamp for the resharding operation."
-
-  _shardsvrReshardingDonorFetchFinalCollectionStats:
-      command_name: _shardsvrReshardingDonorFetchFinalCollectionStats
-      cpp_name: ShardsvrReshardingDonorFetchFinalCollectionStats
-      description: "The internal command for querying a resharding donor shard for the changes in
-                    the number of documents in the collection being resharded between the start of
-                    the cloning phase and the start of the critical section."
-      namespace: type
-      type: namespacestring
-      reply_type: ShardsvrReshardingDonorFetchFinalCollectionStatsResponse
-      api_version: ""
-      strict: false
-      fields:
-        reshardingUUID:
-          type: uuid
-          description: "The UUID for the resharding operation."
-
-  _shardsvrReshardRecipientClone:
-    description: "The internal recipient clone command."
-    command_name: _shardsvrReshardRecipientClone
-    cpp_name: ShardsvrReshardRecipientClone
-    type: uuid
-    strict: false
-    namespace: type
-    reply_type: OkReply
-    api_version: ""
-    fields:
-      cloneTimestamp:
-          type: timestamp
-          description: "The timestamp for the snapshot read while cloning from the donors."
-      donorShards:
-        type: array<DonorShardFetchTimestamp>
-        description: "The list of donors to clone from."
-      approxCopySize:
-        type: ReshardingApproxCopySize
-        description: "Not meant to be used directly. Only use internal fields."
+        strict: false
+        namespace: type
+        reply_type: OkReply
+        api_version: ""
+        fields:
+            cloneTimestamp:
+                type: timestamp
+                description: "The timestamp for the snapshot read while cloning from the donors."
+            donorShards:
+                type: array<DonorShardFetchTimestamp>
+                description: "The list of donors to clone from."
+            approxCopySize:
+                type: ReshardingApproxCopySize
+                description: "Not meant to be used directly. Only use internal fields."

@@ -27,321 +27,330 @@
 #
 
 global:
-  cpp_namespace: "mongo::analyze_shard_key"
-  cpp_includes:
-    - "mongo/client/read_preference.h"
+    cpp_namespace: "mongo::analyze_shard_key"
+    cpp_includes:
+        - "mongo/client/read_preference.h"
 
 imports:
-  - "mongo/client/read_preference_setting.idl"
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/keypattern.idl"
-  - "mongo/s/analyze_shard_key_common.idl"
+    - "mongo/client/read_preference_setting.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/keypattern.idl"
+    - "mongo/s/analyze_shard_key_common.idl"
 
 enums:
-  MonotonicityType:
-    description: "The monotonicity type of a shard key."
-    type: string
-    values:
-      kMonotonic: "monotonic"
-      kNotMonotonic: "not monotonic"
-      kUnknown: "unknown"
+    MonotonicityType:
+        description: "The monotonicity type of a shard key."
+        type: string
+        values:
+            kMonotonic: "monotonic"
+            kNotMonotonic: "not monotonic"
+            kUnknown: "unknown"
 
 structs:
-  ValueFrequencyMetrics:
-    description: "The value and frequency of a shard key value."
-    strict: false
-    fields:
-      value:
-        type: object_owned
-      frequency:
-        type: long
-        validator: { gt: 0 }
+    ValueFrequencyMetrics:
+        description: "The value and frequency of a shard key value."
+        strict: false
+        fields:
+            value:
+                type: object_owned
+            frequency:
+                type: long
+                validator: {gt: 0}
 
-  MonotonicityMetrics:
-    description: "The metrics about the monotonicity of a shard key, i.e. whether its value is
-                  monotonically changing in insertion order."
-    strict: false
-    fields:
-      recordIdCorrelationCoefficient:
-        type: double
-        description: "The RecordId correlation coefficient calculated by the monotonicity check.
-                      This is only set if the monotonicity check occurred, i.e. if the shard key
-                      has a supporting index and the collection is not clustered."
-        validator:
-          gte: -1
-          lte: 1
-        optional: true
-      type:
-        type: MonotonicityType
-        description: "The monotonicity type."
+    MonotonicityMetrics:
+        description:
+            "The metrics about the monotonicity of a shard key, i.e. whether its value is
+            monotonically changing in insertion order."
+        strict: false
+        fields:
+            recordIdCorrelationCoefficient:
+                type: double
+                description:
+                    "The RecordId correlation coefficient calculated by the monotonicity check.
+                    This is only set if the monotonicity check occurred, i.e. if the shard key
+                    has a supporting index and the collection is not clustered."
+                validator:
+                    gte: -1
+                    lte: 1
+                optional: true
+            type:
+                type: MonotonicityType
+                description: "The monotonicity type."
 
-  KeyCharacteristicsMetrics:
-    description: "The metrics about the characteristics of a shard key."
-    strict: false
-    fields:
-      numDocsTotal:
-        type: long
-        description: "The number of documents in the collection."
-        validator: { gt: 0 }
-      numOrphanDocs:
-        type: long
-        description: "The number of orphan documents in the collection."
-        validator: { gte: 0 }
-        optional: true
-      avgDocSizeBytes:
-        type: long
-        description: "The average document size in bytes."
-        validator: { gt: 0 }
-      numDocsSampled:
-        type: long
-        description: "The number of sampled documents when calculating the metrics about the
-                     characteristics of the shard key."
-        validator: { gt: 0 }
-      isUnique:
-        type: bool
-        description: "Whether the shard key index enforces a uniqueness constraint."
-      numDistinctValues:
-        type: long
-        description: "The number of distinct shard key values in the collection."
-        validator: { gt: 0 }
-      mostCommonValues:
-        type: array<ValueFrequencyMetrics>
-        description: "The value and frequency of the most common shard key values."
-      monotonicity:
-        type: MonotonicityMetrics
-        description: "The monotonicity metrics for the shard key."
-      note:
-        description: "The note about how to interpret the metrics."
-        type: string
-        optional: true
+    KeyCharacteristicsMetrics:
+        description: "The metrics about the characteristics of a shard key."
+        strict: false
+        fields:
+            numDocsTotal:
+                type: long
+                description: "The number of documents in the collection."
+                validator: {gt: 0}
+            numOrphanDocs:
+                type: long
+                description: "The number of orphan documents in the collection."
+                validator: {gte: 0}
+                optional: true
+            avgDocSizeBytes:
+                type: long
+                description: "The average document size in bytes."
+                validator: {gt: 0}
+            numDocsSampled:
+                type: long
+                description:
+                    "The number of sampled documents when calculating the metrics about the
+                    characteristics of the shard key."
+                validator: {gt: 0}
+            isUnique:
+                type: bool
+                description: "Whether the shard key index enforces a uniqueness constraint."
+            numDistinctValues:
+                type: long
+                description: "The number of distinct shard key values in the collection."
+                validator: {gt: 0}
+            mostCommonValues:
+                type: array<ValueFrequencyMetrics>
+                description: "The value and frequency of the most common shard key values."
+            monotonicity:
+                type: MonotonicityMetrics
+                description: "The monotonicity metrics for the shard key."
+            note:
+                description: "The note about how to interpret the metrics."
+                type: string
+                optional: true
 
-  ReadSampleSize:
-    description: "The number of sampled read queries by command name."
-    strict: false
-    fields:
-      total:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      find:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      aggregate:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      count:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      distinct:
-        type: long
-        validator: { gte: 0 }
-        default: 0
+    ReadSampleSize:
+        description: "The number of sampled read queries by command name."
+        strict: false
+        fields:
+            total:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            find:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            aggregate:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            count:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            distinct:
+                type: long
+                validator: {gte: 0}
+                default: 0
 
-  WriteSampleSize:
-    description: "The number of sampled write queries by command name."
-    strict: false
-    fields:
-      total:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      update:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      delete:
-        type: long
-        validator: { gte: 0 }
-        default: 0
-      findAndModify:
-        type: long
-        validator: { gte: 0 }
-        default: 0
+    WriteSampleSize:
+        description: "The number of sampled write queries by command name."
+        strict: false
+        fields:
+            total:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            update:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            delete:
+                type: long
+                validator: {gte: 0}
+                default: 0
+            findAndModify:
+                type: long
+                validator: {gte: 0}
+                default: 0
 
-  ReadDistributionMetrics:
-    description: "The metrics about the read distribution calculated using sampled read queries."
-    strict: false
-    fields:
-      sampleSize:
-        type: ReadSampleSize
-      numSingleShardReads:
-        type: long
-        cpp_name: numSingleShard
-        validator: { gte: 0 }
-        optional: true
-      percentageOfSingleShardReads:
-        type: double
-        cpp_name: percentageOfSingleShard
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numMultiShardReads:
-        type: long
-        cpp_name: numMultiShard
-        validator: { gte: 0 }
-        optional: true
-      percentageOfMultiShardReads:
-        type: double
-        cpp_name: percentageOfMultiShard
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numScatterGatherReads:
-        type: long
-        cpp_name: numScatterGather
-        validator: { gte: 0 }
-        optional: true
-      percentageOfScatterGatherReads:
-        type: double
-        cpp_name: percentageOfScatterGather
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numReadsByRange:
-        type: array<long>
-        cpp_name: numByRange
-        description: "The number of dispatched read requests for each chunk range sorted from
-                      MinKey to MaxKey."
-        optional: true
+    ReadDistributionMetrics:
+        description: "The metrics about the read distribution calculated using sampled read queries."
+        strict: false
+        fields:
+            sampleSize:
+                type: ReadSampleSize
+            numSingleShardReads:
+                type: long
+                cpp_name: numSingleShard
+                validator: {gte: 0}
+                optional: true
+            percentageOfSingleShardReads:
+                type: double
+                cpp_name: percentageOfSingleShard
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numMultiShardReads:
+                type: long
+                cpp_name: numMultiShard
+                validator: {gte: 0}
+                optional: true
+            percentageOfMultiShardReads:
+                type: double
+                cpp_name: percentageOfMultiShard
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numScatterGatherReads:
+                type: long
+                cpp_name: numScatterGather
+                validator: {gte: 0}
+                optional: true
+            percentageOfScatterGatherReads:
+                type: double
+                cpp_name: percentageOfScatterGather
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numReadsByRange:
+                type: array<long>
+                cpp_name: numByRange
+                description:
+                    "The number of dispatched read requests for each chunk range sorted from
+                    MinKey to MaxKey."
+                optional: true
 
-  WriteDistributionMetrics:
-    description: "The metrics about the write distribution calculated using sampled write queries."
-    strict: false
-    fields:
-      sampleSize:
-        type: WriteSampleSize
-      numSingleShardWrites:
-        type: long
-        cpp_name: numSingleShard
-        validator: { gte: 0 }
-        optional: true
-      percentageOfSingleShardWrites:
-        type: double
-        cpp_name: percentageOfSingleShard
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numMultiShardWrites:
-        type: long
-        cpp_name: numMultiShard
-        validator: { gte: 0 }
-        optional: true
-      percentageOfMultiShardWrites:
-        type: double
-        cpp_name: percentageOfMultiShard
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numScatterGatherWrites:
-        type: long
-        cpp_name: numScatterGather
-        validator: { gte: 0 }
-        optional: true
-      percentageOfScatterGatherWrites:
-        type: double
-        cpp_name: percentageOfScatterGather
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numWritesByRange:
-        type: array<long>
-        cpp_name: numByRange
-        description: "The number of dispatched write requests for each chunk range sorted from
-                      MinKey to MaxKey."
-        optional: true
-      numShardKeyUpdates:
-        type: long
-        validator: { gte: 0 }
-        optional: true
-      percentageOfShardKeyUpdates:
-        type: double
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numSingleWritesWithoutShardKey:
-        type: long
-        validator: { gte: 0 }
-        optional: true
-      percentageOfSingleWritesWithoutShardKey:
-        type: double
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
-      numMultiWritesWithoutShardKey:
-        type: long
-        validator: { gte: 0 }
-        optional: true
-      percentageOfMultiWritesWithoutShardKey:
-        type: double
-        validator:
-          gte: 0
-          lte: 100
-        optional: true
+    WriteDistributionMetrics:
+        description: "The metrics about the write distribution calculated using sampled write queries."
+        strict: false
+        fields:
+            sampleSize:
+                type: WriteSampleSize
+            numSingleShardWrites:
+                type: long
+                cpp_name: numSingleShard
+                validator: {gte: 0}
+                optional: true
+            percentageOfSingleShardWrites:
+                type: double
+                cpp_name: percentageOfSingleShard
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numMultiShardWrites:
+                type: long
+                cpp_name: numMultiShard
+                validator: {gte: 0}
+                optional: true
+            percentageOfMultiShardWrites:
+                type: double
+                cpp_name: percentageOfMultiShard
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numScatterGatherWrites:
+                type: long
+                cpp_name: numScatterGather
+                validator: {gte: 0}
+                optional: true
+            percentageOfScatterGatherWrites:
+                type: double
+                cpp_name: percentageOfScatterGather
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numWritesByRange:
+                type: array<long>
+                cpp_name: numByRange
+                description:
+                    "The number of dispatched write requests for each chunk range sorted from
+                    MinKey to MaxKey."
+                optional: true
+            numShardKeyUpdates:
+                type: long
+                validator: {gte: 0}
+                optional: true
+            percentageOfShardKeyUpdates:
+                type: double
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numSingleWritesWithoutShardKey:
+                type: long
+                validator: {gte: 0}
+                optional: true
+            percentageOfSingleWritesWithoutShardKey:
+                type: double
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
+            numMultiWritesWithoutShardKey:
+                type: long
+                validator: {gte: 0}
+                optional: true
+            percentageOfMultiWritesWithoutShardKey:
+                type: double
+                validator:
+                    gte: 0
+                    lte: 100
+                optional: true
 
-  analyzeShardKeyResponse:
-    description: "The response for the 'analyzeShardKey' command."
-    strict: false
-    fields:
-      keyCharacteristics:
-        type: KeyCharacteristicsMetrics
-        optional: true
-      readDistribution:
-        type: ReadDistributionMetrics
-        optional: true
-      writeDistribution:
-        type: WriteDistributionMetrics
-        optional: true
+    analyzeShardKeyResponse:
+        description: "The response for the 'analyzeShardKey' command."
+        strict: false
+        fields:
+            keyCharacteristics:
+                type: KeyCharacteristicsMetrics
+                optional: true
+            readDistribution:
+                type: ReadDistributionMetrics
+                optional: true
+            writeDistribution:
+                type: WriteDistributionMetrics
+                optional: true
 
 commands:
-  analyzeShardKey:
-    description: "The command for calculating metrics for evaluating a shard key for a collection."
-    command_name: analyzeShardKey
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      key:
-        type: KeyPattern
-        description: "The shard key to evaluate."
-        validator:
-          callback: validateShardKeyPattern
-      keyCharacteristics:
-        type: bool
-        cpp_name: analyzeKeyCharacteristics
-        description: "The boolean specifying whether the command should calculate the metrics about
-                     the characteristics of the shard key."
-        default: true
-      readWriteDistribution:
-        type: bool
-        cpp_name: analyzeReadWriteDistribution
-        description: "The boolean specifying whether the command should calculate the metrics about
-                     the read and write distribution."
-        default: true
-      sampleRate:
-        description: "The proportion of the documents in the collection, in the range (0,1] to
-                     sample when calculating the metrics about the characteristics of the shard
-                     key."
-        type: safeDouble
-        validator:
-          gt: 0
-          lte: 1
-        optional: true
-      sampleSize:
-        description: "The number of documents to sample when calculating the metrics about the
-                      characteristics of the shard key."
-        type: safeInt64
-        validator:
-          gt: 0
-        optional: true
+    analyzeShardKey:
+        description: "The command for calculating metrics for evaluating a shard key for a collection."
+        command_name: analyzeShardKey
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            key:
+                type: KeyPattern
+                description: "The shard key to evaluate."
+                validator:
+                    callback: validateShardKeyPattern
+            keyCharacteristics:
+                type: bool
+                cpp_name: analyzeKeyCharacteristics
+                description:
+                    "The boolean specifying whether the command should calculate the metrics about
+                    the characteristics of the shard key."
+                default: true
+            readWriteDistribution:
+                type: bool
+                cpp_name: analyzeReadWriteDistribution
+                description:
+                    "The boolean specifying whether the command should calculate the metrics about
+                    the read and write distribution."
+                default: true
+            sampleRate:
+                description:
+                    "The proportion of the documents in the collection, in the range (0,1] to
+                    sample when calculating the metrics about the characteristics of the shard
+                    key."
+                type: safeDouble
+                validator:
+                    gt: 0
+                    lte: 1
+                optional: true
+            sampleSize:
+                description:
+                    "The number of documents to sample when calculating the metrics about the
+                    characteristics of the shard key."
+                type: safeInt64
+                validator:
+                    gt: 0
+                optional: true

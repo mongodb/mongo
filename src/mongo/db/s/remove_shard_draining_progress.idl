@@ -78,4 +78,4 @@ structs:
             firstNonEmptyCollection:
                 type: namespacestring
                 description: "First non empty collection found on the shard being removed."
-                optional: true     
+                optional: true

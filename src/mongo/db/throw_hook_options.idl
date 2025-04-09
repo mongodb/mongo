@@ -29,18 +29,17 @@
 global:
     cpp_namespace: "mongo"
 
-
 server_parameters:
     throwLoggingEnabled:
         description: "Log the stack when exceptions are thrown. By default, only exceptions not inheriting from mongo::DBException are logged."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: bool
         cpp_varname: gThrowLoggingEnabled
         default: true
         redact: false
     throwLoggingExceptionName:
         description: "Log the stack when the named exception is thrown. The provided name must match the (platform dependent) name given by std::type_info::name()."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: std::string
         cpp_varname: gThrowLoggingExceptionName
         default: true

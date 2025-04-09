@@ -28,48 +28,48 @@
 global:
     cpp_namespace: mongo::repl
     cpp_includes:
-      - "mongo/db/repl/database_cloner_common.h"
+        - "mongo/db/repl/database_cloner_common.h"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 types:
-   CollectionOptions:
-      description: "CollectionOptions as passed to createCollection()"
-      cpp_type: "mongo::CollectionOptions"
-      bson_serialization_type: object
-      deserializer: mongo::repl::parseCollectionOptionsForDatabaseCloner
-      serializer: mongo::CollectionOptions::toBSON
-      # View members of CollectionOptions are storageEngine, idIndex, validator, collation, and
-      # pipeline, all of which are always owned.
-      is_view: false
-      
+    CollectionOptions:
+        description: "CollectionOptions as passed to createCollection()"
+        cpp_type: "mongo::CollectionOptions"
+        bson_serialization_type: object
+        deserializer: mongo::repl::parseCollectionOptionsForDatabaseCloner
+        serializer: mongo::CollectionOptions::toBSON
+        # View members of CollectionOptions are storageEngine, idIndex, validator, collation, and
+        # pipeline, all of which are always owned.
+        is_view: false
+
 structs:
-   CollectionInfo:
-      description: "A struct representing the 'info' field in the listCollections output."
-      strict: false
-      fields:
-         readOnly:
-            type: bool
-            optional: true
-         uuid:
-            type: uuid
-            
-   ListCollectionResult:
-      description: "A struct representing the output of the listCollections command"
-      # Adding fields to listCollections should not break initial sync
-      strict: false
-      fields:
-         name:
-            description: "The collection or view name."
-            type: string
-         type:
-            description: "Either 'collection' or 'view'"
-            type: string
-         options:
-            description: "Collection options as passed to db.createCollection()"
-            type: CollectionOptions
-            non_const_getter: true
-         info:
-            type: CollectionInfo
-         # The idIndex field is not used in initial sync, so we do not define it here.
+    CollectionInfo:
+        description: "A struct representing the 'info' field in the listCollections output."
+        strict: false
+        fields:
+            readOnly:
+                type: bool
+                optional: true
+            uuid:
+                type: uuid
+
+    ListCollectionResult:
+        description: "A struct representing the output of the listCollections command"
+        # Adding fields to listCollections should not break initial sync
+        strict: false
+        fields:
+            name:
+                description: "The collection or view name."
+                type: string
+            type:
+                description: "Either 'collection' or 'view'"
+                type: string
+            options:
+                description: "Collection options as passed to db.createCollection()"
+                type: CollectionOptions
+                non_const_getter: true
+            info:
+                type: CollectionInfo
+            # The idIndex field is not used in initial sync, so we do not define it here.

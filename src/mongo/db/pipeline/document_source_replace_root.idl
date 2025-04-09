@@ -27,17 +27,17 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/pipeline/value.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/value.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  ReplaceRootSpec:
-    description: $replaceRoot aggregation stage
-    strict: true
-    fields:
-      newRoot:
-        description: The expression to use to compute the new root of this stage, e.g. '$subObject'
-        type: Value
+    ReplaceRootSpec:
+        description: $replaceRoot aggregation stage
+        strict: true
+        fields:
+            newRoot:
+                description: The expression to use to compute the new root of this stage, e.g. '$subObject'
+                type: Value

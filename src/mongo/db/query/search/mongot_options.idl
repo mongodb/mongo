@@ -27,64 +27,62 @@
 #
 
 global:
-    cpp_namespace: 'mongo'
+    cpp_namespace: "mongo"
     cpp_includes:
-        - 'mongo/db/query/search/mongot_options.h'
+        - "mongo/db/query/search/mongot_options.h"
 
 server_parameters:
     mongotHost:
-        description: 'mongot host address'
-        set_at: [ startup ]
-        default: ''
-        on_update: 'MongotParams::onSetHost'
-        cpp_varname: 'globalMongotParams.host'
+        description: "mongot host address"
+        set_at: [startup]
+        default: ""
+        on_update: "MongotParams::onSetHost"
+        cpp_varname: "globalMongotParams.host"
         validator:
-            callback: 'MongotParams::onValidateHost'
+            callback: "MongotParams::onValidateHost"
         redact: false
 
     skipAuthenticationToMongot:
-        description: 'Skip authentication for mongod->mongot connections, even if auth is enabled on mongod'
-        set_at: [ startup ]
-        cpp_varname: 'globalMongotParams.skipAuthToMongot'
+        description: "Skip authentication for mongod->mongot connections, even if auth is enabled on mongod"
+        set_at: [startup]
+        cpp_varname: "globalMongotParams.skipAuthToMongot"
         default: false
         redact: false
 
     mongotConnectionPoolMinSize:
-      description: <-
-          The minimum number of connections for the TaskExecutor ConnectionPool used for outgoing
-          communication to mongot. Note that this option has no effect when useGrpcForSearch=true.
-      set_at: [ startup, runtime ]
-      cpp_varname: 'globalMongotParams.minConnections'
-      validator:
-          gte: 0
-      default: 1
-      redact: false
+        description: <-
+            The minimum number of connections for the TaskExecutor ConnectionPool used for outgoing
+            communication to mongot. Note that this option has no effect when useGrpcForSearch=true.
+        set_at: [startup, runtime]
+        cpp_varname: "globalMongotParams.minConnections"
+        validator:
+            gte: 0
+        default: 1
+        redact: false
 
     mongotConnectionPoolMaxSize:
-      description: <-
-          The maximum number of connections for the TaskExecutor ConnectionPool used for outgoing
-          communication to mongot. Note that this option has no effect when useGrpcForSearch=true.
-      set_at: [ startup, runtime ]
-      cpp_varname: 'globalMongotParams.maxConnections'
-      validator:
-          gte: 1
-      default: 32767
-      redact: false
+        description: <-
+            The maximum number of connections for the TaskExecutor ConnectionPool used for outgoing
+            communication to mongot. Note that this option has no effect when useGrpcForSearch=true.
+        set_at: [startup, runtime]
+        cpp_varname: "globalMongotParams.maxConnections"
+        validator:
+            gte: 1
+        default: 32767
+        redact: false
 
     useGrpcForSearch:
         description: Configures whether or not shards should communicate with mongot using gRPC.
-        set_at: [ startup ]
+        set_at: [startup]
         default: false
-        cpp_varname: 'globalMongotParams.useGRPC'
+        cpp_varname: "globalMongotParams.useGRPC"
         redact: false
 
     searchTLSMode:
-      description: "Sets the TLS mode for mongod to mongot connection (globalTLS|disabled|allowTLS|preferTLS|requireTLS). globalTLS will use the setting provided in net.tls.mode, while the other settings will operate according to their usual behavior."
-      set_at: [ startup ]
-      cpp_vartype: std::string
-      cpp_varname: 'searchTLSMode'
-      # TODO SERVER-99787 Change default to "globalTLS"
-      default: 'disabled'
-      redact: false
-
-
+        description: "Sets the TLS mode for mongod to mongot connection (globalTLS|disabled|allowTLS|preferTLS|requireTLS). globalTLS will use the setting provided in net.tls.mode, while the other settings will operate according to their usual behavior."
+        set_at: [startup]
+        cpp_vartype: std::string
+        cpp_varname: "searchTLSMode"
+        # TODO SERVER-99787 Change default to "globalTLS"
+        default: "disabled"
+        redact: false

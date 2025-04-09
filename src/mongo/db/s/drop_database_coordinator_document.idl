@@ -73,4 +73,3 @@ structs:
                 type: AuthoritativeMetadataAccessLevel
                 description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
                 default: kNone
-

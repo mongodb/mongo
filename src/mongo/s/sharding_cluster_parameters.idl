@@ -26,55 +26,55 @@
 # it in the license file.
 
 imports:
-  - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
 
 global:
     cpp_namespace: mongo
 
 structs:
-  ShardedClusterCardinalityParam:
-    description: >-
-        Cluster parameter for the number of shards in a sharded cluster. Used to allow or disallow
-        direct writes to the cluster.
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      hasTwoOrMoreShards:
+    ShardedClusterCardinalityParam:
         description: >-
-            Whether there are or have been two or more shards in the cluster. Shards should disallow
-            direct writes if set to true.
-        type: bool
-        default: false
+            Cluster parameter for the number of shards in a sharded cluster. Used to allow or disallow
+            direct writes to the cluster.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            hasTwoOrMoreShards:
+                description: >-
+                    Whether there are or have been two or more shards in the cluster. Shards should disallow
+                    direct writes if set to true.
+                type: bool
+                default: false
 
-  AddOrRemoveShardInProgressParam:
-    description: >-
-      Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
-      ongoing.
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      inProgress:
-        description: "True when there's an ongoing sharding topology change. False otherwise."
-        type: bool
-        default: false
-
-  ConfigServerReadPreferenceForCatalogQueriesParam:
-    description: >-
-      Cluster parameter to always use nearest as the read preference for catalog queries targeting
-      the config server.
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      mustAlwaysUseNearest:
+    AddOrRemoveShardInProgressParam:
         description: >-
-          When true, catalog queries targeting the config server will always use nearest as read
-          preference. Otherwise, the read preference for all those queries is chosen depending on
-          whether the cluster has a config shard (primaryPreferred) or not (nearest).
-        type: bool
-        default: false
+            Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
+            ongoing.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            inProgress:
+                description: "True when there's an ongoing sharding topology change. False otherwise."
+                type: bool
+                default: false
+
+    ConfigServerReadPreferenceForCatalogQueriesParam:
+        description: >-
+            Cluster parameter to always use nearest as the read preference for catalog queries targeting
+            the config server.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            mustAlwaysUseNearest:
+                description: >-
+                    When true, catalog queries targeting the config server will always use nearest as read
+                    preference. Otherwise, the read preference for all those queries is chosen depending on
+                    whether the cluster has a config shard (primaryPreferred) or not (nearest).
+                type: bool
+                default: false
 
 server_parameters:
     shardedClusterCardinalityForDirectConns:
@@ -88,25 +88,25 @@ server_parameters:
         redact: false
 
     addOrRemoveShardInProgress:
-      description: >-
-        Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
-        ongoing.
-      set_at: cluster
-      omit_in_ftdc: false
-      cpp_vartype: AddOrRemoveShardInProgressParam
-      cpp_varname: addOrRemoveShardInProgress
-      redact: false
-      condition:
-        min_fcv: 8.0
+        description: >-
+            Reflects whether there is a sharding topology change (e.g. addShard, removeShard) currently
+            ongoing.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: AddOrRemoveShardInProgressParam
+        cpp_varname: addOrRemoveShardInProgress
+        redact: false
+        condition:
+            min_fcv: 8.0
 
     configServerReadPreferenceForCatalogQueries:
-      description: >-
-        Cluster parameter to always use nearest as the read preference for catalog queries targeting
-        the config server.
-      set_at: cluster
-      omit_in_ftdc: false
-      cpp_vartype: ConfigServerReadPreferenceForCatalogQueriesParam
-      cpp_varname: configServerReadPreferenceForCatalogQueries
-      redact: false
-      condition:
-        min_fcv: 8.0
+        description: >-
+            Cluster parameter to always use nearest as the read preference for catalog queries targeting
+            the config server.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: ConfigServerReadPreferenceForCatalogQueriesParam
+        cpp_varname: configServerReadPreferenceForCatalogQueries
+        redact: false
+        condition:
+            min_fcv: 8.0

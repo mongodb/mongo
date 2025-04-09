@@ -26,31 +26,31 @@
 # it in the license file.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
+    # Follow the MongoDB Drivers API for passing API Version parameters in clients. The drivers API
+    # is like MongoClient(uri, api={version: "1", strict: true, deprecationErrors: true}).
 
-  # Follow the MongoDB Drivers API for passing API Version parameters in clients. The drivers API
-  # is like MongoClient(uri, api={version: "1", strict: true, deprecationErrors: true}).
-
-  ClientAPIVersionParameters:
-    description: "Parser for Stable API parameters passed to 'new Mongo()' in the mongo shell"
-    strict: true
-    fields:
-      version:
-        description: "The requested API version"
-        type: string
-        # The server requires the apiVersion parameter in commands, leave enforcement to the server.
-        optional: true
-      strict:
-        description: "Whether to restrict the connection to behaviors in the requested API version"
-        type: bool
-        optional: true
-      deprecationErrors:
-        description: "Whether to restrict the connection to non-deprecated behaviors in the
-          requested API version"
-        type: bool
-        optional: true
+    ClientAPIVersionParameters:
+        description: "Parser for Stable API parameters passed to 'new Mongo()' in the mongo shell"
+        strict: true
+        fields:
+            version:
+                description: "The requested API version"
+                type: string
+                # The server requires the apiVersion parameter in commands, leave enforcement to the server.
+                optional: true
+            strict:
+                description: "Whether to restrict the connection to behaviors in the requested API version"
+                type: bool
+                optional: true
+            deprecationErrors:
+                description:
+                    "Whether to restrict the connection to non-deprecated behaviors in the
+                    requested API version"
+                type: bool
+                optional: true

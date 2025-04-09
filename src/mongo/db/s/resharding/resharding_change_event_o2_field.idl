@@ -26,10 +26,9 @@
 # it in the license file.
 #
 
-# This file defines structures used to represent change events that occur 
-# during a resharding operation. The ReshardingChangeEventO2Field struct is 
+# This file defines structures used to represent change events that occur
+# during a resharding operation. The ReshardingChangeEventO2Field struct is
 # stored in the o2 field in oplog entries.
-
 
 global:
     cpp_namespace: "mongo"
@@ -51,7 +50,7 @@ structs:
             reshardingUUID:
                 type: uuid
                 description: "The UUID for this resharding operation."
-    
+
     ReshardBlockingWritesChangeEventO2Field:
         description: >-
             Represents a change event which signifies the start of the critical section of a resharding operation on a donor shard.

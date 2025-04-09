@@ -32,21 +32,22 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/catalog/type_namespace_placement.idl"
-  
+
 structs:
-  ConfigsvrGetHistoricalPlacementResponse:
-      description: "Response for the _configsvrGetHistoricalPlacement command"
-      strict: false
-      is_command_reply: true
-      fields:
-        historicalPlacement: HistoricalPlacement
+    ConfigsvrGetHistoricalPlacementResponse:
+        description: "Response for the _configsvrGetHistoricalPlacement command"
+        strict: false
+        is_command_reply: true
+        fields:
+            historicalPlacement: HistoricalPlacement
 
 commands:
     clusterResetPlacementHistory:
         command_name: resetPlacementHistory
         cpp_name: ClusterResetPlacementHistory
-        description: "Admin command to reinitialize the content of config.placementHistory 
-                      based on the current state of the Sharding catalog."
+        description:
+            "Admin command to reinitialize the content of config.placementHistory
+            based on the current state of the Sharding catalog."
         namespace: ignored
         api_version: ""
         strict: false
@@ -54,8 +55,8 @@ commands:
     _configsvrResetPlacementHistory:
         command_name: _configsvrResetPlacementHistory
         cpp_name: ConfigsvrResetPlacementHistory
-        description: "Definition of the resetPlacementHistory command called 
-                      from routers on the config server."
+        description: "Definition of the resetPlacementHistory command called
+            from routers on the config server."
         namespace: ignored
         api_version: ""
         strict: false
@@ -63,19 +64,21 @@ commands:
     _configsvrGetHistoricalPlacement:
         command_name: _configsvrGetHistoricalPlacement
         cpp_name: ConfigsvrGetHistoricalPlacement
-        description: "Internal command to retrieve the list of shard IDs hosting data for the 
-                      namespace/cluster being targeted at a specific point in time"
+        description:
+            "Internal command to retrieve the list of shard IDs hosting data for the
+            namespace/cluster being targeted at a specific point in time"
         namespace: type
         api_version: ""
         type: namespacestring
         strict: false
         fields:
-          at:
-            type: timestamp
-            description: "The requested point in time"
-            optional: false
-          targetWholeCluster:
-            type: bool
-            description: "When true, the command retrieves placement information concerning 
-                          the whole cluster (ignoring the namespace parameter)"
-            default: false
+            at:
+                type: timestamp
+                description: "The requested point in time"
+                optional: false
+            targetWholeCluster:
+                type: bool
+                description:
+                    "When true, the command retrieves placement information concerning
+                    the whole cluster (ignoring the namespace parameter)"
+                default: false

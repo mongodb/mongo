@@ -88,13 +88,13 @@ structs:
     ListCollectionsReplyCursor:
         description: "Cursor object"
         fields:
-            id: 
+            id:
                 type: long
                 stability: stable
-            ns: 
+            ns:
                 type: namespacestring
                 stability: stable
-            firstBatch: 
+            firstBatch:
                 type: array<ListCollectionsReplyItem>
                 stability: stable
 
@@ -121,8 +121,8 @@ commands:
                 - check: should_ignore_auth_checks
                 - check: check_authorized_to_list_collections
                 - privilege:
-                    resource_pattern: database
-                    action_type: listCollections
+                      resource_pattern: database
+                      action_type: listCollections
         fields:
             cursor:
                 type: SimpleCursorOptions

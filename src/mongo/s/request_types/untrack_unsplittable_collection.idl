@@ -27,16 +27,16 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 imports:
     - "mongo/db/basic_types.idl"
 commands:
-  clusterUntrackUnsplittableCollection:
-      command_name: untrackUnshardedCollection
-      cpp_name: ClusterUntrackUnsplittableCollection
-      description: "Internal command to untrack unsplittable collections"
-      strict: false
-      namespace: type
-      type: namespacestring
-      api_version: ""
-      reply_type: OkReply
+    clusterUntrackUnsplittableCollection:
+        command_name: untrackUnshardedCollection
+        cpp_name: ClusterUntrackUnsplittableCollection
+        description: "Internal command to untrack unsplittable collections"
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply

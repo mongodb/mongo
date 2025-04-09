@@ -33,7 +33,7 @@ global:
 server_parameters:
     httpVerboseLogging:
         description: Boolean flag that indicates whether verbose logging for http clients should be enabled.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         default: false
         cpp_varname: "httpClientOptions.verboseLogging"
         redact: false

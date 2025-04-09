@@ -28,105 +28,105 @@
 global:
     cpp_namespace: mongo
     cpp_includes:
-      - "mongo/db/s/sharding_runtime_d_params.h"
+        - "mongo/db/s/sharding_runtime_d_params.h"
 
 server_parameters:
     chunkMigrationConcurrency:
         description: >-
-          The number of threads doing insertions on the recipient during a chunk migration and
-          also the number of _migrateClone requests that the recipient sends to the source in parallel.
+            The number of threads doing insertions on the recipient during a chunk migration and
+            also the number of _migrateClone requests that the recipient sends to the source in parallel.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: chunkMigrationConcurrency
         validator:
-          callback: validateChunkMigrationConcurrency
+            callback: validateChunkMigrationConcurrency
         default: 1
         redact: false
 
     chunkMigrationFetcherMaxBufferedSizeBytesPerThread:
         description: >-
-          Maximum size of buffered documents that the chunk migration cloner will keep per
-          thread. A value of 0 means there will be no limit. The minimum size is the maximum
-          BSON size limit.
+            Maximum size of buffered documents that the chunk migration cloner will keep per
+            thread. A value of 0 means there will be no limit. The minimum size is the maximum
+            BSON size limit.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: chunkMigrationFetcherMaxBufferedSizeBytesPerThread
         validator:
-          callback: validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread
+            callback: validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread
         default:
-          expr: 4 * BSONObjMaxInternalSize
+            expr: 4 * BSONObjMaxInternalSize
         redact: false
 
     rangeDeleterBatchSize:
         description: >-
-          The maximum number of documents in each batch to delete during the cleanup stage of chunk
-          migration (or the cleanupOrphaned command). Between each batch, secondaryThrottle and
-          rangeDeleterBatchDelayMS will apply.
+            The maximum number of documents in each batch to delete during the cleanup stage of chunk
+            migration (or the cleanupOrphaned command). Between each batch, secondaryThrottle and
+            rangeDeleterBatchDelayMS will apply.
 
-          A value of 0 indicates that the system chooses the default value (INT_MAX).
+            A value of 0 indicates that the system chooses the default value (INT_MAX).
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: rangeDeleterBatchSize
         validator:
-          gte: 0
+            gte: 0
         default:
-          expr: std::numeric_limits<int>::max()
+            expr: std::numeric_limits<int>::max()
         redact: false
 
     rangeDeleterBatchDelayMS:
         description: >-
-          The amount of time in milliseconds to wait before the next batch of deletion during the
-          cleanup stage of chunk migration (or the cleanupOrphaned command).
+            The amount of time in milliseconds to wait before the next batch of deletion during the
+            cleanup stage of chunk migration (or the cleanupOrphaned command).
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: rangeDeleterBatchDelayMS
         validator:
-          gte: 0
+            gte: 0
         default: 20
         redact: false
 
     receiveChunkWaitForRangeDeleterTimeoutMS:
         description: >-
-          Maximum amount of time for which the start of a new chunk migration request may be deferred,
-          while pending range deletions that overlap with the request get completed/canceled.
-          If overlapping range deletions are still present upon timeout expiration, the request is aborted.
+            Maximum amount of time for which the start of a new chunk migration request may be deferred,
+            while pending range deletions that overlap with the request get completed/canceled.
+            If overlapping range deletions are still present upon timeout expiration, the request is aborted.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: drainOverlappingRangeDeletionsOnStartTimeoutMS
         validator:
-          gte: 0
+            gte: 0
         default: 10000
         redact: false
 
     migrateCloneInsertionBatchSize:
         description: >-
-          The maximum number of documents to insert in a single batch during the cloning step of
-          the migration process. The default value of 0 indicates no maximum number of documents
-          per batch. However, in practice, this results in batches that contain up to 16 MB of
-          documents. The value 1 corresponds to MongoDB 3.4.16 (and earlier) behavior.
+            The maximum number of documents to insert in a single batch during the cloning step of
+            the migration process. The default value of 0 indicates no maximum number of documents
+            per batch. However, in practice, this results in batches that contain up to 16 MB of
+            documents. The value 1 corresponds to MongoDB 3.4.16 (and earlier) behavior.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: migrateCloneInsertionBatchSize
         validator:
-          gte: 0
+            gte: 0
         default: 0
         redact: false
 
     migrateCloneInsertionBatchDelayMS:
         description: >-
-          Time in milliseconds to wait between batches of insertions during cloning step of the
-          migration process. This wait is in addition to the secondaryThrottle. The default value
-          of 0 indicates no additional wait.
+            Time in milliseconds to wait between batches of insertions during cloning step of the
+            migration process. This wait is in addition to the secondaryThrottle. The default value
+            of 0 indicates no additional wait.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: migrateCloneInsertionBatchDelayMS
         validator:
-          gte: 0
+            gte: 0
         default: 0
         redact: false
 
     migrationLockAcquisitionMaxWaitMS:
-        description: 'How long to wait to acquire collection lock for migration related operations.'
+        description: "How long to wait to acquire collection lock for migration related operations."
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: migrationLockAcquisitionMaxWaitMS
@@ -135,15 +135,15 @@ server_parameters:
 
     maxCatchUpPercentageBeforeBlockingWrites:
         description: >-
-          The maximum percentage of untrasferred chunk mods at the end of a catch up iteration
-          that may be deferred to the next phase of the migration protocol
-          (where new writes get blocked).
+            The maximum percentage of untrasferred chunk mods at the end of a catch up iteration
+            that may be deferred to the next phase of the migration protocol
+            (where new writes get blocked).
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: maxCatchUpPercentageBeforeBlockingWrites
         validator:
-          gte: 0
-          lte: 100
+            gte: 0
+            lte: 100
         default: 10
         redact: false
 
@@ -157,29 +157,29 @@ server_parameters:
 
     disableResumableRangeDeleter:
         description: >-
-          Disable the resumable range deleter. Ranges will not be submitted for deletion, and if an
-          incoming migration sees orphans in the incoming range, the migration will fail. The
-          resumable range deleter replaced the old non-durable range deleter as of FCV 4.4.
+            Disable the resumable range deleter. Ranges will not be submitted for deletion, and if an
+            incoming migration sees orphans in the incoming range, the migration will fail. The
+            resumable range deleter replaced the old non-durable range deleter as of FCV 4.4.
         set_at: [startup]
         cpp_vartype: AtomicWord<bool>
-        cpp_varname : disableResumableRangeDeleter
+        cpp_varname: disableResumableRangeDeleter
         default: false
         redact: false
 
     persistedChunkCacheUpdateMaxBatchSize:
         description: >-
-          Maximum batch size used for updating shard persisted chunk cache.
+            Maximum batch size used for updating shard persisted chunk cache.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: persistedChunkCacheUpdateMaxBatchSize
         validator:
-          gte: 1
+            gte: 1
         default: 1000
         redact: false
 
     terminateSecondaryReadsOnOrphanCleanup:
         description: >-
-          Enables the termination of queries on a secondary node due to orphan cleanup.
+            Enables the termination of queries on a secondary node due to orphan cleanup.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: terminateSecondaryReadsOnOrphanCleanup

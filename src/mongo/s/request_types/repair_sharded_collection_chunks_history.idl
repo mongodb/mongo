@@ -28,14 +28,14 @@
 
 global:
     cpp_namespace: "mongo"
-    
+
 imports:
     - "mongo/db/basic_types.idl"
 
 commands:
     repairShardedCollectionChunksHistory:
         command_name: repairShardedCollectionChunksHistory
-        description: "The repairShardedCollectionChunksHistory command on mongos to repair a sharded collection's chunk history due to the effects of SERVER-62065, with an option to forcefully re-add all history entries if needed."  
+        description: "The repairShardedCollectionChunksHistory command on mongos to repair a sharded collection's chunk history due to the effects of SERVER-62065, with an option to forcefully re-add all history entries if needed."
         namespace: type
         type: namespacestring
         api_version: ""
@@ -44,11 +44,11 @@ commands:
             force:
                 description: "If true, chunks that were repaired earlier by repairShardedCollectionChunksHistory are re-repaired. If false, chunks that were repaired earlier are skipped."
                 type: optionalBool
-    
+
     _configsvrRepairShardedCollectionChunksHistory:
         command_name: _configsvrRepairShardedCollectionChunksHistory
-        cpp_name: ConfigsvrRepairShardedCollectionChunksHistory 
-        description: "The internal _configsvrRepairShardedCollectionChunksHistory command to repair a sharded collection's chunk history."  
+        cpp_name: ConfigsvrRepairShardedCollectionChunksHistory
+        description: "The internal _configsvrRepairShardedCollectionChunksHistory command to repair a sharded collection's chunk history."
         namespace: type
         type: namespacestring
         api_version: ""

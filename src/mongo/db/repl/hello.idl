@@ -296,7 +296,7 @@ commands:
             maxAwaitTimeMS:
                 type: safeInt64
                 optional: true
-                validator: { gte: 0 }
+                validator: {gte: 0}
                 stability: stable
             helloOk:
                 type: safeBool

@@ -27,26 +27,26 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/client/client_api_version_parameters.idl"
-  - "mongo/client/client_transient_tls_parameters.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/client/client_api_version_parameters.idl"
+    - "mongo/client/client_transient_tls_parameters.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  MongoShellOptions:
-    description: "The third argument to `new Mongo(...)`"
-    fields:
-      api:
-        description: "API strict version parameter"
-        type: ClientAPIVersionParameters
-        optional: true
-      tls:
-        description: "TLS configuration options"
-        type: ClientTLSParameters
-        optional: true
-      gRPC:
-        description: "Set if the shell should use gRPC to connect"
-        type: bool
-        optional: true
+    MongoShellOptions:
+        description: "The third argument to `new Mongo(...)`"
+        fields:
+            api:
+                description: "API strict version parameter"
+                type: ClientAPIVersionParameters
+                optional: true
+            tls:
+                description: "TLS configuration options"
+                type: ClientTLSParameters
+                optional: true
+            gRPC:
+                description: "Set if the shell should use gRPC to connect"
+                type: bool
+                optional: true

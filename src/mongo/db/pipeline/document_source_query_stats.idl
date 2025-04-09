@@ -26,38 +26,36 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_query_stats_validators.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/document_source_query_stats_validators.h"
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/query/query_stats/transform_algorithm.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/query/query_stats/transform_algorithm.idl"
 
 structs:
     TransformIdentifiersSpec:
-      description: "Specification for the transformIdentifiers field of $queryStats."
-      strict: true
-      fields:
-        algorithm:
-              description: "The algorithm to use to transform the identifiers."
-              type: TransformAlgorithm
-              optional: false
-              validator:
-                    {callback: "validateAlgo"}
-        hmacKey:
-            description: >
-                The hmac key to be used to transform the identifiers. This is considered sensitive
-                data and should be redacted from data dumps, output I/O, logs, and other persistent
-                storages.
-            type: bindata_sensitive
-            optional: true
-            validator:
-                  {callback: "validateHmac"}
+        description: "Specification for the transformIdentifiers field of $queryStats."
+        strict: true
+        fields:
+            algorithm:
+                description: "The algorithm to use to transform the identifiers."
+                type: TransformAlgorithm
+                optional: false
+                validator: {callback: "validateAlgo"}
+            hmacKey:
+                description: >
+                    The hmac key to be used to transform the identifiers. This is considered sensitive
+                    data and should be redacted from data dumps, output I/O, logs, and other persistent
+                    storages.
+                type: bindata_sensitive
+                optional: true
+                validator: {callback: "validateHmac"}
     DocumentSourceQueryStatsSpec:
         description: "Specification for a $queryStats stage."
         strict: true
         fields:
-          transformIdentifiers:
-            description: "The algorithm and hmac key to use when transforming identifiers."
-            type: TransformIdentifiersSpec
-            optional: true
+            transformIdentifiers:
+                description: "The algorithm and hmac key to use when transforming identifiers."
+                type: TransformIdentifiersSpec
+                optional: true

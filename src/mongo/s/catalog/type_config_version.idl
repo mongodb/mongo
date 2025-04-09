@@ -34,8 +34,9 @@ imports:
 
 structs:
     VersionType:
-        description: "This represents the layout of the single document contained in
-                      config.version collection and contains a unique identifier of the cluster"
+        description:
+            "This represents the layout of the single document contained in
+            config.version collection and contains a unique identifier of the cluster"
         strict: false
         fields:
             clusterId:

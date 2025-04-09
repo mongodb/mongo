@@ -35,7 +35,6 @@ global:
         - "mongo/db/repl/member_id.h"
         - "mongo/db/repl/repl_set_config_validators.h"
 
-
 imports:
     - "mongo/db/basic_types.idl"
 
@@ -72,53 +71,61 @@ structs:
             votes:
                 type: safeInt64
                 default: 1
-                validator: { gte: 0, lte: 1 }
-                description: "The number of votes a server will cast in a replica set election. The
-                              number of votes each member has is either 1 or 0, and arbiters always
-                              have exactly 1 vote"
+                validator: {gte: 0, lte: 1}
+                description:
+                    "The number of votes a server will cast in a replica set election. The
+                    number of votes each member has is either 1 or 0, and arbiters always
+                    have exactly 1 vote"
             newlyAdded:
                 type: bool
                 optional: true
-                validator: { callback: "validateTrue" }
-                description: "Set to true if the member was just added and is in initial sync.
-                              Must be true when specified. Indicates that the votes and priority
-                              fields should be considered '0' for the duration of the initial sync"
+                validator: {callback: "validateTrue"}
+                description:
+                    "Set to true if the member was just added and is in initial sync.
+                    Must be true when specified. Indicates that the votes and priority
+                    fields should be considered '0' for the duration of the initial sync"
             priority:
                 type: safeDouble
                 default: 1.0
-                validator: { gte: 0, lte: 1000 }
-                description: "A number that indicates the relative eligibility of a member to become
-                              a primary"
+                validator: {gte: 0, lte: 1000}
+                description:
+                    "A number that indicates the relative eligibility of a member to become
+                    a primary"
             hidden:
                 type: safeBool
                 default: false
-                description: "When this value is true, the replica set hides this instance and does
-                             not include the member in the output of db.hello() or hello. This
-                             prevents read operations (i.e. queries) from ever reaching this host by
-                             way of secondary read preference"
+                description:
+                    "When this value is true, the replica set hides this instance and does
+                    not include the member in the output of db.hello() or hello. This
+                    prevents read operations (i.e. queries) from ever reaching this host by
+                    way of secondary read preference"
 
             secondaryDelaySecs:
                 cpp_name: secondaryDelaySecs
                 type: safeInt64
                 optional: true
-                validator: { gte: 0, lte: 31622400 }
-                description: "The number of seconds 'behind' the primary that this replica set
-                              member should 'lag'."
+                validator: {gte: 0, lte: 31622400}
+                description:
+                    "The number of seconds 'behind' the primary that this replica set
+                    member should 'lag'."
             arbiterOnly:
                 type: safeBool
                 default: false
-                description: "A boolean that identifies an arbiter. A value of true indicates that
-                              the member is an arbiter"
+                description:
+                    "A boolean that identifies an arbiter. A value of true indicates that
+                    the member is an arbiter"
             buildIndexes:
                 type: safeBool
                 default: true
-                description: "A boolean that indicates whether the mongod builds indexes on this
-                              member"
+                description:
+                    "A boolean that indicates whether the mongod builds indexes on this
+                    member"
             tags:
                 type: object_owned
                 optional: true
-                description: "A tags document contains user-defined tag field and value pairs for
-                              the replica set member"
+                description:
+                    "A tags document contains user-defined tag field and value pairs for
+                    the replica set member"
             horizons:
                 type: object
                 optional: true

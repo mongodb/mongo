@@ -44,15 +44,15 @@ commands:
         type: namespacestring
         strict: false
         fields:
-          allowMigrations:
-              type: bool
-              description: "The new allowMigrations flag state to be set."
-              optional: false
-          collectionUUID:
-              type: uuid
-              description: "The uuid of the collection."
-              optional: true # Optional for backwards compatibility
-                
+            allowMigrations:
+                type: bool
+                description: "The new allowMigrations flag state to be set."
+                optional: false
+            collectionUUID:
+                type: uuid
+                description: "The uuid of the collection."
+                optional: true # Optional for backwards compatibility
+
     setAllowMigrations:
         command_name: setAllowMigrations
         cpp_name: SetAllowMigrations
@@ -61,5 +61,5 @@ commands:
         api_version: ""
         type: namespacestring
         strict: false
-        chained_structs: 
+        chained_structs:
             SetAllowMigrationsRequest: SetAllowMigrationsRequest

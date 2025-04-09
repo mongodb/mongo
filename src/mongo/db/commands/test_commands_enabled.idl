@@ -33,11 +33,10 @@ global:
 
 server_parameters:
     enableTestCommands:
-        description: 'Enable test commands'
+        description: "Enable test commands"
         set_at: startup
         cpp_vartype: bool
         cpp_varname: gEnableTestCommands
         on_update: "onUpdateTestCommandsEnabled"
         default: false
         redact: false
-

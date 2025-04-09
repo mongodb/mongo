@@ -27,35 +27,33 @@
 #
 
 global:
-  cpp_namespace: "mongo::rpc"
+    cpp_namespace: "mongo::rpc"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/auth/auth_types.idl"
-  - "mongo/util/net/hostandport.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/auth/auth_types.idl"
+    - "mongo/util/net/hostandport.idl"
 
 structs:
-  ImpersonatedClientMetadata:
-    description: "A struct representing client connection information used as a type for AuditMetadata.$impersonatedClient"
-    strict: false
-    fields:
-      "hosts":
-        type: array<HostAndPort>
+    ImpersonatedClientMetadata:
+        description: "A struct representing client connection information used as a type for AuditMetadata.$impersonatedClient"
+        strict: false
+        fields:
+            "hosts":
+                type: array<HostAndPort>
 
-  AuditMetadata:
-    description: "A struct representing user/client information from mongos to mongod embedded within the $audit field"
-    strict: true
-    fields:
-      "$impersonatedUser":
-        type: UserName
-        cpp_name: "user"
-        optional: true
-      "$impersonatedRoles":
-        type: array<RoleName>
-        cpp_name: "roles"
-      "$impersonatedClient":
-        type: ImpersonatedClientMetadata
-        cpp_name: "clientMetadata"
-        optional: true
-
-
+    AuditMetadata:
+        description: "A struct representing user/client information from mongos to mongod embedded within the $audit field"
+        strict: true
+        fields:
+            "$impersonatedUser":
+                type: UserName
+                cpp_name: "user"
+                optional: true
+            "$impersonatedRoles":
+                type: array<RoleName>
+                cpp_name: "roles"
+            "$impersonatedClient":
+                type: ImpersonatedClientMetadata
+                cpp_name: "clientMetadata"
+                optional: true

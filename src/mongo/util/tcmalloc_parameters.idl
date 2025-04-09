@@ -27,85 +27,87 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/config.h"
-    - "mongo/util/tcmalloc_set_parameter.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/config.h"
+        - "mongo/util/tcmalloc_set_parameter.h"
 
 server_parameters:
+    tcmallocMaxPerCPUCacheSize:
+        description: "Configure tcmalloc's max_per_cpu_cache_size"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: TCMallocMaxPerCPUCacheSizeServerParameter
+            override_set: true
+        redact: false
 
-  tcmallocMaxPerCPUCacheSize:
-    description: "Configure tcmalloc's max_per_cpu_cache_size"
-    set_at: [startup, runtime]
-    cpp_class:
-      name: TCMallocMaxPerCPUCacheSizeServerParameter
-      override_set: true
-    redact: false
+    tcmallocMaxTotalThreadCacheBytes:
+        description: "Configure tcmalloc's max_total_thread_cache_bytes"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: TCMallocMaxTotalThreadCacheBytesServerParameter
+            override_set: true
+        redact: false
 
-  tcmallocMaxTotalThreadCacheBytes:
-    description: "Configure tcmalloc's max_total_thread_cache_bytes"
-    set_at: [startup, runtime]
-    cpp_class:
-      name: TCMallocMaxTotalThreadCacheBytesServerParameter
-      override_set: true
-    redact: false
+    tcmallocAggressiveMemoryDecommit:
+        description: "Configure tcmalloc's aggressive_memory_decommit"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: TCMallocAggressiveMemoryDecommitServerParameter
+            override_set: true
+        redact: false
 
-  tcmallocAggressiveMemoryDecommit:
-    description: "Configure tcmalloc's aggressive_memory_decommit"
-    set_at: [startup, runtime]
-    cpp_class:
-      name: TCMallocAggressiveMemoryDecommitServerParameter
-      override_set: true
-    redact: false
+    heapProfilingEnabled:
+        description:
+            "Enable Heap Profiling for the tcmalloc-gperf heap profiler (you must also set
+            heapProfilingSampleIntervalBytes at startup in order to enable this). This is not relevant
+            for the tcmalloc-google profiler."
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: HeapProfilingEnabled
+        default: false
+        condition:
+            preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
+        redact: false
 
-  heapProfilingEnabled:
-    description: "Enable Heap Profiling for the tcmalloc-gperf heap profiler (you must also set 
-      heapProfilingSampleIntervalBytes at startup in order to enable this). This is not relevant 
-      for the tcmalloc-google profiler."
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: HeapProfilingEnabled
-    default: false
-    condition:
-      preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
-    redact: false
+    heapProfilingSampleIntervalBytes:
+        description:
+            "Configure heap profiling sample interval bytes. This can be used to
+            enable/disable heap profiling at runtime on the tcmalloc-google profiler, and is a no-op
+            at runtime on the tcmalloc-gperf profiler."
+        set_at: [startup, runtime]
+        cpp_vartype: long long
+        cpp_varname: HeapProfilingSampleIntervalBytes
+        on_update: onUpdateHeapProfilingSampleIntervalBytes
+        validator: {callback: "validateHeapProfilingSampleIntervalBytes"}
+        default: 0
+        condition:
+            preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
+        redact: false
 
-  heapProfilingSampleIntervalBytes:
-    description: "Configure heap profiling sample interval bytes. This can be used to 
-      enable/disable heap profiling at runtime on the tcmalloc-google profiler, and is a no-op 
-      at runtime on the tcmalloc-gperf profiler."
-    set_at: [startup, runtime]
-    cpp_vartype: long long
-    cpp_varname: HeapProfilingSampleIntervalBytes
-    on_update: onUpdateHeapProfilingSampleIntervalBytes
-    validator: { callback: "validateHeapProfilingSampleIntervalBytes" }
-    default: 0
-    condition:
-      preprocessor: defined(_POSIX_VERSION) && (defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE) || defined(MONGO_CONFIG_USE_LIBUNWIND))
-    redact: false
+    heapProfilingMaxObjects:
+        description:
+            "Set the maximum number of objects tracked by the tcmalloc-google heap profiler
+            before it is disabled"
+        set_at: startup
+        cpp_vartype: long long
+        cpp_varname: HeapProfilingMaxObjects
+        default: 0
+        validator: {lt: 1048576}
+        redact: false
 
-  heapProfilingMaxObjects:
-    description: "Set the maximum number of objects tracked by the tcmalloc-google heap profiler 
-      before it is disabled"
-    set_at: startup
-    cpp_vartype: long long
-    cpp_varname: HeapProfilingMaxObjects
-    default: 0
-    validator: { lt: 1048576 }
-    redact: false
-  
-  tcmallocReleaseRate:
-    description: "Configure tcmalloc_release_rate"
-    set_at: [startup, runtime]
-    cpp_class:
-      name: TCMallocReleaseRateServerParameter
-      override_set: false
-    redact: false
+    tcmallocReleaseRate:
+        description: "Configure tcmalloc_release_rate"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: TCMallocReleaseRateServerParameter
+            override_set: false
+        redact: false
 
-  tcmallocEnableBackgroundThread:
-    description: "Enable TCMalloc Background Thread"
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: TCMallocEnableBackgroundThread
-    default: true
-    redact: false
+    tcmallocEnableBackgroundThread:
+        description: "Enable TCMalloc Background Thread"
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: TCMallocEnableBackgroundThread
+        default: true
+        redact: false

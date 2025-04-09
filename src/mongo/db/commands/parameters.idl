@@ -27,52 +27,52 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    # For serverGlobalParams
-    - "mongo/db/server_options.h"
-    # For DBException
-    - "mongo/util/assert_util.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        # For serverGlobalParams
+        - "mongo/db/server_options.h"
+        # For DBException
+        - "mongo/util/assert_util.h"
 
 server_parameters:
-  quiet:
-    description: "Sets quiet logging mode"
-    set_at: ["startup", "runtime"]
-    cpp_varname: "serverGlobalParams.quiet"
-    redact: false
+    quiet:
+        description: "Sets quiet logging mode"
+        set_at: ["startup", "runtime"]
+        cpp_varname: "serverGlobalParams.quiet"
+        redact: false
 
-  traceExceptions:
-    description: "Configures mongod to log full code stack traces for every database and socket C++ exception"
-    set_at: runtime
-    cpp_varname: "DBException::traceExceptions"
-    redact: false
+    traceExceptions:
+        description: "Configures mongod to log full code stack traces for every database and socket C++ exception"
+        set_at: runtime
+        cpp_varname: "DBException::traceExceptions"
+        redact: false
 
-  traceWriteConflictExceptions:
-    description: "Call printStackTrace on every WriteConflictException created"
-    set_at: ["startup", "runtime"]
-    cpp_varname: "DBException::traceWriteConflictExceptions"
-    redact: false
+    traceWriteConflictExceptions:
+        description: "Call printStackTrace on every WriteConflictException created"
+        set_at: ["startup", "runtime"]
+        cpp_varname: "DBException::traceWriteConflictExceptions"
+        redact: false
 
-  logLevel:
-    description: "Specifies the verbosity of logging"
-    set_at: ["startup", "runtime"]
-    cpp_class:
-      name: LogLevelServerParameter
-      override_set: true
-    redact: false
+    logLevel:
+        description: "Specifies the verbosity of logging"
+        set_at: ["startup", "runtime"]
+        cpp_class:
+            name: LogLevelServerParameter
+            override_set: true
+        redact: false
 
-  logComponentVerbosity:
-    description: "Sets the verbosity levels of various components for log messages"
-    set_at: ["startup", "runtime"]
-    cpp_class:
-      name: LogComponentVerbosityServerParameter
-      override_set: true
-    redact: false
+    logComponentVerbosity:
+        description: "Sets the verbosity levels of various components for log messages"
+        set_at: ["startup", "runtime"]
+        cpp_class:
+            name: LogComponentVerbosityServerParameter
+            override_set: true
+        redact: false
 
-  automationServiceDescriptor:
-    description: "automationServiceDescriptor"
-    set_at: ["startup", "runtime"]
-    cpp_class:
-      name: AutomationServiceDescriptorServerParameter
-      override_set: true
-    redact: false
+    automationServiceDescriptor:
+        description: "automationServiceDescriptor"
+        set_at: ["startup", "runtime"]
+        cpp_class:
+            name: AutomationServiceDescriptorServerParameter
+            override_set: true
+        redact: false

@@ -27,9 +27,9 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/query/query_request_helper.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/query/query_request_helper.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -37,47 +37,49 @@ imports:
     - "mongo/db/repl/replication_types.idl"
 
 commands:
-  getMore:
-    cpp_name: GetMoreCommandRequest
-    command_name: getMore
-    description: "Parser for the getMore command."
-    strict: true
-    namespace: type
-    # The command parameter is the cursor id, like {getMore: 12345}.
-    type: long
-    api_version: "1"
-    access_check:
-      ignore: true
-    fields:
-      # Note: getMore interprets the maxTimeMS generic argument (not listed here but injected automatically) differently than other commands.
-      # Instead of it being a limit on execution time, it instead determines the await data timeout: the number of milliseconds for which a
-      # getMore on a tailable, awaitData query should block.
-      collection:
-        type: string
-        validator: { callback: "query_request_helper::validateGetMoreCollectionName" }
-        stability: stable
-      batchSize:
-        description: >
-          The batch size is optional. If not provided, we will put as many documents into the batch
-          as fit within the byte limit.
-        type: safeInt64
-        optional: true
-        validator: {gte: 0}
-        stability: stable
-      term:
-        description: >
-          Only internal queries from replication will typically have a term.
+    getMore:
+        cpp_name: GetMoreCommandRequest
+        command_name: getMore
+        description: "Parser for the getMore command."
+        strict: true
+        namespace: type
+        # The command parameter is the cursor id, like {getMore: 12345}.
         type: long
-        optional: true
-        stability: unstable
-      lastKnownCommittedOpTime:
-        description: Only internal queries from replication will have a last known committed optime.
-        type: optime
-        optional: true
-        stability: unstable
-      includeQueryStatsMetrics:
-        description: Determines whether or not to include query stats metrics in the response.
-        type: optionalBool
-        stability: internal
-    reply_type: CursorGetMoreReply
-
+        api_version: "1"
+        access_check:
+            ignore: true
+        fields:
+            # Note: getMore interprets the maxTimeMS generic argument (not listed here but injected automatically) differently than other commands.
+            # Instead of it being a limit on execution time, it instead determines the await data timeout: the number of milliseconds for which a
+            # getMore on a tailable, awaitData query should block.
+            collection:
+                type: string
+                validator:
+                    {
+                        callback: "query_request_helper::validateGetMoreCollectionName",
+                    }
+                stability: stable
+            batchSize:
+                description: >
+                    The batch size is optional. If not provided, we will put as many documents into the batch
+                    as fit within the byte limit.
+                type: safeInt64
+                optional: true
+                validator: {gte: 0}
+                stability: stable
+            term:
+                description: >
+                    Only internal queries from replication will typically have a term.
+                type: long
+                optional: true
+                stability: unstable
+            lastKnownCommittedOpTime:
+                description: Only internal queries from replication will have a last known committed optime.
+                type: optime
+                optional: true
+                stability: unstable
+            includeQueryStatsMetrics:
+                description: Determines whether or not to include query stats metrics in the response.
+                type: optionalBool
+                stability: internal
+        reply_type: CursorGetMoreReply

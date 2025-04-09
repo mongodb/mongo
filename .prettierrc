@@ -6,6 +6,13 @@
             "options": {
                 "tabWidth": 4
             }
-        }
+        },
+        {
+            "files": "*.idl",
+            "options": {
+                "parser": "yaml",
+                "tabWidth": 4
+            }
+        },
     ]
 }

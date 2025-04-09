@@ -27,53 +27,55 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  GRPCConnectionStats:
-    description: "A struct representing the stats reported by GRPCAsyncClientFactory, typically 
-                  through a NetworkInterface."
-    strict: false
-    fields:
-      totalActiveStreams: 
-        description: "Counts the total number of active streams."
-        type: long
-        default: 0
-      totalInUseStreams:
-        description: "Counts the total number of gRPC streams that are not leased."
-        type: long
-        default: 0
-      totalLeasedStreams:
-        description: "Counts the total number of gRPC streams that are leased."
-        type: long
-        default: 0
-      totalStreamsCreated:
-        description: "Counts the total number of gRPC streams that have been created over the 
-                      lifetime of the GRPCAsyncClientFactory."
-        type: long 
-        default: 0
-      totalSuccessfulStreams:
-        description: "Counts the total number of successfuly finished gRPC streams. A successfully
-                      finished stream is one that terminates with an OK status."
-        type: long
-        default: 0
-      totalFailedStreams:
-        description: "Counts the total number of unsuccessfuly finished gRPC streams. An
-                      unsuccessfully finished stream is one that terminates with a non-OK status.
-                      For example, we may see this if a command gets cancelled or the underlying
-                      channel gets closed."
-        type: long
-        default: 0
-      totalStreamUsageTimeMs:
-        description: "Counts the total amount of time each stream was open for."
-        type: long
-        default: 0
-      totalOpenChannels: 
-        description: "Counts the total number of channels that are currently open."
-        type: long
-        default: 0
-
-                
+    GRPCConnectionStats:
+        description:
+            "A struct representing the stats reported by GRPCAsyncClientFactory, typically
+            through a NetworkInterface."
+        strict: false
+        fields:
+            totalActiveStreams:
+                description: "Counts the total number of active streams."
+                type: long
+                default: 0
+            totalInUseStreams:
+                description: "Counts the total number of gRPC streams that are not leased."
+                type: long
+                default: 0
+            totalLeasedStreams:
+                description: "Counts the total number of gRPC streams that are leased."
+                type: long
+                default: 0
+            totalStreamsCreated:
+                description:
+                    "Counts the total number of gRPC streams that have been created over the
+                    lifetime of the GRPCAsyncClientFactory."
+                type: long
+                default: 0
+            totalSuccessfulStreams:
+                description:
+                    "Counts the total number of successfuly finished gRPC streams. A successfully
+                    finished stream is one that terminates with an OK status."
+                type: long
+                default: 0
+            totalFailedStreams:
+                description:
+                    "Counts the total number of unsuccessfuly finished gRPC streams. An
+                    unsuccessfully finished stream is one that terminates with a non-OK status.
+                    For example, we may see this if a command gets cancelled or the underlying
+                    channel gets closed."
+                type: long
+                default: 0
+            totalStreamUsageTimeMs:
+                description: "Counts the total amount of time each stream was open for."
+                type: long
+                default: 0
+            totalOpenChannels:
+                description: "Counts the total number of channels that are currently open."
+                type: long
+                default: 0

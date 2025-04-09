@@ -31,48 +31,51 @@ global:
 
 server_parameters:
     enableTemporarilyUnavailableExceptions:
-        description: 'Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
-                      throwing WriteConflictException.'
-        set_at: [ startup, runtime ]
-        cpp_varname: 'gEnableTemporarilyUnavailableExceptions'
+        description:
+            "Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
+            throwing WriteConflictException."
+        set_at: [startup, runtime]
+        cpp_varname: "gEnableTemporarilyUnavailableExceptions"
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
 
     temporarilyUnavailableMaxRetries:
-        description: 'The number of times to retry a TemporarilyUnavailable error internally'
-        set_at: [ startup, runtime ]
-        cpp_varname: 'gTemporarilyUnavailableExceptionMaxRetryAttempts'
+        description: "The number of times to retry a TemporarilyUnavailable error internally"
+        set_at: [startup, runtime]
+        cpp_varname: "gTemporarilyUnavailableExceptionMaxRetryAttempts"
         cpp_vartype: AtomicWord<long long>
         default: 10
         validator:
-          gte: 0
+            gte: 0
         redact: false
 
     temporarilyUnavailableBackoffBaseMs:
-        description: 'The base period of time to wait between each TemporarilyUnavailable retry
-                      attempt. The backoff time is linear such that the Nth retry waits for N times
-                      the base backoff period.'
-        set_at: [ startup, runtime ]
-        cpp_varname: 'gTemporarilyUnavailableExceptionRetryBackoffBaseMs'
+        description:
+            "The base period of time to wait between each TemporarilyUnavailable retry
+            attempt. The backoff time is linear such that the Nth retry waits for N times
+            the base backoff period."
+        set_at: [startup, runtime]
+        cpp_varname: "gTemporarilyUnavailableExceptionRetryBackoffBaseMs"
         cpp_vartype: AtomicWord<long long>
         default: 1000
         validator:
-          gte: 0
+            gte: 0
         redact: false
 
     transactionTooLargeForCacheThreshold:
-        description: "Threshold on the proportion of total dirty cache bytes that the running
-                      transaction's dirty cache bytes can represent and still be considered
-                      fullfillable on retry. If this threshold is exceeded, a
-                      TransactionTooLargeForCache exception is thrown. Setting this parameter to 1.0
-                      causes this check to be disabled, and TransactionTooLargeForCache exceptions
-                      will not be thrown."
-        set_at: [ startup, runtime ]
-        cpp_varname: 'gTransactionTooLargeForCacheThreshold'
+        description:
+            "Threshold on the proportion of total dirty cache bytes that the running
+            transaction's dirty cache bytes can represent and still be considered
+            fullfillable on retry. If this threshold is exceeded, a
+            TransactionTooLargeForCache exception is thrown. Setting this parameter to 1.0
+            causes this check to be disabled, and TransactionTooLargeForCache exceptions
+            will not be thrown."
+        set_at: [startup, runtime]
+        cpp_varname: "gTransactionTooLargeForCacheThreshold"
         cpp_vartype: AtomicWord<double>
         default: 0.75
         validator:
-          gte: 0.0
-          lte: 1.0
+            gte: 0.0
+            lte: 1.0
         redact: false

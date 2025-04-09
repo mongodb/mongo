@@ -27,102 +27,102 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/s/sharding_task_executor_pool_controller.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/sharding_task_executor_pool_controller.h"
 
 server_parameters:
-  ShardingTaskExecutorPoolMinSize:
-    description: <-
-        The minimum number of connections for each executor in the pool for the sharding grid.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.minConnections"
-    validator:
-        gte: 0
-    default: 1
-    redact: false
+    ShardingTaskExecutorPoolMinSize:
+        description: <-
+            The minimum number of connections for each executor in the pool for the sharding grid.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.minConnections"
+        validator:
+            gte: 0
+        default: 1
+        redact: false
 
-  ShardingTaskExecutorPoolMaxSize:
-    description: <-
-        The maximum number of connections for each executor in the pool for the sharding grid.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnections"
-    validator:
-        gte: 1
-    default: 32767
-    redact: false
+    ShardingTaskExecutorPoolMaxSize:
+        description: <-
+            The maximum number of connections for each executor in the pool for the sharding grid.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnections"
+        validator:
+            gte: 1
+        default: 32767
+        redact: false
 
-  ShardingTaskExecutorPoolMaxConnecting:
-    description: <-
-        The maximum number of in-flight connections for each executor
-        in the pool for the sharding grid.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnecting"
-    validator:
-        gte: 1
-    default: 2
-    redact: false
+    ShardingTaskExecutorPoolMaxConnecting:
+        description: <-
+            The maximum number of in-flight connections for each executor
+            in the pool for the sharding grid.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnecting"
+        validator:
+            gte: 1
+        default: 2
+        redact: false
 
-  ShardingTaskExecutorPoolHostTimeoutMS:
-    description: <-
-        The timeout for dropping a host for each executor in the pool for the sharding grid.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.hostTimeoutMS"
-    validator:
-        callback: "ShardingTaskExecutorPoolController::validateHostTimeout"
-        gte: 1
-    default: 300000 # 5mins
-    redact: false
+    ShardingTaskExecutorPoolHostTimeoutMS:
+        description: <-
+            The timeout for dropping a host for each executor in the pool for the sharding grid.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.hostTimeoutMS"
+        validator:
+            callback: "ShardingTaskExecutorPoolController::validateHostTimeout"
+            gte: 1
+        default: 300000 # 5mins
+        redact: false
 
-  ShardingTaskExecutorPoolRefreshRequirementMS:
-    description: <-
-        The timeout before a connection needs to be refreshed for each executor
-        in the pool for the sharding grid.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.toRefreshTimeoutMS"
-    validator:
-        gte: 1
-    default: 60000 # 1min
-    redact: false
+    ShardingTaskExecutorPoolRefreshRequirementMS:
+        description: <-
+            The timeout before a connection needs to be refreshed for each executor
+            in the pool for the sharding grid.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.toRefreshTimeoutMS"
+        validator:
+            gte: 1
+        default: 60000 # 1min
+        redact: false
 
-  ShardingTaskExecutorPoolRefreshTimeoutMS:
-    description: <-
-        The timeout for refreshing a connection for each executor in the pool for the sharding grid.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.pendingTimeoutMS"
-    validator:
-        callback: "ShardingTaskExecutorPoolController::validatePendingTimeout"
-        gte: 1
-    default: 20000 # 20secs
-    redact: false
+    ShardingTaskExecutorPoolRefreshTimeoutMS:
+        description: <-
+            The timeout for refreshing a connection for each executor in the pool for the sharding grid.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.pendingTimeoutMS"
+        validator:
+            callback: "ShardingTaskExecutorPoolController::validatePendingTimeout"
+            gte: 1
+        default: 20000 # 20secs
+        redact: false
 
-  ShardingTaskExecutorPoolReplicaSetMatching:
-    description: <-
-        Enables ReplicaSet member connection matching.
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.matchingStrategyString"
-    on_update: "ShardingTaskExecutorPoolController::onUpdateMatchingStrategy"
-    default: "automatic" # matchPrimaryNode on mongos; disabled on mongod
-    redact: false
+    ShardingTaskExecutorPoolReplicaSetMatching:
+        description: <-
+            Enables ReplicaSet member connection matching.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.matchingStrategyString"
+        on_update: "ShardingTaskExecutorPoolController::onUpdateMatchingStrategy"
+        default: "automatic" # matchPrimaryNode on mongos; disabled on mongod
+        redact: false
 
-  ShardingTaskExecutorPoolMinSizeForConfigServers:
-    description: <-
-        Overrides ShardingTaskExecutorPoolMinSize for pools targeting config servers.
-        Has no effect if set to -1 (the default).
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.minConnectionsForConfigServers"
-    validator:
-        gte: -1
-    default: -1
-    redact: false
+    ShardingTaskExecutorPoolMinSizeForConfigServers:
+        description: <-
+            Overrides ShardingTaskExecutorPoolMinSize for pools targeting config servers.
+            Has no effect if set to -1 (the default).
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.minConnectionsForConfigServers"
+        validator:
+            gte: -1
+        default: -1
+        redact: false
 
-  ShardingTaskExecutorPoolMaxSizeForConfigServers:
-    description: <-
-        Overrides ShardingTaskExecutorPoolMaxSize for pools targeting config servers.
-        Has no effect if set to -1 (the default).
-    set_at: [ startup, runtime ]
-    cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnectionsForConfigServers"
-    validator:
-        gte: -1
-    default: -1
-    redact: false
+    ShardingTaskExecutorPoolMaxSizeForConfigServers:
+        description: <-
+            Overrides ShardingTaskExecutorPoolMaxSize for pools targeting config servers.
+            Has no effect if set to -1 (the default).
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnectionsForConfigServers"
+        validator:
+            gte: -1
+        default: -1
+        redact: false

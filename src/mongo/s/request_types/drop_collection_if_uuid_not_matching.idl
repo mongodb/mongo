@@ -29,23 +29,23 @@
 # This IDL file describes the BSON format for _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern command.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-
-  _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern:
-    command_name: _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern
-    cpp_name: ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest
-    description: "Internal dropCollectionIfUUIDNotMatching request with write concern."
-    strict: false
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-        expectedCollectionUUID:
-            type: uuid
-            description: "The expected collection UUID: if the local catalog has a different uuid
-                         associated to the namespace, the collection will be dropped."
-    reply_type: OkReply
+    _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern:
+        command_name: _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern
+        cpp_name: ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest
+        description: "Internal dropCollectionIfUUIDNotMatching request with write concern."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            expectedCollectionUUID:
+                type: uuid
+                description:
+                    "The expected collection UUID: if the local catalog has a different uuid
+                    associated to the namespace, the collection will be dropped."
+        reply_type: OkReply

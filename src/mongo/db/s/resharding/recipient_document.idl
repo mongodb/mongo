@@ -91,17 +91,19 @@ structs:
             cloneTimestamp:
                 type: timestamp
                 optional: true
-                description:  "The timestamp for the snapshot read while cloning from the donors."
+                description: "The timestamp for the snapshot read while cloning from the donors."
             skipCloningAndApplying:
                 type: optionalBool
-                description: "Whether this recipient can skip cloning documents and
-                              fetching/applying oplog entries because it is not going to own any
-                              chunks for the collection after resharding."
+                description:
+                    "Whether this recipient can skip cloning documents and
+                    fetching/applying oplog entries because it is not going to own any
+                    chunks for the collection after resharding."
             storeOplogFetcherProgress:
                 type: optionalBool
-                description: "Whether this recipient should store the count of oplog entries
-                              fetched in a progress document and use this count instead of the fast
-                              count to recover metrics upon recovery."
+                description:
+                    "Whether this recipient should store the count of oplog entries
+                    fetched in a progress document and use this count instead of the fast
+                    count to recover metrics upon recovery."
             changeStreamsMonitor:
                 type: ChangeStreamsMonitorContext
                 optional: true
@@ -114,7 +116,7 @@ structs:
             minimumOperationDurationMillis:
                 type: long
             startConfigTxnCloneTime:
-                type:  date
+                type: date
                 optional: true
             metrics:
                 type: ReshardingRecipientMetrics

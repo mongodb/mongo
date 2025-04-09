@@ -1,4 +1,3 @@
-
 # Copyright (C) 2020-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,69 +27,69 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
-  readHedgingMode:
-    description: >-
-        DEPRECATED. Has no effect on server behavior.
-        Previously enabled hedged reads.
-    set_at: [ startup, runtime ]
-    cpp_class:
-      name: ReadHedgingModeParameter
-      override_set: true
-    redact: false
+    readHedgingMode:
+        description: >-
+            DEPRECATED. Has no effect on server behavior.
+            Previously enabled hedged reads.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: ReadHedgingModeParameter
+            override_set: true
+        redact: false
 
-  maxTimeMSForHedgedReads:
-    description: >-
-        DEPRECATED. Has no effect on server behavior.
-        Previously was the maxTimeMS to set on hedged reads.
-    set_at: [ startup, runtime ]
-    cpp_class:
-      name: MaxTimeMSForHedgedReadsParameter
-      override_set: true
-    redact: false
+    maxTimeMSForHedgedReads:
+        description: >-
+            DEPRECATED. Has no effect on server behavior.
+            Previously was the maxTimeMS to set on hedged reads.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: MaxTimeMSForHedgedReadsParameter
+            override_set: true
+        redact: false
 
-  mongosShutdownTimeoutMillisForSignaledShutdown:
-    description: >-
-        The time taken for quiesce mode at shutdown in response to SIGTERM.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "mongosShutdownTimeoutMillisForSignaledShutdown"
-    default: 15000
-    validator:
-        gte: 0
-    redact: false
+    mongosShutdownTimeoutMillisForSignaledShutdown:
+        description: >-
+            The time taken for quiesce mode at shutdown in response to SIGTERM.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: "mongosShutdownTimeoutMillisForSignaledShutdown"
+        default: 15000
+        validator:
+            gte: 0
+        redact: false
 
-  loadBalancerPort:
-    description: >-
-        The port over which proxied connections using the Proxy Protocol may be made.
-        A value of 0 disables the port entirely.
-    set_at: [ startup ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "loadBalancerPort"
-    default: 0
-    validator: { gte: 0, lte: 65535 }
-    redact: false
+    loadBalancerPort:
+        description: >-
+            The port over which proxied connections using the Proxy Protocol may be made.
+            A value of 0 disables the port entirely.
+        set_at: [startup]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: "loadBalancerPort"
+        default: 0
+        validator: {gte: 0, lte: 65535}
+        redact: false
 
-  testMongosOnlyRuntimeParameter:
-    description: "Test runtime-only mongos server parameter"
-    test_only: true
-    set_at: runtime
-    cpp_vartype: bool
-    cpp_varname: gTestMongosRuntimeParameter
-    default: false
-    redact: false
+    testMongosOnlyRuntimeParameter:
+        description: "Test runtime-only mongos server parameter"
+        test_only: true
+        set_at: runtime
+        cpp_vartype: bool
+        cpp_varname: gTestMongosRuntimeParameter
+        default: false
+        redact: false
 
-  maxRoundsWithoutProgressParameter:
-    description: "Max num rounds without progress"
-    test_only: true
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gMaxRoundsWithoutProgress"
-    default: 5
-    validator: { gte: 5, lte: 20 }
-    redact: false
+    maxRoundsWithoutProgressParameter:
+        description: "Max num rounds without progress"
+        test_only: true
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: "gMaxRoundsWithoutProgress"
+        default: 5
+        validator: {gte: 5, lte: 20}
+        redact: false

@@ -52,7 +52,7 @@ commands:
                 description: "Minimum amount of space recoverable for compaction to proceed."
                 optional: true
                 type: safeInt64
-                validator: { gte: 1 }
+                validator: {gte: 1}
         namespace: concatenate_with_db
         strict: true
 
@@ -68,7 +68,7 @@ commands:
                 description: "Minimum amount of space recoverable for compaction to proceed."
                 optional: true
                 type: safeInt64
-                validator: { gte: 1 }
+                validator: {gte: 1}
             runOnce:
                 description: "Run compact once on every file on the node."
                 type: bool

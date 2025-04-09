@@ -27,34 +27,34 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     SearchFeatures:
-      description: "Enum representing available search features."
-      type: string
-      values:
-        kShardedSort: "shardedSort"
+        description: "Enum representing available search features."
+        type: string
+        values:
+            kShardedSort: "shardedSort"
 
 structs:
-  PlanShardedSearchSpec:
-    description: Specification for a planShardedSearch command.
-    strict: true
-    fields:
-      planShardedSearch:
-        description: Value is the name of the queried collection.
-        type: string
-      query:
-        description: The query to run.
-        type: object
-      explain:
-        description: The explain verbosity.
-        optional: true
-        type: object
-      searchFeatures:
-        description: Versioning variable with keys corresponding to mongos-supported search features with values equal to the version.
-        optional: true
-        type: object
+    PlanShardedSearchSpec:
+        description: Specification for a planShardedSearch command.
+        strict: true
+        fields:
+            planShardedSearch:
+                description: Value is the name of the queried collection.
+                type: string
+            query:
+                description: The query to run.
+                type: object
+            explain:
+                description: The explain verbosity.
+                optional: true
+                type: object
+            searchFeatures:
+                description: Versioning variable with keys corresponding to mongos-supported search features with values equal to the version.
+                optional: true
+                type: object

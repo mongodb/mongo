@@ -33,10 +33,10 @@ global:
 
 server_parameters:
     maxBSONDepth:
-        description: 'Maximum nesting depth of BSON objects'
+        description: "Maximum nesting depth of BSON objects"
         set_at: startup
-        cpp_varname: 'BSONDepth::maxAllowableDepth'
+        cpp_varname: "BSONDepth::maxAllowableDepth"
         validator:
-            gte: { expr: 'BSONDepth::kBSONDepthParameterFloor' }
-            lte: { expr: 'BSONDepth::kBSONDepthParameterCeiling' }
+            gte: {expr: "BSONDepth::kBSONDepthParameterFloor"}
+            lte: {expr: "BSONDepth::kBSONDepthParameterCeiling"}
         redact: false

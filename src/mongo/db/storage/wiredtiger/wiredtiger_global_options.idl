@@ -33,47 +33,47 @@ global:
         - "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
         - "mongo/util/debug_util.h"
     configs:
-        section: 'WiredTiger options'
-        source: [ cli, ini, yaml ]
+        section: "WiredTiger options"
+        source: [cli, ini, yaml]
 
 server_parameters:
     wiredTigerEngineRuntimeConfig:
-        description: 'WiredTiger Configuration'
+        description: "WiredTiger Configuration"
         set_at: runtime
         cpp_class:
             name: WiredTigerEngineRuntimeConfigParameter
-            data: 'std::pair<synchronized_value<std::string>, WiredTigerKVEngine*>'
+            data: "std::pair<synchronized_value<std::string>, WiredTigerKVEngine*>"
         # The data element of this param gets initialized in three
         # disparate ways by different parts of the codebase
         # none of which are easily encoded here.
         # Defer the initialization with condition: false
         # and allow those places to manually set themselves up.
-        condition: { expr: false }
+        condition: {expr: false}
         redact: false
 
     wiredTigerSessionCloseIdleTimeSecs:
-        description: 'Close idle wiredtiger sessions in the session cache after this many seconds'
-        cpp_vartype: 'AtomicWord<std::int32_t>'
+        description: "Close idle wiredtiger sessions in the session cache after this many seconds"
+        cpp_vartype: "AtomicWord<std::int32_t>"
         cpp_varname: gWiredTigerSessionCloseIdleTimeSecs
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         default:
             # The default is 5 mins with a shorter default in the debug build to aid testing.
-            expr: 'kDebugBuild ? 5 : 300'
+            expr: "kDebugBuild ? 5 : 300"
         validator:
             gte: 0
         redact: false
 
     wiredTigerCheckpointCleanupPeriodSeconds:
-      description: Time (in seconds) to spend waiting between checkpoint cleanups.
-      set_at: startup
-      cpp_vartype: 'std::int32_t'
-      cpp_varname: gWiredTigerCheckpointCleanupPeriodSeconds
-      # If the user doesn't set a default, let wiredtiger choose one.
-      default: 0
-      validator:
-        gte: 60
-        lte: 100000
-      redact: false
+        description: Time (in seconds) to spend waiting between checkpoint cleanups.
+        set_at: startup
+        cpp_vartype: "std::int32_t"
+        cpp_varname: gWiredTigerCheckpointCleanupPeriodSeconds
+        # If the user doesn't set a default, let wiredtiger choose one.
+        default: 0
+        validator:
+            gte: 60
+            lte: 100000
+        redact: false
 
     # The "wiredTigerCursorCacheSize" parameter has the following meaning.
     #
@@ -95,174 +95,174 @@ server_parameters:
     # for a short time, except if a cursor is held by a long running session. This
     # is a good compromise for most workloads.
     wiredTigerCursorCacheSize:
-        description: 'Wired tiger cursor cache size'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<std::int32_t>'
+        description: "Wired tiger cursor cache size"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<std::int32_t>"
         cpp_varname: gWiredTigerCursorCacheSize
         default: -100
         validator:
-          lte: 0
+            lte: 0
         redact: false
-    
+
     wiredTigerSessionMax:
-        description: 'WiredTiger session max'
+        description: "WiredTiger session max"
         set_at: startup
-        cpp_varname: 'wiredTigerGlobalOptions.sessionMax'
+        cpp_varname: "wiredTigerGlobalOptions.sessionMax"
         default: 33000
         validator:
-          gte: 1
+            gte: 1
         redact: false
 
     wiredTigerEvictionDirtyTargetGB:
-      description: >-
-         Absolute dirty cache eviction target. Once eviction begins,
-         it will proceed until the target of dirty data in the cache
-         is reached
-         Defaults to 5% cache size
-      set_at: startup
-      cpp_varname: 'wiredTigerGlobalOptions.evictionDirtyTargetGB'
-      default: 0
-      validator:
-        gte: 0.01
-        lte: 10000
-      redact: false
+        description: >-
+            Absolute dirty cache eviction target. Once eviction begins,
+            it will proceed until the target of dirty data in the cache
+            is reached
+            Defaults to 5% cache size
+        set_at: startup
+        cpp_varname: "wiredTigerGlobalOptions.evictionDirtyTargetGB"
+        default: 0
+        validator:
+            gte: 0.01
+            lte: 10000
+        redact: false
 
     wiredTigerEvictionDirtyMaxGB:
-      description: >-
-         Absolute threshold at which dirty cache eviction starts operating
-         aggressively;
-         Defaults to 20% cache size
-      set_at: startup
-      cpp_varname: 'wiredTigerGlobalOptions.evictionDirtyTriggerGB'
-      default: 0
-      validator:
-        gte: 0.01
-        lte: 10000
-      redact: false
+        description: >-
+            Absolute threshold at which dirty cache eviction starts operating
+            aggressively;
+            Defaults to 20% cache size
+        set_at: startup
+        cpp_varname: "wiredTigerGlobalOptions.evictionDirtyTriggerGB"
+        default: 0
+        validator:
+            gte: 0.01
+            lte: 10000
+        redact: false
 
     wiredTigerEvictionDebugMode:
-      description: >-
-         If true, modify internal WiredTiger algorithms to force lookaside eviction to happen more
-         aggressively.
-      set_at: startup
-      cpp_vartype: 'bool'
-      cpp_varname: gWiredTigerEvictionDebugMode
-      default: false
-      # This parameter is only allowed in debug builds.
-      condition:
-        constexpr: 'kDebugBuild'
-      redact: false
+        description: >-
+            If true, modify internal WiredTiger algorithms to force lookaside eviction to happen more
+            aggressively.
+        set_at: startup
+        cpp_vartype: "bool"
+        cpp_varname: gWiredTigerEvictionDebugMode
+        default: false
+        # This parameter is only allowed in debug builds.
+        condition:
+            constexpr: "kDebugBuild"
+        redact: false
 
     wiredTigerFileHandleCloseIdleTime:
-      description: >-
-        The amount of time in seconds a file handle in WiredTiger needs to be idle before attempting
-        to close it.
-      set_at: startup
-      cpp_vartype: 'std::int32_t'
-      cpp_varname: gWiredTigerFileHandleCloseIdleTime
-      default: 600
-      validator:
-        gte: 1
-      redact: false
+        description: >-
+            The amount of time in seconds a file handle in WiredTiger needs to be idle before attempting
+            to close it.
+        set_at: startup
+        cpp_vartype: "std::int32_t"
+        cpp_varname: gWiredTigerFileHandleCloseIdleTime
+        default: 600
+        validator:
+            gte: 1
+        redact: false
 
     wiredTigerExtraDiagnostics:
-      description: >-
-          Extra diagnostics that can be enabled in release mode including diagnostic assertions that can cause WiredTiger to abort upon
-          detected invalid state. Valid options include: ["all", "concurrent_access", "data_validation", "invalid_op", "out_of_order",
-          "panic", "slow_operation", "visibility"]. In order to make runtime changes, this will need to be reconfigured using
-          wiredTigerEngineRuntimeConfigParameter.
-      set_at: [startup]
-      cpp_vartype: 'std::vector<std::string>'
-      cpp_varname: "gWiredTigerExtraDiagnostics"
-      validator:
-          callback: validateExtraDiagnostics
-      redact: false
+        description: >-
+            Extra diagnostics that can be enabled in release mode including diagnostic assertions that can cause WiredTiger to abort upon
+            detected invalid state. Valid options include: ["all", "concurrent_access", "data_validation", "invalid_op", "out_of_order",
+            "panic", "slow_operation", "visibility"]. In order to make runtime changes, this will need to be reconfigured using
+            wiredTigerEngineRuntimeConfigParameter.
+        set_at: [startup]
+        cpp_vartype: "std::vector<std::string>"
+        cpp_varname: "gWiredTigerExtraDiagnostics"
+        validator:
+            callback: validateExtraDiagnostics
+        redact: false
 
     wiredTigerFileHandleCloseMinimum:
-      description: >-
-        The number of handles open before the WiredTiger file manager will look for handles to close.
-      set_at: startup
-      cpp_vartype: 'std::int32_t'
-      cpp_varname: gWiredTigerFileHandleCloseMinimum
-      default: 2000
-      validator:
-        gte: 1
-      redact: false
+        description: >-
+            The number of handles open before the WiredTiger file manager will look for handles to close.
+        set_at: startup
+        cpp_vartype: "std::int32_t"
+        cpp_varname: gWiredTigerFileHandleCloseMinimum
+        default: 2000
+        validator:
+            gte: 1
+        redact: false
 
     wiredTigerFileHandleCloseScanInterval:
-      description: >-
-        The interval in seconds at which WiredTiger checks for inactive files and closes them.
-      set_at: startup
-      cpp_vartype: 'std::int32_t'
-      cpp_varname: gWiredTigerFileHandleCloseScanInterval
-      default: 10
-      validator:
-        gte: 1
-      redact: false
+        description: >-
+            The interval in seconds at which WiredTiger checks for inactive files and closes them.
+        set_at: startup
+        cpp_vartype: "std::int32_t"
+        cpp_varname: gWiredTigerFileHandleCloseScanInterval
+        default: 10
+        validator:
+            gte: 1
+        redact: false
 
     wiredTigerDirectoryForIndexes:
-       description: 'Read-only view of DirectoryForIndexes config parameter'
-       set_at: 'readonly'
-       cpp_class:
-           name: WiredTigerDirectoryForIndexesParameter
-       redact: false
+        description: "Read-only view of DirectoryForIndexes config parameter"
+        set_at: "readonly"
+        cpp_class:
+            name: WiredTigerDirectoryForIndexesParameter
+        redact: false
 
     wiredTigerSkipTableLoggingChecksOnStartup:
-      description: >-
-        Skips table logging setting checks and modifications on startup.
-      set_at: startup
-      cpp_vartype: 'bool'
-      cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
-      default: false
-      redact: false
+        description: >-
+            Skips table logging setting checks and modifications on startup.
+        set_at: startup
+        cpp_vartype: "bool"
+        cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
+        default: false
+        redact: false
 
     wiredTigerSkipTableLoggingChecksDuringValidation:
-      description: Skips table logging setting checks during validation
-      set_at: startup
-      cpp_vartype: 'bool'
-      cpp_varname: gWiredTigerSkipTableLoggingChecksDuringValidation
-      default: false
-      redact: false
+        description: Skips table logging setting checks during validation
+        set_at: startup
+        cpp_vartype: "bool"
+        cpp_varname: gWiredTigerSkipTableLoggingChecksDuringValidation
+        default: false
+        redact: false
 
     wiredTigerStressConfig:
-      description: >-
-        Encourage more interesting races in WiredTiger.
-      set_at: startup
-      cpp_vartype: bool
-      cpp_varname: gWiredTigerStressConfig
-      default: false
-      redact: false
+        description: >-
+            Encourage more interesting races in WiredTiger.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gWiredTigerStressConfig
+        default: false
+        redact: false
 
     wiredTigerSizeStorerPeriodicSyncHits:
-      description: >-
-        The number of hits after which the size storer will perform a flush.
-      set_at: startup
-      cpp_vartype: int32_t
-      cpp_varname: gWiredTigerSizeStorerPeriodicSyncHits
-      default: 100000
-      validator:
-        gte: 1
-      redact: false
+        description: >-
+            The number of hits after which the size storer will perform a flush.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gWiredTigerSizeStorerPeriodicSyncHits
+        default: 100000
+        validator:
+            gte: 1
+        redact: false
 
     wiredTigerSizeStorerPeriodicSyncPeriodMillis:
-      description: >-
-        The period in milliseconds after which the size storer will perform a flush.
-      set_at: startup
-      cpp_vartype: int32_t
-      cpp_varname: gWiredTigerSizeStorerPeriodicSyncPeriodMillis
-      default: 60000
-      validator:
-        gte: 1
-      redact: false
+        description: >-
+            The period in milliseconds after which the size storer will perform a flush.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gWiredTigerSizeStorerPeriodicSyncPeriodMillis
+        default: 60000
+        validator:
+            gte: 1
+        redact: false
 
     wiredTigerVerboseShutdownCheckpointLogs:
-      description: >-
-        Enables verbose checkpoint logs on shutdown.
-      set_at: startup
-      cpp_vartype: bool
-      cpp_varname: gWiredTigerVerboseShutdownCheckpointLogs
-      default: false
-      redact: false
+        description: >-
+            Enables verbose checkpoint logs on shutdown.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gWiredTigerVerboseShutdownCheckpointLogs
+        default: false
+        redact: false
 
 configs:
     # WiredTiger storage engine options
@@ -271,7 +271,7 @@ configs:
             Maximum amount of memory to allocate for cache;
             Defaults to 1/2 of physical RAM
         arg_vartype: Double
-        cpp_varname: 'wiredTigerGlobalOptions.cacheSizeGB'
+        cpp_varname: "wiredTigerGlobalOptions.cacheSizeGB"
         short_name: wiredTigerCacheSizeGB
         validator:
             gte: 0.25
@@ -282,7 +282,7 @@ configs:
             Seconds to wait between each write to a statistics file in the dbpath;
             0 means do not log statistics
         arg_vartype: Int
-        cpp_varname: 'wiredTigerGlobalOptions.statisticsLogDelaySecs'
+        cpp_varname: "wiredTigerGlobalOptions.statisticsLogDelaySecs"
         short_name: wiredTigerStatisticsLogDelaySecs
         hidden: true
         validator:
@@ -290,26 +290,26 @@ configs:
             lte: 100000
         default: 0
     "storage.wiredTiger.engineConfig.zstdCompressionLevel":
-        description: 'Default compression level for zstd compressor'
+        description: "Default compression level for zstd compressor"
         arg_vartype: Int
-        cpp_varname: 'wiredTigerGlobalOptions.zstdCompressorLevel'
+        cpp_varname: "wiredTigerGlobalOptions.zstdCompressorLevel"
         short_name: zstdDefaultCompressionLevel
         validator:
             gte: -7
             lte: 22
         default: 6
     "storage.wiredTiger.engineConfig.journalCompressor":
-        description: 'Use a compressor for log records [none|snappy|zlib|zstd]'
+        description: "Use a compressor for log records [none|snappy|zlib|zstd]"
         arg_vartype: String
-        cpp_varname: 'wiredTigerGlobalOptions.journalCompressor'
+        cpp_varname: "wiredTigerGlobalOptions.journalCompressor"
         short_name: wiredTigerJournalCompressor
-        default: 'snappy'
+        default: "snappy"
         validator:
-            callback: 'WiredTigerGlobalOptions::validateWiredTigerCompressor'
+            callback: "WiredTigerGlobalOptions::validateWiredTigerCompressor"
     "storage.wiredTiger.engineConfig.directoryForIndexes":
-        description: 'Put indexes and data in different directories'
+        description: "Put indexes and data in different directories"
         arg_vartype: Switch
-        cpp_varname: 'wiredTigerGlobalOptions.directoryForIndexes'
+        cpp_varname: "wiredTigerGlobalOptions.directoryForIndexes"
         short_name: wiredTigerDirectoryForIndexes
     "storage.wiredTiger.engineConfig.maxCacheOverflowFileSizeGB":
         description: >-
@@ -317,25 +317,25 @@ configs:
             Defaults to 0 (unbounded)
             Deprecated. Has no effect on storage engine operation.
         arg_vartype: Double
-        cpp_varname: 'wiredTigerGlobalOptions.maxCacheOverflowFileSizeGBDeprecated'
+        cpp_varname: "wiredTigerGlobalOptions.maxCacheOverflowFileSizeGBDeprecated"
         short_name: wiredTigerMaxCacheOverflowFileSizeGB
         default: 0.0
         hidden: true
     "storage.wiredTiger.engineConfig.configString":
-        description: 'WiredTiger storage engine custom configuration setting'
+        description: "WiredTiger storage engine custom configuration setting"
         arg_vartype: String
-        cpp_varname: 'wiredTigerGlobalOptions.engineConfig'
+        cpp_varname: "wiredTigerGlobalOptions.engineConfig"
         short_name: wiredTigerEngineConfigString
         hidden: true
     "storage.wiredTiger.engineConfig.liveRestoreSource":
-        description: 'Path to the source for live restore.'
+        description: "Path to the source for live restore."
         arg_vartype: String
-        cpp_varname: 'wiredTigerGlobalOptions.liveRestoreSource'
+        cpp_varname: "wiredTigerGlobalOptions.liveRestoreSource"
         short_name: wiredTigerLiveRestoreSource
     "storage.wiredTiger.engineConfig.liveRestoreThreads":
-        description: 'Number of live restore background threads.'
+        description: "Number of live restore background threads."
         arg_vartype: Int
-        cpp_varname: 'wiredTigerGlobalOptions.liveRestoreThreads'
+        cpp_varname: "wiredTigerGlobalOptions.liveRestoreThreads"
         short_name: wiredTigerLiveRestoreThreads
         validator:
             gte: 0
@@ -346,7 +346,7 @@ configs:
             'The read size for data migration, in MB, must be a power of two.
             This setting is a best effort. It does not force every read to be this size.'
         arg_vartype: Int
-        cpp_varname: 'wiredTigerGlobalOptions.liveRestoreReadSizeMB'
+        cpp_varname: "wiredTigerGlobalOptions.liveRestoreReadSizeMB"
         short_name: wiredTigerLiveRestoreReadSizeMB
         validator:
             callback: WiredTigerGlobalOptions::validateWiredTigerLiveRestoreReadSizeMB
@@ -354,30 +354,30 @@ configs:
 
     # WiredTiger collection options
     "storage.wiredTiger.collectionConfig.blockCompressor":
-        description: 'Block compression algorithm for collection data [none|snappy|zlib|zstd]'
+        description: "Block compression algorithm for collection data [none|snappy|zlib|zstd]"
         arg_vartype: String
-        cpp_varname: 'wiredTigerGlobalOptions.collectionBlockCompressor'
+        cpp_varname: "wiredTigerGlobalOptions.collectionBlockCompressor"
         short_name: wiredTigerCollectionBlockCompressor
         validator:
-            callback: 'WiredTigerGlobalOptions::validateWiredTigerCompressor'
+            callback: "WiredTigerGlobalOptions::validateWiredTigerCompressor"
         default: snappy
     "storage.wiredTiger.collectionConfig.configString":
-        description: 'WiredTiger custom collection configuration settings'
+        description: "WiredTiger custom collection configuration settings"
         arg_vartype: String
-        cpp_varname: 'wiredTigerGlobalOptions.collectionConfig'
+        cpp_varname: "wiredTigerGlobalOptions.collectionConfig"
         short_name: wiredTigerCollectionConfigString
         hidden: true
 
     # WiredTiger index options
     "storage.wiredTiger.indexConfig.prefixCompression":
-        description: 'Use prefix compression on row-store leaf pages'
+        description: "Use prefix compression on row-store leaf pages"
         arg_vartype: Bool
-        cpp_varname: 'wiredTigerGlobalOptions.useIndexPrefixCompression'
+        cpp_varname: "wiredTigerGlobalOptions.useIndexPrefixCompression"
         short_name: wiredTigerIndexPrefixCompression
         default: true
     "storage.wiredTiger.indexConfig.configString":
-        description: 'WiredTiger custom index configuration settings'
+        description: "WiredTiger custom index configuration settings"
         arg_vartype: String
-        cpp_varname: 'wiredTigerGlobalOptions.indexConfig'
+        cpp_varname: "wiredTigerGlobalOptions.indexConfig"
         short_name: wiredTigerIndexConfigString
         hidden: true

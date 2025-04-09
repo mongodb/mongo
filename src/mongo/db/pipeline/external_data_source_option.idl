@@ -78,4 +78,3 @@ structs:
                 type: array<ExternalDataSourceInfo>
                 optional: false
                 stability: unstable
-

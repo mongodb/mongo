@@ -27,123 +27,126 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/ftdc/ftdc_server.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/ftdc/ftdc_server.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  diagnosticDataCollectionEnabled:
-    description: "Determines whether to enable the collecting and logging of data for diagnostic purposes"
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.enabled"
-    on_update: "onUpdateFTDCEnabled"
-    redact: false
+    diagnosticDataCollectionEnabled:
+        description: "Determines whether to enable the collecting and logging of data for diagnostic purposes"
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.enabled"
+        on_update: "onUpdateFTDCEnabled"
+        redact: false
 
-  diagnosticDataCollectionPeriodMillis:
-    description: "Specifies the interval, in milliseconds, at which to collect diagnostic data."
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.periodMillis"
-    on_update: "onUpdateFTDCPeriod"
-    validator:
-        gte: 100
-    redact: false
+    diagnosticDataCollectionPeriodMillis:
+        description: "Specifies the interval, in milliseconds, at which to collect diagnostic data."
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.periodMillis"
+        on_update: "onUpdateFTDCPeriod"
+        validator:
+            gte: 100
+        redact: false
 
-  diagnosticDataCollectionMetadataCaptureFrequency:
-    description: "Specifies the interval, in instances of diagnostic data collection, at which to collect diagnostic config metadata."
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.metadataCaptureFrequency"
-    on_update: "onUpdateFTDCMetadataCaptureFrequency"
-    validator:
-        gte: 1
-    redact: false
+    diagnosticDataCollectionMetadataCaptureFrequency:
+        description: "Specifies the interval, in instances of diagnostic data collection, at which to collect diagnostic config metadata."
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.metadataCaptureFrequency"
+        on_update: "onUpdateFTDCMetadataCaptureFrequency"
+        validator:
+            gte: 1
+        redact: false
 
-  diagnosticDataCollectionSampleTimeoutMillis:
-    description: "Determines the timeout that each FTDC collector will be waited on during every
-                  sample. This is only used for async FTDC collectors."
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.sampleTimeoutMillis"
-    on_update: "onUpdateFTDCSampleTimeout"
-    validator:
-      callback: "validateSampleTimeoutMillis" # The callback is declared in "ftdc_server.h"
-    redact: false 
+    diagnosticDataCollectionSampleTimeoutMillis:
+        description:
+            "Determines the timeout that each FTDC collector will be waited on during every
+            sample. This is only used for async FTDC collectors."
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.sampleTimeoutMillis"
+        on_update: "onUpdateFTDCSampleTimeout"
+        validator:
+            callback: "validateSampleTimeoutMillis" # The callback is declared in "ftdc_server.h"
+        redact: false
 
-  diagnosticDataCollectionMinThreads:
-    description: "Determines the minimum number of async threads to keep-alive in the async FTDC 
-                  collector threadpool. Runtime updates require a join on the threadpool which could
-                  cause temporary collection delay."
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.minThreads"
-    on_update: "onUpdateFTDCMinThreads"
-    validator:
-        gte: 1
-    redact: false
+    diagnosticDataCollectionMinThreads:
+        description:
+            "Determines the minimum number of async threads to keep-alive in the async FTDC
+            collector threadpool. Runtime updates require a join on the threadpool which could
+            cause temporary collection delay."
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.minThreads"
+        on_update: "onUpdateFTDCMinThreads"
+        validator:
+            gte: 1
+        redact: false
 
-  diagnosticDataCollectionMaxThreads:
-    description: "Determines the maximum number of async threads to scale to in the async FTDC
-                  collector threadpool. Runtime updates require a join on the threadpool which could
-                  cause temporary collection delay."
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.maxThreads"
-    on_update: "onUpdateFTDCMaxThreads"
-    validator:
-        lte: 10
-    redact: false
+    diagnosticDataCollectionMaxThreads:
+        description:
+            "Determines the maximum number of async threads to scale to in the async FTDC
+            collector threadpool. Runtime updates require a join on the threadpool which could
+            cause temporary collection delay."
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.maxThreads"
+        on_update: "onUpdateFTDCMaxThreads"
+        validator:
+            lte: 10
+        redact: false
 
-  diagnosticDataCollectionDirectorySizeMB:
-    description: "Specifies the maximum size, in megabytes, of the diagnostic.data directory"
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.maxDirectorySizeMB"
-    on_update: "onUpdateFTDCDirectorySize"
-    validator:
-        gte: 10
-    redact: false
+    diagnosticDataCollectionDirectorySizeMB:
+        description: "Specifies the maximum size, in megabytes, of the diagnostic.data directory"
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.maxDirectorySizeMB"
+        on_update: "onUpdateFTDCDirectorySize"
+        validator:
+            gte: 10
+        redact: false
 
-  diagnosticDataCollectionFileSizeMB:
-    description: Specifies the maximum size, in megabytes, of each diagnostic file"
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.maxFileSizeMB"
-    on_update: "onUpdateFTDCFileSize"
-    validator:
-        gte: 1
-    redact: false
+    diagnosticDataCollectionFileSizeMB:
+        description: Specifies the maximum size, in megabytes, of each diagnostic file"
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.maxFileSizeMB"
+        on_update: "onUpdateFTDCFileSize"
+        validator:
+            gte: 1
+        redact: false
 
-  diagnosticDataCollectionSamplesPerChunk:
-    description: "Internal, Specifies the number of samples per diagnostic archive chunk"
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.maxSamplesPerArchiveMetricChunk"
-    on_update: "onUpdateFTDCSamplesPerChunk"
-    validator:
-        gte: 2
-    redact: false
+    diagnosticDataCollectionSamplesPerChunk:
+        description: "Internal, Specifies the number of samples per diagnostic archive chunk"
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.maxSamplesPerArchiveMetricChunk"
+        on_update: "onUpdateFTDCSamplesPerChunk"
+        validator:
+            gte: 2
+        redact: false
 
-  diagnosticDataCollectionSamplesPerInterimUpdate:
-    description: "Internal, Specifies the number of samples per diagnostic interim update"
-    set_at: [startup, runtime]
-    cpp_varname: "ftdcStartupParams.maxSamplesPerInterimMetricChunk"
-    on_update: "onUpdateFTDCPerInterimUpdate"
-    validator:
-        gte: 2
-    redact: false
+    diagnosticDataCollectionSamplesPerInterimUpdate:
+        description: "Internal, Specifies the number of samples per diagnostic interim update"
+        set_at: [startup, runtime]
+        cpp_varname: "ftdcStartupParams.maxSamplesPerInterimMetricChunk"
+        on_update: "onUpdateFTDCPerInterimUpdate"
+        validator:
+            gte: 2
+        redact: false
 
-  diagnosticDataCollectionDirectoryPath:
-    description: "Specify the directory for the diagnostic data directory."
-    set_at: [startup, runtime]
-    cpp_class: DiagnosticDataCollectionDirectoryPathServerParameter
-    redact: false
+    diagnosticDataCollectionDirectoryPath:
+        description: "Specify the directory for the diagnostic data directory."
+        set_at: [startup, runtime]
+        cpp_class: DiagnosticDataCollectionDirectoryPathServerParameter
+        redact: false
 
-  diagnosticDataCollectionEnableLatencyHistograms:
-    description: "Enable the capture of opLatencies: { histograms: true } } in FTDC."
-    set_at: [startup, runtime]
-    cpp_vartype: 'AtomicWord<bool>'
-    cpp_varname: gDiagnosticDataCollectionEnableLatencyHistograms
-    redact: false
+    diagnosticDataCollectionEnableLatencyHistograms:
+        description: "Enable the capture of opLatencies: { histograms: true } } in FTDC."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: gDiagnosticDataCollectionEnableLatencyHistograms
+        redact: false
 
-  diagnosticDataCollectionVerboseTCMalloc:
-     description: "Enable the capture of verbose tcmalloc in FTDC."
-     set_at: [startup, runtime]
-     cpp_vartype: 'AtomicWord<bool>'
-     cpp_varname: gDiagnosticDataCollectionVerboseTCMalloc
-     redact: false
+    diagnosticDataCollectionVerboseTCMalloc:
+        description: "Enable the capture of verbose tcmalloc in FTDC."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: gDiagnosticDataCollectionVerboseTCMalloc
+        redact: false

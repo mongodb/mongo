@@ -32,7 +32,7 @@ global:
 server_parameters:
     ttlMonitorEnabled:
         description: "Enable the TTL monitor."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: ttlMonitorEnabled
         default: true
@@ -40,7 +40,7 @@ server_parameters:
 
     ttlMonitorSleepSecs:
         description: "Period of TTL monitor thread (used for testing)."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: ttlMonitorSleepSecs
         on_update: "TTLMonitor::onUpdateTTLMonitorSleepSeconds"
@@ -54,7 +54,7 @@ server_parameters:
             "When enabled, the TTLMonitor batches TTL deletions and also removes expired documents
             more fairly among the TTL indexes. When disabled, it falls back to legacy
             doc-by-document deletions."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: ttlMonitorBatchDeletes
         default: true
@@ -67,7 +67,7 @@ server_parameters:
             TTL indexes within a pass where documents remain. 0 means each TTL index will be
             iterated over once before the sub-pass completes. Only applicable when
             'ttlMonitorBatchDeletes' is true."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: ttlMonitorSubPassTargetSecs
         default: 60
@@ -80,7 +80,7 @@ server_parameters:
             "Limits (approximately) the time, in milliseconds, spent performing a batched delete
             pass over a given TTL index. 0 means unlimited. Only applicable when
             'ttlMonitorBatchDeletes' is true."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: ttlIndexDeleteTargetTimeMS
         default: 1000
@@ -93,7 +93,7 @@ server_parameters:
             "Limits (approximately) the number of expired documents removed from a TTL index over a
             batched delete. 0 means unlimited. Only applicable when 'ttlMonitorBatchDeletes' is
             true."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: ttlIndexDeleteTargetDocs
         default: 50000

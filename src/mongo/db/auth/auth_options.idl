@@ -27,27 +27,27 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  roleGraphInvalidationIsFatal:
-    # Role graph invalidation is non-fatal by default. Making this fatal
-    # during testing makes invalidation events visible.
-    description: "Make role graph invalidation terminate the server"
-    default: false
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: roleGraphInvalidationIsFatal
-    test_only: true
-    redact: false
+    roleGraphInvalidationIsFatal:
+        # Role graph invalidation is non-fatal by default. Making this fatal
+        # during testing makes invalidation events visible.
+        description: "Make role graph invalidation terminate the server"
+        default: false
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: roleGraphInvalidationIsFatal
+        test_only: true
+        redact: false
 
-  enforceUserClusterSeparation:
-    description: "Prevents creation of users whose names would be interpreted as cluster members"
-    set_at: startup
-    cpp_varname: "gEnforceUserClusterSeparation"
-    cpp_vartype: bool
-    default: true
-    redact: false
+    enforceUserClusterSeparation:
+        description: "Prevents creation of users whose names would be interpreted as cluster members"
+        set_at: startup
+        cpp_varname: "gEnforceUserClusterSeparation"
+        cpp_vartype: bool
+        default: true
+        redact: false

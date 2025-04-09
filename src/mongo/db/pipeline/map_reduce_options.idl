@@ -36,7 +36,7 @@ server_parameters:
             for a key that has only a single value. In version 4.4 and later, the reduce 
             function is still called in order to validate the JavaScript reduce function 
             even when there is only one value. This setting will re-enable the old optimization.
-        set_at: startup 
+        set_at: startup
         cpp_vartype: bool
         cpp_varname: mrSingleReduceOptimizationEnabled
         default: false

@@ -36,8 +36,9 @@ commands:
     clusterResetPlacementHistory:
         command_name: resetPlacementHistory
         cpp_name: ClusterResetPlacementHistory
-        description: "Admin command to reinitialize the content of config.placementHistory 
-                      based on the current state of the Sharding catalog."
+        description:
+            "Admin command to reinitialize the content of config.placementHistory
+            based on the current state of the Sharding catalog."
         namespace: ignored
         api_version: ""
         strict: false
@@ -45,8 +46,8 @@ commands:
     _configsvrResetPlacementHistory:
         command_name: _configsvrResetPlacementHistory
         cpp_name: ConfigsvrResetPlacementHistory
-        description: "Definition of the resetPlacementHistory command called 
-                      from routers on the config server."
+        description: "Definition of the resetPlacementHistory command called
+            from routers on the config server."
         namespace: ignored
         api_version: ""
         strict: false

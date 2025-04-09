@@ -38,64 +38,63 @@ structs:
         description: "A pair of non-anchor and anchor positions"
         strict: true
         fields:
-          cpos:
-            description: "non-anchor position"
-            type: long
-          apos:
-            description: "anchor position"
-            type: long
+            cpos:
+                description: "non-anchor position"
+                type: long
+            apos:
+                description: "anchor position"
+                type: long
 
     ESCOptionalPositionsPair:
         description: "A pair of optional non-anchor and anchor positions"
         strict: true
         fields:
-          cpos:
-            description: "non-anchor position"
-            type: long
-            optional: true
-          apos:
-            description: "anchor position"
-            type: long
-            optional: true
+            cpos:
+                description: "non-anchor position"
+                type: long
+                optional: true
+            apos:
+                description: "anchor position"
+                type: long
+                optional: true
 
     QECountInfoReplyTokens:
         description: "A tokens of ESC information"
         strict: true
         fields:
-          t:
-            description: "ESCTwiceDerivedTagToken"
-            type: bindata_generic
-            cpp_name: ESCTwiceDerivedTagToken
-          c:
-            description: "ESC count"
-            type: long
-            cpp_name: count
-          td:
-            description: "EDCDerivedFromDataTokenAndContentionFactorToken"
-            type: bindata_generic
-            cpp_name: EDCDerivedFromDataTokenAndContentionFactorToken
-            optional: true
-          spos:
-            description: "positions returned from emuBinary"
-            type: ESCOptionalPositionsPair
-            cpp_name: SearchedPositions
-            optional: true
-          npos:
-            description: "position pair retrieved from the null anchor"
-            type: ESCPositionsPair
-            cpp_name: NullAnchorPositions
-            optional: true
-          stats:
-            description: "stats returned for compaction or cleanup algorithms"
-            type: ECStats
-            optional: true
+            t:
+                description: "ESCTwiceDerivedTagToken"
+                type: bindata_generic
+                cpp_name: ESCTwiceDerivedTagToken
+            c:
+                description: "ESC count"
+                type: long
+                cpp_name: count
+            td:
+                description: "EDCDerivedFromDataTokenAndContentionFactorToken"
+                type: bindata_generic
+                cpp_name: EDCDerivedFromDataTokenAndContentionFactorToken
+                optional: true
+            spos:
+                description: "positions returned from emuBinary"
+                type: ESCOptionalPositionsPair
+                cpp_name: SearchedPositions
+                optional: true
+            npos:
+                description: "position pair retrieved from the null anchor"
+                type: ESCPositionsPair
+                cpp_name: NullAnchorPositions
+                optional: true
+            stats:
+                description: "stats returned for compaction or cleanup algorithms"
+                type: ECStats
+                optional: true
 
     QECountInfoReplyTokenSet:
         description: "Array of tokens sets"
         strict: true
         fields:
             tokens: array<QECountInfoReplyTokens>
-
 
     QECountInfoRequestTokens:
         description: "A ESC token to lookup in ESC"
@@ -116,7 +115,6 @@ structs:
         strict: true
         fields:
             tokens: array<QECountInfoRequestTokens>
-
 
     QECountInfosReply:
         description: "Reply from the {getQueryableEncryptionCountInfo: ...} command"
@@ -152,4 +150,3 @@ commands:
             queryType:
                 description: "Purpose of command, either for insert, query, compact, or cleanup"
                 type: QECountInfoQueryType
-

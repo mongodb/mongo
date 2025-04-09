@@ -27,7 +27,7 @@
 #
 
 global:
-  cpp_namespace: "mongo::auth"
+    cpp_namespace: "mongo::auth"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -40,22 +40,22 @@ structs:
         fields:
             cluster:
                 # Conflicts with all other resource subfields
-                description: 'ResourcePattern::forClusterResource'
+                description: "ResourcePattern::forClusterResource"
                 type: safeBool
                 optional: true
             anyResource:
                 # Conflicts with all other resource subfields
-                description: 'ResourcePattern::forAnyResource'
+                description: "ResourcePattern::forAnyResource"
                 type: safeBool
                 optional: true
             db:
                 # Conflicts with all but 'collection' and 'system_buckets'
-                description: 'Used with anyNormalResource or partial/exact namespace match'
+                description: "Used with anyNormalResource or partial/exact namespace match"
                 type: string
                 optional: true
             collection:
                 # Conflicts with all but 'db', which is required
-                description: 'Used with anyNormalResource or partial/exact namespace match'
+                description: "Used with anyNormalResource or partial/exact namespace match"
                 type: string
                 optional: true
             system_buckets:

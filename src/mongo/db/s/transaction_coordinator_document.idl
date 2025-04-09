@@ -39,8 +39,9 @@ imports:
 types:
     commit_decision_enum:
         bson_serialization_type: string
-        description: "Ensures that the commit decision serializes/deserializes to a fixed set of
-                      string values"
+        description:
+            "Ensures that the commit decision serializes/deserializes to a fixed set of
+            string values"
         cpp_type: "txn::CommitDecision"
         serializer: "::mongo::txn::writeCommitDecisionEnumProperty"
         deserializer: "::mongo::txn::readCommitDecisionEnumProperty"
@@ -62,18 +63,21 @@ structs:
         fields:
             decision:
                 type: commit_decision_enum
-                description: "See the values in txn::CommitDecision for details. Can only be commit
-                              or abort."
+                description:
+                    "See the values in txn::CommitDecision for details. Can only be commit
+                    or abort."
             commitTimestamp:
                 optional: true
                 type: timestamp
-                description: "If the decision is 'commit', contains the chosen commit timestamp,
-                              otherwise it will not be set"
+                description:
+                    "If the decision is 'commit', contains the chosen commit timestamp,
+                    otherwise it will not be set"
             abortStatus:
                 optional: true
                 type: status
-                description: "If the decision is 'abort', contains the reason the shard aborted,
-                              otherwise it will not be set"
+                description:
+                    "If the decision is 'abort', contains the reason the shard aborted,
+                    otherwise it will not be set"
 
     TransactionCoordinatorDocument:
         description: "A document used for majority confirming the coordinator's state changes"
@@ -89,11 +93,13 @@ structs:
             decision:
                 optional: true
                 type: CoordinatorCommitDecision
-                description: "The coordinator's decision for the transaction including the decision
-                              ('commit' or 'abort') and a commit timestamp (if the decision is
-                              'commit'). Only set if the coordinator has made a decision."
+                description:
+                    "The coordinator's decision for the transaction including the decision
+                    ('commit' or 'abort') and a commit timestamp (if the decision is
+                    'commit'). Only set if the coordinator has made a decision."
             affectedNamespaces:
                 optional: true
                 type: array<namespacestring>
-                description: "The list of namespaces, affected by the transaction. Each participant
-                              returns a list in response to prepareTransaction command."
+                description:
+                    "The list of namespaces, affected by the transaction. Each participant
+                    returns a list in response to prepareTransaction command."

@@ -27,36 +27,36 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/util/uuid.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/uuid.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  ImportCollectionOplogEntry:
-    description: "The object field of an importCollection oplog entry"
-    strict: false
-    fields:
-      importCollection:
-        description: "Namespace of the collection being imported"
-        type: namespacestring
-      importUUID:
-        description: "Identifies the import operation"
-        type: uuid
-      numRecords:
-        description: "Number of records in the collection"
-        type: long
-      dataSize:
-        description: "Date size of the collection"
-        type: long
-      catalogEntry:
-        description: "Catalog entry corresponding to the collection"
-        type: object
-      storageMetadata:
-        description: "Contains the storage engines file and table metadata for each ident"
-        type: object
-      dryRun:
-        description: "Import as a dryRun when true"
-        type: bool
+    ImportCollectionOplogEntry:
+        description: "The object field of an importCollection oplog entry"
+        strict: false
+        fields:
+            importCollection:
+                description: "Namespace of the collection being imported"
+                type: namespacestring
+            importUUID:
+                description: "Identifies the import operation"
+                type: uuid
+            numRecords:
+                description: "Number of records in the collection"
+                type: long
+            dataSize:
+                description: "Date size of the collection"
+                type: long
+            catalogEntry:
+                description: "Catalog entry corresponding to the collection"
+                type: object
+            storageMetadata:
+                description: "Contains the storage engines file and table metadata for each ident"
+                type: object
+            dryRun:
+                description: "Import as a dryRun when true"
+                type: bool

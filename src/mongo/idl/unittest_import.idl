@@ -33,7 +33,6 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
-
 ##################################################################################################
 #
 # Unit test structs for a single value to ensure type validation works correctly
@@ -120,7 +119,6 @@ structs:
             value: uuid
 
 enums:
-
     IntEnum:
         description: "An example int enum"
         type: int

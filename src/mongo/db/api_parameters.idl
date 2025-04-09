@@ -30,48 +30,49 @@
 # BSON representation for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-
-  APIParametersFromClient:
-    description: "Parser for pulling out VersionedAPI parameters from commands"
-    strict: false
-    unsafe_dangerous_disable_extra_field_duplicate_checks: true
-    fields:
-      apiVersion:
-        description: "The api version specified by the command"
-        type: string
-        optional: true
-      apiStrict:
-        description: "With apiVersion: 'V' and apiStrict: true, the server rejects requests to
-        use behaviors not included in V"
-        type: bool
-        optional: true
-      apiDeprecationErrors:
-        description: "With apiVersion: 'V' and apiDeprecationErrors: true, the server rejects
-        requests to use behaviors deprecated in V in the current MongoDB release"
-        type: bool
-        optional: true
+    APIParametersFromClient:
+        description: "Parser for pulling out VersionedAPI parameters from commands"
+        strict: false
+        unsafe_dangerous_disable_extra_field_duplicate_checks: true
+        fields:
+            apiVersion:
+                description: "The api version specified by the command"
+                type: string
+                optional: true
+            apiStrict:
+                description: >-
+                    With apiVersion: 'V' and apiStrict: true, the server rejects requests to
+                    use behaviors not included in V
+                type: bool
+                optional: true
+            apiDeprecationErrors:
+                description: >-
+                    With apiVersion: 'V' and apiDeprecationErrors: true, the server rejects
+                    requests to use behaviors deprecated in V in the current MongoDB release
+                type: bool
+                optional: true
 
 server_parameters:
-  requireApiVersion:
-    description: "Require clients to pass the 'apiVersion' parameter with all commands"
-    test_only: true
-    set_at: ["startup", "runtime"]
-    cpp_vartype: AtomicWord<bool>
-    cpp_varname: gRequireApiVersion
-    default: false
-    redact: false
+    requireApiVersion:
+        description: "Require clients to pass the 'apiVersion' parameter with all commands"
+        test_only: true
+        set_at: ["startup", "runtime"]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gRequireApiVersion
+        default: false
+        redact: false
 
-  acceptApiVersion2:
-    description: "Allow users to issue commands that include apiVersion: \"2\". Test only."
-    test_only: true
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: acceptApiVersion2
-    default: false
-    redact: false
+    acceptApiVersion2:
+        description: 'Allow users to issue commands that include apiVersion: "2". Test only.'
+        test_only: true
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: acceptApiVersion2
+        default: false
+        redact: false

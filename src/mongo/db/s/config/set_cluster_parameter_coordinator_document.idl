@@ -26,7 +26,6 @@
 # it in the license file.
 #
 
-
 global:
     cpp_namespace: "mongo"
 
@@ -77,5 +76,6 @@ structs:
                 optional: true
             compatibleWithTopologyChange:
                 type: bool
-                description: "If true, this cluster parameter change can run during a topology
-                              change"
+                description:
+                    "If true, this cluster parameter change can run during a topology
+                    change"

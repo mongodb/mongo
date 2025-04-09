@@ -26,40 +26,40 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/value.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/value.idl"
 structs:
-  RangeSpec:
-    description: Specification for a range based densification.
-    strict: true
-    fields:
-      step:
-        description: "Step value. Assumed to be a number unless 'unit' is specified."
-        type: numeric
-        optional: false
-      unit:
-        description: "The time unit to be used for 'step' if densifying over dates."
-        optional: true
-        type: string
-      bounds:
-        description: "The bounds over which to densify. Defaults to 'full'."
-        optional: false
-        type: IDLAnyType
-  DensifySpec:
-    description: Specification for a $densify stage.
-    strict: true
-    fields:
-      field:
-        description: The field on which we are densifying.
-        type: string
-        optional: false
-      partitionByFields:
-        description: The field(s) that will be used as the partition keys.
-        type: array<string>
-        optional: true
-      range:
-        description: Specification for range based densification.
-        type: RangeSpec
-        optional: false
+    RangeSpec:
+        description: Specification for a range based densification.
+        strict: true
+        fields:
+            step:
+                description: "Step value. Assumed to be a number unless 'unit' is specified."
+                type: numeric
+                optional: false
+            unit:
+                description: "The time unit to be used for 'step' if densifying over dates."
+                optional: true
+                type: string
+            bounds:
+                description: "The bounds over which to densify. Defaults to 'full'."
+                optional: false
+                type: IDLAnyType
+    DensifySpec:
+        description: Specification for a $densify stage.
+        strict: true
+        fields:
+            field:
+                description: The field on which we are densifying.
+                type: string
+                optional: false
+            partitionByFields:
+                description: The field(s) that will be used as the partition keys.
+                type: array<string>
+                optional: true
+            range:
+                description: Specification for range based densification.
+                type: RangeSpec
+                optional: false

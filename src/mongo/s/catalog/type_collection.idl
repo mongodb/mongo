@@ -41,16 +41,17 @@ enums:
         description: "The list of phases composing the Collection Chunks Defragmentation Algorithm"
         type: string
         values:
-            kMergeAndMeasureChunks : "mergeAndMeasureChunks"
+            kMergeAndMeasureChunks: "mergeAndMeasureChunks"
             kMoveAndMergeChunks: "moveAndMergeChunks"
-            kMergeChunks : "mergeChunks"
+            kMergeChunks: "mergeChunks"
             kSplitChunks: "splitChunks" # Never used but kept for parsing backwards compatibility
             kFinished: "finished"
 
 structs:
     CollectionTypeBase:
-        description: "Represents the layout and contents of documents contained in the config 
-                      server's config.collections collection."
+        description:
+            "Represents the layout and contents of documents contained in the config
+            server's config.collections collection."
         strict: false
         fields:
             _id:
@@ -61,12 +62,13 @@ structs:
             lastmodEpoch:
                 cpp_name: pre22CompatibleEpoch
                 type: objectid
-                description: "Uniquely identifies this incarnation of the collection. Only changes
-                              in case of drop and create, or shard key refine.
+                description:
+                    "Uniquely identifies this incarnation of the collection. Only changes
+                    in case of drop and create, or shard key refine.
 
-                              It is optional for parsing purposes, because in versions of MongoDB
-                              prior to 2.2, this value wasn't being written. In such cases, it will
-                              default to an all-zero OID."
+                    It is optional for parsing purposes, because in versions of MongoDB
+                    prior to 2.2, this value wasn't being written. In such cases, it will
+                    default to an all-zero OID."
                 optional: true
             lastmod:
                 cpp_name: updatedAt
@@ -75,18 +77,20 @@ structs:
                 optional: false
             timestamp:
                 type: timestamp
-                description: "Uniquely identifies this incarnation of the collection. Only changes
-                              in case of drop and create, or shard key refine.
-                              This field will store the ClusterTime of the Config Server when the
-                              collection was created or it's shard key last refined. Because
-                              timestamps are comparable, we are able to define a total order in time
-                              in the collection. This field will replace Epoch, which are not
-                              comparable."
+                description:
+                    "Uniquely identifies this incarnation of the collection. Only changes
+                    in case of drop and create, or shard key refine.
+                    This field will store the ClusterTime of the Config Server when the
+                    collection was created or it's shard key last refined. Because
+                    timestamps are comparable, we are able to define a total order in time
+                    in the collection. This field will replace Epoch, which are not
+                    comparable."
             uuid:
                 cpp_name: uuid
                 type: uuid
-                description: "The UUID that will be used to create the local collection on each of
-                              the shards which have chunks."
+                description:
+                    "The UUID that will be used to create the local collection on each of
+                    the shards which have chunks."
                 optional: false
             key:
                 cpp_name: KeyPattern
@@ -94,14 +98,15 @@ structs:
                 description: "The shard key pattern for the collection."
             defaultCollation:
                 type: object_owned
-                description: "Optional collection default collation. If missing or set to the empty
-                              BSON, implies simple collation."
+                description:
+                    "Optional collection default collation. If missing or set to the empty
+                    BSON, implies simple collation."
                 optional: true
             unique:
                 type: bool
                 description: "Uniqueness of the sharding key."
                 default: false
-            maxChunkSizeBytes: 
+            maxChunkSizeBytes:
                 type: safeInt64
                 description: "Max chunk size in bytes."
                 optional: true
@@ -115,48 +120,56 @@ structs:
                 optional: true
             defragmentationPhase:
                 type: DefragmentationPhase
-                description: "When the balancer is performing defragmentation on the collection,
-                              stores the ID of the currently active phase of the process."
+                description:
+                    "When the balancer is performing defragmentation on the collection,
+                    stores the ID of the currently active phase of the process."
                 optional: true
             noBalance:
                 type: bool
-                description: "Consulted by the Balancer only and indicates whether this collection
-                              should be considered for balancing or not."
+                description:
+                    "Consulted by the Balancer only and indicates whether this collection
+                    should be considered for balancing or not."
                 default: false
             reshardingFields:
                 type: TypeCollectionReshardingFields
-                description: "Resharding-related fields. Only set when this collection is either the
-                              original collection undergoing a resharding operation or this
-                              collection is the temporary resharding collection."
+                description:
+                    "Resharding-related fields. Only set when this collection is either the
+                    original collection undergoing a resharding operation or this
+                    collection is the temporary resharding collection."
                 optional: true
             allowMigrations:
                 type: bool
-                description: "Whether this collection allows chunks to move. It is required by
-                              almost all DDL operations in order to guarantee that the set of
-                              shards, which comprise a collection will not change.
+                description:
+                    "Whether this collection allows chunks to move. It is required by
+                    almost all DDL operations in order to guarantee that the set of
+                    shards, which comprise a collection will not change.
 
-                              If the flag is not present it defaults to true."
+                    If the flag is not present it defaults to true."
                 optional: true
             unsplittable:
                 type: optionalBool
-                description: "Flag that identifies whether the collection is splittable in multiple 
-                            chunks. If unsplittable, the collection is always equivalent to a 1 
-                            chunk collection."
+                description:
+                    "Flag that identifies whether the collection is splittable in multiple
+                    chunks. If unsplittable, the collection is always equivalent to a 1
+                    chunk collection."
 
             timeseriesFields:
                 type: TypeCollectionTimeseriesFields
-                description: "Time-series collection fields. Only set when this is a time-series
-                              buckets collection."
+                description:
+                    "Time-series collection fields. Only set when this is a time-series
+                    buckets collection."
                 optional: true
-# TODO SERVER-61033: merge this flag with allowMigrations.
+            # TODO SERVER-61033: merge this flag with allowMigrations.
             permitMigrations:
                 type: bool
-                description: "DEPRECATED flag that determines wether this collection allows chunks to
-                               move. This will only prevent migration from committing and new balancer
-                               rounds, this flag will not be loaded by shards."
+                description:
+                    "DEPRECATED flag that determines wether this collection allows chunks to
+                    move. This will only prevent migration from committing and new balancer
+                    rounds, this flag will not be loaded by shards."
                 optional: true
             indexVersion:
                 type: timestamp
-                description: "Current collection index version. It will tick everytime a global index 
-                                is created or dropped."
+                description:
+                    "Current collection index version. It will tick everytime a global index
+                    is created or dropped."
                 optional: true

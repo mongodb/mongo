@@ -37,10 +37,11 @@ imports:
 
 structs:
     ShardAuthoritativeCollectionType:
-        description: "Represents the layout and contents of documents contained in the shard
-                      server's config.shard.collections collection. This type must be 
-                      authoritatively written in shards. All manipulation of documents coming
-                      from that collection should be done with this class."
+        description:
+            "Represents the layout and contents of documents contained in the shard
+            server's config.shard.collections collection. This type must be
+            authoritatively written in shards. All manipulation of documents coming
+            from that collection should be done with this class."
         strict: false
         fields:
             _id:
@@ -51,11 +52,13 @@ structs:
             uuid:
                 cpp_name: uuid
                 type: uuid
-                description: "The UUID that will be used to create the local collection on each of
-                              the shards which have chunks."
+                description:
+                    "The UUID that will be used to create the local collection on each of
+                    the shards which have chunks."
                 optional: false
             indexVersion:
                 type: timestamp
-                description: "Current collection index version. It will tick everytime a global
-                              index is created or dropped."
+                description:
+                    "Current collection index version. It will tick everytime a global
+                    index is created or dropped."
                 optional: true

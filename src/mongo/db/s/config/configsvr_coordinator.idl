@@ -26,7 +26,6 @@
 # it in the license file.
 #
 
-
 global:
     cpp_namespace: "mongo"
 
@@ -57,8 +56,9 @@ structs:
                 optional: true
 
     ConfigsvrCoordinatorSession:
-        description: "Container for configsvr coordinator session used for guaranteeing remote
-                      command idempotency."
+        description:
+            "Container for configsvr coordinator session used for guaranteeing remote
+            command idempotency."
         strict: false
         fields:
             lsid:

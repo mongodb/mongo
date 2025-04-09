@@ -27,24 +27,30 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-  - "mongo/shell/shell_options.h"
-  - "mongo/shell/shell_utils.h"
-  configs:
-    source: [ cli, ini, yaml ]
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/shell/shell_options.h"
+        - "mongo/shell/shell_utils.h"
+    configs:
+        source: [cli, ini, yaml]
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 configs:
-  "gRPC":
-    description: "Enable gRPC support (disabled by default)"
-    arg_vartype: Switch
-    conflicts: [ "tls.CRLFile", "tls.disabledProtocols", "tls.FIPSMode", "tls.tlsCertificateKeyFilePassword" ]
+    "gRPC":
+        description: "Enable gRPC support (disabled by default)"
+        arg_vartype: Switch
+        conflicts:
+            [
+                "tls.CRLFile",
+                "tls.disabledProtocols",
+                "tls.FIPSMode",
+                "tls.tlsCertificateKeyFilePassword",
+            ]
 
-  "gRPCAuthToken":
-    description: "Authentication token to be attached to gRPC requests"
-    arg_vartype: String
-    requires: gRPC
-    hidden: true
+    "gRPCAuthToken":
+        description: "Authentication token to be attached to gRPC requests"
+        arg_vartype: String
+        requires: gRPC
+        hidden: true

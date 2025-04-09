@@ -31,8 +31,8 @@ global:
 server_parameters:
     coordinateCommitReturnImmediatelyAfterPersistingDecision:
         description: >-
-          Whether the transaction coordinator should return the decision as soon as the
-          the decision is made durable.
+            Whether the transaction coordinator should return the decision as soon as the
+            the decision is made durable.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: coordinateCommitReturnImmediatelyAfterPersistingDecision

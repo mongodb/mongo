@@ -27,25 +27,25 @@
 #
 
 global:
-  cpp_namespace: "mongo::executor"
+    cpp_namespace: "mongo::executor"
 
 server_parameters:
-  opportunisticSecondaryTargeting:
-    description: >-
-        DEPRECATED. Has no effect on server behavior.
-        Previously allowed attempting to establish connections to multiple secondaries and
-        directing the request to the first secondary that accepts the connection.
-    set_at: [ startup, runtime ]
-    cpp_class:
-      name: OpportunisticSecondaryTargetingParameter
-      override_set: true
-    redact: false
+    opportunisticSecondaryTargeting:
+        description: >-
+            DEPRECATED. Has no effect on server behavior.
+            Previously allowed attempting to establish connections to multiple secondaries and
+            directing the request to the first secondary that accepts the connection.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: OpportunisticSecondaryTargetingParameter
+            override_set: true
+        redact: false
 
-  slowConnectionThresholdMillis:
-    description: >-
-        Log egress connections that take longer than this threshold, in milliseconds, to establish.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<long long>
-    cpp_varname: gSlowConnectionThresholdMillis
-    default: 100
-    redact: false
+    slowConnectionThresholdMillis:
+        description: >-
+            Log egress connections that take longer than this threshold, in milliseconds, to establish.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: gSlowConnectionThresholdMillis
+        default: 100
+        redact: false

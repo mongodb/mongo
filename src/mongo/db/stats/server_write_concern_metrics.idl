@@ -34,7 +34,7 @@ server_parameters:
             opWriteConcernCounters are not tracked unless this is true. This is false by default
             because the mutex acquisition impacts performance when SSL is disabled. (When SSL is
             enabled, other mutexes dominate.)
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: bool
         cpp_varname: reportOpWriteConcernCountersInServerStatus
         default: false

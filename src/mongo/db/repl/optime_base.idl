@@ -35,9 +35,10 @@ imports:
 
 structs:
     OpTimeBase:
-        description: "A document that stores the logical time-related fields in an oplog entry.
-                     Should never be used directly in server code. Instead, create an instance
-                     of OpTime."
+        description:
+            "A document that stores the logical time-related fields in an oplog entry.
+            Should never be used directly in server code. Instead, create an instance
+            of OpTime."
         strict: false
         fields:
             ts:

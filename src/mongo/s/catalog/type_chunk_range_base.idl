@@ -34,9 +34,9 @@ imports:
 
 structs:
     ChunkRangeBase:
-         description: "Basic types that represents range bounds"
-         strict: false
-         fields:
+        description: "Basic types that represents range bounds"
+        strict: false
+        fields:
             min:
                 description: "Lower bound of the range"
                 type: object_owned

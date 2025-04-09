@@ -31,75 +31,74 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
+    CommitTypeStats:
+        description: "Contains metrics for a type of commit"
+        fields:
+            initiated:
+                type: long
+                default: 0
+            successful:
+                type: long
+                default: 0
+            successfulDurationMicros:
+                type: long
+                default: 0
 
-  CommitTypeStats:
-    description: "Contains metrics for a type of commit"
-    fields:
-      initiated:
-        type: long
-        default: 0
-      successful:
-        type: long
-        default: 0
-      successfulDurationMicros:
-        type: long
-        default: 0
+    CommitTypes:
+        description: "Contains metrics for each type of commit"
+        fields:
+            noShards:
+                type: CommitTypeStats
+            singleShard:
+                type: CommitTypeStats
+            singleWriteShard:
+                type: CommitTypeStats
+            readOnly:
+                type: CommitTypeStats
+            twoPhaseCommit:
+                type: CommitTypeStats
+            recoverWithToken:
+                type: CommitTypeStats
 
-  CommitTypes:
-    description: "Contains metrics for each type of commit"
-    fields:
-      noShards:
-        type: CommitTypeStats
-      singleShard:
-        type: CommitTypeStats
-      singleWriteShard:
-        type: CommitTypeStats
-      readOnly:
-        type: CommitTypeStats
-      twoPhaseCommit:
-        type: CommitTypeStats
-      recoverWithToken:
-        type: CommitTypeStats
-
-  RouterTransactionsStats:
-    description: "A struct representing the section of the server status
-                  command on mongos with information about sharded transactions"
-    strict: true
-    fields:
-      currentOpen:
-        type: long
-        default: 0
-      currentActive:
-        type: long
-        default: 0
-      currentInactive:
-        type: long
-        default: 0
-      totalStarted:
-        type: long
-        default: 0
-      totalCommitted:
-        type: long
-        default: 0
-      totalAborted:
-        type: long
-        default: 0
-      abortCause:
-        type: object
-      totalContactedParticipants:
-        type: long
-        default: 0
-      totalParticipantsAtCommit:
-        type: long
-        default: 0
-      totalRequestsTargeted:
-        type: long
-        default: 0
-      commitTypes:
-        type: CommitTypes
+    RouterTransactionsStats:
+        description: "A struct representing the section of the server status
+            command on mongos with information about sharded transactions"
+        strict: true
+        fields:
+            currentOpen:
+                type: long
+                default: 0
+            currentActive:
+                type: long
+                default: 0
+            currentInactive:
+                type: long
+                default: 0
+            totalStarted:
+                type: long
+                default: 0
+            totalCommitted:
+                type: long
+                default: 0
+            totalAborted:
+                type: long
+                default: 0
+            abortCause:
+                type: object
+            totalContactedParticipants:
+                type: long
+                default: 0
+            totalParticipantsAtCommit:
+                type: long
+                default: 0
+            totalRequestsTargeted:
+                type: long
+                default: 0
+            commitTypes:
+                type: CommitTypes

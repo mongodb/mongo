@@ -27,9 +27,9 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/feature_compatibility_version_parser.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/feature_compatibility_version_parser.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -60,34 +60,37 @@ commands:
         fields:
             confirm:
                 description: "A required parameter that ensures that the user is
-                              upgrading/downgrading with support assistance. Internal setFCV
-                              commands issue from the config svr will not require this parameter.
-                              If this parameter is not specified from a user command, the setFCV
-                              command will error out. This parameter is declared optional so that
-                              we can provide the user with a custom error message if it is not
-                              specified."
+                    upgrading/downgrading with support assistance. Internal setFCV
+                    commands issue from the config svr will not require this parameter.
+                    If this parameter is not specified from a user command, the setFCV
+                    command will error out. This parameter is declared optional so that
+                    we can provide the user with a custom error message if it is not
+                    specified."
                 type: safeBool
                 optional: true
             fromConfigServer:
-                description: "A boolean that indicates whether the command is being requested by a
-                              config server. Normally FCV upgrades between last-lts and anything
-                              less than latest are not allowed, but in a sharded cluster, newly
-                              started shard nodes start in lastLTS and this parameter is required in
-                              order to be able to add such a shard to a cluster, which is currently
-                              running at last-continuous."
+                description:
+                    "A boolean that indicates whether the command is being requested by a
+                    config server. Normally FCV upgrades between last-lts and anything
+                    less than latest are not allowed, but in a sharded cluster, newly
+                    started shard nodes start in lastLTS and this parameter is required in
+                    order to be able to add such a shard to a cluster, which is currently
+                    running at last-continuous."
                 type: safeBool
                 optional: true
             phase:
-                description: "An enum that indicates whether the the command is requesting the shard
-                              to enter phase-1 (kStart) or phase-2 (kComplete) of the 2-phase setFCV
-                              protocol. Only valid to be specified for shards. If not specified on a
-                              shard, it will run the full setFCV sequence (both phases)."
+                description:
+                    "An enum that indicates whether the the command is requesting the shard
+                    to enter phase-1 (kStart) or phase-2 (kComplete) of the 2-phase setFCV
+                    protocol. Only valid to be specified for shards. If not specified on a
+                    shard, it will run the full setFCV sequence (both phases)."
                 type: SetFCVPhase
                 optional: true
             changeTimestamp:
-                description: "Timestamp used to identify the 2-phase setFCV request. Both phases
-                              (kStart and kComplete) must have the same timestamp for the entire
-                              sequence, and every new sequence started must strictly have
-                              incrementing timestamp."
+                description:
+                    "Timestamp used to identify the 2-phase setFCV request. Both phases
+                    (kStart and kComplete) must have the same timestamp for the entire
+                    sequence, and every new sequence started must strictly have
+                    incrementing timestamp."
                 type: timestamp
                 optional: true

@@ -34,7 +34,7 @@ server_parameters:
         description: >-
             Controls how caught up in replication a secondary with higher priority than the 
             current primary must be before it will call for a priority takeover election.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: int
         cpp_varname: gPriorityTakeoverFreshnessWindowSeconds
         default: 2

@@ -36,8 +36,8 @@ imports:
 types:
     bsonSerializationTypeAny:
         bson_serialization_type:
-                                - int
-                                - any
+            - int
+            - any
         description: "The bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
         is_view: false
@@ -81,8 +81,9 @@ commands:
         reply_type: NewStructFieldNoUnstableField
 
     newCommandTypeStructFieldNoUnstableField:
-        description: "newly added command has a command type struct field without the unstable
-                      field specified"
+        description:
+            "newly added command has a command type struct field without the unstable
+            field specified"
         command_name: newCommandTypeStructFieldNoUnstableField
         namespace: type
         type: NewStructFieldNoUnstableField
@@ -92,8 +93,9 @@ commands:
         reply_type: OkReply
 
     newCommandParameterBsonSerializationTypeAny:
-        description: "newly added command has a parameter type that has bson_serialization_type
-                      with 'any'"
+        description:
+            "newly added command has a parameter type that has bson_serialization_type
+            with 'any'"
         command_name: newCommandParameterBsonSerializationTypeAny
         namespace: ignored
         cpp_name: newCommandParameterBsonSerializationTypeAny
@@ -106,8 +108,9 @@ commands:
         reply_type: OkReply
 
     newCommandReplyBsonSerializationTypeAny:
-        description: "newly added command has a reply field type that has bson_serialization_type
-                      with 'any'"
+        description:
+            "newly added command has a reply field type that has bson_serialization_type
+            with 'any'"
         command_name: newCommandReplyBsonSerializationTypeAny
         namespace: ignored
         cpp_name: newCommandReplyBsonSerializationTypeAny
@@ -116,8 +119,9 @@ commands:
         reply_type: NewStructFieldTypeContainsAny
 
     newCommandTypeStructFieldBsonSerializationTypeAny:
-        description: "newly added command has a command struct field type that has
-                      bson_serialization_type with 'any'"
+        description:
+            "newly added command has a command struct field type that has
+            bson_serialization_type with 'any'"
         command_name: newCommandTypeStructFieldBsonSerializationTypeAny
         namespace: type
         type: NewStructFieldTypeContainsAny

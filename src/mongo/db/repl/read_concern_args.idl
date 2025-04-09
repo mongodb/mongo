@@ -30,10 +30,8 @@ global:
     cpp_includes:
         - "mongo/db/repl/read_concern_args.h"
 
-
 imports:
     - "mongo/db/basic_types.idl"
-
 
 types:
     ReadConcern:

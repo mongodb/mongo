@@ -34,8 +34,9 @@ imports:
 
 structs:
     CollectionIndexesBase:
-        description: Represents the index part of a collection version, which is subordinate to the
-                      collection generation.
+        description:
+            Represents the index part of a collection version, which is subordinate to the
+            collection generation.
         strict: false
         fields:
             i:
@@ -44,8 +45,9 @@ structs:
                 cpp_name: IndexVersion
                 optional: true
     CollectionIndexesFormat:
-        description: Class that provides the serialization/deserialization for CollectionIndexes
-                      and the network/persistence format.
+        description:
+            Class that provides the serialization/deserialization for CollectionIndexes
+            and the network/persistence format.
         strict: false
         fields:
             uuid:

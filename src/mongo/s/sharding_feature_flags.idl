@@ -32,167 +32,176 @@ global:
     cpp_namespace: "mongo"
 
 feature_flags:
-  featureFlagGlobalIndexesShardingCatalog:
-    description: "Feature flag for enabling sharding catalog features for global indexes"
-    cpp_varname: feature_flags::gGlobalIndexesShardingCatalog
-    default: false
-    shouldBeFCVGated: true
-  featureFlagConcurrencyInChunkMigration:
-    description: "Feature flag for enabling concurrency within a chunk migration"
-    cpp_varname: feature_flags::gConcurrencyInChunkMigration
-    default: true
-    version: 6.3
-    shouldBeFCVGated: true
-  # TODO (SERVER-73632): Remove once 9.0 becomes last LTS.
-  featureFlagRouterPort:
-    description: "Feature flag to open the router port."
-    cpp_varname: feature_flags::gRouterPort
-    default: false
-    shouldBeFCVGated: false
-  # TODO (SERVER-88107): Remove once 8.0 becomes last LTS.
-  featureFlagMultiServiceLogAndFTDCFormat:
-    description: "Feature flag to enable multi-service format of the log and FTDC data files."
-    cpp_varname: feature_flags::gMultiServiceLogAndFTDCFormat
-    default: true
-    shouldBeFCVGated: false
-  # TODO (SERVER-87189): Remove once 9.0 becomes last LTS.
-  featureFlagTrackUnshardedCollectionsUponCreation:
-    description: "Feature flag for enabling the tracking of user unsharded collection on creation"
-    cpp_varname: feature_flags::gTrackUnshardedCollectionsUponCreation
-    default: false
-    shouldBeFCVGated: true
-  # TODO (SERVER-68132): Remove once 8.0 becomes last LTS.
-  featureFlagClusterFsyncLock:
-    description: "Feature flag to enable locking of a cluster through mongos"
-    cpp_varname: feature_flags::gClusterFsyncLock
-    default: true
-    version: 7.1
-    shouldBeFCVGated: true
-  # TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
-  featureFlagBalanceUnshardedCollections:
-    description: "Feature flag for enabling the balancing of user unsharded collections"
-    cpp_varname: feature_flags::gBalanceUnshardedCollections
-    default: false
-    shouldBeFCVGated: true
-  # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
-  featureFlagPlacementHistoryPostFCV73 :
-    description: "Feature flag that marks a version change in the logic that generates config.placementHistory;
-                  it causes such a collection to be reinitialized on FCV upgrade and placement history queries
-                  to be redirected to config.shards prior to the reinitialization."
-    cpp_varname: feature_flags::gPlacementHistoryPostFCV3
-    default: true
-    version: 7.3
-    shouldBeFCVGated: true
-    fcv_context_unaware: true
-  featureFlagShardedAggregationCatalogCacheGossiping:
-    description: "Feature flag that makes routers executing distributed aggregations that involve
-                  secondary collections request the shards to gossip back the catalog cache versions
-                  for these collections."
-    cpp_varname: feature_flags::gShardedAggregationCatalogCacheGossiping
-    default: true
-    version: 8.0
-    shouldBeFCVGated: true
-    fcv_context_unaware: true
-  # TODO (SERVER-81037): enable this feature flag once it's possible to detect prepare conflicts on the catalog
-  featureFlagCreateCollectionInPreparedTransactions:
-    description: "Feature flag protecting the codepath allowing to create collections in prepared transactions "
-    cpp_varname: feature_flags::gCreateCollectionInPreparedTransactions
-    default: false
-    shouldBeFCVGated: true
-  # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
-  featureFlagTrackUnshardedCollectionsUponMoveCollection:
-    description: "Feature flag for enabling the tracking of user unsharded collection upon moveCollection"
-    cpp_varname: feature_flags::gTrackUnshardedCollectionsUponMoveCollection
-    default: true
-    version: 8.0
-    shouldBeFCVGated: true
-    fcv_context_unaware: true
-  # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
-  featureFlag80CollectionCreationPath:
-    description: "Feature flag protecting all codepaths that rely on the 8.0 way of collection creation in a
-                  sharded cluster. Namely, no implicit creations by the shards and no usage of the
-                  storage-level create command."
-    cpp_varname: feature_flags::g80CollectionCreationPath
-    default: true
-    version: 8.0
-    shouldBeFCVGated: true
-    fcv_context_unaware: true
-  featureFlagReplicaSetEndpoint:
-    description: When enabled, allows users to connect to a single-shard cluster with no dedicated config
-                 server using a replica set connection string.
-    cpp_varname: feature_flags::gFeatureFlagReplicaSetEndpoint
-    default: false
-    shouldBeFCVGated: true
-  featureFlagCreateDatabaseDDLCoordinator:
-    description: >
-      Feature flag for enabling the sharding DDL coordinator for database creation. Enabled in
-      transitional FCV because the new coordinator is needed during the transition phase of
-      authoritative databases.
-    cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
-    default: true
-    version: 8.2
-    shouldBeFCVGated: true
-    enable_on_transitional_fcv: true
-  # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
-  featureFlagConfigDebugDumpSupported:
-    description: "The configDebugDump flag is supported in listCollections and $listCatalog."
-    cpp_varname: feature_flags::gConfigDebugDumpSupported
-    default: true
-    version: 8.1
-    shouldBeFCVGated: true
-  # TODO (SERVER-97261): remove once 9.0 becomes last LTS.
-  featureFlagDualCatalogCache:
-    description: "Feature flag to enable one catalog cache for the shard role and another one for
-                  the router role."
-    cpp_varname: feature_flags::gDualCatalogCache
-    default: false
-    shouldBeFCVGated: false
-  featureFlagUseTopologyChangeCoordinators:
-    description: "Feature flag for enabling the coordinator based topology changes."
-    cpp_varname: feature_flags::gUseTopologyChangeCoordinators
-    default: false
-    shouldBeFCVGated: true
-  # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-  featureFlagShardAuthoritativeDbMetadataCRUD:
-    description: "Feature flag to enable the authoritative model to read database metadata from
-                  stored shard-local information"
-    cpp_varname: feature_flags::gShardAuthoritativeDbMetadataCRUD
-    default: false
-    shouldBeFCVGated: true
-    enable_on_transitional_fcv: false
-  # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-  featureFlagShardAuthoritativeDbMetadataDDL:
-    description: "Feature flag to enable the authoritative model to store shard-local information
-                  for database metadata."
-    cpp_varname: feature_flags::gShardAuthoritativeDbMetadataDDL
-    default: false
-    shouldBeFCVGated: true
-    enable_on_transitional_fcv: true
-  # TODO (SERVER-89169): remove once 9.0 becomes last LTS.
-  featureFlagShardAuthoritativeCollMetadata:
-    description: "Feature flag to enable the authoritative model for storing shard-local information
-                  for collections and chunks metadata."
-    cpp_varname: feature_flags::gShardAuthoritativeCollMetadata
-    default: false
-    shouldBeFCVGated: true
-    enable_on_transitional_fcv: false
-  # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
-  featureFlagSessionsCollectionCoordinatorOnConfigServer:
-    description: Feature flag for running the shard collection coordinator on the config server for
-                 config.system.sessions.
-    cpp_varname: feature_flags::gSessionsCollectionCoordinatorOnConfigServer
-    default: true
-    version: 8.1
-    shouldBeFCVGated: true
-  featureFlagTerminateSecondaryReadsUponRangeDeletion:
-    description: "Feature flag to enable the termination of secondary reads due to range deletions."
-    cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
-    default: true
-    version: 8.2
-    shouldBeFCVGated: true
-  # TODO (SERVER-99655): remove this feature flag
-  featureFlagSnapshotFCVInDDLCoordinators:
-    description: "Feature flag to enable snapshotting of the operation FCV at the start of DDL operations."
-    cpp_varname: feature_flags::gSnapshotFCVInDDLCoordinators
-    default: false
-    shouldBeFCVGated: true
+    featureFlagGlobalIndexesShardingCatalog:
+        description: "Feature flag for enabling sharding catalog features for global indexes"
+        cpp_varname: feature_flags::gGlobalIndexesShardingCatalog
+        default: false
+        shouldBeFCVGated: true
+    featureFlagConcurrencyInChunkMigration:
+        description: "Feature flag for enabling concurrency within a chunk migration"
+        cpp_varname: feature_flags::gConcurrencyInChunkMigration
+        default: true
+        version: 6.3
+        shouldBeFCVGated: true
+    # TODO (SERVER-73632): Remove once 9.0 becomes last LTS.
+    featureFlagRouterPort:
+        description: "Feature flag to open the router port."
+        cpp_varname: feature_flags::gRouterPort
+        default: false
+        shouldBeFCVGated: false
+    # TODO (SERVER-88107): Remove once 8.0 becomes last LTS.
+    featureFlagMultiServiceLogAndFTDCFormat:
+        description: "Feature flag to enable multi-service format of the log and FTDC data files."
+        cpp_varname: feature_flags::gMultiServiceLogAndFTDCFormat
+        default: true
+        shouldBeFCVGated: false
+    # TODO (SERVER-87189): Remove once 9.0 becomes last LTS.
+    featureFlagTrackUnshardedCollectionsUponCreation:
+        description: "Feature flag for enabling the tracking of user unsharded collection on creation"
+        cpp_varname: feature_flags::gTrackUnshardedCollectionsUponCreation
+        default: false
+        shouldBeFCVGated: true
+    # TODO (SERVER-68132): Remove once 8.0 becomes last LTS.
+    featureFlagClusterFsyncLock:
+        description: "Feature flag to enable locking of a cluster through mongos"
+        cpp_varname: feature_flags::gClusterFsyncLock
+        default: true
+        version: 7.1
+        shouldBeFCVGated: true
+    # TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
+    featureFlagBalanceUnshardedCollections:
+        description: "Feature flag for enabling the balancing of user unsharded collections"
+        cpp_varname: feature_flags::gBalanceUnshardedCollections
+        default: false
+        shouldBeFCVGated: true
+    # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
+    featureFlagPlacementHistoryPostFCV73:
+        description:
+            "Feature flag that marks a version change in the logic that generates config.placementHistory;
+            it causes such a collection to be reinitialized on FCV upgrade and placement history queries
+            to be redirected to config.shards prior to the reinitialization."
+        cpp_varname: feature_flags::gPlacementHistoryPostFCV3
+        default: true
+        version: 7.3
+        shouldBeFCVGated: true
+        fcv_context_unaware: true
+    featureFlagShardedAggregationCatalogCacheGossiping:
+        description:
+            "Feature flag that makes routers executing distributed aggregations that involve
+            secondary collections request the shards to gossip back the catalog cache versions
+            for these collections."
+        cpp_varname: feature_flags::gShardedAggregationCatalogCacheGossiping
+        default: true
+        version: 8.0
+        shouldBeFCVGated: true
+        fcv_context_unaware: true
+    # TODO (SERVER-81037): enable this feature flag once it's possible to detect prepare conflicts on the catalog
+    featureFlagCreateCollectionInPreparedTransactions:
+        description: "Feature flag protecting the codepath allowing to create collections in prepared transactions "
+        cpp_varname: feature_flags::gCreateCollectionInPreparedTransactions
+        default: false
+        shouldBeFCVGated: true
+    # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+    featureFlagTrackUnshardedCollectionsUponMoveCollection:
+        description: "Feature flag for enabling the tracking of user unsharded collection upon moveCollection"
+        cpp_varname: feature_flags::gTrackUnshardedCollectionsUponMoveCollection
+        default: true
+        version: 8.0
+        shouldBeFCVGated: true
+        fcv_context_unaware: true
+    # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+    featureFlag80CollectionCreationPath:
+        description:
+            "Feature flag protecting all codepaths that rely on the 8.0 way of collection creation in a
+            sharded cluster. Namely, no implicit creations by the shards and no usage of the
+            storage-level create command."
+        cpp_varname: feature_flags::g80CollectionCreationPath
+        default: true
+        version: 8.0
+        shouldBeFCVGated: true
+        fcv_context_unaware: true
+    featureFlagReplicaSetEndpoint:
+        description:
+            When enabled, allows users to connect to a single-shard cluster with no dedicated config
+            server using a replica set connection string.
+        cpp_varname: feature_flags::gFeatureFlagReplicaSetEndpoint
+        default: false
+        shouldBeFCVGated: true
+    featureFlagCreateDatabaseDDLCoordinator:
+        description: >
+            Feature flag for enabling the sharding DDL coordinator for database creation. Enabled in
+            transitional FCV because the new coordinator is needed during the transition phase of
+            authoritative databases.
+        cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
+        default: true
+        version: 8.2
+        shouldBeFCVGated: true
+        enable_on_transitional_fcv: true
+    # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
+    featureFlagConfigDebugDumpSupported:
+        description: "The configDebugDump flag is supported in listCollections and $listCatalog."
+        cpp_varname: feature_flags::gConfigDebugDumpSupported
+        default: true
+        version: 8.1
+        shouldBeFCVGated: true
+    # TODO (SERVER-97261): remove once 9.0 becomes last LTS.
+    featureFlagDualCatalogCache:
+        description:
+            "Feature flag to enable one catalog cache for the shard role and another one for
+            the router role."
+        cpp_varname: feature_flags::gDualCatalogCache
+        default: false
+        shouldBeFCVGated: false
+    featureFlagUseTopologyChangeCoordinators:
+        description: "Feature flag for enabling the coordinator based topology changes."
+        cpp_varname: feature_flags::gUseTopologyChangeCoordinators
+        default: false
+        shouldBeFCVGated: true
+    # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+    featureFlagShardAuthoritativeDbMetadataCRUD:
+        description:
+            "Feature flag to enable the authoritative model to read database metadata from
+            stored shard-local information"
+        cpp_varname: feature_flags::gShardAuthoritativeDbMetadataCRUD
+        default: false
+        shouldBeFCVGated: true
+        enable_on_transitional_fcv: false
+    # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+    featureFlagShardAuthoritativeDbMetadataDDL:
+        description:
+            "Feature flag to enable the authoritative model to store shard-local information
+            for database metadata."
+        cpp_varname: feature_flags::gShardAuthoritativeDbMetadataDDL
+        default: false
+        shouldBeFCVGated: true
+        enable_on_transitional_fcv: true
+    # TODO (SERVER-89169): remove once 9.0 becomes last LTS.
+    featureFlagShardAuthoritativeCollMetadata:
+        description:
+            "Feature flag to enable the authoritative model for storing shard-local information
+            for collections and chunks metadata."
+        cpp_varname: feature_flags::gShardAuthoritativeCollMetadata
+        default: false
+        shouldBeFCVGated: true
+        enable_on_transitional_fcv: false
+    # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
+    featureFlagSessionsCollectionCoordinatorOnConfigServer:
+        description:
+            Feature flag for running the shard collection coordinator on the config server for
+            config.system.sessions.
+        cpp_varname: feature_flags::gSessionsCollectionCoordinatorOnConfigServer
+        default: true
+        version: 8.1
+        shouldBeFCVGated: true
+    featureFlagTerminateSecondaryReadsUponRangeDeletion:
+        description: "Feature flag to enable the termination of secondary reads due to range deletions."
+        cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
+        default: true
+        version: 8.2
+        shouldBeFCVGated: true
+    # TODO (SERVER-99655): remove this feature flag
+    featureFlagSnapshotFCVInDDLCoordinators:
+        description: "Feature flag to enable snapshotting of the operation FCV at the start of DDL operations."
+        cpp_varname: feature_flags::gSnapshotFCVInDDLCoordinators
+        default: false
+        shouldBeFCVGated: true

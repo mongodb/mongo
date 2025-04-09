@@ -31,41 +31,41 @@ global:
 
 server_parameters:
     internalGeoPredicateQuery2DMaxCoveringCells:
-        description: 'Maximum number of cells to use for 2D geo query covering for predicate queries'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
+        description: "Maximum number of cells to use for 2D geo query covering for predicate queries"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: gInternalGeoPredicateQuery2DMaxCoveringCells
         default: 16
         redact: false
 
     internalGeoNearQuery2DMaxCoveringCells:
-        description: 'Maximum number of cells to use for 2D geo query covering for near queries'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
+        description: "Maximum number of cells to use for 2D geo query covering for near queries"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: gInternalGeoNearQuery2DMaxCoveringCells
         default: 16
         redact: false
 
     internalQueryS2GeoFinestLevel:
-        description: 'Finest level we will cover a queried region or geoNear annulus'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
+        description: "Finest level we will cover a queried region or geoNear annulus"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: gInternalQueryS2GeoFinestLevel
         default: 23
         redact: false
 
     internalQueryS2GeoCoarsestLevel:
-        description: 'Coarsest level we will cover a queried region or geoNear annulus'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
+        description: "Coarsest level we will cover a queried region or geoNear annulus"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: gInternalQueryS2GeoCoarsestLevel
         default: 0
         redact: false
 
     internalQueryS2GeoMaxCells:
-        description: 'Maximum cell count that we want? (advisory, not a hard threshold)'
-        set_at: [ startup, runtime ]
-        cpp_vartype: 'AtomicWord<int>'
+        description: "Maximum cell count that we want? (advisory, not a hard threshold)"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: gInternalQueryS2GeoMaxCells
         default: 20
         redact: false

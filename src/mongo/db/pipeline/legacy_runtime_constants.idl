@@ -29,43 +29,45 @@
 # Runtime constants IDL file
 
 global:
-   cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-  LegacyRuntimeConstants:
-      description: A collection of values that do not change once computed. It is shipped as part
-                   of an aggregation request so all shards participating in a query see the same
-                   values.
-      fields:
-          localNow:
-              cpp_name: localNow
-              type: date
-              description: A value of the $$NOW variable.
-              stability: stable
-          clusterTime:
-              cpp_name: clusterTime
-              type: timestamp
-              description: A value of the $$CLUSTER_TIME variable.
-              stability: stable
-          jsScope:
-              cpp_name: jsScope
-              type: object
-              optional: true
-              description: Optional scope variables accessible from internal javacsript expressions.
-              stability: stable
-          isMapReduce:
-              cpp_name: isMapReduce
-              type: bool
-              optional: true
-              stability: stable
-              description: When specified, signals that the aggregation pipeline originated from a
-                           mapReduce command.
-          userRoles:
-               cpp_name: userRoles
-               type: array
-               optional: true
-               description: A value of the $$USER_ROLES variable.
-               stability: unstable
+    LegacyRuntimeConstants:
+        description:
+            A collection of values that do not change once computed. It is shipped as part
+            of an aggregation request so all shards participating in a query see the same
+            values.
+        fields:
+            localNow:
+                cpp_name: localNow
+                type: date
+                description: A value of the $$NOW variable.
+                stability: stable
+            clusterTime:
+                cpp_name: clusterTime
+                type: timestamp
+                description: A value of the $$CLUSTER_TIME variable.
+                stability: stable
+            jsScope:
+                cpp_name: jsScope
+                type: object
+                optional: true
+                description: Optional scope variables accessible from internal javacsript expressions.
+                stability: stable
+            isMapReduce:
+                cpp_name: isMapReduce
+                type: bool
+                optional: true
+                stability: stable
+                description:
+                    When specified, signals that the aggregation pipeline originated from a
+                    mapReduce command.
+            userRoles:
+                cpp_name: userRoles
+                type: array
+                optional: true
+                description: A value of the $$USER_ROLES variable.
+                stability: unstable

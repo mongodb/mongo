@@ -26,7 +26,7 @@
 # it in the license file.
 #
 
-# This file provides the neccesary commands to implement the sharded catalog index protocol. 
+# This file provides the neccesary commands to implement the sharded catalog index protocol.
 #
 # The protocol to register an index works the following way:
 # 1. While the migrations are disallowed and the critical section is taken for the collection,
@@ -37,12 +37,12 @@
 #   transactionally.
 # 3. The critical sections can be freed in all shards and the migrations can be allowed again.
 #
-# To unregister an index, the process is the same, but, instead of using 
-# _shardsvrCommitIndexParticipant and _configsvrCommitIndex, we use 
+# To unregister an index, the process is the same, but, instead of using
+# _shardsvrCommitIndexParticipant and _configsvrCommitIndex, we use
 # _shardsvrDropIndexCatalogEntryParticipant and _configsvrDropIndexCatalogEntry respectively.
 #
-# Additionally in this file we have two functions to test the registering/unregistering process: 
-# _shardsvrRegisterIndex and _shardsvrUnregisterIndex, which will be used by tests while the 
+# Additionally in this file we have two functions to test the registering/unregistering process:
+# _shardsvrRegisterIndex and _shardsvrUnregisterIndex, which will be used by tests while the
 # DDLCoordinator is implemented.
 
 global:
@@ -143,7 +143,7 @@ commands:
         strict: false
         chained_structs:
             UnregisterIndexCatalogRequest: UnregisterIndexCatalogRequest
-            
+
     _configsvrDropIndexCatalogEntry:
         command_name: _configsvrDropIndexCatalogEntry
         cpp_name: ConfigsvrDropIndexCatalogEntry

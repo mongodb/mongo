@@ -43,176 +43,176 @@ enums:
         description: "test"
         type: string
         values:
-           addShard :  "addShard"
-           advanceClusterTime :  "advanceClusterTime"
-           listClusterCatalog : "listClusterCatalog"
-           allCollectionStats: "allCollectionStats"
-           analyze :  "analyze"
-           analyzeShardKey : "analyzeShardKey"
-           anyAction :  "anyAction"         # Special ActionType that represents *all* actions
-           appendOplogNote :  "appendOplogNote"
-           applicationMessage :  "applicationMessage"
-           auditConfigure :  "auditConfigure"
-           auditLogRotate :  "auditLogRotate"  # ID only
-           authCheck :  "authCheck"       # ID only
-           authenticate :  "authenticate"    # ID only
-           authSchemaUpgrade :  "authSchemaUpgrade"
-           bypassDefaultMaxTimeMS: "bypassDefaultMaxTimeMS"
-           bypassDocumentValidation :  "bypassDocumentValidation"
-           bypassWriteBlockingMode :  "bypassWriteBlockingMode"
-           changeCustomData :  "changeCustomData"
-           changePassword :  "changePassword"
-           changeOwnPassword :  "changeOwnPassword"
-           changeOwnCustomData :  "changeOwnCustomData"
-           changeStream :  "changeStream"
-           checkFreeMonitoringStatus :  "checkFreeMonitoringStatus"  # Removed (backwards compatibility)
-           checkMetadataConsistency :  "checkMetadataConsistency"
-           cleanupOrphaned :  "cleanupOrphaned"
-           clearJumboFlag :  "clearJumboFlag"
-           cleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
-           closeAllDatabases :  "closeAllDatabases"  # Deprecated (backwards compatibility)
-           collMod :  "collMod"
-           collStats :  "collStats"
-           compact :  "compact"
-           compactStructuredEncryptionData: "compactStructuredEncryptionData"
-           configureQueryAnalyzer : "configureQueryAnalyzer"
-           connPoolStats :  "connPoolStats"
-           connPoolSync :  "connPoolSync"
-           convertToCapped :  "convertToCapped"
-           cpuProfiler :  "cpuProfiler"
-           createCollection :  "createCollection"
-           createDatabase :  "createDatabase"  # ID only
-           createIndex :  "createIndex"     # ID only
-           createRole :  "createRole"
-           createSearchIndexes : "createSearchIndexes"
-           createUser :  "createUser"
-           dbCheck :  "dbCheck"
-           dbHash :  "dbHash"
-           dbStats :  "dbStats"
-           dropAllRolesFromDatabase :  "dropAllRolesFromDatabase"  # ID only
-           dropAllUsersFromDatabase :  "dropAllUsersFromDatabase"  # ID only
-           dropCollection :  "dropCollection"
-           dropConnections :  "dropConnections"
-           dropDatabase :  "dropDatabase"
-           dropIndex :  "dropIndex"
-           dropRole :  "dropRole"
-           dropSearchIndex : "dropSearchIndex"
-           dropUser :  "dropUser"
-           emptycapped :  "emptycapped"  # Deprecated (backwards compatibility)
-           enableProfiler :  "enableProfiler"
-           enableSharding :  "enableSharding"
-           exportCollection :  "exportCollection"
-           find :  "find"
-           flushRouterConfig :  "flushRouterConfig"
-           forceUUID :  "forceUUID"
-           fsync :  "fsync"
-           fsyncUnlock: "fsyncUnlock" # Deprecated in favor of unlock (refer to:SERVER-89642)
-           getClusterParameter: "getClusterParameter"
-           getDatabaseVersion :  "getDatabaseVersion"
-           getDefaultRWConcern :  "getDefaultRWConcern"
-           getCmdLineOpts :  "getCmdLineOpts"
-           getLog :  "getLog"
-           getParameter :  "getParameter"
-           getShardMap :  "getShardMap"
-           getShardVersion :  "getShardVersion"
-           grantRole :  "grantRole"
-           grantPrivilegesToRole :  "grantPrivilegesToRole"  # ID only
-           grantRolesToRole :  "grantRolesToRole"       # ID only
-           grantRolesToUser :  "grantRolesToUser"       # ID only
-           hostInfo :  "hostInfo"
-           impersonate :  "impersonate"
-           importCollection :  "importCollection"
-           indexStats :  "indexStats"
-           inprog :  "inprog"
-           insert :  "insert"
-           internal :  "internal"  # Special action type that represents internal actions
-           invalidateUserCache :  "invalidateUserCache"
-           issueDirectShardOperations: "issueDirectShardOperations"
-           killAnyCursor :  "killAnyCursor"
-           killAnySession :  "killAnySession"
-           killCursors :  "killCursors"  # Deprecated in favor of killAnyCursor
-           killop :  "killop"
-           listCachedAndActiveUsers :  "listCachedAndActiveUsers"
-           listCollections :  "listCollections"
-           listCursors :  "listCursors"
-           listDatabases :  "listDatabases"
-           listIndexes :  "listIndexes"
-           listSampledQueries : "listSampledQueries"
-           listSearchIndexes : "listSearchIndexes"
-           listSessions :  "listSessions"
-           listShards :  "listShards"
-           logRotate :  "logRotate"
-           updateSearchIndex : "updateSearchIndex"
-           moveChunk :  "moveChunk"
-           moveCollection :  "moveCollection"
-           netstat :  "netstat"
-           oidcListKeys :  "oidcListKeys"
-           oidcRefreshKeys :  "oidcRefreshKeys"
-           oidReset :  "oidReset"    # machine ID reset via the features command
-           operationMetrics :  "operationMetrics"
-           planCacheIndexFilter :  "planCacheIndexFilter"  # view/update index filters
-           planCacheRead :  "planCacheRead"         # view contents of plan cache
-           planCacheWrite :  "planCacheWrite"        # clear cache, drop cache entry, pin/unpin/shun plans
-           querySettings: "querySettings" # allows to set and retrieve querySettings
-           queryStatsRead: "queryStatsRead" # view untransformed contents of queryStats store
-           queryStatsReadTransformed: "queryStatsReadTransformed" # view transformed contents of queryStats store
-           performRawDataOperations: "performRawDataOperations" # allow operations that use the rawData field
-           refineCollectionShardKey :  "refineCollectionShardKey"
-           reIndex :  "reIndex"
-           releaseMemoryAnyCursor: "releaseMemoryAnyCursor"
-           remove :  "remove"
-           removeShard :  "removeShard"
-           renameCollection :  "renameCollection"  # ID only
-           renameCollectionSameDB :  "renameCollectionSameDB"
-           repairDatabase :  "repairDatabase"  # Deprecated (backwards compatibility)
-           replSetConfigure :  "replSetConfigure"
-           replSetGetConfig :  "replSetGetConfig"
-           replSetGetStatus :  "replSetGetStatus"
-           replSetHeartbeat :  "replSetHeartbeat"
-           replSetReconfig :  "replSetReconfig"  # ID only
-           replSetResizeOplog :  "replSetResizeOplog"
-           replSetStateChange :  "replSetStateChange"
-           reshardCollection :  "reshardCollection"
-           resync :  "resync"
-           revokeRole :  "revokeRole"
-           revokePrivilegesFromRole :  "revokePrivilegesFromRole"  # ID only
-           revokeRolesFromRole :  "revokeRolesFromRole"       # ID only
-           revokeRolesFromUser :  "revokeRolesFromUser"       # ID only
-           rotateCertificates :  "rotateCertificates"
-           runAsLessPrivilegedUser :  "runAsLessPrivilegedUser"
-           serverStatus :  "serverStatus"
-           setAuthenticationRestriction :  "setAuthenticationRestriction"
-           setClusterParameter: "setClusterParameter"
-           setDefaultRWConcern :  "setDefaultRWConcern"
-           setFeatureCompatibilityVersion :  "setFeatureCompatibilityVersion"
-           setFreeMonitoring :  "setFreeMonitoring"  # Removed (backwards compatibility)
-           setParameter :  "setParameter"
-           setUserWriteBlockMode: "setUserWriteBlockMode"
-           shardCollection :  "shardCollection"  # ID only
-           shardedDataDistribution : "shardedDataDistribution"
-           shardingState :  "shardingState"
-           shutdown :  "shutdown"
-           splitChunk :  "splitChunk"
-           splitVector :  "splitVector"
-           storageDetails :  "storageDetails"
-           top :  "top"
-           touch :  "touch"
-           trafficRecord :  "trafficRecord"
-           transitionFromDedicatedConfigServer : "transitionFromDedicatedConfigServer"
-           transitionToDedicatedConfigServer : "transitionToDedicatedConfigServer"
-           unlock :  "unlock"
-           unshardCollection :  "unshardCollection"
-           useTenant : "useTenant"
-           useUUID :  "useUUID"
-           update :  "update"
-           updateRole :  "updateRole"  # ID only
-           updateUser :  "updateUser"  # ID only
-           validate :  "validate"
-           viewRole :  "viewRole"
-           viewUser :  "viewUser"
-           applyOps :  "applyOps"
-           setChangeStreamState: "setChangeStreamState"
-           getChangeStreamState: "getChangeStreamState"
+            addShard: "addShard"
+            advanceClusterTime: "advanceClusterTime"
+            listClusterCatalog: "listClusterCatalog"
+            allCollectionStats: "allCollectionStats"
+            analyze: "analyze"
+            analyzeShardKey: "analyzeShardKey"
+            anyAction: "anyAction" # Special ActionType that represents *all* actions
+            appendOplogNote: "appendOplogNote"
+            applicationMessage: "applicationMessage"
+            auditConfigure: "auditConfigure"
+            auditLogRotate: "auditLogRotate" # ID only
+            authCheck: "authCheck" # ID only
+            authenticate: "authenticate" # ID only
+            authSchemaUpgrade: "authSchemaUpgrade"
+            bypassDefaultMaxTimeMS: "bypassDefaultMaxTimeMS"
+            bypassDocumentValidation: "bypassDocumentValidation"
+            bypassWriteBlockingMode: "bypassWriteBlockingMode"
+            changeCustomData: "changeCustomData"
+            changePassword: "changePassword"
+            changeOwnPassword: "changeOwnPassword"
+            changeOwnCustomData: "changeOwnCustomData"
+            changeStream: "changeStream"
+            checkFreeMonitoringStatus: "checkFreeMonitoringStatus" # Removed (backwards compatibility)
+            checkMetadataConsistency: "checkMetadataConsistency"
+            cleanupOrphaned: "cleanupOrphaned"
+            clearJumboFlag: "clearJumboFlag"
+            cleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
+            closeAllDatabases: "closeAllDatabases" # Deprecated (backwards compatibility)
+            collMod: "collMod"
+            collStats: "collStats"
+            compact: "compact"
+            compactStructuredEncryptionData: "compactStructuredEncryptionData"
+            configureQueryAnalyzer: "configureQueryAnalyzer"
+            connPoolStats: "connPoolStats"
+            connPoolSync: "connPoolSync"
+            convertToCapped: "convertToCapped"
+            cpuProfiler: "cpuProfiler"
+            createCollection: "createCollection"
+            createDatabase: "createDatabase" # ID only
+            createIndex: "createIndex" # ID only
+            createRole: "createRole"
+            createSearchIndexes: "createSearchIndexes"
+            createUser: "createUser"
+            dbCheck: "dbCheck"
+            dbHash: "dbHash"
+            dbStats: "dbStats"
+            dropAllRolesFromDatabase: "dropAllRolesFromDatabase" # ID only
+            dropAllUsersFromDatabase: "dropAllUsersFromDatabase" # ID only
+            dropCollection: "dropCollection"
+            dropConnections: "dropConnections"
+            dropDatabase: "dropDatabase"
+            dropIndex: "dropIndex"
+            dropRole: "dropRole"
+            dropSearchIndex: "dropSearchIndex"
+            dropUser: "dropUser"
+            emptycapped: "emptycapped" # Deprecated (backwards compatibility)
+            enableProfiler: "enableProfiler"
+            enableSharding: "enableSharding"
+            exportCollection: "exportCollection"
+            find: "find"
+            flushRouterConfig: "flushRouterConfig"
+            forceUUID: "forceUUID"
+            fsync: "fsync"
+            fsyncUnlock: "fsyncUnlock" # Deprecated in favor of unlock (refer to:SERVER-89642)
+            getClusterParameter: "getClusterParameter"
+            getDatabaseVersion: "getDatabaseVersion"
+            getDefaultRWConcern: "getDefaultRWConcern"
+            getCmdLineOpts: "getCmdLineOpts"
+            getLog: "getLog"
+            getParameter: "getParameter"
+            getShardMap: "getShardMap"
+            getShardVersion: "getShardVersion"
+            grantRole: "grantRole"
+            grantPrivilegesToRole: "grantPrivilegesToRole" # ID only
+            grantRolesToRole: "grantRolesToRole" # ID only
+            grantRolesToUser: "grantRolesToUser" # ID only
+            hostInfo: "hostInfo"
+            impersonate: "impersonate"
+            importCollection: "importCollection"
+            indexStats: "indexStats"
+            inprog: "inprog"
+            insert: "insert"
+            internal: "internal" # Special action type that represents internal actions
+            invalidateUserCache: "invalidateUserCache"
+            issueDirectShardOperations: "issueDirectShardOperations"
+            killAnyCursor: "killAnyCursor"
+            killAnySession: "killAnySession"
+            killCursors: "killCursors" # Deprecated in favor of killAnyCursor
+            killop: "killop"
+            listCachedAndActiveUsers: "listCachedAndActiveUsers"
+            listCollections: "listCollections"
+            listCursors: "listCursors"
+            listDatabases: "listDatabases"
+            listIndexes: "listIndexes"
+            listSampledQueries: "listSampledQueries"
+            listSearchIndexes: "listSearchIndexes"
+            listSessions: "listSessions"
+            listShards: "listShards"
+            logRotate: "logRotate"
+            updateSearchIndex: "updateSearchIndex"
+            moveChunk: "moveChunk"
+            moveCollection: "moveCollection"
+            netstat: "netstat"
+            oidcListKeys: "oidcListKeys"
+            oidcRefreshKeys: "oidcRefreshKeys"
+            oidReset: "oidReset" # machine ID reset via the features command
+            operationMetrics: "operationMetrics"
+            planCacheIndexFilter: "planCacheIndexFilter" # view/update index filters
+            planCacheRead: "planCacheRead" # view contents of plan cache
+            planCacheWrite: "planCacheWrite" # clear cache, drop cache entry, pin/unpin/shun plans
+            querySettings: "querySettings" # allows to set and retrieve querySettings
+            queryStatsRead: "queryStatsRead" # view untransformed contents of queryStats store
+            queryStatsReadTransformed: "queryStatsReadTransformed" # view transformed contents of queryStats store
+            performRawDataOperations: "performRawDataOperations" # allow operations that use the rawData field
+            refineCollectionShardKey: "refineCollectionShardKey"
+            reIndex: "reIndex"
+            releaseMemoryAnyCursor: "releaseMemoryAnyCursor"
+            remove: "remove"
+            removeShard: "removeShard"
+            renameCollection: "renameCollection" # ID only
+            renameCollectionSameDB: "renameCollectionSameDB"
+            repairDatabase: "repairDatabase" # Deprecated (backwards compatibility)
+            replSetConfigure: "replSetConfigure"
+            replSetGetConfig: "replSetGetConfig"
+            replSetGetStatus: "replSetGetStatus"
+            replSetHeartbeat: "replSetHeartbeat"
+            replSetReconfig: "replSetReconfig" # ID only
+            replSetResizeOplog: "replSetResizeOplog"
+            replSetStateChange: "replSetStateChange"
+            reshardCollection: "reshardCollection"
+            resync: "resync"
+            revokeRole: "revokeRole"
+            revokePrivilegesFromRole: "revokePrivilegesFromRole" # ID only
+            revokeRolesFromRole: "revokeRolesFromRole" # ID only
+            revokeRolesFromUser: "revokeRolesFromUser" # ID only
+            rotateCertificates: "rotateCertificates"
+            runAsLessPrivilegedUser: "runAsLessPrivilegedUser"
+            serverStatus: "serverStatus"
+            setAuthenticationRestriction: "setAuthenticationRestriction"
+            setClusterParameter: "setClusterParameter"
+            setDefaultRWConcern: "setDefaultRWConcern"
+            setFeatureCompatibilityVersion: "setFeatureCompatibilityVersion"
+            setFreeMonitoring: "setFreeMonitoring" # Removed (backwards compatibility)
+            setParameter: "setParameter"
+            setUserWriteBlockMode: "setUserWriteBlockMode"
+            shardCollection: "shardCollection" # ID only
+            shardedDataDistribution: "shardedDataDistribution"
+            shardingState: "shardingState"
+            shutdown: "shutdown"
+            splitChunk: "splitChunk"
+            splitVector: "splitVector"
+            storageDetails: "storageDetails"
+            top: "top"
+            touch: "touch"
+            trafficRecord: "trafficRecord"
+            transitionFromDedicatedConfigServer: "transitionFromDedicatedConfigServer"
+            transitionToDedicatedConfigServer: "transitionToDedicatedConfigServer"
+            unlock: "unlock"
+            unshardCollection: "unshardCollection"
+            useTenant: "useTenant"
+            useUUID: "useUUID"
+            update: "update"
+            updateRole: "updateRole" # ID only
+            updateUser: "updateUser" # ID only
+            validate: "validate"
+            viewRole: "viewRole"
+            viewUser: "viewUser"
+            applyOps: "applyOps"
+            setChangeStreamState: "setChangeStreamState"
+            getChangeStreamState: "getChangeStreamState"
 
     # In 'MatchType' the extra_data field "serverlessActionTypes" is used
     # by the AuthorizationSession while in multitenancy mode to determine
@@ -227,7 +227,7 @@ enums:
                 description: Bottom type for resource matches, matches nothing.
                 value: "never"
                 extra_data:
-                    serverlessActionTypes: []  # Explicitly listing no action types valid.
+                    serverlessActionTypes: [] # Explicitly listing no action types valid.
 
             # resource: { cluster: true }
             kMatchClusterResource:
@@ -437,9 +437,9 @@ enums:
                     serverlessActionTypes: *actionsValidOnSystemBuckets
 
 structs:
-      MatchTypeExtraData:
-            description: Extra data defined in the MatchType enum
-            fields:
-                serverlessActionTypes:
-                    description: Permitted action types for the match type when in serverless mode
-                    type: array<string>
+    MatchTypeExtraData:
+        description: Extra data defined in the MatchType enum
+        fields:
+            serverlessActionTypes:
+                description: Permitted action types for the match type when in serverless mode
+                type: array<string>

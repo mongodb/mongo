@@ -34,8 +34,9 @@ imports:
 
 structs:
     RemoveShardEventType:
-        description: "Stores relevant metadata on a committed removeShard operation; 
-                      the type is used to de/serialise the content of config.shardRemovalLog."
+        description:
+            "Stores relevant metadata on a committed removeShard operation;
+            the type is used to de/serialise the content of config.shardRemovalLog."
         strict: false
         fields:
             timestamp:

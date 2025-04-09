@@ -27,19 +27,19 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/ftdc/ftdc_mongod.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/ftdc/ftdc_mongod.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  diagnosticDataCollectionStatsNamespaces:
-    description: "Specifies a comma-separated list of collections to collect metrics on"
-    set_at: [startup, runtime]
-    cpp_vartype: 'synchronized_value<std::vector<std::string>>'
-    cpp_varname: "gDiagnosticDataCollectionStatsNamespaces"
-    validator:
-        callback: validateCollectionStatsNamespaces
-    redact: false
+    diagnosticDataCollectionStatsNamespaces:
+        description: "Specifies a comma-separated list of collections to collect metrics on"
+        set_at: [startup, runtime]
+        cpp_vartype: "synchronized_value<std::vector<std::string>>"
+        cpp_varname: "gDiagnosticDataCollectionStatsNamespaces"
+        validator:
+            callback: validateCollectionStatsNamespaces
+        redact: false

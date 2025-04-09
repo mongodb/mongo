@@ -45,16 +45,16 @@ structs:
             firstBatch:
                 description: "array of BSONObjs where each element conveys the information of a single search index on mongot"
                 type: array<object_owned>
-                optional: false     
+                optional: false
     SearchIndexManagerResponse:
         description: >-
             The SearchIndexManager's response from running the search index command specified 
             in shardsvrRunSearchIndexCommand.userCmd.
         fields:
             ok:
-                description: 'Result of the command execution.'
+                description: "Result of the command execution."
                 type: safeDouble
-                validator: { gte: 0.0, lte: 1.0 }
+                validator: {gte: 0.0, lte: 1.0}
                 optional: false
             cursor:
                 description: "Mongot responds with this field only for $listSearchIndexes"
@@ -74,7 +74,7 @@ structs:
             viewNss:
                 description: "The view's namespace"
                 type: namespacestring
-                optional: false          
+                optional: false
             effectivePipeline:
                 description: >-
                     An array of agg stages gathered from the current and associated views. 
@@ -89,9 +89,9 @@ structs:
                 type: SearchIndexManagerResponse
                 optional: true
             ok:
-                description: 'Result of the command execution.'
+                description: "Result of the command execution."
                 type: safeDouble
-                validator: { gte: 0.0, lte: 1.0 }
+                validator: {gte: 0.0, lte: 1.0}
                 optional: false
             $configTime:
                 description: The time component that represents the config time.
@@ -111,7 +111,6 @@ structs:
             operationTime:
                 type: logicalTime
                 optional: true
-            
 
 commands:
     shardsvrRunSearchIndexCommand:
@@ -136,7 +135,7 @@ commands:
                 type: object
                 optional: false
             view:
-                description: >- 
+                description: >-
                     If the search index command is being run on a sharded view, mongos will use this field to forward the view 
                     information required to issue an index command on mongot
                 type: SearchIndexRequestOnShardedView

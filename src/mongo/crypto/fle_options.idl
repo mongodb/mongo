@@ -27,64 +27,69 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
 
 structs:
-  FLECompactionOptions:
-    description: "Options related to compaction or cleanup operations in Queryable Encryption
-        protocol version 2"
-    strict: false
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      maxCompactionSize:
-        description: "Limits the total size of the set of ESC documents that will be removed by
-            each compactStructuredEncryptionData operation"
-        type: int
-        default: 268435456 # 256 MB
-        validator:
-          gt: 0
-      maxAnchorCompactionSize:
-        description: "Limits the total size of the set of ESC anchors that will be removed by
-            each cleanupStructuredEncryptionData operation"
-        type: int
-        default: 268435456 # 256 MB
-        validator:
-          gt: 0
-      maxESCEntriesPerCompactionDelete:
-        description: "Limits the number of ESC non-anchor documents that will be removed by each
-            delete operation performed by the compactStructuredEncryptionData operation"
-        type: int
-        default: 350000
-        validator:
-          gt: 0
-          lte: 350000 # Limit the tags in the $in query to just under 15 MB per request
-      compactAnchorPaddingFactor:
-        description: "Default value for {compactStructuredEncryptionData.anchorPaddingFactor: %f}"
-        type: double
-        optional: true
-        validator:
-            gte: 0.0
-            lte: 1.0
+    FLECompactionOptions:
+        description:
+            "Options related to compaction or cleanup operations in Queryable Encryption
+            protocol version 2"
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            maxCompactionSize:
+                description:
+                    "Limits the total size of the set of ESC documents that will be removed by
+                    each compactStructuredEncryptionData operation"
+                type: int
+                default: 268435456 # 256 MB
+                validator:
+                    gt: 0
+            maxAnchorCompactionSize:
+                description:
+                    "Limits the total size of the set of ESC anchors that will be removed by
+                    each cleanupStructuredEncryptionData operation"
+                type: int
+                default: 268435456 # 256 MB
+                validator:
+                    gt: 0
+            maxESCEntriesPerCompactionDelete:
+                description:
+                    "Limits the number of ESC non-anchor documents that will be removed by each
+                    delete operation performed by the compactStructuredEncryptionData operation"
+                type: int
+                default: 350000
+                validator:
+                    gt: 0
+                    lte: 350000 # Limit the tags in the $in query to just under 15 MB per request
+            compactAnchorPaddingFactor:
+                description: "Default value for {compactStructuredEncryptionData.anchorPaddingFactor: %f}"
+                type: double
+                optional: true
+                validator:
+                    gte: 0.0
+                    lte: 1.0
 
 server_parameters:
-  unsupportedDangerousTestingFLEDiagnosticsEnabled:
-    description: 'Start with test-only FLE statistics behavior enabled'
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
-    default: false
-    redact: false
-    
-  fleCompactionOptions:
-    description: "Options related to compaction or cleanup operations in Queryable Encryption
-        protocol version 2"
-    set_at: cluster
-    cpp_varname: "fleCompactionOptions"
-    cpp_vartype: FLECompactionOptions
-    redact: false
-    omit_in_ftdc: false
+    unsupportedDangerousTestingFLEDiagnosticsEnabled:
+        description: "Start with test-only FLE statistics behavior enabled"
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
+        default: false
+        redact: false
+
+    fleCompactionOptions:
+        description:
+            "Options related to compaction or cleanup operations in Queryable Encryption
+            protocol version 2"
+        set_at: cluster
+        cpp_varname: "fleCompactionOptions"
+        cpp_vartype: FLECompactionOptions
+        redact: false
+        omit_in_ftdc: false

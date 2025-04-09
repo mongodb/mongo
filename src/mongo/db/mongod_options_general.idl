@@ -32,13 +32,13 @@ global:
         - "mongo/db/global_settings.h"
         - "mongo/db/mongod_options_general.h"
     configs:
-        section: 'General options'
+        section: "General options"
         initializer:
             register: addMongodGeneralOptions
 
 server_parameters:
-    'clusterIpSourceAllowlist':
-        description: 'Network CIDR specification of permitted origin for `__system` access'
+    "clusterIpSourceAllowlist":
+        description: "Network CIDR specification of permitted origin for `__system` access"
         set_at: runtime
         cpp_class:
             name: AllowListedClusterNetworkSetting
@@ -47,19 +47,19 @@ server_parameters:
 
 configs:
     auth:
-        description: 'Run with security'
+        description: "Run with security"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         conflicts: noauth
-    'security.clusterIpSourceAllowlist':
-        description: 'Network CIDR specification of permitted origin for `__system` access'
+    "security.clusterIpSourceAllowlist":
+        description: "Network CIDR specification of permitted origin for `__system` access"
         short_name: clusterIpSourceAllowlist
         deprecated_name: "security.clusterIpSourceWhitelist"
         deprecated_short_name: clusterIpSourceWhitelist
         arg_vartype: StringVector
-        source: [ cli, ini, yaml ]
+        source: [cli, ini, yaml]
         duplicate_behavior: append
-    'security.authorization':
+    "security.authorization":
         description: >-
             How the database behaves with respect to authorization of clients.
             Options are "disabled", which means that authorization checks are not
@@ -69,53 +69,53 @@ configs:
         source: yaml
         validator:
             callback: validateSecurityAuthorizationSetting
-    'security.authSchemaVersion':
-        description: 'TODO'
+    "security.authSchemaVersion":
+        description: "TODO"
         arg_vartype: String
         source: yaml
-    'security.enableLocalhostAuthBypass':
-        description: 'TODO'
+    "security.enableLocalhostAuthBypass":
+        description: "TODO"
         arg_vartype: String
         source: yaml
     profile:
-        description: '0=off 1=slow, 2=all'
+        description: "0=off 1=slow, 2=all"
         arg_vartype: Int
-        source: [ cli, ini ]
-    'operationProfiling.mode':
-        description: '(off/slowOp/all)'
+        source: [cli, ini]
+    "operationProfiling.mode":
+        description: "(off/slowOp/all)"
         arg_vartype: String
         source: yaml
         validator:
             callback: validateOperationProfilingModeSetting
     cpu:
-        description: 'Periodically show cpu and iowait utilization'
+        description: "Periodically show cpu and iowait utilization"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
     sysinfo:
-        description: 'Print some diagnostic system information'
+        description: "Print some diagnostic system information"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
     noscripting:
-        description: 'Disable scripting engine'
+        description: "Disable scripting engine"
         arg_vartype: Switch
-        source: [ cli, ini ]
-    'security.javascriptEnabled':
-        description: 'Enable javascript execution'
+        source: [cli, ini]
+    "security.javascriptEnabled":
+        description: "Enable javascript execution"
         arg_vartype: Bool
         source: yaml
     notablescan:
-        description: 'Do not allow table scans'
+        description: "Do not allow table scans"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
     shutdown:
-        description: 'Kill a running server (for init scripts)'
+        description: "Kill a running server (for init scripts)"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         condition:
-            preprocessor: 'defined(__linux__)'
-    'net.proxyPort':
-        description: 'The port that accepts connections with a proxy protocol header.'
+            preprocessor: "defined(__linux__)"
+    "net.proxyPort":
+        description: "The port that accepts connections with a proxy protocol header."
         short_name: proxyPort
         arg_vartype: Int
-        source: [ cli, yaml ]
-        validator: { gte: 1, lte: 65535 }
+        source: [cli, yaml]
+        validator: {gte: 1, lte: 65535}

@@ -27,32 +27,32 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  TestInternalTransactionsCommandReply:
-    description: "Response for internal transaction command."
-    strict: false
-    is_command_reply: true
-    fields:
-      responses:
-        description: "List of responses to commands in the transaction."
-        type: array<object>
+    TestInternalTransactionsCommandReply:
+        description: "Response for internal transaction command."
+        strict: false
+        is_command_reply: true
+        fields:
+            responses:
+                description: "List of responses to commands in the transaction."
+                type: array<object>
 
-  TestInternalTransactionsCommandInfo:
-    description: "A command, its database name, and other test options."
-    strict: false
-    fields:
-      dbName:
-        type: database_name
-      command:
-        type: object_owned
-      exhaustCursor:
-        type: bool
-        optional: true
+    TestInternalTransactionsCommandInfo:
+        description: "A command, its database name, and other test options."
+        strict: false
+        fields:
+            dbName:
+                type: database_name
+            command:
+                type: object_owned
+            exhaustCursor:
+                type: bool
+                optional: true
 
 commands:
     testInternalTransactions:
@@ -61,14 +61,15 @@ commands:
         namespace: ignored
         api_version: ""
         fields:
-          useClusterClient:
-              description: "Whether the transaction API client used should opt into running the
-                            'cluster' versions of commands that enables a non-router node to run
-                            the router versions of commands. Only meaningful on mongod because a
-                            mongos will always run 'cluster' commands."
-              type: bool
-              default: false
-          commandInfos:
-              description: "List of TestInternalTransactionsCommandInfos to run in a single transaction."
-              type: array<TestInternalTransactionsCommandInfo>
+            useClusterClient:
+                description:
+                    "Whether the transaction API client used should opt into running the
+                    'cluster' versions of commands that enables a non-router node to run
+                    the router versions of commands. Only meaningful on mongod because a
+                    mongos will always run 'cluster' commands."
+                type: bool
+                default: false
+            commandInfos:
+                description: "List of TestInternalTransactionsCommandInfos to run in a single transaction."
+                type: array<TestInternalTransactionsCommandInfo>
         reply_type: TestInternalTransactionsCommandReply

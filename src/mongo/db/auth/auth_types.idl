@@ -27,52 +27,52 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/auth/user_name.h"
-    - "mongo/db/auth/role_name.h"
-    - "mongo/db/auth/role_name_or_string.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/auth/user_name.h"
+        - "mongo/db/auth/role_name.h"
+        - "mongo/db/auth/role_name_or_string.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
-  UserName:
-    bson_serialization_type: any
-    description: "A struct representing a UserName"
-    cpp_type: "UserName"
-    deserializer: "mongo::UserName::parseFromBSON"
-    serializer: "mongo::UserName::serializeToBSON"
-    # The AuthName that is constructed has only non-view members.
-    is_view: false
+    UserName:
+        bson_serialization_type: any
+        description: "A struct representing a UserName"
+        cpp_type: "UserName"
+        deserializer: "mongo::UserName::parseFromBSON"
+        serializer: "mongo::UserName::serializeToBSON"
+        # The AuthName that is constructed has only non-view members.
+        is_view: false
 
-  RoleName:
-    bson_serialization_type: any
-    description: "A struct representing a Role"
-    cpp_type: "RoleName"
-    deserializer: "mongo::RoleName::parseFromBSON"
-    serializer: "mongo::RoleName::serializeToBSON"
-    # The AuthName that is constructed has only non-view members.
-    is_view: false
+    RoleName:
+        bson_serialization_type: any
+        description: "A struct representing a Role"
+        cpp_type: "RoleName"
+        deserializer: "mongo::RoleName::parseFromBSON"
+        serializer: "mongo::RoleName::serializeToBSON"
+        # The AuthName that is constructed has only non-view members.
+        is_view: false
 
-  RoleNameOrString:
-    bson_serialization_type: any
-    description: Wrapper for RoleName which allows specifying just a string.
-    cpp_type: "RoleNameOrString"
-    deserializer: "mongo::RoleNameOrString::parseFromBSON"
-    serializer: "mongo::RoleNameOrString::serializeToBSON"
-    # The AuthName that is constructed has only non-view members.
-    is_view: false
+    RoleNameOrString:
+        bson_serialization_type: any
+        description: Wrapper for RoleName which allows specifying just a string.
+        cpp_type: "RoleNameOrString"
+        deserializer: "mongo::RoleNameOrString::parseFromBSON"
+        serializer: "mongo::RoleNameOrString::serializeToBSON"
+        # The AuthName that is constructed has only non-view members.
+        is_view: false
 
 structs:
-  authLocalGetSubRolesFailPoint:
-    description: Data for authLocalGetSubRoles failpoint
-    fields:
-      resolveRolesDelayMS:
-        type: int
-        validator: { gte: 0 }
-  waitForUserCacheInvalidationFailPoint:
-    description: Data for waitForUserCacheInvalidation fail point
-    fields:
-      userName:
-        type: UserName
+    authLocalGetSubRolesFailPoint:
+        description: Data for authLocalGetSubRoles failpoint
+        fields:
+            resolveRolesDelayMS:
+                type: int
+                validator: {gte: 0}
+    waitForUserCacheInvalidationFailPoint:
+        description: Data for waitForUserCacheInvalidation fail point
+        fields:
+            userName:
+                type: UserName

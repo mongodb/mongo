@@ -67,15 +67,15 @@ structs:
             isTransitionToDedicated:
                 type: bool
                 description: >-
-                  True if the command being run is transitionToDedicated, false for normal remove
-                  shard.
+                    True if the command being run is transitionToDedicated, false for normal remove
+                    shard.
             # TODO (SERVER-99433) Remove this argument when RSEndpoint is removed.
             shouldUpdateClusterCardinality:
                 type: bool
                 description: >-
-                  Tells whether the remove shard coordinator should update the cluster cardinality
-                  parameter after committing a remove shard which leaves only one shard in the
-                  cluster.
+                    Tells whether the remove shard coordinator should update the cluster cardinality
+                    parameter after committing a remove shard which leaves only one shard in the
+                    cluster.
             phase:
                 type: RemoveShardCommitCoordinatorPhase
                 description: "Coordinator phase."

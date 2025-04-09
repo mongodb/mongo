@@ -35,17 +35,17 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-  transitionFromDedicatedConfigServer:
-    description: "The public transitionFromDedicatedConfigServer command on mongos."
-    command_name: transitionFromDedicatedConfigServer
-    strict: true
-    namespace: ignored
-    api_version: ""
+    transitionFromDedicatedConfigServer:
+        description: "The public transitionFromDedicatedConfigServer command on mongos."
+        command_name: transitionFromDedicatedConfigServer
+        strict: true
+        namespace: ignored
+        api_version: ""
 
-  _configsvrTransitionFromDedicatedConfigServer:
-    description: "The transitionFromDedicatedConfigServer command for config server."
-    command_name: _configsvrTransitionFromDedicatedConfigServer
-    cpp_name: ConfigsvrTransitionFromDedicatedConfigServer
-    strict: false
-    namespace: ignored
-    api_version: ""
+    _configsvrTransitionFromDedicatedConfigServer:
+        description: "The transitionFromDedicatedConfigServer command for config server."
+        command_name: _configsvrTransitionFromDedicatedConfigServer
+        cpp_name: ConfigsvrTransitionFromDedicatedConfigServer
+        strict: false
+        namespace: ignored
+        api_version: ""

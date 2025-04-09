@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-    - "mongo/db/transaction/transaction_participant.h"
+        - "mongo/db/transaction/transaction_participant.h"
 
 server_parameters:
     maxTransactionLockRequestTimeoutMillis:
@@ -38,7 +38,7 @@ server_parameters:
             will wait for lock acquisition. If an operation provides a greater timeout in a lock request,
             maxTransactionLockRequestTimeoutMillis will override it. If this is set to a negative value, it
             is inactive and nothing will be overridden.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gMaxTransactionLockRequestTimeoutMillis
         # 5 milliseconds will help avoid deadlocks, but will still allow fast-running metadata operations
@@ -50,7 +50,7 @@ server_parameters:
         description: >-
             Lifetime given to each transaction.
             Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeTransactionLifetimeLimitSeconds)::Argument>
         cpp_varname: gTransactionLifetimeLimitSeconds
         validator:
@@ -58,11 +58,11 @@ server_parameters:
         on_update: std::ref(TransactionParticipant::observeTransactionLifetimeLimitSeconds)
         default: 60
         redact: false
-    
+
     cachePressureQueryPeriodMilliseconds:
         description: >-
             Period in which to run aborts on oldest transactions under cache pressure.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument>
         cpp_varname: gCachePressureQueryPeriodMilliseconds
         validator:
@@ -78,16 +78,16 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: gMaxNumberOfTransactionOperationsInSingleOplogEntry
-        default: 2147483647  # INT_MAX
-        validator: { gte: 1 }
+        default: 2147483647 # INT_MAX
+        validator: {gte: 1}
         redact: false
 
     transactionSizeLimitBytes:
         description: >-
             Maximum total size of operations in a multi-document transaction.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<long long>
         cpp_varname: gTransactionSizeLimitBytes
         default:
-          expr: std::numeric_limits<long long>::max()
+            expr: std::numeric_limits<long long>::max()
         redact: false

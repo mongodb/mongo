@@ -29,7 +29,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-  - "test_types.idl"
+    - "test_types.idl"
 
 structs:
     GenericArguments:

@@ -26,9 +26,9 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 enums:
     PercentileMethod:
         description: "Describes the type of calculation used by a percentile accumulator."

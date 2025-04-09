@@ -36,76 +36,76 @@ structs:
         description: "Struct for $_internalFleEq"
         strict: true
         fields:
-          field:
-            description: "Expression"
-            type: IDLAnyType
-            cpp_name: field
-          server:
-            description: "ServerZerosEncryptionToken"
-            type: bindata_encrypt
-            cpp_name: serverZerosEncryptionToken
+            field:
+                description: "Expression"
+                type: IDLAnyType
+                cpp_name: field
+            server:
+                description: "ServerZerosEncryptionToken"
+                type: bindata_encrypt
+                cpp_name: serverZerosEncryptionToken
 
     InternalFleBetweenStructV2:
         description: "Struct for $_internalFleBetween"
         strict: true
         fields:
-          field:
-            description: "Expression"
-            type: IDLAnyType
-            cpp_name: field
-          server:
-            description: "ServerZerosEncryptionTokens"
-            type: array<bindata_encrypt>
-            cpp_name: serverZerosEncryptionTokens
+            field:
+                description: "Expression"
+                type: IDLAnyType
+                cpp_name: field
+            server:
+                description: "ServerZerosEncryptionTokens"
+                type: array<bindata_encrypt>
+                cpp_name: serverZerosEncryptionTokens
 
     EncStrStartsWithStruct:
         description: "Struct for $encStrStartsWith"
         strict: true
         fields:
-          input:
-            description: "Target field path expression"
-            type: string
-            cpp_name: input
-          prefix:
-            description: "Prefix expression"
-            type: IDLAnyType
-            cpp_name: prefix
+            input:
+                description: "Target field path expression"
+                type: string
+                cpp_name: input
+            prefix:
+                description: "Prefix expression"
+                type: IDLAnyType
+                cpp_name: prefix
 
     EncStrEndsWithStruct:
         description: "Struct for $encStrEndsWith"
         strict: true
         fields:
-          input:
-            description: "Target field path expression"
-            type: string
-            cpp_name: input
-          suffix:
-            description: "Suffix expression"
-            type: IDLAnyType
-            cpp_name: suffix
+            input:
+                description: "Target field path expression"
+                type: string
+                cpp_name: input
+            suffix:
+                description: "Suffix expression"
+                type: IDLAnyType
+                cpp_name: suffix
 
     EncStrContainsStruct:
         description: "Struct for $encStrContains"
         strict: true
         fields:
-          input:
-            description: "Target field path expression"
-            type: string
-            cpp_name: input
-          substring:
-            description: "Substring expression"
-            type: IDLAnyType
-            cpp_name: substring
+            input:
+                description: "Target field path expression"
+                type: string
+                cpp_name: input
+            substring:
+                description: "Substring expression"
+                type: IDLAnyType
+                cpp_name: substring
 
     EncStrNormalizedEqStruct:
         description: "Struct for $encStrNormalizedEq"
         strict: true
         fields:
-          input:
-            description: "Target field path expression"
-            type: string
-            cpp_name: input
-          string:
-            description: "String expression"
-            type: IDLAnyType
-            cpp_name: string
+            input:
+                description: "Target field path expression"
+                type: string
+                cpp_name: input
+            string:
+                description: "String expression"
+                type: IDLAnyType
+                cpp_name: string

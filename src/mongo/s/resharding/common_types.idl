@@ -113,8 +113,9 @@ structs:
             tempNs:
                 cpp_name: tempReshardingNss
                 type: namespacestring
-                description: "The namespace of the temporary resharding collection that exists on
-                              recipient shards."
+                description:
+                    "The namespace of the temporary resharding collection that exists on
+                    recipient shards."
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
@@ -145,14 +146,16 @@ structs:
         fields:
             abortReason:
                 type: object_owned
-                description: "The error that caused the node to abort the resharding operation. In
-                              this case, the node may be a donor shard, recipient shard, or the
-                              coordinator itself."
+                description:
+                    "The error that caused the node to abort the resharding operation. In
+                    this case, the node may be a donor shard, recipient shard, or the
+                    coordinator itself."
                 optional: true
 
     DonorShardContext:
-        description: "Mutable state for a donor shard tracked both locally by a donor shard and
-                      remotely by the resharding coordinator."
+        description:
+            "Mutable state for a donor shard tracked both locally by a donor shard and
+            remotely by the resharding coordinator."
         inline_chained_structs: true
         chained_structs:
             AbortReason: AbortReasonStruct
@@ -167,18 +170,21 @@ structs:
                 default: kUnused
             minFetchTimestamp:
                 type: timestamp
-                description: "Timestamp after which this donor shard has guaranteed that oplog
-                              entries contain recipient shard information."
+                description:
+                    "Timestamp after which this donor shard has guaranteed that oplog
+                    entries contain recipient shard information."
                 optional: true
             bytesToClone:
                 type: long
-                description: "Number of bytes on this donor shard in the collection being
-                              resharded."
+                description:
+                    "Number of bytes on this donor shard in the collection being
+                    resharded."
                 optional: true
             documentsToClone:
                 type: long
-                description: "Number of documents on this donor shard in the collection being
-                              resharded."
+                description:
+                    "Number of documents on this donor shard in the collection being
+                    resharded."
                 optional: true
             writesDuringCriticalSection:
                 type: long
@@ -200,12 +206,14 @@ structs:
             minFetchTimestamp:
                 type: timestamp
                 optional: true
-                description: "Timestamp after which this donor shard has guaranteed that oplog
-                                entries contain recipient shard information."
+                description:
+                    "Timestamp after which this donor shard has guaranteed that oplog
+                    entries contain recipient shard information."
 
     RecipientShardContext:
-        description: "Mutable state for a recipient shard tracked both locally by a recipient shard
-                      and remotely by the resharding coordinator."
+        description:
+            "Mutable state for a recipient shard tracked both locally by a recipient shard
+            and remotely by the resharding coordinator."
         inline_chained_structs: true
         chained_structs:
             AbortReason: AbortReasonStruct
@@ -318,8 +326,9 @@ structs:
                 optional: true
 
     DocumentSourceReshardingOwnershipMatchSpec:
-        description: "A struct representing the information needed for a resharding pipeline to
-                      determine which documents belong to a particular shard."
+        description:
+            "A struct representing the information needed for a resharding pipeline to
+            determine which documents belong to a particular shard."
         strict: true
         query_shape_component: true
         fields:
@@ -333,8 +342,9 @@ structs:
                 query_shape: custom
             temporaryReshardingNamespace:
                 type: namespacestring
-                description: "The namespace of the temporary resharding collection that exists on
-                              recipient shards."
+                description:
+                    "The namespace of the temporary resharding collection that exists on
+                    recipient shards."
                 query_shape: custom
                 optional: true
     ShardKeyRange:

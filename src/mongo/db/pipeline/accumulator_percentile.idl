@@ -26,12 +26,12 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/accumulator_percentile.h"
-    - "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/accumulator_percentile.h"
+        - "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 structs:
     # $percentile allows expressions for 'input' and 'p' fields, which we cannot evaluate through
     # the 'validator' callback and have to accept IDLAnyType.

@@ -1,4 +1,3 @@
-
 # Copyright (C) 2020-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,88 +27,88 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
-  loadRoutingTableOnStartup:
-    description: >-
-        Enables precaching of the mongos routing table on startup.
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: "gLoadRoutingTableOnStartup"
-    default: true
-    redact: false
+    loadRoutingTableOnStartup:
+        description: >-
+            Enables precaching of the mongos routing table on startup.
+        set_at: [startup]
+        cpp_vartype: bool
+        cpp_varname: "gLoadRoutingTableOnStartup"
+        default: true
+        redact: false
 
-  warmMinConnectionsInShardingTaskExecutorPoolOnStartup:
-    description: >-
-        Enables prewarming of the connection pool.
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup"
-    default: true
-    redact: false
+    warmMinConnectionsInShardingTaskExecutorPoolOnStartup:
+        description: >-
+            Enables prewarming of the connection pool.
+        set_at: [startup]
+        cpp_vartype: bool
+        cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartup"
+        default: true
+        redact: false
 
-  warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS:
-    description: >-
-        How long to wait for all hosts to have at least one connection.
-    set_at: [ startup ]
-    cpp_vartype: int
-    cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
-    default: 2000 # 2secs
-    validator:
-      gte: 0
-    redact: false
+    warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS:
+        description: >-
+            How long to wait for all hosts to have at least one connection.
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: "gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS"
+        default: 2000 # 2secs
+        validator:
+            gte: 0
+        redact: false
 
-  enableFinerGrainedCatalogCacheRefresh:
-    description: >-
-        DEPRECATED: This parameter has been deprecated and is here only for maintaining backward compatibility.
-    set_at: [ startup ]
-    cpp_vartype: bool
-    cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
-    default: false
-    redact: false
+    enableFinerGrainedCatalogCacheRefresh:
+        description: >-
+            DEPRECATED: This parameter has been deprecated and is here only for maintaining backward compatibility.
+        set_at: [startup]
+        cpp_vartype: bool
+        cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
+        default: false
+        redact: false
 
-  routingTableCacheChunkBucketSize:
-    description: >-
-        Size of the routing table cache buckets used to implement chunk grouping optimization.
-    set_at: [ startup ]
-    cpp_vartype: long long
-    cpp_varname: "gRoutingTableCacheChunkBucketSize"
-    default: 500
-    validator:
-      gt: 0
-    redact: false
+    routingTableCacheChunkBucketSize:
+        description: >-
+            Size of the routing table cache buckets used to implement chunk grouping optimization.
+        set_at: [startup]
+        cpp_vartype: long long
+        cpp_varname: "gRoutingTableCacheChunkBucketSize"
+        default: 500
+        validator:
+            gt: 0
+        redact: false
 
-  maxNumStaleVersionRetries:
-    description: "Max num of retries when getting a Stale Version error"
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gMaxNumStaleVersionRetries"
-    default: 10
-    validator: { gte: 10, lte: 100 }
-    redact: false
+    maxNumStaleVersionRetries:
+        description: "Max num of retries when getting a Stale Version error"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: "gMaxNumStaleVersionRetries"
+        default: 10
+        validator: {gte: 10, lte: 100}
+        redact: false
 
-  catalogCacheDatabaseMaxEntries:
-    description: >-
-        Maximum number of entries allowed in the catalog cache for databases.
-    set_at: [ startup ]
-    cpp_vartype: int
-    cpp_varname: "gCatalogCacheDatabaseMaxEntries"
-    default: 10000
-    validator:
-      gt: 0
-    redact: false
+    catalogCacheDatabaseMaxEntries:
+        description: >-
+            Maximum number of entries allowed in the catalog cache for databases.
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: "gCatalogCacheDatabaseMaxEntries"
+        default: 10000
+        validator:
+            gt: 0
+        redact: false
 
-  catalogCacheCollectionMaxEntries:
-    description: >-
-        Maximum number of entries allowed in the catalog cache for collections.
-    set_at: [ startup ]
-    cpp_vartype: int
-    cpp_varname: "gCatalogCacheCollectionMaxEntries"
-    default: 10000
-    validator:
-      gt: 0
-    redact: false
+    catalogCacheCollectionMaxEntries:
+        description: >-
+            Maximum number of entries allowed in the catalog cache for collections.
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: "gCatalogCacheCollectionMaxEntries"
+        default: 10000
+        validator:
+            gt: 0
+        redact: false

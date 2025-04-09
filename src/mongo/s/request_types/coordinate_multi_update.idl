@@ -33,7 +33,7 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-  ShardsvrCoordinateMultiUpdateResponse:
+    ShardsvrCoordinateMultiUpdateResponse:
         description: "Response for the internal multi update command."
         strict: false
         is_command_reply: true
@@ -46,20 +46,20 @@ structs:
                 optional: true
 
 commands:
-  _shardsvrCoordinateMultiUpdate:
-    command_name: _shardsvrCoordinateMultiUpdate
-    cpp_name: ShardsvrCoordinateMultiUpdate
-    description: Command called by mongos when pauseMigrationsDuringMultiUpdates is enabled.
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      uuid:
-        description: "The unique identifier for this multi update operation."
-        type: uuid
-        optional: false
-      command:
-        type: object
-        description: The original multi update command to coordinate.
-        optional: false
+    _shardsvrCoordinateMultiUpdate:
+        command_name: _shardsvrCoordinateMultiUpdate
+        cpp_name: ShardsvrCoordinateMultiUpdate
+        description: Command called by mongos when pauseMigrationsDuringMultiUpdates is enabled.
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            uuid:
+                description: "The unique identifier for this multi update operation."
+                type: uuid
+                optional: false
+            command:
+                type: object
+                description: The original multi update command to coordinate.
+                optional: false

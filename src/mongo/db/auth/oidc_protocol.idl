@@ -36,7 +36,7 @@ imports:
 structs:
     OIDCMechanismClientStep1:
         description: Client's opening request in saslStart or
-                     hello.speculativeAuthenticate
+            hello.speculativeAuthenticate
         strict: false
         fields:
             n:
@@ -71,4 +71,3 @@ structs:
                 description: "Compact serialized JWT with signature"
                 cpp_name: JWT
                 type: string
-

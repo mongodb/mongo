@@ -35,34 +35,34 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-  commitReshardCollection:
-    description: "The public commitReshardCollection command on mongos."
-    command_name: commitReshardCollection
-    strict: true
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    commitReshardCollection:
+        description: "The public commitReshardCollection command on mongos."
+        command_name: commitReshardCollection
+        strict: true
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-  _configsvrCommitReshardCollection:
-    command_name: _configsvrCommitReshardCollection
-    cpp_name: ConfigsvrCommitReshardCollection
-    description: "The internal commitReshardCollection command on the config server."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
+    _configsvrCommitReshardCollection:
+        command_name: _configsvrCommitReshardCollection
+        cpp_name: ConfigsvrCommitReshardCollection
+        description: "The internal commitReshardCollection command on the config server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
 
-  _shardsvrCommitReshardCollection:
-    command_name: _shardsvrCommitReshardCollection
-    cpp_name: ShardsvrCommitReshardCollection
-    description: "The internal commitReshardCollection command on the shard server."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    reply_type: OkReply
-    fields:
-      reshardingUUID:
-        type: uuid
-        optional: false
-        description: "The UUID for this resharding operation"
+    _shardsvrCommitReshardCollection:
+        command_name: _shardsvrCommitReshardCollection
+        cpp_name: ShardsvrCommitReshardCollection
+        description: "The internal commitReshardCollection command on the shard server."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        reply_type: OkReply
+        fields:
+            reshardingUUID:
+                type: uuid
+                optional: false
+                description: "The UUID for this resharding operation"

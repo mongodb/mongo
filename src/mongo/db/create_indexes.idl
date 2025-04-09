@@ -41,12 +41,12 @@ structs:
         is_command_reply: true
         fields:
             numIndexesBefore:
-                description: 'Index count before create'
+                description: "Index count before create"
                 type: int
                 optional: true
                 stability: stable
             numIndexesAfter:
-                description: 'Index count after create'
+                description: "Index count after create"
                 type: int
                 optional: true
                 stability: stable
@@ -58,12 +58,12 @@ structs:
                 optional: true
                 stability: stable
             commitQuorum:
-                description: 'Commit Quorum options used'
+                description: "Commit Quorum options used"
                 type: CommitQuorum
                 optional: true
                 stability: stable
             note:
-                description: 'Optional warning/error related to createIndex'
+                description: "Optional warning/error related to createIndex"
                 type: string
                 optional: true
                 stability: stable
@@ -75,16 +75,16 @@ structs:
         strict: true
         fields:
             v:
-                description: 'Index spec version'
+                description: "Index spec version"
                 type: safeInt
                 optional: true
                 stability: stable
             key:
-                description: 'Key to index on'
+                description: "Key to index on"
                 type: object_owned
                 stability: stable
             name:
-                description: 'Descriptive name for the index'
+                description: "Descriptive name for the index"
                 type: string
                 stability: stable
             ns:
@@ -205,37 +205,40 @@ commands:
         strict: true
         fields:
             v:
-                description: 'Index schema version'
+                description: "Index schema version"
                 type: safeInt
                 default: 2
                 stability: stable
             indexes:
-                description: 'Indexes to be created'
+                description: "Indexes to be created"
                 # array<NewIndexSpec> but respect ignoreUnknownIndexOptions
                 type: array<object>
                 stability: stable
             ignoreUnknownIndexOptions:
-                description: 'Ignore unknown options in index spec'
+                description: "Ignore unknown options in index spec"
                 type: safeBool
                 default: false
                 stability: unstable
             commitQuorum:
-                description: "Dictates which or how many replica set members must be ready to commit
-                              the index build before the primary will proceed to commit the index.
-                              This minimizes replication lag by ensuring secondaries are ready for
-                              commit and can quickly apply the commit on a finished index build"
+                description:
+                    "Dictates which or how many replica set members must be ready to commit
+                    the index build before the primary will proceed to commit the index.
+                    This minimizes replication lag by ensuring secondaries are ready for
+                    commit and can quickly apply the commit on a finished index build"
                 type: CommitQuorum
                 optional: true
                 stability: stable
             returnOnStart:
-                description: "For a two-phase index build, whether the command should return upon
-                              the index build starting rather than upon it committing/aborting."
+                description:
+                    "For a two-phase index build, whether the command should return upon
+                    the index build starting rather than upon it committing/aborting."
                 type: optionalBool
                 stability: unstable
             isTimeseriesNamespace:
-                description: "This flag is set to true when the command was originally sent to
-                              mongos on the time-series view, but got rewritten to target
-                              time-series buckets namespace before being sent to shards."
+                description:
+                    "This flag is set to true when the command was originally sent to
+                    mongos on the time-series view, but got rewritten to target
+                    time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
                 stability: internal

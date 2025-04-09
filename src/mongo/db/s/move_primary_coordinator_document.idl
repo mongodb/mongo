@@ -37,7 +37,7 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 enums:
-     MovePrimaryCoordinatorPhase:
+    MovePrimaryCoordinatorPhase:
         description: "Coordinator phase of a movePrimary operation."
         type: string
         values:

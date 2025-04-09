@@ -95,7 +95,7 @@ structs:
             commitDelayMS:
                 type: int
                 default: 0
-                validator: { gte: 0 }
+                validator: {gte: 0}
 
 commands:
     createUser:
@@ -360,7 +360,7 @@ commands:
             showCustomData:
                 description: >-
                     Set the field to false to omit the custom data provided by the client for the
-                    user. 
+                    user.
                 type: safeBool
                 default: true
             filter:
@@ -441,4 +441,3 @@ commands:
                 description: "Drop temp collections when complete"
                 type: bool
                 default: false
-

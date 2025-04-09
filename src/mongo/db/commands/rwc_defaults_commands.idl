@@ -28,7 +28,6 @@
 global:
     cpp_namespace: "mongo"
 
-
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/repl/read_concern_args.idl"
@@ -43,15 +42,17 @@ structs:
             RWConcernDefault: RWConcernDefault
         fields:
             inMemory:
-                description: "Whether the value came from the in-memory cache or it reflects the
-                              defaults which were persisted as of the time of invocation."
+                description:
+                    "Whether the value came from the in-memory cache or it reflects the
+                    defaults which were persisted as of the time of invocation."
                 optional: true
                 type: bool
             localUpdateWallClockTime:
-                description: "The wallclock time of when the default read or write concern was
-                              applied to the cache of the node, which returned the response. This
-                              value is only informational and must not be used for any recency
-                              comparisons."
+                description:
+                    "The wallclock time of when the default read or write concern was
+                    applied to the cache of the node, which returned the response. This
+                    value is only informational and must not be used for any recency
+                    comparisons."
                 type: date
 
 commands:

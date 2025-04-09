@@ -28,7 +28,6 @@
 global:
     cpp_namespace: "mongo"
 
-
 imports:
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
@@ -75,8 +74,9 @@ structs:
 
 commands:
     listDatabasesForAllTenants:
-        description: "listDatabasesForAllTenants Command: lists all databases for all tenants and
-                      can only be run if authenticated with internal __system role"
+        description:
+            "listDatabasesForAllTenants Command: lists all databases for all tenants and
+            can only be run if authenticated with internal __system role"
         command_name: "listDatabasesForAllTenants"
         cpp_name: ListDatabasesForAllTenantsCommand
         namespace: ignored
@@ -84,8 +84,8 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: cluster
-                    action_type: internal
+                      resource_pattern: cluster
+                      action_type: internal
         strict: false
         fields:
             nameOnly:

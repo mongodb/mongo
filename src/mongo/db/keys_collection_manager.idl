@@ -27,17 +27,17 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
-  KeysRotationIntervalSec:
-    description: >-
-      Specifies the number of seconds for which an HMAC signing key is valid before
-      rotating to the next one. This parameter is intended primarily to facilitate
-      authentication testing.
-    set_at: [ startup ]
-    cpp_vartype: int
-    cpp_varname: KeysRotationIntervalSec
-    default:
-      expr: 3 * 30 * 24 * 60 * 60   # ~3 months
-    redact: false
+    KeysRotationIntervalSec:
+        description: >-
+            Specifies the number of seconds for which an HMAC signing key is valid before
+            rotating to the next one. This parameter is intended primarily to facilitate
+            authentication testing.
+        set_at: [startup]
+        cpp_vartype: int
+        cpp_varname: KeysRotationIntervalSec
+        default:
+            expr: 3 * 30 * 24 * 60 * 60 # ~3 months
+        redact: false

@@ -27,17 +27,17 @@
 #
 
 global:
-   cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-  HedgingMode:
-      description: The hedging mode for mongos.
-      fields:
-          enabled:
-              cpp_name: enabled
-              type: bool
-              description: Enable hedged reads.
-              default: true
+    HedgingMode:
+        description: The hedging mode for mongos.
+        fields:
+            enabled:
+                cpp_name: enabled
+                type: bool
+                description: Enable hedged reads.
+                default: true

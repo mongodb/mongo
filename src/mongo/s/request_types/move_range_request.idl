@@ -42,8 +42,8 @@ enums:
         description: "This enum represents whether or not a migration should attempt to move a large range"
         type: int # Not `string` due to backwards compatibility
         values:
-            kDoNotForce: 0    # do not attempt to migrate a large chunk
-            kForceManual: 1   # manual moveChunk command specified `forceJumbo: true`
+            kDoNotForce: 0 # do not attempt to migrate a large chunk
+            kForceManual: 1 # manual moveChunk command specified `forceJumbo: true`
             kForceBalancer: 2 # balancer specified `forceJumbo: true`
 
 types:

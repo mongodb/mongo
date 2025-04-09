@@ -30,231 +30,238 @@
 # and deserialization from its BSON representation for that class.
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/util/uuid.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/uuid.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/crypto/sha256_block.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/crypto/sha256_block.idl"
 
 types:
+    TxnNumber:
+        description:
+            "A strictly-increasing per-session counter, which indicates to which transaction
+            of a given session does the specified command belong. The combination of
+            LogicalSessionId:TxnNumber is referred to as the transaction identifier."
+        bson_serialization_type: long
+        cpp_type: "std::int64_t"
+        deserializer: "mongo::BSONElement::_numberLong"
+        is_view: false
 
-  TxnNumber:
-    description: "A strictly-increasing per-session counter, which indicates to which transaction
-                  of a given session does the specified command belong. The combination of
-                  LogicalSessionId:TxnNumber is referred to as the transaction identifier."
-    bson_serialization_type: long
-    cpp_type: "std::int64_t"
-    deserializer: "mongo::BSONElement::_numberLong"
-    is_view: false
+    StmtId:
+        description: "A number representing an operation within a transaction."
+        bson_serialization_type: int
+        cpp_type: "std::int32_t"
+        deserializer: "mongo::BSONElement::_numberInt"
+        is_view: false
 
-  StmtId:
-    description: "A number representing an operation within a transaction."
-    bson_serialization_type: int
-    cpp_type: "std::int32_t"
-    deserializer: "mongo::BSONElement::_numberInt"
-    is_view: false
-
-  TxnRetryCounter:
-    description: "A strictly-increasing per-transaction counter that starts at 0 and is incremented
-                  every time the transaction is internally retried on a transient transaction
-                  error."
-    bson_serialization_type: int
-    cpp_type: "std::int32_t"
-    deserializer: "mongo::BSONElement::_numberInt"
-    is_view: false
+    TxnRetryCounter:
+        description:
+            "A strictly-increasing per-transaction counter that starts at 0 and is incremented
+            every time the transaction is internally retried on a transient transaction
+            error."
+        bson_serialization_type: int
+        cpp_type: "std::int32_t"
+        deserializer: "mongo::BSONElement::_numberInt"
+        is_view: false
 
 structs:
+    LogicalSessionId:
+        description: "A struct representing a LogicalSessionId"
+        strict: true
+        fields:
+            id: uuid
+            uid: sha256Block
+            # The "txnNumber" field must come after the "id" and "uid" fields and before "txnUUID" field
+            # to enable find commands with session id as the sort field to return results that correspond
+            # to the same session id sorted by the "txnNumber" field.
+            txnNumber:
+                description: "Used for internal sessions only."
+                type: TxnNumber
+                optional: true
+                stability: unstable
+            txnUUID:
+                description: "Used for internal sessions only."
+                type: uuid
+                optional: true
+                stability: unstable
 
-  LogicalSessionId:
-    description: "A struct representing a LogicalSessionId"
-    strict: true
-    fields:
-      id: uuid
-      uid: sha256Block
-      # The "txnNumber" field must come after the "id" and "uid" fields and before "txnUUID" field
-      # to enable find commands with session id as the sort field to return results that correspond
-      # to the same session id sorted by the "txnNumber" field.
-      txnNumber:
-        description: "Used for internal sessions only."
-        type: TxnNumber
-        optional: true
-        stability: unstable
-      txnUUID:
-        description: "Used for internal sessions only."
-        type: uuid
-        optional: true
-        stability: unstable
+    LogicalSessionIdToClient:
+        description: "A struct representing a LogicalSessionId to external clients"
+        strict: true
+        fields:
+            id: uuid
 
-  LogicalSessionIdToClient:
-    description: "A struct representing a LogicalSessionId to external clients"
-    strict: true
-    fields:
-      id: uuid
+    LogicalSessionToClient:
+        description: "A struct representing a LogicalSession reply to external clients"
+        strict: true
+        fields:
+            id: LogicalSessionIdToClient
+            timeoutMinutes: int
 
-  LogicalSessionToClient:
-    description: "A struct representing a LogicalSession reply to external clients"
-    strict: true
-    fields:
-      id: LogicalSessionIdToClient
-      timeoutMinutes: int
+    LogicalSessionRecord:
+        description: "A struct representing a LogicalSessionRecord"
+        strict: true
+        fields:
+            _id:
+                type: LogicalSessionId
+                cpp_name: id
+            lastUse: date
+            user:
+                type: string
+                optional: true
 
-  LogicalSessionRecord:
-    description: "A struct representing a LogicalSessionRecord"
-    strict: true
-    fields:
-      _id:
-        type: LogicalSessionId
-        cpp_name: id
-      lastUse: date
-      user:
-        type: string
-        optional: true
+    LogicalSessionFromClient:
+        description: "A struct representing a LogicalSessionId from external clients"
+        strict: true
+        fields:
+            id:
+                type: uuid
+                stability: stable
+            uid:
+                type: sha256Block
+                optional: true
+                stability: stable
+            txnNumber:
+                description: "Used for internal sessions only."
+                type: TxnNumber
+                optional: true
+                stability: stable
+            txnUUID:
+                description: "Used for internal sessions only."
+                type: uuid
+                optional: true
+                stability: stable
 
-  LogicalSessionFromClient:
-    description: "A struct representing a LogicalSessionId from external clients"
-    strict: true
-    fields:
-      id:
-        type: uuid
-        stability: stable
-      uid:
-        type: sha256Block
-        optional: true
-        stability: stable
-      txnNumber:
-        description: "Used for internal sessions only."
-        type: TxnNumber
-        optional: true
-        stability: stable
-      txnUUID:
-        description: "Used for internal sessions only."
-        type: uuid
-        optional: true
-        stability: stable
+    # TODO (SERVER-80524): This class is only used for OpLog persistence and should be moved to the OpLog's IDL files
+    OperationSessionInfo:
+        description: "Parser for serializing session transaction metadata"
+        strict: false
+        fields:
+            lsid:
+                type: LogicalSessionId
+                cpp_name: sessionId
+                optional: true
+            txnNumber:
+                description:
+                    "The transaction number relative to the session in which a particular write
+                    operation executes."
+                type: TxnNumber
+                optional: true
+            txnRetryCounter:
+                description: "The transaction retry counter for this transaction."
+                type: TxnRetryCounter
+                optional: true
+            autocommit:
+                type: bool
+                optional: true
+            startTransaction:
+                description:
+                    "Used to indicate that a command is the start of a multi-statement
+                    transaction."
+                type: bool
+                optional: true
+            startOrContinueTransaction:
+                description:
+                    "Used to indicate that recipient should be added as a new participant if not
+                    already part of this transaction, or continue the transaction otherwise."
+                type: bool
+                optional: true
 
-  # TODO (SERVER-80524): This class is only used for OpLog persistence and should be moved to the OpLog's IDL files
-  OperationSessionInfo:
-    description: "Parser for serializing session transaction metadata"
-    strict: false
-    fields:
-      lsid:
-        type: LogicalSessionId
-        cpp_name: sessionId
-        optional: true
-      txnNumber:
-        description: "The transaction number relative to the session in which a particular write
-                      operation executes."
-        type: TxnNumber
-        optional: true
-      txnRetryCounter:
-        description: "The transaction retry counter for this transaction."
-        type: TxnRetryCounter
-        optional: true
-      autocommit:
-        type: bool
-        optional: true
-      startTransaction:
-        description: "Used to indicate that a command is the start of a multi-statement
-                      transaction."
-        type: bool
-        optional: true
-      startOrContinueTransaction:
-        description: "Used to indicate that recipient should be added as a new participant if not
-                      already part of this transaction, or continue the transaction otherwise."
-        type: bool
-        optional: true
+    OperationSessionInfoFromClientBase:
+        description:
+            'Parser for pulling out session transaction metadata from commands, as opposed to
+            the OperationSessionInfo class above, which is used for persistence.
 
-  OperationSessionInfoFromClientBase:
-    description: "Parser for pulling out session transaction metadata from commands, as opposed to
-                  the OperationSessionInfo class above, which is used for persistence.
+            Any new fields added here must be added as optional:true so that the default
+            constructed value continues to mean "no logical session was sent by the client".
 
-                  Any new fields added here must be added as optional:true so that the default
-                  constructed value continues to mean \"no logical session was sent by the client\".
+            Please refer to the implementing class OperationSessionInfoFromClient for more
+            information on its usage and contract.
+            '
+        strict: false
+        unsafe_dangerous_disable_extra_field_duplicate_checks: true
+        fields:
+            lsid:
+                type: LogicalSessionFromClient
+                cpp_name: sessionId
+                optional: true
+            txnNumber:
+                description:
+                    "The transaction number relative to the session in which a particular write
+                    operation executes."
+                type: TxnNumber
+                optional: true
+            txnRetryCounter:
+                description: "The transaction retry counter for this transaction."
+                type: TxnRetryCounter
+                optional: true
+            autocommit:
+                type: bool
+                optional: true
+            startTransaction:
+                description:
+                    "Used to indicate that a command is the start of a multi-statement
+                    transaction."
+                type: bool
+                optional: true
+            startOrContinueTransaction:
+                description:
+                    "Used to indicate that recipient should be added as a new participant if not
+                    already part of this transaction, or continue the transaction otherwise."
+                type: bool
+                optional: true
+            coordinator:
+                description: "Indicates that this shard is the coordinator shard for the transaction two-phase commit."
+                type: bool
+                optional: true
 
-                  Please refer to the implementing class OperationSessionInfoFromClient for more
-                  information on its usage and contract.
-                  "
-    strict: false
-    unsafe_dangerous_disable_extra_field_duplicate_checks: true
-    fields:
-      lsid:
-        type: LogicalSessionFromClient
-        cpp_name: sessionId
-        optional: true
-      txnNumber:
-        description: "The transaction number relative to the session in which a particular write
-                      operation executes."
-        type: TxnNumber
-        optional: true
-      txnRetryCounter:
-        description: "The transaction retry counter for this transaction."
-        type: TxnRetryCounter
-        optional: true
-      autocommit:
-        type: bool
-        optional: true
-      startTransaction:
-        description: "Used to indicate that a command is the start of a multi-statement
-                      transaction."
-        type: bool
-        optional: true
-      startOrContinueTransaction:
-        description: "Used to indicate that recipient should be added as a new participant if not
-                      already part of this transaction, or continue the transaction otherwise."
-        type: bool
-        optional: true
-      coordinator:
-        description: "Indicates that this shard is the coordinator shard for the transaction two-phase commit."
-        type: bool
-        optional: true
+    SessionsCollectionFetchResultIndividualResult:
+        description: "Individual result"
+        strict: true
+        fields:
+            _id: LogicalSessionId
 
-  SessionsCollectionFetchResultIndividualResult:
-    description: "Individual result"
-    strict: true
-    fields:
-      _id: LogicalSessionId
+    SessionsCollectionFetchResultCursor:
+        description: "Cursor object"
+        strict: false
+        fields:
+            firstBatch: array<SessionsCollectionFetchResultIndividualResult>
 
-  SessionsCollectionFetchResultCursor:
-    description: "Cursor object"
-    strict: false
-    fields:
-      firstBatch: array<SessionsCollectionFetchResultIndividualResult>
+    SessionsCollectionFetchResult:
+        description: "Parser for pulling out the fetch results from SessionsCollection::fetch"
+        strict: false
+        fields:
+            cursor: SessionsCollectionFetchResultCursor
 
-  SessionsCollectionFetchResult:
-    description: "Parser for pulling out the fetch results from SessionsCollection::fetch"
-    strict: false
-    fields:
-      cursor: SessionsCollectionFetchResultCursor
+    SessionsCollectionFetchRequestFilterId:
+        description: "Id"
+        strict: true
+        fields:
+            $in:
+                type: array<LogicalSessionId>
+                cpp_name: "in"
 
-  SessionsCollectionFetchRequestFilterId:
-    description: "Id"
-    strict: true
-    fields:
-      $in:
-        type: array<LogicalSessionId>
-        cpp_name: "in"
+    SessionsCollectionFetchRequestFilter:
+        description: "filter"
+        strict: true
+        fields:
+            _id: SessionsCollectionFetchRequestFilterId
 
-  SessionsCollectionFetchRequestFilter:
-    description: "filter"
-    strict: true
-    fields:
-      _id: SessionsCollectionFetchRequestFilterId
+    SessionsCollectionFetchRequestProjection:
+        description: "projection"
+        strict: true
+        fields:
+            _id: int
 
-  SessionsCollectionFetchRequestProjection:
-    description: "projection"
-    strict: true
-    fields:
-      _id: int
-
-  SessionsCollectionFetchRequest:
-    description: "Parser for forming the fetch request for SessionsCollection::fetch"
-    strict: true
-    fields:
-      find: string
-      filter: SessionsCollectionFetchRequestFilter
-      projection: SessionsCollectionFetchRequestProjection
-      batchSize: int
-      singleBatch: bool
-      limit: int
+    SessionsCollectionFetchRequest:
+        description: "Parser for forming the fetch request for SessionsCollection::fetch"
+        strict: true
+        fields:
+            find: string
+            filter: SessionsCollectionFetchRequestFilter
+            projection: SessionsCollectionFetchRequestProjection
+            batchSize: int
+            singleBatch: bool
+            limit: int

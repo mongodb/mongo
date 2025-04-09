@@ -31,72 +31,71 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/repl/replication_types.idl"
 
 structs:
+    LastCommittedTransaction:
+        description: "A struct representing the server status subsection on
+            the last committed transaction"
+        strict: true
+        fields:
+            operationCount:
+                type: long
+                default: 0
+            oplogOperationBytes:
+                type: long
+                default: 0
+            writeConcern:
+                type: object
 
-  LastCommittedTransaction:
-    description: "A struct representing the server status subsection on
-                  the last committed transaction"
-    strict: true
-    fields:
-      operationCount:
-        type: long
-        default: 0
-      oplogOperationBytes:
-        type: long
-        default: 0
-      writeConcern:
-        type: object
-
-  TransactionsStats:
-    description: "A struct representing the section of the server status
-                  command with information about transactions"
-    strict: true
-    fields:
-      retriedCommandsCount:
-        type: long
-        default: 0
-      retriedStatementsCount:
-        type: long
-        default: 0
-      transactionsCollectionWriteCount:
-        type: long
-        default: 0
-      currentActive:
-        type: long
-        default: 0
-      currentInactive:
-        type: long
-        default: 0
-      currentOpen:
-        type: long
-        default: 0
-      totalAborted:
-        type: long
-        default: 0
-      totalCommitted:
-        type: long
-        default: 0
-      totalStarted:
-        type: long
-        default: 0
-      totalPrepared:
-        type: long
-        default: 0
-      totalPreparedThenCommitted:
-        type: long
-        default: 0
-      totalPreparedThenAborted:
-        type: long
-        default: 0
-      currentPrepared:
-        type: long
-        default: 0
-      lastCommittedTransaction:
-        type: LastCommittedTransaction
-        optional: true
+    TransactionsStats:
+        description: "A struct representing the section of the server status
+            command with information about transactions"
+        strict: true
+        fields:
+            retriedCommandsCount:
+                type: long
+                default: 0
+            retriedStatementsCount:
+                type: long
+                default: 0
+            transactionsCollectionWriteCount:
+                type: long
+                default: 0
+            currentActive:
+                type: long
+                default: 0
+            currentInactive:
+                type: long
+                default: 0
+            currentOpen:
+                type: long
+                default: 0
+            totalAborted:
+                type: long
+                default: 0
+            totalCommitted:
+                type: long
+                default: 0
+            totalStarted:
+                type: long
+                default: 0
+            totalPrepared:
+                type: long
+                default: 0
+            totalPreparedThenCommitted:
+                type: long
+                default: 0
+            totalPreparedThenAborted:
+                type: long
+                default: 0
+            currentPrepared:
+                type: long
+                default: 0
+            lastCommittedTransaction:
+                type: LastCommittedTransaction
+                optional: true

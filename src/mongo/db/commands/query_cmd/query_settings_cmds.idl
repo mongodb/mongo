@@ -37,33 +37,33 @@ imports:
     - "mongo/db/query/query_shape/query_shape_hash.idl"
 
 structs:
-  SetQuerySettingsCommandReply:
-    description: "Reply to setQuerySettings command."
-    is_command_reply: true
-    inline_chained_structs: true
-    chained_structs:
-      QueryShapeConfiguration: queryShapeConfiguration
+    SetQuerySettingsCommandReply:
+        description: "Reply to setQuerySettings command."
+        is_command_reply: true
+        inline_chained_structs: true
+        chained_structs:
+            QueryShapeConfiguration: queryShapeConfiguration
 
 commands:
-  setQuerySettings:
-    description: "Sets query settings on the entire cluster for the given query shape."
-    command_name: setQuerySettings
-    namespace: type
-    cpp_name: SetQuerySettingsCommandRequest
-    api_version: ""
-    strict: true
-    type:
-      variant: [QueryShapeHash, object_owned]
-    fields:
-      settings: QuerySettings
-    reply_type: SetQuerySettingsCommandReply
+    setQuerySettings:
+        description: "Sets query settings on the entire cluster for the given query shape."
+        command_name: setQuerySettings
+        namespace: type
+        cpp_name: SetQuerySettingsCommandRequest
+        api_version: ""
+        strict: true
+        type:
+            variant: [QueryShapeHash, object_owned]
+        fields:
+            settings: QuerySettings
+        reply_type: SetQuerySettingsCommandReply
 
-  removeQuerySettings:
-    description: "Removes query settings on the entire cluster for the given query shape."
-    command_name: removeQuerySettings
-    namespace: type
-    cpp_name: RemoveQuerySettingsCommandRequest
-    api_version: ""
-    strict: true
-    type:
-      variant: [QueryShapeHash, object_owned]
+    removeQuerySettings:
+        description: "Removes query settings on the entire cluster for the given query shape."
+        command_name: removeQuerySettings
+        namespace: type
+        cpp_name: RemoveQuerySettingsCommandRequest
+        api_version: ""
+        strict: true
+        type:
+            variant: [QueryShapeHash, object_owned]

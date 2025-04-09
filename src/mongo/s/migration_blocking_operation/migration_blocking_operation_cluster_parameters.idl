@@ -26,25 +26,25 @@
 # it in the license file.
 
 imports:
-  - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
 
 global:
     cpp_namespace: mongo::migration_blocking_operation
 
 structs:
-  PauseMigrationsDuringMultiUpdatesParam:
-    description: >-
-        Cluster parameter determining if chunk migrations should be prevented while updateMany or
-        deleteMany operations are ongoing.
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      enabled:
+    PauseMigrationsDuringMultiUpdatesParam:
         description: >-
-            If true, migrations will be paused during multi updates.
-        type: bool
-        default: false
+            Cluster parameter determining if chunk migrations should be prevented while updateMany or
+            deleteMany operations are ongoing.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            enabled:
+                description: >-
+                    If true, migrations will be paused during multi updates.
+                type: bool
+                default: false
 
 server_parameters:
     pauseMigrationsDuringMultiUpdates:
@@ -55,6 +55,6 @@ server_parameters:
         cpp_vartype: PauseMigrationsDuringMultiUpdatesParam
         cpp_varname: pauseMigrationsDuringMultiUpdates
         condition:
-          min_fcv: 7.2
+            min_fcv: 7.2
         redact: false
         omit_in_ftdc: false

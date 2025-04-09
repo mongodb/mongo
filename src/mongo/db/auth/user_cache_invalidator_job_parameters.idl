@@ -26,28 +26,27 @@
 # it in the license file.
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/auth/user_cache_invalidator_job.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/auth/user_cache_invalidator_job.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  userCacheInvalidationIntervalSecs:
-    description: >
-      On a mongos instance, specifies the interval (in seconds) at which the mongos instance
-      checks to determine whether the in-memory cache of user objects has stale data, and if so,
-      clears the cache. If there are no changes to user objects, mongos will not clear the cache.
-    cpp_varname: userCacheInvalidationIntervalSecs
-    cpp_vartype: AtomicWord<int>
-    set_at:
-      - startup
-      - runtime
-    default: 30
-    on_update: userCacheInvalidationIntervalSecsNotify
-    validator:
-      gte: 1
-      lte: 86400
-    redact: false
-
+    userCacheInvalidationIntervalSecs:
+        description: >
+            On a mongos instance, specifies the interval (in seconds) at which the mongos instance
+            checks to determine whether the in-memory cache of user objects has stale data, and if so,
+            clears the cache. If there are no changes to user objects, mongos will not clear the cache.
+        cpp_varname: userCacheInvalidationIntervalSecs
+        cpp_vartype: AtomicWord<int>
+        set_at:
+            - startup
+            - runtime
+        default: 30
+        on_update: userCacheInvalidationIntervalSecsNotify
+        validator:
+            gte: 1
+            lte: 86400
+        redact: false

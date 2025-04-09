@@ -27,42 +27,42 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
-  useReadOnceCursorsForIndexBuilds:
-    description: "When true, enables uses of read once cursors for index builds"
-    set_at:
-      - runtime
-      - startup
-    cpp_varname: useReadOnceCursorsForIndexBuilds
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    redact: false
+    useReadOnceCursorsForIndexBuilds:
+        description: "When true, enables uses of read once cursors for index builds"
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: useReadOnceCursorsForIndexBuilds
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
 
-  maxIndexBuildMemoryUsageMegabytes:
-    description: "Limits the amount of memory that simultaneous index builds on one collection may consume for the duration of the builds"
-    set_at:
-      - runtime
-      - startup
-    cpp_varname: maxIndexBuildMemoryUsageMegabytes
-    cpp_vartype: AtomicWord<int>
-    default: 200
-    validator:
-      gte: 50
-    redact: false
+    maxIndexBuildMemoryUsageMegabytes:
+        description: "Limits the amount of memory that simultaneous index builds on one collection may consume for the duration of the builds"
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: maxIndexBuildMemoryUsageMegabytes
+        cpp_vartype: AtomicWord<int>
+        default: 200
+        validator:
+            gte: 50
+        redact: false
 
-  internalIndexBuildBulkLoadYieldIterations:
-    description: "The number of keys bulk-loaded before yielding."
-    set_at:
-      - runtime
-      - startup
-    cpp_varname: internalIndexBuildBulkLoadYieldIterations
-    cpp_vartype: AtomicWord<int>
-    default: 1000
-    validator:
-      gte: 1
-    redact: false
+    internalIndexBuildBulkLoadYieldIterations:
+        description: "The number of keys bulk-loaded before yielding."
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: internalIndexBuildBulkLoadYieldIterations
+        cpp_vartype: AtomicWord<int>
+        default: 1000
+        validator:
+            gte: 1
+        redact: false

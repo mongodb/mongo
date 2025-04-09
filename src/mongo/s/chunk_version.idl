@@ -38,9 +38,10 @@ imports:
 
 structs:
     CollectionGenerationBase:
-        description: Represents the generation part of a collection version which changes every time
-                     the collection undergoes some major transformation. This is the most
-                     significant part of the version of a collection.
+        description:
+            Represents the generation part of a collection version which changes every time
+            the collection undergoes some major transformation. This is the most
+            significant part of the version of a collection.
         strict: false
         fields:
             e:
@@ -53,8 +54,9 @@ structs:
                 cpp_name: Timestamp
 
     CollectionPlacementBase:
-        description: Represents the chunk-placement part of a collection version, which is
-                     subordinate to the collection generation.
+        description:
+            Represents the chunk-placement part of a collection version, which is
+            subordinate to the collection generation.
         strict: false
         fields:
             v:
@@ -63,8 +65,9 @@ structs:
                 cpp_name: Version
 
     ChunkVersion60Format:
-        description: New chunk version format with is parsed by 6.0 binaries but only generated
-                     starting with the 6.0 binaries when the FCV is 6.0.
+        description:
+            New chunk version format with is parsed by 6.0 binaries but only generated
+            starting with the 6.0 binaries when the FCV is 6.0.
         strict: false
         chained_structs:
             CollectionGenerationBase: Generation

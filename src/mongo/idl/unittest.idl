@@ -41,12 +41,11 @@ imports:
     - "mongo/db/auth/action_type.idl"
 
 types:
-
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for a bindata type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for a bindata type
+    #
+    ##################################################################################################
 
     bindata_custom:
         bson_serialization_type: bindata
@@ -57,11 +56,11 @@ types:
         deserializer: mongo::BinDataCustomType::parseFromBSON
         is_view: false
 
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for an any type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for an any type
+    #
+    ##################################################################################################
 
     any_basic_type:
         bson_serialization_type: any
@@ -71,11 +70,11 @@ types:
         deserializer: mongo::AnyBasicType::parseFromBSON
         is_view: true
 
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for an object type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for an object type
+    #
+    ##################################################################################################
 
     object_basic_type:
         bson_serialization_type: object
@@ -85,11 +84,11 @@ types:
         deserializer: mongo::ObjectBasicType::parseFromBSON
         is_view: true
 
-##################################################################################################
-#
-# Test types used in parser chaining testing
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test types used in parser chaining testing
+    #
+    ##################################################################################################
 
     ChainedType:
         bson_serialization_type: chain
@@ -115,14 +114,12 @@ types:
         deserializer: mongo::ViewChainedType::parseFromBSON
         is_view: true
 
-
 ##################################################################################################
 #
 # Unit test enums
 #
 ##################################################################################################
 enums:
-
     StringEnum:
         description: "An example string enum"
         type: string
@@ -156,7 +153,7 @@ enums:
                 value: "two"
                 extra_data:
                     foo:
-                        - { bar: "baz" }
+                        - {bar: "baz"}
                     baz: '"qu\\nx"'
 
     NonContiguousIntEnum:
@@ -167,14 +164,12 @@ enums:
             five: 5
             ten: 10
 
-
 ##################################################################################################
 #
 # Unit test structs for a single value to ensure type validation works correctly
 #
 ##################################################################################################
 structs:
-
     one_plain_object:
         description: UnitTest for a single BSONObj
         generate_comparison_operators: true
@@ -205,11 +200,11 @@ structs:
         fields:
             reply_field: int
 
-##################################################################################################
-#
-# Structs to test derived parsers
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Structs to test derived parsers
+    #
+    ##################################################################################################
 
     DerivedBaseStruct:
         description: UnitTest for parser that will derive from a type
@@ -217,12 +212,11 @@ structs:
             field1: int
             field2: int
 
-
-##################################################################################################
-#
-# Struct to test non view basic types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Struct to test non view basic types
+    #
+    ##################################################################################################
 
     NonViewStruct:
         description: UnitTest for parsing non view types
@@ -269,22 +263,22 @@ structs:
                 optional: true
             field37: database_name
 
-##################################################################################################
-#
-# Struct to test as a view type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Struct to test as a view type
+    #
+    ##################################################################################################
 
     ViewStruct:
         description: Struct that is a view.
         fields:
             view_type: object
 
-##################################################################################################
-#
-# Structs to test chained view types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Structs to test chained view types
+    #
+    ##################################################################################################
 
     ViewStructChainedStruct:
         description: Struct that is chained with a view struct.
@@ -302,11 +296,11 @@ structs:
         fields:
             view_struct: ViewStruct
 
-##################################################################################################
-#
-# Structs to test various options for structs/fields
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Structs to test various options for structs/fields
+    #
+    ##################################################################################################
     RequiredStrictField3:
         description: UnitTest for a strict struct with 3 required fields
         fields:
@@ -328,11 +322,11 @@ structs:
                 type: int
                 cpp_name: cppField3
 
-##################################################################################################
-#
-# Structs to test comparison options
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Structs to test comparison options
+    #
+    ##################################################################################################
     CompareAllField3:
         description: UnitTest for a struct with 3 int fields to test comparison
         generate_comparison_operators: true
@@ -354,11 +348,11 @@ structs:
                 type: int
                 comparison_order: 1
 
-##################################################################################################
-#
-# Nested Structs with duplicate types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Nested Structs with duplicate types
+    #
+    ##################################################################################################
     NestedWithDuplicateTypes:
         description: UnitTest for a non-strict struct with 3 required fields
         strict: false
@@ -369,11 +363,11 @@ structs:
                 optional: true
             field3: RequiredStrictField3
 
-##################################################################################################
-#
-# Structs to test various options for fields
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Structs to test various options for fields
+    #
+    ##################################################################################################
     ignoredField:
         description: UnitTest for a struct with an ignored_field
         fields:
@@ -391,12 +385,11 @@ structs:
                 type: int
                 ignore: true
 
-
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for a string type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for a string type
+    #
+    ##################################################################################################
 
     one_namespacestring:
         description: UnitTest for a single namespacestring
@@ -409,57 +402,55 @@ structs:
             basic: base64string
             url: base64urlstring
 
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for a bindata type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for a bindata type
+    #
+    ##################################################################################################
 
     one_bindata_custom:
         description: UnitTest for a custom bindata
         fields:
             value: bindata_custom
 
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for an any type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for an any type
+    #
+    ##################################################################################################
 
     one_any_basic_type:
         description: UnitTest for a single any type
         fields:
             value: any_basic_type
 
-
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for an object type
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test a custom non-BSONElement deserialization and serialization methods for an object type
+    #
+    ##################################################################################################
 
     one_object_basic_type:
         description: UnitTest for a single object type
         fields:
             value: object_basic_type
 
-
-##################################################################################################
-#
-# Test types that accept multiple serialization types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test types that accept multiple serialization types
+    #
+    ##################################################################################################
 
     one_safeint64:
         description: UnitTest for a single safeInt64
         fields:
             value: safeInt64
 
-##################################################################################################
-#
-# Test fields with default values
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test fields with default values
+    #
+    ##################################################################################################
 
     default_values:
         description: UnitTest for default values
@@ -488,11 +479,11 @@ structs:
                     variant: [string, int]
                 default: 42
 
-##################################################################################################
-#
-# Test fields with optional values
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test fields with optional values
+    #
+    ##################################################################################################
 
     optional_field:
         description: UnitTest for a optional field
@@ -537,11 +528,11 @@ structs:
                 always_serialize: false
                 optional: true
 
-##################################################################################################
-#
-# Test struct with namespace string field
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test struct with namespace string field
+    #
+    ##################################################################################################
     NamespaceInfoStruct:
         description: "Test struct with namespace string field."
         strict: true
@@ -568,11 +559,11 @@ structs:
             field2:
                 type: array<NamespaceInfoStruct>
 
-##################################################################################################
-#
-# Test array of simple types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test array of simple types
+    #
+    ##################################################################################################
     simple_int_array:
         description: UnitTest for arrays of ints
         fields:
@@ -612,11 +603,11 @@ structs:
                 type: array<bindata_uuid>
                 optional: true
 
-##################################################################################################
-#
-# Test array of complex types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test array of complex types
+    #
+    ##################################################################################################
 
     complex_array_fields:
         description: UnitTest for arrays of complex optional and non-optional simple types
@@ -652,11 +643,11 @@ structs:
                 type: array<one_string>
                 optional: true
 
-##################################################################################################
-#
-# Test Chained Types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test Chained Types
+    #
+    ##################################################################################################
 
     chained_string_basic_type:
         description: Base struct type for a chained string
@@ -688,16 +679,16 @@ structs:
         description: UnitTest for chained struct with only chained types
         strict: false
         chained_types:
-            ChainedType : ChainedType
-            AnotherChainedType : AnotherChainedType
+            ChainedType: ChainedType
+            AnotherChainedType: AnotherChainedType
 
     chained_struct_mixed:
         description: Chained struct with chained structs and fields
         strict: true
         inline_chained_structs: false
         chained_structs:
-            chained_any_basic_type : chained_any_basic_type
-            chained_object_basic_type : ChainedObjectBasicType
+            chained_any_basic_type: chained_any_basic_type
+            chained_object_basic_type: ChainedObjectBasicType
             chained_enum_type: chained_enum_type
         fields:
             field3: string
@@ -706,7 +697,7 @@ structs:
         description: Chained struct with chained types, structs, and fields
         strict: false
         chained_types:
-            ChainedType : chained_type
+            ChainedType: chained_type
             AnotherChainedType:
                 cpp_name: AnotherChainedType
         chained_structs:
@@ -742,15 +733,15 @@ structs:
         strict: true
         inline_chained_structs: true
         chained_structs:
-            chained_string_inline_basic_type : chained_string_inline_basic_type
+            chained_string_inline_basic_type: chained_string_inline_basic_type
         fields:
             field3: string
 
-##################################################################################################
-#
-# Test struct with enum
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test struct with enum
+    #
+    ##################################################################################################
     one_int_enum:
         description: mock
         fields:
@@ -776,11 +767,11 @@ structs:
                 type: StringEnum
                 default: s1
 
-##################################################################################################
-#
-# Test struct with cpp validator
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test struct with cpp validator
+    #
+    ##################################################################################################
 
     StructWithValidator:
         description: mock
@@ -792,11 +783,11 @@ structs:
             second:
                 type: int
                 optional: false
-##################################################################################################
-#
-# Test struct with variant
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test struct with variant
+    #
+    ##################################################################################################
     insert_variant_struct:
         description: Struct with first field name insert
         strict: false
@@ -818,8 +809,9 @@ structs:
                     variant: [int, string]
 
     one_variant_safeInt:
-        description: UnitTest for a single variant with an alternative type which has multiple
-                     BSON serialization types
+        description:
+            UnitTest for a single variant with an alternative type which has multiple
+            BSON serialization types
         strict: false
         fields:
             value:
@@ -841,9 +833,9 @@ structs:
             value:
                 type:
                     variant:
-                    - string
-                    - object
-                    - array<string>
+                        - string
+                        - object
+                        - array<string>
 
     one_variant_struct:
         description: UnitTest for a single variant which accepts an int or a struct
@@ -852,8 +844,8 @@ structs:
             value:
                 type:
                     variant:
-                    - int
-                    - one_string
+                        - int
+                        - one_string
 
     one_variant_safeInt_array:
         description: UnitTest for a single variant which accepts a string or array of safeInt
@@ -862,8 +854,8 @@ structs:
             value:
                 type:
                     variant:
-                    - string
-                    - array<safeInt>
+                        - string
+                        - array<safeInt>
 
     one_variant_struct_array:
         description: UnitTest for a single variant which accepts an int or array of structs
@@ -872,8 +864,8 @@ structs:
             value:
                 type:
                     variant:
-                    - int
-                    - array<one_string>
+                        - int
+                        - array<one_string>
 
     one_variant_two_structs:
         description: UnitTest for a single variant which accepts a one_string or one_int
@@ -882,8 +874,8 @@ structs:
             value:
                 type:
                     variant:
-                    - insert_variant_struct
-                    - update_variant_struct
+                        - insert_variant_struct
+                        - update_variant_struct
 
     one_variant_two_arrays:
         description: UnitTest for a single variant which accepts array of int or array of string
@@ -892,8 +884,8 @@ structs:
             value:
                 type:
                     variant:
-                    - array<int>
-                    - array<string>
+                        - array<int>
+                        - array<string>
 
     one_variant_optional:
         description: UnitTest for a single optional variant
@@ -967,70 +959,71 @@ structs:
         fields:
             field1: string
 
-##################################################################################################
-#
-# Using Validators
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Using Validators
+    #
+    ##################################################################################################
 
     int_basic_ranges:
         description: Struct using basic range validators on ints
         fields:
             positive_int:
                 type: int
-                validator: { gt: 0 }
+                validator: {gt: 0}
             negative_int:
                 type: int
-                validator: { lt: 0 }
+                validator: {lt: 0}
             non_negative_int:
                 type: int
-                validator: { gte: 0 }
+                validator: {gte: 0}
             non_positive_int:
                 type: int
-                validator: { lte: 0 }
+                validator: {lte: 0}
             byte_range_int:
                 type: int
-                validator: { gte: 0, lt: 256 }
+                validator: {gte: 0, lt: 256}
             range_int:
                 type: int
                 # Use INT32_MIN+1 for min since MSVC does not like -2147483647 as a constant.
-                validator: { gte: -2147483647, lte: 2147483647 }
+                validator: {gte: -2147483647, lte: 2147483647}
 
     double_basic_ranges:
         description: Struct using basic range validators on doubles
         fields:
             positive_double:
                 type: double
-                validator: { gt: 0.0 }
+                validator: {gt: 0.0}
             negative_double:
                 type: double
-                validator: { lt: 0.0 }
+                validator: {lt: 0.0}
             non_negative_double:
                 type: double
-                validator: { gte: 0.0 }
+                validator: {gte: 0.0}
             non_positive_double:
                 type: double
-                validator: { lte: 0.0 }
+                validator: {lte: 0.0}
             range_double:
                 type: double
-                validator: { gte: -12345678901234500000., lte: 12345678901234500000. }
+                validator:
+                    {gte: -12345678901234500000., lte: 12345678901234500000.}
 
     callback_validators:
         description: Struct using fields with callback validators
         fields:
             int_even:
                 type: int
-                validator: { callback: 'validateEvenNumber' }
+                validator: {callback: "validateEvenNumber"}
             double_nearly_int:
                 type: double
-                validator: { callback: 'validateNearlyInt' }
+                validator: {callback: "validateNearlyInt"}
             string_starts_with_x:
                 type: string
-                validator: { callback: "validateStartsWith<'x'>" }
+                validator: {callback: "validateStartsWith<'x'>"}
             string_starts_with_x2:
                 type: string
                 optional: true
-                validator: { callback: "validateStartsWith<'x'>" }
+                validator: {callback: "validateStartsWith<'x'>"}
 
     chained_validators:
         description: Uses a chained struct that includes fields with validators
@@ -1043,48 +1036,48 @@ structs:
             int_even:
                 type: int
                 optional: true
-                validator: { callback: 'validateEvenNumber' }
+                validator: {callback: "validateEvenNumber"}
             string_starts_with_x:
                 type: string
                 optional: true
-                validator: { callback: "validateStartsWith<'x'>" }
+                validator: {callback: "validateStartsWith<'x'>"}
             array_of_int:
                 type: array<int>
-                validator: { callback: "validateEvenNumber" }
+                validator: {callback: "validateEvenNumber"}
             array_of_int_optional:
                 type: array<int>
                 optional: true
-                validator: { callback: "validateEvenNumber" }
+                validator: {callback: "validateEvenNumber"}
             one_int:
                 type: one_int
-                validator: { callback: 'validateOneInt' }
+                validator: {callback: "validateOneInt"}
             one_int_optional:
                 type: one_int
                 optional: true
-                validator: { callback: 'validateOneInt' }
+                validator: {callback: "validateOneInt"}
             one_int_array:
                 type: array<one_int>
-                validator: { callback: 'validateOneInt' }
+                validator: {callback: "validateOneInt"}
 
     int_array_validators:
         description: Struct using fields with integer array validators
         fields:
             int_even:
                 type: array<int>
-                validator: { callback: 'validateEvenNumber' }
+                validator: {callback: "validateEvenNumber"}
 
     string_array_validators:
         description: Struct using fields with string array validators
         fields:
             caps_strings:
                 type: array<string>
-                validator: { callback: 'validateAllCapsArray' }
+                validator: {callback: "validateAllCapsArray"}
 
-##################################################################################################
-#
-# Durations
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Durations
+    #
+    ##################################################################################################
 
     struct_with_durations:
         description: A struct expecting durations.
@@ -1096,11 +1089,11 @@ structs:
                 type: milliseconds
                 optional: true
 
-##################################################################################################
-#
-# Date types
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Date types
+    #
+    ##################################################################################################
 
     struct_with_epochs:
         description: A struct expecting a unix epoch and a millis epoch.
@@ -1108,11 +1101,11 @@ structs:
             unix: unixEpoch
             ecma: millisEpoch
 
-##################################################################################################
-#
-# Test setter overloads
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test setter overloads
+    #
+    ##################################################################################################
 
     StructWithOverloadedSetters:
         description: A struct with fields that generate additional setter overloads.
@@ -1124,24 +1117,23 @@ structs:
                 optional: true
             fieldStringWithValidator:
                 type: string
-                validator: { callback: "validateStartsWith<'x'>" }
+                validator: {callback: "validateStartsWith<'x'>"}
             fieldOptionalStringWithValidator:
                 type: string
                 optional: true
-                validator: { callback: "validateStartsWith<'x'>" }
+                validator: {callback: "validateStartsWith<'x'>"}
             fieldArrayString:
                 type: array<string>
             fieldArrayStringWithValidator:
                 type: array<string>
-                validator: { callback: "validateAllCapsArray" }
+                validator: {callback: "validateAllCapsArray"}
             fieldOptionalArrayString:
                 type: array<string>
                 optional: true
             fieldOptionalArrayStringWithValidator:
                 type: array<string>
                 optional: true
-                validator: { callback: "validateAllCapsArray" }
-
+                validator: {callback: "validateAllCapsArray"}
 
     StructWithInlineChainedOverloadedSetters:
         description: A struct with an inline chained struct that generates setter overloads.
@@ -1149,11 +1141,11 @@ structs:
         chained_structs:
             StructWithOverloadedSetters: StructWithOverloadedSetters
 
-##################################################################################################
-#
-# Test unsafe_dangerous_disable_extra_field_duplicate_checks ignores extra fields
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Test unsafe_dangerous_disable_extra_field_duplicate_checks ignores extra fields
+    #
+    ##################################################################################################
 
     struct_with_ignore_extra_duplicates:
         description: A struct expecting a unix epoch and a millis epoch.
@@ -1180,11 +1172,11 @@ structs:
                 forward_to_shards: false
                 optional: true
 
-##################################################################################################
-#
-# Generic argument structs
-#
-##################################################################################################
+    ##################################################################################################
+    #
+    # Generic argument structs
+    #
+    ##################################################################################################
 
     TestGenericArguments:
         description: "List of generic arguments"
@@ -1301,7 +1293,7 @@ commands:
         api_version: ""
         strict: false
         chained_types:
-            ChainedType : chained_type
+            ChainedType: chained_type
             AnotherChainedType:
                 cpp_name: AnotherChainedType
         chained_structs:
@@ -1418,10 +1410,10 @@ commands:
         fields:
             positive_double:
                 type: double
-                validator: { gt: 0.0 }
+                validator: {gt: 0.0}
             negative_double:
                 type: double
-                validator: { lt: 0.0 }
+                validator: {lt: 0.0}
 
     CommandWithReplyType:
         description: A command with its reply type specified by an IDL struct
@@ -1521,7 +1513,6 @@ commands:
                     action_type: [addShard, serverStatus]
         reply_type: OkReply
 
-
     AccessCheckComplexPrivilege:
         description: A Stable API command with access_check complex
         command_name: AccessCheckComplexPrivilegeCommandName
@@ -1531,14 +1522,14 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: cluster
-                    action_type: [addShard, serverStatus]
+                      resource_pattern: cluster
+                      action_type: [addShard, serverStatus]
                 - privilege:
-                    resource_pattern: database
-                    action_type: trafficRecord
+                      resource_pattern: database
+                      action_type: trafficRecord
                 - privilege:
-                    resource_pattern: any
-                    action_type: splitVector
+                      resource_pattern: any
+                      action_type: splitVector
                 - check: is_authenticated
                 - check: is_authorized_to_parse_namespace_element
         reply_type: OkReply

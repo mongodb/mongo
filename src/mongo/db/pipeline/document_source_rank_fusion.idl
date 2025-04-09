@@ -26,34 +26,33 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 imports:
-  - "mongo/db/pipeline/document_source_rank_fusion_inputs.idl"
+    - "mongo/db/pipeline/document_source_rank_fusion_inputs.idl"
 structs:
-  RankFusionCombinationSpec:
-    description: Specification for the 'combination' argument to $rankFusion.
-    strict: true
-    fields:
-      weights:
-        description: Map (name -> double) of input weights. Default is 1 if unspecified.
-        type: object_owned
-        optional: false
-  # The RankFusionInputSpec needs to be in a separate file because use of the
-  # validation callback will otherwise create a circular dependency.
-  RankFusionSpec:
-    description: Specification for a $rankFusion stage.
-    strict: true
-    fields:
-      input:
-        description: The set of sub-pipelines' results to be merged with rank fusion.
-        type: RankFusionInputSpec
-        optional: false
-      combination:
-        description: The set of pipeline weights to match up with the input pipelines.
-        type: RankFusionCombinationSpec
-        optional: true
-      scoreDetails:
-        description: If true scoreDetails will be materialized. Will include sub-pipeline scoreDetails if they have them.
-        type: bool
-        default: false
-
+    RankFusionCombinationSpec:
+        description: Specification for the 'combination' argument to $rankFusion.
+        strict: true
+        fields:
+            weights:
+                description: Map (name -> double) of input weights. Default is 1 if unspecified.
+                type: object_owned
+                optional: false
+    # The RankFusionInputSpec needs to be in a separate file because use of the
+    # validation callback will otherwise create a circular dependency.
+    RankFusionSpec:
+        description: Specification for a $rankFusion stage.
+        strict: true
+        fields:
+            input:
+                description: The set of sub-pipelines' results to be merged with rank fusion.
+                type: RankFusionInputSpec
+                optional: false
+            combination:
+                description: The set of pipeline weights to match up with the input pipelines.
+                type: RankFusionCombinationSpec
+                optional: true
+            scoreDetails:
+                description: If true scoreDetails will be materialized. Will include sub-pipeline scoreDetails if they have them.
+                type: bool
+                default: false

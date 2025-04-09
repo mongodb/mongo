@@ -52,9 +52,10 @@ enums:
 types:
     MigrationSessionId:
         bson_serialization_type: string
-        description: "The migration session id is the legacy unique identifier for a particular
-                      moveChunk command and is exchanged as part of all communication between the
-                      donor and recipient shards."
+        description:
+            "The migration session id is the legacy unique identifier for a particular
+            moveChunk command and is exchanged as part of all communication between the
+            donor and recipient shards."
         cpp_type: "mongo::MigrationSessionId"
         deserializer: "mongo::MigrationSessionId::fromString"
         serializer: "mongo::MigrationSessionId::toString"
@@ -96,8 +97,9 @@ structs:
                 description: "The range being migrated."
             preMigrationChunkVersion:
                 type: ChunkVersion
-                description: "The data placement, at the start of the migration, of the chunk being 
-                             moved."
+                description:
+                    "The data placement, at the start of the migration, of the chunk being
+                    moved."
             decision:
                 type: Decision
                 description: "Enumeration that defines whether the migration committed or aborted."

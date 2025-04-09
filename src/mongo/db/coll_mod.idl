@@ -28,7 +28,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-    - "mongo/db/commands/create_command_validation.h"
+        - "mongo/db/commands/create_command_validation.h"
 
 imports:
     - "mongo/db/auth/action_type.idl"
@@ -125,31 +125,34 @@ structs:
                 optional: true
                 stability: stable
             validationLevel:
-                description: "Determines how strictly to apply the validation rules to existing
-                              documents during an update.
-                              Can be one of following values: 'off', 'strict' or 'moderate'."
+                description:
+                    "Determines how strictly to apply the validation rules to existing
+                    documents during an update.
+                    Can be one of following values: 'off', 'strict' or 'moderate'."
                 type: ValidationLevel
                 optional: true
                 stability: stable
             validationAction:
-                description: "Determines whether to error on invalid documents or just warn about
-                              the violations but allow invalid documents to be inserted.
-                              Can be either 'warn' or 'error'."
+                description:
+                    "Determines whether to error on invalid documents or just warn about
+                    the violations but allow invalid documents to be inserted.
+                    Can be either 'warn' or 'error'."
                 type: ValidationAction
                 optional: true
                 stability: stable
             viewOn:
                 description: "The name of the source collection or view that
-                              'namespace' is based off of."
+                    'namespace' is based off of."
                 type: string
                 optional: true
                 stability: stable
                 validator:
                     callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
-                description: "An array that consists of the aggregation pipeline. Defines the view
-                              by applying the specified pipeline to the 'viewOn' collection or
-                              view."
+                description:
+                    "An array that consists of the aggregation pipeline. Defines the view
+                    by applying the specified pipeline to the 'viewOn' collection or
+                    view."
                 type: array<object>
                 optional: true
                 stability: stable
@@ -159,8 +162,9 @@ structs:
                 optional: true
                 stability: unstable
             expireAfterSeconds:
-                description: "The number of seconds after which old data should be deleted. This can
-                              be disabled by passing in 'off' as a value"
+                description:
+                    "The number of seconds after which old data should be deleted. This can
+                    be disabled by passing in 'off' as a value"
                 optional: true
                 stability: stable
                 type:
@@ -186,9 +190,10 @@ structs:
                 type: safeBool
                 stability: unstable
             dryRun:
-                description: "Runs the requested modification without modifying any database state.
-                              This can be used to determine in advance if a particular collMod
-                              request can be completed without errors."
+                description:
+                    "Runs the requested modification without modifying any database state.
+                    This can be used to determine in advance if a particular collMod
+                    request can be completed without errors."
                 optional: true
                 type: safeBool
                 stability: unstable
@@ -203,14 +208,14 @@ structs:
                 optional: true
                 validator:
                     gte: 1
-                    lte: 1125899906842624  # 1 PB
+                    lte: 1125899906842624 # 1 PB
                 stability: stable
             cappedMax:
                 description: "Update the maximum number of documents allowed in the capped collection."
                 type: safeInt64
                 optional: true
                 validator:
-                    lt: 2147483648  # 2^31
+                    lt: 2147483648 # 2^31
                 stability: stable
             recordIdsReplicated:
                 description: >-
@@ -235,13 +240,12 @@ commands:
             complex:
                 - check: should_ignore_auth_checks
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: collMod
+                      resource_pattern: exact_namespace
+                      action_type: collMod
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: find
+                      resource_pattern: exact_namespace
+                      action_type: find
         inline_chained_structs: true
         chained_structs:
             CollModRequest: CollModRequest
         reply_type: CollModReply
-

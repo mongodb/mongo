@@ -27,16 +27,17 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 commands:
-  TriggerRotateFTDC:
-    description: "This command triggeres a rotate of the FTDC file for the node that this command is
-                  called on."
-    command_name: rotateFTDC
-    strict: true
-    namespace: ignored
-    api_version: ""
+    TriggerRotateFTDC:
+        description:
+            "This command triggeres a rotate of the FTDC file for the node that this command is
+            called on."
+        command_name: rotateFTDC
+        strict: true
+        namespace: ignored
+        api_version: ""

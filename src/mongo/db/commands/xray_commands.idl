@@ -32,7 +32,6 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
-
 # XRAY is a instrumentation tracer that is part of LLVM.
 # see https://llvm.org/docs/XRay.html for more information.
 #

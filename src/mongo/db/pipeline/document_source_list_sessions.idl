@@ -29,42 +29,41 @@
 # Document source list sessions stage IDL file
 
 global:
-   cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 structs:
+    ListSessionsUser:
+        description: "A struct representing a $listSessions/$listLocalSessions User"
+        strict: true
+        generate_comparison_operators: true
+        query_shape_component: true
+        fields:
+            user:
+                type: string
+                query_shape: anonymize
+            db:
+                type: string
+                query_shape: anonymize
 
-  ListSessionsUser:
-    description: "A struct representing a $listSessions/$listLocalSessions User"
-    strict: true
-    generate_comparison_operators: true
-    query_shape_component: true
-    fields:
-      user: 
-        type: string
-        query_shape: anonymize
-      db: 
-        type: string
-        query_shape: anonymize
-
-  ListSessionsSpec:
-    description: "$listSessions and $listLocalSessions pipeline spec"
-    strict: true
-    query_shape_component: true
-    fields:
-      allUsers:
-        type: bool
-        default: false
-        # This boolean parameterizes the stage rather than representing user input, so do not abstract the literal.
-        query_shape: parameter
-      users:
-        type: array<ListSessionsUser>
-        optional: true
-        query_shape: literal
-      $_internalPredicate:
-        cpp_name: predicate
-        type: object
-        optional: true
-        query_shape: literal  # This is a MatchExpression predicate and could be shape-ified rather than completely abstracted.
+    ListSessionsSpec:
+        description: "$listSessions and $listLocalSessions pipeline spec"
+        strict: true
+        query_shape_component: true
+        fields:
+            allUsers:
+                type: bool
+                default: false
+                # This boolean parameterizes the stage rather than representing user input, so do not abstract the literal.
+                query_shape: parameter
+            users:
+                type: array<ListSessionsUser>
+                optional: true
+                query_shape: literal
+            $_internalPredicate:
+                cpp_name: predicate
+                type: object
+                optional: true
+                query_shape: literal # This is a MatchExpression predicate and could be shape-ified rather than completely abstracted.

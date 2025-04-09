@@ -66,13 +66,14 @@ structs:
             cursorResponse:
                 type: CursorResponse
                 query_shape: literal
-                description: The response after establishing a cursor on the remote shard, including
-                             the first batch.
+                description:
+                    The response after establishing a cursor on the remote shard, including
+                    the first batch.
 
     AsyncResultsMergerParams:
         description: The parameters needed to establish an AsyncResultsMerger.
         chained_structs:
-            OperationSessionInfoFromClientBase : OperationSessionInfo
+            OperationSessionInfoFromClientBase: OperationSessionInfo
         query_shape_component: true
         fields:
             sort:

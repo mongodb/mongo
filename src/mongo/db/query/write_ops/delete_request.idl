@@ -41,7 +41,7 @@ imports:
 server_parameters:
     batchUserMultiDeletes:
         description: "When set, it batches multi-doc deletes"
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gBatchUserMultiDeletes
         default: true
@@ -85,14 +85,16 @@ structs:
                 description: "Specifies the collation to use for the delete."
                 type: object
             let:
-                description: "User-defined constant values to be used within $expr. These can be
-                              specified by the user for each individual element of the 'deletes'
-                              array."
+                description:
+                    "User-defined constant values to be used within $expr. These can be
+                    specified by the user for each individual element of the 'deletes'
+                    array."
                 type: object
                 optional: true
             runtimeConstants:
-                description: "A legacy way to specify constant variables available during execution.
-                             'let' is now preferred."
+                description:
+                    "A legacy way to specify constant variables available during execution.
+                    'let' is now preferred."
                 cpp_name: legacyRuntimeConstants
                 type: LegacyRuntimeConstants
                 optional: true
@@ -101,8 +103,9 @@ structs:
                 type: stmt_id
                 default: kUninitializedStmtId
             multi:
-                description: "If true, deletes all documents that meet the query criteria. If false,
-                              limits the delete to one document which meets the query criteria."
+                description:
+                    "If true, deletes all documents that meet the query criteria. If false,
+                    limits the delete to one document which meets the query criteria."
                 type: bool
                 default: false
             god:
@@ -126,9 +129,10 @@ structs:
                 type: yield_policy
                 default: PlanYieldPolicy::YieldPolicy::YIELD_AUTO
             isTimeseriesNamespace:
-                description: "This flag is set to true when the write command was originally sent
-                              to the time-series view, but got rewritten to target time-series
-                              buckets namespace."
+                description:
+                    "This flag is set to true when the write command was originally sent
+                    to the time-series view, but got rewritten to target time-series
+                    buckets namespace."
                 type: optionalBool
                 stability: internal
             sampleId:

@@ -58,7 +58,7 @@ structs:
                 optional: true
 
     DBStats:
-        description: 'Reply from {dbStats: 1, scale: 1} command. Size fields are reduced by scale field.'
+        description: "Reply from {dbStats: 1, scale: 1} command. Size fields are reduced by scale field."
         strict: false
         is_command_reply: true
         fields:
@@ -131,14 +131,14 @@ commands:
         command_name: collStats
         command_alias: collstats
         cpp_name: CollStatsCommand
-        api_version: ''
+        api_version: ""
         namespace: concatenate_with_db
         inline_chained_structs: true
         chained_structs:
             StorageStatsSpec: StorageStatsSpec
         fields:
             validationLevel:
-                description: 'Strictness of validation rules application.'
+                description: "Strictness of validation rules application."
                 type: ValidationLevel
                 optional: true
 
@@ -153,7 +153,7 @@ commands:
         command_name: dataSize
         command_alias: datasize
         cpp_name: DataSizeCommand
-        api_version: ''
+        api_version: ""
         namespace: type
         type: namespacestring
         reply_type: DataSizeReply
@@ -200,7 +200,7 @@ commands:
         command_name: dbStats
         command_alias: dbstats
         cpp_name: DBStatsCommand
-        api_version: ''
+        api_version: ""
         namespace: ignored
         reply_type: DBStats
         fields:

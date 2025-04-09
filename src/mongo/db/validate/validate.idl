@@ -31,21 +31,22 @@ global:
 
 server_parameters:
     maxValidateMBperSec:
-        description: "Max MB per second that a single validate command running with
-                      { background: true } will process in order to limit I/O and CPU usage.
-                      Defaults to 0, which turns off throttling."
-        set_at: [ startup, runtime ]
+        description:
+            "Max MB per second that a single validate command running with
+            { background: true } will process in order to limit I/O and CPU usage.
+            Defaults to 0, which turns off throttling."
+        set_at: [startup, runtime]
         cpp_varname: gMaxValidateMBperSec
         cpp_vartype: AtomicWord<int>
-        validator: { gte: 0 }
+        validator: {gte: 0}
         default: 0
         redact: false
 
     maxValidateMemoryUsageMB:
         description: "Limits the amount of memory that a single validate command will use."
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_varname: maxValidateMemoryUsageMB
         cpp_vartype: AtomicWord<int>
-        validator: { gt: 0 }
+        validator: {gt: 0}
         default: 200
         redact: false

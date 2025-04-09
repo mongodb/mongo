@@ -34,52 +34,52 @@ imports:
 
 structs:
     NamespaceWithOptionalUUID:
-        description: 'Namespace with an optional collection UUID'
+        description: "Namespace with an optional collection UUID"
         strict: false
         fields:
             ns:
-                description: 'Namespace of the collection'
+                description: "Namespace of the collection"
                 type: namespacestring
             UUID:
-                description: 'Collection UUID'
+                description: "Collection UUID"
                 type: uuid
                 optional: true # optional because the caller may not attach the collection UUID
 
     CollStatsForBalancing:
-        description: 'Collection stats for a specific collection'
+        description: "Collection stats for a specific collection"
         strict: false
         fields:
             namespace:
-                description: 'Namespace of the collection'
+                description: "Namespace of the collection"
                 type: namespacestring
                 cpp_name: ns
             collSize:
-                description: 'size of data currently owned by this shard for this collection'
+                description: "size of data currently owned by this shard for this collection"
                 type: safeInt64
 
     ShardsvrGetStatsForBalancingReply:
-        description: 'Response for ShardsvrGetStatsForBalancing command'
+        description: "Response for ShardsvrGetStatsForBalancing command"
         strict: false
         is_command_reply: true
         fields:
             stats:
-                description: 'List of stats for each of the requested collection'
+                description: "List of stats for each of the requested collection"
                 type: array<CollStatsForBalancing>
 
 commands:
     _shardsvrGetStatsForBalancing:
         command_name: _shardsvrGetStatsForBalancing
         cpp_name: ShardsvrGetStatsForBalancing
-        description: 'Internal command used by the balancer to retrieve stats for balancing.'
+        description: "Internal command used by the balancer to retrieve stats for balancing."
         namespace: ignored
-        api_version: ''
+        api_version: ""
         strict: false
         reply_type: ShardsvrGetStatsForBalancingReply
         fields:
             collections:
-                description: 'List of namespaces to retrieve statistic for'
+                description: "List of namespaces to retrieve statistic for"
                 type: array<NamespaceWithOptionalUUID>
             scaleFactor:
-                description: 'Scale factor for data size units. If omitted 1048576 (MiB) will be used'
+                description: "Scale factor for data size units. If omitted 1048576 (MiB) will be used"
                 type: exactInt64
                 optional: true

@@ -46,25 +46,25 @@ types:
 
 structs:
     KillCursorsCommandReply:
-        description: 'Response from killCursors command'
+        description: "Response from killCursors command"
         strict: false
         is_command_reply: true
         fields:
             cursorsKilled:
-                description: 'Cursors successfully killed'
+                description: "Cursors successfully killed"
                 type: array<cursorId>
                 stability: stable
             cursorsNotFound:
-                description: 'Cursors not found'
+                description: "Cursors not found"
                 type: array<cursorId>
                 stability: stable
             cursorsAlive:
-                description: 'Cursors still alive'
+                description: "Cursors still alive"
                 type: array<cursorId>
                 stability: stable
             cursorsUnknown:
                 # This is a legacy field and always returns an empty array.
-                description: 'Unknown cursors'
+                description: "Unknown cursors"
                 type: array<cursorId>
                 stability: stable
 
@@ -79,14 +79,14 @@ commands:
             complex:
                 - check: is_coauthorized_with
                 - privilege:
-                    resource_pattern: cluster
-                    action_type: killAnyCursor
+                      resource_pattern: cluster
+                      action_type: killAnyCursor
                 - privilege:
-                    resource_pattern: database
-                    action_type: killAnyCursor
+                      resource_pattern: database
+                      action_type: killAnyCursor
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: killAnyCursor
+                      resource_pattern: exact_namespace
+                      action_type: killAnyCursor
         strict: true
         namespace: concatenate_with_db
         fields:

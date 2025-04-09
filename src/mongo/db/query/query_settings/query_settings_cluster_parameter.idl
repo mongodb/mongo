@@ -27,37 +27,37 @@
 #
 
 global:
-  cpp_namespace: "mongo::query_settings"
-  cpp_includes:
-    - "mongo/db/query/query_feature_flags_gen.h"
+    cpp_namespace: "mongo::query_settings"
+    cpp_includes:
+        - "mongo/db/query/query_feature_flags_gen.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/query/query_feature_flags.idl"
-  - "mongo/db/query/query_settings/query_settings.idl"
-  - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/query/query_feature_flags.idl"
+    - "mongo/db/query/query_settings/query_settings.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
 
 structs:
-  QuerySettingsClusterParameterValue:
-    description: "The underlying value of the query settings cluster parameter."
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      settingsArray:
-        type: array<QueryShapeConfiguration>
-        stability: stable
+    QuerySettingsClusterParameterValue:
+        description: "The underlying value of the query settings cluster parameter."
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            settingsArray:
+                type: array<QueryShapeConfiguration>
+                stability: stable
 
 server_parameters:
-  querySettings:
-    description: >-
-      Query settings for all query shapes will be stored within this cluster
-      server parameter.
-    set_at: cluster
-    cpp_class:
-      name: QuerySettingsClusterParameter
-      override_set: true
-    condition:
-      feature_flag: feature_flags::gFeatureFlagQuerySettings
-    redact: false
-    omit_in_ftdc: true
+    querySettings:
+        description: >-
+            Query settings for all query shapes will be stored within this cluster
+            server parameter.
+        set_at: cluster
+        cpp_class:
+            name: QuerySettingsClusterParameter
+            override_set: true
+        condition:
+            feature_flag: feature_flags::gFeatureFlagQuerySettings
+        redact: false
+        omit_in_ftdc: true

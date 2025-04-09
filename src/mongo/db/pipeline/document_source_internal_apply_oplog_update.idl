@@ -27,16 +27,16 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  InternalApplyOplogUpdateSpec:
-    description: $internalApplyOplogUpdate aggregation stage
-    strict: true
-    fields:
-      oplogUpdate:
-        description: An update encoded in oplog update format.
-        type: object
+    InternalApplyOplogUpdateSpec:
+        description: $internalApplyOplogUpdate aggregation stage
+        strict: true
+        fields:
+            oplogUpdate:
+                description: An update encoded in oplog update format.
+                type: object

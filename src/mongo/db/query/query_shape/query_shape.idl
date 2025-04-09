@@ -31,7 +31,6 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
-
 structs:
     CommandNamespace:
         description: "Representation of the cmdNs sub-object of the query shape."
@@ -44,7 +43,6 @@ structs:
             uuid:
                 type: string
                 optional: true
-            tenantId: 
+            tenantId:
                 type: string
                 optional: true
-            

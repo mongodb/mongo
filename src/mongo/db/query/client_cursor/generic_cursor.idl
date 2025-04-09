@@ -31,74 +31,76 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/session/logical_session_id.idl"
-  - "mongo/db/repl/replication_types.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  GenericCursor:
-    description: "A struct representing a cursor in either mongod or mongos"
-    fields:
-      cursorId:
-        description: The cursor id of the cursor.
-        type: long
-        optional: true
-      ns:
-        description: The namespace of the cursor.
-        type: namespacestring
-        optional: true
-      createdDate:
-        description: The time and date the cursor was created.
-        type: date
-        optional: true
-      lastAccessDate:
-        description: The last time the cursor was used (was pinned).
-        type: date
-        optional: true
-      nDocsReturned:
-        description: "The number of docs returned by the cursor. Tracked for display in $currentOp
-                     output."
-        type: long
-        optional: true
-      nBatchesReturned:
-        description: The number of batches returned by the cursor.
-        type: long
-        optional: true
-      noCursorTimeout:
-        description: If true the cursor will not be timed out because of inactivity.
-        type: bool
-        optional: true
-      tailable:
-        description: Whether the cursor is tailable and remains open after exhausting all documents in the find.
-        type: bool
-        optional: true
-      awaitData:
-        description: Whether this is a tailable and awaitData cursor that will block waiting for new data to be inserted into a capped collection.
-        type: bool
-        optional: true
-      originatingCommand:
-        description: The bson object containing the command that created the cursor.
-        type: object
-        optional: true
-      lsid:
-        type: LogicalSessionId
-        optional: true
-      txnNumber:
-        type: TxnNumber
-        optional: true
-      planSummary:
-        description: The plan summary of this cursor's query.
-        type: string
-        optional: true
-      operationUsingCursorId:
-        description: The op ID of the operation pinning the cursor. Will be empty for idle cursors.
-        type: long
-        optional: true
-      lastKnownCommittedOpTime:
-        description: "The commit point known by the server at the time when the last batch was
-                      returned."
-        type: optime
-        optional: true
+    GenericCursor:
+        description: "A struct representing a cursor in either mongod or mongos"
+        fields:
+            cursorId:
+                description: The cursor id of the cursor.
+                type: long
+                optional: true
+            ns:
+                description: The namespace of the cursor.
+                type: namespacestring
+                optional: true
+            createdDate:
+                description: The time and date the cursor was created.
+                type: date
+                optional: true
+            lastAccessDate:
+                description: The last time the cursor was used (was pinned).
+                type: date
+                optional: true
+            nDocsReturned:
+                description:
+                    "The number of docs returned by the cursor. Tracked for display in $currentOp
+                    output."
+                type: long
+                optional: true
+            nBatchesReturned:
+                description: The number of batches returned by the cursor.
+                type: long
+                optional: true
+            noCursorTimeout:
+                description: If true the cursor will not be timed out because of inactivity.
+                type: bool
+                optional: true
+            tailable:
+                description: Whether the cursor is tailable and remains open after exhausting all documents in the find.
+                type: bool
+                optional: true
+            awaitData:
+                description: Whether this is a tailable and awaitData cursor that will block waiting for new data to be inserted into a capped collection.
+                type: bool
+                optional: true
+            originatingCommand:
+                description: The bson object containing the command that created the cursor.
+                type: object
+                optional: true
+            lsid:
+                type: LogicalSessionId
+                optional: true
+            txnNumber:
+                type: TxnNumber
+                optional: true
+            planSummary:
+                description: The plan summary of this cursor's query.
+                type: string
+                optional: true
+            operationUsingCursorId:
+                description: The op ID of the operation pinning the cursor. Will be empty for idle cursors.
+                type: long
+                optional: true
+            lastKnownCommittedOpTime:
+                description:
+                    "The commit point known by the server at the time when the last batch was
+                    returned."
+                type: optime
+                optional: true

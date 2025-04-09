@@ -27,25 +27,25 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  SetWindowFieldsSpec:
-    description: Specification for a $setWindowFields stage given in the full, explicit format.
-    strict: true
-    fields:
-      partitionBy:
-        description: An expression used to partition the data.
-        type: IDLAnyType
-        optional: true
-      sortBy:
-        description: Order for the documents within each partition, identical to sort spec.
-        type: object
-        optional: true
-      output:
-        description: Set of fields to project the results of the window function computations.
-        type: object
-        optional: false
+    SetWindowFieldsSpec:
+        description: Specification for a $setWindowFields stage given in the full, explicit format.
+        strict: true
+        fields:
+            partitionBy:
+                description: An expression used to partition the data.
+                type: IDLAnyType
+                optional: true
+            sortBy:
+                description: Order for the documents within each partition, identical to sort spec.
+                type: object
+                optional: true
+            output:
+                description: Set of fields to project the results of the window function computations.
+                type: object
+                optional: false

@@ -40,8 +40,9 @@ structs:
         is_command_reply: true
         fields:
             nIndexesWas:
-                description: Number of indexes on the collection at start of dropIndexes command
-                             (mongod only)
+                description:
+                    Number of indexes on the collection at start of dropIndexes command
+                    (mongod only)
                 type: int
                 optional: true
                 stability: stable
@@ -56,8 +57,9 @@ structs:
         strict: false
         fields:
             index:
-                description: An index name, or array of names, or "*" for all indexes, or an index
-                             spec (an object).
+                description:
+                    An index name, or array of names, or "*" for all indexes, or an index
+                    spec (an object).
                 type:
                     variant:
                         - string
@@ -65,9 +67,10 @@ structs:
                         - object
                 stability: stable
             isTimeseriesNamespace:
-                description: "This flag is set to true when the command was originally sent to
-                              mongos on the time-series view, but got rewritten to target
-                              time-series buckets namespace before being sent to shards."
+                description:
+                    "This flag is set to true when the command was originally sent to
+                    mongos on the time-series view, but got rewritten to target
+                    time-series buckets namespace before being sent to shards."
                 type: optionalBool
                 stability: internal
             collectionUUID:

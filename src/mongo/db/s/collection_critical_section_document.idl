@@ -38,24 +38,28 @@ imports:
 
 structs:
     collectionCriticalSectionDocument:
-        description: "Represents that a database or a collection is under an operation that entered
-                     the critical section."
+        description:
+            "Represents that a database or a collection is under an operation that entered
+            the critical section."
         generate_comparison_operators: false
         strict: false
         fields:
             _id:
                 type: namespacestring
-                description: "The name of the database or the namespace of the collection that is
-                             under the critical section."
+                description:
+                    "The name of the database or the namespace of the collection that is
+                    under the critical section."
                 cpp_name: nss
             reason:
                 type: object
-                description: "An identifier of the operation that entered the critical section.
-                             Only used for diagnostic purposes."
+                description:
+                    "An identifier of the operation that entered the critical section.
+                    Only used for diagnostic purposes."
             blockReads:
                 type: bool
-                description: "It states whether this critical section should block reads (CS in
-                             commit phase) or not (CS in catch up phase)."
+                description:
+                    "It states whether this critical section should block reads (CS in
+                    commit phase) or not (CS in catch up phase)."
             clearDbInfo:
                 type: safeBool
                 description: >-

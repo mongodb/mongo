@@ -41,7 +41,7 @@ imports:
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/vector_clock.idl"
     - "mongo/db/version_context.idl"
-    - "mongo/db/write_concern_options.idl"       
+    - "mongo/db/write_concern_options.idl"
     - "mongo/rpc/metadata/audit_metadata.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/gossiped_routing_cache.idl"
@@ -50,11 +50,11 @@ structs:
     GenericArguments:
         description: "Arguments accepted by all commands."
         strict: false
-        is_generic_cmd_list: "arg" 
-        # Note that the _types_ of these fields are not checked for API version compatability! 
-        # Historically, these types were parsed and serialized directly from BSON by hand-written  
+        is_generic_cmd_list: "arg"
+        # Note that the _types_ of these fields are not checked for API version compatability!
+        # Historically, these types were parsed and serialized directly from BSON by hand-written
         # C++ code. The API comapatibility checker does not enforce stability of the types of these fields,
-        # only of their names (i.e. that none are removed or have their name changed). 
+        # only of their names (i.e. that none are removed or have their name changed).
         fields:
             apiVersion:
                 type: string
@@ -80,7 +80,7 @@ structs:
             #     stability: "stable"
             maxTimeMS:
                 type: exactInt64
-                validator: { gte: 0, lte: 2147483647 } # [0, 2^31 - 1]
+                validator: {gte: 0, lte: 2147483647} # [0, 2^31 - 1]
                 forward_to_shards: true
                 optional: true
                 stability: "stable"
@@ -92,7 +92,7 @@ structs:
             writeConcern:
                 type: WriteConcern
                 forward_to_shards: true
-                optional: true            
+                optional: true
                 stability: "stable"
             lsid:
                 type: LogicalSessionFromClient
@@ -102,12 +102,12 @@ structs:
             clientOperationKey:
                 type: uuid
                 forward_to_shards: true
-                optional: true                
+                optional: true
                 stability: "stable"
             txnNumber:
                 type: TxnNumber
                 forward_to_shards: true
-                optional: true            
+                optional: true
                 stability: "stable"
             autocommit:
                 type: bool
@@ -216,7 +216,7 @@ structs:
                 stability: "internal"
             maxTimeMSOpOnly:
                 type: exactInt64
-                validator: { callback: "::mongo::validateMaxTimeMSOpOnly" }
+                validator: {callback: "::mongo::validateMaxTimeMSOpOnly"}
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
@@ -246,7 +246,7 @@ structs:
                 type: version_context
                 forward_to_shards: false
                 description: "Snapshot of the FCV used by the operation,
-                              which ensures that feature flag checks are stable through its execution."
+                    which ensures that feature flag checks are stable through its execution."
                 optional: true
                 stability: "internal"
             mayBypassWriteBlocking:
@@ -322,7 +322,7 @@ structs:
                 optional: true
                 stability: "internal"
             additionalParticipants:
-                type: array<object_owned> 
+                type: array<object_owned>
                 forward_from_shards: false
                 optional: true
                 stability: "internal"
@@ -360,4 +360,3 @@ structs:
                 forward_from_shards: false
                 optional: true
                 stability: "internal"
-

@@ -36,47 +36,47 @@ structs:
     awsClientFirst:
         description: "SASL AWS Client First message"
         fields:
-          # Must be 32 bytes
-          r:
-            type: bindata_generic
-            cpp_name: nonce
-          p:
-            type: int
-            cpp_name: gs2_cb_flag
+            # Must be 32 bytes
+            r:
+                type: bindata_generic
+                cpp_name: nonce
+            p:
+                type: int
+                cpp_name: gs2_cb_flag
 
     awsServerFirst:
         description: "SASL AWS Server First message"
         fields:
-          # Must be 64 bytes
-          s:
-            type: bindata_generic
-            cpp_name: ServerNonce
-          h:
-            type: string
-            cpp_name: StsHost
+            # Must be 64 bytes
+            s:
+                type: bindata_generic
+                cpp_name: ServerNonce
+            h:
+                type: string
+                cpp_name: StsHost
 
     awsClientSecond:
         description: "SASL AWS Client Second message"
         fields:
-          a:
-            type: string
-            cpp_name: AuthHeader
-          d:
-            type: string
-            cpp_name: XAmzDate
-          t:
-            type: string
-            optional: true
-            cpp_name: XAmzSecurityToken
-          p:
-            type: string
-            optional: true
-            cpp_name: ChannelBindingPrefix
-          c:
-            type: string
-            optional: true
-            cpp_name: ChannelBindingData
-          o:
-            type: object
-            optional: true
-            cpp_name: Object
+            a:
+                type: string
+                cpp_name: AuthHeader
+            d:
+                type: string
+                cpp_name: XAmzDate
+            t:
+                type: string
+                optional: true
+                cpp_name: XAmzSecurityToken
+            p:
+                type: string
+                optional: true
+                cpp_name: ChannelBindingPrefix
+            c:
+                type: string
+                optional: true
+                cpp_name: ChannelBindingData
+            o:
+                type: object
+                optional: true
+                cpp_name: Object

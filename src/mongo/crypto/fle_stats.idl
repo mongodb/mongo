@@ -62,11 +62,11 @@ structs:
     CompactStats:
         description: "Stats about records in ECOC, and ESC compact touched"
         fields:
-           ecoc: ECOCStats
-           esc: ECStats
+            ecoc: ECOCStats
+            esc: ECStats
 
     CleanupStats:
         description: "Stats about records in ECOC, and ESC cleanup touched"
         fields:
-           ecoc: ECOCStats
-           esc: ECStats
+            ecoc: ECOCStats
+            esc: ECStats

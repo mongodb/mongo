@@ -27,16 +27,16 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 structs:
-  DocumentSourceIdLookupSpec:
-    description: Specification for $_internalSearchIdLookup stage.
-    strict: true
-    fields:
-      limit:
-        description: "Limit for the number of documents that should be returned by $_internalSearchIdLookup."
-        optional: true
-        type: long 
+    DocumentSourceIdLookupSpec:
+        description: Specification for $_internalSearchIdLookup stage.
+        strict: true
+        fields:
+            limit:
+                description: "Limit for the number of documents that should be returned by $_internalSearchIdLookup."
+                optional: true
+                type: long

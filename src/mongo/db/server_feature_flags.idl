@@ -59,9 +59,10 @@ feature_flags:
         default: false
         shouldBeFCVGated: true
     featureFlagUseUnreplicatedTruncatesForDeletions:
-        description: "Feature flag to enable pre-image collection and change collection maintenance
-        using unreplicated truncates instead of normal document deletions replicated from the
-        primary."
+        description: >-
+            Feature flag to enable pre-image collection and change collection maintenance
+            using unreplicated truncates instead of normal document deletions replicated from the
+            primary.
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         default: true
         shouldBeFCVGated: false
@@ -77,8 +78,9 @@ feature_flags:
         default: false
         shouldBeFCVGated: true
     featureFlagBanEncryptionOptionsInCollectionCreation:
-        description: "Feature flag that bans encryption options from being used in createCollection
-        commands"
+        description: >-
+            Feature flag that bans encryption options from being used in createCollection
+            commands
         cpp_varname: gFeatureFlagBanEncryptionOptionsInCollectionCreation
         default: true
         version: 7.2
@@ -142,9 +144,10 @@ feature_flags:
         shouldBeFCVGated: true
         fcv_context_unaware: true
     featureFlagCreateViewlessTimeseriesCollections:
-        description: "Enables the creation of viewless timeseries collections.
-        Viewless timeseries collections have only one associated namespace,
-        instead of a view namespace and a system.buckets namespace."
+        description: >-
+            Enables the creation of viewless timeseries collections.
+            Viewless timeseries collections have only one associated namespace,
+            instead of a view namespace and a system.buckets namespace.
         cpp_varname: gFeatureFlagCreateViewlessTimeseriesCollections
         default: false
         shouldBeFCVGated: true
@@ -162,5 +165,5 @@ feature_flags:
     featureFlagIntentRegistration:
         description: "Enables intent registration in place of RSTL acquisitions"
         cpp_varname: gFeatureFlagIntentRegistration
-        default: false 
+        default: false
         shouldBeFCVGated: false

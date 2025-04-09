@@ -38,8 +38,9 @@ imports:
 
 structs:
     ImageEntry:
-        description: "Represents either a pre-image or post-image necessary for satisfying a
-                      retryable findAndModify."
+        description:
+            "Represents either a pre-image or post-image necessary for satisfying a
+            retryable findAndModify."
         strict: false
         fields:
             _id:

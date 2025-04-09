@@ -42,10 +42,10 @@ structs:
             errorLabels:
                 type: StructType
                 stability: stable
-    
+
     StructType:
         description: "This struct contains a field that is optional in the old
-                      command and non-optional in the new command."
+            command and non-optional in the new command."
         fields:
             structField:
                 type: string

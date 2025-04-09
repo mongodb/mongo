@@ -31,16 +31,17 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
-  internalSessionsReapThreshold:
-    description: 'The minimum number of expired internal sessions that must be buffered in memory
-                  before they are early reaped. 0 disables early reaping.'
-    set_at: [startup, runtime]
-    cpp_vartype: 'AtomicWord<int>'
-    cpp_varname: internalSessionsReapThreshold
-    default: 1000
-    validator:
-        gte: 0
-    redact: false
+    internalSessionsReapThreshold:
+        description:
+            "The minimum number of expired internal sessions that must be buffered in memory
+            before they are early reaped. 0 disables early reaping."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: internalSessionsReapThreshold
+        default: 1000
+        validator:
+            gte: 0
+        redact: false

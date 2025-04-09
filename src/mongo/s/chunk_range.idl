@@ -40,8 +40,9 @@ types:
     # Note that in order to use this type for a non-optional field, you must add the IDL struct as a
     # friend class of ChunkRange so that it can access its default constructor.
     chunk_range:
-        description: "Represents the bounds of a chunk range. See ChunkRange for the semantics of
-                      the bounds."
+        description:
+            "Represents the bounds of a chunk range. See ChunkRange for the semantics of
+            the bounds."
         bson_serialization_type: object
         cpp_type: "mongo::ChunkRange"
         serializer: "mongo::ChunkRange::toBSON"

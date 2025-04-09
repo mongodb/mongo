@@ -31,7 +31,7 @@ global:
     cpp_includes:
         - "mongo/s/request_types/merge_chunk_request_valid.h"
         - "mongo/util/uuid.h"
-    
+
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/chunk_range.idl"
@@ -100,7 +100,7 @@ commands:
                 description: "The expected timestamp of the collection that is being committed."
                 type: timestamp
                 optional: true
-    
+
     clusterMergeChunks:
         command_name: mergeChunks
         cpp_name: ClusterMergeChunks
@@ -113,7 +113,7 @@ commands:
             bounds:
                 description: "Chunk bounds to merge."
                 type: array<object_owned>
-    
+
     #TODO (SERVER-98960): Set the command_name to _shardsvrMergeChunks and command_alias to mergeChunks instead.
     _shardsvrMergeChunks:
         command_name: mergeChunks
@@ -135,7 +135,7 @@ commands:
                 description: "The expected timestamp of the collection that is being committed."
                 type: timestamp
                 optional: true
-    
+
     clusterMergeAllChunksOnShard:
         command_name: mergeAllChunksOnShard
         cpp_name: ClusterMergeAllChunksOnShard
@@ -153,12 +153,12 @@ commands:
             maxNumberOfChunksToMerge:
                 description: "The maximum number of chunks to merge"
                 type: int
-                default: 2147483647  # INT_MAX
+                default: 2147483647 # INT_MAX
             maxTimeProcessingChunksMS:
                 description: >-
-                  "The maximum time in milliseconds spent looking for mergeable chunks."
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
                 type: int
-                default: 2147483647  # INT_MAX
+                default: 2147483647 # INT_MAX
 
     _shardsvrMergeAllChunksOnShard:
         command_name: _shardsvrMergeAllChunksOnShard
@@ -177,12 +177,12 @@ commands:
             maxNumberOfChunksToMerge:
                 description: "The maximum number of chunks to merge."
                 type: int
-                default: 2147483647  # INT_MAX
+                default: 2147483647 # INT_MAX
             maxTimeProcessingChunksMS:
                 description: >-
-                  "The maximum time in milliseconds spent looking for mergeable chunks."
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
                 type: int
-                default: 2147483647  # INT_MAX
+                default: 2147483647 # INT_MAX
 
     _configsvrCommitMergeAllChunksOnShard:
         command_name: _configsvrCommitMergeAllChunksOnShard
@@ -202,9 +202,9 @@ commands:
             maxNumberOfChunksToMerge:
                 description: "The maximum number of chunks to merge."
                 type: int
-                default: 2147483647  # INT_MAX
+                default: 2147483647 # INT_MAX
             maxTimeProcessingChunksMS:
                 description: >-
-                  "The maximum time in milliseconds spent looking for mergeable chunks."
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
                 type: int
-                default: 2147483647  # INT_MAX
+                default: 2147483647 # INT_MAX

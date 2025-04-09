@@ -27,12 +27,12 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
     featureCompatibilityVersion:
-        description: 'Read-only view of current Feature Compatability Version'
-        set_at: 'readonly'
+        description: "Read-only view of current Feature Compatability Version"
+        set_at: "readonly"
         cpp_class:
             name: FeatureCompatibilityVersionParameter
         redact: false
@@ -49,7 +49,7 @@ server_parameters:
         redact: false
 
     defaultStartupFCV:
-        description: 'Startup parameter to set a default FCV at startup'
+        description: "Startup parameter to set a default FCV at startup"
         set_at: startup
         cpp_vartype: std::string
         cpp_varname: gDefaultStartupFCV

@@ -27,17 +27,18 @@
 #
 
 global:
-    cpp_namespace: 'mongo'
+    cpp_namespace: "mongo"
     cpp_includes:
-      - "mongo/db/views/resolved_view.h"
+        - "mongo/db/views/resolved_view.h"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 types:
     resolved_view:
-        description: "custom IDL type that wraps the cpp_type ResolvedView, used by ShardsvrResolveViewReply. 
-                      The custom serialize and deserialize methods instruct IDL how to covert to/from C++ and BSON.  "
+        description:
+            "custom IDL type that wraps the cpp_type ResolvedView, used by ShardsvrResolveViewReply.
+            The custom serialize and deserialize methods instruct IDL how to covert to/from C++ and BSON.  "
         bson_serialization_type: any
         cpp_type: "mongo::ResolvedView"
         serializer: "mongo::ResolvedView::serializeToBSON"
@@ -58,8 +59,9 @@ commands:
     _shardsvrResolveView:
         command_name: _shardsvrResolveView
         cpp_name: ShardsvrResolveView
-        description: "Mongos issues this command on the primary shard to resolve the view for search index commands,
-                      which require the view's name and effectivePipeline included in the request"
+        description:
+            "Mongos issues this command on the primary shard to resolve the view for search index commands,
+            which require the view's name and effectivePipeline included in the request"
         namespace: ignored
         api_version: ""
         strict: true
@@ -69,5 +71,3 @@ commands:
                 description: "current operation namespace"
                 type: namespacestring
                 optional: false
-
-

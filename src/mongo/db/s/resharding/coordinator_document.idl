@@ -37,8 +37,9 @@ imports:
 
 structs:
     DonorShardEntry:
-        description: "Represents a donor shard for a particular resharding operation on the
-                      coordinator."
+        description:
+            "Represents a donor shard for a particular resharding operation on the
+            coordinator."
         generate_comparison_operators: false
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
@@ -51,8 +52,9 @@ structs:
             mutableState: DonorShardContext
             documentsToCopy:
                 type: long
-                description: "The number of documents to copy from this donor in the 'cloning'
-                             state."
+                description:
+                    "The number of documents to copy from this donor in the 'cloning'
+                    state."
                 optional: true
             documentsFinal:
                 type: long
@@ -60,8 +62,9 @@ structs:
                 optional: true
 
     RecipientShardEntry:
-        description: "Represents a recipient shard for a particular resharding operation on the
-                      coordinator."
+        description:
+            "Represents a recipient shard for a particular resharding operation on the
+            coordinator."
         generate_comparison_operators: false
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
@@ -78,20 +81,20 @@ structs:
         strict: false
         fields:
             operationRuntime:
-                    type: ReshardingMetricsTimeInterval
-                    description: >-
-                        The time interval of the entire resharding operation on the coordinator.
-                    optional: true
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval of the entire resharding operation on the coordinator.
+                optional: true
             documentCopy:
-                    type: ReshardingMetricsTimeInterval
-                    description: >-
-                        The time interval that it takes to clone documents on this coordinator.
-                    optional: true
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval that it takes to clone documents on this coordinator.
+                optional: true
             oplogApplication:
-                    type: ReshardingMetricsTimeInterval
-                    description: >-
-                        The time interval that it takes to apply oplog entries on this coordinator.
-                    optional: true
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval that it takes to apply oplog entries on this coordinator.
+                optional: true
 
     ReshardingCoordinatorDocument:
         description: "Represents a resharding operation on the coordinator."
@@ -149,7 +152,7 @@ structs:
                 optional: true
             sourceKey:
                 type: object_owned
-                description:  >-
+                description: >-
                     The shard key of the collection before resharding
                     (defined as optional for retro compatibility).
                 optional: true

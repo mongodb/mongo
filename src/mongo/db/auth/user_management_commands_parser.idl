@@ -28,8 +28,8 @@
 global:
     cpp_namespace: "mongo::auth"
     cpp_includes:
-    - "mongo/db/auth/privilege_format.h"
-    - "mongo/db/auth/umc_info_command_arg.h"
+        - "mongo/db/auth/privilege_format.h"
+        - "mongo/db/auth/umc_info_command_arg.h"
 
 imports:
     - "mongo/db/basic_types.idl"

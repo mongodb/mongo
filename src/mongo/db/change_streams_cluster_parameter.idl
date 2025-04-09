@@ -27,57 +27,59 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-  - "mongo/db/change_streams_cluster_parameter.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/change_streams_cluster_parameter.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/idl/cluster_server_parameter.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/idl/cluster_server_parameter.idl"
 
 structs:
-  ChangeStreamsClusterParameterStorage:
-    description: "A specification for the 'changeStreams' cluster-wide configuration parameter
-    type."
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      expireAfterSeconds:
-        description: "The number of seconds to retain the change events. This value will be a
-        non-zero positive value if the change stream is enabled and a zero value if the change
-        stream is disabled."
-        type: safeInt64
-        default: 60 * 60
+    ChangeStreamsClusterParameterStorage:
+        description: >-
+            A specification for the 'changeStreams' cluster-wide configuration parameter
+            type.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            expireAfterSeconds:
+                description: >-
+                    The number of seconds to retain the change events. This value will be a
+                    non-zero positive value if the change stream is enabled and a zero value if the change
+                    stream is disabled.
+                type: safeInt64
+                default: 60 * 60
 
 server_parameters:
-  changeStreams:
-    description: "The cluster-wide configuration parameter for the change stream in the serverless."
-    set_at: cluster
-    omit_in_ftdc: false
-    cpp_vartype: ChangeStreamsClusterParameterStorage
-    cpp_varname: gChangeStreamsClusterParameter
-    validator:
-      callback: validateChangeStreamsClusterParameter
-    condition:
-      min_fcv: 6.2
-    redact: false
+    changeStreams:
+        description: "The cluster-wide configuration parameter for the change stream in the serverless."
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: ChangeStreamsClusterParameterStorage
+        cpp_varname: gChangeStreamsClusterParameter
+        validator:
+            callback: validateChangeStreamsClusterParameter
+        condition:
+            min_fcv: 6.2
+        redact: false
 
-  changeCollectionExpiredDocumentsRemoverJobSleepSeconds:
-    description: "Specifies the number of seconds for which the periodic change collection remover job will sleep between each cycle."
-    set_at: [ startup ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gChangeCollectionExpiredDocumentsRemoverJobSleepSeconds"
-    validator:
-      gte: 1
-    default: 10
-    redact: false
+    changeCollectionExpiredDocumentsRemoverJobSleepSeconds:
+        description: "Specifies the number of seconds for which the periodic change collection remover job will sleep between each cycle."
+        set_at: [startup]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: "gChangeCollectionExpiredDocumentsRemoverJobSleepSeconds"
+        validator:
+            gte: 1
+        default: 10
+        redact: false
 
-  disableExpiredChangeCollectionRemover:
-      description: Disables the expired change collection remover.
-      set_at: [ startup ]
-      cpp_vartype: bool
-      cpp_varname: gChangeCollectionRemoverDisabled
-      default: false
-      test_only: true
-      redact: false
+    disableExpiredChangeCollectionRemover:
+        description: Disables the expired change collection remover.
+        set_at: [startup]
+        cpp_vartype: bool
+        cpp_varname: gChangeCollectionRemoverDisabled
+        default: false
+        test_only: true
+        redact: false

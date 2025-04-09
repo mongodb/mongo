@@ -33,33 +33,33 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
-  batchedDeletesTargetStagedDocBytes:
-    description: "Threshold in bytes accounting for documents (not index entries) at which a batch of document deletions is committed. A value of zero means unlimited"
-    set_at: [startup, runtime]
-    cpp_vartype: 'AtomicWord<long long>'
-    cpp_varname: gBatchedDeletesTargetStagedDocBytes
-    default: 2097152 # 2MB
-    validator:
-      gte: 0
-      lte: 2147483647
-    redact: false
+    batchedDeletesTargetStagedDocBytes:
+        description: "Threshold in bytes accounting for documents (not index entries) at which a batch of document deletions is committed. A value of zero means unlimited"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: gBatchedDeletesTargetStagedDocBytes
+        default: 2097152 # 2MB
+        validator:
+            gte: 0
+            lte: 2147483647
+        redact: false
 
-  batchedDeletesTargetBatchDocs:
-    description: "Threshold of documents at which a batch of document deletions is committed. A value of zero means unlimited"
-    set_at: [startup, runtime]
-    cpp_vartype: 'AtomicWord<long long>'
-    cpp_varname: "gBatchedDeletesTargetBatchDocs"
-    default: 10
-    validator:
-      gte: 0
-    redact: false
+    batchedDeletesTargetBatchDocs:
+        description: "Threshold of documents at which a batch of document deletions is committed. A value of zero means unlimited"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: "gBatchedDeletesTargetBatchDocs"
+        default: 10
+        validator:
+            gte: 0
+        redact: false
 
-  batchedDeletesTargetBatchTimeMS:
-    description: "Threshold in milliseconds of batch processing time at which a batch of document deletions is committed. A value of zero means unlimited"
-    set_at: [startup, runtime]
-    cpp_vartype: 'AtomicWord<long long>'
-    cpp_varname: "gBatchedDeletesTargetBatchTimeMS"
-    default: 5
-    validator:
-      gte: 0
-    redact: false
+    batchedDeletesTargetBatchTimeMS:
+        description: "Threshold in milliseconds of batch processing time at which a batch of document deletions is committed. A value of zero means unlimited"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: "gBatchedDeletesTargetBatchTimeMS"
+        default: 5
+        validator:
+            gte: 0
+        redact: false

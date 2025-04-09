@@ -26,49 +26,47 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 imports:
-  - "mongo/db/pipeline/document_source_score_fusion_inputs.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/document_source_score_fusion_inputs.idl"
+    - "mongo/db/basic_types.idl"
 enums:
-  ScoreFusionCombinationMethod:
-    description: Combination Method options
-    type: string
-    values:
-      kSum : "sum"
-      kAvg : "avg"
-      kExpression : "expression"
+    ScoreFusionCombinationMethod:
+        description: Combination Method options
+        type: string
+        values:
+            kSum: "sum"
+            kAvg: "avg"
+            kExpression: "expression"
 structs:
-  ScoreFusionCombinationSpec:
-    description: Specification for the 'combination' argument to $scoreFusion.
-    strict: true
-    fields:
-      weights:
-        description: Map (name -> double) of input weights. Default is 1 if unspecified.
-        type: object_owned
-        optional: true
-      method:
-        description: Logic to combine all scores together.
-        type: ScoreFusionCombinationMethod
-        optional: true
-      expression:
-        description: Expression to customize score aggregation (how scores are combined together).
-        type: IDLAnyTypeOwned
-        optional: true
+    ScoreFusionCombinationSpec:
+        description: Specification for the 'combination' argument to $scoreFusion.
+        strict: true
+        fields:
+            weights:
+                description: Map (name -> double) of input weights. Default is 1 if unspecified.
+                type: object_owned
+                optional: true
+            method:
+                description: Logic to combine all scores together.
+                type: ScoreFusionCombinationMethod
+                optional: true
+            expression:
+                description: Expression to customize score aggregation (how scores are combined together).
+                type: IDLAnyTypeOwned
+                optional: true
 
-  # The ScoreFusionSpec needs to be in a separate file because use of the 
-  # validation callback will otherwise create a circular dependency.
-  ScoreFusionSpec:
-    description: Specification for a $scoreFusion stage.
-    strict: true
-    fields:
-      input:
-        description: The set of sub-pipelines' results to be merged with score fusion.
-        type: ScoreFusionInputsSpec
-        optional: false
-      combination:
-        description: The set of pipeline weights to match up with the input pipelines.
-        type: ScoreFusionCombinationSpec
-        optional: true
-
-      
+    # The ScoreFusionSpec needs to be in a separate file because use of the
+    # validation callback will otherwise create a circular dependency.
+    ScoreFusionSpec:
+        description: Specification for a $scoreFusion stage.
+        strict: true
+        fields:
+            input:
+                description: The set of sub-pipelines' results to be merged with score fusion.
+                type: ScoreFusionInputsSpec
+                optional: false
+            combination:
+                description: The set of pipeline weights to match up with the input pipelines.
+                type: ScoreFusionCombinationSpec
+                optional: true

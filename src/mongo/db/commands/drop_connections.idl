@@ -41,7 +41,7 @@ commands:
         command_name: dropConnections
         namespace: ignored
         api_version: ""
-        fields: 
+        fields:
             hostAndPort:
-                description: "List of host and ports" 
+                description: "List of host and ports"
                 type: array<HostAndPort>

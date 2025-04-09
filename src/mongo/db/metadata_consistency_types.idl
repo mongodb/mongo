@@ -331,7 +331,7 @@ structs:
             collectionUUID:
                 type: uuid
                 description: "The UUID of the collection."
-    
+
     ShardMissingCollectionRoutingInfoDetails:
         description: "Details about shard that thinks collection is unsharded."
         strict: false
@@ -365,7 +365,7 @@ structs:
                 type: object
                 description: "The second zone that overlaps with the first zone."
 
-    TrackedUnshardedCollectionHasMultipleChunksDetails: 
+    TrackedUnshardedCollectionHasMultipleChunksDetails:
         description: "Details about tracked unsharded collection with more then one chunks"
         strict: false
         fields:
@@ -378,9 +378,9 @@ structs:
                 type: uuid
             numChunks:
                 description: "The number of chunks found for the collection"
-                type: int 
+                type: int
 
-    TrackedUnshardedCollectionHasInvalidKeyDetails: 
+    TrackedUnshardedCollectionHasInvalidKeyDetails:
         description: "Details about tracked unsharded collection with an invalid shard key"
         strict: false
         fields:
@@ -397,7 +397,7 @@ structs:
 
     TrackedUnshardedCollectionIsMissingLocally:
         description: "Details about unsharded collection tracked on the csrs but not present locally on any shard"
-        strict: false 
+        strict: false
         fields:
             namespace:
                 description: "The namespace of the collection."
@@ -412,7 +412,7 @@ structs:
 
     InconsistentDatabaseVersionInShardCatalogDetails:
         description: "Details about an inconsistent database metadata from the shard catalog compared to the one in the global catalog"
-        strict: false 
+        strict: false
         fields:
             dbName:
                 description: "The database name."
@@ -429,7 +429,7 @@ structs:
 
     InconsistentDatabaseVersionInShardCatalogCacheDetails:
         description: "Details about an inconsistent database metadata from the shard catalog cache compared to the one in the global or shard catalog"
-        strict: false 
+        strict: false
         fields:
             dbName:
                 description: "The database name."
@@ -449,7 +449,7 @@ structs:
 
     MissingDatabaseMetadataInShardCatalogDetails:
         description: "Details about a missing database metadata entry in the shard catalog compared to the one in the global catalog"
-        strict: false 
+        strict: false
         fields:
             dbName:
                 description: "The database name."
@@ -463,7 +463,7 @@ structs:
 
     MissingDatabaseMetadataInShardCatalogCacheDetails:
         description: "Details about a missing database metadata entry in the shard catalog cache compared to the one in global catalog"
-        strict: false 
+        strict: false
         fields:
             dbName:
                 description: "The database name."
@@ -477,7 +477,7 @@ structs:
 
     MisplacedDatabaseMetadataInShardCatalogDetails:
         description: "Details about an inconsistent database metadata placed in the wrong shard"
-        strict: false 
+        strict: false
         fields:
             dbName:
                 description: "The database name."
@@ -513,8 +513,9 @@ structs:
                 type: safeBool
                 default: false
             dbMetadataLockMaxTimeMS:
-                description: "Max time in milliseconds that the operation is allowed to block other
-                              DDL operations on a database"
+                description:
+                    "Max time in milliseconds that the operation is allowed to block other
+                    DDL operations on a database"
                 type: exactInt64
-                validator: { gte: 0, lte: 2147483647 } # [0, 2^31 - 1]
+                validator: {gte: 0, lte: 2147483647} # [0, 2^31 - 1]
                 optional: true

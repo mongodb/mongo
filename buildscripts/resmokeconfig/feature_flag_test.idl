@@ -2,7 +2,7 @@
 # resmoke
 feature_flags:
     featureFlagToaster:
-      description: "Create a feature flag"
-      cpp_varname: gFeatureFlagToaster
-      default: false
-      shouldBeFCVGated: true
+        description: "Create a feature flag"
+        cpp_varname: gFeatureFlagToaster
+        default: false
+        shouldBeFCVGated: true

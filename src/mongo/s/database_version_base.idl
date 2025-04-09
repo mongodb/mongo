@@ -34,8 +34,9 @@ imports:
 
 structs:
     DatabaseVersionBase:
-        description: "A (UUID, Timestamp, int) object that uniquely identifies an incarnation of a database
-                      in a cluster and reflects changes to the database's primary shard"
+        description:
+            "A (UUID, Timestamp, int) object that uniquely identifies an incarnation of a database
+            in a cluster and reflects changes to the database's primary shard"
         # The generated comparison operators will do a field-wise lexicographic comparison, which
         # doesn't work because it's nonsensical to lexicographically compare UUIDs.
         generate_comparison_operators: false
@@ -43,23 +44,26 @@ structs:
         fields:
             uuid:
                 type: uuid
-                description: "a unique identifier to distinguish different incarnations of this database.
-                              It is optional for parsing purposes and it will be removed in 5.2."
+                description:
+                    "a unique identifier to distinguish different incarnations of this database.
+                    It is optional for parsing purposes and it will be removed in 5.2."
                 optional: true
             timestamp:
                 type: timestamp
-                description: "Unique identifier to distinguish major events in the lifetime of a
-                   database, such as create/drop and change of primary."
+                description:
+                    "Unique identifier to distinguish major events in the lifetime of a
+                    database, such as create/drop and change of primary."
             lastMod:
                 type: int
                 description: "an integer which is bumped whenever the database's primary shard changes"
             placementConflictTime:
                 type: logicalTime
                 optional: true
-                description: "This optional value represents a conservative upper bound for placement
-                            changes (i.e., movePrimary or drop+recreate) for any collection which might
-                            be accessed for the lifetime of the transaction. If specified, transactions
-                            will fail with a retryable MigrationConflict error if any placement changes
-                            have committed since this time.
-                            A value of Timestamp(0, 0) means that the shard should avoid checking 
-                            placement conflicts timestamps for the database."
+                description:
+                    "This optional value represents a conservative upper bound for placement
+                    changes (i.e., movePrimary or drop+recreate) for any collection which might
+                    be accessed for the lifetime of the transaction. If specified, transactions
+                    will fail with a retryable MigrationConflict error if any placement changes
+                    have committed since this time.
+                    A value of Timestamp(0, 0) means that the shard should avoid checking
+                    placement conflicts timestamps for the database."

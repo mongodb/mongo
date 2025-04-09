@@ -34,27 +34,27 @@ imports:
 
 structs:
     Ec2SecurityCredentials:
-      description : "Security Credentials from EC2 Instance Metadata"
-      # See - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
-      # Don't fail if AWS expands this to include more fields in the future
-      strict: false
-      fields:
-          Code: string
-          LastUpdated: string
-          Type: string
-          AccessKeyId: string
-          SecretAccessKey: string
-          Token: string
-          Expiration: string
+        description: "Security Credentials from EC2 Instance Metadata"
+        # See - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
+        # Don't fail if AWS expands this to include more fields in the future
+        strict: false
+        fields:
+            Code: string
+            LastUpdated: string
+            Type: string
+            AccessKeyId: string
+            SecretAccessKey: string
+            Token: string
+            Expiration: string
 
     EcsTaskSecurityCredentials:
-      description : "Security Credentials from ECS Task"
-      # See -https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html
-      # Don't fail if AWS expands this to include more fields in the future
-      strict: false
-      fields:
-          AccessKeyId: string
-          Expiration: string
-          RoleArn: string
-          SecretAccessKey: string
-          Token: string
+        description: "Security Credentials from ECS Task"
+        # See -https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html
+        # Don't fail if AWS expands this to include more fields in the future
+        strict: false
+        fields:
+            AccessKeyId: string
+            Expiration: string
+            RoleArn: string
+            SecretAccessKey: string
+            Token: string

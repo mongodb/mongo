@@ -27,7 +27,7 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -47,8 +47,9 @@ commands:
                 description: "The field path for which to return distinct values."
                 type: string
             query:
-                description: "Optional query that filters the documents from which to retrieve the
-                              distinct values."
+                description:
+                    "Optional query that filters the documents from which to retrieve the
+                    distinct values."
                 type: object_owned
                 optional: true
             collation:

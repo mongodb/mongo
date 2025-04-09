@@ -29,9 +29,9 @@
 # This IDL file describes the BSON format for the autoSplitVector command.
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/s/auto_split_vector.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/s/auto_split_vector.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -57,27 +57,27 @@ structs:
                 description: "Whether there are more split points available for the requested range"
 
 commands:
-  autoSplitVector:
-    command_name: autoSplitVector
-    cpp_name: AutoSplitVectorRequest
-    description: "Returns the split points for a chunk, given a range and the maximum chunk size."
-    strict: false
-    namespace: concatenate_with_db
-    api_version: ""
-    fields:
-        keyPattern:
-            type: object_owned
-            description: "Shard key pattern of the collection"
-        min:
-            type: object_owned
-            description: "Min key of the chunk"
-        max:
-            type: object_owned
-            description: "Max key of the chunk"
-        maxChunkSizeBytes:
-            type: safeInt64
-            description: "Max chunk size of the collection expressed in bytes"
-        limit:
-            type: int
-            description: "Max number of split points to look for"
-            optional: true
+    autoSplitVector:
+        command_name: autoSplitVector
+        cpp_name: AutoSplitVectorRequest
+        description: "Returns the split points for a chunk, given a range and the maximum chunk size."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            keyPattern:
+                type: object_owned
+                description: "Shard key pattern of the collection"
+            min:
+                type: object_owned
+                description: "Min key of the chunk"
+            max:
+                type: object_owned
+                description: "Max key of the chunk"
+            maxChunkSizeBytes:
+                type: safeInt64
+                description: "Max chunk size of the collection expressed in bytes"
+            limit:
+                type: int
+                description: "Max number of split points to look for"
+                optional: true

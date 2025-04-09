@@ -27,22 +27,22 @@
 #
 
 global:
-  cpp_namespace: "mongo::tracing"
+    cpp_namespace: "mongo::tracing"
 
 server_parameters:
-  opentelemetryTraceDirectory:
-    description: Enable OpenTelemetry with trace file exporter.
-    set_at: startup
-    cpp_varname: gOpenTelemetryTraceDirectory
-    cpp_vartype: std::string
-    redact: false
-  # HTTP exporter can be easier to use for local testing using Jaeger.
-  # Set this parameter to the port used by your local trace collector.
-  # Example:
-  #     --opentelemetryHttpEndpoint="http://localhost:4318/v1/traces"
-  opentelemetryHttpEndpoint:
-    description: Enable OpenTelemetry with HTTP exporter.
-    set_at: startup
-    cpp_varname: gOpenTelemetryHttpEndpoint
-    cpp_vartype: std::string
-    redact: false
+    opentelemetryTraceDirectory:
+        description: Enable OpenTelemetry with trace file exporter.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTraceDirectory
+        cpp_vartype: std::string
+        redact: false
+    # HTTP exporter can be easier to use for local testing using Jaeger.
+    # Set this parameter to the port used by your local trace collector.
+    # Example:
+    #     --opentelemetryHttpEndpoint="http://localhost:4318/v1/traces"
+    opentelemetryHttpEndpoint:
+        description: Enable OpenTelemetry with HTTP exporter.
+        set_at: startup
+        cpp_varname: gOpenTelemetryHttpEndpoint
+        cpp_vartype: std::string
+        redact: false

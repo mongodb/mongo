@@ -38,27 +38,27 @@ structs:
         is_command_reply: true
         fields:
             resourceId:
-                description: 'The resource on which the locks are being held or pending.'
+                description: "The resource on which the locks are being held or pending."
                 type: string
             granted:
-                description: 'An array of documents. Each document provides information on locks that are currently granted on the resource.'
+                description: "An array of documents. Each document provides information on locks that are currently granted on the resource."
                 type: array<object>
             pending:
-                description: 'An array of documents. Each document provides information on locks that are currently pending on the resource.'
+                description: "An array of documents. Each document provides information on locks that are currently pending on the resource."
                 type: array<object>
-    
+
     LockInfoReply:
         description: "Reply for the 'lockInfo' command."
         is_command_reply: true
         fields:
             lockInfo:
-                description: 'The lock information for each resource.'
+                description: "The lock information for each resource."
                 type: array<lockInfoElement>
                 optional: true
             ok:
-                description: 'Result of the command execution.'
+                description: "Result of the command execution."
                 type: safeDouble
-                validator: { gte: 0.0, lte: 1.0 }
+                validator: {gte: 0.0, lte: 1.0}
 
 commands:
     lockInfoCommand:
@@ -66,10 +66,9 @@ commands:
         command_name: lockInfo
         namespace: ignored
         api_version: ""
-        fields: 
+        fields:
             includeStorageEngineDump:
                 optional: true
                 description: "Dump storage engine debug information to the logs"
                 type: bool
         reply_type: LockInfoReply
-        

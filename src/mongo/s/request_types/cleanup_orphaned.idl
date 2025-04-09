@@ -33,16 +33,16 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-  cleanupOrphaned:
-    command_name: cleanupOrphaned
-    cpp_name: CleanupOrphaned
-    description: "The cleanupOrphaned command waits for orphaned documents on a shard to be removed."
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      startingFromKey:
-        description: The value is validated to match the shard key pattern.
-        type: object
-        optional: true
+    cleanupOrphaned:
+        command_name: cleanupOrphaned
+        cpp_name: CleanupOrphaned
+        description: "The cleanupOrphaned command waits for orphaned documents on a shard to be removed."
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            startingFromKey:
+                description: The value is validated to match the shard key pattern.
+                type: object
+                optional: true

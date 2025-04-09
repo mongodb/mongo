@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-    - "mongo/db/catalog/collection_options_validation.h"
+        - "mongo/db/catalog/collection_options_validation.h"
 
 imports:
     - "mongo/db/basic_types.idl"

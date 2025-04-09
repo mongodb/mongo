@@ -27,14 +27,14 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/session/kill_sessions_util.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/session/kill_sessions_util.h"
 
 imports:
-  - "mongo/crypto/sha256_block.idl"
-  - "mongo/db/session/logical_session_id.idl"
-  - "mongo/db/basic_types.idl"
+    - "mongo/crypto/sha256_block.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
     KillSessionsMaxConcurrency:
@@ -57,7 +57,7 @@ server_parameters:
     AbortExpiredTransactionsSessionCheckoutTimeout:
         description: >-
             The maximum number of milliseconds for a session to checkout when aborting expired transactions.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gAbortExpiredTransactionsSessionCheckoutTimeout
         default: 100
@@ -66,7 +66,7 @@ server_parameters:
     AbortOldestTransactionSessionCheckoutTimeoutMilliseconds:
         description: >-
             The maximum number of milliseconds for a session to checkout when aborting oldest transactions.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: int
         cpp_varname: gAbortOldestTransactionSessionCheckoutTimeoutMilliseconds
         default: 100
@@ -75,11 +75,11 @@ server_parameters:
         description: >-
             The maximum number of sessions that will be killed at a time when aborting oldest transactions.
             A value of zero effectively disables evicting the oldest transaction.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: int
         cpp_varname: gAbortOldestTransactionSessionKillLimitPerBatch
         default: 1
-        validator: { gte: 0 }
+        validator: {gte: 0}
         redact: false
     AbortOldestTransactionMemoryClearLimitPerBatch:
         description: >-
@@ -89,70 +89,69 @@ server_parameters:
                means 3% of the cache's configured maximum size.
              - Zero (the default) means that no limit will be applied, i.e. transactions will continue to
                be rolled-back until the system is not under memory pressure or a different limit is reached.
-        set_at: [ startup, runtime ]
+        set_at: [startup, runtime]
         cpp_vartype: double
         cpp_varname: gAbortOldestTransactionMemoryClearLimitPerBatch
         default: 0
-        validator: { gte: -100}
+        validator: {gte: -100}
         redact: false
 
 structs:
+    KillSessionsCmdFromClient:
+        description: "A struct representing a killSessions command from a client"
+        strict: false
+        fields:
+            killSessions: array<LogicalSessionFromClient>
 
-  KillSessionsCmdFromClient:
-    description: "A struct representing a killSessions command from a client"
-    strict: false
-    fields:
-      killSessions: array<LogicalSessionFromClient>
+    KillAllSessionsUser:
+        description: "A struct representing a killAllSessions User"
+        strict: true
+        fields:
+            user: string
+            db: string
 
-  KillAllSessionsUser:
-    description: "A struct representing a killAllSessions User"
-    strict: true
-    fields:
-      user: string
-      db: string
+    KillAllSessionsRole:
+        description: "A struct representing a killAllSessions Role"
+        strict: true
+        fields:
+            role: string
+            db: string
 
-  KillAllSessionsRole:
-    description: "A struct representing a killAllSessions Role"
-    strict: true
-    fields:
-      role: string
-      db: string
+    KillAllSessionsCmd:
+        description: "A struct representing a killAllSessions command"
+        strict: false
+        fields:
+            killAllSessions: array<KillAllSessionsUser>
 
-  KillAllSessionsCmd:
-    description: "A struct representing a killAllSessions command"
-    strict: false
-    fields:
-      killAllSessions: array<KillAllSessionsUser>
+    KillAllSessionsByPattern:
+        description: "A struct representing a killAllSessionsByPatternCmd kill pattern"
+        strict: true
+        fields:
+            lsid:
+                type: LogicalSessionId
+                optional: true
+                validator:
+                    callback: "kill_sessions::validateLsid"
+            uid:
+                type: sha256Block
+                optional: true
+            users:
+                description: "logged in users for impersonate"
+                type: array<KillAllSessionsUser>
+                optional: true
+            roles:
+                description: "logged in roles for impersonate"
+                type: array<KillAllSessionsRole>
+                optional: true
 
-  KillAllSessionsByPattern:
-    description: "A struct representing a killAllSessionsByPatternCmd kill pattern"
-    strict: true
-    fields:
-      lsid:
-        type: LogicalSessionId
-        optional: true
-        validator:
-          callback: "kill_sessions::validateLsid"
-      uid:
-        type: sha256Block
-        optional: true
-      users:
-        description: "logged in users for impersonate"
-        type: array<KillAllSessionsUser>
-        optional: true
-      roles:
-        description: "logged in roles for impersonate"
-        type: array<KillAllSessionsRole>
-        optional: true
+    KillAllSessionsByPatternCmd:
+        description: "A struct representing a killAllSessionsByPattern command"
+        strict: false
+        fields:
+            killAllSessionsByPattern: array<KillAllSessionsByPattern>
 
-  KillAllSessionsByPatternCmd:
-    description: "A struct representing a killAllSessionsByPattern command"
-    strict: false
-    fields:
-      killAllSessionsByPattern: array<KillAllSessionsByPattern>
-
-  KillSessionsCmdToServer:
-    description: "A struct representing a killSessions command to a server"
-    strict: true
-    fields:
-      killSessions: array<LogicalSessionId>
+    KillSessionsCmdToServer:
+        description: "A struct representing a killSessions command to a server"
+        strict: true
+        fields:
+            killSessions: array<LogicalSessionId>

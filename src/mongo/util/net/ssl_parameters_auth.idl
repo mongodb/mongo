@@ -27,11 +27,11 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
-  clusterAuthMode:
-    description: "Transition from sendKeyFile to sendX509, or sendX509 to x509 clusterAuthModes"
-    set_at: runtime
-    cpp_class: ClusterAuthModeServerParameter
-    redact: false
+    clusterAuthMode:
+        description: "Transition from sendKeyFile to sendX509, or sendX509 to x509 clusterAuthModes"
+        set_at: runtime
+        cpp_class: ClusterAuthModeServerParameter
+        redact: false

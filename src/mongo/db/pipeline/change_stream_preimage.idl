@@ -37,7 +37,7 @@ imports:
 server_parameters:
     disableExpiredPreImagesRemover:
         description: Disables the expired pre-images remover.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: bool
         cpp_varname: gPreImageRemoverDisabled
         default: false
@@ -47,7 +47,7 @@ server_parameters:
     expiredChangeStreamPreImageRemovalJobSleepSecs:
         description: >-
             Specifies the period within which expired pre-image removal job is running.
-        set_at: [ startup ]
+        set_at: [startup]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gExpiredChangeStreamPreImageRemovalJobSleepSecs
         validator:
@@ -63,7 +63,7 @@ server_parameters:
         set_at: startup
         cpp_varname: gPreImagesCollectionTruncateMarkersMinBytes
         cpp_vartype: int32_t
-        default: 33_554_432  # 32 MiB
+        default: 33_554_432 # 32 MiB
         validator:
             gt: 0
         redact: false
@@ -79,10 +79,11 @@ structs:
                 description: Timestamp of an oplog entry associated with this document.
                 type: timestamp
             applyOpsIndex:
-                description: Index of an operation in an applyOps entry of a transaction.
-                             0 if the operation is not in a transaction or is the first operation in a transaction.
+                description:
+                    Index of an operation in an applyOps entry of a transaction.
+                    0 if the operation is not in a transaction or is the first operation in a transaction.
                 type: safeInt64
-                validator: { gte: 0 }
+                validator: {gte: 0}
     ChangeStreamPreImage:
         description: A version of a document just before replace, update, or delete operation.
         fields:
@@ -90,8 +91,9 @@ structs:
                 cpp_name: id
                 type: ChangeStreamPreImageId
             operationTime:
-                description: Operation execution wall clock time. Used to determine if the
-                             pre-image expired.
+                description:
+                    Operation execution wall clock time. Used to determine if the
+                    pre-image expired.
                 type: date
             preImage:
                 description: Pre-image of a document for an operation recorded to an oplog entry.

@@ -41,12 +41,11 @@ structs:
             n:
                 type: long
                 description: "For insert: number of documents inserted.
-                              For update: number of documents that matched the query predicate.
-                              For delete: number of documents deleted."
+                    For update: number of documents that matched the query predicate.
+                    For delete: number of documents deleted."
             nModified:
                 type: long
                 description: "The number of documents modified by an update operation."
             upsertedId:
                 type: object
                 description: "The _id value of the object that was upserted."
-

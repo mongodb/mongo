@@ -33,19 +33,21 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-  ChangeStreamStateParameters:
-      description: "The parameters associated with 'setChangeStreamState' and 'getChangeStreamState' commands."
-      fields:
-          enabled:
-              description: "Represents the state of the change stream of a tenant. If true, then
-                            the change stream should be enabled, false otherwise. The corresponding
-                            value is also returned by the 'getChangeStreamState' command"
-              type: bool
+    ChangeStreamStateParameters:
+        description: "The parameters associated with 'setChangeStreamState' and 'getChangeStreamState' commands."
+        fields:
+            enabled:
+                description:
+                    "Represents the state of the change stream of a tenant. If true, then
+                    the change stream should be enabled, false otherwise. The corresponding
+                    value is also returned by the 'getChangeStreamState' command"
+                type: bool
 
 commands:
     setChangeStreamState:
-        description: "The command to set the state of the change stream in the serverless for a
-                      particular tenant."
+        description:
+            "The command to set the state of the change stream in the serverless for a
+            particular tenant."
         command_name: setChangeStreamState
         cpp_name: SetChangeStreamStateCommandRequest
         api_version: ""
@@ -53,8 +55,9 @@ commands:
         chained_structs:
             ChangeStreamStateParameters: ChangeStreamStateParameters
     getChangeStreamState:
-        description: "The command to get the state of the change stream in the serverless for a
-                      particular tenant."
+        description:
+            "The command to get the state of the change stream in the serverless for a
+            particular tenant."
         command_name: getChangeStreamState
         cpp_name: GetChangeStreamStateCommandRequest
         api_version: ""

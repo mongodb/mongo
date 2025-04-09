@@ -35,8 +35,9 @@ imports:
 
 structs:
     migrationRecipientRecoveryDocument:
-        description: "Represents an in-progress chunk migration recipient that has reached the
-                      critical section stage"
+        description:
+            "Represents an in-progress chunk migration recipient that has reached the
+            critical section stage"
         strict: false
         fields:
             _id:
@@ -54,9 +55,10 @@ structs:
                 description: "The range being migrated."
             donorShardIdForLoggingPurposesOnly:
                 type: shard_id
-                description: "The shard from which the chunk is being migrated. This field should
-                              only be used for logging purposes and it is not properly updated
-                              during the automated restores procedure."
+                description:
+                    "The shard from which the chunk is being migrated. This field should
+                    only be used for logging purposes and it is not properly updated
+                    during the automated restores procedure."
             lsid:
                 type: LogicalSessionId
                 description: "The sessionId that the donor uses to communicate with the recipient."

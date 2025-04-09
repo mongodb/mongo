@@ -32,10 +32,11 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
-commands:    
+commands:
     duplicateCommandOld:
-        description: "duplicate command in old commands fails because a command with the same name
-                      is in compatibility_test_fail_old.idl"
+        description:
+            "duplicate command in old commands fails because a command with the same name
+            is in compatibility_test_fail_old.idl"
         command_name: duplicateCommandOld
         namespace: ignored
         cpp_name: duplicateCommandOld

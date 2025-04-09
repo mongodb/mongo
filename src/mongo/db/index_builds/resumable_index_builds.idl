@@ -59,17 +59,20 @@ structs:
         strict: true
         fields:
             sideWritesTable:
-                description: "The name of the ident associated with the side writes table for this
-                              index build"
+                description:
+                    "The name of the ident associated with the side writes table for this
+                    index build"
                 type: string
             duplicateKeyTrackerTable:
-                description: "The name of the ident associated with the duplicate key tracker table
-                              for this index build"
+                description:
+                    "The name of the ident associated with the duplicate key tracker table
+                    for this index build"
                 type: string
                 optional: true
             skippedRecordTrackerTable:
-                description: "The name of the ident associated with the skipped record tracker table
-                              for this index build"
+                description:
+                    "The name of the ident associated with the skipped record tracker table
+                    for this index build"
                 type: string
                 optional: true
             fileName:
@@ -99,16 +102,18 @@ structs:
         strict: true
         fields:
             _id:
-                description: "A UUID that uniquely identifies the index build across replica set
-                              members."
+                description:
+                    "A UUID that uniquely identifies the index build across replica set
+                    members."
                 cpp_name: buildUUID
                 type: uuid
             phase:
                 description: "The phase the index build was in when the node shut down"
                 type: IndexBuildPhase
             collectionUUID:
-                description: "A UUID that uniquely identifies which collection the index is being
-                             built on"
+                description:
+                    "A UUID that uniquely identifies which collection the index is being
+                    built on"
                 type: uuid
             collectionScanPosition:
                 description: "The last record id inserted into the sorter before shutdown"

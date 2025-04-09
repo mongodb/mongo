@@ -27,53 +27,53 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
+    CurrentInSteps:
+        description:
+            "A struct describing the number of transaction coordinators currently in each
+            two-phase commit step"
+        strict: true
+        fields:
+            writingParticipantList:
+                type: long
+                default: 0
+            waitingForVotes:
+                type: long
+                default: 0
+            writingDecision:
+                type: long
+                default: 0
+            waitingForDecisionAcks:
+                type: long
+                default: 0
+            writingEndOfTransaction:
+                type: long
+                default: 0
+            deletingCoordinatorDoc:
+                type: long
+                default: 0
 
-  CurrentInSteps:
-    description: "A struct describing the number of transaction coordinators currently in each
-                  two-phase commit step"
-    strict: true
-    fields:
-      writingParticipantList:
-        type: long
-        default: 0
-      waitingForVotes:
-        type: long
-        default: 0
-      writingDecision:
-        type: long
-        default: 0
-      waitingForDecisionAcks:
-        type: long
-        default: 0
-      writingEndOfTransaction:
-        type: long
-        default: 0
-      deletingCoordinatorDoc:
-        type: long
-        default: 0
-
-  TransactionCoordinatorsStats:
-    description: "A struct representing the section of the server status
-                  command with information about transaction coordinators"
-    strict: true
-    fields:
-      totalCreated:
-        type: long
-        default: 0
-      totalStartedTwoPhaseCommit:
-        type: long
-        default: 0
-      totalAbortedTwoPhaseCommit:
-        type: long
-        default: 0
-      totalCommittedTwoPhaseCommit:
-        type: long
-        default: 0
-      currentInSteps:
-        type: CurrentInSteps
+    TransactionCoordinatorsStats:
+        description: "A struct representing the section of the server status
+            command with information about transaction coordinators"
+        strict: true
+        fields:
+            totalCreated:
+                type: long
+                default: 0
+            totalStartedTwoPhaseCommit:
+                type: long
+                default: 0
+            totalAbortedTwoPhaseCommit:
+                type: long
+                default: 0
+            totalCommittedTwoPhaseCommit:
+                type: long
+                default: 0
+            currentInSteps:
+                type: CurrentInSteps

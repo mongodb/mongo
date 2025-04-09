@@ -27,21 +27,21 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/query/index_hint.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/query/index_hint.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
-  IndexHint:
-    description: >-
-      Type representing possible index hint definition, including index key 
-      pattern, index name and $natural hint.
-    cpp_type: IndexHint
-    bson_serialization_type: any
-    serializer: "mongo::IndexHint::append"
-    deserializer: "mongo::IndexHint::parse"
-    # Deserializer uses owned object or BSONElement::String().
-    is_view: false
+    IndexHint:
+        description: >-
+            Type representing possible index hint definition, including index key 
+            pattern, index name and $natural hint.
+        cpp_type: IndexHint
+        bson_serialization_type: any
+        serializer: "mongo::IndexHint::append"
+        deserializer: "mongo::IndexHint::parse"
+        # Deserializer uses owned object or BSONElement::String().
+        is_view: false

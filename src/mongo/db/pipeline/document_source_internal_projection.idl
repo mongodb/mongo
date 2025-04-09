@@ -27,31 +27,31 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_parsing_validators.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/document_source_parsing_validators.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
-  InternalProjectionPolicy:
-    description: "Enum for identifying which policies should be used when analyzing a projection."
-    type: string
-    values:
-      kAggregate: "aggregate"
-      kAddFields: "addFields"
+    InternalProjectionPolicy:
+        description: "Enum for identifying which policies should be used when analyzing a projection."
+        type: string
+        values:
+            kAggregate: "aggregate"
+            kAddFields: "addFields"
 
 structs:
-  DocumentSourceInternalProjectionSpec:
-    description: Specification for the $_internalProjection stage.
-    strict: true
-    fields:
-      spec:
-        description: Projection specification.
-        type: object
-        optional: false
-      policies:
-        description: Which policies to use when analyzing the projection specification.
-        type: InternalProjectionPolicy
-        optional: false
+    DocumentSourceInternalProjectionSpec:
+        description: Specification for the $_internalProjection stage.
+        strict: true
+        fields:
+            spec:
+                description: Projection specification.
+                type: object
+                optional: false
+            policies:
+                description: Which policies to use when analyzing the projection specification.
+                type: InternalProjectionPolicy
+                optional: false

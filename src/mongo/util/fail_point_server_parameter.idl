@@ -35,12 +35,12 @@ server_parameters:
     # This represents the prototype for Failpoint ServerParameters.
     # It contains condition: { expr: false } to avoid auto-instantiation.
     # Instead, the FP registry will create N instances.
-    'failpoint.*':
-        description: '[internal] Failpoint ServerParameter prototype'
+    "failpoint.*":
+        description: "[internal] Failpoint ServerParameter prototype"
         set_at: startup
         cpp_class:
             name: FailPointServerParameter
-            data: 'FailPoint*'
+            data: "FailPoint*"
             override_ctor: true
         condition:
             expr: false

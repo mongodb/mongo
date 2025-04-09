@@ -31,92 +31,91 @@
 # for that class.
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
+    SnapshotOps:
+        description: "A struct representing the number of operations used with snapshot readConcern"
+        strict: true
+        fields:
+            withClusterTime:
+                type: long
+                default: 0
+            withoutClusterTime:
+                type: long
+                default: 0
 
-  SnapshotOps:
-    description: "A struct representing the number of operations used with snapshot readConcern"
-    strict: true
-    fields:
-      withClusterTime:
-        type: long
-        default: 0
-      withoutClusterTime:
-        type: long
-        default: 0
+    CWRCReadConcernOps:
+        description: "A struct representing CWRC readConcern level usages by read operations"
+        strict: true
+        fields:
+            local:
+                type: long
+                default: 0
+            available:
+                type: long
+                # Not supported in transactions.
+                optional: true
+            majority:
+                type: long
+                default: 0
 
-  CWRCReadConcernOps:
-    description: "A struct representing CWRC readConcern level usages by read operations"
-    strict: true
-    fields:
-      local:
-        type: long
-        default: 0
-      available:
-        type: long
-        # Not supported in transactions.
-        optional: true
-      majority:
-        type: long
-        default: 0
-  
-  ImplicitDefaultReadConcernOps:
-    description: "A struct representing implict-default readConcern level usages by read operations"
-    strict: true
-    fields:
-      local:
-        type: long
-        default: 0
-      available:
-        type: long
-        # Not supported in transactions.
-        optional: true
-  
-  NoneInfo:
-    description: "A struct representing non-explicit readConcern level counters breakdown"
-    strict: true
-    fields:
-      CWRC:
-        type: CWRCReadConcernOps
-      implicitDefault:
-        type: ImplicitDefaultReadConcernOps
-  
-  ReadConcernOps:
-    description: "A struct representing readConcern level usages by read operations"
-    strict: true
-    fields:
-      none:
-        type: long
-        default: 0
-      noneInfo:
-        type: NoneInfo
-      local:
-        type: long
-        default: 0
-      available:
-        type: long
-        # Not supported in transactions.
-        optional: true
-      majority:
-        type: long
-        default: 0
-      snapshot:
-        type: SnapshotOps
-      linearizable:
-        type: long
-        # Not supported in transactions.
-        optional: true
+    ImplicitDefaultReadConcernOps:
+        description: "A struct representing implict-default readConcern level usages by read operations"
+        strict: true
+        fields:
+            local:
+                type: long
+                default: 0
+            available:
+                type: long
+                # Not supported in transactions.
+                optional: true
 
-  ReadConcernStats:
-    description: "A struct representing the section of the server status
-                  command with information about readConcern levels used by operations"
-    strict: true
-    fields:
-      nonTransactionOps:
-        type: ReadConcernOps
-      transactionOps:
-        type: ReadConcernOps
+    NoneInfo:
+        description: "A struct representing non-explicit readConcern level counters breakdown"
+        strict: true
+        fields:
+            CWRC:
+                type: CWRCReadConcernOps
+            implicitDefault:
+                type: ImplicitDefaultReadConcernOps
+
+    ReadConcernOps:
+        description: "A struct representing readConcern level usages by read operations"
+        strict: true
+        fields:
+            none:
+                type: long
+                default: 0
+            noneInfo:
+                type: NoneInfo
+            local:
+                type: long
+                default: 0
+            available:
+                type: long
+                # Not supported in transactions.
+                optional: true
+            majority:
+                type: long
+                default: 0
+            snapshot:
+                type: SnapshotOps
+            linearizable:
+                type: long
+                # Not supported in transactions.
+                optional: true
+
+    ReadConcernStats:
+        description: "A struct representing the section of the server status
+            command with information about readConcern levels used by operations"
+        strict: true
+        fields:
+            nonTransactionOps:
+                type: ReadConcernOps
+            transactionOps:
+                type: ReadConcernOps

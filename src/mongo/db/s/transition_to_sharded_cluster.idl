@@ -33,8 +33,8 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-  transitionToShardedCluster:
-    description: "The public transitionToShardedCluster command on mongod."
-    command_name: transitionToShardedCluster
-    namespace: ignored
-    api_version: ""
+    transitionToShardedCluster:
+        description: "The public transitionToShardedCluster command on mongod."
+        command_name: transitionToShardedCluster
+        namespace: ignored
+        api_version: ""

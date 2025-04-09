@@ -26,41 +26,41 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/value.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/value.idl"
 structs:
-  FillOutputSpec:
-    description: Specification for a single field to be filled.
-    strict: true 
-    fields:
-      value:
-        description: "Used to specify a fixed value output expression."
-        type: IDLAnyType
-        optional: true
-      method:
-        description: "The algorithm to be used for calculated value filling."
-        optional: true
-        type: string
-  FillSpec:
-    description: Specification for a $fill stage.
-    strict: true
-    fields:
-      sortBy:
-        description: "A sort specification to be used in a $sort before running fill."
-        type: object
-        optional: true
-      partitionByFields:
-        description: "The field(s) that will be used as the partition keys."
-        type: array<string>
-        optional: true
-      partitionBy:
-        description: "An expression to be used to partition the input."
-        type:
-            variant: [object, string]
-        optional: true
-      output:
-        description: "An object where each field is a field to be filled and values are the fill functions"
-        type: object
-        optional: false
+    FillOutputSpec:
+        description: Specification for a single field to be filled.
+        strict: true
+        fields:
+            value:
+                description: "Used to specify a fixed value output expression."
+                type: IDLAnyType
+                optional: true
+            method:
+                description: "The algorithm to be used for calculated value filling."
+                optional: true
+                type: string
+    FillSpec:
+        description: Specification for a $fill stage.
+        strict: true
+        fields:
+            sortBy:
+                description: "A sort specification to be used in a $sort before running fill."
+                type: object
+                optional: true
+            partitionByFields:
+                description: "The field(s) that will be used as the partition keys."
+                type: array<string>
+                optional: true
+            partitionBy:
+                description: "An expression to be used to partition the input."
+                type:
+                    variant: [object, string]
+                optional: true
+            output:
+                description: "An object where each field is a field to be filled and values are the fill functions"
+                type: object
+                optional: false

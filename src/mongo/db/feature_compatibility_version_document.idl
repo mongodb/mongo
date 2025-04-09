@@ -26,46 +26,47 @@
 #it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/feature_compatibility_version_parser.h"
-
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/feature_compatibility_version_parser.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
-  featureCompatibilityVersionDocument:
-    description: "featureCompatibilityVersion on-disk document format"
-    generate_comparison_operators: true
-    fields:
-      _id:
-        type: string
-        description: "Key of the featureCompatibilityVersion state singleton document"
-        default: '"featureCompatibilityVersion"'
-      version:
-        description: "Effective featureCompatibilityVersion"
-        type: fcv_string
-      targetVersion:
-        description: "Target featureCompatibilityVersion for upgrade/downgrade"
-        type: fcv_string
-        optional: true
-      previousVersion:
-        description: >-
-          Previous featureCompatibilityVersion for downgrading states, will always be kLatest when
-          present
-        type: fcv_string
-        optional: true
-        validator:
-          callback: "FeatureCompatibilityVersionParser::validatePreviousVersionField"
-      changeTimestamp:
-        description: "Timestamp used to identify the 2-phase setFCV request. Both phases (kStart and
-                      kComplete) must have the same timestamp for the entire sequence, and every new
-                      sequence started must strictly have incrementing timestamp."
-        type: timestamp
-        optional: true
-      isCleaningServerMetadata:
-        description: "Boolean indicating whether the setFCV downgrade request is in the middle of
-                      cleaning up internal server metadata."
-        type: bool
-        optional: true
+    featureCompatibilityVersionDocument:
+        description: "featureCompatibilityVersion on-disk document format"
+        generate_comparison_operators: true
+        fields:
+            _id:
+                type: string
+                description: "Key of the featureCompatibilityVersion state singleton document"
+                default: '"featureCompatibilityVersion"'
+            version:
+                description: "Effective featureCompatibilityVersion"
+                type: fcv_string
+            targetVersion:
+                description: "Target featureCompatibilityVersion for upgrade/downgrade"
+                type: fcv_string
+                optional: true
+            previousVersion:
+                description: >-
+                    Previous featureCompatibilityVersion for downgrading states, will always be kLatest when
+                    present
+                type: fcv_string
+                optional: true
+                validator:
+                    callback: "FeatureCompatibilityVersionParser::validatePreviousVersionField"
+            changeTimestamp:
+                description:
+                    "Timestamp used to identify the 2-phase setFCV request. Both phases (kStart and
+                    kComplete) must have the same timestamp for the entire sequence, and every new
+                    sequence started must strictly have incrementing timestamp."
+                type: timestamp
+                optional: true
+            isCleaningServerMetadata:
+                description:
+                    "Boolean indicating whether the setFCV downgrade request is in the middle of
+                    cleaning up internal server metadata."
+                type: bool
+                optional: true

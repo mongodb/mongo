@@ -66,10 +66,10 @@ types:
         description: Accepts any numerical type within int32 range
         cpp_type: std::int64_t
         bson_serialization_type:
-                                - long
-                                - int
-                                - decimal
-                                - double
+            - long
+            - int
+            - decimal
+            - double
         deserializer: "mongo::BSONElement::numberInt"
         is_view: false
 
@@ -88,7 +88,6 @@ types:
         cpp_type: "std::array<std::uint8_t, 16>"
         deserializer: "mongo::BSONElement::uuid"
         is_view: false
-
 
 structs:
     default_values:
@@ -121,4 +120,3 @@ structs:
             uuidField:
                 type: bindata_uuid
                 description: "A binData of uuid subtype"
-

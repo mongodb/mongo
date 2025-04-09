@@ -28,13 +28,14 @@
 global:
     cpp_namespace: mongo::sdam
     cpp_includes:
-       - "mongo/db/server_options.h"
+        - "mongo/db/server_options.h"
 
 server_parameters:
     heartBeatFrequencyMs:
-        description: "For the 'sdam' replicaSetMonitorProtocol, determines how long to wait between
-        'hello' requests. For the 'streamable' replicaSetMonitorProtocol, duration between rtt
-        measurements."
+        description: >-
+            For the 'sdam' replicaSetMonitorProtocol, determines how long to wait between
+            'hello' requests. For the 'streamable' replicaSetMonitorProtocol, duration between rtt
+            measurements.
         set_at: startup
         cpp_vartype: int
         cpp_varname: sdamHeartBeatFrequencyMs
@@ -59,5 +60,3 @@ server_parameters:
             gte: 500
         default: 10000
         redact: false
-
-

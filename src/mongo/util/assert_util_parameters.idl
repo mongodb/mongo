@@ -26,16 +26,16 @@
 # it in the license file.
 #
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/util/assert_util_parameters.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/assert_util_parameters.h"
 
 server_parameters:
-  enableDiagnosticLogging:
-    description: "Enables additional diagnostic logging during tassert/invariant/signal handing"
-    set_at: ["startup", "runtime"]
-    cpp_varname: "enableDiagnosticLogging"
-    cpp_vartype: AtomicWord<bool>
-    default: true
-    redact: false
-    on_update: onUpdateEnableDiagnosticLogging
+    enableDiagnosticLogging:
+        description: "Enables additional diagnostic logging during tassert/invariant/signal handing"
+        set_at: ["startup", "runtime"]
+        cpp_varname: "enableDiagnosticLogging"
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+        on_update: onUpdateEnableDiagnosticLogging

@@ -37,26 +37,25 @@ global:
 
 configs:
     help:
-        description: 'Show this usage information'
+        description: "Show this usage information"
         arg_vartype: Switch
         single_name: h
     list:
-        description: 'List available suites and their respective workloads'
+        description: "List available suites and their respective workloads"
         arg_vartype: Switch
         single_name: l
     filter:
-        description: 'String substring filter on workload name'
+        description: "String substring filter on workload name"
         arg_vartype: String
         single_name: f
-        cpp_varname: 'simulatorGlobalParams.filter'
+        cpp_varname: "simulatorGlobalParams.filter"
     setParameter:
-        description: 'Set a configurable parameter'
+        description: "Set a configurable parameter"
         arg_vartype: StringMap
         duplicate_behavior: append
     suites:
-        description: 'Workload suites to run'
+        description: "Workload suites to run"
         arg_vartype: StringVector
-        cpp_varname: 'simulatorGlobalParams.suites'
+        cpp_varname: "simulatorGlobalParams.suites"
         hidden: true
-        positional: '1-'
-
+        positional: "1-"

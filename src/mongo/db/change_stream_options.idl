@@ -36,23 +36,24 @@ imports:
     - "mongo/idl/cluster_server_parameter.idl"
 
 structs:
-  PreAndPostImagesOptions:
-    description: "Change streams pre- and post-images options."
-    fields:
-      expireAfterSeconds:
-        description: "The number of seconds after which a pre-image is eligible for
-                      deletion. A string value 'off' enables the default expiration policy."
-        stability: stable
-        type:
-          variant: [string, safeInt64]
-        default: "\"off\""
-  ChangeStreamOptions:
-    description: "A specification for the change streams options."
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: clusterServerParameter
-    fields:
-      preAndPostImages:
-        type: PreAndPostImagesOptions
-        stability: stable
-        default: true
+    PreAndPostImagesOptions:
+        description: "Change streams pre- and post-images options."
+        fields:
+            expireAfterSeconds:
+                description:
+                    "The number of seconds after which a pre-image is eligible for
+                    deletion. A string value 'off' enables the default expiration policy."
+                stability: stable
+                type:
+                    variant: [string, safeInt64]
+                default: '"off"'
+    ChangeStreamOptions:
+        description: "A specification for the change streams options."
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            preAndPostImages:
+                type: PreAndPostImagesOptions
+                stability: stable
+                default: true

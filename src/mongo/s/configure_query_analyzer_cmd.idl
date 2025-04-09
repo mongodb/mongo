@@ -27,31 +27,31 @@
 #
 
 global:
-  cpp_namespace: "mongo::analyze_shard_key"
+    cpp_namespace: "mongo::analyze_shard_key"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/s/analyze_shard_key_common.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/s/analyze_shard_key_common.idl"
 
 structs:
-  configureQueryAnalyzerResponse:
-    description: "The response for the 'configureQueryAnalyzer' command."
-    strict: false
-    fields:
-      newConfiguration:
-        type: QueryAnalyzerConfiguration
-      oldConfiguration:
-        type: QueryAnalyzerConfiguration
-        optional: true
+    configureQueryAnalyzerResponse:
+        description: "The response for the 'configureQueryAnalyzer' command."
+        strict: false
+        fields:
+            newConfiguration:
+                type: QueryAnalyzerConfiguration
+            oldConfiguration:
+                type: QueryAnalyzerConfiguration
+                optional: true
 
 commands:
-  configureQueryAnalyzer:
-    description: "The command for setting the query analyzer configuration for a collection."
-    command_name: configureQueryAnalyzer
-    strict: false
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    inline_chained_structs: true
-    chained_structs:
-      QueryAnalyzerConfiguration: configuration
+    configureQueryAnalyzer:
+        description: "The command for setting the query analyzer configuration for a collection."
+        command_name: configureQueryAnalyzer
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        inline_chained_structs: true
+        chained_structs:
+            QueryAnalyzerConfiguration: configuration

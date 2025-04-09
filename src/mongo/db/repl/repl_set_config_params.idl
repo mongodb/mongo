@@ -31,9 +31,10 @@ global:
 
 server_parameters:
     skipShardingConfigurationChecks:
-        description: Dont run any sharding validations. Can not be combined with --configsvr or
-                     shardvr. Intended to allow restarting config server or shard as an
-                     independent replica set.
+        description:
+            Dont run any sharding validations. Can not be combined with --configsvr or
+            shardvr. Intended to allow restarting config server or shard as an
+            independent replica set.
         set_at: startup
         cpp_vartype: bool
         cpp_varname: skipShardingConfigurationChecks

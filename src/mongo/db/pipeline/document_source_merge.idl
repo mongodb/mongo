@@ -44,8 +44,9 @@ imports:
 types:
     MergeTargetNss:
         bson_serialization_type: any
-        description: Names of the target database and collection. The database name defaults
-                     to the database of the aggregation.
+        description:
+            Names of the target database and collection. The database name defaults
+            to the database of the aggregation.
         cpp_type: mongo::NamespaceString
         serializer: "::mongo::mergeTargetNssSerializeToBSON"
         deserializer: "::mongo::mergeTargetNssParseFromBSON"
@@ -64,9 +65,10 @@ types:
 
     MergeWhenMatchedPolicy:
         bson_serialization_type: any
-        description: Defines a policy strategy describing what to do when there is a matching
-                     document in the target collection. Can hold a value from the
-                     MergeWhenMatchedMode enum, or a custom pipeline definition.
+        description:
+            Defines a policy strategy describing what to do when there is a matching
+            document in the target collection. Can hold a value from the
+            MergeWhenMatchedMode enum, or a custom pipeline definition.
         cpp_type: "::mongo::MergeWhenMatchedPolicy"
         serializer: "::mongo::mergeWhenMatchedSerializeToBSON"
         deserializer: "::mongo::mergeWhenMatchedParseFromBSON"
@@ -94,38 +96,43 @@ structs:
             let:
                 type: object
                 optional: true
-                description: Specifies variables to use in the update pipeline defined in
-                             MergeWhenMatchedPolicy when the 'whenMatched' mode is a custom
-                             pipeline.
+                description:
+                    Specifies variables to use in the update pipeline defined in
+                    MergeWhenMatchedPolicy when the 'whenMatched' mode is a custom
+                    pipeline.
                 query_shape: custom
 
             whenMatched:
                 type: MergeWhenMatchedPolicy
                 optional: true
-                description: The merge mode for the merge operation when source and target elements
-                             match.
+                description:
+                    The merge mode for the merge operation when source and target elements
+                    match.
                 query_shape: parameter
 
             whenNotMatched:
                 type: MergeWhenNotMatchedMode
                 optional: true
-                description: The merge mode for the merge operation when source and target elements
-                             do not match.
+                description:
+                    The merge mode for the merge operation when source and target elements
+                    do not match.
                 query_shape: parameter
 
             targetCollectionVersion:
                 type: ChunkVersion
                 optional: true
-                description: If set, the collection's ChunkVersion found when parsed on mongos. Can
-                             be used to check if a collection has since been dropped and re-created,
-                             in which case the shard key may have changed, or had its shard key
-                             refined. This also can be used to detect if the collection has gone
-                             from unsharded to sharded, and thus now has a shard key.
+                description:
+                    If set, the collection's ChunkVersion found when parsed on mongos. Can
+                    be used to check if a collection has since been dropped and re-created,
+                    in which case the shard key may have changed, or had its shard key
+                    refined. This also can be used to detect if the collection has gone
+                    from unsharded to sharded, and thus now has a shard key.
                 query_shape: parameter
 
             allowMergeOnNullishValues:
                 type: optionalBool
-                description: If set to true, allow values of "on" fields in $merge to include
-                             missing or null values. This fields should only be used by mongos when
-                             passing split pipeline to mongod.
+                description:
+                    If set to true, allow values of "on" fields in $merge to include
+                    missing or null values. This fields should only be used by mongos when
+                    passing split pipeline to mongod.
                 query_shape: parameter

@@ -27,24 +27,26 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/aggregate_command.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/aggregate_command.idl"
 
 structs:
-  SetVariableFromSubPipelineSpec:
-    description: Specification for a $setVariableFromSubPipeline stage given in the full, explicit
-      format.
-    strict: true
-    fields:
-      setVariable:
-        description: The variable to set equal to the document returned by the pipeline arg,
-          double-dollar ($$) prefixed.
-        optional: false
-        type: string
-      pipeline:
-        description: A required aggregation pipeline that will return at most one document.
-        optional: false
-        type: pipeline
+    SetVariableFromSubPipelineSpec:
+        description:
+            Specification for a $setVariableFromSubPipeline stage given in the full, explicit
+            format.
+        strict: true
+        fields:
+            setVariable:
+                description:
+                    The variable to set equal to the document returned by the pipeline arg,
+                    double-dollar ($$) prefixed.
+                optional: false
+                type: string
+            pipeline:
+                description: A required aggregation pipeline that will return at most one document.
+                optional: false
+                type: pipeline

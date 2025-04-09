@@ -29,10 +29,10 @@
 # This IDL file describes the BSON format for cursor response object.
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/namespace_string.h"
-    - "mongo/db/query/client_cursor/cursor_idl_validator.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/namespace_string.h"
+        - "mongo/db/query/client_cursor/cursor_idl_validator.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -122,11 +122,12 @@ structs:
                 type: optionalBool
                 stability: stable
             $_wasStatementExecuted:
-                description: "An optional field set to true if a write without shard key had already
-                              applied the write. To provide some context, this internal field is 
-                              used by the two phase write without shard key protocol introduced in 
-                              PM-1632 to support retryable writes for updateOne without shard key, 
-                              deleteOne without shard key, and findAndModify without shard key."
+                description:
+                    "An optional field set to true if a write without shard key had already
+                    applied the write. To provide some context, this internal field is
+                    used by the two phase write without shard key protocol introduced in
+                    PM-1632 to support retryable writes for updateOne without shard key,
+                    deleteOne without shard key, and findAndModify without shard key."
                 type: optionalBool
                 cpp_name: wasStatementExecuted
                 stability: internal
@@ -147,7 +148,7 @@ structs:
                 optional: true
                 stability: unstable
 
-    MultiResponseInitialResponseCursor: 
+    MultiResponseInitialResponseCursor:
         description: "A struct representing an initial response cursor if multiple cursors are returned."
         inline_chained_structs: true
         chained_structs:
@@ -168,13 +169,13 @@ structs:
                 type: CursorMetrics
                 optional: true
                 stability: unstable
- 
+
     MultiResponseCursor:
         description: "A struct representing a cursor object inside an array of cursors"
         fields:
             cursor:
                 description: "The actual cursor object."
-                type: MultiResponseInitialResponseCursor 
+                type: MultiResponseInitialResponseCursor
                 stability: unstable
             ok:
                 type: bool
@@ -202,7 +203,7 @@ structs:
                 stability: unstable
             type:
                 description: "An optional field containing disambiguation information if a reply contains multiple cursors."
-                type: CursorType 
+                type: CursorType
                 cpp_name: cursorType
                 optional: true
                 stability: unstable

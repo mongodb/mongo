@@ -27,33 +27,33 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/util/buildinfo.idl"
+    - "mongo/util/buildinfo.idl"
 
 enums:
-  BuildInfoAuthMode:
-    description: Acceptable values for the buildInfoAuthMode server parameter.
-    type: string
-    values:
-        kRequiresAuth : 'requiresAuth'
-        kVersionOnlyIfPreAuth : 'versionOnlyIfPreAuth'
-        kAllowedPreAuth : 'allowedPreAuth'
+    BuildInfoAuthMode:
+        description: Acceptable values for the buildInfoAuthMode server parameter.
+        type: string
+        values:
+            kRequiresAuth: "requiresAuth"
+            kVersionOnlyIfPreAuth: "versionOnlyIfPreAuth"
+            kAllowedPreAuth: "allowedPreAuth"
 
 server_parameters:
-  buildInfoAuthMode:
-    description: "Control the level of authorization required to run the buildInfo command"
-    set_at: [ startup, runtime ]
-    cpp_class: BuildInfoAuthModeServerParameter
-    redact: false
+    buildInfoAuthMode:
+        description: "Control the level of authorization required to run the buildInfo command"
+        set_at: [startup, runtime]
+        cpp_class: BuildInfoAuthModeServerParameter
+        redact: false
 
 commands:
-  buildInfo:
-    description: "Return information about the current build environment"
-    namespace: ignored
-    api_version: ''
-    command_name: buildInfo
-    command_alias: buildinfo
-    cpp_name: BuildInfoCommand
-    reply_type: BuildInfo
+    buildInfo:
+        description: "Return information about the current build environment"
+        namespace: ignored
+        api_version: ""
+        command_name: buildInfo
+        command_alias: buildinfo
+        cpp_name: BuildInfoCommand
+        reply_type: BuildInfo

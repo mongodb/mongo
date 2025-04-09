@@ -43,4 +43,3 @@ types:
         deserializer: "mongo::ClientMetadata::parseFromBSON"
         # Deserializer uses getOwned.
         is_view: false
-

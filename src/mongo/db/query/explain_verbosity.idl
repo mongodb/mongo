@@ -28,11 +28,12 @@
 
 global:
     cpp_namespace: "mongo::explain"
-  
+
 enums:
     Verbosity:
-        description: "The various supported verbosity levels for explain. The order is significant: 
-                      the enum values are assigned in order of increasing verbosity"
+        description:
+            "The various supported verbosity levels for explain. The order is significant:
+            the enum values are assigned in order of increasing verbosity"
         type: string
         values:
             # At all verbosities greater than or equal to kQueryPlanner, we display information

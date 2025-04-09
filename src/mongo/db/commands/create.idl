@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-    - "mongo/db/commands/create_command_validation.h"
+        - "mongo/db/commands/create_command_validation.h"
 
 imports:
     - "mongo/crypto/encryption_fields.idl"
@@ -42,23 +42,24 @@ imports:
 
 structs:
     CreateCommandReply:
-        description: 'Reply from the {create: ...} command'
+        description: "Reply from the {create: ...} command"
         strict: true
         is_command_reply: true
         fields:
             note:
-                description: 'Warnings or other additional information'
+                description: "Warnings or other additional information"
                 type: string
                 optional: true
                 stability: stable
-    
+
     CreateCollectionRequest:
         description: "Base request to create a collection"
-        strict: true 
+        strict: true
         fields:
             capped:
-                description: "Specify true to create a capped collection. If you specify true, you
-                              must also set a maximum size in the 'size' field."
+                description:
+                    "Specify true to create a capped collection. If you specify true, you
+                    must also set a maximum size in the 'size' field."
                 type: safeBool
                 default: false
                 # The capped parameter should actually be unstable, and in practice it is, because
@@ -75,19 +76,21 @@ structs:
                 optional: true
                 validator:
                     gte: 1
-                    lte: 1125899906842624  # 1 PB
+                    lte: 1125899906842624 # 1 PB
                 stability: unstable
             max:
-                description: "The maximum number of documents allowed in the capped collection. The
-                              'size' limit takes precedence over this limit."
+                description:
+                    "The maximum number of documents allowed in the capped collection. The
+                    'size' limit takes precedence over this limit."
                 type: safeInt64
                 optional: true
                 validator:
-                    lt: 2147483648  # 2^31
+                    lt: 2147483648 # 2^31
                 stability: unstable
             storageEngine:
-                description: "Specify a configuration to the storage engine on a per-collection
-                              basis when creating a collection."
+                description:
+                    "Specify a configuration to the storage engine on a per-collection
+                    basis when creating a collection."
                 type: object
                 optional: true
                 stability: unstable
@@ -97,37 +100,42 @@ structs:
                 optional: true
                 stability: stable
             validationLevel:
-                description: "Determines how strictly to apply the validation rules to existing
-                              documents during an update.
-                              Can be one of following values: 'off', 'strict' or 'moderate'."
+                description:
+                    "Determines how strictly to apply the validation rules to existing
+                    documents during an update.
+                    Can be one of following values: 'off', 'strict' or 'moderate'."
                 type: ValidationLevel
                 optional: true
                 stability: stable
             validationAction:
-                description: "Determines whether to error on invalid documents or just warn about
-                              the violations but allow invalid documents to be inserted.
-                              Can be either 'warn' or 'error'."
+                description:
+                    "Determines whether to error on invalid documents or just warn about
+                    the violations but allow invalid documents to be inserted.
+                    Can be either 'warn' or 'error'."
                 type: ValidationAction
                 optional: true
                 stability: stable
             indexOptionDefaults:
-                description: "Allows users to specify a default configuration for indexes when
-                              creating a collection."
+                description:
+                    "Allows users to specify a default configuration for indexes when
+                    creating a collection."
                 type: IndexOptionDefaults
                 optional: true
                 stability: unstable
             viewOn:
-                description: "The name of the source collection or view from which to create the
-                              view."
+                description:
+                    "The name of the source collection or view from which to create the
+                    view."
                 type: string
                 optional: true
                 stability: stable
                 validator:
                     callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
-                description: "An array that consists of the aggregation pipeline. Creates the view
-                              by applying the specified pipeline to the 'viewOn' collection or
-                              view."
+                description:
+                    "An array that consists of the aggregation pipeline. Creates the view
+                    by applying the specified pipeline to the 'viewOn' collection or
+                    view."
                 type: array<object>
                 optional: true
                 stability: stable
@@ -147,7 +155,8 @@ structs:
                 optional: true
                 stability: stable
             clusteredIndex:
-                description: "Specifies whether this collection should have a clusteredIndex.
+                description:
+                    "Specifies whether this collection should have a clusteredIndex.
                     Boolean is accepted as the legacy clustered index format for specific internal
                     collections - and implies clustering by _id. Otherwise, clusters according to
                     the ClusteredIndexSpec."
@@ -156,8 +165,9 @@ structs:
                 optional: true
                 stability: stable
             recordIdsReplicated:
-                description: "Specifies whether this collection should utilize the same recordId for a given document
-                              across all nodes in a replica set."
+                description:
+                    "Specifies whether this collection should utilize the same recordId for a given document
+                    across all nodes in a replica set."
                 type: safeBool
                 optional: true
                 stability: unstable
@@ -183,7 +193,7 @@ structs:
                 description: "DEPRECATED"
                 type: safeInt64
                 optional: true
-                stability: unstable     
+                stability: unstable
 
 commands:
     create:
@@ -198,23 +208,23 @@ commands:
                 - check: get_authenticated_user # Can be triggered by aggregation
                 - check: lookup_user # Can be triggered by aggregation
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: convertToCapped
+                      resource_pattern: exact_namespace
+                      action_type: convertToCapped
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: createCollection
+                      resource_pattern: exact_namespace
+                      action_type: createCollection
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: insert
+                      resource_pattern: exact_namespace
+                      action_type: insert
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: find
+                      resource_pattern: exact_namespace
+                      action_type: find
                 - privilege: # Can be triggered by aggregation
-                    resource_pattern: exact_namespace
-                    action_type: [remove, update, collStats, indexStats, planCacheRead]
+                      resource_pattern: exact_namespace
+                      action_type:
+                          [remove, update, collStats, indexStats, planCacheRead]
         reply_type: CreateCommandReply
         strict: true
         inline_chained_structs: true
         chained_structs:
             CreateCollectionRequest: CreateCollectionRequest
-

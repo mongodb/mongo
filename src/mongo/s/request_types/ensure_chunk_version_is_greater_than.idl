@@ -39,8 +39,9 @@ commands:
     _configsvrEnsureChunkVersionIsGreaterThan:
         command_name: _configsvrEnsureChunkVersionIsGreaterThan
         cpp_name: ConfigsvrEnsureChunkVersionIsGreaterThan
-        description: If a chunk matching 'requestedChunk' exists, bumps the chunk's version to one
-                     greater than the current collection version.
+        description:
+            If a chunk matching 'requestedChunk' exists, bumps the chunk's version to one
+            greater than the current collection version.
         namespace: ignored
         api_version: ""
         strict: false
@@ -54,8 +55,9 @@ commands:
                 type: object
                 optional: false
             version:
-                description: The data placement of the chunk, including major version, minor 
-                             version, and epoch.
+                description:
+                    The data placement of the chunk, including major version, minor
+                    version, and epoch.
                 type: ChunkVersion
                 optional: false
             collectionUUID:

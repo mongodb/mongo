@@ -73,7 +73,6 @@ types:
         # Deserializer uses getOwned.
         is_view: false
 
-
 commands:
     mapReduce:
         description: "The MapReduce command."
@@ -84,11 +83,13 @@ commands:
         strict: true
         fields:
             map:
-                description: "Javascript code to run as the map operation which associates a value
+                description:
+                    "Javascript code to run as the map operation which associates a value
                     with a key and emits the key and value pair."
                 type: mapReduceJavascriptCodeType
             reduce:
-                description: "Javascript code to run as the map operation which reduces all the
+                description:
+                    "Javascript code to run as the map operation which reduces all the
                     values associated with a particular key to a single value."
                 type: mapReduceJavascriptCodeType
             out:
@@ -96,7 +97,8 @@ commands:
                 type: mapReduceOutOptionsType
                 cpp_name: outOptions
             query:
-                description: "Query object in match language to use as a filter applied before the
+                description:
+                    "Query object in match language to use as a filter applied before the
                     map step."
                 type: object
                 optional: true
@@ -114,19 +116,21 @@ commands:
                 optional: true
             finalize:
                 description: "Javascript code to run after the reduce operation."
-                type:  mapReduceJavascriptCodeNullPermittedType
+                type: mapReduceJavascriptCodeNullPermittedType
                 optional: true
             scope:
                 description: "Javascript global variable mapping for map, reduce and finalize."
-                type:  mapReduceGlobalVariableScopeType
+                type: mapReduceGlobalVariableScopeType
                 optional: true
             verbose:
-                description: "Specifies whether to include the timing information in the result
+                description:
+                    "Specifies whether to include the timing information in the result
                     information."
                 type: bool
                 optional: true
             bypassDocumentValidation:
-                description: "Causes the out portion of the operation to ignore the output
+                description:
+                    "Causes the out portion of the operation to ignore the output
                     collection's document validation."
                 type: bool
                 optional: true

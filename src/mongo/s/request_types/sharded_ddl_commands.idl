@@ -74,7 +74,6 @@ enums:
             kComplete: "complete"
 
 structs:
-
     ConfigsvrCreateDatabaseResponse:
         description: "Response for the create database command"
         strict: false
@@ -94,13 +93,11 @@ structs:
                 description: "The new namespace for the collection being renamed."
             dropTarget:
                 type: bool
-                description: "If true, mongod will drop the target of renameCollection prior to
-                renaming the collection."
+                description: "If true, mongod will drop the target of renameCollection prior to renaming the collection."
                 default: false
             stayTemp:
                 type: bool
-                description: "If true, the original collection will remain temp if it was temp
-                before the rename."
+                description: "If true, the original collection will remain temp if it was temp before the rename."
                 default: false
             expectedSourceUUID:
                 type: uuid
@@ -112,20 +109,23 @@ structs:
                 optional: true
             expectedIndexes:
                 type: array<object>
-                description: "The expected indexes on the target collection. Rename will fail if
-                              they don't match. An array in the form
-                              {indexName: {spec}, indexName: {spec}, ...}."
+                description:
+                    "The expected indexes on the target collection. Rename will fail if
+                    they don't match. An array in the form
+                    {indexName: {spec}, indexName: {spec}, ...}."
                 optional: true
             expectedCollectionOptions:
                 type: object
-                description: "The expected collection options on the target collection. Rename will
-                              fail if they don't match. Same format as the options from the
-                              listCollections command."
+                description:
+                    "The expected collection options on the target collection. Rename will
+                    fail if they don't match. Same format as the options from the
+                    listCollections command."
                 optional: true
             targetMustNotBeSharded:
                 type: bool
-                description: "If true, then the command will error out if the target collection is
-                              sharded. If false or not set, no restriction is imposed."
+                description:
+                    "If true, then the command will error out if the target collection is
+                    sharded. If false or not set, no restriction is imposed."
                 optional: true
 
     RenameCollectionResponse:
@@ -180,8 +180,9 @@ structs:
                     false then it won't.
                 type: optionalBool
             capped:
-                description: "Specify true to create a capped collection. If you specify true, you
-                              must also set a maximum size in the 'size' field."
+                description:
+                    "Specify true to create a capped collection. If you specify true, you
+                    must also set a maximum size in the 'size' field."
                 type: safeBool
                 default: false
             idIndex:
@@ -194,17 +195,19 @@ structs:
                 optional: true
                 validator:
                     gte: 1
-                    lte: 1125899906842624  # 1 PB
+                    lte: 1125899906842624 # 1 PB
             max:
-                description: "The maximum number of documents allowed in the capped collection. The
-                              'size' limit takes precedence over this limit."
+                description:
+                    "The maximum number of documents allowed in the capped collection. The
+                    'size' limit takes precedence over this limit."
                 type: safeInt64
                 optional: true
                 validator:
-                    lt: 2147483648  # 2^31
+                    lt: 2147483648 # 2^31
             storageEngine:
-                description: "Specify a configuration to the storage engine on a per-collection
-                              basis when creating a collection."
+                description:
+                    "Specify a configuration to the storage engine on a per-collection
+                    basis when creating a collection."
                 type: object
                 optional: true
             validator:
@@ -212,33 +215,38 @@ structs:
                 type: object
                 optional: true
             validationLevel:
-                description: "Determines how strictly to apply the validation rules to existing
-                              documents during an update.
-                              Can be one of following values: 'off', 'strict' or 'moderate'."
+                description:
+                    "Determines how strictly to apply the validation rules to existing
+                    documents during an update.
+                    Can be one of following values: 'off', 'strict' or 'moderate'."
                 type: ValidationLevel
                 optional: true
             validationAction:
-                description: "Determines whether to error on invalid documents or just warn about
-                              the violations but allow invalid documents to be inserted.
-                              Can be either 'warn' or 'error'."
+                description:
+                    "Determines whether to error on invalid documents or just warn about
+                    the violations but allow invalid documents to be inserted.
+                    Can be either 'warn' or 'error'."
                 type: ValidationAction
                 optional: true
             indexOptionDefaults:
-                description: "Allows users to specify a default configuration for indexes when
-                              creating a collection."
+                description:
+                    "Allows users to specify a default configuration for indexes when
+                    creating a collection."
                 type: IndexOptionDefaults
                 optional: true
             viewOn:
-                description: "The name of the source collection or view from which to create the
-                              view."
+                description:
+                    "The name of the source collection or view from which to create the
+                    view."
                 type: string
                 optional: true
                 validator:
                     callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
-                description: "An array that consists of the aggregation pipeline. Creates the view
-                              by applying the specified pipeline to the 'viewOn' collection or
-                              view."
+                description:
+                    "An array that consists of the aggregation pipeline. Creates the view
+                    by applying the specified pipeline to the 'viewOn' collection or
+                    view."
                 type: array<object>
                 optional: true
             collation:
@@ -254,7 +262,8 @@ structs:
                 type: TimeseriesOptions
                 optional: true
             clusteredIndex:
-                description: "Specifies whether this collection should have a clusteredIndex.
+                description:
+                    "Specifies whether this collection should have a clusteredIndex.
                     Boolean is accepted as the legacy clustered index format for specific internal
                     collections - and implies clustering by _id. Otherwise, clusters according to
                     the ClusteredIndexSpec."
@@ -262,8 +271,9 @@ structs:
                     variant: [safeBool, ClusteredIndexSpec]
                 optional: true
             recordIdsReplicated:
-                description: "Specifies whether this collection should utilize the same recordId for a given document
-                              across all nodes in a replica set."
+                description:
+                    "Specifies whether this collection should utilize the same recordId for a given document
+                    across all nodes in a replica set."
                 type: safeBool
                 optional: true
             expireAfterSeconds:
@@ -285,10 +295,11 @@ structs:
 
             unsplittable:
                 type: optionalBool
-                description: "Flag that identifies whether the collection is splittable in multiple
-                            chunks. If unsplittable, the collection is always equivalent to a 1
-                            chunk collection. The shardKey must be set to {_id:1} in case this
-                            flag is enabled"
+                description:
+                    "Flag that identifies whether the collection is splittable in multiple
+                    chunks. If unsplittable, the collection is always equivalent to a 1
+                    chunk collection. The shardKey must be set to {_id:1} in case this
+                    flag is enabled"
             dataShard:
                 description: >-
                     If set, specify shard where the collection should be created, if the collection
@@ -501,8 +512,9 @@ commands:
         fields:
             fromMigrate:
                 type: optionalBool
-                description: "When set to true, the recipient is expected to generate
-                              a not user visible version of the op entry that marks the completion of the request."
+                description:
+                    "When set to true, the recipient is expected to generate
+                    a not user visible version of the op entry that marks the completion of the request."
                 default: false
 
     _shardsvrDropCollection:
@@ -555,8 +567,9 @@ commands:
             RenameCollectionRequest: RenameCollectionRequest
         fields:
             allowEncryptedCollectionRename:
-                description: "Encrypted Collection renames are usually disallowed to minimize user error.
-                              C2C needs to do the renames to replicate create collection."
+                description:
+                    "Encrypted Collection renames are usually disallowed to minimize user error.
+                    C2C needs to do the renames to replicate create collection."
                 type: bool
                 optional: true
         reply_type: OkReply
@@ -635,7 +648,7 @@ commands:
         description: "The internal createDatabase command on the config server"
         api_version: ""
         command_name: _configsvrCreateDatabase
-        cpp_name : ConfigsvrCreateDatabase
+        cpp_name: ConfigsvrCreateDatabase
         namespace: type
         type: string
         reply_type: ConfigsvrCreateDatabaseResponse
@@ -643,9 +656,10 @@ commands:
         fields:
             primaryShardId:
                 type: shard_id
-                description: "If set, indicates to the system which shard should be used as the
-                              primary for the database (if not already created). Otherwise, the
-                              system will use the balancer in order to select a primary."
+                description:
+                    "If set, indicates to the system which shard should be used as the
+                    primary for the database (if not already created). Otherwise, the
+                    system will use the balancer in order to select a primary."
                 optional: true
 
     _shardsvrCollMod:
@@ -680,8 +694,9 @@ commands:
         fields:
             phase:
                 type: ShardsvrSetUserWriteBlockModePhase
-                description: "Determines the phase of the blocking/unblocking procedure to be
-                              executed."
+                description:
+                    "Determines the phase of the blocking/unblocking procedure to be
+                    executed."
 
     _shardsvrSetClusterParameter:
         command_name: _shardsvrSetClusterParameter
@@ -697,8 +712,9 @@ commands:
                 description: "Time that will be associated with the cluster parameter"
 
     _shardsvrCheckMetadataConsistency:
-        description: "Internal command sent to the primary shard of a database to check metadata
-                      consistency."
+        description:
+            "Internal command sent to the primary shard of a database to check metadata
+            consistency."
         command_name: _shardsvrCheckMetadataConsistency
         cpp_name: ShardsvrCheckMetadataConsistency
         namespace: concatenate_with_db
@@ -735,38 +751,40 @@ commands:
                 type: shard_id
 
     _configsvrCheckClusterMetadataConsistency:
-          description: "Internal command sent to the config server to check cluster metadata
-                        consistency."
-          command_name: _configsvrCheckClusterMetadataConsistency
-          cpp_name: ConfigsvrCheckClusterMetadataConsistency
-          namespace: ignored
-          api_version: ""
-          reply_type: CursorInitialReply
-          strict: false
-          fields:
-              cursor:
-                  type: SimpleCursorOptions
-                  optional: true
+        description:
+            "Internal command sent to the config server to check cluster metadata
+            consistency."
+        command_name: _configsvrCheckClusterMetadataConsistency
+        cpp_name: ConfigsvrCheckClusterMetadataConsistency
+        namespace: ignored
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
 
     _configsvrCheckMetadataConsistency:
-         description: "Internal command sent to the config server to check metadata consistency."
-         command_name: _configsvrCheckMetadataConsistency
-         cpp_name: ConfigsvrCheckMetadataConsistency
-         namespace: concatenate_with_db
-         allow_global_collection_name: true
-         api_version: ""
-         reply_type: CursorInitialReply
-         strict: false
-         fields:
-             cursor:
-                 type: SimpleCursorOptions
-                 optional: true
+        description: "Internal command sent to the config server to check metadata consistency."
+        command_name: _configsvrCheckMetadataConsistency
+        cpp_name: ConfigsvrCheckMetadataConsistency
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CursorInitialReply
+        strict: false
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
 
     _configsvrSetClusterParameter:
         command_name: _configsvrSetClusterParameter
         cpp_name: ConfigsvrSetClusterParameter
-        description: "Internal command sent to the config server to start a coordinator and set the
-                      cluster parameter."
+        description:
+            "Internal command sent to the config server to start a coordinator and set the
+            cluster parameter."
         namespace: type
         type: object_owned
         api_version: ""
@@ -782,8 +800,9 @@ commands:
                 optional: true
             _compatibleWithTopologyChange:
                 type: bool
-                description: "If true, this cluster parameter change can run during a topology
-                              change"
+                description:
+                    "If true, this cluster parameter change can run during a topology
+                    change"
                 default: false
 
     _configsvrClearJumboFlag:
@@ -798,7 +817,7 @@ commands:
             epoch:
                 type: objectid
                 description: "The expected epoch of the namespace provided to
-                              clearJumboFlag."
+                    clearJumboFlag."
                 optional: false
             minKey:
                 type: object

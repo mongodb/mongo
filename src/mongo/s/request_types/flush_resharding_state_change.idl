@@ -44,7 +44,7 @@ commands:
         type: namespacestring
         reply_type: OkReply
         fields:
-          reshardingUUID:
-            type: uuid
-            optional: false
-            description: "The UUID for this resharding operation"
+            reshardingUUID:
+                type: uuid
+                optional: false
+                description: "The UUID for this resharding operation"

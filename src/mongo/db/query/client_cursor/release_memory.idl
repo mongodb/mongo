@@ -66,21 +66,21 @@ structs:
                 optional: true
 
     ReleaseMemoryCommandReply:
-        description: 'Response from releaseMemory command'
+        description: "Response from releaseMemory command"
         strict: false
         is_command_reply: true
         fields:
             cursorsReleased:
-                description: 'Cursors that have successfully released memory'
+                description: "Cursors that have successfully released memory"
                 type: array<cursorId>
             cursorsNotFound:
-                description: 'Cursors not found'
+                description: "Cursors not found"
                 type: array<cursorId>
             cursorsCurrentlyPinned:
-                description: 'Cursors that were already pinned during command execution'
+                description: "Cursors that were already pinned during command execution"
                 type: array<cursorId>
             cursorsWithErrors:
-                description: 'Cursors for which release memory failed with an error.'
+                description: "Cursors for which release memory failed with an error."
                 type: array<ReleaseMemoryError>
 
 commands:
@@ -93,14 +93,14 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: cluster
-                    action_type: releaseMemoryAnyCursor
+                      resource_pattern: cluster
+                      action_type: releaseMemoryAnyCursor
                 - privilege:
-                    resource_pattern: database
-                    action_type: releaseMemoryAnyCursor
+                      resource_pattern: database
+                      action_type: releaseMemoryAnyCursor
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: releaseMemoryAnyCursor
+                      resource_pattern: exact_namespace
+                      action_type: releaseMemoryAnyCursor
         strict: true
         namespace: type
         type: array<cursorId>

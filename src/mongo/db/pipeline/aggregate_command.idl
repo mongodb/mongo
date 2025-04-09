@@ -100,113 +100,113 @@ commands:
                 - check: get_authenticated_user
                 - check: lookup_user
                 - privilege: # many commands
-                    resource_pattern: exact_namespace
-                    action_type: [find, insert, update, remove]
+                      resource_pattern: exact_namespace
+                      action_type: [find, insert, update, remove]
                 - privilege: # $planCacheStats
-                    resource_pattern: exact_namespace
-                    action_type: planCacheRead
+                      resource_pattern: exact_namespace
+                      action_type: planCacheRead
                 - privilege: # $querySettings
-                    agg_stage: querySettings
-                    resource_pattern: cluster
-                    action_type: querySettings
+                      agg_stage: querySettings
+                      resource_pattern: cluster
+                      action_type: querySettings
                 - privilege: # $queryStats
-                    agg_stage: queryStats
-                    resource_pattern: cluster
-                    action_type: queryStatsRead
+                      agg_stage: queryStats
+                      resource_pattern: cluster
+                      action_type: queryStatsRead
                 - privilege: # $queryStats
-                    agg_stage: queryStats
-                    resource_pattern: cluster
-                    action_type: queryStatsReadTransformed
+                      agg_stage: queryStats
+                      resource_pattern: cluster
+                      action_type: queryStatsReadTransformed
                 - privilege: # $changeStream
-                    resource_pattern: exact_namespace
-                    action_type: changeStream
+                      resource_pattern: exact_namespace
+                      action_type: changeStream
                 - privilege: # $changeStream
-                    resource_pattern: database
-                    action_type: changeStream
+                      resource_pattern: database
+                      action_type: changeStream
                 - privilege: # $changeStream
-                    resource_pattern: any_normal
-                    action_type: changeStream
+                      resource_pattern: any_normal
+                      action_type: changeStream
                 - privilege: # $changeStream
-                    resource_pattern: database
-                    action_type: find
+                      resource_pattern: database
+                      action_type: find
                 - privilege: # $changeStream
-                    resource_pattern: any_normal
-                    action_type: find
+                      resource_pattern: any_normal
+                      action_type: find
                 - privilege: # $changeStream, $_internalListCollections
-                    resource_pattern: cluster
-                    action_type: internal
+                      resource_pattern: cluster
+                      action_type: internal
                 - privilege: # $collstats
-                    resource_pattern: exact_namespace
-                    action_type: collStats
+                      resource_pattern: exact_namespace
+                      action_type: collStats
                 - privilege: # $currentOp
-                    resource_pattern: cluster
-                    action_type: inprog
+                      resource_pattern: cluster
+                      action_type: inprog
                 - privilege: # $indexStats
-                    resource_pattern: exact_namespace
-                    action_type: indexStats
+                      resource_pattern: exact_namespace
+                      action_type: indexStats
                 - privilege: # $listCachedAndActiveUsers
-                    resource_pattern: any_normal
-                    action_type: listCachedAndActiveUsers
+                      resource_pattern: any_normal
+                      action_type: listCachedAndActiveUsers
                 - privilege: # $listCatalog
-                    agg_stage: listCatalog
-                    resource_pattern: exact_namespace
-                    action_type: [listCollections, listIndexes]
+                      agg_stage: listCatalog
+                      resource_pattern: exact_namespace
+                      action_type: [listCollections, listIndexes]
                 - privilege: # $listCatalog
-                    agg_stage: listCatalog
-                    resource_pattern: cluster
-                    action_type: listDatabases
+                      agg_stage: listCatalog
+                      resource_pattern: cluster
+                      action_type: listDatabases
                 - privilege: # $listCatalog
-                    agg_stage: listCatalog
-                    resource_pattern: any_normal
-                    action_type: [listCollections, listIndexes]
+                      agg_stage: listCatalog
+                      resource_pattern: any_normal
+                      action_type: [listCollections, listIndexes]
                 - privilege: # $listCatalog
-                    agg_stage: listCatalog
-                    resource_pattern: collection
-                    action_type: [listCollections, listIndexes]
+                      agg_stage: listCatalog
+                      resource_pattern: collection
+                      action_type: [listCollections, listIndexes]
                 - privilege: # $listCatalog
-                    agg_stage: listCatalog
-                    resource_pattern: any_system_buckets
-                    action_type: [listCollections, listIndexes]
+                      agg_stage: listCatalog
+                      resource_pattern: any_system_buckets
+                      action_type: [listCollections, listIndexes]
                 - privilege: # $listSampledQueries
-                    agg_stage: listSampledQueries
-                    resource_pattern: cluster
-                    action_type: [listSampledQueries]
+                      agg_stage: listSampledQueries
+                      resource_pattern: cluster
+                      action_type: [listSampledQueries]
                 - privilege: # $listSessions
-                    resource_pattern: cluster
-                    action_type: listSessions
+                      resource_pattern: cluster
+                      action_type: listSessions
                 - privilege: # various
-                    resource_pattern: exact_namespace
-                    action_type: bypassDocumentValidation
+                      resource_pattern: exact_namespace
+                      action_type: bypassDocumentValidation
                 - privilege: # $operationMetrics
-                    resource_pattern: cluster
-                    action_type: operationMetrics
+                      resource_pattern: cluster
+                      action_type: operationMetrics
                 - privilege: # $backupCursorExtend, backupCursor
-                    resource_pattern: cluster
-                    action_type: fsync
+                      resource_pattern: cluster
+                      action_type: fsync
                 - privilege: # $_internalAllCollectionStats
-                     agg_stage: _internalAllCollectionStats
-                     resource_pattern: cluster
-                     action_type: allCollectionStats
+                      agg_stage: _internalAllCollectionStats
+                      resource_pattern: cluster
+                      action_type: allCollectionStats
                 - privilege: # $shardedDataDistribution
-                     agg_stage: shardedDataDistribution
-                     resource_pattern: cluster
-                     action_type: shardedDataDistribution
+                      agg_stage: shardedDataDistribution
+                      resource_pattern: cluster
+                      action_type: shardedDataDistribution
                 - privilege: # $_analyzeShardKeyReadWriteDistribution
-                     agg_stage: _analyzeShardKeyReadWriteDistribution
-                     resource_pattern: exact_namespace
-                     action_type: analyzeShardKey
+                      agg_stage: _analyzeShardKeyReadWriteDistribution
+                      resource_pattern: exact_namespace
+                      action_type: analyzeShardKey
                 - privilege: # $listSearchIndexes
-                    agg_stage: listSearchIndexes
-                    resource_pattern: database
-                    action_type: listSearchIndexes
+                      agg_stage: listSearchIndexes
+                      resource_pattern: database
+                      action_type: listSearchIndexes
                 - privilege: # $listClusterCatalog
-                    agg_stage: listClusterCatalog
-                    resource_pattern: cluster
-                    action_type: listClusterCatalog
+                      agg_stage: listClusterCatalog
+                      resource_pattern: cluster
+                      action_type: listClusterCatalog
                 - privilege: # $listClusterCatalog
-                    agg_stage: listClusterCatalog
-                    resource_pattern: database
-                    action_type: listCollections
+                      agg_stage: listClusterCatalog
+                      resource_pattern: database
+                      action_type: listCollections
         # Note that the 'CursorInitialReply' is not the only response that an aggregate command
         # could return. With 'explain' or 'exchange', the response would not include the fields in
         # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the
@@ -247,10 +247,10 @@ commands:
                 optional: true
                 stability: stable
             querySettings:
-              description: "Query settings for the given query"
-              type: QuerySettings
-              optional: true
-              stability: internal
+                description: "Query settings for the given query"
+                type: QuerySettings
+                optional: true
+                stability: internal
             let:
                 description: "A document containing user-specified let parameter constants; i.e. values that do not change once computed."
                 type: object_owned
@@ -316,14 +316,16 @@ commands:
                 optional: true
                 stability: unstable
             stmtId:
-                description: "The statement id of the write in the original write batch for a write
-                              without shard key."
+                description:
+                    "The statement id of the write in the original write batch for a write
+                    without shard key."
                 type: int
                 optional: true
                 stability: internal
             $_isClusterQueryWithoutShardKeyCmd:
-                description: "True if a _clusterQueryWithoutShardKey command is running a broadcast
-                              aggregate."
+                description: >-
+                    True if a _clusterQueryWithoutShardKey command is running a broadcast
+                    aggregate.
                 type: optionalBool
                 cpp_name: isClusterQueryWithoutShardKeyCmd
                 stability: internal
@@ -333,19 +335,21 @@ commands:
                 type: optionalBool
                 stability: unstable
             $_resumeAfter:
-                description: "Internal usage only. If present, the collection scan will seek to the
-                exact RecordId, or return KeyNotFound if it does not exist. Must only be set on
-                forward collection scans. This field cannot be used in conjunction with 'min', 'max',
-                or '$_startAt', and is not valid on views, or on mongos."
+                description: >-
+                    Internal usage only. If present, the collection scan will seek to the
+                    exact RecordId, or return KeyNotFound if it does not exist. Must only be set on
+                    forward collection scans. This field cannot be used in conjunction with 'min', 'max',
+                    or '$_startAt', and is not valid on views, or on mongos.
                 cpp_name: resumeAfter
                 type: object_owned
                 optional: true
                 stability: unstable
             $_startAt:
-                description: "Internal usage only. If present, the collection scan will seek to the
-                exact RecordId, or the next available RecordId if it does not exist. Must only be set
-                on forward collection scans. This field cannot be used in conjunction with 'min',
-                'max', or '$_resumeAfter', and is not valid on views, or on mongos."
+                description: >-
+                    Internal usage only. If present, the collection scan will seek to the
+                    exact RecordId, or the next available RecordId if it does not exist. Must only be set
+                    on forward collection scans. This field cannot be used in conjunction with 'min',
+                    'max', or '$_resumeAfter', and is not valid on views, or on mongos.
                 cpp_name: startAt
                 type: object_owned
                 optional: true
@@ -356,10 +360,10 @@ commands:
                 stability: internal
             # TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
             $_isRankFusion:
-                description: Internal usage only. If present, indicates that the pipeline is the 
+                description: >-
+                    Internal usage only. If present, indicates that the pipeline is the 
                     desugared representation of a user's $rankFusion pipeline. This is necessary 
                     for guarding that $rankFusion is not yet allowed to be run over views.
                 cpp_name: isRankFusion
                 type: optionalBool
                 stability: internal
-

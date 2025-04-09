@@ -38,4 +38,3 @@ types:
         serializer: HostAndPort::toString
         deserializer: HostAndPort::parseThrowing
         is_view: false
-

@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-        - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     DocumentSourceListClusterCatalogSpec:
@@ -52,4 +52,3 @@ structs:
                 description: "If true, reports whether the collection is tracked."
                 type: optionalBool
                 query_shape: literal
-

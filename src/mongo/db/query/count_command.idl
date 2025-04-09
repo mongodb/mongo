@@ -50,19 +50,19 @@ types:
 
 structs:
     CountCommandReply:
-        description: 'Reply from the {count: ...} command'
+        description: "Reply from the {count: ...} command"
         strict: true
         is_command_reply: true
         fields:
             n:
-                description: 'Number of documents'
+                description: "Number of documents"
                 type:
                     variant: [int, long]
                 optional: false
                 cpp_name: count
                 stability: stable
             metrics:
-                description: 'The metrics for the count command'
+                description: "The metrics for the count command"
                 type: object_owned
                 optional: true
                 stability: unstable
@@ -81,16 +81,17 @@ commands:
                 - check: should_ignore_auth_checks
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: find
+                      resource_pattern: exact_namespace
+                      action_type: find
                 - privilege:
-                    resource_pattern: cluster
-                    action_type: useUUID
+                      resource_pattern: cluster
+                      action_type: useUUID
         reply_type: CountCommandReply
         fields:
             query:
-                description: "A query that selects which documents to count in the collection or
-                view."
+                description: >-
+                    A query that selects which documents to count in the collection or
+                    view.
                 type: object_owned
                 default: BSONObj()
                 stability: stable
@@ -100,11 +101,12 @@ commands:
                 optional: true
                 stability: stable
             skip:
-                description: "The number of matching documents to skip before counting subsequent
+                description:
+                    "The number of matching documents to skip before counting subsequent
                     results."
                 type: safeInt64
                 optional: true
-                validator: { gte: 0 }
+                validator: {gte: 0}
                 stability: stable
             hint:
                 description: "The index name to use or the index specification document."

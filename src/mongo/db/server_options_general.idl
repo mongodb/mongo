@@ -32,33 +32,33 @@ global:
         - "mongo/db/server_options.h"
         - "mongo/db/server_options_base.h"
     configs:
-        section: 'General options'
-        source: [ cli, ini, yaml ]
+        section: "General options"
+        source: [cli, ini, yaml]
         initializer:
             register: addGeneralServerOptionDefinitions
 
 configs:
     help:
-        description: 'Show this usage information'
+        description: "Show this usage information"
         single_name: h
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
     version:
-        description: 'Show version information'
+        description: "Show version information"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
     config:
-        description: 'Configuration file specifying additional options'
+        description: "Configuration file specifying additional options"
         single_name: f
         arg_vartype: String
-        source: [ cli, ini ]
+        source: [cli, ini]
     outputConfig:
-        description: 'Display the resolved configuration and exit'
+        description: "Display the resolved configuration and exit"
         arg_vartype: Switch
         source: cli
         hidden: true
     configExpand:
-        description: 'Process expansion directives in config file (none, exec, rest)'
+        description: "Process expansion directives in config file (none, exec, rest)"
         arg_vartype: String
         source: cli
     configExpandTimeoutSecs:
@@ -69,103 +69,103 @@ configs:
         hidden: true
         default: 30
 
-    'net.port':
+    "net.port":
         description:
-            expr: 'ServerGlobalParams::getPortSettingHelpText()'
+            expr: "ServerGlobalParams::getPortSettingHelpText()"
             is_constexpr: false
         short_name: port
         arg_vartype: Int
-        validator: { gte: 0, lte: 65535 }
-    'net.ipv6':
-        description: 'Enable IPv6 support (disabled by default)'
+        validator: {gte: 0, lte: 65535}
+    "net.ipv6":
+        description: "Enable IPv6 support (disabled by default)"
         short_name: ipv6
         arg_vartype: Switch
-    'net.listenBacklog':
-        description: 'Set socket listen backlog size'
+    "net.listenBacklog":
+        description: "Set socket listen backlog size"
         short_name: listenBacklog
         arg_vartype: Int
-        default: { expr: 'SOMAXCONN' }
-    'net.maxIncomingConnections':
-        description: 'Max number of simultaneous connections'
+        default: {expr: "SOMAXCONN"}
+    "net.maxIncomingConnections":
+        description: "Max number of simultaneous connections"
         short_name: maxConns
         arg_vartype: Int
-        default: { expr: 'static_cast<int>(DEFAULT_MAX_CONN)' }
-    'net.maxIncomingConnectionsOverride':
-        description: 'CIDR ranges that are exempt from the maxIncomingConnections limit'
+        default: {expr: "static_cast<int>(DEFAULT_MAX_CONN)"}
+    "net.maxIncomingConnectionsOverride":
+        description: "CIDR ranges that are exempt from the maxIncomingConnections limit"
         arg_vartype: StringVector
         source: yaml
         hidden: true
-    'net.reservedAdminThreads':
-        description: 'Number of worker threads to reserve for admin and internal connections'
+    "net.reservedAdminThreads":
+        description: "Number of worker threads to reserve for admin and internal connections"
         arg_vartype: Int
         source: yaml
         hidden: true
-    'processManagement.pidFilePath':
-        description: 'Full path to pidfile (if not set, no pidfile is created)'
+    "processManagement.pidFilePath":
+        description: "Full path to pidfile (if not set, no pidfile is created)"
         short_name: pidfilepath
         arg_vartype: String
-    'processManagement.timeZoneInfo':
-        description: 'Full path to time zone info directory, e.g. /usr/share/zoneinfo'
+    "processManagement.timeZoneInfo":
+        description: "Full path to time zone info directory, e.g. /usr/share/zoneinfo"
         short_name: timeZoneInfo
         arg_vartype: String
 
     nounixsocket:
-        description: 'Disable listening on unix sockets'
+        description: "Disable listening on unix sockets"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         condition:
-            preprocessor: '!defined(_WIN32)'
-    'net.unixDomainSocket.enabled':
-        description: 'Disable listening on unix sockets'
+            preprocessor: "!defined(_WIN32)"
+    "net.unixDomainSocket.enabled":
+        description: "Disable listening on unix sockets"
         arg_vartype: Bool
         source: yaml
         condition:
-            preprocessor: '!defined(_WIN32)'
-    'net.unixDomainSocket.pathPrefix':
+            preprocessor: "!defined(_WIN32)"
+    "net.unixDomainSocket.pathPrefix":
         short_name: unixSocketPrefix
-        description: 'Alternative directory for UNIX domain sockets (defaults to /tmp)'
+        description: "Alternative directory for UNIX domain sockets (defaults to /tmp)"
         arg_vartype: String
         condition:
-            preprocessor: '!defined(_WIN32)'
-    'net.unixDomainSocket.filePermissions':
+            preprocessor: "!defined(_WIN32)"
+    "net.unixDomainSocket.filePermissions":
         description:
-            expr: 'getUnixDomainSocketFilePermissionsHelpText()'
+            expr: "getUnixDomainSocketFilePermissionsHelpText()"
             is_constexpr: false
         short_name: filePermissions
         arg_vartype: Int
         condition:
-            preprocessor: '!defined(_WIN32)'
-    'processManagement.fork':
-        description: 'Fork server process'
+            preprocessor: "!defined(_WIN32)"
+    "processManagement.fork":
+        description: "Fork server process"
         short_name: fork
         arg_vartype: Switch
         condition:
-            preprocessor: '!defined(_WIN32)'
+            preprocessor: "!defined(_WIN32)"
 
     objcheck:
-        description: 'Inspect client data for validity on receipt (DEFAULT)'
+        description: "Inspect client data for validity on receipt (DEFAULT)"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         conflicts: noobjcheck
         hidden: true
     noobjcheck:
-        description: 'Do NOT inspect client data for validity on receipt'
+        description: "Do NOT inspect client data for validity on receipt"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         conflicts: objcheck
         hidden: true
-    'net.wireObjectCheck':
-        description: 'Inspect client data for validity on receipt (DEFAULT)'
+    "net.wireObjectCheck":
+        description: "Inspect client data for validity on receipt (DEFAULT)"
         arg_vartype: Bool
         source: yaml
         hidden: true
     crashOnInvalidBSONError:
         description: "Crashes the shell if invalid BSON is returned from a call to the server. Must be paired with objcheck to provoke a BSON validation check."
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         hidden: true
     initializerShuffleSeed:
         description: "Sets random seed used to shuffle initializers (for testing)"
         arg_vartype: Unsigned
-        source: [ cli ]
+        source: [cli]
         hidden: true

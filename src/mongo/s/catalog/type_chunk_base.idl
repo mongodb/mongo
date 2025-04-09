@@ -37,8 +37,9 @@ imports:
 
 structs:
     ChunkHistoryBase:
-        description: "An element of a chunk history array. The array holds the history ordered from
-                      the most recent (the index 0) to the oldest supported."
+        description:
+            "An element of a chunk history array. The array holds the history ordered from
+            the most recent (the index 0) to the oldest supported."
         fields:
             validAfter:
                 type: timestamp

@@ -62,27 +62,27 @@ enums:
         values:
             kDeterministic: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
             kRandom: "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
-    
 
 structs:
     # Maps to the encrypt keyword in JSON Schema.
     EncryptionInfo:
-        description: "Represents the fields that users can specify within the encryptMetadata
+        description:
+            "Represents the fields that users can specify within the encryptMetadata
             subobject in a JSON Schema."
         strict: true
         fields:
-          bsonType:
-            description: "Specifies the type of the to-be-encrypted value."
-            type: bsonTypeSet
-            optional: true
-          algorithm:
-            description: "The encryption algorithm to be used."
-            type: FleAlgorithm
-            optional: true
-          keyId:
-            description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
-            type: encryptSchemaKeyId
-            optional: true
+            bsonType:
+                description: "Specifies the type of the to-be-encrypted value."
+                type: bsonTypeSet
+                optional: true
+            algorithm:
+                description: "The encryption algorithm to be used."
+                type: FleAlgorithm
+                optional: true
+            keyId:
+                description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
+                type: encryptSchemaKeyId
+                optional: true
 
     # Maps to "encryptMetadata" in JSON Schema.
     EncryptionMetadata:
@@ -91,14 +91,11 @@ structs:
         strict: true
         generate_comparison_operators: true
         fields:
-          algorithm:
-            description: "The encryption algorithm to be used."
-            type: FleAlgorithm
-            optional: true
-          keyId:
-            description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
-            type: encryptSchemaKeyId
-            optional: true
-
-
-
+            algorithm:
+                description: "The encryption algorithm to be used."
+                type: FleAlgorithm
+                optional: true
+            keyId:
+                description: "A JSONPointer to a key or an array of UUIDs identifying a set of keys."
+                type: encryptSchemaKeyId
+                optional: true

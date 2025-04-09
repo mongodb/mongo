@@ -26,16 +26,16 @@
 # it in the license file.
 #
 
-
 global:
-    cpp_namespace: 'mongo'
+    cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 imports:
     - "mongo/db/basic_types.idl"
 structs:
     DocumentSourceListSearchIndexesSpec:
-        description: "A document used to specify the $listSearchIndexes stage. If both id and name
+        description:
+            "A document used to specify the $listSearchIndexes stage. If both id and name
             are empty, then this stage will return the information for all indexes in the collection."
         strict: true
         query_shape_component: true

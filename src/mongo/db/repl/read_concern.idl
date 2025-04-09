@@ -28,8 +28,8 @@
 global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
-      - "mongo/db/logical_time.h"
-      - "mongo/db/repl/read_concern_idl.h"
+        - "mongo/db/logical_time.h"
+        - "mongo/db/repl/read_concern_idl.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -38,38 +38,41 @@ imports:
 
 enums:
     ReadConcernLevel:
-      description: Enumeration representing ReadConcern levels
-      type: string
-      values:
-          kLocalReadConcern: "local"
-          kMajorityReadConcern: "majority"
-          kLinearizableReadConcern: "linearizable"
-          kAvailableReadConcern: "available"
-          kSnapshotReadConcern: "snapshot"
+        description: Enumeration representing ReadConcern levels
+        type: string
+        values:
+            kLocalReadConcern: "local"
+            kMajorityReadConcern: "majority"
+            kLinearizableReadConcern: "linearizable"
+            kAvailableReadConcern: "available"
+            kSnapshotReadConcern: "snapshot"
 
 types:
     # TODO: SERVER-89143 delete this type, use logicalTime from basic_types.idl.
     ReadConcernLogicalTime:
-      bson_serialization_type: any
-      description: "A MongoDB LogicalTime. This type has stricter deserialization rules than the
-                    logicalTime defined in basic_types.idl."
-      cpp_type: ::mongo::LogicalTime
-      serializer: ::mongo::serializeReadConcernLogicalTime
-      deserializer: ::mongo::deserializeReadConcernLogicalTime
-      is_view: false
+        bson_serialization_type: any
+        description:
+            "A MongoDB LogicalTime. This type has stricter deserialization rules than the
+            logicalTime defined in basic_types.idl."
+        cpp_type: ::mongo::LogicalTime
+        serializer: ::mongo::serializeReadConcernLogicalTime
+        deserializer: ::mongo::deserializeReadConcernLogicalTime
+        is_view: false
 
 structs:
     ReadConcernIdl:
-        description: "An object representing a read concern document, used only for mapping to
-                      and from BSON."
+        description:
+            "An object representing a read concern document, used only for mapping to
+            and from BSON."
         fields:
             level:
                 type: ReadConcernLevel
                 optional: true
             afterOpTime:
-                description: "Read data after the OpTime of an operation on this replica set.
-                              Deprecated. The only user is for read-after-optime calls using the
-                              config server optime."
+                description:
+                    "Read data after the OpTime of an operation on this replica set.
+                    Deprecated. The only user is for read-after-optime calls using the
+                    config server optime."
                 type: optime
                 optional: true
             afterClusterTime:
@@ -82,8 +85,9 @@ structs:
                 optional: true
             provenance:
                 type: ReadWriteConcernProvenanceSource
-                description: "Represents the 'provenance' (ie. original source) of a read or
-                              write concern."
+                description:
+                    "Represents the 'provenance' (ie. original source) of a read or
+                    write concern."
                 optional: true
             $_allowTransactionTableSnapshot:
                 type: bool

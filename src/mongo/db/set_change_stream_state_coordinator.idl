@@ -26,7 +26,6 @@
 # it in the license file.
 #
 
-
 global:
     cpp_namespace: "mongo"
 
@@ -36,8 +35,9 @@ imports:
 
 structs:
     SetChangeStreamStateCoordinatorId:
-        description: "A specification that uniquely identifies each state document of the
-                      'SetChangeStreamStateCoordinatorService'."
+        description:
+            "A specification that uniquely identifies each state document of the
+            'SetChangeStreamStateCoordinatorService'."
         generate_comparison_operators: false
         strict: false
         fields:
@@ -48,7 +48,7 @@ structs:
 
     SetChangeStreamStateCoordinatorDocument:
         description: "A specification that defines the schema of the
-                      'SetChangeStreamStateCoordinatorService' state document."
+            'SetChangeStreamStateCoordinatorService' state document."
         generate_comparison_operators: false
         strict: false
         fields:

@@ -27,16 +27,16 @@
 #
 
 global:
-  cpp_namespace: "mongo::query_shape"
+    cpp_namespace: "mongo::query_shape"
 
 imports:
-  - "mongo/crypto/sha256_block.idl"
+    - "mongo/crypto/sha256_block.idl"
 
 types:
-  QueryShapeHash:
-    bson_serialization_type: string
-    description: "Type representing SHA256 hash of the QueryShape."
-    cpp_type: mongo::SHA256Block
-    serializer: "mongo::SHA256Block::toHexString"
-    deserializer: "mongo::SHA256Block::fromHexString"
-    is_view: false
+    QueryShapeHash:
+        bson_serialization_type: string
+        description: "Type representing SHA256 hash of the QueryShape."
+        cpp_type: mongo::SHA256Block
+        serializer: "mongo::SHA256Block::toHexString"
+        deserializer: "mongo::SHA256Block::fromHexString"
+        is_view: false

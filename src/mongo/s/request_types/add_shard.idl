@@ -30,8 +30,8 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/s/type_shard_identity.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/s/type_shard_identity.idl"
 
 structs:
     AddShardRequestBase:

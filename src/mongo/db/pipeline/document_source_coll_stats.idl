@@ -27,71 +27,72 @@
 #
 
 global:
-  cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_parsing_validators.h"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/document_source_parsing_validators.h"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/storage_stats_spec.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/storage_stats_spec.idl"
 
 structs:
-  LatencyStatsSpec:
-    description: Represents the 'latencyStats' argument to the $collStats stage.
-    strict: true
-    query_shape_component: true
-    fields: 
-      histograms:
-        description: Adds latency histogram information to the embedded documents in latencyStats if true.
-        type: optionalBool
-        # Do not abstract this literal, since it is parameterizing the stage like an enum rather than representing
-        # real user input.
-        query_shape: parameter  
-  DocumentSourceCollStatsSpec:
-    description: Specification for a $collStats stage.
-    strict: true
-    query_shape_component: true
-    fields:
-      latencyStats:
-        description: A request to include latency stats in the $collStats output.
-        type: LatencyStatsSpec
-        optional: true
-        query_shape: literal
-      storageStats:
-        description: Adds storage statistics to the return document.
-        type: StorageStatsSpec
-        optional: true
-        query_shape: literal
-      count:
-        description: Adds the total number of documents in the collection to the return document.
-        type: object
-        validator:
-          callback: validateObjectIsEmpty
-        optional: true
-        # Treat this value as a parameter (meaning it won't be abstracted or transformed) because
-        # the _only_ accepted value is the empty object. There's no transformation needed.
-        query_shape: parameter
-      queryExecStats:
-        description: Adds query execution statistics to the return document.
-        type: object
-        validator:
-            callback: validateObjectIsEmpty
-        optional: true
-        # Treat this value as a parameter (meaning it won't be abstracted or transformed) because
-        # the _only_ accepted value is the empty object. There's no transformation needed.
-        query_shape: parameter
-      $_requestOnTimeseriesView:
-        description: When set to true, $collStats stage requests statistics from the view namespace.
-          When set to false, $collStats stage requests statistics from the underlying collection.
-        cpp_name: requestOnTimeseriesView
-        type: optionalBool
-        query_shape: parameter
-      operationStats:
-        description: Adds operationStats to $collStats output.
-        type: object
-        optional: true
-        query_shape: literal
-      targetAllNodes:
-        description: When true, $collStats targets all nodes on each shard. When false, $collStats targets only nodes defined by read preference.
-        type: optionalBool
-        query_shape: parameter
+    LatencyStatsSpec:
+        description: Represents the 'latencyStats' argument to the $collStats stage.
+        strict: true
+        query_shape_component: true
+        fields:
+            histograms:
+                description: Adds latency histogram information to the embedded documents in latencyStats if true.
+                type: optionalBool
+                # Do not abstract this literal, since it is parameterizing the stage like an enum rather than representing
+                # real user input.
+                query_shape: parameter
+    DocumentSourceCollStatsSpec:
+        description: Specification for a $collStats stage.
+        strict: true
+        query_shape_component: true
+        fields:
+            latencyStats:
+                description: A request to include latency stats in the $collStats output.
+                type: LatencyStatsSpec
+                optional: true
+                query_shape: literal
+            storageStats:
+                description: Adds storage statistics to the return document.
+                type: StorageStatsSpec
+                optional: true
+                query_shape: literal
+            count:
+                description: Adds the total number of documents in the collection to the return document.
+                type: object
+                validator:
+                    callback: validateObjectIsEmpty
+                optional: true
+                # Treat this value as a parameter (meaning it won't be abstracted or transformed) because
+                # the _only_ accepted value is the empty object. There's no transformation needed.
+                query_shape: parameter
+            queryExecStats:
+                description: Adds query execution statistics to the return document.
+                type: object
+                validator:
+                    callback: validateObjectIsEmpty
+                optional: true
+                # Treat this value as a parameter (meaning it won't be abstracted or transformed) because
+                # the _only_ accepted value is the empty object. There's no transformation needed.
+                query_shape: parameter
+            $_requestOnTimeseriesView:
+                description:
+                    When set to true, $collStats stage requests statistics from the view namespace.
+                    When set to false, $collStats stage requests statistics from the underlying collection.
+                cpp_name: requestOnTimeseriesView
+                type: optionalBool
+                query_shape: parameter
+            operationStats:
+                description: Adds operationStats to $collStats output.
+                type: object
+                optional: true
+                query_shape: literal
+            targetAllNodes:
+                description: When true, $collStats targets all nodes on each shard. When false, $collStats targets only nodes defined by read preference.
+                type: optionalBool
+                query_shape: parameter

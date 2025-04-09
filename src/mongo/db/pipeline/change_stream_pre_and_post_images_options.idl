@@ -36,12 +36,12 @@ imports:
 
 structs:
     ChangeStreamPreAndPostImagesOptions:
-        description: 'A type representing the adjustable options of a collection with change stream point-in-time pre- and post-images.'
+        description: "A type representing the adjustable options of a collection with change stream point-in-time pre- and post-images."
         strict: true
         generate_comparison_operators: true
         fields:
             enabled:
-                description: 'Determines whether point-in-time pre- and post-images are available for change streams.'
+                description: "Determines whether point-in-time pre- and post-images are available for change streams."
                 type: bool
                 optional: false
                 stability: stable

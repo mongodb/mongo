@@ -28,7 +28,6 @@
 global:
     cpp_namespace: "mongo"
 
-
 imports:
     - "mongo/db/basic_types.idl"
 

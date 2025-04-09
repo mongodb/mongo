@@ -27,44 +27,44 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
-  - "mongo/s/sharding_types.idl"
+    - "mongo/db/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
 
 commands:
-  testReshardCloneCollection:
-    command_name: testReshardCloneCollection
-    description: "The 'testReshardCloneCollection' command."
-    namespace: type
-    api_version: ""
-    type: namespacestring
-    fields:
-      atClusterTime:
-        description: "The snapshot time to clone the collection from the donor shards at."
-        type: timestamp
-      outputNs:
-        description: "The namespace to write the cloned contents into."
+    testReshardCloneCollection:
+        command_name: testReshardCloneCollection
+        description: "The 'testReshardCloneCollection' command."
+        namespace: type
+        api_version: ""
         type: namespacestring
-      shardKey:
-        description: "The new shard key pattern."
-        type: object
-      shardId:
-        description: >-
-          "The recipient shard to act as when cloning the collection from the donor shards."
-        type: shard_id
-      uuid:
-        description: "The source collection's UUID."
-        type: uuid
-      reshardingUUID:
-        description: "The unique identifier for the resharding run."
-        optional: true
-        type: uuid
-      relaxed:
-        description: >-
+        fields:
+            atClusterTime:
+                description: "The snapshot time to clone the collection from the donor shards at."
+                type: timestamp
+            outputNs:
+                description: "The namespace to write the cloned contents into."
+                type: namespacestring
+            shardKey:
+                description: "The new shard key pattern."
+                type: object
+            shardId:
+                description: >-
+                    "The recipient shard to act as when cloning the collection from the donor shards."
+                type: shard_id
+            uuid:
+                description: "The source collection's UUID."
+                type: uuid
+            reshardingUUID:
+                description: "The unique identifier for the resharding run."
+                optional: true
+                type: uuid
+            relaxed:
+                description: >-
                     "Runs the cloner aggregation without specifying a collection
                     uuid to avoid errors in a scenario where the collection UUIDs
                     are inconsistent among shards."
-        type: bool
-        default: false
+                type: bool
+                default: false

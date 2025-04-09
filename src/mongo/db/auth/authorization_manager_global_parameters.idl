@@ -32,14 +32,14 @@ global:
 
 server_parameters:
     authSchemaVersion:
-        description: 'Read-only value describing the current auth schema version'
-        set_at: 'readonly'
+        description: "Read-only value describing the current auth schema version"
+        set_at: "readonly"
         cpp_class:
             name: AuthzVersionParameter
         redact: false
 
     startupAuthSchemaValidation:
-        description: 'Validate auth schema on startup'
+        description: "Validate auth schema on startup"
         set_at: startup
         cpp_vartype: bool
         cpp_varname: gStartupAuthSchemaValidation
@@ -47,8 +47,7 @@ server_parameters:
         redact: false
 
     allowRolesFromX509Certificates:
-        description:
-            Whether to allow roles contained in X509 certificates if X509 authentication is enabled
+        description: Whether to allow roles contained in X509 certificates if X509 authentication is enabled
         set_at: startup
         cpp_vartype: bool
         cpp_varname: allowRolesFromX509Certificates

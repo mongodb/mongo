@@ -44,9 +44,10 @@ structs:
         fields:
             _id:
                 type: namespacestring
-                description: "The namespace of the collection that is under the collection critical
-                              section. Empty namespacestring indicates global write blocking to all
-                              collections."
+                description:
+                    "The namespace of the collection that is under the collection critical
+                    section. Empty namespacestring indicates global write blocking to all
+                    collections."
                 cpp_name: nss
             blockNewUserShardedDDL:
                 type: bool

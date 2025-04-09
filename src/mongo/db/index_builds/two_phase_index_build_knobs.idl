@@ -27,58 +27,58 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 server_parameters:
-  # Commit quorum option is supported only for two phase index builds.
-  enableIndexBuildCommitQuorum:
-    description: "Support for using commit quorum for two phase index builds."
-    set_at: startup
-    cpp_vartype: bool
-    cpp_varname: "enableIndexBuildCommitQuorum"
-    default: true
-    test_only: true
-    redact: false
+    # Commit quorum option is supported only for two phase index builds.
+    enableIndexBuildCommitQuorum:
+        description: "Support for using commit quorum for two phase index builds."
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: "enableIndexBuildCommitQuorum"
+        default: true
+        test_only: true
+        redact: false
 
-  maxNumActiveUserIndexBuilds:
-    description: >
-      Specifies the maximum number of active user index builds that can be built simultaneously on
-      the primary node. Index builds initiated by the system are not subject to this limitation.
+    maxNumActiveUserIndexBuilds:
+        description: >
+            Specifies the maximum number of active user index builds that can be built simultaneously on
+            the primary node. Index builds initiated by the system are not subject to this limitation.
 
-      Additionally, active index builds initiated by the system count towards the limit and can
-      delay scheduling user index builds even when the number of active user index builds is below
-      the limit.
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: maxNumActiveUserIndexBuilds
-    default: 3
-    validator:
-      gte: 0
-    redact: false
+            Additionally, active index builds initiated by the system count towards the limit and can
+            delay scheduling user index builds even when the number of active user index builds is below
+            the limit.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: maxNumActiveUserIndexBuilds
+        default: 3
+        validator:
+            gte: 0
+        redact: false
 
-  resumableIndexBuildMajorityOpTimeTimeoutMillis:
-    description: >
-      Time in milliseconds a node waits for the last optime before installing the interceptors to
-      be majority committed for a resumable index build. Once the interceptors are installed, the
-      index build process will start the collection scan phase.
-      If the majority commit point is not reached by the end of this waiting period, the index
-      build will proceed as a non-resumable index build.
-      Set to 0 to skip the wait. This will also disable resumable index builds.
-      Set to a negative value to wait indefinitely for the majority commit point.
-    set_at: startup
-    cpp_vartype: long long
-    cpp_varname: gResumableIndexBuildMajorityOpTimeTimeoutMillis
-    default: 10000
-    redact: false
+    resumableIndexBuildMajorityOpTimeTimeoutMillis:
+        description: >
+            Time in milliseconds a node waits for the last optime before installing the interceptors to
+            be majority committed for a resumable index build. Once the interceptors are installed, the
+            index build process will start the collection scan phase.
+            If the majority commit point is not reached by the end of this waiting period, the index
+            build will proceed as a non-resumable index build.
+            Set to 0 to skip the wait. This will also disable resumable index builds.
+            Set to a negative value to wait indefinitely for the majority commit point.
+        set_at: startup
+        cpp_vartype: long long
+        cpp_varname: gResumableIndexBuildMajorityOpTimeTimeoutMillis
+        default: 10000
+        redact: false
 
-  indexBuildMinAvailableDiskSpaceMB:
-    description: Minimum disk space required to build an index
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<long long>
-    cpp_varname: gIndexBuildMinAvailableDiskSpaceMB
-    default: 500
-    validator:
-      gte: 0
-      # This is equal to std::numeric_limits<int64_t>::max() / (1024 * 1024)
-      lte: 8796093022207
-    redact: false
+    indexBuildMinAvailableDiskSpaceMB:
+        description: Minimum disk space required to build an index
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: gIndexBuildMinAvailableDiskSpaceMB
+        default: 500
+        validator:
+            gte: 0
+            # This is equal to std::numeric_limits<int64_t>::max() / (1024 * 1024)
+            lte: 8796093022207
+        redact: false

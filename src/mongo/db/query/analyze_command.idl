@@ -46,8 +46,8 @@ commands:
             complex:
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: analyze
+                      resource_pattern: exact_namespace
+                      action_type: analyze
         reply_type: OkReply
         fields:
             key:
@@ -55,19 +55,21 @@ commands:
                 type: string
                 optional: true
             sampleRate:
-                description: "The proportion of the collection, in the range (0,1] to be sampled
-                for creating stats."
+                description: >-
+                    The proportion of the collection, in the range (0,1] to be sampled
+                    for creating stats.
                 type: safeDouble
-                validator: { gt: 0.0, lte: 1.0 }
+                validator: {gt: 0.0, lte: 1.0}
                 optional: true
             sampleSize:
-                description: "The number of documents used to build the stats, based on a random
-                sample of the collection."
+                description: >-
+                    The number of documents used to build the stats, based on a random
+                    sample of the collection.
                 type: safeInt
-                validator: { gt: 0 }
+                validator: {gt: 0}
                 optional: true
             numberBuckets:
                 description: "The number of buckets used for creating the histogram."
                 type: safeInt
-                validator: { gt: 0 }
+                validator: {gt: 0}
                 optional: true

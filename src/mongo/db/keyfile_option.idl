@@ -32,14 +32,14 @@ global:
         - "mongo/db/server_options.h"
         - "mongo/db/server_options_base.h"
     configs:
-        section: 'General options'
-        source: [ cli, ini, yaml ]
+        section: "General options"
+        source: [cli, ini, yaml]
         initializer:
             register: addKeyfileServerOption
 
 configs:
-    'security.keyFile':
-        description: 'Private key for cluster authentication'
+    "security.keyFile":
+        description: "Private key for cluster authentication"
         short_name: keyFile
         arg_vartype: String
         conflicts: noauth

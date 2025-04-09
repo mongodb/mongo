@@ -63,17 +63,19 @@ feature_flags:
         version: 8.1
         shouldBeFCVGated: true
     featureFlagReshardingSkipCloningAndApplyingIfApplicable:
-        description: "Feature flag to make recipient shards that are not going to own any chunks for
-                      the collection after resharding only clone the options and indexes for the
-                      collection (i.e. skip cloning the documents and fetch/apply the oplog entries
-                      for it). Currently, only the primary shard can be such a recipient shard."
+        description:
+            "Feature flag to make recipient shards that are not going to own any chunks for
+            the collection after resharding only clone the options and indexes for the
+            collection (i.e. skip cloning the documents and fetch/apply the oplog entries
+            for it). Currently, only the primary shard can be such a recipient shard."
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
         default: false
         shouldBeFCVGated: true
     featureFlagReshardingStoreOplogFetcherProgress:
-        description: "Feature flag to make recipient shards store the count of oplog entries fetched
-                      in a progress document and use this count instead of the fast count to recover
-                      metrics upon recovery."
+        description:
+            "Feature flag to make recipient shards store the count of oplog entries fetched
+            in a progress document and use this count instead of the fast count to recover
+            metrics upon recovery."
         cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
         default: false
         shouldBeFCVGated: true
@@ -84,8 +86,9 @@ feature_flags:
         version: 8.1
         shouldBeFCVGated: true
     featureFlagReshardingVerification:
-        description: "Feature flag to enable data loss and consistency verification steps during
-                      resharding to ensure correctness."
+        description:
+            "Feature flag to enable data loss and consistency verification steps during
+            resharding to ensure correctness."
         cpp_varname: gFeatureFlagReshardingVerification
         default: false
         shouldBeFCVGated: true

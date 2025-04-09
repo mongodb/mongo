@@ -31,7 +31,7 @@ global:
     cpp_includes:
         - "mongo/db/mongod_options_replication.h"
     configs:
-        source: [ yaml, cli, ini ]
+        source: [yaml, cli, ini]
         initializer:
             register: addMongodReplicationOptions
 
@@ -39,43 +39,43 @@ configs:
     #
     # Replication options
     #
-    'replication.oplogSizeMB':
-        section: 'Replication options'
-        description: 'Size to use (in MB) for replication op log. default is 5% of disk space (i.e. large is good)'
+    "replication.oplogSizeMB":
+        section: "Replication options"
+        description: "Size to use (in MB) for replication op log. default is 5% of disk space (i.e. large is good)"
         short_name: oplogSize
         arg_vartype: Int
     master:
-        section: 'Replication options'
-        description: 'Master/slave replication no longer supported'
+        section: "Replication options"
+        description: "Master/slave replication no longer supported"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         hidden: true
     slave:
-        section: 'Replication options'
-        description: 'Master/slave replication no longer supported'
+        section: "Replication options"
+        description: "Master/slave replication no longer supported"
         arg_vartype: Switch
-        source: [ cli, ini ]
+        source: [cli, ini]
         hidden: true
 
     #
     # Replica set options
     #
 
-    'replication.replSet':
-        section: 'Replica set options'
-        description: 'arg is <setname>[/<optionalseedhostlist>]'
+    "replication.replSet":
+        section: "Replica set options"
+        description: "arg is <setname>[/<optionalseedhostlist>]"
         short_name: replSet
         arg_vartype: String
-    'replication.replSetName':
-        section: 'Replica set options'
-        description: 'arg is <setname>'
+    "replication.replSetName":
+        section: "Replica set options"
+        description: "arg is <setname>"
         short_name: replSetName
         arg_vartype: String
         validator:
             callback: validateReplicaSetNameSetting
-    'replication.serverless':
-        section: 'Serverless mode'
-        description: 'Serverless mode implies replication is enabled, cannot be used with replSet or replSetName.'
+    "replication.serverless":
+        section: "Serverless mode"
+        description: "Serverless mode implies replication is enabled, cannot be used with replSet or replSetName."
         arg_vartype: Bool
         short_name: serverless
-        source: [ yaml, cli ]
+        source: [yaml, cli]

@@ -45,9 +45,10 @@ imports:
 types:
     smallExactInt64:
         bson_serialization_type: any
-        description: "Accepts any numerical type within int64 range.  Serializes as NumberInt if it
-                      fits in an int32, NumberLong otherwise.  Rejects decimals and doubles that
-                      are not integer values."
+        description:
+            "Accepts any numerical type within int64 range.  Serializes as NumberInt if it
+            fits in an int32, NumberLong otherwise.  Rejects decimals and doubles that
+            are not integer values."
         cpp_type: std::int64_t
         serializer: ::mongo::repl::smallExactInt64Append
         deserializer: ::mongo::repl::parseSmallExactInt64
@@ -90,41 +91,46 @@ structs:
             chainingAllowed:
                 type: safeBool
                 default: true
-                description: "When true, the replica set allows secondary members to replicate
-                              from other secondary members. When false, secondaries can replicate
-                              only from the primary."
+                description:
+                    "When true, the replica set allows secondary members to replicate
+                    from other secondary members. When false, secondaries can replicate
+                    only from the primary."
             heartbeatIntervalMillis:
                 type: smallExactInt64
                 default: 2000
                 description: "The frequency in milliseconds of the heartbeats"
-                validator: { gt: 0 }
+                validator: {gt: 0}
             heartbeatTimeoutSecs:
                 type: smallExactInt64
                 default: 10
-                description: "Number of seconds that the replica set members wait for a successful
-                              heartbeat from each other"
-                validator: { gt: 0 }
+                description:
+                    "Number of seconds that the replica set members wait for a successful
+                    heartbeat from each other"
+                validator: {gt: 0}
             electionTimeoutMillis:
                 type: smallExactInt64
                 default: 10000
-                description: "The time limit in milliseconds for detecting when a replica set’s
-                              primary is unreachable"
-                validator: { gt: 0 }
+                description:
+                    "The time limit in milliseconds for detecting when a replica set’s
+                    primary is unreachable"
+                validator: {gt: 0}
             catchUpTimeoutMillis:
                 type: smallExactInt64
                 default: -1
-                description: "Time limit in milliseconds for a newly elected primary to sync
-                              (catch up) with the other replica set members that may have more
-                              recent writes. If timeout is -1, infinite catchup time.  If timeout
-                              is 0, newly elected primaries will not attempt to catch up"
-                validator: { gte: -1 }
+                description:
+                    "Time limit in milliseconds for a newly elected primary to sync
+                    (catch up) with the other replica set members that may have more
+                    recent writes. If timeout is -1, infinite catchup time.  If timeout
+                    is 0, newly elected primaries will not attempt to catch up"
+                validator: {gte: -1}
             catchUpTakeoverDelayMillis:
                 type: smallExactInt64
                 default: 30000
-                description: "Time in milliseconds a node waits to initiate a catchup takeover
-                              after determining it is ahead of the current primary. -1 disables
-                              catchup takeover"
-                validator: { gte: -1 }
+                description:
+                    "Time in milliseconds a node waits to initiate a catchup takeover
+                    after determining it is ahead of the current primary. -1 disables
+                    catchup takeover"
+                validator: {gte: -1}
             getLastErrorModes:
                 type: replSetWriteConcernModeMap
                 default: ReplSetWriteConcernModeDefinitions()
@@ -132,11 +138,11 @@ structs:
                 cpp_name: defaultWriteConcern
                 type: WriteConcern
                 default: WriteConcernOptions()
-                validator: { callback: "validateDefaultWriteConcernHasMember"}
+                validator: {callback: "validateDefaultWriteConcernHasMember"}
             replicaSetId:
                 type: objectid
                 optional: true
-                validator: { callback: "validateReplicaSetIdNotNull"}
+                validator: {callback: "validateReplicaSetIdNotNull"}
 
     ReplSetConfigBase:
         description: "The complete configuration for the replica set"
@@ -144,39 +150,44 @@ structs:
             _id:
                 cpp_name: replSetName
                 type: string
-                description: "The name of the replica set. Once set, you cannot change the name of
-                              a replica set"
+                description:
+                    "The name of the replica set. Once set, you cannot change the name of
+                    a replica set"
             version:
                 cpp_name: configVersion
                 type: smallExactInt64
-                description: "An incrementing number used to distinguish revisions of the replica
-                              set configuration object from previous iterations of the
-                              configuration"
-                validator: { gt: 0 }
+                description:
+                    "An incrementing number used to distinguish revisions of the replica
+                    set configuration object from previous iterations of the
+                    configuration"
+                validator: {gt: 0}
                 #upper limit is implicitly the value of int64_max
             term:
                 cpp_name: configTerm
                 type: termType
-                description: "The configuration term is the term of the primary that originally
-                              created this configuration. Configurations in a replica set are
-                              totally ordered by their term and configuration version."
+                description:
+                    "The configuration term is the term of the primary that originally
+                    created this configuration. Configurations in a replica set are
+                    totally ordered by their term and configuration version."
                 default: -1
-                validator: { gte: -1, lt: 2147483648 }
+                validator: {gte: -1, lt: 2147483648}
             members:
                 type: array<memberConfig>
-                description: "An array of member configuration documents, one for each member of
-                              the replica set"
+                description:
+                    "An array of member configuration documents, one for each member of
+                    the replica set"
             configsvr:
                 cpp_name: configServer_deprecated
                 type: optionalBoolSerializeIfTrue
-                description: "Indicates whether the replica set is used for a sharded cluster’s
-                              config servers. Set to true if the replica set is for a sharded
-                              cluster’s config servers"
+                description:
+                    "Indicates whether the replica set is used for a sharded cluster’s
+                    config servers. Set to true if the replica set is for a sharded
+                    cluster’s config servers"
             protocolVersion:
                 description: "Election protocol version.  Always 1, as PV0 is no longer supported"
                 type: safeInt64
                 default: 1
-                validator: { gte: 1, lte: 1 }
+                validator: {gte: 1, lte: 1}
             writeConcernMajorityJournalDefault:
                 cpp_name: writeConcernMajorityShouldJournal
                 description: >-
@@ -185,11 +196,13 @@ structs:
                 type: safeBool
                 default: true
             settings:
-                description: "A document that contains configuration options that apply to the whole
-                              replica set."
+                description:
+                    "A document that contains configuration options that apply to the whole
+                    replica set."
                 type: ReplSetConfigSettings
                 optional: true
             repaired:
-                description: "This field indicates the replicated data has been repaired, and
-                              prevents use of the configuration until it is removed."
+                description:
+                    "This field indicates the replicated data has been repaired, and
+                    prevents use of the configuration until it is removed."
                 type: optionalBool

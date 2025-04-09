@@ -27,56 +27,56 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
-  _id_key:
-    bson_serialization_type: any
-    description: "An _id value."
-    cpp_type: "mongo::BSONKey"
-    serializer: "mongo::BSONKey::serializeToBSON"
-    deserializer: "mongo::BSONKey::parseFromBSON"
-    is_view: false
+    _id_key:
+        bson_serialization_type: any
+        description: "An _id value."
+        cpp_type: "mongo::BSONKey"
+        serializer: "mongo::BSONKey::serializeToBSON"
+        deserializer: "mongo::BSONKey::parseFromBSON"
+        is_view: false
 
 enums:
-  Severity:
-    description: "The severity of a healthlog entry."
-    type: string
-    values:
-      Info: "info"
-      Warning: "warning"
-      Error: "error"
-  Scope:
-    description: "The scope covered by a healthlog entry."
-    type: string
-    values:
-      Cluster: "cluster"
-      Node: "node"
-      Database: "database"
-      Collection: "collection"
-      Index: "index"
-      Document: "document"
+    Severity:
+        description: "The severity of a healthlog entry."
+        type: string
+        values:
+            Info: "info"
+            Warning: "warning"
+            Error: "error"
+    Scope:
+        description: "The scope covered by a healthlog entry."
+        type: string
+        values:
+            Cluster: "cluster"
+            Node: "node"
+            Database: "database"
+            Collection: "collection"
+            Index: "index"
+            Document: "document"
 
 structs:
-  HealthLogEntry:
-    description: "An entry in system.local.healthlog."
-    is_catalog_ctxt: true
-    fields:
-      namespace:
-        cpp_name: nss
-        type: namespacestring
-        optional: true
-      collectionUUID: 
-        type: uuid
-        optional: true
-      timestamp: date
-      severity: Severity
-      msg: string
-      scope: Scope
-      operation: string
-      data:
-        type: object
-        optional: true
+    HealthLogEntry:
+        description: "An entry in system.local.healthlog."
+        is_catalog_ctxt: true
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                optional: true
+            collectionUUID:
+                type: uuid
+                optional: true
+            timestamp: date
+            severity: Severity
+            msg: string
+            scope: Scope
+            operation: string
+            data:
+                type: object
+                optional: true

@@ -35,12 +35,12 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-  DocumentSourceQuerySettingsSpec:
-    description: A document used to specify the $querySettings stage of an aggregation pipeline.
-    fields:
-      showDebugQueryShape:
-        cpp_name: showDebugQueryShape
-        type: optionalBool
-        description: >-
-          A flag indicating whether an additional 'debugQueryShape' field has to be included in the
-          stage output.
+    DocumentSourceQuerySettingsSpec:
+        description: A document used to specify the $querySettings stage of an aggregation pipeline.
+        fields:
+            showDebugQueryShape:
+                cpp_name: showDebugQueryShape
+                type: optionalBool
+                description: >-
+                    A flag indicating whether an additional 'debugQueryShape' field has to be included in the
+                    stage output.

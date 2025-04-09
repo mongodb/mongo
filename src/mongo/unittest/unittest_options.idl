@@ -35,20 +35,20 @@ global:
 
 configs:
     list:
-        description: 'List all test suites in this unit test.'
+        description: "List all test suites in this unit test."
         arg_vartype: Switch
         default: false
     suite:
-        description: 'Test suite name. Specify --suite more than once to run multiple suites.'
+        description: "Test suite name. Specify --suite more than once to run multiple suites."
         arg_vartype: StringVector
     filter:
-        description: 'Test case name filter. Specify a regex partial-matching the test names.'
+        description: "Test case name filter. Specify a regex partial-matching the test names."
         arg_vartype: String
     fileNameFilter:
-        description: 'Filter test cases by source file name by partial-matching regex.'
+        description: "Filter test cases by source file name by partial-matching regex."
         arg_vartype: String
     repeat:
-        description: 'Specifies the number of runs for each test.'
+        description: "Specifies the number of runs for each test."
         arg_vartype: Int
         default: 1
     verbose:
@@ -59,10 +59,10 @@ configs:
         description: "Used internally to resume a death test in the child process."
         arg_vartype: String
     tempPath:
-        description: 'Directory to place mongo::TempDir subdirectories'
+        description: "Directory to place mongo::TempDir subdirectories"
         arg_vartype: String
     autoUpdateAsserts:
-        description: 'Auto-update expected output for asserts in unit tests which support auto-updating.'
+        description: "Auto-update expected output for asserts in unit tests which support auto-updating."
         arg_vartype: Switch
         default: false
     rewriteAllAutoAsserts:

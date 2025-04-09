@@ -29,63 +29,63 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-      - "mongo/client/read_preference_validators.h"
+        - "mongo/client/read_preference_validators.h"
 
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/client/hedging_mode.idl"
 
 enums:
-  ReadPreference:
-      description: Enumeration representing Read Preference Modes
-      type: string
-      values:
-          # Read from primary only. All operations produce an error (throw an exception where
-          # applicable) if primary is unavailable. Cannot be combined with tags.
-          PrimaryOnly: "primary"
-          #
-          # Read from primary if available, otherwise a secondary. Tags will only be applied in the
-          # event that the primary is unavailable and a secondary is read from. In this event only
-          # secondaries matching the tags provided would be read from.
-          PrimaryPreferred: "primaryPreferred"
-          #
-          # Read from secondary if available, otherwise error.
-          SecondaryOnly: "secondary"
-          #
-          # Read from a secondary if available, otherwise read from the primary.
-          SecondaryPreferred: "secondaryPreferred"
-          #
-          # Read from any member.
-          Nearest: "nearest"
-
+    ReadPreference:
+        description: Enumeration representing Read Preference Modes
+        type: string
+        values:
+            # Read from primary only. All operations produce an error (throw an exception where
+            # applicable) if primary is unavailable. Cannot be combined with tags.
+            PrimaryOnly: "primary"
+            #
+            # Read from primary if available, otherwise a secondary. Tags will only be applied in the
+            # event that the primary is unavailable and a secondary is read from. In this event only
+            # secondaries matching the tags provided would be read from.
+            PrimaryPreferred: "primaryPreferred"
+            #
+            # Read from secondary if available, otherwise error.
+            SecondaryOnly: "secondary"
+            #
+            # Read from a secondary if available, otherwise read from the primary.
+            SecondaryPreferred: "secondaryPreferred"
+            #
+            # Read from any member.
+            Nearest: "nearest"
 
 structs:
-
-  ReadPreferenceIdl:
-      description: "An object representing a read preference document, used only for mapping to
-                    and from BSON."
-      strict: false
-      fields:
-        mode:
-          description: Read preference mode.
-          type: ReadPreference
-        tags:
-          description: List of tags requested by $readPreference.
-          type: array
-          optional: true
-        hedge:
-          description: Hedging mode determines whether or not hedging is enabled.
-          type: HedgingMode
-          optional: true
-        maxStalenessSeconds:
-          description: Specifies a maximum replication lag for reads from secondaries.
-          type: safeInt64
-          optional: true
-          validator:
-            callback: validateMaxStalenessSecondsExternal
-        $_isPretargeted:
-          description: "Used by the replica set endpoint in sharding to mark commands that it
-                        forces to go through the router as needing to target the local mongod."
-          cpp_name: isPretargeted
-          type: bool
-          optional: true
+    ReadPreferenceIdl:
+        description:
+            "An object representing a read preference document, used only for mapping to
+            and from BSON."
+        strict: false
+        fields:
+            mode:
+                description: Read preference mode.
+                type: ReadPreference
+            tags:
+                description: List of tags requested by $readPreference.
+                type: array
+                optional: true
+            hedge:
+                description: Hedging mode determines whether or not hedging is enabled.
+                type: HedgingMode
+                optional: true
+            maxStalenessSeconds:
+                description: Specifies a maximum replication lag for reads from secondaries.
+                type: safeInt64
+                optional: true
+                validator:
+                    callback: validateMaxStalenessSecondsExternal
+            $_isPretargeted:
+                description:
+                    "Used by the replica set endpoint in sharding to mark commands that it
+                    forces to go through the router as needing to target the local mongod."
+                cpp_name: isPretargeted
+                type: bool
+                optional: true

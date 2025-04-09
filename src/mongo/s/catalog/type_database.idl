@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/s/catalog/types_validators.h" 
+        - "mongo/s/catalog/types_validators.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -37,8 +37,9 @@ imports:
 
 structs:
     DatabaseType:
-        description: "Represents the layout and contents of documents contained in the config 
-                      server's config.databases and the primary shard's config.shard.catalog.databases collection."
+        description:
+            "Represents the layout and contents of documents contained in the config
+            server's config.databases and the primary shard's config.shard.catalog.databases collection."
         strict: false
         fields:
             _id:
@@ -58,4 +59,3 @@ structs:
                 description: "Version of the database."
                 type: database_version
                 optional: false
-

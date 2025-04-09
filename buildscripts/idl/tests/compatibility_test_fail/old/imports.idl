@@ -31,8 +31,9 @@ global:
 
 structs:
     ImportedUnstableNewFieldReply:
-        description: "This reply contains a field that is stable in the old command but is
-                      unstable in the new command."
+        description:
+            "This reply contains a field that is stable in the old command but is
+            unstable in the new command."
         fields:
             unstableNewField:
                 type: string

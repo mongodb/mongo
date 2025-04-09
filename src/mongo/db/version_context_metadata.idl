@@ -29,10 +29,10 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-      - "mongo/db/feature_compatibility_version_parser.h"
+        - "mongo/db/feature_compatibility_version_parser.h"
 
 imports:
-     - "mongo/db/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     ofcv_string:

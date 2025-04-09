@@ -36,54 +36,59 @@ imports:
 types:
     intStringToInt:
         bson_serialization_type:
-                                - int
-                                - string
-        description: "The bson_serialization_type changes from [int, string] in the old command's
-                      reply field type to int in the new command's reply field type"
+            - int
+            - string
+        description:
+            "The bson_serialization_type changes from [int, string] in the old command's
+            reply field type to int in the new command's reply field type"
         cpp_type: "std::int32_t"
         is_view: false
 
     intStringBoolToIntString:
         bson_serialization_type:
-                                - int
-                                - string
-                                - bool
-        description: "The bson_serialization_type changes from [int, string, bool] in the old
-                      command's reply field type to [int, string] in the new command's reply
-                      field type"
+            - int
+            - string
+            - bool
+        description:
+            "The bson_serialization_type changes from [int, string, bool] in the old
+            command's reply field type to [int, string] in the new command's reply
+            field type"
         cpp_type: "std::int32_t"
         is_view: false
 
     intStringToIntStringBool:
         bson_serialization_type:
-                                - int
-                                - string
-        description: "The bson_serialization_type changes from [int, string] in the old command's
-                      reply field type to [int, string, bool] in the new command's reply field
-                      type"
+            - int
+            - string
+        description:
+            "The bson_serialization_type changes from [int, string] in the old command's
+            reply field type to [int, string, bool] in the new command's reply field
+            type"
         cpp_type: "std::int32_t"
         is_view: false
 
     intToIntString:
         bson_serialization_type:
-                                - int
-        description: "The bson_serialization_type changes from [int] in the old command
-                      parameter's type to [int, string] in the new command parameter's type"
+            - int
+        description:
+            "The bson_serialization_type changes from [int] in the old command
+            parameter's type to [int, string] in the new command parameter's type"
         cpp_type: "std::int32_t"
         is_view: false
 
     bsonSerializationTypeAnyAllowed:
         bson_serialization_type:
-                                - int
-                                - any
+            - int
+            - any
         description: "The bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
         is_view: false
 
 enums:
     NewReplyFieldEnumSubset:
-        description: "The new reply type is an enum that is a subset of the old reply type's
-                      enum values"
+        description:
+            "The new reply type is an enum that is a subset of the old reply type's
+            enum values"
         type: string
         values:
             valueOne: "one"
@@ -99,8 +104,9 @@ enums:
 
 structs:
     StableNewFieldReply:
-        description: "This reply contains a field that is unstable in the old command but is
-                        stable in the new command."
+        description:
+            "This reply contains a field that is unstable in the old command but is
+            stable in the new command."
         is_command_reply: true
         fields:
             stableNewField:
@@ -108,8 +114,9 @@ structs:
                 stability: unstable
 
     UnstableNewFieldReplyIgnoreList:
-        description: "This reply contains a field that is stable in the old command and is
-                      unstable in the new command, but the change is explicitly allowed."
+        description:
+            "This reply contains a field that is stable in the old command and is
+            unstable in the new command, but the change is explicitly allowed."
         is_command_reply: true
         fields:
             unstableNewFieldIgnoreList:
@@ -117,8 +124,9 @@ structs:
                 stability: stable
 
     NewReplyTypeEnumOrStructIgnoreList:
-        description: "the type is a non-enum or struct type in the old command, and an enum or struct
-                      in the new command, but the change is explicitly allowed"
+        description:
+            "the type is a non-enum or struct type in the old command, and an enum or struct
+            in the new command, but the change is explicitly allowed"
         is_command_reply: true
         fields:
             newReplyTypeEnumOrStructIgnoreList:
@@ -126,8 +134,9 @@ structs:
                 stability: stable
 
     RequiredNewFieldReply:
-        description: "This reply contains a field that is optional in the old command but is
-                      required in the new command."
+        description:
+            "This reply contains a field that is optional in the old command but is
+            required in the new command."
         is_command_reply: true
         fields:
             requiredNewField:
@@ -136,8 +145,9 @@ structs:
                 stability: stable
 
     OptionalNewField:
-        description: "This struct contains a field that is required in the old command but is
-                      optional in the new command."
+        description:
+            "This struct contains a field that is required in the old command but is
+            optional in the new command."
         fields:
             optionalNewField:
                 type: string
@@ -148,8 +158,9 @@ structs:
         is_command_reply: true
 
     UnstableOldFieldReply:
-        description: "This reply contains a field that is unstable in the old command and is
-                      unstable and optional in the new command."
+        description:
+            "This reply contains a field that is unstable in the old command and is
+            unstable and optional in the new command."
         is_command_reply: true
         fields:
             unstableOldField:
@@ -157,8 +168,9 @@ structs:
                 stability: unstable
 
     UnstableOptionalNewFieldReplyIgnoreList:
-        description: "This reply contains a field that is stable in the old command and is
-                      unstable and optional in the new command, but the change is allowed"
+        description:
+            "This reply contains a field that is stable in the old command and is
+            unstable and optional in the new command, but the change is allowed"
         is_command_reply: true
         fields:
             unstableOptionalNewFieldIgnoreList:
@@ -166,8 +178,9 @@ structs:
                 type: string
 
     EnumSubsetReply:
-        description: "This reply contains an enum field where the new enum values is a subset
-                      of the old reply type's enum values"
+        description:
+            "This reply contains an enum field where the new enum values is a subset
+            of the old reply type's enum values"
         is_command_reply: true
         fields:
             replyField:
@@ -175,8 +188,9 @@ structs:
                 stability: stable
 
     BsonSubsetReply:
-        description: "This reply contains a field type where the new bson_serialization_type
-                      is a subset of the old bson_serialization_type"
+        description:
+            "This reply contains a field type where the new bson_serialization_type
+            is a subset of the old bson_serialization_type"
         is_command_reply: true
         fields:
             bsonSubsetReplyField:
@@ -184,8 +198,9 @@ structs:
                 stability: stable
 
     BsonSubsetReplyTwo:
-        description: "This reply contains a field type where the new bson_serialization_type
-                      is a subset of the old bson_serialization_type"
+        description:
+            "This reply contains a field type where the new bson_serialization_type
+            is a subset of the old bson_serialization_type"
         is_command_reply: true
         fields:
             bsonSubsetReplyFieldTwo:
@@ -193,8 +208,9 @@ structs:
                 stability: stable
 
     StructFieldTypeRecursiveReplyIgnoreList:
-        description: "This reply contains a field whose new type is a struct that is not
-                      compatible with the old field type, but this is explicitly allowed"
+        description:
+            "This reply contains a field whose new type is a struct that is not
+            compatible with the old field type, but this is explicitly allowed"
         is_command_reply: true
         fields:
             structReplyField:
@@ -202,8 +218,9 @@ structs:
                 stability: stable
 
     StructFieldTypeRecursiveReplyOne:
-        description: "This reply contains a field whose new type is a struct that is
-                      compatible with the old field type"
+        description:
+            "This reply contains a field whose new type is a struct that is
+            compatible with the old field type"
         is_command_reply: true
         fields:
             structReplyField:
@@ -211,8 +228,9 @@ structs:
                 stability: stable
 
     StructFieldTypeRecursiveReplyTwo:
-        description: "This reply contains a field whose new type is a struct that is
-                      compatible with the old field type"
+        description:
+            "This reply contains a field whose new type is a struct that is
+            compatible with the old field type"
         is_command_reply: true
         fields:
             structReplyField:
@@ -220,24 +238,27 @@ structs:
                 stability: stable
 
     StructType:
-        description: "This struct contains a field whose new type is compatible with the
-                      old field type"
+        description:
+            "This struct contains a field whose new type is compatible with the
+            old field type"
         fields:
             fieldOne:
                 type: BsonSubsetReply
                 stability: stable
 
     StructTypeUnstable:
-        description: "This struct contains a field whose new type is compatible with the
-                      old field type and is unstable in both the old and new versions"
+        description:
+            "This struct contains a field whose new type is compatible with the
+            old field type and is unstable in both the old and new versions"
         fields:
             fieldOne:
                 type: BsonSubsetReply
                 stability: unstable
 
     OldVariantTypeReply:
-        description: "This reply contains an old field that has a variant type while the new field
-                      is not a variant type"
+        description:
+            "This reply contains an old field that has a variant type while the new field
+            is not a variant type"
         is_command_reply: true
         fields:
             oldVariantTypeReplyField:
@@ -246,8 +267,9 @@ structs:
                     variant: [int, string, array<string>]
 
     NewVariantNotSubsetReplyIgnoreList:
-        description: "This reply contains a field whose new variant types are not a subset
-                      of the old variant types"
+        description:
+            "This reply contains a field whose new variant types are not a subset
+            of the old variant types"
         is_command_reply: true
         fields:
             variantNotSubsetReplyFieldIgnoreList:
@@ -256,8 +278,9 @@ structs:
                     variant: [int, bool, string]
 
     NewVariantSubsetReply:
-        description: "This reply contains a field whose new variant types are a subset
-                      of the old variant types"
+        description:
+            "This reply contains a field whose new variant types are a subset
+            of the old variant types"
         is_command_reply: true
         fields:
             variantSubsetReplyField:
@@ -266,8 +289,9 @@ structs:
                     variant: [int, bool, string, array<string>]
 
     NewVariantSubsetReplyTwo:
-        description: "This reply contains a field whose new variant types are a subset
-                      of the old variant types"
+        description:
+            "This reply contains a field whose new variant types are a subset
+            of the old variant types"
         is_command_reply: true
         fields:
             variantSubsetReplyFieldTwo:
@@ -276,61 +300,88 @@ structs:
                     variant: [int, string, bool, double, array<string>]
 
     NewVariantSubsetReplyThree:
-        description: "This reply contains a field whose new variant types are a subset
-                      of the old variant types"
+        description:
+            "This reply contains a field whose new variant types are a subset
+            of the old variant types"
         is_command_reply: true
         fields:
             variantSubsetReplyFieldThree:
                 stability: stable
                 type:
-                    variant: [int, string, intStringBoolToIntString, 
-                              StructFieldTypeRecursiveReplyTwo]
+                    variant:
+                        [
+                            int,
+                            string,
+                            intStringBoolToIntString,
+                            StructFieldTypeRecursiveReplyTwo,
+                        ]
 
     NewArrayVariantSubsetReply:
-        description: "This reply contains a field whose new array<variant> types are a subset
-                      of the old array<variant> types"
+        description:
+            "This reply contains a field whose new array<variant> types are a subset
+            of the old array<variant> types"
         is_command_reply: true
         fields:
             variantSubsetReplyFieldThree:
                 stability: stable
-                type:
-                    array<variant<int, string, intStringBoolToIntString, StructFieldTypeRecursiveReplyTwo>>
+                type: array<variant<int, string, intStringBoolToIntString, StructFieldTypeRecursiveReplyTwo>>
 
     VariantRecursiveReply:
-        description: "This reply contains a field that has a new variant type that is compatible
-                      with the old variant type"
+        description:
+            "This reply contains a field that has a new variant type that is compatible
+            with the old variant type"
         is_command_reply: true
         fields:
             variantRecursiveReplyField:
                 stability: stable
                 type:
-                    variant: [int, intStringBoolToIntString,
-                              array<intStringBoolToIntString>, array<string>]
+                    variant:
+                        [
+                            int,
+                            intStringBoolToIntString,
+                            array<intStringBoolToIntString>,
+                            array<string>,
+                        ]
 
     OldVariantStructReply:
-        description: "This reply contains a field whose new variant type does not have a variant
-                      struct type while the old one does"
+        description:
+            "This reply contains a field whose new variant type does not have a variant
+            struct type while the old one does"
         is_command_reply: true
         fields:
             variantStructReplyField:
                 stability: stable
                 type:
-                    variant: [int, string, StructType, array<StructType>, array<string>]
+                    variant:
+                        [
+                            int,
+                            string,
+                            StructType,
+                            array<StructType>,
+                            array<string>,
+                        ]
 
     VariantStructRecursiveReply:
-        description: "This reply contains a field that has a new variant struct type that is
-                      compatible with the old variant struct type"
+        description:
+            "This reply contains a field that has a new variant struct type that is
+            compatible with the old variant struct type"
         is_command_reply: true
         fields:
             variantStructRecursiveReplyField:
                 stability: stable
                 type:
-                    variant: [int, StructFieldTypeRecursiveReplyTwo,
-                              array<StructFieldTypeRecursiveReplyTwo>, array<string>]
+                    variant:
+                        [
+                            int,
+                            StructFieldTypeRecursiveReplyTwo,
+                            array<StructFieldTypeRecursiveReplyTwo>,
+                            array<string>,
+                        ]
 
     VariantDifferentStructReplyIgnoreList:
-        description: "This reply contains a field that has a new variant struct type that is
-                      different from the old variant struct type"
+        description:
+            "This reply contains a field that has a new variant struct type that is
+            different from the old variant struct type"
         is_command_reply: true
         fields:
             variantStructRecursiveReplyFieldIgnoreList:
@@ -339,8 +390,9 @@ structs:
                     variant: [int, StructFieldTypeRecursiveReplyOne]
 
     NonVariantToVariantReplyIgnoreList:
-        description: "This reply contains a field that changes from a non-variant type to a variant
-                      type, but the field is in the ignore list"
+        description:
+            "This reply contains a field that changes from a non-variant type to a variant
+            type, but the field is in the ignore list"
         is_command_reply: true
         fields:
             nonVariantToVariantReplyFieldIgnoreList:
@@ -348,8 +400,9 @@ structs:
                 type: StructType
 
     NonEnumToEnumReplyIgnoreList:
-        description: "This reply contains a field that changes from a non-enum type to an enum
-                      type, but the field is in the ignore list"
+        description:
+            "This reply contains a field that changes from a non-enum type to an enum
+            type, but the field is in the ignore list"
         is_command_reply: true
         fields:
             nonEnumToEnumReplyIgnoreList:
@@ -358,11 +411,11 @@ structs:
 
     NewCommandParameterStruct:
         description: "The new command parameter's type and the
-                     old command parameter's type are both structs"
+            old command parameter's type are both structs"
 
     InsertParameterStruct:
         description: "The new command parameter's type and the
-                     old command parameter's type are both structs"
+            old command parameter's type are both structs"
         fields:
             insert:
                 type: int
@@ -370,31 +423,34 @@ structs:
 
     UpdateParameterStruct:
         description: "The new command parameter's type and the
-                     old command parameter's type are both structs"
+            old command parameter's type are both structs"
         fields:
             update:
                 type: int
                 stability: stable
 
     CommandParamStructRecursiveOne:
-        description: "This command parameter struct type contains a unstable field while the
-                      new struct field is stable and optional"
+        description:
+            "This command parameter struct type contains a unstable field while the
+            new struct field is stable and optional"
         fields:
             unstableToStableOptionalField:
                 type: string
                 stability: unstable
 
     CommandParamStructRecursiveTwo:
-        description: "This command parameter struct type contains a field whose new type is
-                      a superset of the old field type"
+        description:
+            "This command parameter struct type contains a field whose new type is
+            a superset of the old field type"
         fields:
             supersetField:
                 type: intToIntString
                 stability: stable
 
     OldValidatorStruct:
-        description: "This struct contains a field where the old version contains a validator while
-                      the new version does not"
+        description:
+            "This struct contains a field where the old version contains a validator while
+            the new version does not"
         is_command_reply: true
         fields:
             oldValidatorField:
@@ -421,32 +477,36 @@ structs:
         description: "This struct contains a field that is added and optional in the new version"
 
     StableOptionalTypeFieldStruct:
-        description: "This struct contains a field that is stable and optional in the new version
-                      but unstable in the corresponding old version"
+        description:
+            "This struct contains a field that is stable and optional in the new version
+            but unstable in the corresponding old version"
         fields:
             stableOptionalTypeField:
                 type: string
                 stability: unstable
 
     StableWithDefaultTypeFieldStruct:
-        description: "This struct contains a field that is stable and required with a default value
-                      in the new version but unstable in the corresponding old version"
+        description:
+            "This struct contains a field that is stable and required with a default value
+            in the new version but unstable in the corresponding old version"
         fields:
             stableWithDefaultTypeField:
                 type: string
                 stability: unstable
 
     RemovedUnstableTypeFieldStruct:
-        description: "This struct contains a field that is unstable in the old version and
-                      is removed in the new version"
+        description:
+            "This struct contains a field that is unstable in the old version and
+            is removed in the new version"
         fields:
             removedUnstableTypeField:
                 type: string
                 stability: unstable
 
     RemovedInternalTypeFieldStruct:
-        description: "This struct contains a field that is internal in the old version and
-                      is removed in the new version"
+        description:
+            "This struct contains a field that is internal in the old version and
+            is removed in the new version"
         fields:
             removedInternalTypeField:
                 type: string
@@ -459,32 +519,36 @@ structs:
         description: "This struct contains a field that is added and internal in the new version"
 
     KeptUnstableTypeFieldStruct:
-        description: "This struct contains a field that is unstable in the new version and also
-                      exists in the old version"
+        description:
+            "This struct contains a field that is unstable in the new version and also
+            exists in the old version"
         fields:
             keptUnstableTypeField:
                 type: string
                 stability: unstable
 
     KeptInternalTypeFieldStruct:
-        description: "This struct contains a field that is internal in the new version and also
-                      exists in the old version"
+        description:
+            "This struct contains a field that is internal in the new version and also
+            exists in the old version"
         fields:
             keptInternalTypeField:
                 type: string
                 stability: internal
 
     StructCommandParameterTypeRecursive:
-        description: "This param struct type contains a field that is compatible between the
-                      old and new versions"
+        description:
+            "This param struct type contains a field that is compatible between the
+            old and new versions"
         fields:
             structCommandParameterTypeRecursiveField:
                 type: intStringToIntStringBool
                 stability: stable
 
     VariantSupersetStruct:
-        description: "This struct contains a field where the new variant types are a superset
-                      of the old variant types"
+        description:
+            "This struct contains a field where the new variant types are a superset
+            of the old variant types"
         fields:
             variantSupersetField:
                 stability: stable
@@ -492,8 +556,9 @@ structs:
                     variant: [int, bool, array<string>]
 
     VariantSupersetStructTwo:
-        description: "This struct contains a field where the new variant types are a superset
-                      of the old variant types"
+        description:
+            "This struct contains a field where the new variant types are a superset
+            of the old variant types"
         fields:
             variantSupersetFieldTwo:
                 stability: stable
@@ -501,36 +566,51 @@ structs:
                     variant: [int, bool, array<string>]
 
     OldTypeNotVariantStruct:
-        description: "This struct contains a field where the new type is variant while the
-                      old one is not"
+        description:
+            "This struct contains a field where the new type is variant while the
+            old one is not"
         fields:
             variantField:
                 type: int
                 stability: stable
 
     VariantRecursiveStruct:
-        description: "This struct contains a field where the new variant types are
-                      compatible with the old variant types"
+        description:
+            "This struct contains a field where the new variant types are
+            compatible with the old variant types"
         fields:
             variantRecursiveField:
                 stability: stable
                 type:
-                    variant: [int, intStringToIntStringBool,
-                              array<intStringToIntStringBool>, array<string>]
+                    variant:
+                        [
+                            int,
+                            intStringToIntStringBool,
+                            array<intStringToIntStringBool>,
+                            array<string>,
+                        ]
 
     VariantStructSupersetStruct:
-        description: "This struct contains a field where the new variant types contains a struct
-                      while the old one does not"
+        description:
+            "This struct contains a field where the new variant types contains a struct
+            while the old one does not"
         fields:
             variantStructSupersetField:
                 stability: stable
                 type:
-                    variant: [int, string, NewCommandParameterStruct,
-                              array<NewCommandParameterStruct>, array<string>]
+                    variant:
+                        [
+                            int,
+                            string,
+                            NewCommandParameterStruct,
+                            array<NewCommandParameterStruct>,
+                            array<string>,
+                        ]
 
     VariantStructSupersetTwoStruct:
-        description: "This struct contains a field where the new variant types contains two structs
-                      while the old one contains one"
+        description:
+            "This struct contains a field where the new variant types contains two structs
+            while the old one contains one"
         fields:
             variantStructSupersetField:
                 stability: stable
@@ -538,23 +618,30 @@ structs:
                     variant: [int, string, InsertParameterStruct]
 
     ArrayVariantStructSupersetTwoStruct:
-        description: "This struct contains a field where the new array<variant> types contains two structs
-                      while the old one contains one"
+        description:
+            "This struct contains a field where the new array<variant> types contains two structs
+            while the old one contains one"
         fields:
             variantStructSupersetField:
                 stability: stable
-                type:
-                    array<variant<int, string, InsertParameterStruct>>
+                type: array<variant<int, string, InsertParameterStruct>>
 
     VariantStructRecursiveStruct:
-        description: "This struct contains a field where the old variant struct and the new
-                      variant struct are compatible"
+        description:
+            "This struct contains a field where the old variant struct and the new
+            variant struct are compatible"
         fields:
             variantStructRecursiveField:
                 stability: stable
                 type:
-                    variant: [int, string, StructCommandParameterTypeRecursive,
-                              array<StructCommandParameterTypeRecursive>, array<string>]
+                    variant:
+                        [
+                            int,
+                            string,
+                            StructCommandParameterTypeRecursive,
+                            array<StructCommandParameterTypeRecursive>,
+                            array<string>,
+                        ]
 
     BsonSerializationTypeAnyReply:
         description: "This reply contains a field whose type is 'any' and is explicitly allowed"
@@ -565,8 +652,9 @@ structs:
                 stability: stable
 
     NewlyAddedBsonSerializationTypeAnyReply:
-        description: "This reply contains a newly added field whose type has a bson_serialization_type
-                        that contains 'any' that is explicitly allowed"
+        description:
+            "This reply contains a newly added field whose type has a bson_serialization_type
+            that contains 'any' that is explicitly allowed"
         is_command_reply: true
 
     OldUnstableTypeChangesReply:
@@ -586,8 +674,9 @@ structs:
                 type: intStringToIntStringBool
 
     NewUnstableTypeChangesReplyIgnoreList:
-        description: "This reply contains a field that is stable in the old version and has type changes,
-                      but is also in the ignore list"
+        description:
+            "This reply contains a field that is stable in the old version and has type changes,
+            but is also in the ignore list"
         is_command_reply: true
         fields:
             newUnstableTypeChangesReplyFieldIgnoreList:
@@ -596,8 +685,9 @@ structs:
                 optional: true
 
     NewlyAddedBsonSerializationTypeAnyStruct:
-        description: "This struct contains a newly added field whose type has a bson_serialization_type
-                        that contains 'any' that is explicitly allowed"
+        description:
+            "This struct contains a newly added field whose type has a bson_serialization_type
+            that contains 'any' that is explicitly allowed"
 
     OldUnstableTypeChangesStruct:
         description: "This struct contains a field that is unstable in the old version and has type changes"
@@ -607,8 +697,9 @@ structs:
                 type: intStringBoolToIntString
 
     NewUnstableTypeChangesStructIgnoreList:
-        description: "This struct contains a field that is stable in the old version and has type,
-                      changes but is also in the ignore list"
+        description:
+            "This struct contains a field that is stable in the old version and has type,
+            changes but is also in the ignore list"
         fields:
             newUnstableTypeChangesFieldIgnoreList:
                 type: intStringBoolToIntString
@@ -616,19 +707,23 @@ structs:
                 optional: true
 
     BsonSerializationTypeAnyWithVariantReply:
-        description: "This reply contains a new reply field with variant types where one of the
-                      bson serialization types is 'any' and is explicitly allowed"
+        description:
+            "This reply contains a new reply field with variant types where one of the
+            bson serialization types is 'any' and is explicitly allowed"
         is_command_reply: true
         fields:
             anyTypeField:
                 stability: stable
                 type:
-                    variant: [intStringBoolToIntString,
-                              bsonSerializationTypeAnyAllowed,
-                              StructFieldTypeRecursiveReplyTwo,
-                              array<intStringBoolToIntString>,
-                              array<bsonSerializationTypeAnyAllowed>,
-                              array<StructFieldTypeRecursiveReplyTwo>]
+                    variant:
+                        [
+                            intStringBoolToIntString,
+                            bsonSerializationTypeAnyAllowed,
+                            StructFieldTypeRecursiveReplyTwo,
+                            array<intStringBoolToIntString>,
+                            array<bsonSerializationTypeAnyAllowed>,
+                            array<StructFieldTypeRecursiveReplyTwo>,
+                        ]
 
     ArrayTypeStruct:
         description: "Struct with ArrayType field."
@@ -639,8 +734,9 @@ structs:
                 stability: stable
 
     MissingUnstableFieldNewFieldStruct:
-        description: "This struct contains a field that missing the 'stability' field in the new
-                      command."
+        description:
+            "This struct contains a field that missing the 'stability' field in the new
+            command."
         is_command_reply: true
         fields:
             missingUnstableFieldNewField:
@@ -648,8 +744,9 @@ structs:
                 stability: unstable
 
     MissingUnstableFieldOldFieldStruct:
-        description: "This struct contains a field that missing the 'stability' field in the old
-                      command."
+        description:
+            "This struct contains a field that missing the 'stability' field in the old
+            command."
         is_command_reply: true
         fields:
             missingUnstableFieldNewField:
@@ -778,8 +875,9 @@ commands:
         reply_type: OkReply
 
     addedCommandParameterStable:
-        description: "new command has an optional stable parameter that is unstable
-                      in the corresponding old command and still passes"
+        description:
+            "new command has an optional stable parameter that is unstable
+            in the corresponding old command and still passes"
         command_name: addedCommandParameterStable
         namespace: ignored
         cpp_name: addedCommandParameterStable
@@ -792,8 +890,9 @@ commands:
                 stability: unstable
 
     addedCommandParameterStableRequired:
-        description: "new command has a stable parameter that is unstable and required
-                      in the corresponding old command and still passes"
+        description:
+            "new command has a stable parameter that is unstable and required
+            in the corresponding old command and still passes"
         command_name: addedCommandParameterStableRequired
         namespace: ignored
         cpp_name: addedCommandParameterStableRequired
@@ -806,8 +905,9 @@ commands:
                 stability: unstable
 
     addedCommandParameterStableWithDefault:
-        description: "new command has a required stable parameter with a default value
-                      that is unstable in the corresponding old command and still passes"
+        description:
+            "new command has a required stable parameter with a default value
+            that is unstable in the corresponding old command and still passes"
         command_name: addedCommandParameterStableWithDefault
         namespace: ignored
         cpp_name: addedCommandParameterStableWithDefault
@@ -820,8 +920,9 @@ commands:
                 stability: unstable
 
     commandParameterUnstableIgnoreList:
-        description: "new unstable command parameter is stable in the corresponding old
-                      command, but the change is explcitly allowed"
+        description:
+            "new unstable command parameter is stable in the corresponding old
+            command, but the change is explcitly allowed"
         command_name: commandParameterUnstableIgnoreList
         namespace: ignored
         cpp_name: commandParameterUnstableIgnoreList
@@ -835,7 +936,7 @@ commands:
 
     removeCommandParameterUnstable:
         description: "new command removes parameter that is unstable
-                      in the corresponding old command and still passes"
+            in the corresponding old command and still passes"
         command_name: removeCommandParameterUnstable
         namespace: ignored
         cpp_name: removeCommandParameterUnstable
@@ -849,7 +950,7 @@ commands:
 
     addedCommandParameterOptional:
         description: "new command has an optional parameter that is required
-                      in the corresponding old command and still passes"
+            in the corresponding old command and still passes"
         command_name: addedCommandParameterOptional
         namespace: ignored
         cpp_name: addedCommandParameterOptional
@@ -864,7 +965,7 @@ commands:
 
     addedUnstableCommandParameter:
         description: "new command has a new unstable parameter that does not
-                      exist in the corresponding old command and still passes"
+            exist in the corresponding old command and still passes"
         command_name: addedUnstableCommandParameter
         namespace: ignored
         cpp_name: addedUnstableCommandParameter
@@ -874,7 +975,7 @@ commands:
 
     keptUnstableCommandParameter:
         description: "new command has an unstable parameter that also
-                      exists in the corresponding old command and still passes"
+            exists in the corresponding old command and still passes"
         command_name: keptUnstableCommandParameter
         namespace: ignored
         cpp_name: keptUnstableCommandParameter
@@ -887,8 +988,9 @@ commands:
                 stability: unstable
 
     newCommandParameterType:
-        description: "new command passes because its command parameter type is compatible with
-                     the corresponding old command's parameter type"
+        description:
+            "new command passes because its command parameter type is compatible with
+            the corresponding old command's parameter type"
         command_name: newCommandParameterType
         namespace: ignored
         cpp_name: newCommandParameterType
@@ -901,8 +1003,9 @@ commands:
                 stability: stable
 
     newCommandParameterTypeEnumSuperset:
-        description: "new command passes because its command parameter type is an enum that is
-                      a superset of the corresponding old command parameter's type's enum values"
+        description:
+            "new command passes because its command parameter type is an enum that is
+            a superset of the corresponding old command parameter's type's enum values"
         command_name: newCommandParameterTypeEnumSuperset
         namespace: ignored
         cpp_name: newCommandParameterTypeEnumSuperset
@@ -915,8 +1018,9 @@ commands:
                 stability: stable
 
     newCommandParameterTypeStruct:
-        description: "new command passes because its command parameter type is a struct and the
-                      corresponding old command parameter type is also a struct"
+        description:
+            "new command passes because its command parameter type is a struct and the
+            corresponding old command parameter type is also a struct"
         command_name: newCommandParameterTypeStruct
         namespace: ignored
         cpp_name: newCommandParameterTypeStruct
@@ -929,9 +1033,10 @@ commands:
                 stability: stable
 
     newCommandParameterTypeBsonSuperset:
-        description: "new command passes because its parameter type has a bson_serialization_type
-                      that is a superset of the corresponding old command parameter type's
-                      bson_serialization_type"
+        description:
+            "new command passes because its parameter type has a bson_serialization_type
+            that is a superset of the corresponding old command parameter type's
+            bson_serialization_type"
         command_name: newCommandParameterTypeBsonSuperset
         namespace: ignored
         cpp_name: newCommandParameterTypeBsonSuperset
@@ -944,8 +1049,9 @@ commands:
                 stability: stable
 
     newCommandParameterTypeStructRecursiveOne:
-        description: "new command passes because its parameter type is a struct that is
-                      compatible with the old parameter type struct"
+        description:
+            "new command passes because its parameter type is a struct that is
+            compatible with the old parameter type struct"
         command_name: newCommandParameterTypeStructRecursiveOne
         namespace: ignored
         cpp_name: newCommandParameterTypeStructRecursiveOne
@@ -958,8 +1064,9 @@ commands:
                 stability: stable
 
     newCommandParameterTypeStructRecursiveTwo:
-        description: "new command passes because its parameter type is a struct that is
-                      compatible with the old parameter type struct"
+        description:
+            "new command passes because its parameter type is a struct that is
+            compatible with the old parameter type struct"
         command_name: newCommandParameterTypeStructRecursiveTwo
         namespace: ignored
         cpp_name: newCommandParameterTypeStructRecursiveTwo
@@ -972,8 +1079,9 @@ commands:
                 stability: stable
 
     newlyAddedParamBsonAnyAllowList:
-        description: "command passes when its parameter is newly added and has bson type 'any'
-                      that is explicitly allowed"
+        description:
+            "command passes when its parameter is newly added and has bson type 'any'
+            that is explicitly allowed"
         command_name: newlyAddedParamBsonAnyAllowList
         namespace: ignored
         cpp_name: newlyAddedParamBsonAnyAllowList
@@ -1008,8 +1116,9 @@ commands:
                 stability: internal
 
     newUnstableParamTypeChangesIgnoreList:
-        description: "command has param with incompatible type changes, but is in the stable-to-unstable
-                      ignore list"
+        description:
+            "command has param with incompatible type changes, but is in the stable-to-unstable
+            ignore list"
         command_name: newUnstableParamTypeChangesIgnoreList
         namespace: ignored
         cpp_name: newUnstableParamTypeChangesIgnoreList
@@ -1023,8 +1132,9 @@ commands:
                 optional: true
 
     newlyAddedTypeFieldBsonAnyAllowList:
-        description: "command passes when its type field is newly added and has bson type 'any'
-                      that is explicitly allowed"
+        description:
+            "command passes when its type field is newly added and has bson type 'any'
+            that is explicitly allowed"
         command_name: newlyAddedTypeFieldBsonAnyAllowList
         namespace: type
         type: NewlyAddedBsonSerializationTypeAnyStruct
@@ -1044,8 +1154,9 @@ commands:
         reply_type: OkReply
 
     newUnstableTypeChangesIgnoreList:
-        description: "command has type with incompatible changes, but is in the stable-to-unstable
-                      ignore list"
+        description:
+            "command has type with incompatible changes, but is in the stable-to-unstable
+            ignore list"
         command_name: newUnstableTypeChangesIgnoreList
         namespace: type
         type: NewUnstableTypeChangesStructIgnoreList
@@ -1055,8 +1166,9 @@ commands:
         reply_type: OkReply
 
     oldCommandParameterValidator:
-        description: "new command passes when it contains a parameter that does not contain a validator
-                      that is present in the old parameter"
+        description:
+            "new command passes when it contains a parameter that does not contain a validator
+            that is present in the old parameter"
         command_name: oldCommandParameterValidator
         namespace: ignored
         cpp_name: oldCommandParameterValidator
@@ -1071,8 +1183,9 @@ commands:
                     lt: 0
 
     commandParameterValidatorsEqual:
-        description: "new command passes because it contains a parameter that contains a validator
-                      that is exactly equal to the old parameter validator"
+        description:
+            "new command passes because it contains a parameter that contains a validator
+            that is exactly equal to the old parameter validator"
         command_name: commandParameterValidatorsEqual
         namespace: ignored
         cpp_name: commandParameterValidatorsEqual
@@ -1091,8 +1204,9 @@ commands:
                     callback: "callback"
 
     oldCommandTypeValidator:
-        description: "new command passes because it contains a type that does not contain a validator
-                      that is present in the old type"
+        description:
+            "new command passes because it contains a type that does not contain a validator
+            that is present in the old type"
         command_name: oldCommandTypeValidator
         namespace: type
         type: OldValidatorStruct
@@ -1102,8 +1216,9 @@ commands:
         reply_type: OkReply
 
     commandTypeValidatorsEqual:
-        description: "new command passes because it contains a type that contains a validator
-                      that is exactly equal to the old type validator"
+        description:
+            "new command passes because it contains a type that contains a validator
+            that is exactly equal to the old type validator"
         command_name: commandTypeValidatorsEqual
         namespace: type
         type: ValidatorsEqualStruct
@@ -1114,7 +1229,7 @@ commands:
 
     newReplyFieldStable:
         description: "new command contains a stable reply field that is unstable
-                      in the corresponding old command and still passes"
+            in the corresponding old command and still passes"
         command_name: newReplyFieldStable
         namespace: ignored
         cpp_name: newReplyFieldStable
@@ -1123,8 +1238,9 @@ commands:
         reply_type: StableNewFieldReply
 
     newReplyFieldUnstableIgnoreList:
-        description: "new command contains an unstable reply field that is stable
-                      in the corresponding old command but is explicitly allowed"
+        description:
+            "new command contains an unstable reply field that is stable
+            in the corresponding old command but is explicitly allowed"
         command_name: newReplyFieldUnstableIgnoreList
         namespace: ignored
         cpp_name: newReplyFieldUnstableIgnoreList
@@ -1133,8 +1249,9 @@ commands:
         reply_type: UnstableNewFieldReplyIgnoreList
 
     newReplyFieldRequired:
-        description: "new command contains a required reply field that is optional
-                      in the corresponding old command and still passes"
+        description:
+            "new command contains a required reply field that is optional
+            in the corresponding old command and still passes"
         command_name: newReplyFieldRequired
         namespace: ignored
         cpp_name: newReplyFieldRequired
@@ -1152,8 +1269,9 @@ commands:
         reply_type: AddedNewFieldReply
 
     oldReplyFieldUnstable:
-        description: "old reply field is unstable so new command passes even if its new reply
-                      field is unstable"
+        description:
+            "old reply field is unstable so new command passes even if its new reply
+            field is unstable"
         command_name: oldReplyFieldUnstable
         namespace: ignored
         cpp_name: oldReplyFieldUnstable
@@ -1162,8 +1280,9 @@ commands:
         reply_type: UnstableOldFieldReply
 
     newReplyFieldUnstableOptionalIgnoreList:
-        description: "old reply field is stable but is included in the ignore list so new command
-                      passes even if its new reply field is unstable and optional"
+        description:
+            "old reply field is stable but is included in the ignore list so new command
+            passes even if its new reply field is unstable and optional"
         command_name: newReplyFieldUnstableOptionalIgnoreList
         namespace: ignored
         cpp_name: newReplyFieldUnstableOptionalIgnoreList
@@ -1181,8 +1300,9 @@ commands:
         reply_type: ImportedStableNewFieldReply
 
     newReplyFieldTypeEnumSubset:
-        description: "new command passes because its reply field type is an enum that is
-                      a subset of the corresponding old reply field type's enum values"
+        description:
+            "new command passes because its reply field type is an enum that is
+            a subset of the corresponding old reply field type's enum values"
         command_name: newReplyFieldTypeEnumSubset
         namespace: ignored
         cpp_name: newReplyFieldTypeEnumSubset
@@ -1192,8 +1312,8 @@ commands:
 
     newReplyFieldTypeBsonSubset:
         description: "new command passes because its reply field type has a
-                      bson_serialization_type that is a subset of the corresponding
-                      old reply field type's bson_serialization_type"
+            bson_serialization_type that is a subset of the corresponding
+            old reply field type's bson_serialization_type"
         command_name: newReplyFieldTypeBsonSubset
         namespace: ignored
         cpp_name: newReplyFieldTypeBsonSubset
@@ -1203,8 +1323,8 @@ commands:
 
     newReplyFieldTypeBsonSubsetTwo:
         description: "new command passes because its reply field type has a
-                      bson_serialization_type that is a subset of the corresponding
-                      old reply field type's bson_serialization_type"
+            bson_serialization_type that is a subset of the corresponding
+            old reply field type's bson_serialization_type"
         command_name: newReplyFieldTypeBsonSubsetTwo
         namespace: ignored
         cpp_name: newReplyFieldTypeBsonSubsetTwo
@@ -1213,8 +1333,9 @@ commands:
         reply_type: BsonSubsetReplyTwo
 
     newReplyFieldTypeStructRecursiveOne:
-        description: "new command passes because its reply field type is a struct that is
-                      compatible with the old reply field type struct"
+        description:
+            "new command passes because its reply field type is a struct that is
+            compatible with the old reply field type struct"
         command_name: newReplyFieldTypeStructRecursiveOne
         namespace: ignored
         cpp_name: newReplyFieldTypeStructRecursiveOne
@@ -1223,8 +1344,9 @@ commands:
         reply_type: StructFieldTypeRecursiveReplyOne
 
     newReplyFieldTypeStructRecursiveTwo:
-        description: "new command passes because its reply field type is a struct that is
-                      compatible with the old reply field type struct"
+        description:
+            "new command passes because its reply field type is a struct that is
+            compatible with the old reply field type struct"
         command_name: newReplyFieldTypeStructRecursiveTwo
         namespace: ignored
         cpp_name: newReplyFieldTypeStructRecursiveTwo
@@ -1233,8 +1355,9 @@ commands:
         reply_type: StructFieldTypeRecursiveReplyTwo
 
     newReplyFieldTypeStructIgnoreList:
-        description: "command has a reply contains a field whose new type is a struct that is not
-                      compatible with the old field type, but this is explicitly allowed"
+        description:
+            "command has a reply contains a field whose new type is a struct that is not
+            compatible with the old field type, but this is explicitly allowed"
         command_name: newReplyFieldTypeStructIgnoreList
         namespace: ignored
         cpp_name: newReplyFieldTypeStructIgnoreList
@@ -1253,7 +1376,7 @@ commands:
 
     newNamespaceConcatenateWithDbOrUuid:
         description: "new command passes when its namespace is changed to
-                      concatenate_with_db_or_uuid from concatenate_with_db"
+            concatenate_with_db_or_uuid from concatenate_with_db"
         command_name: newNamespaceConcatenateWithDbOrUuid
         namespace: concatenate_with_db
         cpp_name: newNamespaceConcatenateWithDbOrUuid
@@ -1272,8 +1395,9 @@ commands:
         reply_type: OkReply
 
     oldNamespaceTypeNamespaceString:
-        description: "If old command has namespace: type and type: namespacestring,
-                      the new namespace can be changed to concatenate_with_db"
+        description:
+            "If old command has namespace: type and type: namespacestring,
+            the new namespace can be changed to concatenate_with_db"
         command_name: oldNamespaceTypeNamespaceString
         namespace: type
         type: namespacestring
@@ -1283,8 +1407,9 @@ commands:
         reply_type: OkReply
 
     oldNamespaceTypeNamespaceStringTwo:
-        description: "If old command has namespace: type and type: namespacestring,
-                      the new namespace can be changed to concatenate_with_db_or_uuid"
+        description:
+            "If old command has namespace: type and type: namespacestring,
+            the new namespace can be changed to concatenate_with_db_or_uuid"
         command_name: oldNamespaceTypeNamespaceStringTwo
         namespace: type
         type: namespacestring
@@ -1295,7 +1420,7 @@ commands:
 
     newTypeSuperset:
         description: "new command passes because its type is a superset
-                      of the old type"
+            of the old type"
         command_name: newTypeSuperset
         namespace: type
         type: intStringToIntStringBool
@@ -1306,7 +1431,7 @@ commands:
 
     newTypeEnumSuperset:
         description: "new command passes because its type is an enum that is
-                      a superset of the corresponding old type's enum values"
+            a superset of the corresponding old type's enum values"
         command_name: newTypeEnumSuperset
         namespace: type
         type: EnumSuperset
@@ -1316,8 +1441,9 @@ commands:
         reply_type: OkReply
 
     newReplyTypeEnumOrStructIgnoreList:
-        description: "the type is a non-enum or struct type in the old command, and an enum or struct
-                     in the new command, but the change is explicitly allowed"
+        description:
+            "the type is a non-enum or struct type in the old command, and an enum or struct
+            in the new command, but the change is explicitly allowed"
         command_name: newReplyTypeEnumOrStructIgnoreList
         namespace: type
         type: namespacestring
@@ -1327,8 +1453,9 @@ commands:
         reply_type: NewReplyTypeEnumOrStructIgnoreList
 
     newTypeFieldOptional:
-        description: "new command type contains an optional field that is required
-                      in the corresponding old command and still passes"
+        description:
+            "new command type contains an optional field that is required
+            in the corresponding old command and still passes"
         command_name: newTypeFieldOptional
         namespace: type
         type: OptionalNewField
@@ -1349,7 +1476,7 @@ commands:
 
     newTypeFieldStableOptional:
         description: "new command has an optional type field that is unstable
-                      in the corresponding old command and still passes"
+            in the corresponding old command and still passes"
         command_name: newTypeFieldStableOptional
         namespace: type
         type: StableOptionalTypeFieldStruct
@@ -1360,7 +1487,7 @@ commands:
 
     newTypeFieldStableWithDefault:
         description: "new command has a required type field with a default value
-                      that is unstable in the corresponding old command and still passes"
+            that is unstable in the corresponding old command and still passes"
         command_name: newTypeFieldStableWithDefault
         namespace: type
         type: StableWithDefaultTypeFieldStruct
@@ -1370,8 +1497,9 @@ commands:
         reply_type: OkReply
 
     newTypeFieldUnstableIgnoreList:
-        description: "new command contains an unstable type field that is stable in the corresponding
-                      old command but that is explicitly allowed"
+        description:
+            "new command contains an unstable type field that is stable in the corresponding
+            old command but that is explicitly allowed"
         command_name: newTypeFieldUnstableIgnoreList
         namespace: type
         type: UnstableNewFieldReplyIgnoreList
@@ -1382,7 +1510,7 @@ commands:
 
     removeTypeFieldUnstable:
         description: "new command removes type field that is unstable
-                      in the corresponding old command and still passes"
+            in the corresponding old command and still passes"
         command_name: removeTypeFieldUnstable
         namespace: type
         type: RemovedUnstableTypeFieldStruct
@@ -1393,7 +1521,7 @@ commands:
 
     removeTypeFieldInternal:
         description: "new command removes type field that is internal
-                      in the corresponding old command and still passes"
+            in the corresponding old command and still passes"
         command_name: removeTypeFieldInternal
         namespace: type
         type: RemovedInternalTypeFieldStruct
@@ -1404,7 +1532,7 @@ commands:
 
     addedUnstableTypeField:
         description: "new command has a new unstable type field that does not
-                      exist in the corresponding old command and still passes"
+            exist in the corresponding old command and still passes"
         command_name: addedUnstableTypeField
         namespace: type
         type: AddedUnstableTypeFieldStruct
@@ -1415,7 +1543,7 @@ commands:
 
     addedInternalTypeField:
         description: "new command has a new internal type field that does not
-                      exist in the corresponding old command and still passes"
+            exist in the corresponding old command and still passes"
         command_name: addedInternalTypeField
         namespace: type
         type: AddedInternalTypeFieldStruct
@@ -1426,7 +1554,7 @@ commands:
 
     keptUnstableTypeField:
         description: "new command has an unstable type field that also
-                      exists in the corresponding old command and still passes"
+            exists in the corresponding old command and still passes"
         command_name: keptUnstableTypeField
         namespace: type
         type: KeptUnstableTypeFieldStruct
@@ -1437,7 +1565,7 @@ commands:
 
     keptInternalTypeField:
         description: "new command has an internal type field that also
-                      exists in the corresponding old command and still passes"
+            exists in the corresponding old command and still passes"
         command_name: keptInternalTypeField
         namespace: type
         type: KeptInternalTypeFieldStruct
@@ -1447,8 +1575,9 @@ commands:
         reply_type: OkReply
 
     oldReplyFieldVariantType:
-        description: "new command passes when its reply field type is not a variant type while
-                      the old reply field is a variant type"
+        description:
+            "new command passes when its reply field type is not a variant type while
+            the old reply field is a variant type"
         command_name: oldReplyFieldVariantType
         namespace: ignored
         cpp_name: oldReplyFieldVariantType
@@ -1466,8 +1595,9 @@ commands:
         reply_type: NewVariantNotSubsetReplyIgnoreList
 
     newReplyFieldVariantSubset:
-        description: "new command when its reply field type is a variant type that is
-                      a subset of the old reply field variant types"
+        description:
+            "new command when its reply field type is a variant type that is
+            a subset of the old reply field variant types"
         command_name: newReplyFieldVariantSubset
         namespace: ignored
         cpp_name: newReplyFieldVariantSubset
@@ -1476,8 +1606,9 @@ commands:
         reply_type: NewVariantSubsetReply
 
     newReplyFieldVariantSubsetTwo:
-        description: "new command when its reply field type is a variant type that is
-                      a subset of the old reply field variant types"
+        description:
+            "new command when its reply field type is a variant type that is
+            a subset of the old reply field variant types"
         command_name: newReplyFieldVariantSubsetTwo
         namespace: ignored
         cpp_name: newReplyFieldVariantSubsetTwo
@@ -1486,8 +1617,9 @@ commands:
         reply_type: NewVariantSubsetReplyTwo
 
     newReplyFieldVariantSubsetThree:
-        description: "new command when its reply field type is a variant type that is
-                      a subset of the old reply field variant types"
+        description:
+            "new command when its reply field type is a variant type that is
+            a subset of the old reply field variant types"
         command_name: newReplyFieldVariantSubsetThree
         namespace: ignored
         cpp_name: newReplyFieldVariantSubsetThree
@@ -1496,8 +1628,9 @@ commands:
         reply_type: NewVariantSubsetReplyThree
 
     replyFieldVariantRecursive:
-        description: "new command passes when its reply field type is a variant type that is
-                      compatible with the old reply field variant type"
+        description:
+            "new command passes when its reply field type is a variant type that is
+            compatible with the old reply field variant type"
         command_name: replyFieldVariantRecursive
         namespace: ignored
         cpp_name: replyFieldVariantRecursive
@@ -1506,8 +1639,9 @@ commands:
         reply_type: VariantRecursiveReply
 
     oldReplyFieldVariantStruct:
-        description: "new command passes if it doesn't have a variant struct type while the
-                      old command does"
+        description:
+            "new command passes if it doesn't have a variant struct type while the
+            old command does"
         command_name: oldReplyFieldVariantStruct
         namespace: ignored
         cpp_name: oldReplyFieldVariantStruct
@@ -1516,8 +1650,9 @@ commands:
         reply_type: OldVariantStructReply
 
     replyFieldVariantStructRecursive:
-        description: "new command passes when its reply field type has a variant struct type
-                      that is compatible with the old reply field variant struct type"
+        description:
+            "new command passes when its reply field type has a variant struct type
+            that is compatible with the old reply field variant struct type"
         command_name: replyFieldVariantStructRecursive
         namespace: ignored
         cpp_name: replyFieldVariantStructRecursive
@@ -1526,8 +1661,9 @@ commands:
         reply_type: VariantStructRecursiveReply
 
     replyFieldVariantDifferentStructIgnoreList:
-        description: "the old field has a non-variant type and the new field has a variant type but the
-                      change is explicitly allowed"
+        description:
+            "the old field has a non-variant type and the new field has a variant type but the
+            change is explicitly allowed"
         command_name: replyFieldVariantDifferentStructIgnoreList
         namespace: ignored
         cpp_name: replyFieldVariantDifferentStructIgnoreList
@@ -1536,8 +1672,9 @@ commands:
         reply_type: VariantDifferentStructReplyIgnoreList
 
     replyFieldNonVariantToVariantIgnoreList:
-        description: "the old and new field have different variant struct types but the change is
-                      explicitly allowed"
+        description:
+            "the old and new field have different variant struct types but the change is
+            explicitly allowed"
         command_name: replyFieldNonVariantToVariantIgnoreList
         namespace: ignored
         cpp_name: replyFieldNonVariantToVariantIgnoreList
@@ -1546,8 +1683,9 @@ commands:
         reply_type: NonVariantToVariantReplyIgnoreList
 
     replyFieldNonEnumToEnumIgnoreList:
-        description: "the old field has a non-enum type and the new field has an enum type but the
-                      change is explicitly allowed"
+        description:
+            "the old field has a non-enum type and the new field has an enum type but the
+            change is explicitly allowed"
         command_name: replyFieldNonEnumToEnumIgnoreList
         namespace: ignored
         cpp_name: replyFieldNonEnumToEnumIgnoreList
@@ -1556,8 +1694,9 @@ commands:
         reply_type: NonEnumToEnumReplyIgnoreList
 
     newlyAddedReplyFieldTypeBsonAnyAllowed:
-        description: "command passes because it has a newly added reply field type has a bson_serialization_type
-                      that contains 'any' that is explicitly allowed"
+        description:
+            "command passes because it has a newly added reply field type has a bson_serialization_type
+            that contains 'any' that is explicitly allowed"
         command_name: newlyAddedReplyFieldTypeBsonAnyAllowed
         namespace: ignored
         cpp_name: newlyAddedReplyFieldTypeBsonAnyAllowed
@@ -1584,8 +1723,9 @@ commands:
         reply_type: OldInternalTypeChangesReply
 
     newUnstableReplyFieldTypeChangesIgnoreList:
-        description: "command has an old stable reply field with incompatible type changes but it is also
-                      in the ignore list"
+        description:
+            "command has an old stable reply field with incompatible type changes but it is also
+            in the ignore list"
         command_name: newUnstableReplyFieldTypeChangesIgnoreList
         namespace: ignored
         cpp_name: newUnstableReplyFieldTypeChangesIgnoreList
@@ -1595,7 +1735,7 @@ commands:
 
     commandAllowedAnyTypes:
         description: "new command that has parameter and reply type with
-                      explicitly allowed 'any' bson serialization type passes"
+            explicitly allowed 'any' bson serialization type passes"
         command_name: commandAllowedAnyTypes
         namespace: type
         type: bsonSerializationTypeAnyAllowed
@@ -1610,7 +1750,7 @@ commands:
 
     commandAllowedAnyTypesWithVariant:
         description: "command that has reply variant types with
-                      explicitly allowed 'any' bson serialization type passes"
+            explicitly allowed 'any' bson serialization type passes"
         command_name: commandAllowedAnyTypesWithVariant
         namespace: ignored
         cpp_name: commandAllowedAnyTypesWithVariant
@@ -1619,8 +1759,9 @@ commands:
         reply_type: BsonSerializationTypeAnyWithVariantReply
 
     newParamVariantSuperset:
-        description: "new command passes because its parameter type is a variant type that is
-                      a superset of the old parameter variant types"
+        description:
+            "new command passes because its parameter type is a variant type that is
+            a superset of the old parameter variant types"
         command_name: newParamVariantSuperset
         namespace: ignored
         cpp_name: newParamVariantSuperset
@@ -1634,8 +1775,9 @@ commands:
                     variant: [int, bool, string, array<string>]
 
     newParamVariantSupersetTwo:
-        description: "new command passes because its parameter type is a variant type that is
-                      a superset of the old parameter variant types"
+        description:
+            "new command passes because its parameter type is a variant type that is
+            a superset of the old parameter variant types"
         command_name: newParamVariantSupersetTwo
         namespace: ignored
         cpp_name: newParamVariantSupersetTwo
@@ -1649,8 +1791,9 @@ commands:
                     variant: [int, string, bool, double, array<string>]
 
     oldParamTypeNotVariant:
-        description: "new command passes because its parameter type is variant while the old
-                      param type is not"
+        description:
+            "new command passes because its parameter type is variant while the old
+            param type is not"
         command_name: newParamTypeNotVariant
         namespace: ignored
         cpp_name: newParamTypeNotVariant
@@ -1664,8 +1807,9 @@ commands:
                     variant: [int, string, array<string>]
 
     newParamVariantRecursive:
-        description: "new command passes because its param type is a variant type that is
-                      compatible with the old param variant type"
+        description:
+            "new command passes because its param type is a variant type that is
+            compatible with the old param variant type"
         command_name: newParamVariantRecursive
         namespace: ignored
         cpp_name: newParamVariantRecursive
@@ -1676,12 +1820,18 @@ commands:
             variantRecursiveParam:
                 stability: stable
                 type:
-                    variant: [int, intStringToIntStringBool,
-                              array<intStringToIntStringBool>, array<string>]
+                    variant:
+                        [
+                            int,
+                            intStringToIntStringBool,
+                            array<intStringToIntStringBool>,
+                            array<string>,
+                        ]
 
     newParamVariantStructSuperset:
-        description: "new command passes because its parameter type is a variant type that is
-                      a subset of the old parameter variant types"
+        description:
+            "new command passes because its parameter type is a variant type that is
+            a subset of the old parameter variant types"
         command_name: newParamVariantStructSuperset
         namespace: ignored
         cpp_name: newParamVariantStructSuperset
@@ -1692,13 +1842,20 @@ commands:
             variantStructSupersetParam:
                 stability: stable
                 type:
-                    variant: [int, string, NewCommandParameterStruct,
-                              array<NewCommandParameterStruct>, array<string>]
+                    variant:
+                        [
+                            int,
+                            string,
+                            NewCommandParameterStruct,
+                            array<NewCommandParameterStruct>,
+                            array<string>,
+                        ]
 
     newParamVariantStructRecursive:
-        description: "new command passes because its parameter type has a variant
-                      struct type that is compatible with the old parameter variant
-                      struct type"
+        description:
+            "new command passes because its parameter type has a variant
+            struct type that is compatible with the old parameter variant
+            struct type"
         command_name: newParamVariantStructRecursive
         namespace: ignored
         cpp_name: newParamVariantStructRecursive
@@ -1709,12 +1866,19 @@ commands:
             variantStructRecursiveParam:
                 stability: stable
                 type:
-                    variant: [int, string, StructCommandParameterTypeRecursive,
-                              array<StructCommandParameterTypeRecursive>, array<string>]
+                    variant:
+                        [
+                            int,
+                            string,
+                            StructCommandParameterTypeRecursive,
+                            array<StructCommandParameterTypeRecursive>,
+                            array<string>,
+                        ]
 
     newCommandTypeVariantSuperset:
-        description: "new command passes because its type is a variant type that is
-                      a superset of the old type variant types"
+        description:
+            "new command passes because its type is a variant type that is
+            a superset of the old type variant types"
         command_name: newCommandTypeVariantSuperset
         namespace: type
         type: VariantSupersetStruct
@@ -1724,8 +1888,9 @@ commands:
         reply_type: OkReply
 
     newCommandTypeVariantSupersetTwo:
-        description: "new command passes because its type is a variant type that is
-                      a superset of the old command type variant types"
+        description:
+            "new command passes because its type is a variant type that is
+            a superset of the old command type variant types"
         command_name: newCommandTypeVariantSupersetTwo
         namespace: type
         type: VariantSupersetStructTwo
@@ -1735,8 +1900,9 @@ commands:
         reply_type: OkReply
 
     oldCommandTypeNotVariant:
-        description: "new command passes because its type is variant while the old
-                      type is not"
+        description:
+            "new command passes because its type is variant while the old
+            type is not"
         command_name: oldCommandTypeNotVariant
         namespace: type
         type: OldTypeNotVariantStruct
@@ -1746,8 +1912,9 @@ commands:
         reply_type: OkReply
 
     newCommandTypeVariantRecursive:
-        description: "new command passes because its type is a variant type that is passes
-                      compatible with the old command type variant type"
+        description:
+            "new command passes because its type is a variant type that is passes
+            compatible with the old command type variant type"
         command_name: newCommandTypeVariantRecursive
         namespace: type
         type: VariantRecursiveStruct
@@ -1757,8 +1924,9 @@ commands:
         reply_type: OkReply
 
     newCommandTypeVariantStructSuperset:
-        description: "new command passes because its type is a variant type that is
-                      a superset of the old command type variant types"
+        description:
+            "new command passes because its type is a variant type that is
+            a superset of the old command type variant types"
         command_name: newCommandTypeVariantStructSuperset
         namespace: type
         type: VariantStructSupersetStruct
@@ -1768,8 +1936,9 @@ commands:
         reply_type: OkReply
 
     newCommandTypeVariantStructSupersetTwo:
-        description: "new command passes because its type is a variant type that is
-                      a superset of the old command type variant types"
+        description:
+            "new command passes because its type is a variant type that is
+            a superset of the old command type variant types"
         command_name: newCommandTypeVariantStructTwoSuperset
         namespace: type
         type: VariantStructSupersetTwoStruct
@@ -1779,8 +1948,9 @@ commands:
         reply_type: OkReply
 
     newCommandTypeArrayVariantStructSuperset:
-        description: "new command passes because its type is a array<variant> type that is
-                      a superset of the old command type array<variant> types"
+        description:
+            "new command passes because its type is a array<variant> type that is
+            a superset of the old command type array<variant> types"
         command_name: newCommandTypeArrayVariantStructSuperset
         namespace: type
         type: ArrayVariantStructSupersetTwoStruct
@@ -1791,8 +1961,8 @@ commands:
 
     newCommandTypeVariantStructRecursive:
         description: "new command passes because its type has a variant
-                      struct type that is compatible with the old command type variant
-                      struct type"
+            struct type that is compatible with the old command type variant
+            struct type"
         command_name: newCommandTypeVariantStructRecursive
         namespace: type
         type: VariantStructRecursiveStruct
@@ -1802,8 +1972,9 @@ commands:
         reply_type: OkReply
 
     oldReplyFieldValidator:
-        description: "new command passes because it contains a reply field that does not contain a validator
-                      that is present in the old reply field"
+        description:
+            "new command passes because it contains a reply field that does not contain a validator
+            that is present in the old reply field"
         command_name: oldReplyFieldValidator
         namespace: ignored
         cpp_name: oldReplyFieldValidator
@@ -1812,8 +1983,9 @@ commands:
         reply_type: OldValidatorStruct
 
     replyFieldValidatorsEqual:
-        description: "new command passes because it contains a reply field that contains a validator
-                      that is exactly equal to the old reply field validator"
+        description:
+            "new command passes because it contains a reply field that contains a validator
+            that is exactly equal to the old reply field validator"
         command_name: replyFieldValidatorsEqual
         namespace: ignored
         cpp_name: replyFieldValidatorsEqual
@@ -1823,7 +1995,7 @@ commands:
 
     simpleCheckEqual:
         description: "new command passes because its simple check is equal to
-                      the old check"
+            the old check"
         command_name: simpleCheckEqual
         namespace: ignored
         cpp_name: simpleCheckEqual
@@ -1835,8 +2007,9 @@ commands:
                 check: check
 
     simplePrivilegeEqual:
-        description: "new command passes because its simple privilege is equal to
-                      the old privilege"
+        description:
+            "new command passes because its simple privilege is equal to
+            the old privilege"
         command_name: simplePrivilegeEqual
         namespace: ignored
         cpp_name: simplePrivilegeEqual
@@ -1850,8 +2023,9 @@ commands:
                     action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
 
     newSimpleActionTypeSubset:
-        description: "new command passes because its simple privilege action_type is a subset
-                      of the old privilege action_type"
+        description:
+            "new command passes because its simple privilege action_type is a subset
+            of the old privilege action_type"
         command_name: newSimpleActionTypeSubset
         namespace: ignored
         cpp_name: newSimpleActionTypeSubset
@@ -1865,8 +2039,9 @@ commands:
                     action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
 
     ArrayCommand:
-        description: "new command will pass because the command type and the field type are of
-                      ArrayType of a type that is compatible with the old command."
+        description:
+            "new command will pass because the command type and the field type are of
+            ArrayType of a type that is compatible with the old command."
         command_name: arrayCommand
         namespace: type
         type: array<ArrayTypeStruct>
@@ -1890,11 +2065,12 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: resourcePattern
-                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+                      resource_pattern: resourcePattern
+                      action_type:
+                          [actionTypeOne, actionTypeTwo, actionTypeThree]
                 - privilege:
-                    resource_pattern: resourcePatternTwo
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePatternTwo
+                      action_type: [actionTypeOne, actionTypeTwo]
                 - check: checkOne
 
     complexActionTypesSubsetTwo:
@@ -1908,13 +2084,14 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: resourcePattern
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePattern
+                      action_type: [actionTypeOne, actionTypeTwo]
                 - check: checkOne
                 - check: checkTwo
                 - privilege:
-                    resource_pattern: resourcePatternTwo
-                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+                      resource_pattern: resourcePatternTwo
+                      action_type:
+                          [actionTypeOne, actionTypeTwo, actionTypeThree]
 
     complexChecksSubset:
         description: "new command passes when the complex checks are a subset of the old checks"
@@ -1931,8 +2108,9 @@ commands:
                 - check: checkThree
 
     complexChecksSupersetAllowed:
-        description: "new command passes when the the complex checks are a superset of the old
-                      checks but all the additional checks are explicitly allowed."
+        description:
+            "new command passes when the the complex checks are a superset of the old
+            checks but all the additional checks are explicitly allowed."
         command_name: complexChecksSupersetAllowed
         namespace: ignored
         cpp_name: complexChecksSupersetAllowed
@@ -1943,8 +2121,8 @@ commands:
             complex:
                 - check: checkOne
                 - privilege:
-                    resource_pattern: resourcePatternOne
-                    action_type: [actionTypeOne]
+                      resource_pattern: resourcePatternOne
+                      action_type: [actionTypeOne]
 
     addedAggStage:
         description: "new command passes when a agg stage is added"
@@ -1957,12 +2135,12 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: resourcePatternTwo
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePatternTwo
+                      action_type: [actionTypeOne, actionTypeTwo]
                 - check: checkOne
                 - privilege:
-                    resource_pattern: resourcePattern
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePattern
+                      action_type: [actionTypeOne, actionTypeTwo]
 
     removedAggStage:
         description: "new command passes when a agg stage is removed"
@@ -1975,17 +2153,16 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: resourcePatternTwo
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePatternTwo
+                      action_type: [actionTypeOne, actionTypeTwo]
                 - check: checkOne
                 - privilege:
-                    resource_pattern: resourcePattern
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePattern
+                      action_type: [actionTypeOne, actionTypeTwo]
                 - privilege:
-                    agg_stage: aggStage
-                    resource_pattern: resourcePatternFour
-                    action_type: actionTypeFour
-
+                      agg_stage: aggStage
+                      resource_pattern: resourcePatternFour
+                      action_type: actionTypeFour
 
     removedComplexPrivilege:
         description: "new command passes when a complex privilege is removed"
@@ -1998,12 +2175,13 @@ commands:
         access_check:
             complex:
                 - privilege:
-                    resource_pattern: resourcePattern
-                    action_type: [actionTypeOne, actionTypeTwo]
+                      resource_pattern: resourcePattern
+                      action_type: [actionTypeOne, actionTypeTwo]
                 - check: checkOne
                 - privilege:
-                    resource_pattern: resourcePattern
-                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+                      resource_pattern: resourcePattern
+                      action_type:
+                          [actionTypeOne, actionTypeTwo, actionTypeThree]
 
     addedAccessCheckField:
         description: "new command passes because it adds the access_check field when the api_version is not '1'"
@@ -2015,8 +2193,9 @@ commands:
         reply_type: OkReply
 
     newReplyFieldMissingUnstableField:
-        description: "new command passes because it does not have an api_version even though it
-                      contains a reply field that is missing the 'stability' field"
+        description:
+            "new command passes because it does not have an api_version even though it
+            contains a reply field that is missing the 'stability' field"
         command_name: newReplyFieldMissingUnstableField
         namespace: ignored
         cpp_name: newReplyFieldMissingUnstableField
@@ -2026,7 +2205,7 @@ commands:
 
     oldReplyFieldMissingUnstableField:
         description: "old command passes even though it
-                      contains a reply field that is missing the 'stability' field"
+            contains a reply field that is missing the 'stability' field"
         command_name: oldReplyFieldMissingUnstableField
         namespace: ignored
         cpp_name: oldReplyFieldMissingUnstableField
@@ -2035,8 +2214,9 @@ commands:
         reply_type: MissingUnstableFieldOldFieldStruct
 
     newCommandTypeFieldMissingUnstableField:
-        description: "new command passes because it does not have an api_version even though it
-                      contains a command type field that is missing the 'stability' field"
+        description:
+            "new command passes because it does not have an api_version even though it
+            contains a command type field that is missing the 'stability' field"
         command_name: newCommandTypeFieldMissingUnstableField
         namespace: type
         cpp_name: newCommandTypeFieldMissingUnstableField
@@ -2047,7 +2227,7 @@ commands:
 
     oldCommandTypeFieldMissingUnstableField:
         description: "old command passes even though it
-                      contains a command type field that is missing the 'stability' field"
+            contains a command type field that is missing the 'stability' field"
         command_name: oldCommandTypeFieldMissingUnstableField
         namespace: type
         cpp_name: oldCommandTypeFieldMissingUnstableField
@@ -2057,8 +2237,9 @@ commands:
         reply_type: OkReply
 
     newParameterMissingUnstableField:
-        description: "new command passes because it does not have an api_version even though it
-                      contains a parameter that is missing the 'stability' field"
+        description:
+            "new command passes because it does not have an api_version even though it
+            contains a parameter that is missing the 'stability' field"
         command_name: newParameterMissingUnstableField
         namespace: ignored
         cpp_name: newParameterMissingUnstableField
@@ -2072,7 +2253,7 @@ commands:
 
     oldParameterMissingUnstableField:
         description: "old command passes even though it
-                      contains a parameter that is missing the 'stability' field"
+            contains a parameter that is missing the 'stability' field"
         command_name: oldParameterMissingUnstableField
         namespace: ignored
         cpp_name: oldParameterMissingUnstableField
@@ -2084,8 +2265,9 @@ commands:
         reply_type: OkReply
 
     chainedStructCompatible:
-        description: "new command passes because it contains a chained struct that has compatible
-                      fields"
+        description:
+            "new command passes because it contains a chained struct that has compatible
+            fields"
         command_name: chainedStructCompatible
         namespace: ignored
         cpp_name: chainedStructCompatible
@@ -2096,8 +2278,9 @@ commands:
             VariantStructRecursiveStruct: VariantStructRecursiveStruct
 
     replyWithCompatibleChainedStruct:
-        description: "new command passes because its reply contains a chained struct that has
-                      compatible fields"
+        description:
+            "new command passes because its reply contains a chained struct that has
+            compatible fields"
         command_name: replyWithCompatibleChainedStruct
         namespace: ignored
         cpp_name: replyWithCompatibleChainedStruct
@@ -2106,8 +2289,9 @@ commands:
         reply_type: CompatibleChainedStructReply
 
     typeWithCompatibleChainedStruct:
-        description: "new command passes because its type contains a chained struct that has
-                      compatible fields"
+        description:
+            "new command passes because its type contains a chained struct that has
+            compatible fields"
         command_name: typeWithCompatibleChainedStruct
         namespace: type
         type: CompatibleChainedStructType
