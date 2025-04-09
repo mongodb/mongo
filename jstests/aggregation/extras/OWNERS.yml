@@ -12,4 +12,4 @@ filters:
       - 10gen/query-integration-staff-leads
   - "window_function_helpers.js":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions

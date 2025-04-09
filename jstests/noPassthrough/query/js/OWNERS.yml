@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "OWNERS.yml":
     approvers:
       - 10gen/query-integration-staff-leads

@@ -10,7 +10,7 @@ filters:
       - 10gen/query-integration-staff-leads
   - "evaluate_javascript*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "evaluate_fle*":
     approvers:
-      - 10gen/query-integration-fle
+      - 10gen/query-integration-extensions

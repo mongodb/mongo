@@ -26,7 +26,7 @@ filters:
       - 10gen/query-integration-observability
   - "authwhere.js":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "batch_write_command_sharded.js":
     approvers:
       - 10gen/query-execution-router-write-exec

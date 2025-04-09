@@ -59,7 +59,7 @@ filters:
       - 10gen/server-security
   - "mozjs":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
       - 10gen/server-security
   - "murmurhash3":
     approvers:

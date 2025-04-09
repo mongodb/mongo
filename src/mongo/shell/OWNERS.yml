@@ -59,7 +59,7 @@ filters:
       - 10gen/devprod-correctness
   - "named_pipe_test_helper*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "feature_compatibility_version.js":
     approvers:
       - 10gen/server-fcv

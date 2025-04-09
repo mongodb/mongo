@@ -10,4 +10,4 @@ filters:
       - 10gen/query-integration-staff-leads
   - "percentiles_util.js":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions

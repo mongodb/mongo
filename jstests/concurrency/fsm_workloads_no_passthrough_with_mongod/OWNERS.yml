@@ -2,4 +2,4 @@ version: 1.0.0
 filters:
   - "external_data_source.js":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions

@@ -44,7 +44,7 @@ filters:
       - 10gen/query-execution-aggregation
   - "extensions_callback_real_test.cpp":
     approvers:
-      - 10gen/query-integration-staff-leads
+      - 10gen/query-integration-search
   - "matchertests.cpp":
     approvers:
       - 10gen/query-execution

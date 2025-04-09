@@ -2,5 +2,5 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-integration-fle
+      - 10gen/query-integration-extensions
       - 10gen/server-security

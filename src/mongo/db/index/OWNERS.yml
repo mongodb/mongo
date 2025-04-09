@@ -38,16 +38,16 @@ filters:
       - 10gen/query-execution-indexing
   - "2d_common*":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "2d_key_generator*":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "s2_common*":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "s2*key_generator*":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "index_descriptor*":
     approvers:
       - 10gen/server-catalog-and-routing

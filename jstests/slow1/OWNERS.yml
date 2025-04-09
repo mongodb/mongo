@@ -5,7 +5,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "geo_array1.js":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "initial_sync_many_dbs.js":
     approvers:
       - 10gen/server-initial-sync

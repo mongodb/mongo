@@ -41,7 +41,7 @@ filters:
       - 10gen/query-integration-search
   - "set_window_fields_read_concern_snapshot.js":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "analyze*":
     approvers:
       - 10gen/query-optimization
@@ -50,10 +50,10 @@ filters:
       - 10gen/query-execution
   - "compute_mode.js":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "external_data_source*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "fail_point_getmore_after_cursor_checkout.js":
     approvers:
       - 10gen/query-execution-client-cursor

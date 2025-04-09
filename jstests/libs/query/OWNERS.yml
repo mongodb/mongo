@@ -14,7 +14,7 @@ filters:
       - 10gen/query-execution-change-streams
   - "geo*.js":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "group_to_distinct_scan_utils.js":
     approvers:
       - 10gen/query-optimization

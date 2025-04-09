@@ -10,7 +10,7 @@ filters:
       - 10gen/query-integration-staff-leads
   - "encrypt_keyword*":
     approvers:
-      - 10gen/query-integration-fle
+      - 10gen/query-integration-extensions
   - "encrypt_schema*":
     approvers:
-      - 10gen/query-integration-fle
+      - 10gen/query-integration-extensions

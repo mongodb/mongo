@@ -3,4 +3,4 @@ filters:
   - "*":
     approvers:
       - 10gen/server-security
-      - 10gen/query-integration-fle
+      - 10gen/query-integration-extensions

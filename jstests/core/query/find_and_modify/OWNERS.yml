@@ -19,4 +19,4 @@ filters:
       - 10gen/query-optimization
   - "find_and_modify_where.js":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions

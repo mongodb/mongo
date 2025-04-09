@@ -55,13 +55,13 @@ filters:
       - 10gen/query-integration-observability
   - "document_source_densify*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "document_source_fill*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "document_source*geo*":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "document_source_hybrid_scoring*":
     approvers:
       - 10gen/query-integration-search
@@ -79,7 +79,7 @@ filters:
       - 10gen/query-optimization
   - "document_source_query_stats*":
     approvers:
-      - 10gen/query-integration-query-stats
+      - 10gen/query-integration-observability
   - "document_source_rank_fusion*":
     approvers:
       - 10gen/query-integration-search
@@ -91,7 +91,7 @@ filters:
       - 10gen/query-integration-search
   - "document_source_set_window_fields*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "document_source_merge_spec*":
     approvers:
       - 10gen/query-optimization
@@ -133,10 +133,10 @@ filters:
       - 10gen/query-optimization
   - "expression_javascript*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "expression_js*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "expression_visitor*":
     approvers:
       - 10gen/query-optimization
@@ -151,7 +151,7 @@ filters:
       - 10gen/query-execution-aggregation
   - "javascript_execution*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "initialize_auto_get_helper.h":
     approvers:
       - 10gen/query-execution-aggregation
@@ -169,7 +169,7 @@ filters:
       - 10gen/streams-engine
   - "make_js_function*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "*_processor*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -234,10 +234,10 @@ filters:
   # QI.
   - "percentile_algo*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "pipeline_metadata_tree*":
     approvers:
-      - 10gen/query-integration-fle
+      - 10gen/query-integration-extensions
   - "plan_explainer*":
     approvers:
       - 10gen/query-optimization

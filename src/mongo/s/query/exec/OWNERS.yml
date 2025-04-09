@@ -21,4 +21,4 @@ filters:
       - 10gen/query-execution-aggregation
   - "collect_query_stats_mongos.*":
     approvers:
-      - 10gen/query-integration-query-stats
+      - 10gen/query-integration-observability

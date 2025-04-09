@@ -35,7 +35,7 @@ filters:
       - 10gen/query-execution-datetime
   - "fts.js":
     approvers:
-      - 10gen/query-integration-staff-leads
+      - 10gen/query-integration-search
   - "local_reads.js":
     approvers:
       - 10gen/query-integration-observability
