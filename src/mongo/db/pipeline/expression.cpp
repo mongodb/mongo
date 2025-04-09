@@ -67,7 +67,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_parser_gen.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/server_feature_flags_gen.h"

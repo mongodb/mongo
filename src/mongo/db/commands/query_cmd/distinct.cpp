@@ -70,7 +70,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/profile_settings.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
@@ -197,7 +197,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         std::move(expCtx), std::move(parsedDistinct), nullptr);
 }
 
-namespace dps = dotted_path_support;
+namespace mdps = multikey_dotted_path_support;
 
 namespace {
 // This function might create a classic or SBE plan executor. It relies on some assumptions that are
@@ -647,7 +647,7 @@ public:
                 // available to us without this.  If a collection scan is providing the data, we may
                 // have to expand an array.
                 BSONElementSet elts;
-                dps::extractAllElementsAlongPath(obj, key, elts);
+                mdps::extractAllElementsAlongPath(obj, key, elts);
 
                 for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
                     BSONElement elt = *it;

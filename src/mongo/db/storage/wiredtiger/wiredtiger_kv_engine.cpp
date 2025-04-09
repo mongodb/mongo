@@ -70,11 +70,11 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -249,8 +249,6 @@ std::string WiredTigerFileVersion::getDowngradeString() {
 
 using std::set;
 using std::string;
-
-namespace dps = ::mongo::dotted_path_support;
 
 class WiredTigerKVEngine::WiredTigerSessionSweeper : public BackgroundJob {
 public:
@@ -1665,9 +1663,9 @@ Status WiredTigerKVEngine::createSortedDataInterface(RecoveryUnit& ru,
     std::string collIndexOptions;
 
     if (auto storageEngineOptions = collOptions.indexOptionDefaults.getStorageEngine()) {
-        collIndexOptions =
-            dps::extractElementAtPath(*storageEngineOptions, _canonicalName + ".configString")
-                .str();
+        collIndexOptions = ::mongo::bson::extractElementAtDottedPath(
+                               *storageEngineOptions, _canonicalName + ".configString")
+                               .str();
     }
 
     bool isReplSet = getGlobalReplSettings().isReplSet();

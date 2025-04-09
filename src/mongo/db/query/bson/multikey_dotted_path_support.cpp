@@ -39,12 +39,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {
-namespace dotted_path_support {
+namespace multikey_dotted_path_support {
 
 namespace {
 
@@ -128,44 +128,6 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
 
 }  // namespace
 
-BSONElement extractElementAtPath(const BSONObj& obj, StringData path) {
-    BSONElement e = obj.getField(path);
-    if (e.eoo()) {
-        size_t dot_offset = path.find('.');
-        if (dot_offset != std::string::npos) {
-            StringData left = path.substr(0, dot_offset);
-            StringData right = path.substr(dot_offset + 1);
-            BSONObj sub = obj.getObjectField(left);
-            return sub.isEmpty() ? BSONElement() : extractElementAtPath(sub, right);
-        }
-    }
-
-    return e;
-}
-
-BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*& path) {
-    const char* p = strchr(path, '.');
-
-    BSONElement sub;
-
-    if (p) {
-        sub = obj.getField(StringData(path, p - path));
-        path = p + 1;
-    } else {
-        sub = obj.getField(path);
-        path = path + strlen(path);
-    }
-
-    if (sub.eoo())
-        return BSONElement();
-    else if (sub.type() == Array || path[0] == '\0')
-        return sub;
-    else if (sub.type() == Object)
-        return extractElementAtPathOrArrayAlongPath(sub.embeddedObject(), path);
-    else
-        return BSONElement();
-}
-
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
                                  BSONElementSet& elements,
@@ -186,69 +148,5 @@ void extractAllElementsAlongPath(const BSONObj& obj,
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }
 
-BSONObj extractElementsBasedOnTemplate(const BSONObj& obj,
-                                       const BSONObj& pattern,
-                                       bool useNullIfMissing) {
-    // scanandorder.h can make a zillion of these, so we start the allocation very small.
-    BSONObjBuilder b(32);
-    BSONObjIterator i(pattern);
-    while (i.more()) {
-        BSONElement e = i.next();
-        const auto name = e.fieldNameStringData();
-        BSONElement x = extractElementAtPath(obj, name);
-        if (!x.eoo())
-            b.appendAs(x, name);
-        else if (useNullIfMissing)
-            b.appendNull(name);
-    }
-    return b.obj();
-}
-
-BSONObj extractNullForAllFieldsBasedOnTemplate(const BSONObj& pattern) {
-    BSONObjBuilder b;
-    BSONObjIterator i(pattern);
-    while (i.more()) {
-        BSONElement e = i.next();
-        b.appendNull(e.fieldNameStringData());
-    }
-    return b.obj();
-}
-
-int compareObjectsAccordingToSort(const BSONObj& firstObj,
-                                  const BSONObj& secondObj,
-                                  const BSONObj& sortKey,
-                                  bool assumeDottedPaths) {
-    if (firstObj.isEmpty())
-        return secondObj.isEmpty() ? 0 : -1;
-    if (secondObj.isEmpty())
-        return 1;
-
-    uassert(10060, "compareObjectsAccordingToSort() needs a non-empty sortKey", !sortKey.isEmpty());
-
-    BSONObjIterator i(sortKey);
-    while (1) {
-        BSONElement f = i.next();
-        if (f.eoo())
-            return 0;
-
-        const auto name = f.fieldNameStringData();
-        BSONElement l =
-            assumeDottedPaths ? extractElementAtPath(firstObj, name) : firstObj.getField(name);
-        if (l.eoo())
-            l = kNullElt;
-        BSONElement r =
-            assumeDottedPaths ? extractElementAtPath(secondObj, name) : secondObj.getField(name);
-        if (r.eoo())
-            r = kNullElt;
-
-        int x = l.woCompare(r, false);
-        if (f.number() < 0)
-            x = -x;
-        if (x != 0)
-            return x;
-    }
-    return -1;
-}
-
-}  // namespace dotted_path_support
+}  // namespace multikey_dotted_path_support
 }  // namespace mongo

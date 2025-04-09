@@ -29,10 +29,10 @@
 
 #include "mongo/db/index/2d_key_generator.h"
 
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 
 namespace mongo::index2d {
-namespace dps = ::mongo::dotted_path_support;
+namespace mdps = ::mongo::multikey_dotted_path_support;
 
 void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                const BSONObj& obj,
@@ -45,7 +45,7 @@ void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
 
     // Get all the nested location fields, but don't return individual elements from
     // the last array, if it exists.
-    dps::extractAllElementsAlongPath(obj, params.geo.c_str(), bSet, false);
+    mdps::extractAllElementsAlongPath(obj, params.geo.c_str(), bSet, false);
 
     if (bSet.empty())
         return;
@@ -102,7 +102,7 @@ void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                  ++i) {
                 // Get *all* fields for the index key
                 BSONElementSet eSet;
-                dps::extractAllElementsAlongPath(obj, i->first, eSet);
+                mdps::extractAllElementsAlongPath(obj, i->first, eSet);
 
                 if (eSet.size() == 0)
                     keyString.appendNull();

@@ -34,11 +34,11 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -83,7 +83,7 @@ PatternElementCmp::PatternElementCmp(const BSONObj& pattern, const CollatorInter
 
 bool PatternElementCmp::operator()(const mutablebson::Element& lhs,
                                    const mutablebson::Element& rhs) const {
-    namespace dps = ::mongo::dotted_path_support;
+    namespace dps = ::mongo::bson;
     if (useWholeValue) {
         const int comparedValue = lhs.compareWithElement(rhs, collator, false);
 
@@ -112,7 +112,7 @@ PatternValueCmp::PatternValueCmp(const BSONObj& pattern,
       collator(collator) {}
 
 bool PatternValueCmp::operator()(const Value& lhs, const Value& rhs) const {
-    namespace dps = ::mongo::dotted_path_support;
+    namespace dps = ::mongo::bson;
     if (useWholeValue) {
         const bool descending = (sortPattern.firstElement().number() < 0);
         return (descending ? ValueComparator(collator).getLessThan()(rhs, lhs)

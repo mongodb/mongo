@@ -39,11 +39,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -778,7 +778,7 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromIndexKeyData_FromMultipleIndexesP
 }
 
 BSONObj getDocumentKey(const BSONObj& obj, const ShardKeyPattern& shardKeyPattern) {
-    return dotted_path_support::extractElementsBasedOnTemplate(obj, shardKeyPattern.toBSON());
+    return bson::extractElementsBasedOnTemplate(obj, shardKeyPattern.toBSON());
 }
 
 TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Single) {

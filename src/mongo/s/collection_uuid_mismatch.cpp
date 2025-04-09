@@ -41,11 +41,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/client.h"
 #include "mongo/db/list_collections_gen.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -108,7 +108,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
         return status;
     }
 
-    if (auto actualCollectionElem = dotted_path_support::extractElementAtPath(
+    if (auto actualCollectionElem = bson::extractElementAtDottedPath(
             response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
         return {CollectionUUIDMismatchInfo{info->dbName(),
                                            info->collectionUUID(),

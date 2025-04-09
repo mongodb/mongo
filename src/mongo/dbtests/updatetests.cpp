@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
@@ -53,7 +54,6 @@
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/service_context.h"
@@ -63,8 +63,6 @@
 
 namespace mongo {
 namespace UpdateTests {
-
-namespace dps = ::mongo::dotted_path_support;
 
 class ClientBase {
 public:
@@ -1368,8 +1366,8 @@ struct ProjectKeyCmp {
     ProjectKeyCmp(BSONObj pattern) : sortPattern(pattern) {}
 
     int operator()(const BSONObj& left, const BSONObj& right) const {
-        BSONObj keyLeft = dps::extractElementsBasedOnTemplate(left, sortPattern, true);
-        BSONObj keyRight = dps::extractElementsBasedOnTemplate(right, sortPattern, true);
+        BSONObj keyLeft = ::mongo::bson::extractElementsBasedOnTemplate(left, sortPattern, true);
+        BSONObj keyRight = ::mongo::bson::extractElementsBasedOnTemplate(right, sortPattern, true);
         return keyLeft.woCompare(keyRight, sortPattern) < 0;
     }
 };

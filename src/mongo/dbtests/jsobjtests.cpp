@@ -58,6 +58,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
@@ -66,7 +67,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/query/bson/bson_helper.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
@@ -82,7 +82,7 @@
 
 namespace mongo {
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::mongo::bson;
 
 namespace {
 

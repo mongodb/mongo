@@ -55,7 +55,7 @@
 #include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -1378,7 +1378,7 @@ void StoredGeometry::extractGeometries(const BSONObj& doc,
     BSONElementSet geomElements;
     // NOTE: Annoyingly, we cannot just expand arrays b/c single 2d points are arrays, we need
     // to manually expand all results to check if they are geometries
-    ::mongo::dotted_path_support::extractAllElementsAlongPath(
+    ::mongo::multikey_dotted_path_support::extractAllElementsAlongPath(
         doc, path, geomElements, false /* expand arrays */);
 
     for (BSONElementSet::iterator it = geomElements.begin(); it != geomElements.end(); ++it) {

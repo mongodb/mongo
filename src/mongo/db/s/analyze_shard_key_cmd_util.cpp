@@ -55,6 +55,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
@@ -77,7 +78,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -570,7 +570,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
     aggRequest.setReadConcern(extractReadConcern(opCtx));
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
-        auto value = dotted_path_support::extractElementsBasedOnTemplate(doc.getOwned(), shardKey);
+        auto value = bson::extractElementsBasedOnTemplate(doc.getOwned(), shardKey);
         if (value.objsize() > maxSizeBytesPerValue) {
             value = truncateBSONObj(value, maxSizeBytesPerValue);
         }
@@ -636,12 +636,12 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
 
         auto value = [&] {
             if (doc.hasField(kIndexKeyFieldName)) {
-                return dotted_path_support::extractElementsBasedOnTemplate(
+                return bson::extractElementsBasedOnTemplate(
                     doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
             }
             if (doc.hasField(kDocFieldName)) {
-                return dotted_path_support::extractElementsBasedOnTemplate(
-                    doc.getObjectField(kDocFieldName), shardKey);
+                return bson::extractElementsBasedOnTemplate(doc.getObjectField(kDocFieldName),
+                                                            shardKey);
             }
             uasserted(7588600,
                       str::stream() << "Failed to look up documents for most common shard key "
@@ -820,7 +820,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
             recordIds.push_back(recordId.getLong());
             if (!scannedMultipleShardKeys) {
-                auto currentShardKey = dotted_path_support::extractElementsBasedOnTemplate(
+                auto currentShardKey = bson::extractElementsBasedOnTemplate(
                     recordVal.replaceFieldNames(shardKey), shardKey);
                 if (recordIds.size() == 1) {
                     firstShardKey = currentShardKey;
@@ -1104,7 +1104,7 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
                     : ErrorCodes::IllegalOperation,
                 "Cannot analyze the characteristics of a shard key for an empty collection",
                 !doc.isEmpty());
-        auto value = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyBson);
+        auto value = bson::extractElementsBasedOnTemplate(doc, shardKeyBson);
         uassertShardKeyValueNotContainArrays(value);
 
         // Restore the original readConcern.

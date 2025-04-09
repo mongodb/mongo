@@ -21,12 +21,12 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/bson:bson_validate",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:security_token_auth",
-        "//src/mongo/db/query/bson:dotted_path_support",
     ] + select({
         "//bazel/config:use_wiredtiger_enabled": [
             "//src/third_party/wiredtiger:wiredtiger_checksum",

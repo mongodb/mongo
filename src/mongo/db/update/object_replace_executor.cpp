@@ -37,13 +37,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/storage_validation.h"
@@ -151,8 +151,7 @@ UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyReplacementUpdate(
                     newElem.getType() != BSONType::Array);
         }
 
-        auto oldElem =
-            dotted_path_support::extractElementAtPath(originalDoc, (*path)->dottedField());
+        auto oldElem = bson::extractElementAtDottedPath(originalDoc, (*path)->dottedField());
 
         uassert(ErrorCodes::ImmutableField,
                 str::stream() << "After applying the update, the '" << (*path)->dottedField()

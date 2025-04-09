@@ -39,8 +39,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -122,7 +122,7 @@ BSONObj CollectionMetadata::extractDocumentKey(const ShardKeyPattern* shardKeyPa
     BSONObj key;
 
     if (shardKeyPattern) {
-        key = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern->toBSON());
+        key = bson::extractElementsBasedOnTemplate(doc, shardKeyPattern->toBSON());
         if (shardKeyPattern->hasId()) {
             return key;
         }

@@ -34,14 +34,12 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 using std::string;
-
-namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 
@@ -154,7 +152,7 @@ bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) con
         // that would get destroyed at the end of this function. *out would then point to dangling
         // memory.
         invariant(!doc.value().isModified());
-        *out = dps::extractElementAtPath(doc.value().toBson(), field);
+        *out = ::mongo::bson::extractElementAtDottedPath(doc.value().toBson(), field);
         return true;
     }
 

@@ -48,7 +48,8 @@ mongo_cc_library(
     deps = [
         ":geometry",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
+        "//src/mongo/db/query/bson:multikey_dotted_path_support",
         "//src/third_party/s2",
     ],
 )

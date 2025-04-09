@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection.h"
@@ -65,7 +66,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
@@ -92,8 +92,6 @@
 
 namespace mongo {
 namespace QueryStageSortTests {
-
-namespace dps = ::mongo::dotted_path_support;
 
 class QueryStageSortTestBase {
 public:
@@ -239,7 +237,7 @@ public:
         BSONObj current;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, nullptr))) {
-            int cmp = sgn(dps::compareObjectsAccordingToSort(current, last, sortPattern));
+            int cmp = sgn(::mongo::bson::compareObjectsAccordingToSort(current, last, sortPattern));
             // The next object should be equal to the previous or oriented according to the sort
             // pattern.
             ASSERT(cmp == 0 || cmp == 1);

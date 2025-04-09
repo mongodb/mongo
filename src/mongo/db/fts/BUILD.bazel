@@ -101,10 +101,10 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:common",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/fts/unicode",
-        "//src/mongo/db/query/bson:dotted_path_support",
         "//src/mongo/util:md5",
     ],
 )

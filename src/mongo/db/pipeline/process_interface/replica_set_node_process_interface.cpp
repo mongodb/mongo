@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -47,7 +48,6 @@
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -229,8 +229,8 @@ UUID ReplicaSetNodeProcessInterface::fetchCollectionUUIDFromPrimary(OperationCon
         opCtx, nss, listCollectionsCmd.toBSON(), /* attachWriteConcern */ false);
     uassertStatusOK(result);
 
-    auto uuid = dotted_path_support::extractElementAtPath(result.getValue(),
-                                                          "cursor.firstBatch.0.info.uuid");
+    auto uuid =
+        bson::extractElementAtDottedPath(result.getValue(), "cursor.firstBatch.0.info.uuid");
     return uassertStatusOK(UUID::parse(uuid));
 }
 

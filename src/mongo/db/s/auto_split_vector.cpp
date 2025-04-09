@@ -37,6 +37,7 @@
 
 #include <boost/optional/optional.hpp>
 
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection.h"
@@ -45,7 +46,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
@@ -110,8 +110,7 @@ std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& shardK
 auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
     // Note: It is correct to hydrate the indexKey 'key' with 'keyPattern', because the index key
     // pattern is a prefix of 'keyPattern'.
-    return dotted_path_support::extractElementsBasedOnTemplate(key.replaceFieldNames(keyPattern),
-                                                               keyPattern);
+    return bson::extractElementsBasedOnTemplate(key.replaceFieldNames(keyPattern), keyPattern);
 }
 
 }  // namespace

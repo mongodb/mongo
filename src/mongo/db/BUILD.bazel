@@ -1381,6 +1381,7 @@ mongo_cc_library(
         "working_set_common",
         "write_stage_common",
         ":curop_failpoint_helpers",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/catalog:collection_query_info",
         "//src/mongo/db/catalog:database_holder",
@@ -1404,7 +1405,6 @@ mongo_cc_library(
         "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query:query_planner",
-        "//src/mongo/db/query/bson:dotted_path_support",
         "//src/mongo/db/query/ce:sampling_estimator_interface",
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/query/cost_based_ranker:estimates",
@@ -2642,6 +2642,7 @@ mongo_cc_library(
         ":server_base",  # TODO(SERVER-93876): Remove.
         ":service_context",  # TODO(SERVER-93876): Remove.
         ":vector_clock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/crypto:fle_crypto",
         "//src/mongo/crypto:fle_tokens",
@@ -2660,7 +2661,6 @@ mongo_cc_library(
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:random_utils",
         "//src/mongo/db/query/boolean_simplification",
-        "//src/mongo/db/query/bson:dotted_path_support",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
@@ -3397,7 +3397,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:aggregation",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
         "profile_collection",
-        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "query_exec",
         "read_concern_d_impl",
         "read_write_concern_defaults",

@@ -34,14 +34,14 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_dotted_path_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 namespace mongo::index2dsphere {
-namespace dps = ::mongo::dotted_path_support;
+namespace mdps = ::mongo::multikey_dotted_path_support;
 
 MONGO_FAIL_POINT_DEFINE(relaxIndexMaxNumGeneratedKeysPerDocument);
 
@@ -481,11 +481,11 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                                                                               ordering,
                                                                               maxNumKeys);
             } else {
-                dps::extractAllElementsAlongPath(obj,
-                                                 keyElem.fieldName(),
-                                                 fieldElements,
-                                                 expandArrayOnTrailingField,
-                                                 arrayComponents);
+                mdps::extractAllElementsAlongPath(obj,
+                                                  keyElem.fieldName(),
+                                                  fieldElements,
+                                                  expandArrayOnTrailingField,
+                                                  arrayComponents);
 
                 if (IndexNames::GEO_2DSPHERE == keyElem.str()) {
                     if (params.indexVersion >= S2_INDEX_VERSION_2) {

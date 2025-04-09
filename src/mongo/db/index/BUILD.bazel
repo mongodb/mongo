@@ -77,6 +77,7 @@ mongo_cc_library(
     ],
     deps = [
         ":expression_params",
+        "//src/mongo/bson/dotted_path:dotted_path_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:multi_key_path_tracker",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:query_expressions",  # TODO(SERVER-93876): Remove.
@@ -98,7 +99,6 @@ mongo_cc_library(
         "//src/mongo/db/query:projection_ast",
         "//src/mongo/db/query:sort_pattern",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:spill_util",
-        "//src/mongo/db/query/bson:dotted_path_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/sorter:sorter_base",

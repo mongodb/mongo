@@ -54,9 +54,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -68,7 +68,7 @@
 
 namespace mongo {
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::mongo::bson;
 
 // Convenience function to extract flat point coordinates from enclosing element.
 // Note, coordinate elements must not outlive the parent element.
@@ -635,7 +635,7 @@ Status GeoParser::parseMultiPoint(const BSONObj& obj, MultiPointWithCRS* out) {
         return status;
 
     out->points.clear();
-    BSONElement coordElt = dps::extractElementAtPath(obj, GEOJSON_COORDINATES);
+    BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_COORDINATES);
     status = parseArrayOfCoordinates(coordElt, &out->points);
     if (!status.isOK())
         return status;
@@ -656,7 +656,7 @@ Status GeoParser::parseMultiLine(const BSONObj& obj, bool skipValidation, MultiL
     if (!status.isOK())
         return status;
 
-    BSONElement coordElt = dps::extractElementAtPath(obj, GEOJSON_COORDINATES);
+    BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_COORDINATES);
     if (Array != coordElt.type()) {
         return BAD_VALUE("MultiLineString coordinates must be an array, instead got type "
                          << typeName(coordElt.type()));
@@ -689,7 +689,7 @@ Status GeoParser::parseMultiPolygon(const BSONObj& obj,
     if (!status.isOK())
         return status;
 
-    BSONElement coordElt = dps::extractElementAtPath(obj, GEOJSON_COORDINATES);
+    BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_COORDINATES);
     if (Array != coordElt.type()) {
         return BAD_VALUE("MultiPolygon coordinates must be an array, instead got type "
                          << typeName(coordElt.type()));
@@ -784,7 +784,7 @@ Status GeoParser::parseCenterSphere(const BSONObj& obj, CapWithCRS* out) {
 Status GeoParser::parseGeometryCollection(const BSONObj& obj,
                                           bool skipValidation,
                                           GeometryCollection* out) {
-    BSONElement coordElt = dps::extractElementAtPath(obj, GEOJSON_GEOMETRIES);
+    BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_GEOMETRIES);
     if (Array != coordElt.type()) {
         return BAD_VALUE("GeometryCollection geometries must be an array, instead got type "
                          << typeName(coordElt.type()));
@@ -876,7 +876,7 @@ GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {
 }
 
 GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
-    BSONElement type = dps::extractElementAtPath(obj, GEOJSON_TYPE);
+    BSONElement type = dps::extractElementAtDottedPath(obj, GEOJSON_TYPE);
     if (String != type.type()) {
         return GeoParser::GEOJSON_UNKNOWN;
     }
@@ -885,7 +885,7 @@ GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
 
 // TODO: SERVER-86141 audit if this method is needed else remove.
 void GeoParser::assertValidGeoJSONType(const BSONObj& obj) {
-    BSONElement type = dps::extractElementAtPath(obj, GEOJSON_TYPE);
+    BSONElement type = dps::extractElementAtDottedPath(obj, GEOJSON_TYPE);
     uassert(8459801,
             str::stream() << "Expected valid geojson of type string, got non-string type of value "
                           << type,

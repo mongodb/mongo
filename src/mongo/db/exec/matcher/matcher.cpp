@@ -28,13 +28,13 @@
  */
 
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -73,7 +73,7 @@ void MatchExpressionEvaluator::visit(const ExprMatchExpression* expr) {
 
 void MatchExpressionEvaluator::visit(const InternalEqHashedKey* expr) {
     // Sadly, we need to match EOO elements to null index keys, as a special case.
-    if (!dotted_path_support::extractElementAtPath(_doc->toBSON(), expr->path())) {
+    if (!bson::extractElementAtDottedPath(_doc->toBSON(), expr->path())) {
         _result = BSONElementHasher::hash64(BSON("" << BSONNULL).firstElement(),
                                             BSONElementHasher::DEFAULT_HASH_SEED) ==
             expr->getData().numberLong();

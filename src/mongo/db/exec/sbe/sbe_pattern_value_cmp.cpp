@@ -34,9 +34,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 
 namespace mongo::sbe {
 namespace {
@@ -85,13 +85,11 @@ bool SbePatternValueCmp::operator()(const std::pair<value::TypeTags, value::Valu
             return false;
         }
     } else {
-        namespace dps = ::mongo::dotted_path_support;
-
         BSONObj lhsObj = convertValueToBSONObj(lhsTag, lhsVal);
         BSONObj rhsObj = convertValueToBSONObj(rhsTag, rhsVal);
 
-        BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
-        BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
+        BSONObj lhsKey = ::mongo::bson::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
+        BSONObj rhsKey = ::mongo::bson::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
 
         return lhsKey.woCompare(rhsKey, sortPattern, BSONObj::ComparisonRulesSet{0}, collator) < 0;
     }

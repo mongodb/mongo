@@ -61,7 +61,6 @@
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"

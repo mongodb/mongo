@@ -41,13 +41,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -59,8 +59,6 @@ namespace fts {
 // This file contains functionality specific to indexing documents from TEXT_INDEX_VERSION_1
 // text indexes.
 //
-
-namespace dps = ::mongo::dotted_path_support;
 
 namespace {
 void _addFTSStuff(BSONObjBuilder* b) {
@@ -187,7 +185,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
     for (Weights::const_iterator i = _weights.begin(); i != _weights.end(); i++) {
         const char* leftOverName = i->first.c_str();
         // name of field
-        BSONElement e = dps::extractElementAtPath(obj, leftOverName);
+        BSONElement e = ::mongo::bson::extractElementAtDottedPath(obj, leftOverName);
         // weight associated to name of field
         double weight = i->second;
 
@@ -198,7 +196,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
             while (j.more()) {
                 BSONElement x = j.next();
                 if (leftOverName[0] && x.isABSONObj())
-                    x = dps::extractElementAtPath(x.Obj(), leftOverName);
+                    x = ::mongo::bson::extractElementAtDottedPath(x.Obj(), leftOverName);
                 if (x.type() == String)
                     _scoreStringV1(tools, x.valueStringData(), term_freqs, weight);
             }

@@ -47,9 +47,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -58,7 +58,7 @@ namespace mongo {
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::mongo::bson;
 
 namespace {
 const BSONObj nullObj = BSON("" << BSONNULL);
@@ -165,7 +165,7 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
 
     *arrayNestedArray = false;
     if (haveObjField) {
-        return dps::extractElementAtPathOrArrayAlongPath(obj, *field);
+        return dps::extractElementAtOrArrayAlongDottedPath(obj, *field);
     } else if (positionalInfo.hasPositionallyIndexedElt()) {
         if (arrField.type() == Array) {
             *arrayNestedArray = true;
@@ -521,7 +521,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
                 continue;
             }
 
-            // The earlier call to dps::extractElementAtPathOrArrayAlongPath(..., fieldNames[i])
+            // The earlier call to dps::extractElementAtOrArrayAlongDottedPath(..., fieldNames[i])
             // modified fieldNames[i] to refer to the suffix of the path immediately following the
             // 'arrElt' array value. If we haven't reached the end of this indexed field yet, then
             // we must have traversed through 'arrElt'.
@@ -564,7 +564,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
             // multikey.
             subPositionalInfo[i].arrayObj = arrObj;
             subPositionalInfo[i].remainingPath = (*fieldNames)[i];
-            subPositionalInfo[i].dottedElt = dps::extractElementAtPathOrArrayAlongPath(
+            subPositionalInfo[i].dottedElt = dps::extractElementAtOrArrayAlongDottedPath(
                 arrObj, subPositionalInfo[i].remainingPath);
         }
 

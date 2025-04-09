@@ -104,6 +104,7 @@ mongo_cc_library(
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,
     deps = [
         "storage_wiredtiger_customization_hooks",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:global_settings",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:record_id_helpers",
@@ -111,7 +112,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/storage:backup_block",
         "//src/mongo/db/storage:capped_snapshots",

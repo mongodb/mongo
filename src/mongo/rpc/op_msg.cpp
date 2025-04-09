@@ -42,10 +42,10 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
@@ -231,8 +231,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // Technically this is O(N*M) but N is at most 2.
     for (const auto& docSeq : msg.sequences) {
         const char* name = docSeq.name.c_str();  // Pointer is redirected by next call.
-        auto inBody =
-            !dotted_path_support::extractElementAtPathOrArrayAlongPath(msg.body, name).eoo();
+        auto inBody = !bson::extractElementAtOrArrayAlongDottedPath(msg.body, name).eoo();
         uassert(40433,
                 str::stream() << "Duplicate field between body and document sequence "
                               << docSeq.name,

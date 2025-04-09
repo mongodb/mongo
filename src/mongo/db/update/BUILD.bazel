@@ -32,10 +32,10 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:common",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/mutable_bson",
-        "//src/mongo/db/query/bson:dotted_path_support",
     ],
 )
 

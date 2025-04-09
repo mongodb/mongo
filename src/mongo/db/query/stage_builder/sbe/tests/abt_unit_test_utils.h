@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"

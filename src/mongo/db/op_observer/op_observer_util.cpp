@@ -37,7 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -119,8 +119,7 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc) {
     boost::optional<BSONObj> shardKey;
 
     if (coll.isSharded_DEPRECATED()) {
-        shardKey = dotted_path_support::extractElementsBasedOnTemplate(
-                       doc, coll.getShardKeyPattern().toBSON())
+        shardKey = bson::extractElementsBasedOnTemplate(doc, coll.getShardKeyPattern().toBSON())
                        .getOwned();
     }
 
@@ -132,8 +131,7 @@ DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern, BSONObj const
     BSONObj id = idField ? idField.wrap() : doc;
 
     return {std::move(id),
-            dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern.toBSON())
-                .getOwned()};
+            bson::extractElementsBasedOnTemplate(doc, shardKeyPattern.toBSON()).getOwned()};
 }
 
 }  // namespace mongo

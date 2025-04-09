@@ -52,13 +52,13 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -74,7 +74,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 namespace mongo {
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = ::mongo::bson;
 
 // static
 void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collection,
@@ -159,7 +159,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
     for (auto&& indexEntry : keyPattern) {
         auto indexPath = indexEntry.fieldNameStringData();
         auto* cstr = indexPath.rawData();
-        auto fieldVal = dps::extractElementAtPathOrArrayAlongPath(obj, cstr);
+        auto fieldVal = dps::extractElementAtOrArrayAlongDottedPath(obj, cstr);
 
         // If we hit an array while traversing the path, 'cstr' will point to the path component
         // immediately following the array, or the null termination byte if the terminal path

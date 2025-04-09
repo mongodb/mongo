@@ -87,7 +87,7 @@ mongo_cc_library(
         "//src/mongo/db/query/stage_builder/sbe/tests:abt_unit_test_utils.h",
     ],
     deps = [
-        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db/query/optimizer:optimizer_base",
         "//src/mongo/unittest",
     ],

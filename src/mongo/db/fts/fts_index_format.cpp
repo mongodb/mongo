@@ -47,7 +47,7 @@
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/md5.h"
@@ -63,7 +63,7 @@ namespace fts {
 using std::string;
 using std::vector;
 
-namespace dps = ::mongo::dotted_path_support;
+namespace mdps = ::mongo::multikey_dotted_path_support;
 
 namespace {
 BSONObj nullObj;
@@ -99,7 +99,7 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
     BSONElementSet indexedElements;
     const bool expandArrayOnTrailingField = true;
     MultikeyComponents arrayComponents;
-    dps::extractAllElementsAlongPath(
+    mdps::extractAllElementsAlongPath(
         obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
 
     if (MONGO_unlikely(enableCompoundTextIndexes.shouldFail())) {

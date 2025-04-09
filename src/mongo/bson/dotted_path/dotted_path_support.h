@@ -35,10 +35,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/index/multikey_paths.h"
 
 namespace mongo {
-namespace dotted_path_support {
+namespace bson {
 
 /**
  * Returns the element at the specified path. This function returns BSONElement() if the element
@@ -58,7 +57,7 @@ namespace dotted_path_support {
  *   Consider the document {a: [{b: 1}]} and the path "a.0.b". An element with key="b" and value=1
  *   would be returned.
  */
-BSONElement extractElementAtPath(const BSONObj& obj, StringData path);
+BSONElement extractElementAtDottedPath(const BSONObj& obj, StringData path);
 
 /**
  * Returns the element at the specified path, or the first element with an array value encountered
@@ -78,39 +77,7 @@ BSONElement extractElementAtPath(const BSONObj& obj, StringData path);
  *   Consider the document {a: [{b: 1}]} and the path "a.b". An element with key="a" and
  *   value=[{b: 1}] would be returned. 'path' would be changed to the string "b".
  */
-BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*& path);
-
-/**
- * Expands arrays along the specified path and adds all elements to the 'elements' set.
- *
- * The 'path' can be specified using a dotted notation in order to traverse through embedded objects
- * and array elements.
- *
- * This function fills 'arrayComponents' with the positions (starting at 0) of 'path' corresponding
- * to array values.
- *
- * Some examples:
- *
- *   Consider the document {a: [{b: 1}, {b: 2}]} and the path "a.b". The elements {b: 1} and {b: 2}
- *   would be added to the set. 'arrayComponents' would be set as std::set<size_t>{0U}.
- *
- *   Consider the document {a: [{b: [1, 2]}, {b: [2, 3]}]} and the path "a.b". The elements {b: 1},
- *   {b: 2}, and {b: 3} would be added to the set and 'arrayComponents' would be set as
- *   std::set<size_t>{0U, 1U} if 'expandArrayOnTrailingField' is true. The elements {b: [1, 2]} and
- *   {b: [2, 3]} would be added to the set and 'arrayComponents' would be set as
- *   std::set<size_t>{0U} if 'expandArrayOnTrailingField' is false.
- */
-void extractAllElementsAlongPath(const BSONObj& obj,
-                                 StringData path,
-                                 BSONElementSet& elements,
-                                 bool expandArrayOnTrailingField = true,
-                                 MultikeyComponents* arrayComponents = nullptr);
-
-void extractAllElementsAlongPath(const BSONObj& obj,
-                                 StringData path,
-                                 BSONElementMultiSet& elements,
-                                 bool expandArrayOnTrailingField = true,
-                                 MultikeyComponents* arrayComponents = nullptr);
+BSONElement extractElementAtOrArrayAlongDottedPath(const BSONObj& obj, const char*& path);
 
 /**
  * Returns an owned BSONObj with elements in the same order as they appear in the 'pattern' object
@@ -165,5 +132,5 @@ int compareObjectsAccordingToSort(const BSONObj& firstObj,
                                   const BSONObj& sortKey,
                                   bool assumeDottedPaths = false);
 
-}  // namespace dotted_path_support
+}  // namespace bson
 }  // namespace mongo

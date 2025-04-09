@@ -40,9 +40,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
@@ -88,8 +88,8 @@ void checkImmutablePathsNotModifiedFromOriginal(mutablebson::Element element,
         // 'immutablePath'. We already know that 'pathTaken' is not equal to 'immutablePath', or we
         // would have uasserted.
         if (prefixSize == pathTaken.numParts()) {
-            auto oldElem = dotted_path_support::extractElementAtPath(
-                original, (*immutablePath)->dottedField());
+            auto oldElem =
+                bson::extractElementAtDottedPath(original, (*immutablePath)->dottedField());
 
             // We are allowed to modify immutable paths that do not yet exist.
             if (!oldElem.ok()) {

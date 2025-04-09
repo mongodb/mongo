@@ -31,7 +31,7 @@
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
+#include "mongo/db/query/bson/multikey_dotted_path_support.h"
 
 namespace mongo {
 
@@ -153,7 +153,7 @@ Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,
                Variables* variables) {
     BSONElementSet elts(expr.getExpressionContext()->getCollator());
     auto bsonRoot = root.toBson();
-    dotted_path_support::extractAllElementsAlongPath(
+    multikey_dotted_path_support::extractAllElementsAlongPath(
         bsonRoot, expr.getFieldPath().fullPath(), elts);
     std::vector<Value> outputVals;
     for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
