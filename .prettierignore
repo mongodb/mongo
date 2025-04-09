@@ -39,3 +39,6 @@ src/third_party
 # Ignore anything in the build output directories
 build
 bazel-*
+
+# Streams specific
+src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist
