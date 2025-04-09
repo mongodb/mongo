@@ -219,11 +219,7 @@ void ShardingDDLCoordinatorService::waitForCoordinatorsOfGivenOfcvToComplete(
     stdx::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lk, [this, pred]() {
         const auto numActiveCoords = _countActiveCoordinators(
-            [pred](DDLCoordinatorTypeEnum activeCoordType, boost::optional<FCV> ofcv) {
-                // TODO SERVER-102971: Simplify once resharding gets aborted before draining DDL
-                // coordinators during FCV downgrades.
-                return pred(ofcv) && activeCoordType != DDLCoordinatorTypeEnum::kReshardCollection;
-            });
+            [pred](DDLCoordinatorTypeEnum, boost::optional<FCV> ofcv) { return pred(ofcv); });
         return _state == State::kRecovered && numActiveCoords == 0;
     });
 }

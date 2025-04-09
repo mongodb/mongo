@@ -669,6 +669,12 @@ public:
                         "Failing downgrade due to "
                         "'failBeforeSendingShardsToDowngradingOrUpgrading' failpoint set",
                         !failBeforeSendingShardsToDowngradingOrUpgrading.shouldFail());
+
+                // Always abort the reshardCollection regardless of version to ensure that it
+                // will run on a consistent version from start to finish. This will ensure that
+                // it will be able to apply the oplog entries correctly.
+                abortAllReshardCollection(opCtx);
+
                 // Tell the shards to enter 'start' phase of setFCV (transition to kDowngrading).
                 _sendSetFCVRequestToShards(
                     opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
@@ -1091,12 +1097,6 @@ private:
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         if (role && role->has(ClusterRole::ConfigServer)) {
-
-            // Always abort the reshardCollection regardless of version to ensure that it will run
-            // on a consistent version from start to finish. This will ensure that it will be able
-            // to apply the oplog entries correctly.
-            abortAllReshardCollection(opCtx);
-
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kConfigsvrIndexCatalogNamespace);
 
@@ -1387,10 +1387,6 @@ private:
                 requestedVersion,
                 originalVersion,
                 NamespaceString::kConfigsvrIndexCatalogNamespace);
-            // Always abort the reshardCollection regardless of version to ensure that it will
-            // run on a consistent version from start to finish. This will ensure that it will
-            // be able to apply the oplog entries correctly.
-            abortAllReshardCollection(opCtx);
             _dropSessionsCollectionLocally(opCtx, requestedVersion, originalVersion);
         }
 
