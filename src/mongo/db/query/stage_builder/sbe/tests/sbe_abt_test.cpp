@@ -29,14 +29,13 @@
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 namespace {
 
-using namespace optimizer;
+using namespace abt;
 
 class AbtToSbeExpression : public sbe::EExpressionTestFixture {
 public:
@@ -478,4 +477,4 @@ TEST_F(AbtToSbeExpression, LowerNaryMult) {
 }
 
 }  // namespace
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

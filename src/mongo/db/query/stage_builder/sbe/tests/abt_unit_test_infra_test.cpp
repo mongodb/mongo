@@ -34,19 +34,19 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 namespace {
 using namespace unit_test_abt_literals;
-using namespace optimizer;
+using namespace abt;
 
 TEST(TestInfra, AutoUpdateExplain) {
     ABT tree = make<BinaryOp>(Operations::Add,
@@ -135,4 +135,4 @@ TEST(TestInfra, GenerateABTLiterals) {
 #undef SHORTHAND_EXAMPLE_ABT
 }
 }  // namespace
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

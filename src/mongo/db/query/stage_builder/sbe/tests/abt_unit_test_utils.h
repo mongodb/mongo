@@ -35,33 +35,33 @@
 #include <vector>
 
 #include "mongo/bson/dotted_path/dotted_path_support.h"
-#include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/unittest/unittest.h"
 
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 
-void maybePrintABT(optimizer::ABT::reference_type abt);
+void maybePrintABT(abt::ABT::reference_type abt);
 
-#define ASSERT_EXPLAIN_V2(expected, abtTree)           \
-    mongo::stage_builder::abt::maybePrintABT(abtTree); \
-    ASSERT_EQ(expected, mongo::optimizer::ExplainGenerator::explainV2(abtTree))
+#define ASSERT_EXPLAIN_V2(expected, abtTree)                 \
+    mongo::stage_builder::abt_lower::maybePrintABT(abtTree); \
+    ASSERT_EQ(expected, mongo::abt::ExplainGenerator::explainV2(abtTree))
 
-#define ASSERT_EXPLAIN_V2_AUTO(expected, abtTree)      \
-    mongo::stage_builder::abt::maybePrintABT(abtTree); \
-    ASSERT_STR_EQ_AUTO(expected, mongo::optimizer::ExplainGenerator::explainV2(abtTree))
+#define ASSERT_EXPLAIN_V2_AUTO(expected, abtTree)            \
+    mongo::stage_builder::abt_lower::maybePrintABT(abtTree); \
+    ASSERT_STR_EQ_AUTO(expected, mongo::abt::ExplainGenerator::explainV2(abtTree))
 
-#define ASSERT_EXPLAIN_BSON(expected, abtTree)         \
-    mongo::stage_builder::abt::maybePrintABT(abtTree); \
-    ASSERT_EQ(expected, mongo::optimizer::ExplainGenerator::explainBSONStr(abtTree))
+#define ASSERT_EXPLAIN_BSON(expected, abtTree)               \
+    mongo::stage_builder::abt_lower::maybePrintABT(abtTree); \
+    ASSERT_EQ(expected, mongo::abt::ExplainGenerator::explainBSONStr(abtTree))
 
 // Do not remove macro even if unused: used to update tests before committing code.
-#define ASSERT_EXPLAIN_BSON_AUTO(expected, abtTree)    \
-    mongo::stage_builder::abt::maybePrintABT(abtTree); \
-    ASSERT_STR_EQ_AUTO(expected, mongo::optimizer::ExplainGenerator::explainBSONStr(abtTree))
+#define ASSERT_EXPLAIN_BSON_AUTO(expected, abtTree)          \
+    mongo::stage_builder::abt_lower::maybePrintABT(abtTree); \
+    ASSERT_STR_EQ_AUTO(expected, mongo::abt::ExplainGenerator::explainBSONStr(abtTree))
 
 #define ASSERT_BETWEEN(a, b, value) \
     ASSERT_LTE(a, value);           \
@@ -81,4 +81,4 @@ void maybePrintABT(optimizer::ABT::reference_type abt);
                                   false));                                  \
     }
 
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

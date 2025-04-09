@@ -35,11 +35,11 @@
 #include <typeinfo>
 
 #include "mongo/db/exec/sbe/util/print_options.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 
-namespace mongo::stage_builder::abt::unit_test_abt_literals {
+namespace mongo::stage_builder::abt_lower::unit_test_abt_literals {
 using namespace sbe::value;
-using namespace optimizer;
+using namespace abt;
 
 /**
  * The functions in this file aim to simplify and shorten the manual construction of ABTs for
@@ -367,4 +367,4 @@ public:
         return algebra::transport<false>(n, *this);
     }
 };
-}  // namespace mongo::stage_builder::abt::unit_test_abt_literals
+}  // namespace mongo::stage_builder::abt_lower::unit_test_abt_literals

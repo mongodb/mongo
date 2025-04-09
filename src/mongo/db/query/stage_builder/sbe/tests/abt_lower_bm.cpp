@@ -32,19 +32,19 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 namespace {
 void BM_LowerABTLetExpr(benchmark::State& state) {
     auto nLets = state.range(0);
-    optimizer::ABT n = optimizer::Constant::boolean(true);
+    abt::ABT n = abt::Constant::boolean(true);
     for (int i = 0; i < nLets; i++) {
-        n = make<optimizer::Let>(
-            optimizer::ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
-            optimizer::Constant::int32(i),
+        n = make<abt::Let>(
+            abt::ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
+            abt::Constant::int32(i),
             std::move(n));
     }
     for (auto keepRunning : state) {
-        auto env = optimizer::VariableEnvironment::build(n);
+        auto env = abt::VariableEnvironment::build(n);
         SlotVarMap map;
         sbe::RuntimeEnvironment runtimeEnv;
         sbe::value::SlotIdGenerator ids;
@@ -59,16 +59,15 @@ BENCHMARK(BM_LowerABTLetExpr)->Arg(1)->Arg(10)->Arg(20)->Arg(40)->Arg(100);
 
 void BM_LowerABTMultiLetExpr(benchmark::State& state) {
     auto nLets = state.range(0);
-    std::vector<std::pair<optimizer::ProjectionName, optimizer::ABT>> vars;
+    std::vector<std::pair<abt::ProjectionName, abt::ABT>> vars;
     for (int i = 0; i < nLets; i++) {
         vars.push_back(std::make_pair(
-            optimizer::ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
-            optimizer::Constant::int32(i)));
+            abt::ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
+            abt::Constant::int32(i)));
     }
-    optimizer::ABT n =
-        optimizer::make<optimizer::MultiLet>(std::move(vars), optimizer::Constant::boolean(true));
+    abt::ABT n = abt::make<abt::MultiLet>(std::move(vars), abt::Constant::boolean(true));
     for (auto keepRunning : state) {
-        auto env = optimizer::VariableEnvironment::build(n);
+        auto env = abt::VariableEnvironment::build(n);
         SlotVarMap map;
         sbe::RuntimeEnvironment runtimeEnv;
         sbe::value::SlotIdGenerator ids;
@@ -81,4 +80,4 @@ void BM_LowerABTMultiLetExpr(benchmark::State& state) {
 
 BENCHMARK(BM_LowerABTMultiLetExpr)->Arg(1)->Arg(10)->Arg(20)->Arg(40)->Arg(100);
 }  // namespace
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

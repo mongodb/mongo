@@ -35,7 +35,7 @@
 
 #include "mongo/util/assert_util.h"
 
-namespace mongo::optimizer::algebra {
+namespace mongo::algebra {
 namespace detail {
 
 template <typename T, typename... Args>
@@ -530,4 +530,4 @@ public:
     }
 };
 
-}  // namespace mongo::optimizer::algebra
+}  // namespace mongo::algebra

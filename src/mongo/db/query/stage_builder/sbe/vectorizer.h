@@ -32,7 +32,7 @@
 #include <list>
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
@@ -61,19 +61,19 @@ namespace mongo::stage_builder {
 class Vectorizer {
 public:
     using VariableTypes =
-        stdx::unordered_map<optimizer::ProjectionName,
-                            std::pair<TypeSignature, boost::optional<optimizer::ProjectionName>>,
-                            optimizer::ProjectionName::Hasher>;
+        stdx::unordered_map<abt::ProjectionName,
+                            std::pair<TypeSignature, boost::optional<abt::ProjectionName>>,
+                            abt::ProjectionName::Hasher>;
     struct Tree {
         // The ABT expression produced by vectorizing the original expression tree. If not set, the
         // original expression cannot be converted into a vectorized one, usually because of missing
         // functionalities in the engine.
-        boost::optional<optimizer::ABT> expr;
+        boost::optional<abt::ABT> expr;
         // The type signature of the expression.
         TypeSignature typeSignature;
         // If set, it points to a slot holding a cell type that must be used in a call to a fold
         // function to obtain the correct result of the evaluation.
-        boost::optional<optimizer::ProjectionName> sourceCell;
+        boost::optional<abt::ProjectionName> sourceCell;
     };
 
     // Declare the context in which the expression will be evaluated, affecting how cell values will
@@ -92,66 +92,66 @@ public:
     // The externalBindings argument contains the known types for the slots referenced by the ABT
     // tree. The externalBitmapSlot argument contains the slot where another stage has already
     // computed a valid selectivity bitmap.
-    Tree vectorize(optimizer::ABT& node,
+    Tree vectorize(abt::ABT& node,
                    const VariableTypes& externalBindings,
                    boost::optional<SbSlot> externalBitmapSlot);
 
     // The default visitor for non-supported nodes, returning an empty value to mean "node not
     // supported".
     template <int Arity>
-    Tree operator()(const optimizer::ABT& n, const optimizer::ABTOpFixedArity<Arity>& op) {
+    Tree operator()(const abt::ABT& n, const abt::ABTOpFixedArity<Arity>& op) {
         logUnsupportedConversion(n);
         return {{}, TypeSignature::kAnyScalarType, {}};
     }
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::Constant& value);
+    Tree operator()(const abt::ABT& n, const abt::Constant& value);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::Variable& var);
+    Tree operator()(const abt::ABT& n, const abt::Variable& var);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op);
+    Tree operator()(const abt::ABT& n, const abt::BinaryOp& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::NaryOp& op);
+    Tree operator()(const abt::ABT& n, const abt::NaryOp& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::UnaryOp& op);
+    Tree operator()(const abt::ABT& n, const abt::UnaryOp& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::FunctionCall& op);
+    Tree operator()(const abt::ABT& n, const abt::FunctionCall& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::Let& op);
+    Tree operator()(const abt::ABT& n, const abt::Let& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::MultiLet& op);
+    Tree operator()(const abt::ABT& n, const abt::MultiLet& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::If& op);
+    Tree operator()(const abt::ABT& n, const abt::If& op);
 
-    Tree operator()(const optimizer::ABT& n, const optimizer::Switch& op);
+    Tree operator()(const abt::ABT& n, const abt::Switch& op);
 
 private:
     // Helper function that encapsulates the logic to vectorize And/Or statement.
     template <typename Lhs, typename Rhs>
-    Tree vectorizeLogicalOp(optimizer::Operations opType, Lhs lhsNode, Rhs rhsNode);
+    Tree vectorizeLogicalOp(abt::Operations opType, Lhs lhsNode, Rhs rhsNode);
 
     // Helper function that encapsulates the logic to vectorize arithmetic operations.
     template <typename Lhs, typename Rhs>
-    Tree vectorizeArithmeticOp(optimizer::Operations opType, Lhs lhsNode, Rhs rhsNode);
+    Tree vectorizeArithmeticOp(abt::Operations opType, Lhs lhsNode, Rhs rhsNode);
 
     // Helper function that allows the recursive transformation of a N-ary statement.
-    Tree vectorizeNaryHelper(const optimizer::NaryOp& op, size_t argIdx);
+    Tree vectorizeNaryHelper(const abt::NaryOp& op, size_t argIdx);
 
     // Helper function that encapsules the logic to vectorize an If statement.
     template <typename Cond, typename Then, typename Else>
     Tree vectorizeCond(Cond condNode, Then thenNode, Else elseNode);
 
     // Helper function that allows the recursive transformation of a Switch statement.
-    Tree vectorizeSwitchHelper(const optimizer::Switch& op, size_t branchIdx);
+    Tree vectorizeSwitchHelper(const abt::Switch& op, size_t branchIdx);
 
     // Ensure that the generated tree is representing a block of measures (i.e.
     // if it's a block expanded from a cell, fold it).
     void foldIfNecessary(Tree& tree, bool useFoldF = false);
 
     // Return an expression combining all the active bitmap masks currently in scope.
-    optimizer::ABT generateMaskArg();
+    abt::ABT generateMaskArg();
 
     // Helper method to report unsupported constructs.
-    void logUnsupportedConversion(const optimizer::ABT& node);
+    void logUnsupportedConversion(const abt::ABT& node);
 
     // The purpose of the operations being vectorized.
     Purpose _purpose;
@@ -160,7 +160,7 @@ private:
     bool _mayHaveCollation;
 
     // Keep track of the active mask.
-    std::list<optimizer::ProjectionName> _activeMasks;
+    std::list<abt::ProjectionName> _activeMasks;
 
     // Keep track of the type of the in-scope variables.
     VariableTypes _variableTypes;

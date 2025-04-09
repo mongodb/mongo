@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/strong_alias.h"
-#include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/stage_builder/sbe/abt/containers.h"
+#include "mongo/db/query/stage_builder/sbe/abt/strong_alias.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax_fwd_declare.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 /**
  * Representation of a variable name. Cannot be empty.
@@ -200,4 +200,4 @@ public:
     }
 };
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
 
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/unittest/unittest.h"
 
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 namespace {
 
 TEST(ReferenceTrackerTest, GetDefinitionsForLet) {
@@ -385,4 +385,4 @@ TEST(ReferenceTrackerTest, MultiLetLastRefs) {
     }
 }
 }  // namespace
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

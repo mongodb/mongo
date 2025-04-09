@@ -31,12 +31,12 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 
-using namespace optimizer;
+using namespace abt;
 
 static constexpr auto kParameterFunctionName = "getParam";
 
@@ -144,7 +144,7 @@ private:
 
     stdx::unordered_map<const Let*, sbe::FrameId> _letMap;
     stdx::unordered_map<const MultiLet*,
-                        std::pair<sbe::FrameId, optimizer::ProjectionNameMap<sbe::value::SlotId>>>
+                        std::pair<sbe::FrameId, abt::ProjectionNameMap<sbe::value::SlotId>>>
         _multiLetMap;
     stdx::unordered_map<const LambdaAbstraction*, sbe::FrameId> _lambdaMap;
 };
@@ -194,4 +194,4 @@ inline sbe::EPrimBinary::Op getEPrimBinaryOp(Operations op) {
             MONGO_UNREACHABLE;
     }
 }
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

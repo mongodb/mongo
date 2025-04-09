@@ -34,10 +34,10 @@
 #include <functional>
 #include <memory>
 
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 /**
  * Every Variable ABT conceptually references to a point in the ABT tree. The pointed tree is the
@@ -137,4 +137,4 @@ private:
     std::unique_ptr<ResolvedVariablesMap> _resolvedVariablesMap;
 };
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

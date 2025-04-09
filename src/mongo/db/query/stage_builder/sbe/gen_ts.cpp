@@ -40,7 +40,6 @@
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
@@ -263,7 +262,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
             }
         }
 
-        auto abt = abt::unwrap(scalarExpression.extractABT());
+        auto abt = unwrap(scalarExpression.extractABT());
 
         Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings, bitmapSlot);
 
@@ -272,7 +271,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
             // the type of the slots, as they are now block variables that are not supported by
             // the type checker. Manually set the type signature of the SbExpr to be whatever
             // was reported by the vectorizer.
-            auto e = SbExpr{abt::wrap(std::move(*blockABT.expr))};
+            auto e = SbExpr{wrap(std::move(*blockABT.expr))};
             e.optimize(state);
             e.setTypeSignature(blockABT.typeSignature);
 

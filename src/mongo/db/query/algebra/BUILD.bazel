@@ -22,7 +22,7 @@ mongo_cc_unit_test(
     srcs = [
         "algebra_test.cpp",
     ],
-    tags = ["mongo_unittest_seventh_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":algebra",
     ],

@@ -35,7 +35,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/exec/sbe:query_sbe_stages",
-        "//src/mongo/db/query/optimizer:optimizer_base",
+        "//src/mongo/db/query/stage_builder/sbe/abt:abt_base",
     ],
 )
 
@@ -87,7 +87,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/bson/dotted_path:dotted_path_support",
-        "//src/mongo/db/query/optimizer:optimizer_base",
+        "//src/mongo/db/query/stage_builder/sbe/abt:abt_base",
         "//src/mongo/unittest",
     ],
 )

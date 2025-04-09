@@ -463,7 +463,7 @@ AccumInputsPtr buildAccumExprsAvg(const AccumOp& acc,
     auto binds = SbExpr::makeSeq(inputs->inputExpr.clone());
     auto var = SbVar{frameId, 0};
 
-    auto e = b.makeIf(b.makeBooleanOpTree(optimizer::Operations::Or,
+    auto e = b.makeIf(b.makeBooleanOpTree(abt::Operations::Or,
                                           b.generateNullMissingOrUndefined(var),
                                           b.generateNonNumericCheck(var)),
                       b.makeInt64Constant(0),
@@ -982,7 +982,7 @@ SbExpr wrapMergeObjectsArg(SbExpr arg, StageBuilderState& state) {
     auto var = SbVar{frameId, 0};
 
     auto expr =
-        b.makeIf(b.makeBooleanOpTree(optimizer::Operations::Or,
+        b.makeIf(b.makeBooleanOpTree(abt::Operations::Or,
                                      b.generateNullMissingOrUndefined(var),
                                      b.makeFunction("isObject", var)),
                  SbExpr{var},
@@ -1053,7 +1053,7 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
 
         auto e =
             b.makeIf(b.makeBooleanOpTree(
-                         optimizer::Operations::And,
+                         abt::Operations::And,
                          b.makeFunction("exists", var),
                          b.makeBinaryOp(sbe::EPrimBinary::greater, var, b.makeInt64Constant(0))),
                      b.makeFunction("newArray",
@@ -1508,7 +1508,7 @@ SbExpr buildFinalizeDerivative(const AccumOp& acc,
 
     return b.makeIf(
         b.makeBooleanOpTree(
-            optimizer::Operations::And,
+            abt::Operations::And,
             b.makeFunction("exists", slots[0]),
             b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
         b.makeFunction("aggDerivativeFinalize",

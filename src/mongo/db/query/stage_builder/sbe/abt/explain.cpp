@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -46,15 +46,15 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/strong_alias.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
+#include "mongo/db/query/stage_builder/sbe/abt/containers.h"
+#include "mongo/db/query/stage_builder/sbe/abt/strong_alias.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/util/assert_util.h"
 
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 bool constexpr operator<(const ExplainVersion v1, const ExplainVersion v2) {
     return static_cast<int>(v1) < static_cast<int>(v2);
@@ -1033,4 +1033,4 @@ std::string ExplainGenerator::explainBSONStr(const ABT::reference_type node) {
     printBSONstr(printer, tag, val);
     return printer.str();
 }
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

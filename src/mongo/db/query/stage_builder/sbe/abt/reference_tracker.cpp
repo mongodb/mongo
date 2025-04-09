@@ -30,13 +30,13 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/stage_builder/sbe/abt/containers.h"
+#include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 #include "mongo/util/assert_util.h"
 
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 /**
  * While analyzing an ABT tree via the Collector transport class, there is a need
@@ -136,7 +136,7 @@ public:
         _variableDefinitionCallback(op.varName());
     }
 
-    void transport(const MultiLet& op, const std::vector<optimizer::ABT>& /*nodes*/) {
+    void transport(const MultiLet& op, const std::vector<abt::ABT>& /*nodes*/) {
         for (auto&& name : op.varNames()) {
             _variableDefinitionCallback(name);
         }
@@ -509,4 +509,4 @@ void VariableEnvironment::walkVariables(
 }
 
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

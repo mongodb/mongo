@@ -63,11 +63,11 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
@@ -660,7 +660,7 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
     if (shouldRegisterLowHighKeyInRuntimeEnv && !isPointInterval) {
         stage =
             b.makeConstFilter(std::move(stage),
-                              b.makeBooleanOpTree(optimizer::Operations::And,
+                              b.makeBooleanOpTree(abt::Operations::And,
                                                   b.makeFunction("exists", lowKeyExpr.clone()),
                                                   b.makeFunction("exists", highKeyExpr.clone())));
     }

@@ -844,7 +844,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:profile_settings",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query/optimizer/algebra",
+        "//src/mongo/db/query/algebra",
         "//src/mongo/db/storage/key_string",
     ],
 )

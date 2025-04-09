@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 
-using SlotVarMap = stdx::
-    unordered_map<optimizer::ProjectionName, sbe::value::SlotId, optimizer::ProjectionName::Hasher>;
+using SlotVarMap =
+    stdx::unordered_map<abt::ProjectionName, sbe::value::SlotId, abt::ProjectionName::Hasher>;
 
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

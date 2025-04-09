@@ -38,10 +38,10 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 
 namespace mongo::interval_evaluation_tree {
 class ConstNode;
@@ -54,14 +54,14 @@ class ExplodeNode;
 /**
  *  IET is a polyvalue that represents a node of Interval Evaluation Tree.
  */
-using IET = optimizer::algebra::
-    PolyValue<ConstNode, EvalNode, IntersectNode, UnionNode, ComplementNode, ExplodeNode>;
+using IET =
+    algebra::PolyValue<ConstNode, EvalNode, IntersectNode, UnionNode, ComplementNode, ExplodeNode>;
 
 /**
  *  ConstNode is a node that represents an interval with constant bounds, such as (MinKey,
  * MaxKey).
  */
-class ConstNode : public optimizer::algebra::OpFixedArity<IET, 0> {
+class ConstNode : public algebra::OpFixedArity<IET, 0> {
 public:
     explicit ConstNode(const OrderedIntervalList& oil) : oil{oil} {}
 
@@ -76,7 +76,7 @@ public:
  * EvalNode is a node that evaluates an interval from a simple predicate such as {$gt: p1} where
  * p1 is a parameter value known at runtime.
  */
-class EvalNode : public optimizer::algebra::OpFixedArity<IET, 0> {
+class EvalNode : public algebra::OpFixedArity<IET, 0> {
 public:
     using InputParamId = MatchExpression::InputParamId;
 
@@ -106,9 +106,9 @@ private:
  * "explode for sort" optimization in the query planner. It also takes a 'cacheKey' that can be used
  * to search in the evaluation cache to avoid re-evaluating child.
  */
-class ExplodeNode : public optimizer::algebra::OpFixedArity<IET, 1> {
+class ExplodeNode : public algebra::OpFixedArity<IET, 1> {
 public:
-    using Base = optimizer::algebra::OpFixedArity<IET, 1>;
+    using Base = algebra::OpFixedArity<IET, 1>;
     using CacheKey = std::pair<int, int>;
 
     /**
@@ -140,9 +140,9 @@ private:
 /**
  * IntersectNode is a node that represents an intersection of two intervals.
  */
-class IntersectNode : public optimizer::algebra::OpFixedArity<IET, 2> {
+class IntersectNode : public algebra::OpFixedArity<IET, 2> {
 public:
-    using Base = optimizer::algebra::OpFixedArity<IET, 2>;
+    using Base = algebra::OpFixedArity<IET, 2>;
 
     IntersectNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
 
@@ -154,9 +154,9 @@ public:
 /**
  * UnionNode is a node that represents a union of two intervals.
  */
-class UnionNode : public optimizer::algebra::OpFixedArity<IET, 2> {
+class UnionNode : public algebra::OpFixedArity<IET, 2> {
 public:
-    using Base = optimizer::algebra::OpFixedArity<IET, 2>;
+    using Base = algebra::OpFixedArity<IET, 2>;
 
     UnionNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
 
@@ -168,9 +168,9 @@ public:
 /**
  * ComplementNode is a node that complements its child.
  */
-class ComplementNode : public optimizer::algebra::OpFixedArity<IET, 1> {
+class ComplementNode : public algebra::OpFixedArity<IET, 1> {
 public:
-    using Base = optimizer::algebra::OpFixedArity<IET, 1>;
+    using Base = algebra::OpFixedArity<IET, 1>;
 
     ComplementNode(IET child) : Base(std::move(child)) {}
 
@@ -218,7 +218,7 @@ private:
 template <typename H>
 H AbslHashValue(H h, const IET& iet) {
     IETHasher hasher(std::move(h));
-    optimizer::algebra::transport<false>(iet, hasher);
+    algebra::transport<false>(iet, hasher);
     return hasher.releaseHashState();
 }
 

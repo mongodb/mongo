@@ -37,13 +37,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 /**
  * Marker class for expressions. Mutually exclusive with paths and nodes.
@@ -597,4 +597,4 @@ public:
     }
 };
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

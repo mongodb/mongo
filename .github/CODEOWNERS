@@ -2053,9 +2053,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/fle/**/* @10gen/query-integration-fle @svc-auto-approve-bot
 /src/mongo/db/query/fle/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/query/optimizer/OWNERS.yml
-/src/mongo/db/query/optimizer/**/* @10gen/query-optimization @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/query/plan_cache/OWNERS.yml
 /src/mongo/db/query/plan_cache/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/plan_cache/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
@@ -2091,6 +2088,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/stage_builder/sbe/OWNERS.yml
 /src/mongo/db/query/stage_builder/sbe/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/query/stage_builder/sbe/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/stage_builder/sbe/abt/OWNERS.yml
+/src/mongo/db/query/stage_builder/sbe/abt/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
+/src/mongo/db/query/stage_builder/sbe/abt/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/stats/OWNERS.yml
 /src/mongo/db/query/stats/**/* @10gen/query-optimization @svc-auto-approve-bot

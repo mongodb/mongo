@@ -36,7 +36,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 
-namespace mongo::optimizer::opt {
+namespace mongo::abt::opt {
 
 enum class ContainerImpl { STD, STDX };
 
@@ -76,4 +76,4 @@ using unordered_set = ActiveContainers::unordered_set<T, H, Args...>;
 template <class K, class V, class H = ActiveContainers::Hasher<K>, typename... Args>
 using unordered_map = ActiveContainers::unordered_map<K, V, H, Args...>;
 
-}  // namespace mongo::optimizer::opt
+}  // namespace mongo::abt::opt

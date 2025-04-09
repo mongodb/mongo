@@ -37,20 +37,20 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 
 static constexpr bool kDebugAsserts = false;
 
-void maybePrintABT(const optimizer::ABT::reference_type abt) {
+void maybePrintABT(const abt::ABT::reference_type abt) {
     // Always print using the supported versions to make sure we don't crash.
-    const std::string strV2 = optimizer::ExplainGenerator::explainV2(abt);
-    const std::string strBSON = optimizer::ExplainGenerator::explainBSONStr(abt);
+    const std::string strV2 = abt::ExplainGenerator::explainV2(abt);
+    const std::string strBSON = abt::ExplainGenerator::explainBSONStr(abt);
 
     if constexpr (kDebugAsserts) {
         std::cout << "V2: " << strV2 << "\n";
         std::cout << "BSON: " << strBSON << "\n";
     }
 }
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

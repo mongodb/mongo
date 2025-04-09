@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/platform/decimal128.h"
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 using namespace sbe::value;
 
@@ -211,4 +211,4 @@ bool Constant::getValueBool() const {
     return bitcastTo<bool>(_val);
 }
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

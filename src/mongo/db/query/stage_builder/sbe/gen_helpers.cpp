@@ -453,7 +453,7 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
         return b.makeLet(
             frameId,
             SbExpr::makeSeq(std::move(fieldExpr)),
-            b.makeBooleanOpTree(optimizer::Operations::Or,
+            b.makeBooleanOpTree(abt::Operations::Or,
                                 b.makeFunction("isArray"_sd, SbVar{frameId, 0}),
                                 generateArrayCheckForSort(
                                     state, SbVar{frameId, 0}, fp, level + 1, frameIdGenerator)));
@@ -620,7 +620,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                             std::make_pair(PlanStageSlots::kField, fp.getFieldName(0)))));
                 };
 
-                return b.makeBooleanOpTree(optimizer::Operations::Or,
+                return b.makeBooleanOpTree(abt::Operations::Or,
                                            makeIsNotArrayCheck(*sortPattern[0].fieldPath),
                                            makeIsNotArrayCheck(*sortPattern[1].fieldPath));
             } else {
@@ -645,7 +645,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                     args.emplace_back(makeIsArrayCheck(*sortPattern[idx].fieldPath));
                 }
 
-                auto numArraysExpr = b.makeNaryOp(optimizer::Operations::Add, std::move(args));
+                auto numArraysExpr = b.makeNaryOp(abt::Operations::Add, std::move(args));
 
                 return b.makeBinaryOp(
                     sbe::EPrimBinary::lessEq, std::move(numArraysExpr), b.makeInt32Constant(1));

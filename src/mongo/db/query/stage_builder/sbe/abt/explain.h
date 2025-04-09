@@ -33,10 +33,10 @@
 #include <utility>
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 enum class ExplainVersion { V2, V3, Vmax };
 
@@ -47,4 +47,4 @@ public:
     static std::string explainBSONStr(ABT::reference_type node);
 };
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

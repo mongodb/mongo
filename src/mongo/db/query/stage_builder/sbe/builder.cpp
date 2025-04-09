@@ -118,13 +118,13 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
@@ -1617,7 +1617,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
                 b.makeFail(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
 
             auto failOnParallelArraysExpr =
-                b.makeBooleanOpTree(optimizer::Operations::Or,
+                b.makeBooleanOpTree(abt::Operations::Or,
                                     std::move(sortKeys.parallelArraysCheckExpr),
                                     std::move(parallelArraysError));
 

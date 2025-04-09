@@ -56,13 +56,13 @@
 
 namespace mongo::stage_builder {
 namespace {
-inline optimizer::ABT extractABT(SbExpr& e) {
-    return abt::unwrap(e.extractABT());
+inline abt::ABT extractABT(SbExpr& e) {
+    return unwrap(e.extractABT());
 }
 
-inline optimizer::ABTVector extractABT(SbExpr::Vector& exprs) {
+inline abt::ABTVector extractABT(SbExpr::Vector& exprs) {
     // Convert the SbExpr vector to an ABT vector.
-    optimizer::ABTVector abtExprs;
+    abt::ABTVector abtExprs;
     abtExprs.reserve(exprs.size());
 
     for (auto& e : exprs) {
@@ -72,47 +72,47 @@ inline optimizer::ABTVector extractABT(SbExpr::Vector& exprs) {
     return abtExprs;
 }
 
-inline optimizer::Operations getOptimizerOp(sbe::EPrimUnary::Op op) {
+inline abt::Operations getOptimizerOp(sbe::EPrimUnary::Op op) {
     switch (op) {
         case sbe::EPrimUnary::negate:
-            return optimizer::Operations::Neg;
+            return abt::Operations::Neg;
         case sbe::EPrimUnary::logicNot:
-            return optimizer::Operations::Not;
+            return abt::Operations::Not;
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-inline optimizer::Operations getOptimizerOp(sbe::EPrimBinary::Op op) {
+inline abt::Operations getOptimizerOp(sbe::EPrimBinary::Op op) {
     switch (op) {
         case sbe::EPrimBinary::eq:
-            return optimizer::Operations::Eq;
+            return abt::Operations::Eq;
         case sbe::EPrimBinary::neq:
-            return optimizer::Operations::Neq;
+            return abt::Operations::Neq;
         case sbe::EPrimBinary::greater:
-            return optimizer::Operations::Gt;
+            return abt::Operations::Gt;
         case sbe::EPrimBinary::greaterEq:
-            return optimizer::Operations::Gte;
+            return abt::Operations::Gte;
         case sbe::EPrimBinary::less:
-            return optimizer::Operations::Lt;
+            return abt::Operations::Lt;
         case sbe::EPrimBinary::lessEq:
-            return optimizer::Operations::Lte;
+            return abt::Operations::Lte;
         case sbe::EPrimBinary::add:
-            return optimizer::Operations::Add;
+            return abt::Operations::Add;
         case sbe::EPrimBinary::sub:
-            return optimizer::Operations::Sub;
+            return abt::Operations::Sub;
         case sbe::EPrimBinary::fillEmpty:
-            return optimizer::Operations::FillEmpty;
+            return abt::Operations::FillEmpty;
         case sbe::EPrimBinary::logicAnd:
-            return optimizer::Operations::And;
+            return abt::Operations::And;
         case sbe::EPrimBinary::logicOr:
-            return optimizer::Operations::Or;
+            return abt::Operations::Or;
         case sbe::EPrimBinary::cmp3w:
-            return optimizer::Operations::Cmp3w;
+            return abt::Operations::Cmp3w;
         case sbe::EPrimBinary::div:
-            return optimizer::Operations::Div;
+            return abt::Operations::Div;
         case sbe::EPrimBinary::mul:
-            return optimizer::Operations::Mult;
+            return abt::Operations::Mult;
         default:
             MONGO_UNREACHABLE;
     }
@@ -195,93 +195,93 @@ std::vector<sbe::WindowStage::Window> SbExprBuilder::lower(std::vector<SbWindow>
 }
 
 SbExpr SbExprBuilder::makeNot(SbExpr e) {
-    return abt::wrap(stage_builder::makeNot(extractABT(e)));
+    return wrap(stage_builder::makeNot(extractABT(e)));
 }
 
 SbExpr SbExprBuilder::makeUnaryOp(sbe::EPrimUnary::Op unaryOp, SbExpr e) {
-    return abt::wrap(stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e)));
+    return wrap(stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e)));
 }
 
-SbExpr SbExprBuilder::makeUnaryOp(optimizer::Operations unaryOp, SbExpr e) {
-    return abt::wrap(stage_builder::makeUnaryOp(unaryOp, extractABT(e)));
+SbExpr SbExprBuilder::makeUnaryOp(abt::Operations unaryOp, SbExpr e) {
+    return wrap(stage_builder::makeUnaryOp(unaryOp, extractABT(e)));
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, SbExpr rhs) {
-    return abt::wrap(
+    return wrap(
         stage_builder::makeBinaryOp(getOptimizerOp(binaryOp), extractABT(lhs), extractABT(rhs)));
 }
 
-SbExpr SbExprBuilder::makeBinaryOp(optimizer::Operations binaryOp, SbExpr lhs, SbExpr rhs) {
-    return makeBinaryOp(abt::getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
+SbExpr SbExprBuilder::makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr rhs) {
+    return makeBinaryOp(abt_lower::getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
 }
 
-SbExpr SbExprBuilder::makeNaryOp(optimizer::Operations naryOp, SbExpr::Vector args) {
-    return abt::wrap(stage_builder::makeNaryOp(naryOp, extractABT(args)));
+SbExpr SbExprBuilder::makeNaryOp(abt::Operations naryOp, SbExpr::Vector args) {
+    return wrap(stage_builder::makeNaryOp(naryOp, extractABT(args)));
 }
 
 SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
-    return abt::wrap(optimizer::make<optimizer::Constant>(tag, val));
+    return wrap(abt::make<abt::Constant>(tag, val));
 }
 
 SbExpr SbExprBuilder::makeNothingConstant() {
-    return abt::wrap(optimizer::Constant::nothing());
+    return wrap(abt::Constant::nothing());
 }
 
 SbExpr SbExprBuilder::makeNullConstant() {
-    return abt::wrap(optimizer::Constant::null());
+    return wrap(abt::Constant::null());
 }
 
 SbExpr SbExprBuilder::makeBoolConstant(bool boolVal) {
-    return abt::wrap(optimizer::Constant::boolean(boolVal));
+    return wrap(abt::Constant::boolean(boolVal));
 }
 
 SbExpr SbExprBuilder::makeInt32Constant(int32_t num) {
-    return abt::wrap(optimizer::Constant::int32(num));
+    return wrap(abt::Constant::int32(num));
 }
 
 SbExpr SbExprBuilder::makeInt64Constant(int64_t num) {
-    return abt::wrap(optimizer::Constant::int64(num));
+    return wrap(abt::Constant::int64(num));
 }
 
 SbExpr SbExprBuilder::makeDoubleConstant(double num) {
-    return abt::wrap(optimizer::Constant::fromDouble(num));
+    return wrap(abt::Constant::fromDouble(num));
 }
 
 SbExpr SbExprBuilder::makeDecimalConstant(const Decimal128& num) {
-    return abt::wrap(optimizer::Constant::fromDecimal(num));
+    return wrap(abt::Constant::fromDecimal(num));
 }
 
 SbExpr SbExprBuilder::makeStrConstant(StringData str) {
-    return abt::wrap(optimizer::Constant::str(str));
+    return wrap(abt::Constant::str(str));
 }
 
 SbExpr SbExprBuilder::makeUndefinedConstant() {
-    return abt::wrap(optimizer::make<optimizer::Constant>(sbe::value::TypeTags::bsonUndefined, 0));
+    return wrap(abt::make<abt::Constant>(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
 SbExpr SbExprBuilder::makeFunction(StringData name, SbExpr::Vector args) {
-    return abt::wrap(stage_builder::makeABTFunction(name, extractABT(args)));
+    return wrap(stage_builder::makeABTFunction(name, extractABT(args)));
 }
 
 SbExpr SbExprBuilder::makeIf(SbExpr condExpr, SbExpr thenExpr, SbExpr elseExpr) {
-    return abt::wrap(
+    return wrap(
         stage_builder::makeIf(extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr)));
 }
 
 SbExpr SbExprBuilder::makeLet(sbe::FrameId frameId, SbExpr::Vector binds, SbExpr expr) {
-    return abt::wrap(stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr)));
+    return wrap(stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr)));
 }
 
 SbExpr SbExprBuilder::makeLocalLambda(sbe::FrameId frameId, SbExpr expr) {
-    return abt::wrap(stage_builder::makeLocalLambda(frameId, extractABT(expr)));
+    return wrap(stage_builder::makeLocalLambda(frameId, extractABT(expr)));
 }
 
 SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) {
-    return abt::wrap(stage_builder::makeNumericConvert(extractABT(expr), tag));
+    return wrap(stage_builder::makeNumericConvert(extractABT(expr), tag));
 }
 
 SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage) {
-    return abt::wrap(stage_builder::makeABTFail(error, errorMessage));
+    return wrap(stage_builder::makeABTFail(error, errorMessage));
 }
 
 SbExpr SbExprBuilder::makeFillEmpty(SbExpr expr, SbExpr altExpr) {
@@ -305,7 +305,7 @@ SbExpr SbExprBuilder::makeFillEmptyUndefined(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
-    return abt::wrap(stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator));
+    return wrap(stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator));
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
@@ -326,64 +326,63 @@ SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
-    return abt::wrap(stage_builder::generateABTPositiveCheck(extractABT(expr)));
+    return wrap(stage_builder::generateABTPositiveCheck(extractABT(expr)));
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNullOrMissing(var.getABTName()));
+    return wrap(stage_builder::generateABTNullOrMissing(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNullMissingOrUndefined(var.getABTName()));
+    return wrap(stage_builder::generateABTNullMissingOrUndefined(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonStringCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNonStringCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNonStringCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonTimestampCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNonTimestampCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNonTimestampCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNegativeCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNegativeCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNegativeCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonPositiveCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNonPositiveCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNonPositiveCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonNumericCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNonNumericCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNonNumericCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateLongLongMinCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTLongLongMinCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTLongLongMinCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonArrayCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNonArrayCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNonArrayCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonObjectCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNonObjectCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNonObjectCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNullishOrNotRepresentableInt32Check(SbVar var) {
-    return abt::wrap(
-        stage_builder::generateABTNullishOrNotRepresentableInt32Check(var.getABTName()));
+    return wrap(stage_builder::generateABTNullishOrNotRepresentableInt32Check(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNaNCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNaNCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTNaNCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateInfinityCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateABTInfinityCheck(var.getABTName()));
+    return wrap(stage_builder::generateABTInfinityCheck(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
-    return abt::wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
+    return wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
 }
 
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(

@@ -31,7 +31,6 @@
 
 #include <charconv>
 
-#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -43,25 +42,25 @@ namespace mongo::stage_builder {
 using SlotId = sbe::value::SlotId;
 using FrameId = sbe::FrameId;
 
-optimizer::ProjectionName getABTVariableName(SbSlot ts) {
+abt::ProjectionName getABTVariableName(SbSlot ts) {
     constexpr StringData prefix = "__s"_sd;
     str::stream varName;
     varName << prefix << ts.getId();
-    return optimizer::ProjectionName{std::string(varName)};
+    return abt::ProjectionName{std::string(varName)};
 }
 
-optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slotId) {
+abt::ProjectionName getABTVariableName(sbe::value::SlotId slotId) {
     return getABTVariableName(SbSlot{slotId});
 }
 
-optimizer::ProjectionName getABTLocalVariableName(FrameId frameId, SlotId slotId) {
+abt::ProjectionName getABTLocalVariableName(FrameId frameId, SlotId slotId) {
     constexpr StringData prefix = "__l"_sd;
     str::stream varName;
     varName << prefix << frameId << "_" << slotId;
-    return optimizer::ProjectionName{std::string(varName)};
+    return abt::ProjectionName{std::string(varName)};
 }
 
-boost::optional<SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var) {
+boost::optional<SlotId> getSbeVariableInfo(const abt::ProjectionName& var) {
     constexpr StringData prefix = "__s"_sd;
     StringData name = var.value();
 
@@ -81,7 +80,7 @@ boost::optional<SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var)
 }
 
 boost::optional<std::pair<FrameId, SlotId>> getSbeLocalVariableInfo(
-    const optimizer::ProjectionName& var) {
+    const abt::ProjectionName& var) {
     constexpr StringData prefix = "__l"_sd;
     StringData name = var.value();
 
@@ -110,20 +109,20 @@ boost::optional<std::pair<FrameId, SlotId>> getSbeLocalVariableInfo(
     return boost::none;
 }
 
-optimizer::ABT makeABTVariable(SbSlot ts) {
-    return optimizer::make<optimizer::Variable>(getABTVariableName(ts));
+abt::ABT makeABTVariable(SbSlot ts) {
+    return abt::make<abt::Variable>(getABTVariableName(ts));
 }
 
-optimizer::ABT makeABTVariable(sbe::value::SlotId slotId) {
+abt::ABT makeABTVariable(sbe::value::SlotId slotId) {
     return makeABTVariable(SbSlot{slotId});
 }
 
-optimizer::ABT makeABTLocalVariable(FrameId frameId, SlotId slotId) {
-    return optimizer::make<optimizer::Variable>(getABTLocalVariableName(frameId, slotId));
+abt::ABT makeABTLocalVariable(FrameId frameId, SlotId slotId) {
+    return abt::make<abt::Variable>(getABTLocalVariableName(frameId, slotId));
 }
 
-optimizer::ABT makeVariable(optimizer::ProjectionName var) {
-    return optimizer::make<optimizer::Variable>(std::move(var));
+abt::ABT makeVariable(abt::ProjectionName var) {
+    return abt::make<abt::Variable>(std::move(var));
 }
 
 void addVariableTypesHelper(VariableTypes& varTypes, const PlanStageSlots& outputs) {
@@ -138,9 +137,7 @@ VariableTypes excludeTypes(VariableTypes varTypes, TypeSignature typesToExclude)
     return varTypes;
 }
 
-TypeSignature constantFold(optimizer::ABT& abt,
-                           StageBuilderState& state,
-                           const VariableTypes* slotInfo) {
+TypeSignature constantFold(abt::ABT& abt, StageBuilderState& state, const VariableTypes* slotInfo) {
     auto& runtimeEnv = *state.env;
 
     // Do not use descriptive names here.
@@ -181,7 +178,7 @@ TypeSignature constantFold(optimizer::ABT& abt,
     return signature;
 }
 
-SbVar::SbVar(const optimizer::ProjectionName& name, boost::optional<TypeSignature> typeSig)
+SbVar::SbVar(const abt::ProjectionName& name, boost::optional<TypeSignature> typeSig)
     : _typeSig(typeSig) {
     if (auto slotId = getSbeVariableInfo(name)) {
         _slotId = *slotId;
@@ -198,14 +195,14 @@ SbVar::SbVar(const optimizer::ProjectionName& name, boost::optional<TypeSignatur
     tasserted(8455800, str::stream() << "Unable to decode variable info for: " << name.value());
 }
 
-SbExpr::SbExpr(const abt::HolderPtr& a, boost::optional<TypeSignature> typeSig) {
+SbExpr::SbExpr(const HolderPtr& a, boost::optional<TypeSignature> typeSig) {
     if (a) {
-        _storage = Abt{abt::wrap(a->_value)};
+        _storage = Abt{wrap(a->_value)};
         _typeSig = typeSig;
     }
 }
 
-SbExpr::SbExpr(abt::HolderPtr&& a, boost::optional<TypeSignature> typeSig) noexcept
+SbExpr::SbExpr(HolderPtr&& a, boost::optional<TypeSignature> typeSig) noexcept
     : SbExpr(Abt{std::move(a)}, typeSig) {}
 
 SbExpr::SbExpr(Abt a, boost::optional<TypeSignature> typeSig) noexcept {
@@ -222,9 +219,9 @@ SbExpr::SbExpr(OptimizedAbt a, boost::optional<TypeSignature> typeSig) noexcept 
     }
 }
 
-SbExpr& SbExpr::operator=(const abt::HolderPtr& a) {
+SbExpr& SbExpr::operator=(const HolderPtr& a) {
     if (a) {
-        _storage = Abt{abt::wrap(a->_value)};
+        _storage = Abt{wrap(a->_value)};
         _typeSig.reset();
     } else {
         reset();
@@ -232,7 +229,7 @@ SbExpr& SbExpr::operator=(const abt::HolderPtr& a) {
     return *this;
 }
 
-SbExpr& SbExpr::operator=(abt::HolderPtr&& a) noexcept {
+SbExpr& SbExpr::operator=(HolderPtr&& a) noexcept {
     *this = Abt{std::move(a)};
     return *this;
 }
@@ -277,10 +274,10 @@ std::unique_ptr<sbe::EExpression> SbExpr::lower(StageBuilderState& state,
     }
 
     const auto& abt = getAbtInternal()->_value;
-    auto env = optimizer::VariableEnvironment::build(abt);
+    auto env = abt::VariableEnvironment::build(abt);
     auto& runtimeEnv = *state.env;
 
-    auto varResolver = abt::VarResolver([](const optimizer::ProjectionName& var) {
+    auto varResolver = abt_lower::VarResolver([](const abt::ProjectionName& var) {
         if (auto slotId = getSbeVariableInfo(var)) {
             return sbe::makeE<sbe::EVariable>(*slotId);
         }
@@ -293,12 +290,12 @@ std::unique_ptr<sbe::EExpression> SbExpr::lower(StageBuilderState& state,
 
     // Invoke 'SBEExpressionLowering' to lower the ABT to SBE.
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
-    abt::SBEExpressionLowering exprLower{env,
-                                         std::move(varResolver),
-                                         runtimeEnv,
-                                         *state.slotIdGenerator,
-                                         staticData->inputParamToSlotMap,
-                                         state.frameIdGenerator};
+    abt_lower::SBEExpressionLowering exprLower{env,
+                                               std::move(varResolver),
+                                               runtimeEnv,
+                                               *state.slotIdGenerator,
+                                               staticData->inputParamToSlotMap,
+                                               state.frameIdGenerator};
 
     return exprLower.optimize(abt);
 }
@@ -311,22 +308,22 @@ SbExpr SbExpr::clone() const {
         return SbExpr{get<LocalVarInfo>(_storage), _typeSig.get()};
     }
     if (holds_alternative<Abt>(_storage)) {
-        return SbExpr{Abt{abt::wrap(getAbtInternal()->_value)}, _typeSig.get()};
+        return SbExpr{Abt{wrap(getAbtInternal()->_value)}, _typeSig.get()};
     }
     if (holds_alternative<OptimizedAbt>(_storage)) {
-        return SbExpr{OptimizedAbt{abt::wrap(getAbtInternal()->_value)}, _typeSig.get()};
+        return SbExpr{OptimizedAbt{wrap(getAbtInternal()->_value)}, _typeSig.get()};
     }
 
     return SbExpr{};
 }
 
 bool SbExpr::isConstantExpr() const {
-    return holdsAbtInternal() && getAbtInternal()->_value.is<optimizer::Constant>();
+    return holdsAbtInternal() && getAbtInternal()->_value.is<abt::Constant>();
 }
 
 bool SbExpr::isVarExpr() const {
     return holds_alternative<SlotId>(_storage) || holds_alternative<LocalVarInfo>(_storage) ||
-        (holdsAbtInternal() && getAbtInternal()->_value.is<optimizer::Variable>());
+        (holdsAbtInternal() && getAbtInternal()->_value.is<abt::Variable>());
 }
 
 bool SbExpr::isSlotExpr() const {
@@ -334,7 +331,7 @@ bool SbExpr::isSlotExpr() const {
         return true;
     }
     if (holdsAbtInternal()) {
-        auto* var = getAbtInternal()->_value.cast<optimizer::Variable>();
+        auto* var = getAbtInternal()->_value.cast<abt::Variable>();
         if (var && getSbeVariableInfo(var->name())) {
             return true;
         }
@@ -347,7 +344,7 @@ bool SbExpr::isLocalVarExpr() const {
         return true;
     }
     if (holdsAbtInternal()) {
-        auto* var = getAbtInternal()->_value.cast<optimizer::Variable>();
+        auto* var = getAbtInternal()->_value.cast<abt::Variable>();
         if (var && !getSbeVariableInfo(var->name())) {
             return true;
         }
@@ -358,7 +355,7 @@ bool SbExpr::isLocalVarExpr() const {
 std::pair<sbe::value::TypeTags, sbe::value::Value> SbExpr::getConstantValue() const {
     tassert(8455801, "Expected SbExpr to be a constant expression", isConstantExpr());
 
-    return getAbtInternal()->_value.cast<optimizer::Constant>()->get();
+    return getAbtInternal()->_value.cast<abt::Constant>()->get();
 }
 
 SbVar SbExpr::toVar() const {
@@ -374,7 +371,7 @@ SbVar SbExpr::toVar() const {
     }
 
     tassert(8455805, "Expected holdsAbtInternal() to be true", holdsAbtInternal());
-    auto* var = getAbtInternal()->_value.cast<optimizer::Variable>();
+    auto* var = getAbtInternal()->_value.cast<abt::Variable>();
     auto& name = var->name();
     if (auto slotId = getSbeVariableInfo(name)) {
         return SbVar{*slotId, getTypeSignature()};
@@ -396,7 +393,7 @@ SbSlot SbExpr::toSlot() const {
     }
 
     tassert(8455809, "Expected holdsAbtInternal() to be true", holdsAbtInternal());
-    auto* var = getAbtInternal()->_value.cast<optimizer::Variable>();
+    auto* var = getAbtInternal()->_value.cast<abt::Variable>();
     auto slotId = var ? getSbeVariableInfo(var->name()) : boost::none;
 
     tassert(8455808, "Expected variable info decoding to succeed", slotId.has_value());
@@ -414,7 +411,7 @@ SbLocalVar SbExpr::toLocalVar() const {
 
     tassert(8455813, "Expected holdsAbtInternal() to be true", holdsAbtInternal());
 
-    auto* var = getAbtInternal()->_value.cast<optimizer::Variable>();
+    auto* var = getAbtInternal()->_value.cast<abt::Variable>();
     auto localVarInfo = getSbeLocalVariableInfo(var->name());
     tassert(8455812, "Expected variable info decoding to succeed", localVarInfo.has_value());
 
@@ -422,22 +419,22 @@ SbLocalVar SbExpr::toLocalVar() const {
     return SbLocalVar{frameId, slotId, getTypeSignature()};
 }
 
-abt::HolderPtr SbExpr::extractABT() {
+HolderPtr SbExpr::extractABT() {
     tassert(6950800, "Expected isNull() to be false", !isNull());
 
     if (!holdsAbtInternal()) {
         if (isSlotExpr()) {
             // Handle the slot variable case.
-            return abt::wrap(makeABTVariable(toSlot()));
+            return wrap(makeABTVariable(toSlot()));
         } else if (isLocalVarExpr()) {
             // Handle the local variable case.
             auto var = toLocalVar();
-            return abt::wrap(makeABTLocalVariable(var.getFrameId(), var.getSlotId()));
+            return wrap(makeABTLocalVariable(var.getFrameId(), var.getSlotId()));
         } else if (isConstantExpr()) {
             // Handle the constant case.
             auto [tag, val] = getConstantValue();
             auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
-            return abt::wrap(optimizer::make<optimizer::Constant>(copyTag, copyVal));
+            return wrap(abt::make<abt::Constant>(copyTag, copyVal));
         }
     }
 
@@ -481,7 +478,7 @@ void SbExpr::setFinishedOptimizing() {
         auto typeSig = _typeSig;
 
         // Call extractABT() to get the ABT, wrap it with 'OptimizedAbt' and store it in '_storage'.
-        abt::HolderPtr abt = extractABT();
+        HolderPtr abt = extractABT();
         _storage = OptimizedAbt{std::move(abt)};
 
         // Restore '_typeSig' in case it got clobbered by the call to extractABT().
@@ -499,6 +496,6 @@ void SbExpr::set(SbLocalVar l) {
         return;
     }
 
-    _storage = Abt{abt::wrap(makeVariable(getABTLocalVariableName(l.getFrameId(), l.getSlotId())))};
+    _storage = Abt{wrap(makeVariable(getABTLocalVariableName(l.getFrameId(), l.getSlotId())))};
 }
 }  // namespace mongo::stage_builder

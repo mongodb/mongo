@@ -17,10 +17,10 @@ mongo_cc_library(
     hdrs = [
         "expr.h",
         "syntax.h",
-        "//src/mongo/db/query/optimizer:comparison_op.h",
-        "//src/mongo/db/query/optimizer:containers.h",
-        "//src/mongo/db/query/optimizer:strong_alias.h",
-        "//src/mongo/db/query/optimizer/syntax:syntax_fwd_declare.h",
+        "syntax_fwd_declare.h",
+        "//src/mongo/db/query/stage_builder/sbe/abt:comparison_op.h",
+        "//src/mongo/db/query/stage_builder/sbe/abt:containers.h",
+        "//src/mongo/db/query/stage_builder/sbe/abt:strong_alias.h",
     ],
     header_deps = [
         "//src/mongo/db:sbe_values",

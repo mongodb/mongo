@@ -31,21 +31,21 @@
 
 #include <type_traits>
 
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder {
 
 /**
  * Implementation of ABT Holder. Only include from *.cpp files.
  */
 struct Holder {
-    optimizer::ABT _value;
+    abt::ABT _value;
 };
 static_assert(std::is_aggregate_v<Holder>, "Holder must be an aggregate type");
 
-HolderPtr wrap(optimizer::ABT abt);
-optimizer::ABT unwrap(HolderPtr ptr);
+HolderPtr wrap(abt::ABT abt);
+abt::ABT unwrap(HolderPtr ptr);
 
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder

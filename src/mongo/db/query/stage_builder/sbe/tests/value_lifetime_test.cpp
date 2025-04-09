@@ -33,9 +33,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
@@ -44,7 +44,7 @@
 namespace mongo::stage_builder {
 namespace {
 
-using namespace optimizer;
+using namespace abt;
 
 TEST(ValueLifetimeTest, ProcessTraverseOnGlobal) {
     // Simulate a "$inputVar.a.b" traversal - no makeOwn expected

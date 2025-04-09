@@ -35,10 +35,9 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/algebra/polyvalue.h"
 
-namespace mongo::optimizer {
-namespace algebra {
+namespace mongo::algebra {
 
 /**
  * Concrete storage for 'S' items of type 'T'. This class is an alias for a static array, useful in
@@ -634,5 +633,4 @@ auto walk(N&& node, D& domain, Args&&... args) {
     return node.visit(OpWalker<D, withSlot>{domain}, std::forward<Args>(args)...);
 }
 
-}  // namespace algebra
-}  // namespace mongo::optimizer
+}  // namespace mongo::algebra

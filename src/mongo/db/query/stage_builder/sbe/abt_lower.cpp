@@ -45,12 +45,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/util/str.h"
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder::abt_lower {
 
 static sbe::EExpression::Vector toInlinedVector(
     std::vector<std::unique_ptr<sbe::EExpression>> args) {
@@ -114,7 +114,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 void SBEExpressionLowering::prepare(const MultiLet& multiLet) {
     // Assign a frame ID and slotId for the local variables bound by this MultiLet expression.
 
-    optimizer::ProjectionNameMap<sbe::value::SlotId> slotIdMap{};
+    abt::ProjectionNameMap<sbe::value::SlotId> slotIdMap{};
     auto frameId = generateFrameId();
 
     sbe::value::SlotId id = 0;
@@ -399,4 +399,4 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 
     return sbe::makeE<sbe::EFunction>(name, toInlinedVector(std::move(args)));
 }
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder::abt_lower

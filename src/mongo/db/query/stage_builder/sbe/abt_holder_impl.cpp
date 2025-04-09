@@ -32,18 +32,18 @@
 #include <memory>
 #include <utility>
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder {
 
 void HolderDeleter::operator()(Holder* ptr) const {
     delete ptr;
 }
 
-HolderPtr wrap(optimizer::ABT abt) {
+HolderPtr wrap(abt::ABT abt) {
     return {new Holder{std::move(abt)}, HolderDeleter{}};
 }
 
-optimizer::ABT unwrap(HolderPtr ptr) {
+abt::ABT unwrap(HolderPtr ptr) {
     return std::move(ptr->_value);
 }
 
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder

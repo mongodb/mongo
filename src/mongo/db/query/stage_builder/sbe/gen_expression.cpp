@@ -64,13 +64,13 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
@@ -84,8 +84,7 @@ namespace mongo::stage_builder {
 namespace {
 size_t kArgumentCountForBinaryTree = 100;
 
-inline optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId,
-                                                       sbe::value::SlotId slotId) {
+inline abt::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId) {
     return getABTLocalVariableName(frameId, slotId);
 }
 
@@ -123,12 +122,12 @@ struct ExpressionVisitorContext {
         exprStack.emplace_back(std::move(expr));
     }
 
-    optimizer::ABT popABTExpr() {
+    abt::ABT popABTExpr() {
         tassert(6987504, "tried to pop from empty SbExpr stack", !exprStack.empty());
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
-        return abt::unwrap(expr.extractABT());
+        return unwrap(expr.extractABT());
     }
 
     SbExpr popExpr() {
@@ -253,16 +252,15 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
     auto totalCaseConversionExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
         {ABTCaseValuePair{generateABTNullMissingOrUndefined(varStr), makeABTConstant(""_sd)},
          ABTCaseValuePair{
-             makeABTFunction(
-                 "typeMatch"_sd, makeVariable(varStr), optimizer::Constant::int32(typeMask)),
+             makeABTFunction("typeMatch"_sd, makeVariable(varStr), abt::Constant::int32(typeMask)),
              makeABTFunction(caseConversionFunction,
                              makeABTFunction("coerceToString"_sd, makeVariable(varStr)))}},
         makeABTFail(ErrorCodes::Error{7158200},
                     str::stream() << "$" << caseConversionFunction
                                   << " input type is not supported"));
 
-    _context->pushExpr(abt::wrap(optimizer::make<optimizer::Let>(
-        varStr, std::move(str), std::move(totalCaseConversionExpr))));
+    _context->pushExpr(
+        wrap(abt::make<abt::Let>(varStr, std::move(str), std::move(totalCaseConversionExpr))));
 }
 
 class ExpressionPreVisitor final : public ExpressionConstVisitor {
@@ -659,8 +657,7 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto absExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157700}, "$abs only supports numeric types")},
@@ -669,8 +666,8 @@ public:
                  makeABTFail(ErrorCodes::Error{7157701}, "can't take $abs of long long min")}},
             makeABTFunction("abs", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(inputName), _context->popABTExpr(), std::move(absExpr)));
+        pushABT(
+            abt::make<abt::Let>(std::move(inputName), _context->popABTExpr(), std::move(absExpr)));
     }
 
     void visit(const ExpressionAdd* expr) final {
@@ -685,47 +682,43 @@ public:
             return;
         }
 
-        auto checkLeaf = [&](optimizer::ABT arg) {
+        auto checkLeaf = [&](abt::ABT arg) {
             auto name = makeLocalVariableName(_context->state.frameId(), 0);
             auto var = makeVariable(name);
             auto checkedLeaf = buildABTMultiBranchConditional(
-                ABTCaseValuePair{
-                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                         makeABTFunction("isNumber", var),
-                                                         makeABTFunction("isDate", var)),
-                    var},
+                ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                                          makeABTFunction("isNumber", var),
+                                                          makeABTFunction("isDate", var)),
+                                 var},
                 makeABTFail(ErrorCodes::Error{7315401},
                             "only numbers and dates are allowed in an $add expression"));
-            return optimizer::make<optimizer::Let>(
-                std::move(name), std::move(arg), std::move(checkedLeaf));
+            return abt::make<abt::Let>(std::move(name), std::move(arg), std::move(checkedLeaf));
         };
 
-        auto combineTwoTree = [&](optimizer::ABT left, optimizer::ABT right) {
+        auto combineTwoTree = [&](abt::ABT left, abt::ABT right) {
             auto nameLeft = makeLocalVariableName(_context->state.frameId(), 0);
             auto nameRight = makeLocalVariableName(_context->state.frameId(), 0);
             auto varLeft = makeVariable(nameLeft);
             auto varRight = makeVariable(nameRight);
 
             auto addExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(
-                                      optimizer::Operations::Or,
-                                      generateABTNullMissingOrUndefined(nameLeft),
-                                      generateABTNullMissingOrUndefined(nameRight)),
-                                  optimizer::Constant::null()},
-                 ABTCaseValuePair{
-                     optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                          makeABTFunction("isDate", varLeft),
-                                                          makeABTFunction("isDate", varRight)),
-                     makeABTFail(ErrorCodes::Error{7315402},
-                                 "only one date allowed in an $add expression")}},
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Add, varLeft, varRight));
+                {ABTCaseValuePair{
+                     abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                              generateABTNullMissingOrUndefined(nameLeft),
+                                              generateABTNullMissingOrUndefined(nameRight)),
+                     abt::Constant::null()},
+                 ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::And,
+                                                           makeABTFunction("isDate", varLeft),
+                                                           makeABTFunction("isDate", varRight)),
+                                  makeABTFail(ErrorCodes::Error{7315402},
+                                              "only one date allowed in an $add expression")}},
+                abt::make<abt::BinaryOp>(abt::Operations::Add, varLeft, varRight));
             return makeLet({std::move(nameLeft), std::move(nameRight)},
-                           optimizer::makeSeq(std::move(left), std::move(right)),
+                           abt::makeSeq(std::move(left), std::move(right)),
                            std::move(addExpr));
         };
 
-        optimizer::ABTVector leaves;
+        abt::ABTVector leaves;
         leaves.reserve(arity);
         for (size_t idx = 0; idx < arity; ++idx) {
             leaves.emplace_back(checkLeaf(_context->popABTExpr()));
@@ -741,13 +734,13 @@ public:
 
         if (arity == 0) {
             // Return a zero constant if the expression has no operand children.
-            pushABT(optimizer::Constant::int32(0));
+            pushABT(abt::Constant::int32(0));
         } else {
-            optimizer::ABTVector binds;
-            optimizer::ProjectionNameVector names;
-            optimizer::ABTVector variables;
-            optimizer::ABTVector checkArgIsNull;
-            optimizer::ABTVector checkArgHasValidType;
+            abt::ABTVector binds;
+            abt::ProjectionNameVector names;
+            abt::ABTVector variables;
+            abt::ABTVector checkArgIsNull;
+            abt::ABTVector checkArgHasValidType;
             binds.reserve(arity);
             names.reserve(arity);
             variables.reserve(arity);
@@ -762,9 +755,9 @@ public:
                 // so that we can later check that we have at most one date.
                 checkArgHasValidType.emplace_back(buildABTMultiBranchConditionalFromCaseValuePairs(
                     {ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(name)),
-                                      optimizer::Constant::int32(0)},
+                                      abt::Constant::int32(0)},
                      ABTCaseValuePair{makeABTFunction("isDate", makeVariable(name)),
-                                      optimizer::Constant::int32(1)}},
+                                      abt::Constant::int32(1)}},
                     makeABTFail(ErrorCodes::Error{7157723},
                                 "only numbers and dates are allowed in an $add expression")));
 
@@ -780,21 +773,20 @@ public:
             std::reverse(std::begin(binds), std::end(binds));
 
             auto checkNullAllArguments =
-                makeBooleanOpTree(optimizer::Operations::Or, std::move(checkArgIsNull));
+                makeBooleanOpTree(abt::Operations::Or, std::move(checkArgIsNull));
 
             auto checkValidTypeAndCountDates =
-                makeNaryOp(optimizer::Operations::Add, std::move(checkArgHasValidType));
+                makeNaryOp(abt::Operations::Add, std::move(checkArgHasValidType));
 
-            auto addOp = makeNaryOp(optimizer::Operations::Add, std::move(variables));
+            auto addOp = makeNaryOp(abt::Operations::Add, std::move(variables));
 
             auto addExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{std::move(checkNullAllArguments), optimizer::Constant::null()},
-                 ABTCaseValuePair{
-                     optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Gt,
-                                                          std::move(checkValidTypeAndCountDates),
-                                                          optimizer::Constant::int32(1)),
-                     makeABTFail(ErrorCodes::Error{7157722},
-                                 "only one date allowed in an $add expression")}},
+                {ABTCaseValuePair{std::move(checkNullAllArguments), abt::Constant::null()},
+                 ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Gt,
+                                                           std::move(checkValidTypeAndCountDates),
+                                                           abt::Constant::int32(1)),
+                                  makeABTFail(ErrorCodes::Error{7157722},
+                                              "only one date allowed in an $add expression")}},
                 std::move(addOp));
 
             addExpr = makeLet(std::move(names), std::move(binds), std::move(addExpr));
@@ -806,7 +798,7 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionAnd* expr) final {
-        visitMultiBranchLogicExpression(expr, optimizer::Operations::And);
+        visitMultiBranchLogicExpression(expr, abt::Operations::And);
     }
     void visit(const ExpressionAnyElementTrue* expr) final {
         auto arg = _context->popABTExpr();
@@ -815,19 +807,18 @@ public:
         auto lambdaArgName = makeLocalVariableName(_context->state.frameId(), 0);
         auto lambdaBody =
             makeFillEmptyFalse(makeABTFunction("coerceToBool", makeVariable(lambdaArgName)));
-        auto lambdaExpr = optimizer::make<optimizer::LambdaAbstraction>(std::move(lambdaArgName),
-                                                                        std::move(lambdaBody));
+        auto lambdaExpr =
+            abt::make<abt::LambdaAbstraction>(std::move(lambdaArgName), std::move(lambdaBody));
 
-        auto resultExpr = optimizer::make<optimizer::If>(
+        auto resultExpr = abt::make<abt::If>(
             makeFillEmptyFalse(makeABTFunction("isArray", makeVariable(argName))),
             makeABTFunction("traverseF",
                             makeVariable(argName),
                             std::move(lambdaExpr),
-                            optimizer::Constant::boolean(false)),
+                            abt::Constant::boolean(false)),
             makeABTFail(ErrorCodes::Error{7158300}, "$anyElementTrue's argument must be an array"));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(argName), std::move(arg), std::move(resultExpr)));
+        pushABT(abt::make<abt::Let>(std::move(argName), std::move(arg), std::move(resultExpr)));
     }
 
     void visit(const ExpressionArray* expr) final {
@@ -840,20 +831,20 @@ public:
             return;
         }
 
-        std::vector<optimizer::ProjectionName> varNames;
-        std::vector<optimizer::ABT> binds;
+        std::vector<abt::ProjectionName> varNames;
+        std::vector<abt::ABT> binds;
         for (size_t idx = 0; idx < arity; ++idx) {
             varNames.emplace_back(makeLocalVariableName(_context->state.frameId(), 0));
             binds.emplace_back(_context->popABTExpr());
         }
         std::reverse(std::begin(binds), std::end(binds));
 
-        optimizer::ABTVector argVars;
+        abt::ABTVector argVars;
         for (auto& name : varNames) {
             argVars.push_back(makeFillEmptyNull(makeVariable(name)));
         }
 
-        auto arrayExpr = optimizer::make<optimizer::FunctionCall>("newArray", std::move(argVars));
+        auto arrayExpr = abt::make<abt::FunctionCall>("newArray", std::move(argVars));
 
         pushABT(makeLet(std::move(varNames), std::move(binds), std::move(arrayExpr)));
     }
@@ -890,15 +881,14 @@ public:
         auto validationExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{makeABTFunction("exists"_sd, makeVariable(funcName)),
                               makeVariable(funcName)},
-             ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
-                              optimizer::Constant::null()},
+             ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
              ABTCaseValuePair{generateABTNonObjectCheck(argName),
                               makeABTFail(ErrorCodes::Error{5153215},
                                           "$objectToArray requires an object input")}},
-            optimizer::Constant::nothing());
+            abt::Constant::nothing());
 
         pushABT(makeLet({std::move(argName), std::move(funcName)},
-                        optimizer::makeSeq(std::move(arg), std::move(funcCall)),
+                        abt::makeSeq(std::move(arg), std::move(funcCall)),
                         std::move(validationExpr)));
     }
     void visit(const ExpressionArrayToObject* expr) final {
@@ -913,15 +903,14 @@ public:
         auto validationExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{makeABTFunction("exists"_sd, makeVariable(funcName)),
                               makeVariable(funcName)},
-             ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
-                              optimizer::Constant::null()},
+             ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
              ABTCaseValuePair{generateABTNonArrayCheck(argName),
                               makeABTFail(ErrorCodes::Error{5153200},
                                           "$arrayToObject requires an array input")}},
-            optimizer::Constant::nothing());
+            abt::Constant::nothing());
 
         pushABT(makeLet({std::move(argName), std::move(funcName)},
-                        optimizer::makeSeq(std::move(arg), std::move(funcCall)),
+                        abt::makeSeq(std::move(arg), std::move(funcCall)),
                         std::move(validationExpr)));
     }
     void visit(const ExpressionBsonSize* expr) final {
@@ -934,30 +923,27 @@ public:
         auto argName = makeLocalVariableName(_context->state.frameId(), 0);
 
         auto bsonSizeExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonObjectCheck(argName),
                  makeABTFail(ErrorCodes::Error{7158301}, "$bsonSize requires a document input")}},
             makeABTFunction("bsonSize", makeVariable(argName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(argName), std::move(arg), std::move(bsonSizeExpr)));
+        pushABT(abt::make<abt::Let>(std::move(argName), std::move(arg), std::move(bsonSizeExpr)));
     }
 
     void visit(const ExpressionCeil* expr) final {
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto ceilExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157702}, "$ceil only supports numeric types")}},
             makeABTFunction("ceil", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(inputName), _context->popABTExpr(), std::move(ceilExpr)));
+        pushABT(
+            abt::make<abt::Let>(std::move(inputName), _context->popABTExpr(), std::move(ceilExpr)));
     }
     void visit(const ExpressionCompare* expr) final {
         _context->ensureArity(2);
@@ -979,8 +965,8 @@ public:
             return;
         }
 
-        std::vector<optimizer::ProjectionName> varNames;
-        std::vector<optimizer::ABT> binds;
+        std::vector<abt::ProjectionName> varNames;
+        std::vector<abt::ABT> binds;
         for (size_t idx = 0; idx < arity; ++idx) {
             // ABT can bind a single variable at a time, so create a new frame for each
             // argument.
@@ -989,26 +975,24 @@ public:
         }
         std::reverse(std::begin(binds), std::end(binds));
 
-        optimizer::ABTVector checkNullArg;
-        optimizer::ABTVector checkStringArg;
-        optimizer::ABTVector argVars;
+        abt::ABTVector checkNullArg;
+        abt::ABTVector checkStringArg;
+        abt::ABTVector argVars;
         for (auto& name : varNames) {
             checkNullArg.push_back(generateABTNullMissingOrUndefined(name));
             checkStringArg.push_back(makeABTFunction("isString"_sd, makeVariable(name)));
             argVars.push_back(makeVariable(name));
         }
 
-        auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
+        auto checkNullAnyArgument = makeBooleanOpTree(abt::Operations::Or, std::move(checkNullArg));
 
         auto checkStringAllArguments =
-            makeBooleanOpTree(optimizer::Operations::And, std::move(checkStringArg));
+            makeBooleanOpTree(abt::Operations::And, std::move(checkStringArg));
 
         auto concatExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
-             ABTCaseValuePair{
-                 std::move(checkStringAllArguments),
-                 optimizer::make<optimizer::FunctionCall>("concat", std::move(argVars))}},
+            {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
+             ABTCaseValuePair{std::move(checkStringAllArguments),
+                              abt::make<abt::FunctionCall>("concat", std::move(argVars))}},
             makeABTFail(ErrorCodes::Error{7158201}, "$concat supports only strings"));
 
         pushABT(makeLet(std::move(varNames), std::move(binds), std::move(concatExpr)));
@@ -1020,20 +1004,20 @@ public:
 
         // If there are no children, return an empty array.
         if (numChildren == 0) {
-            pushABT(optimizer::Constant::emptyArray());
+            pushABT(abt::Constant::emptyArray());
             return;
         }
 
-        std::vector<optimizer::ABT> args;
+        std::vector<abt::ABT> args;
         args.reserve(numChildren + 1);
         for (size_t i = 0; i < numChildren; ++i) {
             args.emplace_back(_context->popABTExpr());
         }
         std::reverse(args.begin(), args.end());
 
-        std::vector<optimizer::ABT> argIsNullOrMissing;
-        optimizer::ProjectionNameVector argNames;
-        optimizer::ABTVector argVars;
+        std::vector<abt::ABT> argIsNullOrMissing;
+        abt::ProjectionNameVector argNames;
+        abt::ABTVector argVars;
         argIsNullOrMissing.reserve(numChildren);
         argNames.reserve(numChildren + 1);
         argVars.reserve(numChildren);
@@ -1043,10 +1027,9 @@ public:
             argIsNullOrMissing.emplace_back(generateABTNullMissingOrUndefined(argNames.back()));
         }
 
-        optimizer::ProjectionName resultName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName resultName = makeLocalVariableName(_context->state.frameId(), 0);
         argNames.emplace_back(resultName);
-        args.emplace_back(
-            optimizer::make<optimizer::FunctionCall>("concatArrays", std::move(argVars)));
+        args.emplace_back(abt::make<abt::FunctionCall>("concatArrays", std::move(argVars)));
 
         pushABT(makeLet(
             std::move(argNames),
@@ -1055,8 +1038,8 @@ public:
                 {ABTCaseValuePair{makeABTFunction("exists"_sd, makeVariable(resultName)),
                                   makeVariable(resultName)},
                  ABTCaseValuePair{
-                     makeBooleanOpTree(optimizer::Operations::Or, std::move(argIsNullOrMissing)),
-                     optimizer::Constant::null()}},
+                     makeBooleanOpTree(abt::Operations::Or, std::move(argIsNullOrMissing)),
+                     abt::Constant::null()}},
                 makeABTFail(ErrorCodes::Error{7158000}, "$concatArrays only supports arrays"))));
     }
 
@@ -1087,12 +1070,12 @@ public:
         auto unitIsWeekVar = makeVariable(unitIsWeekName);
 
         // Get child expressions.
-        boost::optional<optimizer::ABT> startOfWeekExpression;
+        boost::optional<abt::ABT> startOfWeekExpression;
         if (expr->isStartOfWeekSpecified()) {
             startOfWeekExpression = _context->popABTExpr();
         }
-        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
-                                                              : optimizer::Constant::str("UTC"_sd);
+        auto timezoneExpression =
+            expr->isTimezoneSpecified() ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
         auto unitExpression = _context->popABTExpr();
         auto endDateExpression = _context->popABTExpr();
         auto startDateExpression = _context->popABTExpr();
@@ -1101,7 +1084,7 @@ public:
         auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
 
         //  Set parameters for an invocation of built-in "dateDiff" function.
-        optimizer::ABTVector arguments;
+        abt::ABTVector arguments;
         arguments.push_back(timeZoneDBVar);
         arguments.push_back(startDateVar);
         arguments.push_back(endDateVar);
@@ -1112,13 +1095,13 @@ public:
             // "startOfWeek" of "$dateDiff" expression, otherwise pass a valid default value, since
             // "dateDiff" built-in function does not accept non-string type values for this
             // parameter.
-            arguments.push_back(optimizer::make<optimizer::If>(
-                unitIsWeekVar, startOfWeekVar, optimizer::Constant::str("sun"_sd)));
+            arguments.push_back(
+                abt::make<abt::If>(unitIsWeekVar, startOfWeekVar, abt::Constant::str("sun"_sd)));
         }
 
         // Set bindings for the frame.
-        optimizer::ABTVector bindings;
-        optimizer::ProjectionNameVector bindingNames;
+        abt::ABTVector bindings;
+        abt::ProjectionNameVector bindingNames;
         bindingNames.push_back(startDateName);
         bindings.push_back(std::move(startDateExpression));
         bindingNames.push_back(endDateName);
@@ -1135,8 +1118,7 @@ public:
         }
 
         // Create an expression to invoke built-in "dateDiff" function.
-        auto dateDiffFunctionCall =
-            optimizer::make<optimizer::FunctionCall>("dateDiff", std::move(arguments));
+        auto dateDiffFunctionCall = abt::make<abt::FunctionCall>("dateDiff", std::move(arguments));
 
         // Create expressions to check that each argument to "dateDiff" function exists, is not
         // null, and is of the correct type.
@@ -1149,11 +1131,10 @@ public:
         inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(timezoneVar));
         if (expr->isStartOfWeekSpecified()) {
             inputValidationCases.emplace_back(
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::And,
-                    unitIsWeekVar,
-                    generateABTNullMissingOrUndefined(startOfWeekName)),
-                optimizer::Constant::null());
+                abt::make<abt::BinaryOp>(abt::Operations::And,
+                                         unitIsWeekVar,
+                                         generateABTNullMissingOrUndefined(startOfWeekName)),
+                abt::Constant::null());
         }
 
         // "timezone" parameter validation.
@@ -1187,16 +1168,15 @@ public:
         if (expr->isStartOfWeekSpecified()) {
             // If 'timeUnit' value is equal to "week" then validate "startOfWeek" parameter.
             inputValidationCases.emplace_back(
-                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                     unitIsWeekVar,
-                                                     generateABTNonStringCheck(startOfWeekName)),
+                abt::make<abt::BinaryOp>(abt::Operations::And,
+                                         unitIsWeekVar,
+                                         generateABTNonStringCheck(startOfWeekName)),
                 makeABTFail(ErrorCodes::Error{7157925},
                             "$dateDiff parameter 'startOfWeek' must be a string"));
             inputValidationCases.emplace_back(
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::And,
-                    unitIsWeekVar,
-                    makeNot(makeABTFunction("isDayOfWeek", startOfWeekVar))),
+                abt::make<abt::BinaryOp>(abt::Operations::And,
+                                         unitIsWeekVar,
+                                         makeNot(makeABTFunction("isDayOfWeek", startOfWeekVar))),
                 makeABTFail(ErrorCodes::Error{7157926},
                             "$dateDiff parameter 'startOfWeek' must be a valid day of the week"));
         }
@@ -1216,17 +1196,17 @@ public:
 
         // Get child expressions.
         auto onErrorExpression =
-            expr->isOnErrorSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+            expr->isOnErrorSpecified() ? _context->popABTExpr() : abt::Constant::null();
 
         auto onNullExpression =
-            expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+            expr->isOnNullSpecified() ? _context->popABTExpr() : abt::Constant::null();
 
         auto formatExpression =
-            expr->isFormatSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+            expr->isFormatSpecified() ? _context->popABTExpr() : abt::Constant::null();
         auto formatName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
-                                                              : optimizer::Constant::str("UTC"_sd);
+        auto timezoneExpression =
+            expr->isTimezoneSpecified() ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
         auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
 
         auto dateStringExpression = _context->popABTExpr();
@@ -1236,15 +1216,15 @@ public:
         auto timeZoneDBName = getABTVariableName(timeZoneDBSlot);
 
         // Set parameters for an invocation of built-in "dateFromString" function.
-        optimizer::ABTVector arguments;
+        abt::ABTVector arguments;
         arguments.push_back(makeVariable(timeZoneDBName));
         // Set bindings for the frame.
-        optimizer::ABTVector bindings;
-        optimizer::ProjectionNameVector bindingNames;
+        abt::ABTVector bindings;
+        abt::ProjectionNameVector bindingNames;
         bindingNames.push_back(dateStringName);
         bindings.push_back(std::move(dateStringExpression));
         arguments.push_back(makeVariable(dateStringName));
-        if (timezoneExpression.is<optimizer::Constant>()) {
+        if (timezoneExpression.is<abt::Constant>()) {
             arguments.push_back(timezoneExpression);
         } else {
             bindingNames.push_back(timezoneName);
@@ -1252,7 +1232,7 @@ public:
             arguments.push_back(makeVariable(timezoneName));
         }
         if (expr->isFormatSpecified()) {
-            if (formatExpression.is<optimizer::Constant>()) {
+            if (formatExpression.is<abt::Constant>()) {
                 arguments.push_back(formatExpression);
             } else {
                 bindingNames.push_back(formatName);
@@ -1265,7 +1245,7 @@ public:
         std::string functionName =
             expr->isOnErrorSpecified() ? "dateFromStringNoThrow" : "dateFromString";
         auto dateFromStringFunctionCall =
-            optimizer::make<optimizer::FunctionCall>(functionName, std::move(arguments));
+            abt::make<abt::FunctionCall>(functionName, std::move(arguments));
 
         // Create expressions to check that each argument to "dateFromString" function exists, is
         // not null, and is of the correct type.
@@ -1279,7 +1259,7 @@ public:
         // Create an expression to return Nothing if specified, or raise a conversion failure.
         // As long as onError is specified, a Nothing return will always be filled with onError.
         auto nonStringReturn = expr->isOnErrorSpecified()
-            ? optimizer::Constant::nothing()
+            ? abt::Constant::nothing()
             : makeABTFail(ErrorCodes::ConversionFailure,
                           "$dateFromString requires that 'dateString' be a string");
 
@@ -1287,7 +1267,7 @@ public:
             {generateABTNonStringCheck(makeVariable(dateStringName)), std::move(nonStringReturn)});
 
         if (expr->isTimezoneSpecified()) {
-            if (timezoneExpression.is<optimizer::Constant>()) {
+            if (timezoneExpression.is<abt::Constant>()) {
                 // Return null if timezone is specified as either null or missing.
                 inputValidationCases.push_back(
                     generateABTReturnNullIfNullMissingOrUndefined(timezoneExpression));
@@ -1299,7 +1279,7 @@ public:
 
         if (expr->isFormatSpecified()) {
             // validate "format" parameter only if it has been specified.
-            if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
+            if (auto* formatExpressionConst = formatExpression.cast<abt::Constant>();
                 formatExpressionConst) {
                 inputValidationCases.push_back(
                     generateABTReturnNullIfNullMissingOrUndefined(formatExpression));
@@ -1323,12 +1303,12 @@ public:
                     // This should be unreachable. The validation function above will uassert on an
                     // invalid format string and then return true. It returns false on non-string
                     // input, but we already check for non-string format above.
-                    optimizer::Constant::null());
+                    abt::Constant::null());
             }
         }
 
         // "timezone" parameter validation.
-        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<abt::Constant>();
             timezoneExpressionConst) {
             auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
             if (!sbe::value::isNullish(timezoneTag)) {
@@ -1365,10 +1345,9 @@ public:
         // If onError is specified, a Nothing return means that either dateString is not a string,
         // or the builtin dateFromStringNoThrow caught an error. We return onError in either case.
         if (expr->isOnErrorSpecified()) {
-            dateFromStringExpr =
-                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::FillEmpty,
-                                                     std::move(dateFromStringExpr),
-                                                     std::move(onErrorExpression));
+            dateFromStringExpr = abt::make<abt::BinaryOp>(abt::Operations::FillEmpty,
+                                                          std::move(dateFromStringExpr),
+                                                          std::move(onErrorExpression));
         }
 
         pushABT(
@@ -1380,47 +1359,47 @@ public:
         const auto& children = expr->getChildren();
         invariant(children.size() == 11);
 
-        boost::optional<optimizer::ABT> eTimezone;
+        boost::optional<abt::ABT> eTimezone;
         if (children[10]) {
             eTimezone = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eIsoDayOfWeek;
+        boost::optional<abt::ABT> eIsoDayOfWeek;
         if (children[9]) {
             eIsoDayOfWeek = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eIsoWeek;
+        boost::optional<abt::ABT> eIsoWeek;
         if (children[8]) {
             eIsoWeek = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eIsoWeekYear;
+        boost::optional<abt::ABT> eIsoWeekYear;
         if (children[7]) {
             eIsoWeekYear = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eMillisecond;
+        boost::optional<abt::ABT> eMillisecond;
         if (children[6]) {
             eMillisecond = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eSecond;
+        boost::optional<abt::ABT> eSecond;
         if (children[5]) {
             eSecond = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eMinute;
+        boost::optional<abt::ABT> eMinute;
         if (children[4]) {
             eMinute = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eHour;
+        boost::optional<abt::ABT> eHour;
         if (children[3]) {
             eHour = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eDay;
+        boost::optional<abt::ABT> eDay;
         if (children[2]) {
             eDay = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eMonth;
+        boost::optional<abt::ABT> eMonth;
         if (children[1]) {
             eMonth = _context->popABTExpr();
         }
-        boost::optional<optimizer::ABT> eYear;
+        boost::optional<abt::ABT> eYear;
         if (children[0]) {
             eYear = _context->popABTExpr();
         }
@@ -1453,33 +1432,33 @@ public:
 
         // Constructs an expression that does a bound check of var over a closed interval [lower,
         // upper].
-        auto boundedCheck =
-            [](optimizer::ABT& var, int16_t lower, int16_t upper, const std::string& varName) {
-                str::stream errMsg;
-                if (varName == "year" || varName == "isoWeekYear") {
-                    errMsg << "'" << varName << "'"
-                           << " must evaluate to an integer in the range " << lower << " to "
-                           << upper;
-                } else {
-                    errMsg << "'" << varName << "'"
-                           << " must evaluate to a value in the range [" << lower << ", " << upper
-                           << "]";
-                }
-                return ABTCaseValuePair{
-                    optimizer::make<optimizer::BinaryOp>(
-                        optimizer::Operations::Or,
-                        optimizer::make<optimizer::BinaryOp>(
-                            optimizer::Operations::Lt, var, optimizer::Constant::int32(lower)),
-                        optimizer::make<optimizer::BinaryOp>(
-                            optimizer::Operations::Gt, var, optimizer::Constant::int32(upper))),
-                    makeABTFail(ErrorCodes::Error{7157916}, errMsg)};
-            };
+        auto boundedCheck = [](abt::ABT& var,
+                               int16_t lower,
+                               int16_t upper,
+                               const std::string& varName) {
+            str::stream errMsg;
+            if (varName == "year" || varName == "isoWeekYear") {
+                errMsg << "'" << varName << "'"
+                       << " must evaluate to an integer in the range " << lower << " to " << upper;
+            } else {
+                errMsg << "'" << varName << "'"
+                       << " must evaluate to a value in the range [" << lower << ", " << upper
+                       << "]";
+            }
+            return ABTCaseValuePair{
+                abt::make<abt::BinaryOp>(
+                    abt::Operations::Or,
+                    abt::make<abt::BinaryOp>(abt::Operations::Lt, var, abt::Constant::int32(lower)),
+                    abt::make<abt::BinaryOp>(
+                        abt::Operations::Gt, var, abt::Constant::int32(upper))),
+                makeABTFail(ErrorCodes::Error{7157916}, errMsg)};
+        };
 
         // Here we want to validate each field that is provided as input to the agg expression. To
         // do this we implement the following checks:
         // 1) Check if the value in a given slot null or missing.
         // 2) Check if the value in a given slot is an integral int64.
-        auto fieldConversionBinding = [](optimizer::ABT& expr,
+        auto fieldConversionBinding = [](abt::ABT& expr,
                                          sbe::value::FrameIdGenerator* frameIdGenerator,
                                          const std::string& varName) {
             auto outerName = makeLocalVariableName(frameIdGenerator->generate(), 0);
@@ -1487,27 +1466,26 @@ public:
             auto convertedFieldName = makeLocalVariableName(frameIdGenerator->generate(), 0);
             auto convertedFieldVar = makeVariable(convertedFieldName);
 
-            return optimizer::make<optimizer::Let>(
+            return abt::make<abt::Let>(
                 outerName,
                 std::move(expr),
-                optimizer::make<optimizer::If>(
-                    optimizer::make<optimizer::BinaryOp>(
-                        optimizer::Operations::Or,
-                        makeNot(makeABTFunction("exists", outerVar)),
-                        makeABTFunction("isNull", outerVar)),
-                    optimizer::Constant::null(),
-                    optimizer::make<optimizer::Let>(
+                abt::make<abt::If>(
+                    abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                             makeNot(makeABTFunction("exists", outerVar)),
+                                             makeABTFunction("isNull", outerVar)),
+                    abt::Constant::null(),
+                    abt::make<abt::Let>(
                         convertedFieldName,
                         makeABTFunction("convert",
                                         outerVar,
-                                        optimizer::Constant::int32(static_cast<int32_t>(
+                                        abt::Constant::int32(static_cast<int32_t>(
                                             sbe::value::TypeTags::NumberInt64))),
-                        optimizer::make<optimizer::If>(
-                            makeABTFunction("exists", convertedFieldVar),
-                            convertedFieldVar,
-                            makeABTFail(ErrorCodes::Error{7157917},
-                                        str::stream() << "'" << varName << "'"
-                                                      << " must evaluate to an integer")))));
+                        abt::make<abt::If>(makeABTFunction("exists", convertedFieldVar),
+                                           convertedFieldVar,
+                                           makeABTFail(ErrorCodes::Error{7157917},
+                                                       str::stream()
+                                                           << "'" << varName << "'"
+                                                           << " must evaluate to an integer")))));
         };
 
         // Build two vectors on the fly to elide bound and conversion for defaulted values.
@@ -1517,36 +1495,36 @@ public:
         // Make a disjunction of null checks for each date part by over this vector. These checks
         // are necessary after the initial conversion computation because we need have the outer let
         // binding evaluate to null if any field is null.
-        auto nullExprs = optimizer::ABTVector{generateABTNullMissingOrUndefined(timeZoneName),
-                                              generateABTNullMissingOrUndefined(millisecName),
-                                              generateABTNullMissingOrUndefined(secName),
-                                              generateABTNullMissingOrUndefined(minName),
-                                              generateABTNullMissingOrUndefined(hourName),
-                                              generateABTNullMissingOrUndefined(dayName),
-                                              generateABTNullMissingOrUndefined(monthName),
-                                              generateABTNullMissingOrUndefined(yearName)};
+        auto nullExprs = abt::ABTVector{generateABTNullMissingOrUndefined(timeZoneName),
+                                        generateABTNullMissingOrUndefined(millisecName),
+                                        generateABTNullMissingOrUndefined(secName),
+                                        generateABTNullMissingOrUndefined(minName),
+                                        generateABTNullMissingOrUndefined(hourName),
+                                        generateABTNullMissingOrUndefined(dayName),
+                                        generateABTNullMissingOrUndefined(monthName),
+                                        generateABTNullMissingOrUndefined(yearName)};
 
         // The first "if" expression allows short-circuting of the null field case. If the nullish
         // checks pass, then we check the bounds of each field and invoke the builtins if all checks
         // pass.
-        boundChecks.push_back({makeBooleanOpTree(optimizer::Operations::Or, std::move(nullExprs)),
-                               optimizer::Constant::null()});
+        boundChecks.push_back(
+            {makeBooleanOpTree(abt::Operations::Or, std::move(nullExprs)), abt::Constant::null()});
 
         // Operands is for the outer let bindings.
-        optimizer::ABTVector operands;
+        abt::ABTVector operands;
         if (eIsoWeekYear) {
             boundChecks.push_back(boundedCheck(yearVar, 1, 9999, "isoWeekYear"));
             operands.push_back(fieldConversionBinding(
                 *eIsoWeekYear, _context->state.frameIdGenerator, "isoWeekYear"));
             if (!eIsoWeek) {
-                operands.push_back(optimizer::Constant::int32(1));
+                operands.push_back(abt::Constant::int32(1));
             } else {
                 boundChecks.push_back(boundedCheck(monthVar, minInt16, maxInt16, "isoWeek"));
                 operands.push_back(
                     fieldConversionBinding(*eIsoWeek, _context->state.frameIdGenerator, "isoWeek"));
             }
             if (!eIsoDayOfWeek) {
-                operands.push_back(optimizer::Constant::int32(1));
+                operands.push_back(abt::Constant::int32(1));
             } else {
                 boundChecks.push_back(boundedCheck(dayVar, minInt16, maxInt16, "isoDayOfWeek"));
                 operands.push_back(fieldConversionBinding(
@@ -1555,21 +1533,21 @@ public:
         } else {
             // The regular year/month/day case.
             if (!eYear) {
-                operands.push_back(optimizer::Constant::int32(1970));
+                operands.push_back(abt::Constant::int32(1970));
             } else {
                 boundChecks.push_back(boundedCheck(yearVar, 1, 9999, "year"));
                 operands.push_back(
                     fieldConversionBinding(*eYear, _context->state.frameIdGenerator, "year"));
             }
             if (!eMonth) {
-                operands.push_back(optimizer::Constant::int32(1));
+                operands.push_back(abt::Constant::int32(1));
             } else {
                 boundChecks.push_back(boundedCheck(monthVar, minInt16, maxInt16, "month"));
                 operands.push_back(
                     fieldConversionBinding(*eMonth, _context->state.frameIdGenerator, "month"));
             }
             if (!eDay) {
-                operands.push_back(optimizer::Constant::int32(1));
+                operands.push_back(abt::Constant::int32(1));
             } else {
                 boundChecks.push_back(boundedCheck(dayVar, minInt16, maxInt16, "day"));
                 operands.push_back(
@@ -1577,21 +1555,21 @@ public:
             }
         }
         if (!eHour) {
-            operands.push_back(optimizer::Constant::int32(0));
+            operands.push_back(abt::Constant::int32(0));
         } else {
             boundChecks.push_back(boundedCheck(hourVar, minInt16, maxInt16, "hour"));
             operands.push_back(
                 fieldConversionBinding(*eHour, _context->state.frameIdGenerator, "hour"));
         }
         if (!eMinute) {
-            operands.push_back(optimizer::Constant::int32(0));
+            operands.push_back(abt::Constant::int32(0));
         } else {
             boundChecks.push_back(boundedCheck(minVar, minInt16, maxInt16, "minute"));
             operands.push_back(
                 fieldConversionBinding(*eMinute, _context->state.frameIdGenerator, "minute"));
         }
         if (!eSecond) {
-            operands.push_back(optimizer::Constant::int32(0));
+            operands.push_back(abt::Constant::int32(0));
         } else {
             // MQL doesn't place bound restrictions on the second field, because seconds carry over
             // to minutes and can be large ints such as 71,841,012 or even unix epochs.
@@ -1599,7 +1577,7 @@ public:
                 fieldConversionBinding(*eSecond, _context->state.frameIdGenerator, "second"));
         }
         if (!eMillisecond) {
-            operands.push_back(optimizer::Constant::int32(0));
+            operands.push_back(abt::Constant::int32(0));
         } else {
             // MQL doesn't enforce bound restrictions on millisecond fields because milliseconds
             // carry over to seconds.
@@ -1607,15 +1585,15 @@ public:
                 *eMillisecond, _context->state.frameIdGenerator, "millisecond"));
         }
         if (!eTimezone) {
-            operands.push_back(optimizer::Constant::str("UTC"));
+            operands.push_back(abt::Constant::str("UTC"));
         } else {
             // Validate that eTimezone is a string.
             auto timeZoneName = makeLocalVariableName(_context->state.frameId(), 0);
             auto timeZoneVar = makeVariable(timeZoneName);
-            operands.push_back(optimizer::make<optimizer::Let>(
+            operands.push_back(abt::make<abt::Let>(
                 timeZoneName,
                 std::move(*eTimezone),
-                optimizer::make<optimizer::If>(
+                abt::make<abt::If>(
                     makeABTFunction("isString", timeZoneVar),
                     timeZoneVar,
                     makeABTFail(ErrorCodes::Error{7157918},
@@ -1662,11 +1640,11 @@ public:
         auto isoflagVar = makeVariable(isoflagName);
 
         // Initialize arguments with values from stack or default values.
-        auto isoflag = optimizer::Constant::boolean(false);
+        auto isoflag = abt::Constant::boolean(false);
         if (children[2]) {
             isoflag = _context->popABTExpr();
         }
-        auto timezone = optimizer::Constant::str("UTC");
+        auto timezone = abt::Constant::str("UTC");
         if (children[1]) {
             timezone = _context->popABTExpr();
         }
@@ -1684,7 +1662,7 @@ public:
         // Check that each argument exists, is not null, and is the correct type.
         auto totalDateToPartsFunc = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{generateABTNullMissingOrUndefined(timezoneName),
-                              optimizer::Constant::null()},
+                              abt::Constant::null()},
              ABTCaseValuePair{
                  makeNot(makeABTFunction("isString", timezoneVar)),
                  makeABTFail(ErrorCodes::Error{7157912}, "$dateToParts timezone must be a string")},
@@ -1692,29 +1670,26 @@ public:
                               makeABTFail(ErrorCodes::Error{7157913},
                                           "$dateToParts timezone must be a valid timezone")},
              ABTCaseValuePair{generateABTNullMissingOrUndefined(isoflagName),
-                              optimizer::Constant::null()},
+                              abt::Constant::null()},
              ABTCaseValuePair{
-                 makeNot(makeABTFunction(
-                     "typeMatch", isoflagVar, optimizer::Constant::int32(isoTypeMask))),
+                 makeNot(
+                     makeABTFunction("typeMatch", isoflagVar, abt::Constant::int32(isoTypeMask))),
                  makeABTFail(ErrorCodes::Error{7157914}, "$dateToParts iso8601 must be a boolean")},
-             ABTCaseValuePair{generateABTNullMissingOrUndefined(dateName),
-                              optimizer::Constant::null()},
-             ABTCaseValuePair{makeNot(makeABTFunction("typeMatch",
-                                                      dateVar,
-                                                      optimizer::Constant::int32(dateTypeMask()))),
+             ABTCaseValuePair{generateABTNullMissingOrUndefined(dateName), abt::Constant::null()},
+             ABTCaseValuePair{makeNot(makeABTFunction(
+                                  "typeMatch", dateVar, abt::Constant::int32(dateTypeMask()))),
                               makeABTFail(ErrorCodes::Error{7157915},
                                           "$dateToParts date must have the format of a date")},
              // Determine whether to call dateToParts or isoDateToParts.
              ABTCaseValuePair{
-                 optimizer::make<optimizer::BinaryOp>(
-                     optimizer::Operations::Eq, isoflagVar, optimizer::Constant::boolean(false)),
+                 abt::make<abt::BinaryOp>(
+                     abt::Operations::Eq, isoflagVar, abt::Constant::boolean(false)),
                  makeABTFunction("dateToParts", timeZoneDBVar, dateVar, timezoneVar, isoflagVar)}},
             makeABTFunction("isoDateToParts", timeZoneDBVar, dateVar, timezoneVar, isoflagVar));
 
-        pushABT(
-            makeLet({std::move(dateName), std::move(timezoneName), std::move(isoflagName)},
-                    optimizer::makeSeq(std::move(date), std::move(timezone), std::move(isoflag)),
-                    std::move(totalDateToPartsFunc)));
+        pushABT(makeLet({std::move(dateName), std::move(timezoneName), std::move(isoflagName)},
+                        abt::makeSeq(std::move(date), std::move(timezone), std::move(isoflag)),
+                        std::move(totalDateToPartsFunc)));
     }
 
     void visit(const ExpressionDateToString* expr) final {
@@ -1725,17 +1700,16 @@ public:
                               (expr->isOnNullSpecified() ? 1 : 0));
 
         // Get child expressions.
-        optimizer::ABT onNullExpression =
-            expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
+        abt::ABT onNullExpression =
+            expr->isOnNullSpecified() ? _context->popABTExpr() : abt::Constant::null();
 
-        optimizer::ABT timezoneExpression = expr->isTimezoneSpecified()
-            ? _context->popABTExpr()
-            : optimizer::Constant::str("UTC"_sd);
-        optimizer::ABT dateExpression = _context->popABTExpr();
+        abt::ABT timezoneExpression =
+            expr->isTimezoneSpecified() ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
+        abt::ABT dateExpression = _context->popABTExpr();
 
-        optimizer::ABT formatExpression = expr->isFormatSpecified()
+        abt::ABT formatExpression = expr->isFormatSpecified()
             ? _context->popABTExpr()
-            : optimizer::Constant::str(kIsoFormatStringZ);  // assumes UTC until disproven
+            : abt::Constant::str(kIsoFormatStringZ);  // assumes UTC until disproven
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
         auto [timezoneDBTag, timezoneDBVal] =
@@ -1772,7 +1746,7 @@ public:
             makeVariable(dateName), ErrorCodes::Error{4997901}, "$dateToString"_sd, "date"_sd));
 
         // "timezone" parameter validation.
-        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<abt::Constant>();
             timezoneExpressionConst) {
             auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
             if (!sbe::value::isNullish(timezoneTag)) {
@@ -1780,7 +1754,7 @@ public:
                 // specified, the default format should not use a 'Z' suffix.
                 if (!expr->isFormatSpecified() &&
                     !(sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB).isUtcZone())) {
-                    formatExpression = optimizer::Constant::str(kIsoFormatStringNonZ);
+                    formatExpression = abt::Constant::str(kIsoFormatStringNonZ);
                 }
 
                 // We don't want to error on null.
@@ -1804,7 +1778,7 @@ public:
         }
 
         // "format" parameter validation.
-        if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
+        if (auto* formatExpressionConst = formatExpression.cast<abt::Constant>();
             formatExpressionConst) {
             auto [formatTag, formatVal] = formatExpressionConst->get();
             if (!sbe::value::isNullish(formatTag)) {
@@ -1826,7 +1800,7 @@ public:
         }
 
         // Set parameters for an invocation of built-in "dateToString" function.
-        optimizer::ABTVector arguments;
+        abt::ABTVector arguments;
         arguments.push_back(makeABTVariable(timeZoneDBSlot));
         arguments.push_back(makeVariable(dateName));
         arguments.push_back(makeVariable(formatName));
@@ -1834,18 +1808,18 @@ public:
 
         // Create an expression to invoke built-in "dateToString" function.
         auto dateToStringFunctionCall =
-            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
+            abt::make<abt::FunctionCall>("dateToString", std::move(arguments));
 
         pushABT(makeLet({std::move(dateName),
                          std::move(formatName),
                          std::move(timezoneName),
                          std::move(dateToStringName)},
-                        optimizer::makeSeq(std::move(dateExpression),
-                                           std::move(formatExpression),
-                                           std::move(timezoneExpression),
-                                           std::move(dateToStringFunctionCall)),
+                        abt::makeSeq(std::move(dateExpression),
+                                     std::move(formatExpression),
+                                     std::move(timezoneExpression),
+                                     std::move(dateToStringFunctionCall)),
                         buildABTMultiBranchConditionalFromCaseValuePairs(
-                            std::move(inputValidationCases), optimizer::Constant::nothing())));
+                            std::move(inputValidationCases), abt::Constant::nothing())));
     }
     void visit(const ExpressionDateTrunc* expr) final {
         const auto& children = expr->getChildren();
@@ -1855,13 +1829,12 @@ public:
                               (expr->isStartOfWeekSpecified() ? 1 : 0));
 
         // Get child expressions.
-        auto startOfWeekExpression = expr->isStartOfWeekSpecified()
-            ? _context->popABTExpr()
-            : optimizer::Constant::str("sun"_sd);
-        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
-                                                              : optimizer::Constant::str("UTC"_sd);
+        auto startOfWeekExpression =
+            expr->isStartOfWeekSpecified() ? _context->popABTExpr() : abt::Constant::str("sun"_sd);
+        auto timezoneExpression =
+            expr->isTimezoneSpecified() ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
         auto binSizeExpression =
-            expr->isBinSizeSpecified() ? _context->popABTExpr() : optimizer::Constant::int64(1);
+            expr->isBinSizeSpecified() ? _context->popABTExpr() : abt::Constant::int64(1);
         auto unitExpression = _context->popABTExpr();
         auto dateExpression = _context->popABTExpr();
 
@@ -1888,7 +1861,7 @@ public:
         auto startOfWeekVar = makeVariable(startOfWeekName);
 
         // Set parameters for an invocation of built-in "dateTrunc" function.
-        optimizer::ABTVector arguments;
+        abt::ABTVector arguments;
         arguments.push_back(timeZoneDBVar);
         arguments.push_back(dateVar);
         arguments.push_back(unitVar);
@@ -1898,7 +1871,7 @@ public:
 
         // Create an expression to invoke built-in "dateTrunc" function.
         auto dateTruncFunctionCall =
-            optimizer::make<optimizer::FunctionCall>("dateTrunc", std::move(arguments));
+            abt::make<abt::FunctionCall>("dateTrunc", std::move(arguments));
         auto dateTruncName = makeLocalVariableName(_context->state.frameId(), 0);
         auto dateTruncVar = makeVariable(dateTruncName);
 
@@ -1920,14 +1893,14 @@ public:
         inputValidationCases.push_back(
             generateABTReturnNullIfNullMissingOrUndefined(timezoneExpression));
         inputValidationCases.emplace_back(
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                 unitIsWeekVar,
-                                                 generateABTNullMissingOrUndefined(startOfWeekVar)),
-            optimizer::Constant::null());
+            abt::make<abt::BinaryOp>(abt::Operations::And,
+                                     unitIsWeekVar,
+                                     generateABTNullMissingOrUndefined(startOfWeekVar)),
+            abt::Constant::null());
 
         // "timezone" parameter validation.
-        if (timezoneExpression.is<optimizer::Constant>()) {
-            auto [timezoneTag, timezoneVal] = timezoneExpression.cast<optimizer::Constant>()->get();
+        if (timezoneExpression.is<abt::Constant>()) {
+            auto [timezoneTag, timezoneVal] = timezoneExpression.cast<abt::Constant>()->get();
             tassert(7157928,
                     "$dateTrunc parameter 'timezone' must be a string",
                     sbe::value::isString(timezoneTag));
@@ -1950,8 +1923,8 @@ public:
             dateVar, ErrorCodes::Error{7157932}, "$dateTrunc"_sd, "date"_sd));
 
         // "unit" parameter validation.
-        if (unitExpression.is<optimizer::Constant>()) {
-            auto [unitTag, unitVal] = unitExpression.cast<optimizer::Constant>()->get();
+        if (unitExpression.is<abt::Constant>()) {
+            auto [unitTag, unitVal] = unitExpression.cast<abt::Constant>()->get();
             tassert(7157933,
                     "$dateTrunc parameter 'unit' must be a string",
                     sbe::value::isString(unitTag));
@@ -1972,9 +1945,8 @@ public:
 
         // "binSize" parameter validation.
         if (expr->isBinSizeSpecified()) {
-            if (binSizeExpression.is<optimizer::Constant>()) {
-                auto [binSizeTag, binSizeValue] =
-                    binSizeExpression.cast<optimizer::Constant>()->get();
+            if (binSizeExpression.is<abt::Constant>()) {
+                auto [binSizeTag, binSizeValue] = binSizeExpression.cast<abt::Constant>()->get();
                 tassert(7157937,
                         "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
                         "integer",
@@ -1993,16 +1965,16 @@ public:
                         binSize > 0);
             } else {
                 inputValidationCases.emplace_back(
-                    makeNot(optimizer::make<optimizer::BinaryOp>(
-                        optimizer::Operations::And,
-                        optimizer::make<optimizer::BinaryOp>(
-                            optimizer::Operations::And,
+                    makeNot(abt::make<abt::BinaryOp>(
+                        abt::Operations::And,
+                        abt::make<abt::BinaryOp>(
+                            abt::Operations::And,
                             makeABTFunction("isNumber", binSizeVar),
                             makeABTFunction(
                                 "exists",
                                 makeABTFunction("convert",
                                                 binSizeVar,
-                                                optimizer::Constant::int32(static_cast<int32_t>(
+                                                abt::Constant::int32(static_cast<int32_t>(
                                                     sbe::value::TypeTags::NumberInt64))))),
                         generateABTPositiveCheck(binSizeVar))),
                     makeABTFail(
@@ -2014,9 +1986,9 @@ public:
 
         // "startOfWeek" parameter validation.
         if (expr->isStartOfWeekSpecified()) {
-            if (startOfWeekExpression.is<optimizer::Constant>()) {
+            if (startOfWeekExpression.is<abt::Constant>()) {
                 auto [startOfWeekTag, startOfWeekVal] =
-                    startOfWeekExpression.cast<optimizer::Constant>()->get();
+                    startOfWeekExpression.cast<abt::Constant>()->get();
                 tassert(7157941,
                         "$dateTrunc parameter 'startOfWeek' must be a string",
                         sbe::value::isString(startOfWeekTag));
@@ -2027,14 +1999,14 @@ public:
             } else {
                 // If 'timeUnit' value is equal to "week" then validate "startOfWeek" parameter.
                 inputValidationCases.emplace_back(
-                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                         unitIsWeekVar,
-                                                         generateABTNonStringCheck(startOfWeekVar)),
+                    abt::make<abt::BinaryOp>(abt::Operations::And,
+                                             unitIsWeekVar,
+                                             generateABTNonStringCheck(startOfWeekVar)),
                     makeABTFail(ErrorCodes::Error{7157943},
                                 "$dateTrunc parameter 'startOfWeek' must be a string"));
                 inputValidationCases.emplace_back(
-                    optimizer::make<optimizer::BinaryOp>(
-                        optimizer::Operations::And,
+                    abt::make<abt::BinaryOp>(
+                        abt::Operations::And,
                         unitIsWeekVar,
                         makeNot(makeABTFunction("isDayOfWeek", startOfWeekVar))),
                     makeABTFail(
@@ -2050,20 +2022,19 @@ public:
              std::move(timezoneName),
              std::move(startOfWeekName),
              std::move(dateTruncName)},
-            optimizer::makeSeq(std::move(dateExpression),
-                               std::move(unitExpression),
-                               std::move(binSizeExpression),
-                               std::move(timezoneExpression),
-                               std::move(startOfWeekExpression),
-                               std::move(dateTruncFunctionCall)),
-            optimizer::make<optimizer::If>(
-                makeABTFunction("exists", dateTruncVar),
-                dateTruncVar,
-                optimizer::make<optimizer::Let>(
-                    std::move(unitIsWeekName),
-                    std::move(unitIsWeek),
-                    buildABTMultiBranchConditionalFromCaseValuePairs(
-                        std::move(inputValidationCases), optimizer::Constant::nothing())))));
+            abt::makeSeq(std::move(dateExpression),
+                         std::move(unitExpression),
+                         std::move(binSizeExpression),
+                         std::move(timezoneExpression),
+                         std::move(startOfWeekExpression),
+                         std::move(dateTruncFunctionCall)),
+            abt::make<abt::If>(makeABTFunction("exists", dateTruncVar),
+                               dateTruncVar,
+                               abt::make<abt::Let>(std::move(unitIsWeekName),
+                                                   std::move(unitIsWeek),
+                                                   buildABTMultiBranchConditionalFromCaseValuePairs(
+                                                       std::move(inputValidationCases),
+                                                       abt::Constant::nothing())))));
     }
     void visit(const ExpressionDivide* expr) final {
         _context->ensureArity(2);
@@ -2073,41 +2044,40 @@ public:
         auto lhsName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
         auto rhsName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
-        auto checkIsNumber = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::And,
-            makeABTFunction("isNumber", makeVariable(lhsName)),
-            makeABTFunction("isNumber", makeVariable(rhsName)));
+        auto checkIsNumber =
+            abt::make<abt::BinaryOp>(abt::Operations::And,
+                                     makeABTFunction("isNumber", makeVariable(lhsName)),
+                                     makeABTFunction("isNumber", makeVariable(rhsName)));
 
         auto checkIsNullOrMissing =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullMissingOrUndefined(lhsName),
-                                                 generateABTNullMissingOrUndefined(rhsName));
+            abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                     generateABTNullMissingOrUndefined(lhsName),
+                                     generateABTNullMissingOrUndefined(rhsName));
 
         auto divideExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkIsNullOrMissing), optimizer::Constant::null()},
+            {ABTCaseValuePair{std::move(checkIsNullOrMissing), abt::Constant::null()},
              ABTCaseValuePair{std::move(checkIsNumber),
-                              optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Div,
-                                                                   makeVariable(lhsName),
-                                                                   makeVariable(rhsName))}},
+                              abt::make<abt::BinaryOp>(abt::Operations::Div,
+                                                       makeVariable(lhsName),
+                                                       makeVariable(rhsName))}},
             makeABTFail(ErrorCodes::Error{7157719}, "$divide only supports numeric types"));
 
         pushABT(makeLet({std::move(lhsName), std::move(rhsName)},
-                        optimizer::makeSeq(std::move(lhs), std::move(rhs)),
+                        abt::makeSeq(std::move(lhs), std::move(rhs)),
                         std::move(divideExpr)));
     }
     void visit(const ExpressionExp* expr) final {
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto expExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157704}, "$exp only supports numeric types")}},
             makeABTFunction("exp", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(inputName), _context->popABTExpr(), std::move(expExpr)));
+        pushABT(
+            abt::make<abt::Let>(std::move(inputName), _context->popABTExpr(), std::move(expExpr)));
     }
     void visit(const ExpressionFieldPath* expr) final {
         _context->pushExpr(generateExpressionFieldPath(_context->state,
@@ -2125,21 +2095,20 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto floorExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157703}, "$floor only supports numeric types")}},
             makeABTFunction("floor", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
+        pushABT(abt::make<abt::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(floorExpr)));
     }
     void visit(const ExpressionIfNull* expr) final {
         auto numChildren = expr->getChildren().size();
         invariant(numChildren >= 2);
 
-        std::vector<optimizer::ABT> values;
+        std::vector<abt::ABT> values;
         values.reserve(numChildren);
         for (size_t i = 0; i < numChildren; ++i) {
             values.emplace_back(_context->popABTExpr());
@@ -2156,22 +2125,21 @@ public:
         auto expLocalVar = makeLocalVariableName(_context->state.frameId(), 0);
         auto arrLocalVar = makeLocalVariableName(_context->state.frameId(), 0);
 
-        optimizer::ABTVector functionArgs{makeVariable(expLocalVar), makeVariable(arrLocalVar)};
+        abt::ABTVector functionArgs{makeVariable(expLocalVar), makeVariable(arrLocalVar)};
         auto collatorSlot = _context->state.getCollatorSlot();
         if (collatorSlot) {
             functionArgs.emplace_back(makeABTVariable(*collatorSlot));
         }
 
-        auto inExpr = optimizer::make<optimizer::If>(
+        auto inExpr = abt::make<abt::If>(
             // Check that the arr argument is an array and is not missing.
             makeFillEmptyFalse(makeABTFunction("isArray", makeVariable(arrLocalVar))),
-            (collatorSlot
-                 ? optimizer::make<optimizer::FunctionCall>("collIsMember", std::move(functionArgs))
-                 : optimizer::make<optimizer::FunctionCall>("isMember", std::move(functionArgs))),
+            (collatorSlot ? abt::make<abt::FunctionCall>("collIsMember", std::move(functionArgs))
+                          : abt::make<abt::FunctionCall>("isMember", std::move(functionArgs))),
             makeABTFail(ErrorCodes::Error{5153700}, "$in requires an array as a second argument"));
 
         pushABT(makeLet({std::move(expLocalVar), std::move(arrLocalVar)},
-                        optimizer::makeSeq(std::move(expArg), std::move(arrExpArg)),
+                        abt::makeSeq(std::move(expArg), std::move(arrExpArg)),
                         std::move(inExpr)));
     }
     void visit(const ExpressionIndexOfArray* expr) final {
@@ -2188,12 +2156,11 @@ public:
     void visit(const ExpressionIsNumber* expr) final {
         auto arg = _context->popABTExpr();
         auto varName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto exprIsNum =
-            optimizer::make<optimizer::If>(makeABTFunction("exists", makeVariable(varName)),
-                                           makeABTFunction("isNumber", makeVariable(varName)),
-                                           optimizer::Constant::boolean(false));
+        auto exprIsNum = abt::make<abt::If>(makeABTFunction("exists", makeVariable(varName)),
+                                            makeABTFunction("isNumber", makeVariable(varName)),
+                                            abt::Constant::boolean(false));
 
-        pushABT(optimizer::make<optimizer::Let>(varName, std::move(arg), std::move(exprIsNum)));
+        pushABT(abt::make<abt::Let>(varName, std::move(arg), std::move(exprIsNum)));
     }
     void visit(const ExpressionLet* expr) final {
         invariant(!_context->varsFrameStack.empty());
@@ -2207,11 +2174,11 @@ public:
         invariant(currentFrame.currentBindingIndex == currentFrame.bindings.size());
 
         auto resultExpr = _context->popABTExpr();
-        std::vector<optimizer::ProjectionName> varNames;
-        std::vector<optimizer::ABT> bindings;
+        std::vector<abt::ProjectionName> varNames;
+        std::vector<abt::ABT> bindings;
         for (auto& binding : currentFrame.bindings) {
             varNames.emplace_back(makeLocalVariableName(binding.frameId, 0));
-            bindings.emplace_back(abt::unwrap(binding.expr.extractABT()));
+            bindings.emplace_back(unwrap(binding.expr.extractABT()));
         }
 
         pushABT(makeLet(std::move(varNames), std::move(bindings), std::move(resultExpr)));
@@ -2228,8 +2195,7 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto lnExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157705}, "$ln only supports numeric types")},
@@ -2238,15 +2204,15 @@ public:
              ABTCaseValuePair{generateABTNaNCheck(inputName),
                               makeABTFunction("convert",
                                               makeVariable(inputName),
-                                              optimizer::Constant::int32(static_cast<int32_t>(
+                                              abt::Constant::int32(static_cast<int32_t>(
                                                   sbe::value::TypeTags::NumberDouble)))},
              ABTCaseValuePair{generateABTNonPositiveCheck(inputName),
                               makeABTFail(ErrorCodes::Error{7157706},
                                           "$ln's argument must be a positive number")}},
             makeABTFunction("ln", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(inputName), _context->popABTExpr(), std::move(lnExpr)));
+        pushABT(
+            abt::make<abt::Let>(std::move(inputName), _context->popABTExpr(), std::move(lnExpr)));
     }
     void visit(const ExpressionLog* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -2255,8 +2221,7 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto log10Expr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157707}, "$log10 only supports numeric types")},
@@ -2265,14 +2230,14 @@ public:
              ABTCaseValuePair{generateABTNaNCheck(inputName),
                               makeABTFunction("convert",
                                               makeVariable(inputName),
-                                              optimizer::Constant::int32(static_cast<int32_t>(
+                                              abt::Constant::int32(static_cast<int32_t>(
                                                   sbe::value::TypeTags::NumberDouble)))},
              ABTCaseValuePair{generateABTNonPositiveCheck(inputName),
                               makeABTFail(ErrorCodes::Error{7157708},
                                           "$log10's argument must be a positive number")}},
             makeABTFunction("log10", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
+        pushABT(abt::make<abt::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(log10Expr)));
     }
     void visit(const ExpressionInternalFLEBetween* expr) final {
@@ -2303,14 +2268,13 @@ public:
     void visit(const ExpressionMeta* expr) final {
         auto pushMetadataABT = [this](boost::optional<sbe::value::SlotId> slot, uint32_t typeMask) {
             if (slot) {
-                pushABT(optimizer::make<optimizer::If>(
-                    makeFillEmptyTrue(makeABTFunction("typeMatch"_sd,
-                                                      makeABTVariable(*slot),
-                                                      optimizer::Constant::int32(typeMask))),
+                pushABT(abt::make<abt::If>(
+                    makeFillEmptyTrue(makeABTFunction(
+                        "typeMatch"_sd, makeABTVariable(*slot), abt::Constant::int32(typeMask))),
                     makeABTVariable(*slot),
                     makeABTFail(ErrorCodes::Error{8107800}, "Unexpected metadata type")));
             } else {
-                pushABT(optimizer::Constant::nothing());
+                pushABT(abt::Constant::nothing());
             }
         };
         switch (expr->getMetaType()) {
@@ -2342,20 +2306,19 @@ public:
         auto rhsName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto modExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{
-                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                      generateABTNullMissingOrUndefined(lhsName),
-                                                      generateABTNullMissingOrUndefined(rhsName)),
-                 optimizer::Constant::null()},
+            {ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                                       generateABTNullMissingOrUndefined(lhsName),
+                                                       generateABTNullMissingOrUndefined(rhsName)),
+                              abt::Constant::null()},
              ABTCaseValuePair{
-                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                      generateABTNonNumericCheck(lhsName),
-                                                      generateABTNonNumericCheck(rhsName)),
+                 abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                          generateABTNonNumericCheck(lhsName),
+                                          generateABTNonNumericCheck(rhsName)),
                  makeABTFail(ErrorCodes::Error{7157718}, "$mod only supports numeric types")}},
             makeABTFunction("mod", makeVariable(lhsName), makeVariable(rhsName)));
 
         pushABT(makeLet({std::move(lhsName), std::move(rhsName)},
-                        optimizer::makeSeq(std::move(lhs), std::move(rhs)),
+                        abt::makeSeq(std::move(lhs), std::move(rhs)),
                         std::move(modExpr)));
     }
     void visit(const ExpressionMultiply* expr) final {
@@ -2368,37 +2331,36 @@ public:
             return;
         }
 
-        auto checkLeaf = [&](optimizer::ABT arg) {
+        auto checkLeaf = [&](abt::ABT arg) {
             auto name = makeLocalVariableName(_context->state.frameId(), 0);
             auto var = makeVariable(name);
             auto checkedLeaf = buildABTMultiBranchConditional(
                 ABTCaseValuePair{makeABTFunction("isNumber", var), var},
                 makeABTFail(ErrorCodes::Error{7315403},
                             "only numbers are allowed in an $multiply expression"));
-            return optimizer::make<optimizer::Let>(
-                std::move(name), std::move(arg), std::move(checkedLeaf));
+            return abt::make<abt::Let>(std::move(name), std::move(arg), std::move(checkedLeaf));
         };
 
-        auto combineTwoTree = [&](optimizer::ABT left, optimizer::ABT right) {
+        auto combineTwoTree = [&](abt::ABT left, abt::ABT right) {
             auto nameLeft = makeLocalVariableName(_context->state.frameId(), 0);
             auto nameRight = makeLocalVariableName(_context->state.frameId(), 0);
             auto varLeft = makeVariable(nameLeft);
             auto varRight = makeVariable(nameRight);
 
             auto mulExpr = buildABTMultiBranchConditional(
-                ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(
-                                     optimizer::Operations::Or,
-                                     generateABTNullMissingOrUndefined(nameLeft),
-                                     generateABTNullMissingOrUndefined(nameRight)),
-                                 optimizer::Constant::null()},
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Mult, std::move(varLeft), std::move(varRight)));
+                ABTCaseValuePair{
+                    abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                             generateABTNullMissingOrUndefined(nameLeft),
+                                             generateABTNullMissingOrUndefined(nameRight)),
+                    abt::Constant::null()},
+                abt::make<abt::BinaryOp>(
+                    abt::Operations::Mult, std::move(varLeft), std::move(varRight)));
             return makeLet({std::move(nameLeft), std::move(nameRight)},
-                           optimizer::makeSeq(std::move(left), std::move(right)),
+                           abt::makeSeq(std::move(left), std::move(right)),
                            std::move(mulExpr));
         };
 
-        optimizer::ABTVector leaves;
+        abt::ABTVector leaves;
         leaves.reserve(arity);
         for (size_t idx = 0; idx < arity; ++idx) {
             leaves.emplace_back(checkLeaf(_context->popABTExpr()));
@@ -2413,15 +2375,15 @@ public:
 
         // Return multiplicative identity if the $multiply expression has no operands.
         if (arity == 0) {
-            pushABT(optimizer::Constant::int32(1));
+            pushABT(abt::Constant::int32(1));
             return;
         }
 
-        optimizer::ABTVector binds;
-        optimizer::ProjectionNameVector names;
-        optimizer::ABTVector checkExprsNull;
-        optimizer::ABTVector checkExprsNumber;
-        optimizer::ABTVector variables;
+        abt::ABTVector binds;
+        abt::ProjectionNameVector names;
+        abt::ABTVector checkExprsNull;
+        abt::ABTVector checkExprsNumber;
+        abt::ABTVector variables;
         binds.reserve(arity);
         names.reserve(arity);
         variables.reserve(arity);
@@ -2445,13 +2407,13 @@ public:
         std::reverse(std::begin(binds), std::end(binds));
 
         auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkExprsNull));
+            makeBooleanOpTree(abt::Operations::Or, std::move(checkExprsNull));
         auto checkNumberAllArguments =
-            makeBooleanOpTree(optimizer::Operations::And, std::move(checkExprsNumber));
-        auto multiplication = makeNaryOp(optimizer::Operations::Mult, std::move(variables));
+            makeBooleanOpTree(abt::Operations::And, std::move(checkExprsNumber));
+        auto multiplication = makeNaryOp(abt::Operations::Mult, std::move(variables));
 
         auto multiplyExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+            {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
              ABTCaseValuePair{std::move(checkNumberAllArguments), std::move(multiplication)}},
             makeABTFail(ErrorCodes::Error{7157721},
                         "only numbers are allowed in an $multiply expression"));
@@ -2471,24 +2433,24 @@ public:
         // The expression argument for 'newObj' must be a sequence of a field name constant
         // expression and an expression for the value. So, we need 2 * childExprs.size() elements in
         // the expressions vector.
-        optimizer::ABTVector exprs;
+        abt::ABTVector exprs;
         exprs.reserve(childSize * 2);
 
         // We iterate over child expressions in reverse, because they will be popped from stack in
         // reverse order.
         for (auto rit = childExprs.rbegin(); rit != childExprs.rend(); ++rit) {
             exprs.push_back(_context->popABTExpr());
-            exprs.push_back(optimizer::Constant::str(rit->first));
+            exprs.push_back(abt::Constant::str(rit->first));
         }
 
         // Lastly we need to reverse it to get the correct order of arguments.
         std::reverse(exprs.begin(), exprs.end());
 
-        pushABT(optimizer::make<optimizer::FunctionCall>("newObj", std::move(exprs)));
+        pushABT(abt::make<abt::FunctionCall>("newObj", std::move(exprs)));
     }
 
     void visit(const ExpressionOr* expr) final {
-        visitMultiBranchLogicExpression(expr, optimizer::Operations::Or);
+        visitMultiBranchLogicExpression(expr, abt::Operations::Or);
     }
     void visit(const ExpressionPow* expr) final {
         _context->ensureArity(2);
@@ -2498,23 +2460,20 @@ public:
         auto lhsName = makeLocalVariableName(_context->state.frameId(), 0);
         auto rhsName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto checkIsNotNumber =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNonNumericCheck(lhsName),
-                                                 generateABTNonNumericCheck(rhsName));
+        auto checkIsNotNumber = abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                                         generateABTNonNumericCheck(lhsName),
+                                                         generateABTNonNumericCheck(rhsName));
 
-        auto checkBaseIsZero = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::Eq, makeVariable(lhsName), optimizer::Constant::int32(0));
+        auto checkBaseIsZero = abt::make<abt::BinaryOp>(
+            abt::Operations::Eq, makeVariable(lhsName), abt::Constant::int32(0));
 
-        auto checkIsZeroAndNegative =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                 std::move(checkBaseIsZero),
-                                                 generateABTNegativeCheck(rhsName));
+        auto checkIsZeroAndNegative = abt::make<abt::BinaryOp>(
+            abt::Operations::And, std::move(checkBaseIsZero), generateABTNegativeCheck(rhsName));
 
         auto checkIsNullOrMissing =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullMissingOrUndefined(lhsName),
-                                                 generateABTNullMissingOrUndefined(rhsName));
+            abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                     generateABTNullMissingOrUndefined(lhsName),
+                                     generateABTNullMissingOrUndefined(rhsName));
 
         // Create an expression to invoke built-in "pow" function
         auto powFunctionCall = makeABTFunction("pow", makeVariable(lhsName), makeVariable(rhsName));
@@ -2523,24 +2482,23 @@ public:
         auto powResVariable = makeVariable(powResName);
 
         // Return the result or check for issues if result is empty (Nothing)
-        auto checkPowRes = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::FillEmpty,
+        auto checkPowRes = abt::make<abt::BinaryOp>(
+            abt::Operations::FillEmpty,
             std::move(powResVariable),
             buildABTMultiBranchConditionalFromCaseValuePairs(
-                {ABTCaseValuePair{std::move(checkIsNullOrMissing), optimizer::Constant::null()},
+                {ABTCaseValuePair{std::move(checkIsNullOrMissing), abt::Constant::null()},
                  ABTCaseValuePair{
                      std::move(checkIsNotNumber),
                      makeABTFail(ErrorCodes::Error{5154200}, "$pow only supports numeric types")},
                  ABTCaseValuePair{std::move(checkIsZeroAndNegative),
                                   makeABTFail(ErrorCodes::Error{5154201},
                                               "$pow cannot raise 0 to a negative exponent")}},
-                optimizer::Constant::nothing()));
+                abt::Constant::nothing()));
 
 
-        pushABT(
-            makeLet({std::move(lhsName), std::move(rhsName), std::move(powResName)},
-                    optimizer::makeSeq(std::move(lhs), std::move(rhs), std::move(powFunctionCall)),
-                    std::move(checkPowRes)));
+        pushABT(makeLet({std::move(lhsName), std::move(rhsName), std::move(powResName)},
+                        abt::makeSeq(std::move(lhs), std::move(rhs), std::move(powFunctionCall)),
+                        std::move(checkPowRes)));
     }
     void visit(const ExpressionRange* expr) final {
         auto startName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
@@ -2554,14 +2512,14 @@ public:
         auto convertedStepName =
             makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
-        auto step = expr->getChildren().size() == 3 ? _context->popABTExpr()
-                                                    : optimizer::Constant::int32(1);
+        auto step =
+            expr->getChildren().size() == 3 ? _context->popABTExpr() : abt::Constant::int32(1);
         auto end = _context->popABTExpr();
         auto start = _context->popABTExpr();
 
         auto rangeExpr = makeLet(
             {startName, endName, stepName},
-            optimizer::makeSeq(std::move(start), std::move(end), std::move(step)),
+            abt::makeSeq(std::move(start), std::move(end), std::move(step)),
             buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{generateABTNonNumericCheck(startName),
                                   makeABTFail(ErrorCodes::Error{7157711},
@@ -2574,19 +2532,18 @@ public:
                                               "$range only supports numeric types for step")}},
                 makeLet(
                     {convertedStartName, convertedEndName, convertedStepName},
-                    optimizer::makeSeq(
-                        makeABTFunction("convert",
-                                        makeVariable(startName),
-                                        optimizer::Constant::int32(static_cast<int32_t>(
-                                            sbe::value::TypeTags::NumberInt32))),
-                        makeABTFunction("convert",
-                                        makeVariable(endName),
-                                        optimizer::Constant::int32(static_cast<int32_t>(
-                                            sbe::value::TypeTags::NumberInt32))),
-                        makeABTFunction("convert",
-                                        makeVariable(stepName),
-                                        optimizer::Constant::int32(static_cast<int32_t>(
-                                            sbe::value::TypeTags::NumberInt32)))),
+                    abt::makeSeq(makeABTFunction("convert",
+                                                 makeVariable(startName),
+                                                 abt::Constant::int32(static_cast<int32_t>(
+                                                     sbe::value::TypeTags::NumberInt32))),
+                                 makeABTFunction("convert",
+                                                 makeVariable(endName),
+                                                 abt::Constant::int32(static_cast<int32_t>(
+                                                     sbe::value::TypeTags::NumberInt32))),
+                                 makeABTFunction("convert",
+                                                 makeVariable(stepName),
+                                                 abt::Constant::int32(static_cast<int32_t>(
+                                                     sbe::value::TypeTags::NumberInt32)))),
                     buildABTMultiBranchConditionalFromCaseValuePairs(
                         {ABTCaseValuePair{
                              makeNot(makeABTFunction("exists", makeVariable(convertedStartName))),
@@ -2603,12 +2560,11 @@ public:
                              makeABTFail(ErrorCodes::Error{7157716},
                                          "$range step argument cannot be "
                                          "represented as a 32-bit integer")},
-                         ABTCaseValuePair{
-                             optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Eq,
-                                                                  makeVariable(convertedStepName),
-                                                                  optimizer::Constant::int32(0)),
-                             makeABTFail(ErrorCodes::Error{7157717},
-                                         "$range requires a non-zero step value")}},
+                         ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Eq,
+                                                                   makeVariable(convertedStepName),
+                                                                   abt::Constant::int32(0)),
+                                          makeABTFail(ErrorCodes::Error{7157717},
+                                                      "$range requires a non-zero step value")}},
                         makeABTFunction("newArrayFromRange",
                                         makeVariable(convertedStartName),
                                         makeVariable(convertedEndName),
@@ -2635,24 +2591,23 @@ public:
         auto findArgNullName = makeLocalVariableName(_context->state.frameId(), 0);
         auto replacementArgNullName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto checkNull = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::Or,
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 makeVariable(inputArgNullName),
-                                                 makeVariable(findArgNullName)),
+        auto checkNull = abt::make<abt::BinaryOp>(
+            abt::Operations::Or,
+            abt::make<abt::BinaryOp>(
+                abt::Operations::Or, makeVariable(inputArgNullName), makeVariable(findArgNullName)),
             makeVariable(replacementArgNullName));
 
         // Check if find string is empty, and if so return the the concatenation of the replacement
         // string and the input string, otherwise replace the first occurrence of the find string.
-        auto isEmptyFindStr = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::Eq, makeVariable(findArgName), optimizer::Constant::str(""_sd));
+        auto isEmptyFindStr = abt::make<abt::BinaryOp>(
+            abt::Operations::Eq, makeVariable(findArgName), abt::Constant::str(""_sd));
 
-        auto generateTypeCheckCaseValuePair = [](optimizer::ProjectionName paramName,
-                                                 optimizer::ProjectionName paramIsNullName,
+        auto generateTypeCheckCaseValuePair = [](abt::ProjectionName paramName,
+                                                 abt::ProjectionName paramIsNullName,
                                                  StringData param) {
             return ABTCaseValuePair{
-                makeNot(optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Or,
+                makeNot(abt::make<abt::BinaryOp>(
+                    abt::Operations::Or,
                     makeVariable(std::move(paramIsNullName)),
                     makeABTFunction("isString", makeVariable(std::move(paramName))))),
                 makeABTFail(ErrorCodes::Error{7158302},
@@ -2666,15 +2621,15 @@ public:
              generateTypeCheckCaseValuePair(findArgName, findArgNullName, "find"),
              generateTypeCheckCaseValuePair(
                  replacementArgName, replacementArgNullName, "replacement"),
-             ABTCaseValuePair{std::move(checkNull), optimizer::Constant::null()}},
-            optimizer::make<optimizer::If>(std::move(isEmptyFindStr),
-                                           makeABTFunction("concat",
-                                                           makeVariable(replacementArgName),
-                                                           makeVariable(inputArgName)),
-                                           makeABTFunction("replaceOne",
-                                                           makeVariable(inputArgName),
-                                                           makeVariable(findArgName),
-                                                           makeVariable(replacementArgName))));
+             ABTCaseValuePair{std::move(checkNull), abt::Constant::null()}},
+            abt::make<abt::If>(std::move(isEmptyFindStr),
+                               makeABTFunction("concat",
+                                               makeVariable(replacementArgName),
+                                               makeVariable(inputArgName)),
+                               makeABTFunction("replaceOne",
+                                               makeVariable(inputArgName),
+                                               makeVariable(findArgName),
+                                               makeVariable(replacementArgName))));
 
         pushABT(makeLet({replacementArgName,
                          findArgName,
@@ -2682,12 +2637,12 @@ public:
                          replacementArgNullName,
                          findArgNullName,
                          inputArgNullName},
-                        optimizer::makeSeq(std::move(replacementArg),
-                                           std::move(findArg),
-                                           std::move(inputArg),
-                                           generateABTNullMissingOrUndefined(replacementArgName),
-                                           generateABTNullMissingOrUndefined(findArgName),
-                                           generateABTNullMissingOrUndefined(inputArgName)),
+                        abt::makeSeq(std::move(replacementArg),
+                                     std::move(findArg),
+                                     std::move(inputArg),
+                                     generateABTNullMissingOrUndefined(replacementArgName),
+                                     generateABTNullMissingOrUndefined(findArgName),
+                                     generateABTNullMissingOrUndefined(inputArgName)),
                         std::move(replaceOneExpr)));
     }
 
@@ -2742,14 +2697,13 @@ public:
         auto argumentIsNotArray = makeNot(makeABTFunction("isArray", var));
 
         auto exprReverseArr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), abt::Constant::null()},
              ABTCaseValuePair{std::move(argumentIsNotArray),
                               makeABTFail(ErrorCodes::Error{7158002},
                                           "$reverseArray argument must be an array")}},
             makeABTFunction("reverseArray", std::move(var)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(name), std::move(arg), std::move(exprReverseArr)));
+        pushABT(abt::make<abt::Let>(std::move(name), std::move(arg), std::move(exprReverseArr)));
     }
 
     void visit(const ExpressionSortArray* expr) final {
@@ -2763,7 +2717,7 @@ public:
 
         auto argumentIsNotArray = makeNot(makeABTFunction("isArray", var));
 
-        optimizer::ABTVector functionArgs{std::move(var), std::move(specConstant)};
+        abt::ABTVector functionArgs{std::move(var), std::move(specConstant)};
 
         auto collatorSlot = _context->state.getCollatorSlot();
         if (collatorSlot) {
@@ -2771,14 +2725,13 @@ public:
         }
 
         auto exprSortArr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), abt::Constant::null()},
              ABTCaseValuePair{std::move(argumentIsNotArray),
                               makeABTFail(ErrorCodes::Error{7158001},
                                           "$sortArray input argument must be an array")}},
-            optimizer::make<optimizer::FunctionCall>("sortArray", std::move(functionArgs)));
+            abt::make<abt::FunctionCall>("sortArray", std::move(functionArgs)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(name), std::move(arg), std::move(exprSortArr)));
+        pushABT(abt::make<abt::Let>(std::move(name), std::move(arg), std::move(exprSortArr)));
     }
 
     void visit(const ExpressionSlice* expr) final {
@@ -2817,38 +2770,37 @@ public:
         // then make further validity checks against the input. Fail if the delimiter is an
         // empty string. Return [""] if the string expression is an empty string.
         auto totalSplitFunc = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(
-                                  optimizer::Operations::Or,
-                                  generateABTNullMissingOrUndefined(varString),
-                                  generateABTNullMissingOrUndefined(varDelimiter)),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{
+                 abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                          generateABTNullMissingOrUndefined(varString),
+                                          generateABTNullMissingOrUndefined(varDelimiter)),
+                 abt::Constant::null()},
              ABTCaseValuePair{makeNot(makeABTFunction("isString"_sd, makeVariable(varString))),
                               makeABTFail(ErrorCodes::Error{7158202},
                                           "$split string expression must be a string")},
              ABTCaseValuePair{
                  makeNot(makeABTFunction("isString"_sd, makeVariable(varDelimiter))),
                  makeABTFail(ErrorCodes::Error{7158203}, "$split delimiter must be a string")},
-             ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Eq,
-                                                                   makeVariable(varDelimiter),
-                                                                   makeABTConstant(""_sd)),
+             ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Eq,
+                                                       makeVariable(varDelimiter),
+                                                       makeABTConstant(""_sd)),
                               makeABTFail(ErrorCodes::Error{7158204},
                                           "$split delimiter must not be an empty string")},
-             ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Eq,
-                                                                   makeVariable(varString),
-                                                                   makeABTConstant(""_sd)),
+             ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Eq,
+                                                       makeVariable(varString),
+                                                       makeABTConstant(""_sd)),
                               std::move(emptyResult)}},
             makeABTFunction("split"_sd, makeVariable(varString), makeVariable(varDelimiter)));
 
         pushABT(makeLet({varString, varDelimiter},
-                        optimizer::makeSeq(std::move(stringExpression), std::move(delimiter)),
+                        abt::makeSeq(std::move(stringExpression), std::move(delimiter)),
                         std::move(totalSplitFunc)));
     }
     void visit(const ExpressionSqrt* expr) final {
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto sqrtExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  generateABTNonNumericCheck(inputName),
                  makeABTFail(ErrorCodes::Error{7157709}, "$sqrt only supports numeric types")},
@@ -2857,8 +2809,8 @@ public:
                                           "$sqrt's argument must be greater than or equal to 0")}},
             makeABTFunction("sqrt", makeVariable(inputName)));
 
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(inputName), _context->popABTExpr(), std::move(sqrtExpr)));
+        pushABT(
+            abt::make<abt::Let>(std::move(inputName), _context->popABTExpr(), std::move(sqrtExpr)));
     }
     void visit(const ExpressionStrcasecmp* expr) final {
         invariant(expr->getChildren().size() == 2);
@@ -2871,27 +2823,23 @@ public:
         generateStringCaseConversionExpression(_context, "toUpper");
         SbExpr lhs = _context->popExpr();
 
-        _context->pushExpr(
-            b.makeBinaryOp(optimizer::Operations::Cmp3w, std::move(lhs), std::move(rhs)));
+        _context->pushExpr(b.makeBinaryOp(abt::Operations::Cmp3w, std::move(lhs), std::move(rhs)));
     }
     void visit(const ExpressionSubstrBytes* expr) final {
         invariant(expr->getChildren().size() == 3);
         _context->ensureArity(3);
 
-        optimizer::ABT byteCount = _context->popABTExpr();
-        optimizer::ABT startIndex = _context->popABTExpr();
-        optimizer::ABT stringExpr = _context->popABTExpr();
+        abt::ABT byteCount = _context->popABTExpr();
+        abt::ABT startIndex = _context->popABTExpr();
+        abt::ABT stringExpr = _context->popABTExpr();
 
-        optimizer::ProjectionName stringExprName =
-            makeLocalVariableName(_context->state.frameId(), 0);
-        optimizer::ProjectionName startIndexName =
-            makeLocalVariableName(_context->state.frameId(), 0);
-        optimizer::ProjectionName byteCountName =
-            makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName stringExprName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName startIndexName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName byteCountName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        optimizer::ABTVector functionArgs;
+        abt::ABTVector functionArgs;
 
-        optimizer::ABT validStringExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+        abt::ABT validStringExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{generateABTNullMissingOrUndefined(stringExprName),
                               makeABTConstant(""_sd)},
              ABTCaseValuePair{
@@ -2901,57 +2849,54 @@ public:
             makeABTFunction("coerceToString", makeVariable(stringExprName)));
         functionArgs.push_back(std::move(validStringExpr));
 
-        optimizer::ABT validStartIndexExpr = optimizer::make<optimizer::If>(
-            optimizer::make<optimizer::BinaryOp>(
-                optimizer::Operations::Or,
+        abt::ABT validStartIndexExpr = abt::make<abt::If>(
+            abt::make<abt::BinaryOp>(
+                abt::Operations::Or,
                 generateABTNullMissingOrUndefined(startIndexName),
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Or,
-                    generateABTNonNumericCheck(startIndexName),
-                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
-                                                         makeVariable(startIndexName),
-                                                         optimizer::Constant::int32(0)))),
+                abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                         generateABTNonNumericCheck(startIndexName),
+                                         abt::make<abt::BinaryOp>(abt::Operations::Lt,
+                                                                  makeVariable(startIndexName),
+                                                                  abt::Constant::int32(0)))),
             makeABTFail(ErrorCodes::Error{5155603},
                         "Starting index must be non-negative numeric type"),
-            makeABTFunction("convert",
-                            makeVariable(startIndexName),
-                            optimizer::Constant::int32(
-                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+            makeABTFunction(
+                "convert",
+                makeVariable(startIndexName),
+                abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(validStartIndexExpr));
 
-        optimizer::ABT validLengthExpr = optimizer::make<optimizer::If>(
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullMissingOrUndefined(byteCountName),
-                                                 generateABTNonNumericCheck(byteCountName)),
+        abt::ABT validLengthExpr = abt::make<abt::If>(
+            abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                     generateABTNullMissingOrUndefined(byteCountName),
+                                     generateABTNonNumericCheck(byteCountName)),
             makeABTFail(ErrorCodes::Error{5155602}, "Length must be a numeric type"),
-            makeABTFunction("convert",
-                            makeVariable(byteCountName),
-                            optimizer::Constant::int32(
-                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+            makeABTFunction(
+                "convert",
+                makeVariable(byteCountName),
+                abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(validLengthExpr));
 
         pushABT(makeLet(
             {std::move(byteCountName), std::move(startIndexName), std::move(stringExprName)},
-            optimizer::makeSeq(std::move(byteCount), std::move(startIndex), std::move(stringExpr)),
-            optimizer::make<optimizer::FunctionCall>("substrBytes", std::move(functionArgs))));
+            abt::makeSeq(std::move(byteCount), std::move(startIndex), std::move(stringExpr)),
+            abt::make<abt::FunctionCall>("substrBytes", std::move(functionArgs))));
     }
     void visit(const ExpressionSubstrCP* expr) final {
         invariant(expr->getChildren().size() == 3);
         _context->ensureArity(3);
 
-        optimizer::ABT len = _context->popABTExpr();
-        optimizer::ABT startIndex = _context->popABTExpr();
-        optimizer::ABT stringExpr = _context->popABTExpr();
+        abt::ABT len = _context->popABTExpr();
+        abt::ABT startIndex = _context->popABTExpr();
+        abt::ABT stringExpr = _context->popABTExpr();
 
-        optimizer::ProjectionName stringExprName =
-            makeLocalVariableName(_context->state.frameId(), 0);
-        optimizer::ProjectionName startIndexName =
-            makeLocalVariableName(_context->state.frameId(), 0);
-        optimizer::ProjectionName lenName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName stringExprName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName startIndexName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ProjectionName lenName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        optimizer::ABTVector functionArgs;
+        abt::ABTVector functionArgs;
 
-        optimizer::ABT validStringExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+        abt::ABT validStringExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{generateABTNullMissingOrUndefined(stringExprName),
                               makeABTConstant(""_sd)},
              ABTCaseValuePair{
@@ -2962,59 +2907,57 @@ public:
             makeABTFunction("coerceToString", makeVariable(stringExprName)));
         functionArgs.push_back(std::move(validStringExpr));
 
-        optimizer::ABT validStartIndexExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+        abt::ABT validStartIndexExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{
                  generateABTNullishOrNotRepresentableInt32Check(startIndexName),
                  makeABTFail(ErrorCodes::Error{5155700},
                              "$substrCP: starting index must be numeric type representable as a "
                              "32-bit integral value")},
              ABTCaseValuePair{
-                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
-                                                      makeVariable(startIndexName),
-                                                      optimizer::Constant::int32(0)),
+                 abt::make<abt::BinaryOp>(
+                     abt::Operations::Lt, makeVariable(startIndexName), abt::Constant::int32(0)),
                  makeABTFail(ErrorCodes::Error{5155701},
                              "$substrCP: starting index must be a non-negative integer")}},
-            makeABTFunction("convert",
-                            makeVariable(startIndexName),
-                            optimizer::Constant::int32(
-                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
+            makeABTFunction(
+                "convert",
+                makeVariable(startIndexName),
+                abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
         functionArgs.push_back(std::move(validStartIndexExpr));
 
-        optimizer::ABT validLengthExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+        abt::ABT validLengthExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             {ABTCaseValuePair{generateABTNullishOrNotRepresentableInt32Check(lenName),
                               makeABTFail(ErrorCodes::Error{5155702},
                                           "$substrCP: length must be numeric type representable as "
                                           "a 32-bit integral value")},
-             ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
-                                                                   makeVariable(lenName),
-                                                                   optimizer::Constant::int32(0)),
+             ABTCaseValuePair{abt::make<abt::BinaryOp>(abt::Operations::Lt,
+                                                       makeVariable(lenName),
+                                                       abt::Constant::int32(0)),
                               makeABTFail(ErrorCodes::Error{5155703},
                                           "$substrCP: length must be a non-negative integer")}},
-            makeABTFunction("convert",
-                            makeVariable(lenName),
-                            optimizer::Constant::int32(
-                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
+            makeABTFunction(
+                "convert",
+                makeVariable(lenName),
+                abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
         functionArgs.push_back(std::move(validLengthExpr));
 
-        pushABT(makeLet(
-            {std::move(lenName), std::move(startIndexName), std::move(stringExprName)},
-            optimizer::makeSeq(std::move(len), std::move(startIndex), std::move(stringExpr)),
-            optimizer::make<optimizer::FunctionCall>("substrCP", std::move(functionArgs))));
+        pushABT(makeLet({std::move(lenName), std::move(startIndexName), std::move(stringExprName)},
+                        abt::makeSeq(std::move(len), std::move(startIndex), std::move(stringExpr)),
+                        abt::make<abt::FunctionCall>("substrCP", std::move(functionArgs))));
     }
     void visit(const ExpressionStrLenBytes* expr) final {
         tassert(5155802, "expected 'expr' to have 1 child", expr->getChildren().size() == 1);
         _context->ensureArity(1);
 
-        optimizer::ProjectionName strName = makeLocalVariableName(_context->state.frameId(), 0);
-        optimizer::ABT strExpression = _context->popABTExpr();
-        optimizer::ABT strVar = makeVariable(strName);
+        abt::ProjectionName strName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ABT strExpression = _context->popABTExpr();
+        abt::ABT strVar = makeVariable(strName);
 
-        auto strLenBytesExpr = optimizer::make<optimizer::If>(
+        auto strLenBytesExpr = abt::make<abt::If>(
             makeFillEmptyFalse(makeABTFunction("isString", strVar)),
             makeABTFunction("strLenBytes", strVar),
             makeABTFail(ErrorCodes::Error{5155800}, "$strLenBytes requires a string argument"));
 
-        pushABT(optimizer::make<optimizer::Let>(
+        pushABT(abt::make<abt::Let>(
             std::move(strName), std::move(strExpression), std::move(strLenBytesExpr)));
     }
     void visit(const ExpressionBinarySize* expr) final {
@@ -3024,16 +2967,16 @@ public:
         tassert(5155902, "expected 'expr' to have 1 child", expr->getChildren().size() == 1);
         _context->ensureArity(1);
 
-        optimizer::ProjectionName strName = makeLocalVariableName(_context->state.frameId(), 0);
-        optimizer::ABT strExpression = _context->popABTExpr();
-        optimizer::ABT strVar = makeVariable(strName);
+        abt::ProjectionName strName = makeLocalVariableName(_context->state.frameId(), 0);
+        abt::ABT strExpression = _context->popABTExpr();
+        abt::ABT strVar = makeVariable(strName);
 
-        auto strLenCPExpr = optimizer::make<optimizer::If>(
+        auto strLenCPExpr = abt::make<abt::If>(
             makeFillEmptyFalse(makeABTFunction("isString", strVar)),
             makeABTFunction("strLenCP", strVar),
             makeABTFail(ErrorCodes::Error{5155900}, "$strLenCP requires a string argument"));
 
-        pushABT(optimizer::make<optimizer::Let>(
+        pushABT(abt::make<abt::Let>(
             std::move(strName), std::move(strExpression), std::move(strLenCPExpr)));
     }
     void visit(const ExpressionSubtract* expr) final {
@@ -3047,25 +2990,24 @@ public:
         auto rhsName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto checkNullArguments =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullMissingOrUndefined(lhsName),
-                                                 generateABTNullMissingOrUndefined(rhsName));
+            abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                     generateABTNullMissingOrUndefined(lhsName),
+                                     generateABTNullMissingOrUndefined(rhsName));
 
-        auto checkArgumentTypes = makeNot(optimizer::make<optimizer::If>(
+        auto checkArgumentTypes = makeNot(abt::make<abt::If>(
             makeABTFunction("isNumber", makeVariable(lhsName)),
             makeABTFunction("isNumber", makeVariable(rhsName)),
-            optimizer::make<optimizer::BinaryOp>(
-                optimizer::Operations::And,
+            abt::make<abt::BinaryOp>(
+                abt::Operations::And,
                 makeABTFunction("isDate", makeVariable(lhsName)),
-                optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::Or,
-                    makeABTFunction("isNumber", makeVariable(rhsName)),
-                    makeABTFunction("isDate", makeVariable(rhsName))))));
+                abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                         makeABTFunction("isNumber", makeVariable(rhsName)),
+                                         makeABTFunction("isDate", makeVariable(rhsName))))));
 
-        auto subtractOp = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::Sub, makeVariable(lhsName), makeVariable(rhsName));
+        auto subtractOp = abt::make<abt::BinaryOp>(
+            abt::Operations::Sub, makeVariable(lhsName), makeVariable(rhsName));
         auto subtractExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullArguments), optimizer::Constant::null()},
+            {ABTCaseValuePair{std::move(checkNullArguments), abt::Constant::null()},
              ABTCaseValuePair{
                  std::move(checkArgumentTypes),
                  makeABTFail(
@@ -3075,14 +3017,14 @@ public:
             std::move(subtractOp));
 
         pushABT(makeLet({std::move(lhsName), std::move(rhsName)},
-                        optimizer::makeSeq(std::move(lhs), std::move(rhs)),
+                        abt::makeSeq(std::move(lhs), std::move(rhs)),
                         std::move(subtractExpr)));
     }
     void visit(const ExpressionSwitch* expr) final {
         visitConditionalExpression(expr);
     }
     void visit(const ExpressionTestApiVersion* expr) final {
-        pushABT(optimizer::Constant::int32(1));
+        pushABT(abt::Constant::int32(1));
     }
     void visit(const ExpressionToLower* expr) final {
         generateStringCaseConversionExpression(_context, "toLower");
@@ -3104,16 +3046,16 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameId(), 0);
         auto charsName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto charsString = isCharsProvided ? _context->popABTExpr() : optimizer::Constant::null();
+        auto charsString = isCharsProvided ? _context->popABTExpr() : abt::Constant::null();
         auto inputString = _context->popABTExpr();
         auto trimBuiltinName = expr->getTrimTypeString();
 
         auto checkCharsNullish = isCharsProvided ? generateABTNullMissingOrUndefined(charsName)
-                                                 : optimizer::Constant::boolean(false);
+                                                 : abt::Constant::boolean(false);
 
         auto checkCharsNotString = isCharsProvided
             ? makeNot(makeABTFunction("isString"_sd, makeVariable(charsName)))
-            : optimizer::Constant::boolean(false);
+            : abt::Constant::boolean(false);
 
 
         /*
@@ -3138,13 +3080,12 @@ public:
            }
         */
         auto trimFunc = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName), abt::Constant::null()},
              ABTCaseValuePair{
                  makeNot(makeABTFunction("isString"_sd, makeVariable(inputName))),
                  makeABTFail(ErrorCodes::Error{5156302},
                              "$" + trimBuiltinName + " input expression must be a string")},
-             ABTCaseValuePair{std::move(checkCharsNullish), optimizer::Constant::null()},
+             ABTCaseValuePair{std::move(checkCharsNullish), abt::Constant::null()},
              ABTCaseValuePair{std::move(checkCharsNotString),
                               makeABTFail(ErrorCodes::Error{5156303},
                                           "$" + trimBuiltinName +
@@ -3152,7 +3093,7 @@ public:
             makeABTFunction(trimBuiltinName, makeVariable(inputName), makeVariable(charsName)));
 
         pushABT(makeLet({std::move(inputName), std::move(charsName)},
-                        optimizer::makeSeq(std::move(inputString), std::move(charsString)),
+                        abt::makeSeq(std::move(inputString), std::move(charsString)),
                         std::move(trimFunc)));
     }
     void visit(const ExpressionTrunc* expr) final {
@@ -3271,24 +3212,24 @@ public:
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         if (arity == 0) {
-            pushABT(optimizer::Constant::null());
+            pushABT(abt::Constant::null());
         } else if (arity == 1) {
-            optimizer::ABT singleInput = _context->popABTExpr();
-            optimizer::ProjectionName singleInputName =
+            abt::ABT singleInput = _context->popABTExpr();
+            abt::ProjectionName singleInputName =
                 makeLocalVariableName(_context->state.frameId(), 0);
             auto k = makeVariable(singleInputName);
 
-            optimizer::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            abt::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  optimizer::Constant::null()},
+                                  abt::Constant::null()},
                  ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
                                   makeFillEmptyNull(makeABTFunction(
                                       "avgOfArray", makeVariable(singleInputName)))},
                  ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(singleInputName)),
                                   makeVariable(singleInputName)}},
-                optimizer::Constant::null());
+                abt::Constant::null());
 
-            pushABT(optimizer::make<optimizer::Let>(
+            pushABT(abt::make<abt::Let>(
                 std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "avgOfArray");
@@ -3325,24 +3266,24 @@ public:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            pushABT(optimizer::Constant::null());
+            pushABT(abt::Constant::null());
         } else if (arity == 1) {
-            optimizer::ABT singleInput = _context->popABTExpr();
-            optimizer::ProjectionName singleInputName =
+            abt::ABT singleInput = _context->popABTExpr();
+            abt::ProjectionName singleInputName =
                 makeLocalVariableName(_context->state.frameId(), 0);
-            optimizer::ABT stdDevPopExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            abt::ABT stdDevPopExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  optimizer::Constant::null()},
+                                  abt::Constant::null()},
                  ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
                                   makeFillEmptyNull(
                                       makeABTFunction("stdDevPop", makeVariable(singleInputName)))},
                  ABTCaseValuePair{
                      makeABTFunction("isNumber", makeVariable(singleInputName)),
                      // Population standard deviation for a single numeric input is always 0.
-                     optimizer::Constant::int32(0)}},
-                optimizer::Constant::null());
+                     abt::Constant::int32(0)}},
+                abt::Constant::null());
 
-            pushABT(optimizer::make<optimizer::Let>(
+            pushABT(abt::make<abt::Let>(
                 std::move(singleInputName), std::move(singleInput), std::move(stdDevPopExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "stdDevPop");
@@ -3353,21 +3294,21 @@ public:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            pushABT(optimizer::Constant::null());
+            pushABT(abt::Constant::null());
         } else if (arity == 1) {
-            optimizer::ABT singleInput = _context->popABTExpr();
-            optimizer::ProjectionName singleInputName =
+            abt::ABT singleInput = _context->popABTExpr();
+            abt::ProjectionName singleInputName =
                 makeLocalVariableName(_context->state.frameId(), 0);
-            optimizer::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            abt::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  optimizer::Constant::null()},
+                                  abt::Constant::null()},
                  ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
                                   makeFillEmptyNull(makeABTFunction(
                                       "stdDevSamp", makeVariable(singleInputName)))}},
                 // Sample standard deviation is undefined for a single input.
-                optimizer::Constant::null());
+                abt::Constant::null());
 
-            pushABT(optimizer::make<optimizer::Let>(
+            pushABT(abt::make<abt::Let>(
                 std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "stdDevSamp");
@@ -3377,25 +3318,25 @@ public:
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         if (arity == 0) {
-            pushABT(optimizer::Constant::null());
+            pushABT(abt::Constant::null());
         } else if (arity == 1) {
-            optimizer::ABT singleInput = _context->popABTExpr();
-            optimizer::ProjectionName singleInputName =
+            abt::ABT singleInput = _context->popABTExpr();
+            abt::ProjectionName singleInputName =
                 makeLocalVariableName(_context->state.frameId(), 0);
             auto k = makeVariable(singleInputName);
 
             // $sum returns 0 if the operand is missing, undefined, or non-numeric.
-            optimizer::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            abt::ABT stdDevSampExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  optimizer::Constant::int32(0)},
+                                  abt::Constant::int32(0)},
                  ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
                                   makeFillEmptyNull(makeABTFunction(
                                       "sumOfArray", makeVariable(singleInputName)))},
                  ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(singleInputName)),
                                   makeVariable(singleInputName)}},
-                optimizer::Constant::int32(0));
+                abt::Constant::int32(0));
 
-            pushABT(optimizer::make<optimizer::Let>(
+            pushABT(abt::make<abt::Let>(
                 std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, "sumOfArray");
@@ -3472,14 +3413,13 @@ public:
         auto var = makeVariable(name);
 
         auto tsSecondExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), abt::Constant::null()},
              ABTCaseValuePair{generateABTNonTimestampCheck(name),
                               makeABTFail(ErrorCodes::Error{7157900},
                                           str::stream() << expr->getOpName()
                                                         << " expects argument of type timestamp")}},
             makeABTFunction("tsSecond", makeVariable(name)));
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(name), std::move(arg), std::move(tsSecondExpr)));
+        pushABT(abt::make<abt::Let>(std::move(name), std::move(arg), std::move(tsSecondExpr)));
     }
 
     void visit(const ExpressionTsIncrement* expr) final {
@@ -3491,14 +3431,13 @@ public:
         auto var = makeVariable(name);
 
         auto tsIncrementExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(name), abt::Constant::null()},
              ABTCaseValuePair{generateABTNonTimestampCheck(name),
                               makeABTFail(ErrorCodes::Error{7157901},
                                           str::stream() << expr->getOpName()
                                                         << " expects argument of type timestamp")}},
             makeABTFunction("tsIncrement", makeVariable(name)));
-        pushABT(optimizer::make<optimizer::Let>(
-            std::move(name), std::move(arg), std::move(tsIncrementExpr)));
+        pushABT(abt::make<abt::Let>(std::move(name), std::move(arg), std::move(tsIncrementExpr)));
     }
 
     void visit(const ExpressionInternalOwningShard* expr) final {
@@ -3547,18 +3486,17 @@ private:
                                                               "an integer between -20 and 100"));
         }
 
-        optimizer::ABT abtExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+        abt::ABT abtExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
             std::move(inputValidationCases),
             makeABTFunction((opName == "$round" ? "round"_sd : "trunc"_sd),
                             makeVariable(inputNumName),
                             makeVariable(inputPlaceName)));
 
         // "place" argument defaults to 0.
-        optimizer::ABT placeABT =
-            hasPlaceArg ? _context->popABTExpr() : optimizer::Constant::int32(0);
-        optimizer::ABT inputABT = _context->popABTExpr();
+        abt::ABT placeABT = hasPlaceArg ? _context->popABTExpr() : abt::Constant::int32(0);
+        abt::ABT inputABT = _context->popABTExpr();
         pushABT(makeLet({std::move(inputNumName), std::move(inputPlaceName)},
-                        optimizer::makeSeq(std::move(inputABT), std::move(placeABT)),
+                        abt::makeSeq(std::move(inputABT), std::move(placeABT)),
                         std::move(abtExpr)));
     }
 
@@ -3568,19 +3506,19 @@ private:
      * together using binary and/or EExpressions so that the result has MQL's short-circuit
      * semantics.
      */
-    void visitMultiBranchLogicExpression(const Expression* expr, optimizer::Operations logicOp) {
-        invariant(logicOp == optimizer::Operations::And || logicOp == optimizer::Operations::Or);
+    void visitMultiBranchLogicExpression(const Expression* expr, abt::Operations logicOp) {
+        invariant(logicOp == abt::Operations::And || logicOp == abt::Operations::Or);
 
         size_t numChildren = expr->getChildren().size();
         if (numChildren == 0) {
             // Empty $and and $or always evaluate to their logical operator's identity value:
             // true and false, respectively.
-            auto logicIdentityVal = (logicOp == optimizer::Operations::And);
-            pushABT(optimizer::Constant::boolean(logicIdentityVal));
+            auto logicIdentityVal = (logicOp == abt::Operations::And);
+            pushABT(abt::Constant::boolean(logicIdentityVal));
             return;
         }
 
-        std::vector<optimizer::ABT> exprs;
+        std::vector<abt::ABT> exprs;
         exprs.reserve(numChildren);
         for (size_t i = 0; i < numChildren; ++i) {
             exprs.emplace_back(
@@ -3627,7 +3565,7 @@ private:
         invariant(children.size() == 2);
 
         auto timezoneExpression =
-            children[1] ? _context->popABTExpr() : optimizer::Constant::str("UTC"_sd);
+            children[1] ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
         auto dateExpression = _context->popABTExpr();
 
         // Local bind to hold the date expression result
@@ -3636,7 +3574,7 @@ private:
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
 
         // Set parameters for an invocation of the built-in function.
-        optimizer::ABTVector arguments;
+        abt::ABTVector arguments;
         arguments.push_back(makeVariable(dateName));
 
         // Local bind to hold the timezone expression result
@@ -3655,8 +3593,8 @@ private:
             generateABTReturnNullIfNullMissingOrUndefined(makeVariable(dateName)));
 
         // "timezone" parameter validation.
-        if (timezoneExpression.is<optimizer::Constant>()) {
-            auto [timezoneTag, timezoneVal] = timezoneExpression.cast<optimizer::Constant>()->get();
+        if (timezoneExpression.is<abt::Constant>()) {
+            auto [timezoneTag, timezoneVal] = timezoneExpression.cast<abt::Constant>()->get();
             auto [timezoneDBTag, timezoneDBVal] =
                 _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
             auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
@@ -3670,8 +3608,7 @@ private:
                     sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
             auto [timezoneObjTag, timezoneObjVal] = sbe::value::makeCopyTimeZone(
                 sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB));
-            auto timezoneConst =
-                optimizer::make<optimizer::Constant>(timezoneObjTag, timezoneObjVal);
+            auto timezoneConst = abt::make<abt::Constant>(timezoneObjTag, timezoneObjVal);
             arguments.push_back(std::move(timezoneConst));
         } else {
             inputValidationCases.push_back(
@@ -3695,13 +3632,13 @@ private:
         inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
             makeVariable(dateName), ErrorCodes::Error{5157904}, exprName, "date"_sd));
 
-        pushABT(makeLet({std::move(dateName), std::move(timezoneName), funcName},
-                        optimizer::makeSeq(std::move(dateExpression),
-                                           std::move(timezoneExpression),
-                                           optimizer::make<optimizer::FunctionCall>(
-                                               exprName.toString(), std::move(arguments))),
-                        buildABTMultiBranchConditionalFromCaseValuePairs(
-                            std::move(inputValidationCases), optimizer::Constant::nothing())));
+        pushABT(makeLet(
+            {std::move(dateName), std::move(timezoneName), funcName},
+            abt::makeSeq(std::move(dateExpression),
+                         std::move(timezoneExpression),
+                         abt::make<abt::FunctionCall>(exprName.toString(), std::move(arguments))),
+            buildABTMultiBranchConditionalFromCaseValuePairs(std::move(inputValidationCases),
+                                                             abt::Constant::nothing())));
     }
 
     /**
@@ -3713,36 +3650,33 @@ private:
      * expressionName - a name of an expression the parameter belongs to.
      * parameterName - a name of the parameter corresponding to variable 'dateRef'.
      */
-    static ABTCaseValuePair generateABTFailIfNotCoercibleToDate(const optimizer::ABT& dateVar,
+    static ABTCaseValuePair generateABTFailIfNotCoercibleToDate(const abt::ABT& dateVar,
                                                                 ErrorCodes::Error errorCode,
                                                                 StringData expressionName,
                                                                 StringData parameterName) {
-        return {makeNot(makeABTFunction(
-                    "typeMatch", dateVar, optimizer::Constant::int32(dateTypeMask()))),
-                makeABTFail(errorCode,
-                            str::stream() << expressionName << " parameter '" << parameterName
-                                          << "' must be coercible to date")};
+        return {
+            makeNot(makeABTFunction("typeMatch", dateVar, abt::Constant::int32(dateTypeMask()))),
+            makeABTFail(errorCode,
+                        str::stream() << expressionName << " parameter '" << parameterName
+                                      << "' must be coercible to date")};
     }
 
     /**
      * Creates a CaseValuePair such that Null value is returned if a value of variable denoted by
      * 'variable' is null, missing, or undefined.
      */
-    static ABTCaseValuePair generateABTReturnNullIfNullMissingOrUndefined(
-        const optimizer::ABT& name) {
-        return {generateABTNullMissingOrUndefined(name), optimizer::Constant::null()};
+    static ABTCaseValuePair generateABTReturnNullIfNullMissingOrUndefined(const abt::ABT& name) {
+        return {generateABTNullMissingOrUndefined(name), abt::Constant::null()};
     }
 
     /**
      * Creates a boolean expression to check if 'variable' is equal to string 'string'.
      */
-    static optimizer::ABT generateABTIsEqualToStringCheck(const optimizer::ABT& expr,
-                                                          StringData string) {
-        return optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::And,
+    static abt::ABT generateABTIsEqualToStringCheck(const abt::ABT& expr, StringData string) {
+        return abt::make<abt::BinaryOp>(
+            abt::Operations::And,
             makeABTFunction("isString", expr),
-            optimizer::make<optimizer::BinaryOp>(
-                optimizer::Operations::Eq, expr, optimizer::Constant::str(string)));
+            abt::make<abt::BinaryOp>(abt::Operations::Eq, expr, abt::Constant::str(string)));
     }
 
     /**
@@ -3755,15 +3689,14 @@ private:
         auto argName = makeLocalVariableName(frameId, 0);
 
         auto genericTrigonometricExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
              ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(argName)),
                               makeABTFunction(exprName, makeVariable(argName))}},
             makeABTFail(ErrorCodes::Error{7157800},
                         str::stream()
                             << "$" << exprName.toString() << " supports only numeric types"));
 
-        pushABT(optimizer::make<optimizer::Let>(
+        pushABT(abt::make<abt::Let>(
             std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
     }
 
@@ -3781,17 +3714,16 @@ private:
         auto rhsVariable = makeVariable(rhsName);
 
         auto checkNullOrMissing =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullMissingOrUndefined(lhsName),
-                                                 generateABTNullMissingOrUndefined(rhsName));
+            abt::make<abt::BinaryOp>(abt::Operations::Or,
+                                     generateABTNullMissingOrUndefined(lhsName),
+                                     generateABTNullMissingOrUndefined(rhsName));
 
-        auto checkIsNumber =
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                 makeABTFunction("isNumber", lhsVariable),
-                                                 makeABTFunction("isNumber", rhsVariable));
+        auto checkIsNumber = abt::make<abt::BinaryOp>(abt::Operations::And,
+                                                      makeABTFunction("isNumber", lhsVariable),
+                                                      makeABTFunction("isNumber", rhsVariable));
 
         auto genericTrigonometricExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullOrMissing), optimizer::Constant::null()},
+            {ABTCaseValuePair{std::move(checkNullOrMissing), abt::Constant::null()},
              ABTCaseValuePair{
                  std::move(checkIsNumber),
                  makeABTFunction(exprName, std::move(lhsVariable), std::move(rhsVariable))}},
@@ -3800,7 +3732,7 @@ private:
 
 
         pushABT(makeLet({std::move(lhsName), std::move(rhsName)},
-                        optimizer::makeSeq(std::move(lhs), std::move(rhs)),
+                        abt::makeSeq(std::move(lhs), std::move(rhs)),
                         std::move(genericTrigonometricExpr)));
     }
 
@@ -3815,23 +3747,22 @@ private:
         auto arg = _context->popABTExpr();
         auto argName = makeLocalVariableName(frameId, 0);
         auto variable = makeVariable(argName);
-        optimizer::Operations lowerCmp =
-            lowerBound.inclusive ? optimizer::Operations::Gte : optimizer::Operations::Gt;
-        optimizer::Operations upperCmp =
-            upperBound.inclusive ? optimizer::Operations::Lte : optimizer::Operations::Lt;
-        auto checkBounds = optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::And,
-            optimizer::make<optimizer::BinaryOp>(
-                lowerCmp, variable, optimizer::Constant::fromDouble(lowerBound.bound)),
-            optimizer::make<optimizer::BinaryOp>(
-                upperCmp, variable, optimizer::Constant::fromDouble(upperBound.bound)));
+        abt::Operations lowerCmp =
+            lowerBound.inclusive ? abt::Operations::Gte : abt::Operations::Gt;
+        abt::Operations upperCmp =
+            upperBound.inclusive ? abt::Operations::Lte : abt::Operations::Lt;
+        auto checkBounds = abt::make<abt::BinaryOp>(
+            abt::Operations::And,
+            abt::make<abt::BinaryOp>(
+                lowerCmp, variable, abt::Constant::fromDouble(lowerBound.bound)),
+            abt::make<abt::BinaryOp>(
+                upperCmp, variable, abt::Constant::fromDouble(upperBound.bound)));
 
         auto checkIsNumber = makeABTFunction("isNumber", variable);
         auto trigonometricExpr = makeABTFunction(exprName, variable);
 
         auto genericTrigonometricExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
              ABTCaseValuePair{makeNot(std::move(checkIsNumber)),
                               makeABTFail(ErrorCodes::Error{7157802},
                                           str::stream() << "$" << exprName.toString()
@@ -3843,7 +3774,7 @@ private:
                                       << ", value must be in " << lowerBound.printLowerBound()
                                       << ", " << upperBound.printUpperBound()));
 
-        pushABT(optimizer::make<optimizer::Let>(
+        pushABT(abt::make<abt::Let>(
             std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
     }
 
@@ -3855,20 +3786,20 @@ private:
                               const std::string& indexOfFunction) {
         const auto& children = expr->getChildren();
         auto operandSize = children.size() <= 3 ? 3 : 4;
-        optimizer::ABTVector operands;
+        abt::ABTVector operands;
         operands.reserve(operandSize);
 
         auto strName = makeLocalVariableName(_context->state.frameId(), 0);
         auto substrName = makeLocalVariableName(_context->state.frameId(), 0);
         auto startIndexName = makeLocalVariableName(_context->state.frameId(), 0);
-        boost::optional<optimizer::ProjectionName> endIndexName;
+        boost::optional<abt::ProjectionName> endIndexName;
 
         // Get arguments from stack.
-        std::vector<optimizer::ProjectionName> varNames;
+        std::vector<abt::ProjectionName> varNames;
         switch (children.size()) {
             case 2: {
                 varNames.emplace_back(startIndexName);
-                operands.emplace_back(optimizer::Constant::int64(0));
+                operands.emplace_back(abt::Constant::int64(0));
                 varNames.emplace_back(substrName);
                 operands.emplace_back(_context->popABTExpr());
                 varNames.emplace_back(strName);
@@ -3901,7 +3832,7 @@ private:
         }
 
         // Add string and substring operands.
-        optimizer::ABTVector functionArgs{makeVariable(strName), makeVariable(substrName)};
+        abt::ABTVector functionArgs{makeVariable(strName), makeVariable(substrName)};
 
         // Add start index operand.
         auto checkValidStartIndex = buildABTMultiBranchConditionalFromCaseValuePairs(
@@ -3914,10 +3845,10 @@ private:
                               makeABTFail(ErrorCodes::Error{7158004},
                                           str::stream() << "$" << indexOfFunction
                                                         << " start index must be positive")}},
-            makeABTFunction("convert",
-                            makeVariable(startIndexName),
-                            optimizer::Constant::int32(
-                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+            makeABTFunction(
+                "convert",
+                makeVariable(startIndexName),
+                abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
         functionArgs.push_back(std::move(checkValidStartIndex));
 
         // Add end index operand.
@@ -3932,17 +3863,16 @@ private:
                                   makeABTFail(ErrorCodes::Error{7158006},
                                               str::stream() << "$" << indexOfFunction
                                                             << " end index must be positive")}},
-                makeABTFunction("convert",
-                                makeVariable(*endIndexName),
-                                optimizer::Constant::int32(
-                                    static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+                makeABTFunction(
+                    "convert",
+                    makeVariable(*endIndexName),
+                    abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
             functionArgs.push_back(std::move(checkValidEndIndex));
         }
 
         // Check if string or substring are null or missing before calling indexOfFunction.
         auto resultExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{generateABTNullMissingOrUndefined(strName),
-                              optimizer::Constant::null()},
+            {ABTCaseValuePair{generateABTNullMissingOrUndefined(strName), abt::Constant::null()},
              ABTCaseValuePair{generateABTNonStringCheck(strName),
                               makeABTFail(ErrorCodes::Error{7158007},
                                           str::stream()
@@ -3956,7 +3886,7 @@ private:
                               makeABTFail(ErrorCodes::Error{7158009},
                                           str::stream() << "$" << indexOfFunction
                                                         << " substring must resolve to a string")}},
-            optimizer::make<optimizer::FunctionCall>(indexOfFunction, std::move(functionArgs)));
+            abt::make<abt::FunctionCall>(indexOfFunction, std::move(functionArgs)));
 
         // Build local binding tree.
         pushABT(makeLet(std::move(varNames), std::move(operands), std::move(resultExpr)));
@@ -3972,15 +3902,15 @@ private:
         _context->ensureArity(arity);
 
         if (arity == 0) {
-            pushABT(optimizer::Constant::null());
+            pushABT(abt::Constant::null());
         } else if (arity == 1) {
-            optimizer::ABT singleInput = _context->popABTExpr();
-            optimizer::ProjectionName singleInputName =
+            abt::ABT singleInput = _context->popABTExpr();
+            abt::ProjectionName singleInputName =
                 makeLocalVariableName(_context->state.frameId(), 0);
 
-            optimizer::ABT maxMinExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            abt::ABT maxMinExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
                 {ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
-                                  optimizer::Constant::null()},
+                                  abt::Constant::null()},
                  ABTCaseValuePair{
                      makeABTFunction("isArray", makeVariable(singleInputName)),
                      // In the case of a single argument, if the input is an array, $min or $max
@@ -3989,7 +3919,7 @@ private:
                          makeABTFunction(maxMinFunction, makeVariable(singleInputName)))}},
                 makeVariable(singleInputName));
 
-            pushABT(optimizer::make<optimizer::Let>(
+            pushABT(abt::make<abt::Let>(
                 std::move(singleInputName), std::move(singleInput), std::move(maxMinExpr)));
         } else {
             generateExpressionFromAccumulatorExpression(expr, _context, maxMinFunction);
@@ -4005,24 +3935,23 @@ private:
                                                      ExpressionVisitorContext* _context,
                                                      const std::string& functionCall) {
         size_t arity = expr->getChildren().size();
-        std::vector<optimizer::ProjectionName> varNames;
-        std::vector<optimizer::ABT> binds;
+        std::vector<abt::ProjectionName> varNames;
+        std::vector<abt::ABT> binds;
         for (size_t idx = 0; idx < arity; ++idx) {
             varNames.emplace_back(makeLocalVariableName(_context->state.frameId(), 0));
             binds.emplace_back(_context->popABTExpr());
         }
 
         std::reverse(std::begin(binds), std::end(binds));
-        optimizer::ABTVector argVars;
+        abt::ABTVector argVars;
         for (auto& name : varNames) {
             argVars.push_back(makeVariable(name));
         }
 
         // Take in all arguments and construct an array.
-        auto arrayExpr =
-            makeLet(std::move(varNames),
-                    std::move(binds),
-                    optimizer::make<optimizer::FunctionCall>("newArray", std::move(argVars)));
+        auto arrayExpr = makeLet(std::move(varNames),
+                                 std::move(binds),
+                                 abt::make<abt::FunctionCall>("newArray", std::move(argVars)));
 
         pushABT(makeFillEmptyNull(makeABTFunction(functionCall, std::move(arrayExpr))));
     }
@@ -4036,12 +3965,12 @@ private:
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
-        optimizer::ABTVector args;
-        optimizer::ProjectionNameVector argNames;
-        optimizer::ABTVector variables;
+        abt::ABTVector args;
+        abt::ProjectionNameVector argNames;
+        abt::ABTVector variables;
 
-        optimizer::ABTVector checkNulls;
-        optimizer::ABTVector checkNotArrays;
+        abt::ABTVector checkNulls;
+        abt::ABTVector checkNotArrays;
 
         auto collatorSlot = _context->state.getCollatorSlot();
 
@@ -4072,30 +4001,28 @@ private:
         // operations, such as $setDifference, are not commutative.
         std::reverse(std::begin(args), std::end(args));
 
-        auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNulls));
+        auto checkNullAnyArgument = makeBooleanOpTree(abt::Operations::Or, std::move(checkNulls));
         auto checkNotArrayAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNotArrays));
-        optimizer::ABT setExpr = [&]() -> optimizer::ABT {
+            makeBooleanOpTree(abt::Operations::Or, std::move(checkNotArrays));
+        abt::ABT setExpr = [&]() -> abt::ABT {
             // To match classic engine semantics, $setEquals and $setIsSubset should throw an error
             // for any non-array arguments including null and missing values.
             if (setOp == SetOperation::Equals || setOp == SetOperation::IsSubset) {
-                return makeIf(makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
-                              makeABTFail(ErrorCodes::Error{7158100},
-                                          str::stream() << "All operands of $" << operatorName
-                                                        << " must be arrays."),
-                              optimizer::make<optimizer::FunctionCall>(setFunctionName.toString(),
-                                                                       std::move(variables)));
+                return makeIf(
+                    makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
+                    makeABTFail(ErrorCodes::Error{7158100},
+                                str::stream()
+                                    << "All operands of $" << operatorName << " must be arrays."),
+                    abt::make<abt::FunctionCall>(setFunctionName.toString(), std::move(variables)));
             } else {
                 return buildABTMultiBranchConditionalFromCaseValuePairs(
-                    {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+                    {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
                      ABTCaseValuePair{std::move(checkNotArrayAnyArgument),
                                       makeABTFail(ErrorCodes::Error{7158101},
                                                   str::stream()
                                                       << "All operands of $" << operatorName
                                                       << " must be arrays.")}},
-                    optimizer::make<optimizer::FunctionCall>(setFunctionName.toString(),
-                                                             std::move(variables)));
+                    abt::make<abt::FunctionCall>(setFunctionName.toString(), std::move(variables)));
             }
         }();
 
@@ -4133,7 +4060,7 @@ private:
         size_t arity = expr->hasOptions() ? 3 : 2;
         _context->ensureArity(arity);
 
-        boost::optional<optimizer::ABT> options;
+        boost::optional<abt::ABT> options;
         if (expr->hasOptions()) {
             options = _context->popABTExpr();
         }
@@ -4145,11 +4072,11 @@ private:
 
         auto generateRegexNullResponse = [exprName]() {
             if (exprName == "regexMatch"_sd) {
-                return optimizer::Constant::boolean(false);
+                return abt::Constant::boolean(false);
             } else if (exprName == "regexFindAll"_sd) {
-                return optimizer::Constant::emptyArray();
+                return abt::Constant::emptyArray();
             } else {
-                return optimizer::Constant::null();
+                return abt::Constant::null();
             }
         };
 
@@ -4158,12 +4085,12 @@ private:
                                str::stream() << "$" << exprName.toString() << ": " << message);
         };
 
-        auto makeRegexFunctionCall = [&](optimizer::ABT compiledRegex) {
+        auto makeRegexFunctionCall = [&](abt::ABT compiledRegex) {
             auto resultVar = makeLocalVariableName(_context->state.frameId(), 0);
-            return optimizer::make<optimizer::Let>(
+            return abt::make<abt::Let>(
                 resultVar,
                 makeABTFunction(exprName, std::move(compiledRegex), makeVariable(inputVar)),
-                optimizer::make<optimizer::If>(
+                abt::make<abt::If>(
                     makeABTFunction("exists"_sd, makeVariable(resultVar)),
                     makeVariable(resultVar),
                     makeError(5073403, "error occurred while executing the regular expression")));
@@ -4196,16 +4123,16 @@ private:
             // } else {
             //     fail('pattern must be either string or BSON RegEx')
             // }
-            auto patternArgument = optimizer::make<optimizer::If>(
+            auto patternArgument = abt::make<abt::If>(
                 makeABTFunction("isString"_sd, makeVariable(patternVar)),
-                optimizer::make<optimizer::If>(
+                abt::make<abt::If>(
                     makeABTFunction("hasNullBytes"_sd, makeVariable(patternVar)),
                     makeError(5126602, "regex pattern must not have embedded null bytes"),
                     makeVariable(patternVar)),
-                optimizer::make<optimizer::If>(
+                abt::make<abt::If>(
                     makeABTFunction("typeMatch"_sd,
                                     makeVariable(patternVar),
-                                    optimizer::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                                    abt::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
                     makeABTFunction("getRegexPattern"_sd, makeVariable(patternVar)),
                     makeError(5126601,
                               "regex pattern must have either string or BSON RegEx type")));
@@ -4213,18 +4140,17 @@ private:
             if (!options) {
                 // If no options are passed to the expression, try to extract them from the
                 // pattern.
-                auto optionsArgument = optimizer::make<optimizer::If>(
+                auto optionsArgument = abt::make<abt::If>(
                     makeABTFunction("typeMatch"_sd,
                                     makeVariable(patternVar),
-                                    optimizer::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                                    abt::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
                     makeABTFunction("getRegexFlags"_sd, makeVariable(patternVar)),
                     makeABTConstant(""_sd));
                 auto compiledRegex = makeABTFunction(
                     "regexCompile"_sd, std::move(patternArgument), std::move(optionsArgument));
-                return optimizer::make<optimizer::If>(
-                    makeABTFunction("isNull"_sd, makeVariable(patternVar)),
-                    generateRegexNullResponse(),
-                    makeRegexFunctionCall(std::move(compiledRegex)));
+                return abt::make<abt::If>(makeABTFunction("isNull"_sd, makeVariable(patternVar)),
+                                          generateRegexNullResponse(),
+                                          makeRegexFunctionCall(std::move(compiledRegex)));
             }
 
             // If there are options passed to the expression, we construct local bind with
@@ -4259,33 +4185,32 @@ private:
                 //     } else {
                 //         stringOptions
                 //     }
-                auto stringOptions = optimizer::make<optimizer::If>(
+                auto stringOptions = abt::make<abt::If>(
                     makeABTFunction("isString"_sd, makeVariable(userOptionsVar)),
-                    optimizer::make<optimizer::If>(
+                    abt::make<abt::If>(
                         makeABTFunction("hasNullBytes"_sd, makeVariable(userOptionsVar)),
                         makeError(5126604, "regex flags must not have embedded null bytes"),
                         makeVariable(userOptionsVar)),
-                    optimizer::make<optimizer::If>(
+                    abt::make<abt::If>(
                         makeABTFunction("isNull"_sd, makeVariable(userOptionsVar)),
                         makeABTConstant(""_sd),
                         makeError(5126603, "regex flags must have either string or null type")));
 
-                auto generateIsEmptyString = [](const optimizer::ProjectionName& var) {
-                    return optimizer::make<optimizer::BinaryOp>(
-                        optimizer::Operations::Eq, makeVariable(var), makeABTConstant(""_sd));
+                auto generateIsEmptyString = [](const abt::ProjectionName& var) {
+                    return abt::make<abt::BinaryOp>(
+                        abt::Operations::Eq, makeVariable(var), makeABTConstant(""_sd));
                 };
 
                 auto stringVar = makeLocalVariableName(_context->state.frameId(), 0);
                 auto bsonPatternVar = makeLocalVariableName(_context->state.frameId(), 0);
-                return optimizer::make<optimizer::Let>(
+                return abt::make<abt::Let>(
                     stringVar,
                     std::move(stringOptions),
-                    optimizer::make<optimizer::If>(
-                        makeABTFunction(
-                            "typeMatch"_sd,
-                            makeVariable(patternVar),
-                            optimizer::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
-                        optimizer::make<optimizer::Let>(
+                    abt::make<abt::If>(
+                        makeABTFunction("typeMatch"_sd,
+                                        makeVariable(patternVar),
+                                        abt::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                        abt::make<abt::Let>(
                             bsonPatternVar,
                             makeABTFunction("getRegexFlags", makeVariable(patternVar)),
                             buildABTMultiBranchConditionalFromCaseValuePairs(
@@ -4302,8 +4227,8 @@ private:
             auto optionsVar = makeLocalVariableName(_context->state.frameId(), 0);
             return makeLet(
                 {userOptionsVar, optionsVar},
-                optimizer::makeSeq(std::move(*options), std::move(optionsArgument)),
-                optimizer::make<optimizer::If>(
+                abt::makeSeq(std::move(*options), std::move(optionsArgument)),
+                abt::make<abt::If>(
                     makeABTFunction("isNull"_sd, makeVariable(patternVar)),
                     generateRegexNullResponse(),
                     makeRegexFunctionCall(makeABTFunction(
@@ -4318,7 +4243,7 @@ private:
             std::move(regexFunctionResult));
 
         pushABT(makeLet({inputVar, patternVar},
-                        optimizer::makeSeq(std::move(input), std::move(pattern)),
+                        abt::makeSeq(std::move(input), std::move(pattern)),
                         std::move(regexCall)));
     }
 
@@ -4330,8 +4255,7 @@ private:
         const auto& children = expr->getChildren();
         auto arity = children.size();
         invariant(arity == 4);
-        auto timezoneExpr =
-            children[3] ? _context->popABTExpr() : optimizer::Constant::str("UTC"_sd);
+        auto timezoneExpr = children[3] ? _context->popABTExpr() : abt::Constant::str("UTC"_sd);
         auto amountExpr = _context->popABTExpr();
         auto unitExpr = _context->popABTExpr();
         auto startDateExpr = _context->popABTExpr();
@@ -4344,17 +4268,15 @@ private:
 
         auto convertedAmountInt64 = [&]() {
             if (dateExprName == "dateAdd") {
-                return makeABTFunction("convert",
-                                       makeVariable(origAmountName),
-                                       optimizer::Constant::int32(static_cast<int32_t>(
-                                           sbe::value::TypeTags::NumberInt64)));
+                return makeABTFunction(
+                    "convert",
+                    makeVariable(origAmountName),
+                    abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
             } else if (dateExprName == "dateSubtract") {
                 return makeABTFunction(
                     "convert",
-                    optimizer::make<optimizer::UnaryOp>(optimizer::Operations::Neg,
-                                                        makeVariable(origAmountName)),
-                    optimizer::Constant::int32(
-                        static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
+                    abt::make<abt::UnaryOp>(abt::Operations::Neg, makeVariable(origAmountName)),
+                    abt::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
             } else {
                 MONGO_UNREACHABLE;
             }
@@ -4363,17 +4285,16 @@ private:
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
         auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
 
-        optimizer::ABTVector checkNullArg;
+        abt::ABTVector checkNullArg;
         checkNullArg.push_back(generateABTNullMissingOrUndefined(startDateName));
         checkNullArg.push_back(generateABTNullMissingOrUndefined(unitName));
         checkNullArg.push_back(generateABTNullMissingOrUndefined(origAmountName));
         checkNullArg.push_back(generateABTNullMissingOrUndefined(tzName));
 
-        auto checkNullAnyArgument =
-            makeBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
+        auto checkNullAnyArgument = makeBooleanOpTree(abt::Operations::Or, std::move(checkNullArg));
 
         auto dateAddExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
-            {ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+            {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
              ABTCaseValuePair{generateABTNonStringCheck(tzName),
                               makeABTFail(ErrorCodes::Error{7157902},
                                           str::stream()
@@ -4386,7 +4307,7 @@ private:
              ABTCaseValuePair{
                  makeNot(makeABTFunction("typeMatch",
                                          makeVariable(startDateName),
-                                         optimizer::Constant::int32(dateTypeMask()))),
+                                         abt::Constant::int32(dateTypeMask()))),
                  makeABTFail(ErrorCodes::Error{7157904},
                              str::stream() << "$" << dateExprName
                                            << " must have startDate argument convertable to date")},
@@ -4415,11 +4336,11 @@ private:
                          std::move(origAmountName),
                          std::move(tzName),
                          std::move(amountName)},
-                        optimizer::makeSeq(std::move(startDateExpr),
-                                           std::move(unitExpr),
-                                           std::move(amountExpr),
-                                           std::move(timezoneExpr),
-                                           std::move(convertedAmountInt64)),
+                        abt::makeSeq(std::move(startDateExpr),
+                                     std::move(unitExpr),
+                                     std::move(amountExpr),
+                                     std::move(timezoneExpr),
+                                     std::move(convertedAmountInt64)),
                         std::move(dateAddExpr)));
     }
 
@@ -4432,8 +4353,8 @@ private:
     }
 
 private:
-    void pushABT(optimizer::ABT abt) {
-        _context->pushExpr(abt::wrap(std::move(abt)));
+    void pushABT(abt::ABT abt) {
+        _context->pushExpr(wrap(std::move(abt)));
     }
 
     ExpressionVisitorContext* _context;
@@ -4563,19 +4484,19 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
     auto comparisonOperator = [op]() {
         switch (op) {
             case ExpressionCompare::CmpOp::EQ:
-                return optimizer::Operations::Eq;
+                return abt::Operations::Eq;
             case ExpressionCompare::CmpOp::NE:
-                return optimizer::Operations::Neq;
+                return abt::Operations::Neq;
             case ExpressionCompare::CmpOp::GT:
-                return optimizer::Operations::Gt;
+                return abt::Operations::Gt;
             case ExpressionCompare::CmpOp::GTE:
-                return optimizer::Operations::Gte;
+                return abt::Operations::Gte;
             case ExpressionCompare::CmpOp::LT:
-                return optimizer::Operations::Lt;
+                return abt::Operations::Lt;
             case ExpressionCompare::CmpOp::LTE:
-                return optimizer::Operations::Lte;
+                return abt::Operations::Lte;
             case ExpressionCompare::CmpOp::CMP:
-                return optimizer::Operations::Cmp3w;
+                return abt::Operations::Cmp3w;
         }
         MONGO_UNREACHABLE;
     }();
@@ -4583,9 +4504,9 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
     // We use the "cmp3w" primitive for every comparison, because it "type brackets" its
     // comparisons (for example, a number will always compare as less than a string). The
     // other comparison primitives are designed for comparing values of the same type.
-    auto cmp3w = b.makeBinaryOp(optimizer::Operations::Cmp3w, lhsVar, rhsVar);
+    auto cmp3w = b.makeBinaryOp(abt::Operations::Cmp3w, lhsVar, rhsVar);
 
-    auto cmp = (comparisonOperator == optimizer::Operations::Cmp3w)
+    auto cmp = (comparisonOperator == abt::Operations::Cmp3w)
         ? std::move(cmp3w)
         : b.makeBinaryOp(comparisonOperator, std::move(cmp3w), b.makeInt32Constant(0));
 
@@ -4598,7 +4519,7 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
     auto generateExists = [&](SbLocalVar var) {
         auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::Undefined));
         return b.makeBinaryOp(
-            optimizer::Operations::And,
+            abt::Operations::And,
             b.makeFunction("exists"_sd, var),
             b.makeFunction("typeMatch"_sd, var, b.makeInt32Constant(~undefinedTypeMask)));
     };

@@ -35,12 +35,12 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/overloaded_visitor.h"
 
-namespace mongo::optimizer::algebra {
+namespace mongo::algebra {
 
 namespace {
 
@@ -729,4 +729,4 @@ TEST(TreeCursorTest, CursorTypes) {
 }
 
 }  // namespace
-}  // namespace mongo::optimizer::algebra
+}  // namespace mongo::algebra

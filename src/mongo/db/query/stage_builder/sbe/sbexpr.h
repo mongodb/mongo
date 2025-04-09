@@ -33,8 +33,8 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 
@@ -55,7 +55,7 @@ class SbExpr;
  */
 class PrefixId {
     using IdType = uint64_t;
-    using PrefixMapType = optimizer::opt::unordered_map<std::string, IdType>;
+    using PrefixMapType = abt::opt::unordered_map<std::string, IdType>;
 
 public:
     static PrefixId create(const bool useDescriptiveVarNames) {
@@ -66,8 +66,8 @@ public:
     }
 
     template <size_t N>
-    optimizer::ProjectionName getNextId(const char (&prefix)[N]) {
-        return optimizer::ProjectionName{visit(
+    abt::ProjectionName getNextId(const char (&prefix)[N]) {
+        return abt::ProjectionName{visit(
             [&]<typename T>(T& v) -> std::string {
                 if constexpr (std::is_same_v<T, IdType>)
                     return fmt::format("p{}", v++);
@@ -95,28 +95,28 @@ private:
     std::variant<IdType, PrefixMapType> _ids;
 };
 
-optimizer::ProjectionName getABTVariableName(SbSlot s);
+abt::ProjectionName getABTVariableName(SbSlot s);
 
-optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slotId);
+abt::ProjectionName getABTVariableName(sbe::value::SlotId slotId);
 
-optimizer::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
+abt::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
-boost::optional<sbe::value::SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var);
+boost::optional<sbe::value::SlotId> getSbeVariableInfo(const abt::ProjectionName& var);
 
 boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getSbeLocalVariableInfo(
-    const optimizer::ProjectionName& var);
+    const abt::ProjectionName& var);
 
-optimizer::ABT makeABTVariable(SbSlot s);
+abt::ABT makeABTVariable(SbSlot s);
 
-optimizer::ABT makeABTVariable(sbe::value::SlotId slotId);
+abt::ABT makeABTVariable(sbe::value::SlotId slotId);
 
-using VariableTypes = stdx::
-    unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
+using VariableTypes =
+    stdx::unordered_map<abt::ProjectionName, TypeSignature, abt::ProjectionName::Hasher>;
 
 // Run constant folding on the provided ABT tree and return its type signature. If the type
 // information for the visible slots is available in the slotInfo argument, it is used to perform a
 // more precise type checking optimization. On return, the abt argument points to the modified tree.
-TypeSignature constantFold(optimizer::ABT& abt,
+TypeSignature constantFold(abt::ABT& abt,
                            StageBuilderState& state,
                            const VariableTypes* slotInfo = nullptr);
 
@@ -266,8 +266,7 @@ public:
     SbVar(const sbe::EVariable& var, boost::optional<TypeSignature> typeSig = boost::none)
         : _frameId(var.getFrameId()), _slotId(var.getSlotId()), _typeSig(typeSig) {}
 
-    SbVar(const optimizer::ProjectionName& name,
-          boost::optional<TypeSignature> typeSig = boost::none);
+    SbVar(const abt::ProjectionName& name, boost::optional<TypeSignature> typeSig = boost::none);
 
     SbVar(SbSlot s) : _slotId(s.getId()), _typeSig(s.getTypeSignature()) {}
 
@@ -313,11 +312,11 @@ public:
         return SbLocalVar{*_frameId, _slotId, getTypeSignature()};
     }
 
-    optimizer::ProjectionName getABTName() const {
+    abt::ProjectionName getABTName() const {
         return _frameId ? getABTLocalVariableName(*_frameId, _slotId) : getABTVariableName(_slotId);
     }
 
-    operator optimizer::ProjectionName() const {
+    operator abt::ProjectionName() const {
         return getABTName();
     }
 
@@ -361,10 +360,10 @@ public:
     using LocalVarInfo = std::pair<int32_t, int32_t>;
 
     struct Abt {
-        abt::HolderPtr ptr;
+        HolderPtr ptr;
     };
     struct OptimizedAbt {
-        abt::HolderPtr ptr;
+        HolderPtr ptr;
     };
 
     /**
@@ -422,9 +421,9 @@ public:
 
     SbExpr(boost::optional<SbVar> var) : SbExpr(var ? SbExpr{*var} : SbExpr{}) {}
 
-    SbExpr(const abt::HolderPtr& a, boost::optional<TypeSignature> typeSig = boost::none);
+    SbExpr(const HolderPtr& a, boost::optional<TypeSignature> typeSig = boost::none);
 
-    SbExpr(abt::HolderPtr&& a, boost::optional<TypeSignature> typeSig = boost::none) noexcept;
+    SbExpr(HolderPtr&& a, boost::optional<TypeSignature> typeSig = boost::none) noexcept;
 
     SbExpr(Abt a, boost::optional<TypeSignature> typeSig = boost::none) noexcept;
 
@@ -480,9 +479,9 @@ public:
         return *this;
     }
 
-    SbExpr& operator=(const abt::HolderPtr& a);
+    SbExpr& operator=(const HolderPtr& a);
 
-    SbExpr& operator=(abt::HolderPtr&& a) noexcept;
+    SbExpr& operator=(HolderPtr&& a) noexcept;
 
     SbExpr& operator=(Abt a) noexcept;
 
@@ -532,7 +531,7 @@ public:
      * As its name suggests, extractABT() should be treated like a "move-from" style operation
      * that leaves 'this' in a valid but indeterminate state.
      */
-    abt::HolderPtr extractABT();
+    HolderPtr extractABT();
 
     bool hasTypeSignature() const {
         return _typeSig.has_value();
@@ -574,13 +573,13 @@ private:
         return holds_alternative<Abt>(_storage) || holds_alternative<OptimizedAbt>(_storage);
     }
 
-    const abt::HolderPtr& getAbtInternal() const {
+    const HolderPtr& getAbtInternal() const {
         tassert(8455819, "Expected ABT expression", holdsAbtInternal());
         return holds_alternative<Abt>(_storage) ? get<Abt>(_storage).ptr
                                                 : get<OptimizedAbt>(_storage).ptr;
     }
 
-    abt::HolderPtr& getAbtInternal() {
+    HolderPtr& getAbtInternal() {
         tassert(8455820, "Expected ABT expression", holdsAbtInternal());
         return holds_alternative<Abt>(_storage) ? get<Abt>(_storage).ptr
                                                 : get<OptimizedAbt>(_storage).ptr;

@@ -32,7 +32,7 @@
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 #define PATHSYNTAX_OPNAMES(F)                                                                      \
     /* Binary Operations */                                                                        \
@@ -125,4 +125,4 @@ inline constexpr Operations flipComparisonOp(Operations op) {
             MONGO_UNREACHABLE;
     }
 }
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt

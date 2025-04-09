@@ -154,12 +154,12 @@ public:
     SbExpr makeNot(SbExpr e);
 
     SbExpr makeUnaryOp(sbe::EPrimUnary::Op unaryOp, SbExpr e);
-    SbExpr makeUnaryOp(optimizer::Operations unaryOp, SbExpr e);
+    SbExpr makeUnaryOp(abt::Operations unaryOp, SbExpr e);
 
     SbExpr makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, SbExpr rhs);
-    SbExpr makeBinaryOp(optimizer::Operations binaryOp, SbExpr lhs, SbExpr rhs);
+    SbExpr makeBinaryOp(abt::Operations binaryOp, SbExpr lhs, SbExpr rhs);
 
-    SbExpr makeNaryOp(optimizer::Operations naryOp, SbExpr::Vector args);
+    SbExpr makeNaryOp(abt::Operations naryOp, SbExpr::Vector args);
 
     SbExpr makeConstant(sbe::value::TypeTags tag, sbe::value::Value val);
     SbExpr makeNothingConstant();
@@ -244,13 +244,13 @@ public:
     /**
      * Creates a boolean expression tree from given collection of leaf expression.
      */
-    SbExpr makeBooleanOpTree(optimizer::Operations logicOp, SbExpr lhs, SbExpr rhs) {
+    SbExpr makeBooleanOpTree(abt::Operations logicOp, SbExpr lhs, SbExpr rhs) {
         SbExpr::Vector leaves;
         leaves.emplace_back(std::move(lhs));
         leaves.emplace_back(std::move(rhs));
         return stage_builder::makeBooleanOpTree(logicOp, std::move(leaves), _state);
     }
-    SbExpr makeBooleanOpTree(optimizer::Operations logicOp, SbExpr::Vector leaves) {
+    SbExpr makeBooleanOpTree(abt::Operations logicOp, SbExpr::Vector leaves) {
         return stage_builder::makeBooleanOpTree(logicOp, std::move(leaves), _state);
     }
 

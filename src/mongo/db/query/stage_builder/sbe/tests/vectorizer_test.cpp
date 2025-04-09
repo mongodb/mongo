@@ -33,9 +33,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
@@ -45,7 +45,7 @@
 namespace mongo::stage_builder {
 namespace {
 
-using namespace optimizer;
+using namespace abt;
 
 TEST(VectorizerTest, ConvertDateTrunc) {
     auto tree = make<FunctionCall>("dateTrunc",
@@ -3470,7 +3470,7 @@ TEST(VectorizerTest, ConvertMixedScalarIf) {
 
 TEST(VectorizerTest, ConvertProjection) {
     auto tree1 = make<BinaryOp>(
-        Operations::FillEmpty, make<Variable>("inputVar"), optimizer::Constant::emptyObject());
+        Operations::FillEmpty, make<Variable>("inputVar"), abt::Constant::emptyObject());
 
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;

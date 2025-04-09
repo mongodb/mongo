@@ -33,8 +33,8 @@
 #include <list>
 #include <utility>
 
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -58,14 +58,14 @@ public:
     // In case of mismatch, throw an error; in case the node is a type checking function, check if
     // it can be answered on the basis of the type information of its inputs, and replace the node
     // with the one representing its result.
-    TypeSignature typeCheck(optimizer::ABT& node);
+    TypeSignature typeCheck(abt::ABT& node);
 
     // Retrieve the type of a variable from the information collected so far.
-    boost::optional<TypeSignature> getInferredType(optimizer::ProjectionName variable);
+    boost::optional<TypeSignature> getInferredType(abt::ProjectionName variable);
 
     // Associate a type to a variable. If the new type is not a subset of the existing one, throw an
     // error.
-    void bind(optimizer::ProjectionName variable, TypeSignature type);
+    void bind(abt::ProjectionName variable, TypeSignature type);
 
     // Create a local scope where ABT variables can be temporarily assigned to a stricter type
     // definition.
@@ -74,56 +74,52 @@ public:
     void exitLocalBinding();
 
     template <typename T, size_t... I>
-    void visitChildren(optimizer::ABT& n, T&& op, std::index_sequence<I...>) {
+    void visitChildren(abt::ABT& n, T&& op, std::index_sequence<I...>) {
         (op.template get<I>().visit(*this, false), ...);
     }
 
     // The default visitor for types we don't have special type checking rules.
     template <int Arity>
-    TypeSignature operator()(optimizer::ABT& n,
-                             optimizer::ABTOpFixedArity<Arity>& op,
-                             bool saveInference) {
+    TypeSignature operator()(abt::ABT& n, abt::ABTOpFixedArity<Arity>& op, bool saveInference) {
         visitChildren(n, op, std::make_index_sequence<Arity>{});
         return TypeSignature::kAnyScalarType;
     }
 
-    TypeSignature operator()(optimizer::ABT& node, optimizer::Constant& value, bool saveInference);
-    TypeSignature operator()(optimizer::ABT& n, optimizer::Variable& var, bool saveInference);
+    TypeSignature operator()(abt::ABT& node, abt::Constant& value, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::Variable& var, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n,
-                             optimizer::LambdaAbstraction& lambda,
-                             bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::LambdaAbstraction& lambda, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::Let& let, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::Let& let, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::MultiLet& let, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::MultiLet& let, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::UnaryOp& op, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::UnaryOp& op, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::BinaryOp& op, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::BinaryOp& op, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::NaryOp& op, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::NaryOp& op, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::FunctionCall& op, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::FunctionCall& op, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::If& op, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::If& op, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n, optimizer::Switch& op, bool saveInference);
+    TypeSignature operator()(abt::ABT& n, abt::Switch& op, bool saveInference);
 
     bool modified() const {
         return _changed;
     }
 
 private:
-    using VariableTypes = stdx::
-        unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
+    using VariableTypes =
+        stdx::unordered_map<abt::ProjectionName, TypeSignature, abt::ProjectionName::Hasher>;
     using BindingsType = std::list<VariableTypes>;
 
     // Helper function that manipulates the tree.
-    void swapAndUpdate(optimizer::ABT& n, optimizer::ABT newN);
+    void swapAndUpdate(abt::ABT& n, abt::ABT newN);
 
     // Helper function used to implement isNumber, isString, etc..
-    TypeSignature evaluateTypeTest(optimizer::ABT& n,
+    TypeSignature evaluateTypeTest(abt::ABT& n,
                                    TypeSignature argSignature,
                                    TypeSignature typeToCheck);
 

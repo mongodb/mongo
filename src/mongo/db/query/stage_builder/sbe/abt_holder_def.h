@@ -30,7 +30,7 @@
 #pragma once
 
 
-namespace mongo::stage_builder::abt {
+namespace mongo::stage_builder {
 
 /**
  * Forward declaration for ABT Holder. Only include from header files.
@@ -43,4 +43,4 @@ struct HolderDeleter {
 
 using HolderPtr = std::unique_ptr<Holder, HolderDeleter>;
 
-}  // namespace mongo::stage_builder::abt
+}  // namespace mongo::stage_builder

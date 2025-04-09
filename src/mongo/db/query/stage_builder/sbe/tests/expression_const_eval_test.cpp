@@ -34,9 +34,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
-#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
@@ -49,9 +49,9 @@
 namespace mongo::stage_builder {
 namespace {
 
-using namespace optimizer;
-using namespace abt::unit_test_abt_literals;
-using namespace mongo::stage_builder::abt;
+using namespace abt;
+using namespace abt_lower::unit_test_abt_literals;
+using namespace mongo::stage_builder::abt_lower;
 
 class AbtToSbeExpression : public sbe::EExpressionTestFixture {
 public:

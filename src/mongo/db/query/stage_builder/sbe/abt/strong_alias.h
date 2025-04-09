@@ -32,7 +32,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-namespace mongo::optimizer {
+namespace mongo::abt {
 
 /**
  * Strong string alias. It is used to provide strong type safety between various string types in the
@@ -271,4 +271,4 @@ constexpr StrongDoubleAlias<T> operator*(const double v1, StrongDoubleAlias<T> v
     return v2 * v1;
 }
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::abt
