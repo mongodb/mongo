@@ -61,6 +61,7 @@
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/crypto/fle_util.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/mongocrypt_definitions.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_crypto.h"
@@ -996,9 +997,10 @@ public:
      *
      * HMAC(EDCTwiceDerivedToken, count)
      */
-    static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
+    static PrfBlock generateTag(HmacContext* obj,
+                                EDCTwiceDerivedToken edcTwiceDerived,
+                                FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
-    static PrfBlock generateTag(const FLEEdgeToken& token, FLECounter count);
     static std::vector<PrfBlock> generateTags(const EDCServerPayloadInfo& rangePayload);
     static std::vector<PrfBlock> generateTagsForTextSearch(const EDCServerPayloadInfo& textPayload);
 
@@ -1284,9 +1286,9 @@ public:
     /**
      * Compute HMAC-SHA-256
      */
-    static PrfBlock prf(ConstDataRange key, ConstDataRange cdr);
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr);
 
-    static PrfBlock prf(ConstDataRange key, uint64_t value);
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value);
 
     /**
      * Decrypt AES-256-CTR encrypted data. Exposed for benchmarking purposes.
