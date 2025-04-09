@@ -109,8 +109,6 @@ private:
     // a document to return, a StageState code, or a Status representing an error.
     using MockResult = std::variant<WorkingSetID, PlanStage::StageState, Status>;
 
-    WorkingSet* _ws;
-
     std::queue<MockResult> _results;
 
     MockStats _specificStats;

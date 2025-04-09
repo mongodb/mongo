@@ -1205,7 +1205,7 @@ private:
  */
 class MatchExpressionInVisitor final : public MatchExpressionConstVisitor {
 public:
-    MatchExpressionInVisitor(MatchExpressionVisitorContext* context) : _context(context) {}
+    MatchExpressionInVisitor(MatchExpressionVisitorContext*) {}
 
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
@@ -1265,9 +1265,6 @@ public:
     void visit(const TypeMatchExpression* expr) final {}
     void visit(const WhereMatchExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
-
-private:
-    MatchExpressionVisitorContext* _context;
 };
 }  // namespace
 

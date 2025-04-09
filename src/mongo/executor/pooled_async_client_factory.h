@@ -169,7 +169,6 @@ private:
     };
 
     std::string _name;
-    transport::TransportLayer* _tl = nullptr;
     ConnectionPool::Options _poolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::shared_ptr<ConnectionPool> _pool;

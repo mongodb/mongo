@@ -287,7 +287,6 @@ private:
                              const ClusteredIndexSpec& indexSpec,
                              const CollatorInterface* collator);
 
-    OperationContext* _opCtx;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
     md5_state_t _state;
 

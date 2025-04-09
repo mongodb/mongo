@@ -590,7 +590,6 @@ public:
             numResults = exec->getNextBatch(
                 batchSize,
                 FindCommon::BSONObjCursorAppender{true /* alwaysAcceptFirstDoc */,
-                                                  exec,
                                                   &firstBatch,
                                                   &docUnitsReturned,
                                                   pbrt,

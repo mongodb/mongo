@@ -70,8 +70,6 @@ public:
     static const char* kStageType;
 
 private:
-    WorkingSet* _ws;
-
     // We only return this many results.
     long long _numToReturn;
 

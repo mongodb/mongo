@@ -134,8 +134,6 @@ private:
 
     StorageInterface* const _storageInterface;
 
-    ReplicationConsistencyMarkers* const _consistencyMarkers;
-
     std::unique_ptr<OplogWriter> _oplogWriter;
 
 protected:

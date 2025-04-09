@@ -147,8 +147,7 @@ public:
     IndexKeysObjectsGenerator(ExpressionContext* expCtx,
                               const BSONObj& docObj,
                               IndexDescriptor* indexDescriptor)
-        : _expCtx{expCtx},
-          _docObj{docObj},
+        : _docObj{docObj},
           _indexDescriptor{indexDescriptor},
           _fieldNames{indexDescriptor->getFieldNames()} {
         // Validate the key pattern to ensure that the field ordering is ascending.
@@ -415,9 +414,6 @@ private:
 
         return Value{keysArrayBuilder};
     }
-
-    // An existing expression context.
-    const ExpressionContext* const _expCtx;
 
     // The document for which the key strings should be generated.
     const BSONObj& _docObj;

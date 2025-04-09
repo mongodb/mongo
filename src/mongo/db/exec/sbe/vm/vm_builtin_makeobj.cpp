@@ -39,8 +39,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeObj(ArityTyp
             arity >= 2);
 
     const int argsStackOff = 2;
-    const uint32_t numArgs = arity - 2;
-    const auto impl = MakeObjImpl{*this, argsStackOff, numArgs, code};
+    const auto impl = MakeObjImpl{*this, argsStackOff, code};
 
     return impl.makeObj<ObjectWriter, ArrayWriter>();
 }

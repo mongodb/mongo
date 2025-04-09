@@ -369,7 +369,7 @@ PlanExecutorExpress<Plan>::PlanExecutorExpress(
       _cq(std::move(cq)),
       _nss(express::accessCollection(collection).ns()),
       _commonStats("EXPRESS"),
-      _planExplainer(&_commonStats, &_planStats, &_iteratorStats, &_writeOperationStats),
+      _planExplainer(&_planStats, &_iteratorStats, &_writeOperationStats),
       _plan(std::move(plan)),
       _mustReturnOwnedBson(returnOwnedBson) {
     _plan.open(

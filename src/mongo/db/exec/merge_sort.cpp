@@ -54,7 +54,6 @@ MergeSortStage::MergeSortStage(ExpressionContext* expCtx,
     : PlanStage(kStageType, expCtx),
       _ws(ws),
       _pattern(params.pattern),
-      _collator(params.collator),
       _dedup(params.dedup),
       _recordIdDeduplicator(expCtx),
       _merging(StageWithValueComparison(ws, params.pattern, params.collator)) {}

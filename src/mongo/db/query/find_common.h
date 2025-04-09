@@ -125,13 +125,11 @@ public:
     class BSONObjCursorAppender {
     public:
         BSONObjCursorAppender(const bool alwaysAcceptFirstDoc,
-                              PlanExecutor* exec,
                               CursorResponseBuilder* builder,
                               ResourceConsumption::DocumentUnitCounter* docUnitsReturned,
                               BSONObj& pbrt,
                               bool& failedToAppend)
             : _alwaysAcceptFirstDoc{alwaysAcceptFirstDoc},
-              _exec{exec},
               _builder{builder},
               _docUnitsReturned{docUnitsReturned},
               _pbrt{pbrt},
@@ -168,7 +166,6 @@ public:
     private:
         // State not owned by us.
         const bool _alwaysAcceptFirstDoc;
-        PlanExecutor* _exec;
         CursorResponseBuilder* _builder;
         ResourceConsumption::DocumentUnitCounter* _docUnitsReturned;
         BSONObj& _pbrt;

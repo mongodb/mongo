@@ -397,8 +397,7 @@ DbCheckHasher::DbCheckHasher(
     int64_t maxCount,
     int64_t maxBytes,
     Date_t deadlineOnSecondary)
-    : _opCtx(opCtx),
-      _maxKey(end),
+    : _maxKey(end),
       _indexName(indexName),
       _maxCount(maxCount),
       _maxBytes(maxBytes),

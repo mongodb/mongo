@@ -84,9 +84,6 @@ public:
     static const char* kStageType;
 
 private:
-    // We don't own this.
-    WorkingSet* _ws;
-
     // The data we return.
     std::queue<WorkingSetID> _members;
 

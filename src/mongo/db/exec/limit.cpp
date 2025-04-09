@@ -42,9 +42,9 @@ const char* LimitStage::kStageType = "LIMIT";
 
 LimitStage::LimitStage(ExpressionContext* expCtx,
                        long long limit,
-                       WorkingSet* ws,
+                       WorkingSet*,
                        std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType, expCtx), _ws(ws), _numToReturn(limit) {
+    : PlanStage(kStageType, expCtx), _numToReturn(limit) {
     _specificStats.limit = _numToReturn;
     _children.emplace_back(std::move(child));
 }

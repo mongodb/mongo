@@ -81,10 +81,9 @@ private:
     void addIntegerData(T number);
 
     md5_state_t _md5State;
-    HashSeed _seed;
 };
 
-Hasher::Hasher(HashSeed seed) : _seed(seed) {
+Hasher::Hasher(HashSeed seed) {
     md5_init_state(&_md5State);
     addSeed(seed);
 }

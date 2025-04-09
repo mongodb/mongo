@@ -1457,9 +1457,8 @@ class ByteCode::MakeObjImplBase {
 public:
     MONGO_COMPILER_ALWAYS_INLINE MakeObjImplBase(ByteCode& bc,
                                                  int argsStackOffset,
-                                                 uint32_t numArgs,
                                                  const CodeFragment* code)
-        : bc(bc), argsStackOffset(argsStackOffset), numArgs(numArgs), code(code) {}
+        : bc(bc), argsStackOffset(argsStackOffset), code(code) {}
 
 protected:
     MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> getSpec() const {
@@ -1496,7 +1495,6 @@ protected:
 private:
     ByteCode& bc;
     const int argsStackOffset;
-    const uint32_t numArgs;
     const CodeFragment* const code;
 };
 

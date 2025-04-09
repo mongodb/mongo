@@ -50,10 +50,8 @@ namespace mongo {
 
 class AlwaysBooleanMatchExpression : public MatchExpression {
 public:
-    AlwaysBooleanMatchExpression(MatchType type,
-                                 bool value,
-                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : MatchExpression(type, std::move(annotation)), _value(value) {}
+    AlwaysBooleanMatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(type, std::move(annotation)) {}
 
     ~AlwaysBooleanMatchExpression() override = default;
 
@@ -104,8 +102,6 @@ private:
             return expression;
         };
     }
-
-    bool _value;
 };
 
 class AlwaysFalseMatchExpression final : public AlwaysBooleanMatchExpression {
@@ -113,7 +109,7 @@ public:
     static constexpr StringData kName = "$alwaysFalse"_sd;
 
     AlwaysFalseMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, false, std::move(annotation)) {}
+        : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -141,7 +137,7 @@ public:
     static constexpr StringData kName = "$alwaysTrue"_sd;
 
     AlwaysTrueMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, true, std::move(annotation)) {}
+        : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;

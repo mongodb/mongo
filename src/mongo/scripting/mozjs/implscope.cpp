@@ -560,7 +560,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _generation(0),
       _requireOwnedObjects(false),
       _hasOutOfMemoryException(false),
-      _inReportError(false),
       _binDataProto(_context),
       _bsonProto(_context),
       _codeProto(_context),

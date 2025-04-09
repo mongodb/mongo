@@ -118,10 +118,6 @@ private:
     // The pattern that we're sorting by.
     BSONObj _pattern;
 
-    // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
-    // represents the collator used to compare strings.
-    const CollatorInterface* _collator;
-
     // Are we deduplicating on RecordId?
     const bool _dedup;
 

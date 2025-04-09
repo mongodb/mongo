@@ -38,8 +38,8 @@ using std::unique_ptr;
 
 const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
-QueuedDataStage::QueuedDataStage(ExpressionContext* expCtx, WorkingSet* ws)
-    : PlanStage(kStageType, expCtx), _ws(ws) {}
+QueuedDataStage::QueuedDataStage(ExpressionContext* expCtx, WorkingSet*)
+    : PlanStage(kStageType, expCtx) {}
 
 PlanStage::StageState QueuedDataStage::doWork(WorkingSetID* out) {
     if (isEOF()) {

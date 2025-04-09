@@ -192,12 +192,10 @@ private:
  */
 class PlanExplainerExpress final : public PlanExplainer {
 public:
-    PlanExplainerExpress(const mongo::CommonStats* stats,
-                         const express::PlanStats* planStats,
+    PlanExplainerExpress(const express::PlanStats* planStats,
                          const express::IteratorStats* iteratorStats,
                          const express::WriteOperationStats* writeOperationStats)
-        : _stats(stats),
-          _planStats(planStats),
+        : _planStats(planStats),
           _iteratorStats(iteratorStats),
           _writeOperationStats(writeOperationStats) {}
 
@@ -226,7 +224,6 @@ public:
     }
 
 private:
-    const mongo::CommonStats* _stats;
     const express::PlanStats* _planStats;
     const express::IteratorStats* _iteratorStats;
     const express::WriteOperationStats* _writeOperationStats;

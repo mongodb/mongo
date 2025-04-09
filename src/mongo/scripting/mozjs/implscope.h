@@ -541,8 +541,6 @@ private:
     std::string _baseURL;
     bool _hasOutOfMemoryException;
 
-    bool _inReportError;
-
     std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
     // _promiseResult must be a persistentRootedValue (instead of a simple RootedValue). Using a
