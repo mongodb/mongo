@@ -56,26 +56,96 @@ function setup() {
     }
 }
 
-// Check that there are no cursors still open on the source collection. If any are found, the
-// test will fail and print a list of idle cursors. This should be called each time we
-// expect a cursor to have been destroyed.
-function assertNoOpenCursorsOnSourceCollection() {
+function assertNoOpenCursorsOnCollection(collectionName) {
     const cursors = testDB.getSiblingDB("admin")
                         .aggregate([
                             {"$currentOp": {"idleCursors": true}},
                             {
-                                "$match": {ns: sourceCollection.getFullName(), "type": "idleCursor"}
+                                "$match": {ns: collectionName, "type": "idleCursor"}
 
                             }
                         ])
                         .toArray();
-    assert.eq(
-        cursors.length, 0, "Did not expect to find any cursors, but found " + tojson(cursors));
+    assert.eq(cursors.length,
+              0,
+              `Did not expect to find any cursors on collection "${collectionName}", but found ${
+                  tojson(cursors)}`);
+}
+
+// Check that there are no cursors still open on the source collection. If any are found, the
+// test will fail and print a list of idle cursors. This should be called each time we
+// expect a cursor to have been destroyed.
+function assertNoOpenCursorsOnSourceCollection() {
+    assertNoOpenCursorsOnCollection(sourceCollection.getFullName());
 }
 
 const defaultAggregateCmdSmallBatch = {
     aggregate: sourceCollection.getName(),
     pipeline: [],
+    cursor: {
+        batchSize: batchSize,
+    },
+};
+
+const aggregateAndSortCmdSmallBatch = {
+    aggregate: sourceCollection.getName(),
+    pipeline: [{$_internalInhibitOptimization: {}}, {$sort: {x: 1}}],
+    cursor: {
+        batchSize: batchSize,
+    },
+};
+
+const aggregateAndLookupCmdSmallBatch = {
+    aggregate: sourceCollection.getName(),
+    pipeline: [
+        {
+            $lookup: {
+                from: foreignCollection.getName(),
+                localField: 'local',
+                foreignField: 'foreign',
+                pipeline: [{$project: {a: 1}}],
+                as: 'results',
+            }
+        },
+    ],
+    cursor: {
+        batchSize: batchSize,
+    },
+};
+
+const aggregateAndLookupAndUnwindCmdSmallBatch = {
+    aggregate: sourceCollection.getName(),
+    pipeline: [
+        {
+            $lookup: {
+                from: foreignCollection.getName(),
+                localField: 'local',
+                foreignField: 'foreign',
+                as: 'results',
+            }
+        },
+        // Use an $unwind stage to allow the $lookup stage to return some but not all of the
+        // results for a single lookup.
+        {$unwind: '$results'},
+    ],
+    cursor: {
+        batchSize: batchSize,
+    },
+};
+
+const aggregateAndGraphLookupCmdSmallBatch = {
+    aggregate: sourceCollection.getName(),
+    pipeline: [
+        {
+            $graphLookup: {
+                from: foreignCollection.getName(),
+                startWith: '$local',
+                connectFromField: '_id',
+                connectToField: 'foreign',
+                as: 'results',
+            }
+        },
+    ],
     cursor: {
         batchSize: batchSize,
     },
@@ -105,13 +175,7 @@ assertNoOpenCursorsOnSourceCollection();
 // The test expects that the $sort will execute in the agg layer, and will not be pushed down into
 // the PlanStage layer. We add an $_internalInhibitOptimization stage to enforce this.
 setup();
-res = assert.commandWorked(testDB.runCommand({
-    aggregate: sourceCollection.getName(),
-    pipeline: [{$_internalInhibitOptimization: {}}, {$sort: {x: 1}}],
-    cursor: {
-        batchSize: batchSize,
-    },
-}));
+res = assert.commandWorked(testDB.runCommand(aggregateAndSortCmdSmallBatch));
 
 sourceCollection.drop();
 
@@ -123,23 +187,7 @@ assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: getM
 // results from the foreign collection. It will instead return no matches for subsequent
 // lookups, as if the foreign collection was empty.
 setup();
-res = assert.commandWorked(testDB.runCommand({
-        aggregate: sourceCollection.getName(),
-        pipeline: [
-            {
-              $lookup: {
-                  from: foreignCollection.getName(),
-                  localField: 'local',
-                  foreignField: 'foreign',
-                  pipeline: [{$project: {a: 1}}],
-                  as: 'results',
-              }
-            },
-        ],
-        cursor: {
-            batchSize: batchSize,
-        },
-    }));
+res = assert.commandWorked(testDB.runCommand(aggregateAndLookupCmdSmallBatch));
 
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
@@ -154,25 +202,7 @@ assertNoOpenCursorsOnSourceCollection();
 // batches of a single lookup. This is the same scenario as above, but with the $lookup stage
 // left in a state where it has returned some but not all of the matches for a single lookup.
 setup();
-res = assert.commandWorked(testDB.runCommand({
-        aggregate: sourceCollection.getName(),
-        pipeline: [
-            {
-              $lookup: {
-                  from: foreignCollection.getName(),
-                  localField: 'local',
-                  foreignField: 'foreign',
-                  as: 'results',
-              }
-            },
-            // Use an $unwind stage to allow the $lookup stage to return some but not all of the
-            // results for a single lookup.
-            {$unwind: '$results'},
-        ],
-        cursor: {
-            batchSize: batchSize,
-        },
-    }));
+res = assert.commandWorked(testDB.runCommand(aggregateAndLookupAndUnwindCmdSmallBatch));
 
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
@@ -189,23 +219,7 @@ assertNoOpenCursorsOnSourceCollection();
 // fetch more results from the foreign collection. It will instead return no matches for
 // subsequent lookups, as if the foreign collection was empty.
 setup();
-res = assert.commandWorked(testDB.runCommand({
-        aggregate: sourceCollection.getName(),
-        pipeline: [
-            {
-              $graphLookup: {
-                  from: foreignCollection.getName(),
-                  startWith: '$local',
-                  connectFromField: '_id',
-                  connectToField: 'foreign',
-                  as: 'results',
-              }
-            },
-        ],
-        cursor: {
-            batchSize: batchSize,
-        },
-    }));
+res = assert.commandWorked(testDB.runCommand(aggregateAndGraphLookupCmdSmallBatch));
 
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
@@ -215,6 +229,124 @@ assert.commandWorked(res,
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
+
+setup();
+
+// 'DocumentSourceCursor' is only available in classic engine.
+const originalFrameworkControl =
+    assert
+        .commandWorked(testDB.adminCommand(
+            {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}))
+        .was;
+
+// How many WriteConflict errors we are expecting at least. Note that the failure point in this test
+// is triggered randomly, so even with 1000 max iterations we cannot make this number really high.
+const expectedToFailAtLeast = 10;
+// Test with different pipeline commands while we make the storage engine randmoly throw
+// WriteConflict errors upon reading. This ensures that the cleanup procedure of
+// 'DocumentSourceCursor' works properly.
+try {
+    [[defaultAggregateCmdSmallBatch, 0],
+     [aggregateAndSortCmdSmallBatch, expectedToFailAtLeast],
+     [aggregateAndLookupCmdSmallBatch, expectedToFailAtLeast],
+     [aggregateAndLookupAndUnwindCmdSmallBatch, expectedToFailAtLeast],
+     [aggregateAndGraphLookupCmdSmallBatch, expectedToFailAtLeast]]
+        .forEach(([cmd, expectedToFailAtLeast]) => {
+            // Verbosity levels for explain: 'null' here means no explain!
+            [null, "executionStats", "allPlansExecution"].forEach((verbosity) => {
+                // Set failure rate for 'WriteConflictExceptionForReads' faiure point to 15%. This
+                // should be enough to hit the failure point at least a few times during the test.
+                assert.commandWorked(testDB.adminCommand({
+                    configureFailPoint: 'WTWriteConflictExceptionForReads',
+                    mode: {activationProbability: 0.15}
+                }));
+
+                const runTest = (expectedToFailAtLeast, cb) => {
+                    let actualFailed = 0;
+                    if (expectedToFailAtLeast === 0) {
+                        cb();
+                    } else {
+                        for (let i = 0; i < 1000 && actualFailed < expectedToFailAtLeast; ++i) {
+                            try {
+                                cb();
+                            } catch (res) {
+                                assert.commandFailedWithCode(res, [ErrorCodes.WriteConflict]);
+                                actualFailed++;
+                            }
+                        }
+                    }
+                    return actualFailed;
+                };
+
+                const runExplainTest = (verbosity, cmd, expectedToFailAtLeast) => {
+                    const assertExplainWorked = (res) => {
+                        assert.commandWorked(res);
+                        assert.eq(cmd.aggregate,
+                                  res.command.aggregate,
+                                  "Unexpected explain response",
+                                  {cmd, res});
+                        assert.eq(cmd.pipeline,
+                                  res.command.pipeline,
+                                  "Unexpected explain response",
+                                  {cmd, res});
+                    };
+
+                    return runTest(expectedToFailAtLeast, () => {
+                        const res = testDB.runCommand({explain: cmd, verbosity});
+                        try {
+                            assertExplainWorked(res);
+                        } catch (err) {
+                            throw res;
+                        }
+                    });
+                };
+
+                const runAggregateTest = (cmd, expectedToFailAtLeast) => {
+                    return runTest(expectedToFailAtLeast, () => {
+                        let res = testDB.runCommand(cmd);
+                        try {
+                            assert.commandWorked(res);
+                            // Read the full cursor data using 'getMore' commands, so that we don't
+                            // leave any cursors open.
+                            while (res.cursor && res.cursor.id > 0) {
+                                getMoreCollName =
+                                    res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
+                                res = testDB.runCommand(
+                                    {getMore: res.cursor.id, collection: getMoreCollName});
+                                assert.commandWorked(res);
+                            }
+                        } catch (err) {
+                            throw res;
+                        }
+                    });
+                };
+
+                const actualFailed = verbosity
+                    ? runExplainTest(verbosity, cmd, expectedToFailAtLeast)
+                    : runAggregateTest(cmd, expectedToFailAtLeast);
+
+                assert.gte(actualFailed,
+                           expectedToFailAtLeast,
+                           `Expecting at least ${expectedToFailAtLeast} to have failed`);
+
+                // Turn off fail point.
+                const res = assert.commandWorked(testDB.adminCommand(
+                    {configureFailPoint: 'WTWriteConflictExceptionForReads', mode: 'off'}));
+                assert.gte(res.count,
+                           expectedToFailAtLeast,
+                           `Expecting failure point to have been hit at least ${
+                               expectedToFailAtLeast} times`);
+            });
+        });
+} finally {
+    // Restore original query framework used.
+    assert.commandWorked(testDB.adminCommand(
+        {setParameter: 1, internalQueryFrameworkControl: originalFrameworkControl}));
+}
+
+// Make sure the cursors were cleaned up.
+assertNoOpenCursorsOnSourceCollection();
+assertNoOpenCursorsOnCollection(foreignCollection.getFullName());
 
 // Test that the getMore still succeeds if the $graphLookup is followed by an $unwind on the
 // 'as' field and the collection is dropped between the initial request and a getMore.
