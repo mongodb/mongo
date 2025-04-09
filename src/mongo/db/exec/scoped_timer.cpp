@@ -29,47 +29,123 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/compiler.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-
 namespace mongo {
-ScopedTimer::ScopedTimer(Nanoseconds* counter, TickSource* ts)
-    : _counter(counter), _tickSource(ts), _clockSource(nullptr), _startTS(ts->getTicks()) {}
+
+class ScopedTimer::State {
+public:
+    virtual ~State() = default;
+};
+
+class ScopedTimer::CsState final : public State {
+public:
+    CsState(Nanoseconds* counter, ClockSource* cs) : counter{counter}, cs{cs}, start{cs->now()} {}
+    ~CsState() override {
+        *counter += cs->now() - start;
+    }
+
+private:
+    Nanoseconds* counter;
+    ClockSource* cs;
+    Date_t start;
+};
+
+class ScopedTimer::TsState final : public State {
+public:
+    TsState(Nanoseconds* counter, TickSource* ts)
+        : counter{counter}, ts{ts}, start{ts->getTicks()} {}
+    ~TsState() override {
+        *counter += ts->ticksTo<Nanoseconds>(ts->getTicks() - start);
+    }
+
+private:
+    Nanoseconds* counter;
+    TickSource* ts;
+    TickSource::Tick start;
+};
 
 ScopedTimer::ScopedTimer(Nanoseconds* counter, ClockSource* cs)
-    : _counter(counter), _tickSource(nullptr), _clockSource(cs), _startCS(cs->now()) {}
+    : _state{std::make_unique<CsState>(counter, cs)} {}
 
-ScopedTimer::~ScopedTimer() {
-    if (MONGO_likely(_clockSource)) {
-        *_counter += Nanoseconds{
-            (durationCount<Milliseconds>(_clockSource->now() - _startCS) * 1000 * 1000)};
-        return;
-    }
-    if (_tickSource) {
-        *_counter += _tickSource->ticksTo<Nanoseconds>(_tickSource->getTicks() - _startTS);
-    }
+ScopedTimer::ScopedTimer(Nanoseconds* counter, TickSource* ts)
+    : _state{std::make_unique<TsState>(counter, ts)} {}
+
+ScopedTimer::ScopedTimer() = default;
+ScopedTimer::ScopedTimer(ScopedTimer&&) noexcept = default;
+ScopedTimer& ScopedTimer::operator=(ScopedTimer&&) noexcept = default;
+ScopedTimer::~ScopedTimer() = default;
+
+namespace {
+
+/** C++23's `std::to_underlying`. */
+constexpr auto toUnderlying(auto e) {
+    return static_cast<std::underlying_type_t<decltype(e)>>(e);
 }
 
-TimeElapsedBuilderScopedTimer::TimeElapsedBuilderScopedTimer(ClockSource* clockSource,
-                                                             StringData description,
-                                                             BSONObjBuilder* builder)
-    : _clockSource(clockSource),
-      _description(description),
-      _beginTime(clockSource->now()),
-      _builder(builder) {}
+#define X(e) #e ""_sd,
+constexpr std::array sectionNames{MONGO_EXPAND_TIMED_SECTION_IDS(X)};
+#undef X
 
-TimeElapsedBuilderScopedTimer::~TimeElapsedBuilderScopedTimer() {
-    mongo::Milliseconds elapsedTime = _clockSource->now() - _beginTime;
-    _builder->append(_description, elapsedTime.toString());
+template <typename Dur>
+struct SectionNamesWithDurationSuffix {
+    static constexpr auto suffix = Dur::mongoUnitSuffix();
+
+    template <size_t idx>
+    static constexpr auto buf = [] {
+        constexpr auto name = sectionNames[idx];
+        std::array<char, name.size() + suffix.size()> buf;
+        auto pos = buf.begin();
+        pos = std::copy(name.begin(), name.end(), pos);
+        pos = std::copy(suffix.begin(), suffix.end(), pos);
+        return buf;
+    }();
+
+    static constexpr auto value = []<size_t... Is>(std::index_sequence<Is...>) {
+        return std::array{StringData{buf<Is>.data(), buf<Is>.size()}...};
+    }(std::make_index_sequence<sectionNames.size()>{});
+};
+
+template <typename Dur>
+constexpr StringData toStringWithDurationSuffix(TimedSectionId id) {
+    return SectionNamesWithDurationSuffix<Dur>::value[toUnderlying(id)];
 }
 
-boost::optional<TimeElapsedBuilderScopedTimer> createTimeElapsedBuilderScopedTimer(
-    ClockSource* clockSource, StringData description, BSONObjBuilder* builder) {
-    if (builder == nullptr) {
-        return boost::none;
+}  // namespace
+
+StringData toString(TimedSectionId id) {
+    return sectionNames[toUnderlying(id)];
+}
+
+class SectionScopedTimer::State {
+public:
+    State(BSONObjBuilder* builder, ClockSource* cs, TimedSectionId section)
+        : _builder{builder}, _cs{cs}, _section{section}, _beginTime{_cs->now()} {}
+
+    ~State() {
+        if (!_builder)
+            return;
+        _builder->append(toStringWithDurationSuffix<Milliseconds>(_section),
+                         durationCount<Milliseconds>(_cs->now() - _beginTime));
     }
-    return boost::optional<TimeElapsedBuilderScopedTimer>(
-        boost::in_place_init, clockSource, description, builder);
-}
+
+private:
+    BSONObjBuilder* _builder;
+    ClockSource* _cs;
+    TimedSectionId _section;
+    Date_t _beginTime;
+};
+
+SectionScopedTimer::SectionScopedTimer(ClockSource* clockSource,
+                                       TimedSectionId section,
+                                       BSONObjBuilder* builder)
+    : _state{builder ? std::make_unique<State>(builder, clockSource, section)
+                     : std::unique_ptr<State>{}} {}
+
+SectionScopedTimer::SectionScopedTimer() = default;
+SectionScopedTimer::SectionScopedTimer(SectionScopedTimer&&) noexcept = default;
+SectionScopedTimer& SectionScopedTimer::operator=(SectionScopedTimer&&) noexcept = default;
+SectionScopedTimer::~SectionScopedTimer() = default;
+
 }  // namespace mongo

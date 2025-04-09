@@ -31,6 +31,7 @@
 
 #include <variant>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"
@@ -40,53 +41,161 @@
 
 namespace mongo {
 /**
- * The timer increments a counter by the time elapsed since its construction when it goes out of
+ * Increments a counter by the time elapsed since its construction when it goes out of
  * scope.
  */
 class ScopedTimer {
-    ScopedTimer(const ScopedTimer&) = delete;
-    ScopedTimer& operator=(const ScopedTimer&) = delete;
-
 public:
-    ScopedTimer(ScopedTimer&& other) = default;
-
-    ScopedTimer(Nanoseconds* counter, TickSource* ts);
+    ScopedTimer();
     ScopedTimer(Nanoseconds* counter, ClockSource* cs);
-
+    ScopedTimer(Nanoseconds* counter, TickSource* ts);
+    ScopedTimer(ScopedTimer&&) noexcept;
+    ScopedTimer& operator=(ScopedTimer&&) noexcept;
     ~ScopedTimer();
 
 private:
-    // Reference to the counter that we are incrementing with the elapsed time.
-    Nanoseconds* const _counter;
-    TickSource* _tickSource;
-    ClockSource* _clockSource;
-
-    Date_t _startCS;
-    TickSource::Tick _startTS;
+    class State;
+    class CsState;
+    class TsState;
+    std::unique_ptr<State> _state;
 };
+
+// This is the enum for a short description of the timed sections during mongod/mongos
+// startup/shutdown and magic restore. The enum id is directly converted into a string when being
+// logged, so any changes to the enum ids should be communicated to the relevant team.
+#define MONGO_EXPAND_TIMED_SECTION_IDS(X)       \
+    /* For startup: */                          \
+    X(initAndListenTotal)                       \
+    X(runMongosTotal)                           \
+    X(setUpTransportLayer)                      \
+    X(setUpPeriodicRunner)                      \
+    X(setUpOCSP)                                \
+    X(initSyncCrashRecovery)                    \
+    X(standaloneClusterParams)                  \
+    X(userAndRolesGraph)                        \
+    X(waitForMajorityService)                   \
+    X(configServerState)                        \
+    X(clusterTimeKeysManager)                   \
+    X(startUpReplCoord)                         \
+    X(recoverChangeStream)                      \
+    X(logStartupOptions)                        \
+    X(startUpTransportLayer)                    \
+    X(createFCVDocument)                        \
+    X(restoreFCVDocument)                       \
+    X(dropAbandonedIdents)                      \
+    X(repairServerConfigNamespace)              \
+    X(initializeFCV)                            \
+    X(repairLocalDB)                            \
+    X(repairRemainingDB)                        \
+    X(initializeFCVForIndex)                    \
+    X(createLockFile)                           \
+    X(getStorageEngineMetadata)                 \
+    X(validateMetadata)                         \
+    X(createStorageEngine)                      \
+    X(writePID)                                 \
+    X(writeNewMetadata)                         \
+    X(createSystemUsersIndex)                   \
+    X(createSystemRolesIndex)                   \
+    X(initializeFromShardIdentity)              \
+    X(loadGlobalSettings)                       \
+    X(initializeGlobalShardingState)            \
+    X(resetConfigConnectionString)              \
+    X(waitForSigningKeys)                       \
+    X(preCacheRoutingInfo)                      \
+    X(preWarmConnectionPool)                    \
+    X(refreshBalancerConfig)                    \
+    X(refreshRWConcernDefaults)                 \
+    X(startMongosFTDC)                          \
+    X(setUpScriptEngine)                        \
+    X(initializeAuditSynchronizeJob)            \
+    /* For shutdown: */                         \
+    X(shutdownTaskTotal)                        \
+    X(cleanupTaskTotal)                         \
+    X(enterTerminalShutdown)                    \
+    X(stepDownReplCoord)                        \
+    X(quiesceMode)                              \
+    X(stopFLECrud)                              \
+    X(shutDownMirrorMaestro)                    \
+    X(shutDownWaitForMajorityService)           \
+    X(shutDownLogicalSessionCache)              \
+    X(shutDownQueryAnalysisSampler)             \
+    X(shutDownGlobalConnectionPool)             \
+    X(shutDownSearchTaskExecutors)              \
+    X(shutDownFlowControlTicketHolder)          \
+    X(shutDownReplicaSetNodeExecutor)           \
+    X(shutDownAbortExpiredTransactionsThread)   \
+    X(shutDownRollbackUnderCachePressureThread) \
+    X(shutDownIndexConsistencyChecker)          \
+    X(killAllOperations)                        \
+    X(shutDownOpenTransactions)                 \
+    X(acquireRSTL)                              \
+    X(shutDownIndexBuildsCoordinator)           \
+    X(shutDownReplicaSetMonitor)                \
+    X(shutDownShardRegistry)                    \
+    X(shutDownTransactionCoord)                 \
+    X(shutDownLogicalTimeValidator)             \
+    X(shutDownExecutorPool)                     \
+    X(shutDownCatalogCache)                     \
+    X(shutDownTransportLayer)                   \
+    X(shutDownHealthLog)                        \
+    X(shutDownTTLMonitor)                       \
+    X(shutDownExpiredDocumentRemover)           \
+    X(shutDownOplogCapMaintainer)               \
+    X(shutDownStorageEngine)                    \
+    X(shutDownFTDC)                             \
+    X(shutDownOCSP)                             \
+    X(shutDownReplicaSetAwareServices)          \
+    X(waitForStartupComplete)                   \
+    X(shutDownReplication)                      \
+    X(shutDownInitialSyncer)                    \
+    X(shutDownExternalState)                    \
+    X(shutDownReplExecutor)                     \
+    X(joinReplExecutor)                         \
+    X(closeListenerSockets)                     \
+    X(shutDownSynchronizeJob)                   \
+    X(shutDownClusterParamRefresher)            \
+    X(abortAllTransactions)                     \
+    X(joinLogicalSessionCache)                  \
+    X(shutDownCursorManager)                    \
+    /* For magic restore: */                    \
+    X(magicRestoreToolTotal)                    \
+    X(readMagicRestoreConfig)                   \
+    X(truncateOplogAndLocalDB)                  \
+    X(insertOplogEntries)                       \
+    X(truncateOplogToPIT)                       \
+    X(applyOplogEntriesForRestore)              \
+    X(createInternalCollections)                \
+    X(updateShardingMetadata)                   \
+    X(upsertAutomationCredentials)              \
+    /* */
+
+enum class TimedSectionId {
+#define X(e) e,
+    MONGO_EXPAND_TIMED_SECTION_IDS(X)
+#undef X
+};
+
+StringData toString(TimedSectionId id);
 
 /**
- * The timer appends the time elapsed since its construction to a BSON Object.
+ * Appends the time elapsed since its construction to a BSON Object.
  */
-class TimeElapsedBuilderScopedTimer {
+class SectionScopedTimer {
 public:
-    explicit TimeElapsedBuilderScopedTimer(ClockSource* clockSource,
-                                           StringData description,
-                                           BSONObjBuilder* builder);
-    ~TimeElapsedBuilderScopedTimer();
+    SectionScopedTimer();
+
+    /** If `builder` is null, the object is inactive and does nothing at all. */
+    SectionScopedTimer(ClockSource* clockSource,
+                       TimedSectionId timedSectionId,
+                       BSONObjBuilder* builder);
+
+    SectionScopedTimer(SectionScopedTimer&&) noexcept;
+    SectionScopedTimer& operator=(SectionScopedTimer&&) noexcept;
+    ~SectionScopedTimer();
 
 private:
-    ClockSource* _clockSource;
-    StringData _description;
-    Date_t _beginTime;
-    BSONObjBuilder* _builder;
+    class State;
+    std::unique_ptr<State> _state;
 };
 
-/*
- * This helper function only creates a TimeElapsedBuilderScopedTimer when a valid pointer to a
- * builder is passed in. This is used when timing startup tasks, so that tasks that run during
- * startup and outside of startup will only be timed when they are called during startup.
- */
-boost::optional<TimeElapsedBuilderScopedTimer> createTimeElapsedBuilderScopedTimer(
-    ClockSource* clockSource, StringData description, BSONObjBuilder* builder);
 }  // namespace mongo

@@ -1192,10 +1192,9 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
     }
 
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Shut down the replica set aware services",
-                                                shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::shutDownReplicaSetAwareServices,
+                                       shutdownTimeElapsedBuilder);
         LOGV2(5074000, "Shutting down the replica set aware services.");
         ReplicaSetAwareServiceRegistry::get(_service).onShutdown();
     }
@@ -1216,19 +1215,17 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
         }
         if (_rsConfigState == kConfigStartingUp) {
             // Wait until we are finished starting up, so that we can cleanly shut everything down.
-            auto scopedTimer = createTimeElapsedBuilderScopedTimer(
-                opCtx->getServiceContext()->getFastClockSource(),
-                "Wait for startup to complete before shutting down",
-                shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                           TimedSectionId::waitForStartupComplete,
+                                           shutdownTimeElapsedBuilder);
             lk.unlock();
             _waitForStartUpComplete();
             lk.lock();
             fassert(18823, _rsConfigState != kConfigStartingUp);
         }
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Shut down replication",
-                                                shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::shutDownReplication,
+                                       shutdownTimeElapsedBuilder);
         _replicationWaiterList.setErrorAll(
             lk, {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _lastAppliedOpTimeWaiterList.setErrorAll(
@@ -1241,10 +1238,9 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
 
     // joining the replication executor is blocking so it must be run outside of the mutex
     if (initialSyncerCopy) {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Shut down initial syncer",
-                                                shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::shutDownInitialSyncer,
+                                       shutdownTimeElapsedBuilder);
         LOGV2_DEBUG(
             21329, 1, "ReplicationCoordinatorImpl::shutdown calling InitialSyncer::shutdown");
         const auto status = initialSyncerCopy->shutdown();
@@ -1256,24 +1252,21 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
     }
 
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Shut down external state",
-                                                shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::shutDownExternalState,
+                                       shutdownTimeElapsedBuilder);
         _externalState->shutdown(opCtx);
     }
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Shut down replication executor",
-                                                shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::shutDownReplExecutor,
+                                       shutdownTimeElapsedBuilder);
         _replExecutor->shutdown();
     }
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Join replication executor",
-                                                shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::joinReplExecutor,
+                                       shutdownTimeElapsedBuilder);
         _replExecutor->join();
     }
 }

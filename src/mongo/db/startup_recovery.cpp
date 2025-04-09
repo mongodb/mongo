@@ -153,10 +153,9 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with last LTS version.",
               "version"_attr = multiversion::toString(multiversion::GenericFCV::kLastLTS));
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Create new fcv document",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::createFCVDocument,
+                                       startupTimeElapsedBuilder);
         uassertStatusOK(createCollection(opCtx, fcvNss.dbName(), BSON("create" << fcvNss.coll())));
     }
 
@@ -175,10 +174,9 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
                           fcvColl.getCollectionPtr(),
                           BSON("_id" << multiversion::kParameterName),
                           featureCompatibilityVersion)) {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Restore fcv document",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::restoreFCVDocument,
+                                       startupTimeElapsedBuilder);
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         LOGV2(21000,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
@@ -565,10 +563,9 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
 
     StorageEngine::ReconcileResult reconcileResult;
     {
-        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
-            opCtx->getServiceContext()->getFastClockSource(),
-            "Drop abandoned idents and get back index builds that need to be restarted",
-            startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::dropAbandonedIdents,
+                                       startupTimeElapsedBuilder);
         reconcileResult =
             fassert(40593,
                     storageEngine->reconcileCatalogAndIdents(
@@ -703,10 +700,9 @@ void startupRepair(OperationContext* opCtx,
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
 
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(svcCtx->getFastClockSource(),
-                                                "Repair server configuration namespace",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(svcCtx->getFastClockSource(),
+                                       TimedSectionId::repairServerConfigNamespace,
+                                       startupTimeElapsedBuilder);
         databaseHolder->openDb(opCtx, fcvColl->ns().dbName());
         fassertNoTrace(4805000,
                        repair::repairCollection(
@@ -716,8 +712,8 @@ void startupRepair(OperationContext* opCtx,
         restoreMissingFeatureCompatibilityVersionDocument(opCtx, startupTimeElapsedBuilder));
 
     {
-        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
-            svcCtx->getFastClockSource(), "Initialize FCV for startup", startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(
+            svcCtx->getFastClockSource(), TimedSectionId::initializeFCV, startupTimeElapsedBuilder);
         FeatureCompatibilityVersion::initializeForStartup(opCtx);
         abortRepairOnFCVErrors.dismiss();
     }
@@ -728,8 +724,8 @@ void startupRepair(OperationContext* opCtx,
     auto dbNames = catalog::listDatabases();
     if (auto it = std::find(dbNames.begin(), dbNames.end(), DatabaseName::kLocal);
         it != dbNames.end()) {
-        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
-            svcCtx->getFastClockSource(), "Repair the local database", startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(
+            svcCtx->getFastClockSource(), TimedSectionId::repairLocalDB, startupTimeElapsedBuilder);
         fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
 
         // This must be set before rebuilding index builds on replicated collections.
@@ -739,9 +735,9 @@ void startupRepair(OperationContext* opCtx,
 
     {
         // Repair the remaining databases.
-        auto scopedTimer = createTimeElapsedBuilderScopedTimer(svcCtx->getFastClockSource(),
-                                                               "Repair the remaining databases",
-                                                               startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(svcCtx->getFastClockSource(),
+                                       TimedSectionId::repairRemainingDB,
+                                       startupTimeElapsedBuilder);
         for (const auto& dbName : dbNames) {
             fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, dbName));
         }
@@ -871,10 +867,9 @@ void startupRecovery(OperationContext* opCtx,
 
     // Initialize FCV before rebuilding indexes that may have features dependent on FCV.
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(svcCtx->getFastClockSource(),
-                                                "Initialize FCV before rebuilding indexes",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(svcCtx->getFastClockSource(),
+                                       TimedSectionId::initializeFCVForIndex,
+                                       startupTimeElapsedBuilder);
         FeatureCompatibilityVersion::initializeForStartup(opCtx);
     }
 

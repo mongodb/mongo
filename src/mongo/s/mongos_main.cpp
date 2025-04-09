@@ -68,6 +68,7 @@
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/keys_collection_client.h"
@@ -339,20 +340,6 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
     }
 }
 
-void logMongosShutdownTimeElapsedStatistics(ServiceContext* serviceContext,
-                                            Date_t beginCleanupTask,
-                                            BSONObjBuilder* shutdownTimeElapsedBuilder,
-                                            BSONObjBuilder* shutdownInfoBuilder) {
-    mongo::Milliseconds elapsedInitAndListen =
-        serviceContext->getFastClockSource()->now() - beginCleanupTask;
-    shutdownTimeElapsedBuilder->append("cleanupTask total elapsed time",
-                                       elapsedInitAndListen.toString());
-    shutdownInfoBuilder->append("Statistics", shutdownTimeElapsedBuilder->obj());
-    LOGV2_INFO(8423406,
-               "mongos shutdown complete",
-               "Summary of time elapsed"_attr = shutdownInfoBuilder->obj());
-}
-
 /**
  * NOTE: This function may be called at any time after registerShutdownTask is called below. It must
  * not depend on the prior execution of mongo initializers or the existence of threads.
@@ -363,14 +350,15 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
     BSONObjBuilder shutdownTimeElapsedBuilder;
     BSONObjBuilder shutdownInfoBuilder;
 
-    Date_t beginCleanupTask = serviceContext->getFastClockSource()->now();
-    ScopeGuard logShutdownStats(
-        [serviceContext, beginCleanupTask, &shutdownTimeElapsedBuilder, &shutdownInfoBuilder] {
-            logMongosShutdownTimeElapsedStatistics(serviceContext,
-                                                   beginCleanupTask,
-                                                   &shutdownTimeElapsedBuilder,
-                                                   &shutdownInfoBuilder);
-        });
+    ScopeGuard logShutdownStats = [&] {
+        shutdownInfoBuilder.append("Statistics", shutdownTimeElapsedBuilder.obj());
+        LOGV2_INFO(8423406,
+                   "mongos shutdown complete",
+                   "Summary of time elapsed"_attr = shutdownInfoBuilder.obj());
+    };
+    SectionScopedTimer cleanupTaskTotalTimer{serviceContext->getFastClockSource(),
+                                             TimedSectionId::cleanupTaskTotal,
+                                             &shutdownTimeElapsedBuilder};
 
     {
         // This client initiation pattern is only to be used here, with plans to eliminate this
@@ -402,9 +390,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Time spent in quiesce mode",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::quiesceMode,
+                                           &shutdownTimeElapsedBuilder);
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }
 
@@ -412,35 +400,32 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
         // Inform the TransportLayers to stop accepting new connections.
         if (auto tlm = serviceContext->getTransportLayerManager()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(
-                serviceContext->getFastClockSource(),
-                "Inform the transport layer to stop accepting new connections",
-                &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::closeListenerSockets,
+                                           &shutdownTimeElapsedBuilder);
             LOGV2_OPTIONS(8314101, {LogComponent::kNetwork}, "Shutdown: Closing listener sockets");
             tlm->stopAcceptingSessions();
         }
 
         if (audit::shutdownSynchronizeJob) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down the audit synchronize job",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownSynchronizeJob,
+                                           &shutdownTimeElapsedBuilder);
             audit::shutdownSynchronizeJob();
         }
 
         {
-            TimeElapsedBuilderScopedTimer scopedTimer(
-                serviceContext->getFastClockSource(),
-                "Shut down cluster server parameter refresher",
-                &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownClusterParamRefresher,
+                                           &shutdownTimeElapsedBuilder);
             ClusterServerParameterRefresher::onShutdown(serviceContext);
         }
 
         try {
             // Abort transactions while we can still send remote commands.
-            TimeElapsedBuilderScopedTimer scopedTimer(
-                serviceContext->getFastClockSource(),
-                "Abort all active transactions in the catalog that have not yet been committed",
-                &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::abortAllTransactions,
+                                           &shutdownTimeElapsedBuilder);
             implicitlyAbortAllTransactions(opCtx);
             pauseAfterImplicitlyAbortAllTransactions.pauseWhileSet();
         } catch (const DBException& excep) {
@@ -448,26 +433,25 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (auto lsc = LogicalSessionCache::get(serviceContext)) {
-            TimeElapsedBuilderScopedTimer scopedTimer(
-                serviceContext->getFastClockSource(),
-                "Join the logical session cache's refresher and reaper tasks",
-                &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::joinLogicalSessionCache,
+                                           &shutdownTimeElapsedBuilder);
             lsc->joinOnShutDown();
         }
 
         {
             LOGV2_OPTIONS(
                 6973901, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down the Query Analysis Sampler",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownQueryAnalysisSampler,
+                                           &shutdownTimeElapsedBuilder);
             analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
         }
 
         {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down replica set monitor",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownReplicaSetMonitor,
+                                           &shutdownTimeElapsedBuilder);
             ReplicaSetMonitor::shutdown();
         }
 
@@ -477,9 +461,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (serviceContext) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Kill all operations",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::killAllOperations,
+                                           &shutdownTimeElapsedBuilder);
             serviceContext->setKillAllOperations();
 
             if (MONGO_unlikely(pauseWhileKillingOperationsAtShutdown.shouldFail())) {
@@ -499,54 +483,54 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // that any pending threads are about to terminate
 
         if (auto validator = LogicalTimeValidator::get(serviceContext)) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down logical time validator",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownLogicalTimeValidator,
+                                           &shutdownTimeElapsedBuilder);
             validator->shutDown();
         }
 
         if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down cursor manager",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownCursorManager,
+                                           &shutdownTimeElapsedBuilder);
             cursorManager->shutdown(opCtx);
         }
 
         if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
             LOGV2_OPTIONS(7698300, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down the executor pool",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownExecutorPool,
+                                           &shutdownTimeElapsedBuilder);
             pool->shutdownAndJoin();
         }
 
         if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down shard registry",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownShardRegistry,
+                                           &shutdownTimeElapsedBuilder);
             shardRegistry->shutdown();
         }
 
         if (Grid::get(serviceContext)->isShardingInitialized()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down the catalog cache",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownCatalogCache,
+                                           &shutdownTimeElapsedBuilder);
             LOGV2_OPTIONS(7698301, {LogComponent::kSharding}, "Shutting down the CatalogCache");
             Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
         }
 
         {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shutting down the search task executors",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownSearchTaskExecutors,
+                                           &shutdownTimeElapsedBuilder);
             executor::shutdownSearchExecutorsIfNeeded(serviceContext);
         }
 
         // Finish shutting down the TransportLayers
         if (auto tlm = serviceContext->getTransportLayerManager()) {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down the transport layer",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownTransportLayer,
+                                           &shutdownTimeElapsedBuilder);
             LOGV2_OPTIONS(
                 22843, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
             tlm->shutdown();
@@ -554,9 +538,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
         // Shutdown Full-Time Data Capture
         {
-            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                      "Shut down full-time data capture",
-                                                      &shutdownTimeElapsedBuilder);
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownFTDC,
+                                           &shutdownTimeElapsedBuilder);
             stopMongoSFTDC();
         }
     }
@@ -566,10 +550,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
 #ifdef MONGO_CONFIG_SSL
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(),
-            "Shut down online certificate status protocol manager",
-            &shutdownTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownOCSP,
+                                       &shutdownTimeElapsedBuilder);
         OCSPManager::shutdown(serviceContext);
     }
 #endif
@@ -624,10 +607,9 @@ Status initializeSharding(
                                                          std::move(shardRemovalHooks));
 
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Initialize global sharding state",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::initializeGlobalShardingState,
+                                       startupTimeElapsedBuilder);
         Status status = initializeGlobalShardingState(
             opCtx,
             std::move(catalogCache),
@@ -651,10 +633,9 @@ Status initializeSharding(
     auto configShardConnStr =
         Grid::get(opCtx->getServiceContext())->shardRegistry()->getConfigServerConnectionString();
     if (configShardConnStr.type() == ConnectionString::ConnectionType::kReplicaSet) {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Reset the shard registry config connection string",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::resetConfigConnectionString,
+                                       startupTimeElapsedBuilder);
         ConnectionString rsMonitorConfigConnStr(
             ReplicaSetMonitor::get(configShardConnStr.getSetName())->getServerAddress(),
             ConnectionString::ConnectionType::kReplicaSet);
@@ -665,10 +646,9 @@ Status initializeSharding(
     }
 
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Load global settings from config server",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::loadGlobalSettings,
+                                       startupTimeElapsedBuilder);
         Status status =
             loadGlobalSettingsFromConfigServer(opCtx, Grid::get(opCtx)->catalogClient());
         if (!status.isOK()) {
@@ -677,10 +657,9 @@ Status initializeSharding(
     }
 
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Wait for signing keys",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::waitForSigningKeys,
+                                       startupTimeElapsedBuilder);
         Status status = waitForSigningKeys(opCtx);
         if (!status.isOK()) {
             return status;
@@ -690,20 +669,18 @@ Status initializeSharding(
     // Loading of routing information may fail. Since this is just an optimization (warmup), any
     // failure must not prevent mongos from starting.
     try {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Pre-cache mongos routing info",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::preCacheRoutingInfo,
+                                       startupTimeElapsedBuilder);
         preCacheMongosRoutingInfo(opCtx);
     } catch (const DBException& ex) {
         LOGV2_WARNING(6203601, "Failed to warmup routing information", "error"_attr = redact(ex));
     }
 
     {
-        auto scopedTimer =
-            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
-                                                "Warm up connections to shards",
-                                                startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                       TimedSectionId::preWarmConnectionPool,
+                                       startupTimeElapsedBuilder);
         Status status = preWarmConnectionPool(opCtx);
         if (!status.isOK()) {
             return status;
@@ -727,32 +704,20 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
     }};
 }  // namespace
 
-void logMongosStartupTimeElapsedStatistics(ServiceContext* serviceContext,
-                                           Date_t beginRunMongosServer,
-                                           BSONObjBuilder* startupTimeElapsedBuilder,
-                                           BSONObjBuilder* startupInfoBuilder) {
-    mongo::Milliseconds elapsedTime =
-        serviceContext->getFastClockSource()->now() - beginRunMongosServer;
-    startupTimeElapsedBuilder->append("runMongosServer total elapsed time", elapsedTime.toString());
-    startupInfoBuilder->append("Statistics", startupTimeElapsedBuilder->obj());
-    LOGV2_INFO(8423405,
-               "mongos startup complete",
-               "Summary of time elapsed"_attr = startupInfoBuilder->obj());
-}
-
 ExitCode runMongosServer(ServiceContext* serviceContext) {
     BSONObjBuilder startupTimeElapsedBuilder;
     BSONObjBuilder startupInfoBuilder;
 
-    Date_t beginRunMongosServer = serviceContext->getFastClockSource()->now();
-
-    ScopeGuard logStartupStats(
-        [serviceContext, beginRunMongosServer, &startupTimeElapsedBuilder, &startupInfoBuilder] {
-            logMongosStartupTimeElapsedStatistics(serviceContext,
-                                                  beginRunMongosServer,
-                                                  &startupTimeElapsedBuilder,
-                                                  &startupInfoBuilder);
-        });
+    SectionScopedTimer runMongosTotalTimer{serviceContext->getFastClockSource(),
+                                           TimedSectionId::runMongosTotal,
+                                           &startupTimeElapsedBuilder};
+    auto logStartupStats = std::make_unique<ScopeGuard<std::function<void()>>>([&] {
+        runMongosTotalTimer = {};
+        startupInfoBuilder.append("Statistics", startupTimeElapsedBuilder.obj());
+        LOGV2_INFO(8423405,
+                   "mongos startup complete",
+                   "Summary of time elapsed"_attr = startupInfoBuilder.obj());
+    });
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     ThreadClient tc("mongosMain",
@@ -763,19 +728,18 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     // Set up the periodic runner for background job execution
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Set up periodic runner",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::setUpPeriodicRunner,
+                                       &startupTimeElapsedBuilder);
         auto runner = makePeriodicRunner(serviceContext);
         serviceContext->setPeriodicRunner(std::move(runner));
     }
 
 #ifdef MONGO_CONFIG_SSL
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(),
-            "Set up online certificate status protocol manager",
-            &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::setUpOCSP,
+                                       &startupTimeElapsedBuilder);
         OCSPManager::start(serviceContext);
     }
     CertificateExpirationMonitor::get()->start(serviceContext);
@@ -810,9 +774,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 #endif
         }
 
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Set up transport layer listener",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::setUpTransportLayer,
+                                       &startupTimeElapsedBuilder);
         auto tl = transport::TransportLayerManagerImpl::createWithConfig(
             &serverGlobalParams,
             serviceContext,
@@ -870,9 +834,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Refresh the balancer configuration",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::refreshBalancerConfig,
+                                       &startupTimeElapsedBuilder);
         Grid::get(serviceContext)
             ->getBalancerConfiguration()
             ->refreshAndCheck(opCtx)
@@ -880,9 +844,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 
     try {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Update read write concern defaults",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::refreshRWConcernDefaults,
+                                       &startupTimeElapsedBuilder);
         ReadWriteConcernDefaults::get(opCtx).refreshIfNecessary(opCtx);
     } catch (const DBException& ex) {
         LOGV2_WARNING(22855,
@@ -897,22 +861,23 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ClusterServerParameterRefresher::start(serviceContext, opCtx);
 
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(), "Start mongos FTDC", &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::startMongosFTDC,
+                                       &startupTimeElapsedBuilder);
         startMongoSFTDC(serviceContext);
     }
 
     if (mongosGlobalParams.scriptingEnabled) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Set up script engine",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::setUpScriptEngine,
+                                       &startupTimeElapsedBuilder);
         ScriptEngine::setup(ExecutionEnvironment::Server);
     }
 
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Build user and roles graph",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::userAndRolesGraph,
+                                       &startupTimeElapsedBuilder);
         Status status = globalAuthzManagerFactory->initialize(opCtx);
         if (!status.isOK()) {
             LOGV2_ERROR(22858, "Error initializing authorization data", "error"_attr = status);
@@ -929,9 +894,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     UserCacheInvalidator::start(serviceContext, opCtx);
 
     if (audit::initializeSynchronizeJob) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Initialize the audit synchronize job",
-                                                  &startupTimeElapsedBuilder);
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::initializeAuditSynchronizeJob,
+                                       &startupTimeElapsedBuilder);
         audit::initializeSynchronizeJob(serviceContext);
     }
 
@@ -987,9 +952,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 #endif
 
-    logStartupStats.dismiss();
-    logMongosStartupTimeElapsedStatistics(
-        serviceContext, beginRunMongosServer, &startupTimeElapsedBuilder, &startupInfoBuilder);
+    logStartupStats = {};
 
     if (MONGO_unlikely(shutdownAtStartup.shouldFail())) {
         LOGV2(9494000, "Starting clean exit via failpoint");
