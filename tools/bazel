@@ -103,7 +103,7 @@ cert_locs+=("/etc/ssl/cert.pem")                                 # Alpine Linux
 
 for cert in ${cert_locs[@]}; do
   if [ -f $cert ]; then
-    export SSL_CERT_DI=R$(dirname $cert)
+    export SSL_CERT_DIR=$(dirname $cert)
     export SSL_CERT_FILE=$cert
     break
   fi
