@@ -59,6 +59,11 @@ crudTest(() => {
     assert.eq(coll.count({"control.count": 2}, {rawData: true}), 1);
 });
 
+// countDocuments()
+crudTest(() => {
+    assert.eq(coll.countDocuments({"control.count": 2}, {rawData: true}), 1);
+});
+
 // distinct()
 crudTest(() => {
     assert.eq(coll.distinct("control.count", {}, {rawData: true}).sort(), [1, 2]);

@@ -1469,6 +1469,8 @@ DBCollection.prototype.enableAutoMerger = function() {
  * @param {string} [options.readConcern=null] The level of readConcern passed to the count command
  * @param {object} [options.collation=null] The collation that should be used for string comparisons
  * for this count op.
+ * @param {boolean} [options.rawData=null] Whether to operate on the underlying data format of the
+ *     collection.
  * @return {number}
  *
  */
@@ -1497,6 +1499,8 @@ DBCollection.prototype.count = function(query, options) {
  * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
  * @param {object} [options.collation=null] The collation that should be used for string comparisons
  * for this count op.
+ * @param {boolean} [options.rawData=null] Whether to operate on the underlying data format of the
+ *     collection.
  * @return {number}
  */
 DBCollection.prototype.countDocuments = function(query, options) {
@@ -1527,6 +1531,9 @@ DBCollection.prototype.countDocuments = function(query, options) {
     if (options.collation) {
         aggregateOptions.collation = options.collation;
     }
+    if (options.rawData) {
+        aggregateOptions.rawData = options.rawData;
+    }
 
     // Format cursor into an array.
     const res = this.aggregate(pipeline, aggregateOptions).toArray();
@@ -1543,6 +1550,8 @@ DBCollection.prototype.countDocuments = function(query, options) {
  * @method
  * @param {object} [options=null] Optional settings.
  * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+ * @param {boolean} [options.rawData=null] Whether to operate on the underlying data format of the
+ *     collection.
  * @return {number}
  */
 DBCollection.prototype.estimatedDocumentCount = function(options) {
@@ -1553,6 +1562,9 @@ DBCollection.prototype.estimatedDocumentCount = function(options) {
 
     if (options.maxTimeMS) {
         cmd.maxTimeMS = options.maxTimeMS;
+    }
+    if (options.rawData) {
+        cmd.rawData = options.rawData;
     }
 
     const res = this.runCommand(cmd);
