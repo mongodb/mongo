@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
 #include <vector>
 
 #include "mongo/base/string_data.h"

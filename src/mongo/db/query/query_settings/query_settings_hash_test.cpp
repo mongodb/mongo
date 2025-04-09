@@ -30,7 +30,6 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"

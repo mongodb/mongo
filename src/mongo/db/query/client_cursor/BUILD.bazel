@@ -148,3 +148,16 @@ mongo_cc_unit_test(
         "//src/mongo/util:clock_source_mock",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "cursors_test",
+    srcs = [
+        "cursor_response_test.cpp",
+        "killcursors_request_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":client_cursor",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)

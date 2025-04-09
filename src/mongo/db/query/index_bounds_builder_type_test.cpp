@@ -28,7 +28,6 @@
  */
 
 #include <limits>
-#include <memory>
 #include <vector>
 
 #include "mongo/base/string_data.h"

@@ -2345,7 +2345,6 @@ mongo_cc_library(
     name = "service_context_test_fixture",
     srcs = [
         "service_context_test_fixture.cpp",
-        "//src/mongo/util:tick_source_mock.h",
     ],
     hdrs = [
         "service_context_test_fixture.h",
@@ -2361,6 +2360,7 @@ mongo_cc_library(
         "//src/mongo/transport:session_manager",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:tick_source_mock",
     ],
 )
 

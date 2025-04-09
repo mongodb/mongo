@@ -32,7 +32,6 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"

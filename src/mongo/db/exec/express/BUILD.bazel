@@ -11,7 +11,10 @@ exports_files(
 
 mongo_cc_unit_test(
     name = "express_execution_test",
-    srcs = ["express_plan_test.cpp"],
+    srcs = [
+        "express_plan_test.cpp",
+        "plan_executor_express_test.cpp",
+    ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         "//src/mongo/db:query_exec",
@@ -21,5 +24,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/collation:collator_interface_mock",
     ],
 )

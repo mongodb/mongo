@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
-#include <list>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -48,7 +47,6 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -57,11 +55,8 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_test_util.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"

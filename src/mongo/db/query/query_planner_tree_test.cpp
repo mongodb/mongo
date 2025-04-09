@@ -29,10 +29,8 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iterator>
 #include <string>
 #include <tuple>
-#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"

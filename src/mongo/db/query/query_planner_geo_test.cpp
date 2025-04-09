@@ -39,10 +39,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

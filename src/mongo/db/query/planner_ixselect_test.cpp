@@ -36,7 +36,6 @@
 #include <algorithm>
 #include <memory>
 #include <set>
-#include <type_traits>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
@@ -57,19 +56,15 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 using namespace mongo;

@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
 #include <memory>
-#include <type_traits>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/status.h"
@@ -40,15 +39,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"

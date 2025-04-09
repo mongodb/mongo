@@ -308,25 +308,36 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_unit_test(
-    name = "makeobj_spec_hash_test",
+mongo_cc_library(
+    name = "sbe_unittest_base",
     srcs = [
+        "sbe_unittest.cpp",
+    ],
+    hdrs = [
         "expression_test_base.h",
-        "makeobj_spec_hash_test.cpp",
         "sbe_unittest.h",
     ],
-    tags = ["mongo_unittest_first_group"],
     deps = [
-        ":query_sbe_makeobj_spec",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
 
 mongo_cc_unit_test(
+    name = "makeobj_spec_hash_test",
+    srcs = [
+        "makeobj_spec_hash_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":query_sbe_makeobj_spec",
+        ":sbe_unittest_base",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "db_sbe_test",
     srcs = [
-        "expression_test_base.h",
         "sbe_agg_project_test.cpp",
         "sbe_block_hashagg_test.cpp",
         "sbe_block_stages_test.cpp",
@@ -358,8 +369,6 @@ mongo_cc_unit_test(
         "sbe_test.cpp",
         "sbe_trial_run_tracker_test.cpp",
         "sbe_unique_test.cpp",
-        "sbe_unittest.cpp",
-        "sbe_unittest.h",
         "sbe_window_test.cpp",
         "write_value_to_stream_test.cpp",
         "//src/mongo/db/exec:shard_filterer_mock.h",
@@ -441,6 +450,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":sbe_plan_stage_test",
+        ":sbe_unittest_base",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/pipeline:expression_context_for_test",

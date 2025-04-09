@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -30,5 +30,26 @@ mongo_cc_library(
     ],
     hdrs = [
         "string_util.h",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_util_test",
+    srcs = [
+        "cartesian_product.h",
+        "cartesian_product_test.cpp",
+        "deferred_test.cpp",
+        "hash_roaring_set_test.cpp",
+        "jparse_util_test.cpp",
+        "memory_util_test.cpp",
+        "string_util_test.cpp",
+    ],
+    tags = [
+        "compile_requires_large_memory_gcc",
+        "mongo_unittest_third_group",
+    ],
+    deps = [
+        ":jparse_util",
+        "//src/mongo/db:query_exec",
     ],
 )

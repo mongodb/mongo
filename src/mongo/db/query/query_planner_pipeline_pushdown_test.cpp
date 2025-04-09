@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -48,7 +48,6 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

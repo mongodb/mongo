@@ -39,8 +39,6 @@
 #include "mongo/db/query/expression_geo_index_mapping.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
 #include "mongo/db/query/interval.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/time_support.h"
 

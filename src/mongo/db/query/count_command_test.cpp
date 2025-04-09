@@ -28,7 +28,6 @@
  */
 
 #include <algorithm>
-#include <cstdint>
 #include <limits>
 #include <vector>
 
@@ -51,7 +50,6 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

@@ -32,7 +32,6 @@
  */
 
 #include <absl/container/node_hash_map.h>
-#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -46,25 +45,19 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/exec/index_path_projection.h"
-#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

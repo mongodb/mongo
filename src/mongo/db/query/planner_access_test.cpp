@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/record_id_bound.h"
+#include <memory>
+
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,8 +41,9 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/planner_access.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

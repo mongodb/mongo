@@ -29,21 +29,17 @@
 
 #include "mongo/db/query/canonical_query_test_util.h"
 
-#include <cstdint>
 #include <utility>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 const NamespaceString CanonicalQueryTest::nss =

@@ -29,17 +29,16 @@
 
 
 #include <algorithm>
+
 #include <boost/container/vector.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
-
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"

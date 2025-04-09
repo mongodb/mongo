@@ -31,14 +31,13 @@
  * This file contains tests for mongo/db/query/plan_cache/plan_cache.h
  */
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 #include <memory>
-#include <type_traits>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -49,13 +48,10 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_constants.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
@@ -78,13 +74,10 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/query/stage_types.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 

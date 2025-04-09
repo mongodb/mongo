@@ -33,7 +33,6 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"

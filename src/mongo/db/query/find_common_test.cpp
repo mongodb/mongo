@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

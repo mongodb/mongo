@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "BUILD.bazel":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "collection_compact*":
     approvers:
       - 10gen/server-rss-sydney

@@ -30,15 +30,8 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/field_set.h"
 
 namespace mongo::stage_builder {
 namespace {

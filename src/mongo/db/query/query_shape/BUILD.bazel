@@ -108,3 +108,22 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "query_shape_test",
+    srcs = [
+        "agg_cmd_shape_test.cpp",
+        "count_cmd_shape_test.cpp",
+        "distinct_cmd_shape_test.cpp",
+        "find_cmd_shape_test.cpp",
+        "let_shape_component_test.cpp",
+        "serialization_options_test.cpp",
+    ],
+    tags = [
+        "compile_requires_large_memory_gcc",
+        "mongo_unittest_sixth_group",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
