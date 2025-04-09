@@ -171,7 +171,7 @@ def send_failure_message_to_slack(expansions):
 
     evg_api = RetryingEvergreenApi.get_api(config_file=".evergreen.yml")
     evg_api.send_slack_message(
-        target="#sdp-triager",
+        target="#devprod-build-automation",
         msg=error_msg,
     )
 
@@ -481,7 +481,7 @@ def main():
         ):
             return
 
-        # Send a failure message to #sdp-triager if the Copybara sync task fails.
+        # Send a failure message to #devprod-build-automation if the Copybara sync task fails.
         send_failure_message_to_slack(expansions)
 
 
