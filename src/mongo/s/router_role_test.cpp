@@ -309,19 +309,19 @@ TEST_F(RouterRoleTest, RoutingContextCreation) {
 TEST_F(RouterRoleTest, RoutingContextPropagatesCatalogCacheErrors) {
     auto opCtx = operationContext();
 
-    auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    // Invalidate the cache to trigger a refresh on next access.
-    catalogCache->invalidateCollectionEntry_LINEARIZABLE(_nss);
-    {
-        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
+    auto future = launchAsync([this, &opCtx] {
+        // Mark the routing info as stale to force a refresh.
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        catalogCache->onStaleCollectionVersion(_nss, boost::none);
 
-        // RoutingContext should correctly propagate errors from the CatalogCache
-        const auto nssList = std::vector{_nss};
-        ASSERT_THROWS_CODE((RoutingContext{opCtx, nssList, true /* allowLocks */}),
-                           DBException,
-                           ErrorCodes::ShardCannotRefreshDueToLocksHeld);
-    }
-    catalogCache->invalidateCollectionEntry_LINEARIZABLE(_nss);
+        RoutingContext routingCtx(opCtx, {_nss});
+    });
+
+    onCommand([](const executor::RemoteCommandRequest& request) {
+        return Status(ErrorCodes::InternalError, "Simulated failure");
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::InternalError);
 }
 
 TEST_F(RouterRoleTest, RoutingContextRoutingTablesAreImmutable) {
