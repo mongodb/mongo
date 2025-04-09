@@ -12,7 +12,7 @@ from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 def engflow_auth(args):
     start = time.time()
-    from buildscripts.engflow_auth import setup_auth
+    from buildscripts.bazel_rules_mongo.engflow_auth.engflow_auth import setup_auth
 
     args_str = " ".join(args)
     if (

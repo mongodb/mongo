@@ -82,6 +82,11 @@ alias(
     actual = "@bazel_rules_mongo//codeowners:codeowners_add_auto_approver",
 )
 
+alias(
+    name = "engflow_auth",
+    actual = "@bazel_rules_mongo//engflow_auth:engflow_auth",
+)
+
 setup_mongo_toolchain_aliases()
 
 render_template(

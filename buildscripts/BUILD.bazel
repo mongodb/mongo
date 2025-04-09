@@ -62,19 +62,6 @@ py_binary(
     ],
 )
 
-py_binary(
-    name = "engflow_auth",
-    srcs = ["engflow_auth.py"],
-    main = "engflow_auth.py",
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "retry",
-            group = "testing",
-        ),
-    ],
-)
-
 py_library(
     name = "install_bazel",
     srcs = [

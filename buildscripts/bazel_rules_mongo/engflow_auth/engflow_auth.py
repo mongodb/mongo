@@ -2,6 +2,7 @@
 Install engflow_auth binary if not on system and authenticate if token is expired.
 """
 
+import hashlib
 import json
 import os
 import platform
@@ -17,7 +18,14 @@ NORMALIZED_ARCH = {"x86_64": "x64", "aarch64": "arm64", "arm64": "arm64", "AMD64
 
 NORMALIZED_OS = {"Windows": "windows", "Darwin": "macos", "Linux": "linux"}
 
-GH_URL_PREFIX = "https://github.com/EngFlow/auth/releases/latest/download/"
+CHECKSUMS = {
+    "engflow_auth_linux_arm64": "ad5ffee1e6db926f5066aa40ee35517b1993851d0063ac121dbf5b407c81e2bf",
+    "engflow_auth_linux_x64": "b731bae21628b2be321c24b342854c6ed1ed0326010e62a2ecf0b5650a56cf1a",
+    "engflow_auth_macos_arm64": "69057929b4515d41b1af861c9bfdbc47427cc5ce5a80c94d4776c8bef672292e",
+    "engflow_auth_macos_x64": "a322373e41faa7750c34348f357c5a4a670a66cfd988e80b4343c72822d91292",
+    "engflow_auth_windows_x64.exe": "cb9590ffcc6731389ded173250f604b37778417450b1dc92c6bafadeef342826",
+}
+GH_URL_PREFIX = "https://github.com/EngFlow/auth/releases/download/v0.0.13/"
 CLUSTER = "sodalite.cluster.engflow.com"
 
 LOGIN_TIMEOUT = 300
@@ -43,6 +51,12 @@ def get_release_tag():
     return tag + f"_{os_sys}_{arch}"
 
 
+def check_hash(binary_path: str, tag: str) -> bool:
+    with open(binary_path, "rb") as f:
+        digest = hashlib.file_digest(f, "sha256")
+    return digest.hexdigest() == CHECKSUMS[tag]
+
+
 def install(verbose: bool) -> str:
     binary_directory = os.path.expanduser("~/.local/bin")
     os.makedirs(binary_directory, exist_ok=True)
@@ -58,7 +72,12 @@ def install(verbose: bool) -> str:
         url = GH_URL_PREFIX + tag
         print(f"Downloading {url}...")
         download(url, binary_path)
-        os.chmod(binary_path, stat.S_IEXEC)
+        os.chmod(binary_path, stat.S_IRWXU)
+        if not check_hash(binary_path, tag):
+            print("File hash doesn't match expected checksum. Removing...")
+            print("Please raise the issue in #ask-devprod-build")
+            os.remove(binary_path)
+            raise Exception("Checksum failure")
         print(f"Downloaded {binary_path}")
 
     return binary_path
