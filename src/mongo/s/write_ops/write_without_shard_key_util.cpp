@@ -69,6 +69,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -283,9 +284,11 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     return true;
 }
 
-StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(OperationContext* opCtx,
-                                                                         NamespaceString nss,
-                                                                         BSONObj cmdObj) {
+StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    boost::optional<WriteConcernErrorDetail>* wce) {
     if (opCtx->isRetryableWrite()) {
         tassert(7260900,
                 "Retryable writes must have an explicit stmtId",
@@ -390,6 +393,11 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
         });
 
     if (swResult.isOK()) {
+        // Check if 'swResult' contains a 'WriteConcernError', and if so, populate the 'wce' out
+        // variable if it exists.
+        if (wce != nullptr && swResult.getValue().wcError.isValid(nullptr)) {
+            wce->emplace(swResult.getValue().wcError);
+        }
         if (swResult.getValue().getEffectiveStatus().isOK()) {
             return StatusWith<ClusterWriteWithoutShardKeyResponse>(
                 sharedBlock->clusterWriteResponse);

@@ -890,6 +890,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         }
     } else {
         getQueryCounters(opCtx).findAndModifyUnshardedCount.increment(1);
+
         _runCommand(opCtx,
                     cri.getDbPrimaryShardId(),
                     boost::make_optional(!cri.getDbVersion().isFixed(), ShardVersion::UNSHARDED()),
@@ -1000,8 +1001,9 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
                                     boost::none /* shardVersion */,
                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
+    boost::optional<WriteConcernErrorDetail> wce;
     auto swRes =
-        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough);
+        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough, &wce);
 
     // runTwoPhaseWriteProtocol returns an empty response when there are no matching documents
     // and {upsert: false}.
@@ -1023,6 +1025,18 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
             cmdResponse = swRes.getValue().getResponse();
         }
         shardId = ShardId(swRes.getValue().getShardId().toString());
+    }
+
+    if (wce.has_value() && !cmdResponse.hasField("writeConcernError")) {
+        // We have received a 'writeConcernError' as part of the transaction, but 'cmdResponse' does
+        // not include it yet. In this case, merge the 'writeConcernError' details into
+        // 'cmdResponse', so that we will always pass it on correctly later.
+        BSONObjBuilder bob;
+        for (auto&& originalField : cmdResponse) {
+            bob.append(originalField);
+        }
+        bob.append("writeConcernError", wce->toBSON());
+        cmdResponse = bob.obj();
     }
 
     // Extract findAndModify command result from the result of the two phase write protocol.

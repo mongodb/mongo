@@ -36,7 +36,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -45,6 +44,8 @@
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 
 namespace mongo {
+class WriteConcernErrorDetail;
+
 namespace write_without_shard_key {
 
 // Used as a "dummy" target document for constructing explain responses for single writes without
@@ -89,11 +90,16 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
  * shard to execute.
  *
  * Both phases are run transactionally using an internal transaction.
- *
+ * The write phase can produce a 'WriteConcernError', which can be orthogonal to other errors
+ * reported by the write. The optional 'wce' out variable can be used to capture the
+ * 'WriteConcernError' separately, so the caller can handle it. If 'wce' is a nullptr, no separate
+ * 'WriteConcernError' will be reported.
  **/
-StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(OperationContext* opCtx,
-                                                                         NamespaceString nss,
-                                                                         BSONObj cmdObj);
+StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    boost::optional<WriteConcernErrorDetail>* wce = nullptr);
 /**
  * Return a formatted 'explain' response that describes the work done in the two phase write
  * protocol.

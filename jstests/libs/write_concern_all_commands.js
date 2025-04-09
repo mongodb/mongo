@@ -5947,13 +5947,9 @@ function shouldSkipTestCase(
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
 
         // TODO SERVER-100938 createIndexes does not return WCE
-
-        // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
-        // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
         if (clusterType == "sharded" &&
             (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-             command == "createIndexes" || command == "setDefaultRWConcern" ||
-             command == "findOneAndUpdate" || command == "findAndModify")) {
+             command == "createIndexes" || command == "setDefaultRWConcern")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
