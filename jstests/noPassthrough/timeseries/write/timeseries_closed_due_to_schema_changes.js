@@ -35,13 +35,8 @@ let typeList = [
 ];
 
 for (let i = 0; i < typeList.length; i++) {
-    // After the second measurement, we begin to reopen hard-closed buckets that were closed due to
-    // schema change. Because none of the measurements are schema compatible, we will now have two
-    // numBucketsClosedDueToSchemaChange; the previous open bucket and a query-based reopening
-    // bucket.
-    let numBuckets = (i < 2) ? i : (2 * i - 1);
     assert.commandWorked(coll.insert({[timeFieldName]: t0, [metaFieldName]: 0, x: typeList[i]}));
-    assert.eq(coll.stats().timeseries.numBucketsClosedDueToSchemaChange, numBuckets);
+    assert.eq(coll.stats().timeseries.numBucketsClosedDueToSchemaChange, i);
 }
 
 MongoRunner.stopMongod(conn);

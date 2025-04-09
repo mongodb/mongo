@@ -175,9 +175,7 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketsQueried++;
 expectedStats.numBucketQueriesFailed++;
-expectedStats.numDuplicateBucketsReopened++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements. We change the order twice of fields in the
@@ -197,9 +195,7 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketsQueried++;
 expectedStats.numBucketQueriesFailed++;
-expectedStats.numDuplicateBucketsReopened++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 125kB on the measurements stored in the 'data' field.
@@ -221,7 +217,7 @@ expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numBucketQueriesFailed += 2;
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes the measurements in each bucket span at most one hour (based on the time field).
