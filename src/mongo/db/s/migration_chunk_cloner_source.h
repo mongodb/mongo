@@ -262,7 +262,7 @@ public:
      *
      * NOTE: Must be called without any locks.
      */
-    void cancelClone(OperationContext* opCtx) noexcept;
+    void cancelClone(OperationContext* opCtx);
 
     /**
      * Notifies this cloner that an insert happened to the collection, which it owns. It is up to

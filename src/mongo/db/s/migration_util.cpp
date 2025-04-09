@@ -678,7 +678,7 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
 }
 
 void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
-                                                 const NamespaceString& nss) noexcept {
+                                                 const NamespaceString& nss) {
     ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, nss] {
             ThreadClient tc{"MigrationRecovery", svcCtx->getService(ClusterRole::ShardServer)};

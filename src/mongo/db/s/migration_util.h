@@ -197,7 +197,7 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx);
  * Submits an asynchronous task to recover the migration until it succeeds or the node steps down.
  */
 void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
-                                                 const NamespaceString& nss) noexcept;
+                                                 const NamespaceString& nss);
 
 /**
  * This function writes a no-op message to the oplog when migrating a first chunk to the recipient

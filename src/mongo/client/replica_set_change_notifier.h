@@ -139,22 +139,22 @@ public:
     /**
      * React to a new ReplicaSet that will soon be scanned
      */
-    virtual void onFoundSet(const Key& key) noexcept = 0;
+    virtual void onFoundSet(const Key& key) = 0;
 
     /**
      * React to a finished scan that found no primary
      */
-    virtual void onPossibleSet(const State& data) noexcept = 0;
+    virtual void onPossibleSet(const State& data) = 0;
 
     /**
      * React to a finished scan that found a primary
      */
-    virtual void onConfirmedSet(const State& data) noexcept = 0;
+    virtual void onConfirmedSet(const State& data) = 0;
 
     /**
      * React to a ReplicaSet being dropped from use
      */
-    virtual void onDroppedSet(const Key& key) noexcept = 0;
+    virtual void onDroppedSet(const Key& key) = 0;
 
     /**
      * Get the State as of the last signal function invoked on the Notifier

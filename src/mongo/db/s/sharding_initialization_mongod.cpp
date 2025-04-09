@@ -152,10 +152,10 @@ public:
         : _serviceContext(serviceContext) {}
     ~ShardingReplicaSetChangeListener() final = default;
 
-    void onFoundSet(const Key&) noexcept final {}
+    void onFoundSet(const Key&) final {}
 
     // Update the shard identy config string
-    void onConfirmedSet(const State& state) noexcept final {
+    void onConfirmedSet(const State& state) final {
         const auto& connStr = state.connStr;
         try {
             LOGV2(471691,
@@ -198,7 +198,7 @@ public:
         }
     }
 
-    void onPossibleSet(const State& state) noexcept final {
+    void onPossibleSet(const State& state) final {
         try {
             Grid::get(_serviceContext)
                 ->shardRegistry()
@@ -212,7 +212,7 @@ public:
         }
     }
 
-    void onDroppedSet(const Key&) noexcept final {}
+    void onDroppedSet(const Key&) final {}
 
 private:
     // Schedules updates to the shard identity config string while preserving order.

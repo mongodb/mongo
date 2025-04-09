@@ -70,7 +70,7 @@ public:
         std::unique_ptr<CollectionShardingState> css;
     };
 
-    CSSAndLock* getOrCreate(const NamespaceString& nss) noexcept {
+    CSSAndLock* getOrCreate(const NamespaceString& nss) {
         std::shared_lock lk(_mutex);  // NOLINT
         if (auto it = _collections.find(nss); MONGO_likely(it != _collections.end())) {
             return it->second.get();

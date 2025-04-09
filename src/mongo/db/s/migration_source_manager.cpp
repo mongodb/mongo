@@ -742,7 +742,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     moveChunkHangAtStep6.pauseWhileSet();
 }
 
-void MigrationSourceManager::_cleanupOnError() noexcept {
+void MigrationSourceManager::_cleanupOnError() {
     if (_state == kDone) {
         return;
     }
@@ -802,7 +802,7 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflic
     return metadata;
 }
 
-void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
+void MigrationSourceManager::_cleanup(bool completeMigration) {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {

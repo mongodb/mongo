@@ -201,7 +201,7 @@ public:
     CollectionAcquisition(CollectionAcquisition&& other) noexcept;
 
     CollectionAcquisition& operator=(const CollectionAcquisition& other);
-    CollectionAcquisition& operator=(CollectionAcquisition&& other) noexcept;
+    CollectionAcquisition& operator=(CollectionAcquisition&& other);
 
     ~CollectionAcquisition();
 
@@ -254,7 +254,7 @@ public:
     ViewAcquisition(ViewAcquisition&& other) noexcept;
 
     ViewAcquisition& operator=(const ViewAcquisition& other);
-    ViewAcquisition& operator=(ViewAcquisition&& other) noexcept;
+    ViewAcquisition& operator=(ViewAcquisition&& other);
 
     ~ViewAcquisition();
 

@@ -454,7 +454,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
     return responseStatus.getStatus();
 }
 
-void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) noexcept {
+void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     _sessionCatalogSource->onCloneCleanup();

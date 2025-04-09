@@ -743,7 +743,7 @@ CollectionAcquisition& CollectionAcquisition::operator=(const CollectionAcquisit
     return *this;
 }
 
-CollectionAcquisition& CollectionAcquisition::operator=(CollectionAcquisition&& other) noexcept {
+CollectionAcquisition& CollectionAcquisition::operator=(CollectionAcquisition&& other) {
     if (this != &other) {
         auto tmp{std::move(*this)};
         _txnResources = std::exchange(other._txnResources, {});
@@ -853,7 +853,7 @@ ViewAcquisition& ViewAcquisition::operator=(const ViewAcquisition& other) {
     return *this;
 }
 
-ViewAcquisition& ViewAcquisition::operator=(ViewAcquisition&& other) noexcept {
+ViewAcquisition& ViewAcquisition::operator=(ViewAcquisition&& other) {
     if (this != &other) {
         auto tmp{std::move(*this)};
         _txnResources = std::exchange(other._txnResources, {});
