@@ -32,11 +32,12 @@ import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_ti
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export function isBinaryCompatibleFlagEnabledAndStable(db, flagName) {
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, flagName)) {
+    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db, flagName);
+    if (FeatureFlagUtil.getFeatureFlagDocStatus(db, flagDoc) !==
+        FeatureFlagUtil.FlagStatus.kEnabled) {
         return false;
     }
 
-    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db, flagName);
     assert.hasFields(flagDoc, ['shouldBeFCVGated', 'version']);
     assert(!flagDoc.shouldBeFCVGated);
 

@@ -105,6 +105,13 @@ export var FeatureFlagUtil = (function() {
         return _getFeatureFlagDoc(conn, flagName);
     }
 
+    function getFeatureFlagDocStatus(db, flagDoc, ignoreFCV) {
+        // TODO (SERVER-102609): Remove _getStatusLegacy() once v9.0 becomes last-LTS.
+        return flagDoc.hasOwnProperty("currentlyEnabled")
+            ? _getStatus(ignoreFCV, flagDoc)
+            : _getStatusLegacy(_getAuthenticatedConnectionToMongod(db), ignoreFCV, flagDoc);
+    }
+
     /**
      * @param 'featureFlag' - the name of the flag you want to check, but *without* the
      *     'featureFlag' prefix. For example, just "Toaster" instead of "featureFlagToaster."
@@ -124,18 +131,7 @@ export var FeatureFlagUtil = (function() {
         // a mongod.
         const conn = _getAuthenticatedConnectionToMongod(db);
         const flagDoc = _getFeatureFlagDoc(conn, featureFlag);
-
-        if (!flagDoc) {
-            return FlagStatus.kNotFound;
-        }
-
-        // TODO (SERVER-102609): keep only top branch and remove _getStatusLegacy() once 9.0 becomes
-        // last LTS.
-        if (flagDoc.hasOwnProperty("currentlyEnabled")) {
-            return _getStatus(ignoreFCV, flagDoc);
-        } else {
-            return _getStatusLegacy(conn, ignoreFCV, flagDoc);
-        }
+        return flagDoc ? getFeatureFlagDocStatus(db, flagDoc, ignoreFCV) : FlagStatus.kNotFound;
     }
 
     /**
@@ -226,6 +222,7 @@ export var FeatureFlagUtil = (function() {
         isPresentAndEnabled: isPresentAndEnabled,
         isPresentAndDisabled: isPresentAndDisabled,
         getFeatureFlagDoc: getFeatureFlagDoc,
+        getFeatureFlagDocStatus: getFeatureFlagDocStatus,
         getStatus: getStatus,
     };
 })();
