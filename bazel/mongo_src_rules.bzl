@@ -8,20 +8,9 @@ load(
     "REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE",
 )
 load(
-    "//bazel/toolchains/cc/mongo_linux:mongo_compiler_flags.bzl",
-    "MONGO_LINUX_CC_COPTS",
-    "MONGO_LINUX_CC_LINKFLAGS",
-)
-load(
-    "//bazel/toolchains/cc/mongo_windows:mongo_compiler_flags.bzl",
-    "MONGO_WIN_CC_COPTS",
-    "MONGO_WIN_CC_LINKFLAGS",
-    "WINDOWS_MULTITHREAD_RUNTIME_COPTS",
-)
-load(
-    "//bazel/toolchains/cc/mongo_apple:mongo_compiler_flags.bzl",
-    "MONGO_MAC_CC_COPTS",
-    "MONGO_MAC_CC_LINKFLAGS",
+    "//bazel/toolchains/cc:mongo_compiler_flags.bzl",
+    "get_copts",
+    "get_linkopts",
 )
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
@@ -79,30 +68,6 @@ LIBUNWIND_DEPS = select({
     "//bazel/config:_libunwind_off": [],
     "//bazel/config:libunwind_enabled": ["//src/third_party/unwind:unwind"],
 }, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
-
-# Used as both link flags and copts
-# Suppress the function sanitizer check for third party libraries, because:
-#
-# - mongod (a C++ binary) links in WiredTiger (a C library)
-# - If/when mongod--built under ubsan--fails, the sanitizer will by
-#   default analyze the failed execution for undefined behavior related to
-#   function pointer usage. See:
-#   https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#available-checks
-# - When this happens, the sanitizer will attempt to dynamically load to perform
-#   the analysis.
-# - However, since WT was built as a C library, is not linked with the function
-#   sanitizer library symbols despite its C++ dependencies referencing them.
-# - This will cause the sanitizer itself to fail, resulting in debug information
-#   being unavailable.
-# - So by suppressing the function ubsan check, we won't reference symbols
-#   defined in the unavailable ubsan function sanitier library and will get
-#   useful debugging information.
-UBSAN_OPTS_THIRD_PARTY = select({
-    "//bazel/config:sanitize_undefined_dynamic_link_settings": [
-        "-fno-sanitize=function",
-    ],
-    "//conditions:default": [],
-})
 
 REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = """
 Error:
@@ -331,38 +296,9 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/abseil-cpp:absl_local_repo_deps",
 ]
 
-MONGO_GLOBAL_COPTS = MONGO_LINUX_CC_COPTS + MONGO_WIN_CC_COPTS + MONGO_MAC_CC_COPTS
-
-MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS + MONGO_WIN_CC_LINKFLAGS + MONGO_MAC_CC_LINKFLAGS
-
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
 
 MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + DEBUG_LEVEL_FEATURES + OVERLOADED_VIRTUAL_FEATURES + DISABLE_DEBUGGING_SYMBOLS_FEATURE
-
-MONGO_COPTS_THIRD_PARTY = UBSAN_OPTS_THIRD_PARTY
-
-MONGO_LINKFLAGS_THIRD_PARTY = UBSAN_OPTS_THIRD_PARTY
-
-def force_includes_copt(package_name, name):
-    if package_name.startswith("src/mongo"):
-        basic_h = "mongo/platform/basic.h"
-        return select({
-            "@platforms//os:windows": ["/FI" + basic_h],
-            "//conditions:default": ["-include", basic_h],
-        })
-
-    if name in ["scripting", "scripting_mozjs_test", "encrypted_dbclient"]:
-        return select({
-            "//bazel/config:linux_aarch64": ["-include", "third_party/mozjs/platform/aarch64/linux/build/js-config.h"],
-            "//bazel/config:linux_ppc64le": ["-include", "third_party/mozjs/platform/ppc64le/linux/build/js-config.h"],
-            "//bazel/config:linux_s390x": ["-include", "third_party/mozjs/platform/s390x/linux/build/js-config.h"],
-            "//bazel/config:linux_x86_64": ["-include", "third_party/mozjs/platform/x86_64/linux/build/js-config.h"],
-            "//bazel/config:macos_aarch64": ["-include", "third_party/mozjs/platform/aarch64/macOS/build/js-config.h"],
-            "//bazel/config:macos_x86_64": ["-include", "third_party/mozjs/platform/x86_64/macOS/build/js-config.h"],
-            "//bazel/config:windows_x86_64": ["/FI" + "third_party/mozjs/platform/x86_64/windows/build/js-config.h"],
-        })
-
-    return []
 
 def force_includes_hdr(package_name, name):
     if package_name.startswith("src/mongo"):
@@ -384,25 +320,6 @@ def force_includes_hdr(package_name, name):
             "//bazel/config:macos_x86_64": ["//src/third_party/mozjs:platform/x86_64/macOS/build/js-config.h"],
             "//bazel/config:windows_x86_64": ["//src/third_party/mozjs:/platform/x86_64/windows/build/js-config.h"],
         })
-
-    return []
-
-# TODO(SERVER-103006): Stop including this flag when ASP is able to upgrade mongoc and mongocxx
-STREAMS_THIRD_PARTY_DIR = "src/mongo/db/modules/enterprise/src/streams/third_party"
-
-def package_specific_copt(package_name):
-    if package_name.startswith("src/third_party"):
-        return MONGO_COPTS_THIRD_PARTY
-    if package_name.startswith(STREAMS_THIRD_PARTY_DIR):
-        return UBSAN_OPTS_THIRD_PARTY
-
-    return []
-
-def package_specific_linkflag(package_name):
-    if package_name.startswith("src/third_party"):
-        return MONGO_LINKFLAGS_THIRD_PARTY
-    if package_name.startswith(STREAMS_THIRD_PARTY_DIR):
-        return UBSAN_OPTS_THIRD_PARTY
 
     return []
 
@@ -601,13 +518,9 @@ def mongo_cc_library(
             "//conditions:default": {},
         })
 
-    fincludes_copt = force_includes_copt(native.package_name(), name)
+    copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
-    package_specific_copts = package_specific_copt(native.package_name())
-    package_specific_linkflags = package_specific_linkflag(native.package_name())
-
-    if not skip_windows_crt_flags:
-        package_specific_copts += WINDOWS_MULTITHREAD_RUNTIME_COPTS
+    linkopts = get_linkopts(native.package_name(), linkopts)
 
     if mongo_api_name:
         visibility_support_defines_list = ["MONGO_USE_VISIBILITY", "MONGO_API_" + mongo_api_name]
@@ -672,10 +585,10 @@ def mongo_cc_library(
         textual_hdrs = textual_hdrs,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
+        copts = copts,
         data = data,
         tags = tags + ["mongo_library"],
-        linkopts = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts,
+        linkopts = linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
         defines = defines,
@@ -703,10 +616,10 @@ def mongo_cc_library(
         textual_hdrs = textual_hdrs,
         visibility = visibility,
         testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
+        copts = copts,
         data = data,
         tags = tags + ["mongo_library"],
-        linkopts = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts,
+        linkopts = linkopts,
         linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
@@ -745,7 +658,7 @@ def mongo_cc_library(
         deps = [name + WITH_DEBUG_SUFFIX + "_ownership_remapped"] if linkshared else [name + WITH_DEBUG_SUFFIX],
         visibility = visibility,
         tags = tags + ["mongo_library"],
-        user_link_flags = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
+        user_link_flags = get_linkopts(native.package_name()) + undefined_ref_flag + non_transitive_dyn_linkopts + rpath_flags + visibility_support_shared_flags,
         target_compatible_with = shared_library_compatible_with + target_compatible_with + enterprise_compatible,
         dynamic_deps = dynamic_deps,
         shared_lib_name = shared_lib_name,
@@ -889,12 +802,9 @@ def _mongo_cc_binary_and_test(
             "//conditions:default": {},
         })
 
-    fincludes_copt = force_includes_copt(native.package_name(), name)
+    copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
-    package_specific_copts = package_specific_copt(native.package_name())
-    package_specific_linkflags = package_specific_linkflag(native.package_name())
-    if not skip_windows_crt_flags:
-        package_specific_copts += WINDOWS_MULTITHREAD_RUNTIME_COPTS
+    linkopts = get_linkopts(native.package_name(), linkopts)
 
     all_deps = deps
 
@@ -949,10 +859,10 @@ def _mongo_cc_binary_and_test(
         "deps": all_deps + [name + HEADER_DEP_SUFFIX],
         "visibility": visibility,
         "testonly": testonly,
-        "copts": MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
+        "copts": copts,
         "data": data + SANITIZER_DATA,
         "tags": tags,
-        "linkopts": MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags + select({
+        "linkopts": linkopts + rpath_flags + select({
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//bazel/config:bolt_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//conditions:default": [],

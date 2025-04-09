@@ -11,7 +11,7 @@ load(
 )
 
 # Flags listed in this file is only visible to the bazel build system.
-visibility("//bazel")
+visibility("//bazel/toolchains/cc")
 
 LINUX_OPT_COPTS = select({
     # This is opt=debug, not to be confused with (opt=on && dbg=on)

@@ -1,7 +1,7 @@
 """This file contains compiler flags that is specific to Mac C++ compiling and linking."""
 
 # Flags listed in this file is only visible to the bazel build system.
-visibility("//bazel")
+visibility("//bazel/toolchains/cc")
 
 MACOS_WARNINGS_COPTS = select({
     "@platforms//os:macos": [

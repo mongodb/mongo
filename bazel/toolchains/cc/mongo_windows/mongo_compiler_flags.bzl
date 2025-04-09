@@ -1,7 +1,10 @@
 """This file contains compiler flags that is specific to Windows C++ compiling and linking."""
 
 # Flags listed in this file is only visible to the bazel build system.
-visibility("//bazel")
+visibility([
+    "//bazel/toolchains/cc",
+    "//bazel",
+])
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
 #   /MD defines _MT and _DLL and links in MSVCRT.lib into each .obj file
