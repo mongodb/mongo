@@ -27,27 +27,28 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <utility>
+
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
+namespace {
 
-class ServiceContext;
+const auto& replSetMemberInStandaloneMode = ServiceContext::declareDecoration<bool>();
 
-/**
- * Returns the boolean decoration on 'serviceCtx', which indicates whether or not this is a replica
- * set member running in standalone mode.
- *
- * This method will hit an invariant if the decoration wasn't set before using it.
- */
-bool getReplSetMemberInStandaloneMode(ServiceContext* serviceCtx);
+}  // namespace
 
-/**
- * Sets the boolean decoration on 'serviceCtx', which indicates whether or not this is a replica set
- * member running in standalone mode.
- *
- * This method will hit an invariant if the decoration was previously set.
- */
+bool getReplSetMemberInStandaloneMode(ServiceContext* serviceCtx) {
+    return replSetMemberInStandaloneMode(serviceCtx);
+}
+
 void setReplSetMemberInStandaloneMode(ServiceContext* serviceCtx,
-                                      bool isReplSetMemberInStandaloneMode);
+                                      bool isReplSetMemberInStandaloneMode) {
+    auto& replSetMemberInStandaloneModeBool = replSetMemberInStandaloneMode(serviceCtx);
+    invariant(!replSetMemberInStandaloneModeBool || isReplSetMemberInStandaloneMode);
+    replSetMemberInStandaloneModeBool = isReplSetMemberInStandaloneMode;
+}
 
 }  // namespace mongo

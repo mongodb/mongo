@@ -259,9 +259,6 @@ filters:
   - "server_lifecycle_monitor*":
     approvers:
       - 10gen/server-programmability
-  - "repl_set_member_in_standalone_mode*":
-    approvers:
-      - 10gen/server-storage-engine-integration
   - "server_recovery*":
     approvers:
       - 10gen/server-storage-engine-integration

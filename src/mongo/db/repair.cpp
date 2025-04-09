@@ -53,7 +53,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repair.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"

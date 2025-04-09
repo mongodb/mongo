@@ -75,6 +75,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -157,6 +158,34 @@ boost::filesystem::path getOngoingBackupPath() {
         WiredTigerBackup::kOngoingBackupFile;
 }
 
+// There are a few delicate restore scenarios where untimestamped writes are still required.
+bool allowUntimestampedWrites() {
+    // Magic restore may need to perform untimestamped writes on timestamped tables as a part of
+    // the server automated restore procedure.
+    if (storageGlobalParams.magicRestore) {
+        return true;
+    }
+
+    if (!gAllowUnsafeUntimestampedWrites) {
+        return false;
+    }
+
+    // Ignore timestamps in selective restore mode.
+    if (storageGlobalParams.restore) {
+        return true;
+    }
+
+    // We can safely ignore setting this configuration option when recovering from the
+    // oplog as standalone because:
+    // 1. Replaying oplog entries write with a timestamp.
+    // 2. The instance is put in read-only mode after oplog application has finished.
+    if (getReplSetMemberInStandaloneMode(getGlobalServiceContext()) &&
+        !repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        return true;
+    }
+
+    return false;
+}
 }  // namespace
 
 std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
@@ -1420,7 +1449,11 @@ void WiredTigerKVEngine::setOldestActiveTransactionTimestampCallback(
 };
 
 std::unique_ptr<RecoveryUnit> WiredTigerKVEngine::newRecoveryUnit() {
-    return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
+    if (MONGO_unlikely(allowUntimestampedWrites())) {
+        ru->allowAllUntimestampedWrites();
+    }
+    return ru;
 }
 
 void WiredTigerKVEngine::setRecordStoreExtraOptions(const std::string& options) {

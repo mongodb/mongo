@@ -56,7 +56,11 @@ mongo_cc_library(
 mongo_cc_library(
     name = "repl_settings",
     srcs = [
+        "repl_set_member_in_standalone_mode.cpp",
         "repl_settings.cpp",
+    ],
+    hdrs = [
+        "repl_set_member_in_standalone_mode.h",
     ],
     deps = [
         ":repl_server_parameters",  # TODO(SERVER-93876): Remove.
