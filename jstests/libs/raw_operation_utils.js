@@ -33,8 +33,9 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export function isBinaryCompatibleFlagEnabledAndStable(db, flagName) {
     const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db, flagName);
-    if (FeatureFlagUtil.getFeatureFlagDocStatus(db, flagDoc) !==
-        FeatureFlagUtil.FlagStatus.kEnabled) {
+    if (!flagDoc ||
+        FeatureFlagUtil.getFeatureFlagDocStatus(db, flagDoc) !==
+            FeatureFlagUtil.FlagStatus.kEnabled) {
         return false;
     }
 
