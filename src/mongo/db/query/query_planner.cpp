@@ -100,35 +100,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-namespace log_detail {
-void logSubplannerIndexEntry(const IndexEntry& entry, size_t childIndex) {
-    LOGV2_DEBUG(20598,
-                5,
-                "Subplanner: index number and entry",
-                "indexNumber"_attr = childIndex,
-                "indexEntry"_attr = entry);
-}
-
-void logCachedPlanFound(size_t numChildren, size_t childIndex) {
-    LOGV2_DEBUG(20599,
-                5,
-                "Subplanner: cached plan found",
-                "childIndex"_attr = childIndex,
-                "numChildren"_attr = numChildren);
-}
-
-void logCachedPlanNotFound(size_t numChildren, size_t childIndex) {
-    LOGV2_DEBUG(20600,
-                5,
-                "Subplanner: planning child",
-                "childIndex"_attr = childIndex,
-                "numChildren"_attr = numChildren);
-}
-
-void logNumberOfSolutions(size_t numSolutions) {
-    LOGV2_DEBUG(20601, 5, "Subplanner: number of solutions", "numSolutions"_attr = numSolutions);
-}
-}  // namespace log_detail
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(queryPlannerAlwaysFails);
@@ -2025,7 +1996,11 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
         const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
         // Be sure the key was not already in the map.
         invariant(insertionRes.second);
-        log_detail::logSubplannerIndexEntry(ie, i);
+        LOGV2_DEBUG(20598,
+                    5,
+                    "Subplanner: index number and entry",
+                    "indexNumber"_attr = ie,
+                    "indexEntry"_attr = i);
     }
 
     for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
@@ -2057,10 +2032,18 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
         }
 
         if (branchResult->cachedData) {
-            log_detail::logCachedPlanFound(planningResult.orExpression->numChildren(), i);
+            LOGV2_DEBUG(20599,
+                        5,
+                        "Subplanner: cached plan found",
+                        "childIndex"_attr = i,
+                        "numChildren"_attr = planningResult.orExpression->numChildren());
         } else {
             // No CachedSolution found. We'll have to plan from scratch.
-            log_detail::logCachedPlanNotFound(planningResult.orExpression->numChildren(), i);
+            LOGV2_DEBUG(20600,
+                        5,
+                        "Subplanner: planning child",
+                        "childIndex"_attr = i,
+                        "numChildren"_attr = planningResult.orExpression->numChildren());
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
@@ -2089,7 +2072,10 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
                 branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
             }
 
-            log_detail::logNumberOfSolutions(branchResult->solutions.size());
+            LOGV2_DEBUG(20601,
+                        5,
+                        "Subplanner: number of solutions",
+                        "numSolutions"_attr = branchResult->solutions.size());
         }
     }
 

@@ -35,6 +35,8 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 // Forward declarations.
 namespace mongo::sbe::plan_ranker {
 std::unique_ptr<mongo::plan_ranker::PlanScorer<PlanStageStats>> makePlanScorer(
@@ -186,11 +188,21 @@ void addTieBreakingHeuristicsBonuses(
 
         // Log tie breaking bonuses.
         for (const auto& score : scores) {
-            log_detail::logTieBreaking(score.score,
-                                       score.docsExaminedBonus,
-                                       score.indexPrefixBonus,
-                                       score.distinctScanBonus,
-                                       score.isPlanTied);
+            LOGV2_DEBUG(
+                8027500, 2, "Tie breaking heuristics", "formula"_attr = [&]() {
+                    StringBuilder sb;
+                    sb << "isPlanTied: " << score.isPlanTied << ". finalScore("
+                       << str::convertDoubleToString(score.score + score.docsExaminedBonus +
+                                                     score.indexPrefixBonus)
+                       << ") = score(" << str::convertDoubleToString(score.score)
+                       << ") + docsExaminedBonus("
+                       << str::convertDoubleToString(score.docsExaminedBonus)
+                       << ") + indexPrefixBonus("
+                       << str::convertDoubleToString(score.indexPrefixBonus)
+                       << ") + distinctScanBonus("
+                       << str::convertDoubleToString(score.distinctScanBonus);
+                    return sb.str();
+                }());
         }
 
         for (auto& scoreAndIndex : scoresAndCandidateIndices) {
@@ -235,19 +247,26 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
             candidates[i].root, candidates[i].solution->_enumeratorExplainInfo);
 
         if (candidates[i].status.isOK()) {
-            log_detail::logScoringPlan([&]() { return candidates[i].solution->toString(); },
-                                       [&]() {
-                                           auto&& [stats, _] = explainer->getWinningPlanStats(
-                                               ExplainOptions::Verbosity::kExecStats);
-                                           return stats.jsonString(ExtendedRelaxedV2_0_0, true);
-                                       },
-                                       [&]() { return explainer->getPlanSummary(); },
-                                       i,
-                                       statTrees[i]->common.isEOF);
+            LOGV2_DEBUG(20956,
+                        5,
+                        "Scoring plan",
+                        "planIndex"_attr = i,
+                        "querySolution"_attr = redact(candidates[i].solution->toString()),
+                        "stats"_attr = redact([&]() {
+                            auto&& [stats, _] = explainer->getWinningPlanStats(
+                                ExplainOptions::Verbosity::kExecStats);
+                            return stats.jsonString(ExtendedRelaxedV2_0_0, true);
+                        }()));
+            LOGV2_DEBUG(20957,
+                        2,
+                        "Scoring query plan",
+                        "planSummary"_attr = explainer->getPlanSummary(),
+                        "planHitEOF"_attr = statTrees[i]->common.isEOF);
+
             double score = makePlanScorer()->calculateScore(statTrees[i].get(), cq);
-            log_detail::logScore(score);
+            LOGV2_DEBUG(20958, 5, "Basic plan score", "score"_attr = score);
             if (statTrees[i]->common.isEOF) {
-                log_detail::logEOFBonus(eofBonus);
+                LOGV2_DEBUG(20959, 5, "Adding EOF bonus to score", "eofBonus"_attr = eofBonus);
                 score += 1;
             }
 
@@ -260,7 +279,10 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
             documentsExamined.push_back(stats.totalDocsExamined);
         } else {
             failed.push_back(i);
-            log_detail::logFailedPlan([&] { return explainer->getPlanSummary(); });
+            LOGV2_DEBUG(20960,
+                        2,
+                        "Not scoring a plan because the plan failed",
+                        "planSummary"_attr = explainer->getPlanSummary());
         }
     }
 
@@ -310,3 +332,5 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     return StatusWith<std::unique_ptr<PlanRankingDecision>>(std::move(why));
 }
 }  // namespace mongo::plan_ranker
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

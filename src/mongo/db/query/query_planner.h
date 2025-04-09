@@ -50,16 +50,6 @@
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
-// The logging facility enforces the rule that logging should not be done in a header file. Since
-// template classes and functions below must be defined in the header file and since they use the
-// logging facility, we have to define the helper functions below to perform the actual logging
-// operation from template code.
-namespace log_detail {
-void logSubplannerIndexEntry(const IndexEntry& entry, size_t childIndex);
-void logCachedPlanFound(size_t numChildren, size_t childIndex);
-void logCachedPlanNotFound(size_t numChildren, size_t childIndex);
-void logNumberOfSolutions(size_t numSolutions);
-}  // namespace log_detail
 
 class Collection;
 class CollectionPtr;

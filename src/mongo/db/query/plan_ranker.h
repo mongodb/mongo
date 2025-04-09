@@ -53,40 +53,9 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/container_size_helper.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo::plan_ranker {
-// The logging facility enforces the rule that logging should not be done in a header file. Since
-// template classes and functions below must be defined in the header file and since they use the
-// logging facility, we have to define the helper functions below to perform the actual logging
-// operation from template code.
-// Note that we pass std::function callback instead of string values to avoid spending time
-// generating log output that may never actually be written to the logs, depending on the current
-// log level.
-namespace log_detail {
-void logScoreFormula(std::function<std::string()> formula,
-                     double score,
-                     double baseScore,
-                     double productivity,
-                     double noFetchBonus,
-                     double noSortBonus,
-                     double noIxisectBonus,
-                     double tieBreakers,
-                     boost::optional<double> groupByDistinctBonus);
-void logScoreBoost(double score);
-void logScoreGroupByDistinctBoost(double bonus);
-void logScoringPlan(std::function<std::string()> solution,
-                    std::function<std::string()> explain,
-                    std::function<std::string()> planSummary,
-                    size_t planIndex,
-                    bool isEOF);
-void logScore(double score);
-void logEOFBonus(double eofBonus);
-void logFailedPlan(std::function<std::string()> planSummary);
-void logTieBreaking(double score,
-                    double docsFetchedBonus,
-                    double indexPrefixBonus,
-                    double distinctScanBonus,
-                    bool isPlanTied);
-}  // namespace log_detail
 
 // Constant used for tie breakers.
 const double kBonusEpsilon = 1e-4;
@@ -154,27 +123,40 @@ public:
             // distinct scan is not very productive (< 0.5) we don't want to prioritize it
             // too much; conversely, if it is very productive, we don't need a huge bonus.
             groupByDistinctBonus = std::min(1 - productivity, productivity);
-            log_detail::logScoreGroupByDistinctBoost(*groupByDistinctBonus);
+            LOGV2_DEBUG(9961700,
+                        5,
+                        "Adding groupByDistinctBonus, boost formula is: std::min(1 - productivity, "
+                        "productivity)",
+                        "groupByDistinctBonus"_attr = *groupByDistinctBonus);
         }
 
         double score = baseScore + productivity + tieBreakers + groupByDistinctBonus.value_or(0.0);
 
-        log_detail::logScoreFormula([this, stats] { return getProductivityFormula(stats); },
-                                    score,
-                                    baseScore,
-                                    productivity,
-                                    noFetchBonus,
-                                    noSortBonus,
-                                    noIxisectBonus,
-                                    tieBreakers,
-                                    groupByDistinctBonus);
+        LOGV2_DEBUG(
+            20961, 2, "Score formula", "formula"_attr = [&]() {
+                StringBuilder sb;
+                sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
+                   << str::convertDoubleToString(baseScore) << ")"
+                   << " + productivity(" << getProductivityFormula(stats) << " = "
+                   << str::convertDoubleToString(productivity) << ")"
+                   << " + tieBreakers(" << str::convertDoubleToString(noFetchBonus)
+                   << " noFetchBonus + " << str::convertDoubleToString(noSortBonus)
+                   << " noSortBonus + " << str::convertDoubleToString(noIxisectBonus)
+                   << " noIxisectBonus = " << str::convertDoubleToString(tieBreakers) << ")";
+                if (groupByDistinctBonus) {
+                    sb << " + groupByDistinctBonus(" << *groupByDistinctBonus << ")";
+                }
+                return sb.str();
+            }());
+
 
         if (internalQueryForceIntersectionPlans.load()) {
             if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
                 // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
                 // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
                 score += 3;
-                log_detail::logScoreBoost(score);
+                LOGV2_DEBUG(
+                    20962, 5, "Score boosted due to intersection forcing", "newScore"_attr = score);
             }
         }
 
@@ -254,3 +236,5 @@ using CandidatePlan = BaseCandidatePlan<PlanStage*, WorkingSetID, WorkingSet*>;
  */
 std::vector<size_t> applyIndexPrefixHeuristic(const std::vector<const QuerySolution*>& solutions);
 }  // namespace mongo::plan_ranker
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
