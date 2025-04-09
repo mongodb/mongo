@@ -47,6 +47,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/metadata/audit_client_attrs.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/util/assert_util.h"
@@ -71,6 +72,11 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
             setImpersonatedUserMetadata(metadata);
         }
     }
+
+    if (auto auditClientAttrs = rpc::AuditClientAttrs::get(opCtx->getClient())) {
+        setAuditClientMetadata(std::move(auditClientAttrs));
+    }
+
     boost::optional<StringData> originalSecurityToken = boost::none;
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     if (vts != boost::none && !vts->getOriginalToken().empty()) {
@@ -96,6 +102,10 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
             AuthorizationSession::get(client)->setImpersonatedUserData(username,
                                                                        authMetadata.getRoles());
         }
+    }
+
+    if (const auto& optAuditClientMetadata = getAuditClientMetadata()) {
+        rpc::AuditClientAttrs::set(client, optAuditClientMetadata.value());
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());

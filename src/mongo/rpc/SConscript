@@ -141,6 +141,7 @@ env.Library(
     ],
     source=[
         'metadata/audit_client_attrs.cpp',
+        'metadata/audit_client_attrs.idl',
         'metadata/impersonated_user_metadata.cpp',
     ],
     LIBDEPS=[
