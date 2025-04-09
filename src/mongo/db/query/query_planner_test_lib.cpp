@@ -615,9 +615,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         BSONElement filter = ixscanObj["filter"];
-        if (filter.eoo()) {
-            return Status::OK();
-        } else if (filter.isNull()) {
+        if (filter.isNull() || filter.eoo()) {
             if (ixn->filter == nullptr) {
                 return Status::OK();
             }
