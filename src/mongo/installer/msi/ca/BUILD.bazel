@@ -17,9 +17,6 @@ mongo_cc_library(
         "//src/mongo/platform:compiler.h",
         "//src/mongo/util:scopeguard.h",
     ],
-    additional_linker_inputs = [
-        ":CustomAction.def",
-    ],
     copts = select({
         "//bazel/config:dbg_enabled": [
             "/MTd",
@@ -34,9 +31,6 @@ mongo_cc_library(
         "Advapi32.lib",
     ],
     linkshared = True,
-    non_transitive_dyn_linkopts = [
-        "/DEF:$(location :CustomAction.def)",
-    ],
     # We don't want any special allocator here either.
     skip_global_deps = [
         "allocator",
@@ -51,5 +45,6 @@ mongo_cc_library(
         "@platforms//os:windows": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+    win_def_file = ":CustomAction.def",
     deps = [],
 )

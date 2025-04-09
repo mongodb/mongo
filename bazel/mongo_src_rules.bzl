@@ -492,6 +492,7 @@ def mongo_cc_library(
         linkshared = False,
         skip_windows_crt_flags = False,
         shared_lib_name = "",
+        win_def_file = None,
         **kwargs):
     """Wrapper around cc_library.
 
@@ -754,6 +755,7 @@ def mongo_cc_library(
         }),
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
+        win_def_file = win_def_file,
     )
 
     shared_library = select({
