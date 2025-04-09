@@ -72,7 +72,7 @@ static char home[1024]; /* Program working dir */
 #define MAX_BACKUP_INVL 4 /* Maximum interval between backups */
 #define MAX_CKPT_INVL 5   /* Maximum interval between checkpoints */
 #define MAX_TH 200        /* Maximum configurable threads */
-#define MAX_TIME 40
+#define MAX_TIME 120
 #define MAX_VAL 1024
 #define MIN_TH 5
 #define MIN_TIME 10

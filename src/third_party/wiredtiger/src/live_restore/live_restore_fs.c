@@ -1859,7 +1859,7 @@ __live_restore_fs_remove(
 
     WT_RET(__live_restore_fs_find_layer(fs, session, name, &layer));
     if (layer == WTI_LIVE_RESTORE_FS_LAYER_NONE)
-        return (0);
+        return (ENOENT);
 
     /*
      * It's possible to call remove on a file that hasn't yet been created in the destination. In
@@ -1915,8 +1915,19 @@ __live_restore_fs_rename(
         WT_RET_MSG(session, ENOENT, "Live restore cannot find: %s", from);
 
     /*
-     * Any call to rename should succeed from WiredTiger's perspective thus if the file can't be
-     * renamed as it does not exist in the destination that means something doesn't add up.
+     * A call to rename must succeed from the perspective of WiredTiger, it knows that the file that
+     * it wants to rename exists. As a result of deprecating schema->rename WiredTiger will only
+     * ever rename regular files. Thus files can never be in a partially migrated state during a
+     * rename.
+     *
+     * The typical rename scenario is when WiredTiger creates a new temporary turtle file,
+     * initializes it and then renames it over the top of the existing one. The act of creation
+     * followed by writing to it means that it must exist in the destination for it to be renamed.
+     *
+     * We leverage this and the regular file copy-on-open behavior to enforce that renamed files
+     * must first exist in the destination. Sadly at this level we cannot check whether a file is a
+     * regular file or not as we only have access to the file system, not the individual file
+     * handles.
      */
     if (which != WTI_LIVE_RESTORE_FS_LAYER_DESTINATION)
         WT_RET_MSG(session, EINVAL, "Rename failed as file does not exist in destination");

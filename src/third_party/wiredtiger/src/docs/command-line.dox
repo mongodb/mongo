@@ -254,7 +254,7 @@ database.  If a URI is specified as an argument, only information about
 that data source is printed.
 
 @subsection util_list_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [uri]`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [-f output] [uri]`
 
 @subsection util_list_options Options
 The following are command-specific options for the \c list command:
@@ -262,6 +262,10 @@ The following are command-specific options for the \c list command:
 @par \c -c
 If the \c -c option is specified, the data source's checkpoints are printed
 in a human-readable format.
+
+@par \c -f
+By default, the \c list command output is written to the standard output;
+the \c -f option re-directs the output to the specified file.
 
 @par \c -v
 If the \c -v option is specified, the data source's complete schema table
