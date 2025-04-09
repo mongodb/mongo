@@ -157,8 +157,7 @@ export function getPartialFilterPredicateArb({leafArb = leafParameterArb} = {}) 
     return getMatchPredicateSpec({
                leafArb,
                maxDepth: 2,
-               // TODO SERVER-102825 reenable $or
-               allowOrs: false,
+               allowOrs: true,
                allowNors: false,
                allowNot: false,
                // $ne not allowed
