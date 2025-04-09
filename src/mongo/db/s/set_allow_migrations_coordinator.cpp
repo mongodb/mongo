@@ -70,7 +70,10 @@ namespace mongo {
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        if (coll.getUnsplittable().value_or(false)) {
+            return false;
+        }
         return true;
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The collection is unsharded or doesn't exist
