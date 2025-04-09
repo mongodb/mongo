@@ -235,10 +235,32 @@ function testLargeSetFunction() {
     jsTestLog("Testing large $setIntersection");
 
     const fieldExprs = [];
-    for (let j = 1; j <= 13000; j++) {
+    for (let j = 1; j <= 750000; j++) {
         fieldExprs.push("$a" + j);
     }
     const pipeline = [{$project: {a: {$setIntersection: fieldExprs}}}, {$group: {_id: "$a"}}];
+    runAgg(pipeline);
+}
+
+function testLargeConcatFunction() {
+    jsTestLog("Testing large $concat");
+
+    const fieldExprs = [];
+    for (let j = 1; j <= 750000; j++) {
+        fieldExprs.push("$a" + j);
+    }
+    const pipeline = [{$project: {a: {$concat: fieldExprs}}}];
+    runAgg(pipeline);
+}
+
+function testLargeArrayToObjectFunction() {
+    jsTestLog("Testing large $arrayToObject");
+
+    const fieldExprs = [];
+    for (let j = 1; j <= 200000; j++) {
+        fieldExprs.push(["a" + j, j]);
+    }
+    const pipeline = [{$project: {a: {$arrayToObject: [fieldExprs]}}}];
     runAgg(pipeline);
 }
 
@@ -251,7 +273,9 @@ const tests = [
     testDeeplyNestedPath,
     testNestedAndOr,
     testPipelineLimits,
-    testLargeSetFunction
+    testLargeSetFunction,
+    testLargeConcatFunction,
+    testLargeArrayToObjectFunction
 ];
 
 for (const test of tests) {
