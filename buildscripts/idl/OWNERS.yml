@@ -8,13 +8,13 @@ filters:
       - 10gen/devprod-build
   - "compatibility_rules.yml":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "idl_check_compatibility.py":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "idl_compatibility_errors.py":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "test_compatibility.py":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization

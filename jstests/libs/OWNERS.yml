@@ -11,7 +11,7 @@ filters:
       - 10gen/server-cluster-scalability
   - "*golden_test.js":
     approvers:
-      - 10gen/query-optimization-golden-test
+      - 10gen/query-optimization
   - "sharded_cluster_fixture_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -53,7 +53,7 @@ filters:
       - 10gen/query-integration-search-testing
   - "shard_targeting_util.js":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "api_version_helpers.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization

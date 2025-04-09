@@ -17,7 +17,7 @@ filters:
       - 10gen/query-integration-analytic-extensions
   - "agg_explain_fmt.js":
     approvers:
-      - 10gen/query-optimization-explain
+      - 10gen/query-optimization
   - "*targeting*":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization

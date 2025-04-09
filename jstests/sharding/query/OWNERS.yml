@@ -11,16 +11,16 @@ filters:
       - 10gen/query-execution-router-query-exec
   - "*plan_cache*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "*target*":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "exact_shard_key_target.js":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "hidden_index.js":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "sharded_profile.js":
     approvers:
       - 10gen/query-integration-observability
@@ -38,7 +38,7 @@ filters:
       - 10gen/query-execution-client-cursor
   - "lookup_from_config_cache_chunks.js":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "stats.js":
     approvers:
       - 10gen/query-integration-observability

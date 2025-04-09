@@ -10,7 +10,7 @@ filters:
       - 10gen/query-integration-staff-leads
   - "cluster_analyze_cmd.cpp":
     approvers:
-      - 10gen/query-optimization-statistics
+      - 10gen/query-optimization
   - "cluster_current_op.cpp":
     approvers:
       - 10gen/query-integration-observability
@@ -28,7 +28,7 @@ filters:
       - 10gen/query-execution-query-settings
   - "cluster_plan_cache_clear_cmd.cpp":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "cluster_profile_cmd.cpp":
     approvers:
       - 10gen/query-integration-observability

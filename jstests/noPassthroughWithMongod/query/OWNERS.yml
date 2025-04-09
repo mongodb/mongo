@@ -8,7 +8,7 @@ filters:
       - 10gen/query-integration-query-stats
   - "plan_cache*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "cbr_infrastructure.js":
     approvers:
       - 10gen/query-optimization-cost-based-ranker

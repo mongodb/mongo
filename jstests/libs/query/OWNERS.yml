@@ -5,7 +5,7 @@ filters:
       - 10gen/query
   - "analyze_plan.js":
     approvers:
-      - 10gen/query-optimization-explain
+      - 10gen/query-optimization
   - "aggregation_pipeline_utils.js":
     approvers:
       - 10gen/query
@@ -26,4 +26,4 @@ filters:
       - 10gen/query-execution-sbe
   - "wildcard_index_helpers.js":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization

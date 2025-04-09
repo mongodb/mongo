@@ -11,7 +11,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "view_definition_feature_compatibility_version.js":
     approvers:
-      - 10gen/query-optimization-views
+      - 10gen/query-optimization
   - "1_test_launching_replset.js":
     approvers:
       - 10gen/server-replication

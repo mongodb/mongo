@@ -8,7 +8,7 @@ filters:
   # unit tests.
   - "golden_test*":
     approvers:
-      - 10gen/query-optimization-golden-test
+      - 10gen/query-optimization
   - "ensure_fcv.h":
     approvers:
       - 10gen/server-fcv

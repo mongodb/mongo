@@ -15,17 +15,17 @@ filters:
   # owned by QO by default.
   - "*.idl":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   # This file deals primarily with parsing for accumulators, and is therefore owned by QO.
   - "accumulation_statement*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "accumulator*":
     approvers:
       - 10gen/query-execution-aggregation
   - "aggregation_request*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "aggregation_context_fixture.h":
     approvers:
       - 10gen/query-optimization
@@ -43,7 +43,7 @@ filters:
       - 10gen/query-optimization
   - "dependencies*":
     approvers:
-      - 10gen/query-optimization-heuristic-rewrite
+      - 10gen/query-optimization
   - "dispatch_shard_pipeline_test.cpp":
     approvers:
       - 10gen/query-optimization
@@ -76,7 +76,7 @@ filters:
       - 10gen/query-integration-timeseries
   - "document_source_parsing_validators*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "document_source_query_stats*":
     approvers:
       - 10gen/query-integration-query-stats
@@ -112,7 +112,7 @@ filters:
       - 10gen/query-optimization
   - "expression*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "expression_find_internal*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -130,7 +130,7 @@ filters:
       - 10gen/query-optimization
   - "expression_dependencies*":
     approvers:
-      - 10gen/query-optimization-heuristic-rewrite
+      - 10gen/query-optimization
   - "expression_javascript*":
     approvers:
       - 10gen/query-integration-javascript
@@ -139,10 +139,10 @@ filters:
       - 10gen/query-integration-javascript
   - "expression_visitor*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "expression_walker*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "field_path*":
     approvers:
       - 10gen/query-optimization
@@ -178,7 +178,7 @@ filters:
       - 10gen/query-execution-aggregation
   - "lite_parsed*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "partition_key_comparator*":
     approvers:
       - 10gen/query-integration-analytic-extensions
@@ -223,10 +223,10 @@ filters:
       - 10gen/query-execution-write-exec
   - "split_pipeline*":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "sharded_agg_helpers*":
     approvers:
-      - 10gen/query-optimization-cluster-planning
+      - 10gen/query-optimization
   - "merge_processor*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -240,7 +240,7 @@ filters:
       - 10gen/query-integration-fle
   - "plan_explainer*":
     approvers:
-      - 10gen/query-optimization-explain
+      - 10gen/query-optimization
   - "plan_executor_pipeline*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -252,7 +252,7 @@ filters:
       - 10gen/query-optimization
   - "semantic_analysis*":
     approvers:
-      - 10gen/query-optimization-heuristic-rewrite
+      - 10gen/query-optimization
   - "sequential_document_cache*":
     approvers:
       - 10gen/query-execution-aggregation

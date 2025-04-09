@@ -10,13 +10,13 @@ filters:
       - 10gen/query-integration-staff-leads
   - "find_and_modify_invalid_query_params.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "find_and_modify_metrics.js":
     approvers:
       - 10gen/query-integration-observability
   - "find_and_modify_pipeline_update.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "find_and_modify_where.js":
     approvers:
       - 10gen/query-integration-javascript

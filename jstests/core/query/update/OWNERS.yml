@@ -10,10 +10,10 @@ filters:
       - 10gen/query-integration-staff-leads
   - "update_hint.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "update_metrics.js":
     approvers:
       - 10gen/query-integration-observability
   - "update_arrayFilters.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization

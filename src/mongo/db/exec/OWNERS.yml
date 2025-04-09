@@ -19,22 +19,22 @@ filters:
       - 10gen/query-integration-geo
   - "cached_plan*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "multi_plan*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "subplan*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "plan_cache*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "trial_period_utils*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "trial_run_tracker.h":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "trial_stage*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization

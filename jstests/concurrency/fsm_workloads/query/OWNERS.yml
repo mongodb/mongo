@@ -8,10 +8,10 @@ filters:
       - 10gen/query-execution-sbe
   - "plan_cache_drop_database.js":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "profile_command.js":
     approvers:
       - 10gen/query-integration-observability
   - "drop_index_during_replan.js":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization

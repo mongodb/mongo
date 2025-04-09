@@ -22,4 +22,4 @@ filters:
       - 10gen/query-integration-analytic-extensions
   - "percentiles_syntax.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization

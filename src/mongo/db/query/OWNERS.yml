@@ -19,22 +19,22 @@ filters:
       - 10gen/query-execution-index-access-stats
   - "collection_query_info*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "eof_node_type*":
     approvers:
       - 10gen/query-optimization
   - "explain*":
     approvers:
-      - 10gen/query-optimization-explain
+      - 10gen/query-optimization
   - "expression_walker*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "index_bounds.*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "indexability*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "plan_summary_stats*":
     approvers:
       - 10gen/query-execution
@@ -61,28 +61,28 @@ filters:
       - 10gen/query-integration-geo
   - "plan_explainer*":
     approvers:
-      - 10gen/query-optimization-explain
+      - 10gen/query-optimization
   - "bind_input_params*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "interval_evaluation_tree*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "partitioned_cache.h":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "canonical_query*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "canonical_query_encoder*":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "plan_rank*":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "*.idl":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "query_feature_flags.idl":
     approvers:
       # Almost every project will create and adjust a feature flag.
@@ -92,49 +92,49 @@ filters:
       - 10gen/query
   - "projection_parser*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "hint_parser*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "parsed*":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "canonical_distinct*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "projection_ast*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "projection_policies.h":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "projection_test.cpp":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "projection.*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "sort_pattern*":
     approvers:
-      - 10gen/query-optimization-logical-models
+      - 10gen/query-optimization
   - "query_planner*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "query_solution*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "planner*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "interval.*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "interval_test.*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "index_tag*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization
   - "index_bounds_builder*":
     approvers:
-      - 10gen/query-optimization-planner
+      - 10gen/query-optimization

@@ -32,10 +32,10 @@ filters:
       - 10gen/query-execution-change-streams
   - "core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "core_repeat_queries.yml":
     approvers:
-      - 10gen/query-optimization-plan-cache
+      - 10gen/query-optimization
   - "replica_sets_jscore_pqs*":
     approvers:
       - 10gen/query-execution-query-settings

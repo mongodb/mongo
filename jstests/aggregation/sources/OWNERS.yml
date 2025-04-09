@@ -12,7 +12,7 @@ filters:
       - 10gen/query-integration-staff-leads
   - "collection_uuid_coll_stats_index_stats.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "multiple_unpack_bucket_error.js":
     approvers:
       - 10gen/query-integration-timeseries
@@ -21,7 +21,7 @@ filters:
       - 10gen/query-integration-search
   - "single_stage_alias_error.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "sort_by_count_validation.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization

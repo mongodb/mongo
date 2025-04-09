@@ -5,7 +5,7 @@ filters:
       - 10gen/query
   - "boolean_expression_simplification.js":
     approvers:
-      - 10gen/query-optimization-heuristic-rewrite
+      - 10gen/query-optimization
   - "noop_writes.js":
     approvers:
       - 10gen/query-execution-write-exec

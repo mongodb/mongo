@@ -17,7 +17,7 @@ filters:
       - 10gen/server-index-builds
   - "insert_test.cpp":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "jsobjtests.cpp":
     approvers:
       - 10gen/server-programmability
@@ -53,10 +53,10 @@ filters:
       - 10gen/query-execution
   - "plan_ranking.cpp":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "query_stage_multiplan.cpp":
     approvers:
-      - 10gen/query-optimization-runtime-planners
+      - 10gen/query-optimization
   - "catalogtests.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
