@@ -118,6 +118,18 @@ TEST(AddFieldsProjectionExecutorSpec, ThrowsOnCreationWithInvalidObjectsOrExpres
                   AssertionException);
 }
 
+TEST(AddFieldsProjectionExecutorSpec, EmbeddedNullBytes) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    // Literals with embedded nulls are allowed as values.
+    AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("b" << "a\0b"_sd)));
+    // Embedded nulls are not allowed in field path expressions.
+    ASSERT_THROWS(AddFieldsProjectionExecutor::create(expCtx, BSON("a" << BSON("b" << "$a\0b"_sd))),
+                  AssertionException);
+    // It's not possible to construct a BSONObj with embedded nulls in field names, so such objects
+    // are not possible inputs to 'AddFieldsProjectionExecutor::create()'.
+    ASSERT_THROWS(BSON("a\0b"_sd << 1), AssertionException);
+}
+
 TEST(AddFieldsProjectionExecutor, DoesNotErrorOnEmptySpec) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddFieldsProjectionExecutor::create(expCtx, BSONObj());
