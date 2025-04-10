@@ -321,6 +321,11 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
             _groupProcessor.setIdExpression(parseIdExpression(pExpCtx, groupField, vps));
             invariant(!idExpressions.empty());
         } else if (pFieldName == kDoingMergeSpecField) {
+            uassert(ErrorCodes::Unauthorized,
+                    "Setting '$doingMerge' is not allowed in user requests",
+                    AuthorizationSession::get(getContext()->getOperationContext()->getClient())
+                        ->isAuthorizedForClusterAction(ActionType::internal, boost::none));
+
             massert(17030, "$doingMerge should be true if present", groupField.Bool());
 
             _groupProcessor.setDoingMerge(true);
