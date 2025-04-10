@@ -8,6 +8,7 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
@@ -18,7 +19,6 @@ let count = 0;
 
 const runTest = function(write, numExpectedDocs) {
     const coll = db["coll_" + count++];
-    const bucketsColl = db["system.buckets." + coll.getName()];
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
@@ -55,16 +55,18 @@ const runTest = function(write, numExpectedDocs) {
         }
     };
 
-    assert.commandWorked(bucketsColl.insert(uncompressedBucket));
+    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket,
+                                                                        getRawOperationSpec(db)));
     assert.eq(coll.find().itcount(), 2);
-    assert.eq(bucketsColl.find().itcount(), 1);
-    assert.eq(bucketsColl.find().toArray()[0].control.version,
+    assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
+    assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version,
               TimeseriesTest.BucketVersion.kUncompressed);
 
     assert.commandWorked(write(coll));
     assert.eq(coll.find().itcount(), numExpectedDocs);
-    assert.eq(bucketsColl.find().itcount(), 1);
-    assert(TimeseriesTest.isBucketCompressed(bucketsColl.find().toArray()[0].control.version));
+    assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
+    assert(TimeseriesTest.isBucketCompressed(
+        getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version));
 };
 
 runTest((coll) => coll.insert({t: time, m: 0, a: 2}, {ordered: false}), 3);

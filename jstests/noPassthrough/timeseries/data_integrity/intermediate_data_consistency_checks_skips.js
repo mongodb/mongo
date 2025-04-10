@@ -15,7 +15,6 @@ rst.initiate();
 
 const testDB = rst.getPrimary().getDB(jsTestName());
 const coll = testDB.coll;
-const bucketsColl = testDB.system.buckets.coll;
 const time = ISODate("2024-01-16T20:48:39.448Z");
 
 coll.drop();

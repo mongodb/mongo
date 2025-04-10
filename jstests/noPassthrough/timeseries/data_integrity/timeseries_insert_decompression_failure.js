@@ -8,6 +8,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 // This test intentionally corrupts a bucket, so disable testing diagnostics.
 TestData.testingDiagnosticsEnabled = false;
@@ -17,7 +18,6 @@ TimeseriesTest.run((insert) => {
 
     const db = conn.getDB(jsTestName());
     const coll = db.coll;
-    const bucketsColl = db.system.buckets.coll;
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
@@ -46,15 +46,20 @@ TimeseriesTest.run((insert) => {
             _id: BinData(7, "BwBlpuun5tLoSOCMN1CALgAAAAAAAAAA"),
         }
     };
-    assert.commandWorked(bucketsColl.insert(bucket));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
 
     // Corrupt the compressed "a" column so that the bucket cannot be decompressd.
-    const res = assert.commandWorked(bucketsColl.updateOne({_id: bucket._id}, {
-        $set: {
-            "data.a": BinData(
-                7, bucket.data.a.base64().substr(0, 11) + "B" + bucket.data.a.base64().substr(12))
-        }
-    }));
+    const res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
+        {_id: bucket._id},
+        {
+            $set: {
+                "data.a": BinData(
+                    7,
+                    bucket.data.a.base64().substr(0, 11) + "B" + bucket.data.a.base64().substr(12))
+            }
+        },
+        getRawOperationSpec(db)));
     assert.eq(res.modifiedCount, 1);
 
     assert.commandWorked(insert(coll, [
@@ -68,7 +73,8 @@ TimeseriesTest.run((insert) => {
     assert.eq(coll.find({m: 1}).itcount(), 3);
     assert.eq(coll.find({m: 2}).itcount(), 1);
 
-    const buckets = bucketsColl.find({meta: bucket.meta}).toArray();
+    const buckets =
+        getTimeseriesCollForRawOps(db, coll).find({meta: bucket.meta}).rawData().toArray();
     assert.eq(buckets.length, 2);
     assert(TimeseriesTest.isBucketCompressed(buckets[0].control.version));
     assert.eq(buckets[0].control.count, 2);

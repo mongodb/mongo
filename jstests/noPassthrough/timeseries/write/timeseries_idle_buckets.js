@@ -6,6 +6,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
@@ -17,7 +18,6 @@ const db = rst.getPrimary().getDB(jsTestName());
 assert.commandWorked(db.dropDatabase());
 
 const coll = db[jsTestName()];
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
@@ -64,10 +64,11 @@ for (let i = 0; i < numDocs; i++) {
     }));
 
     // Check buckets.
-    let bucketDocs =
-        bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
-            .limit(1)
-            .toArray();
+    let bucketDocs = getTimeseriesCollForRawOps(db, coll)
+                         .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+                         .rawData()
+                         .limit(1)
+                         .toArray();
     if (bucketDocs.length > 0) {
         foundExpiredBucket = true;
     }

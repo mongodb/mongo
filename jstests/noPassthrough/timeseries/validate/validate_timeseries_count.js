@@ -8,14 +8,12 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 let testCount = 0;
 const collNamePrefix = jsTestName();
-const bucketNamePrefix = "system.buckets." + jsTestName();
 let collName = collNamePrefix + testCount;
-let bucketName = bucketNamePrefix + testCount;
 let coll = null;
-let bucket = null;
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
@@ -24,16 +22,14 @@ jsTestLog(
     "Running the validate command to check that time-series bucket 'control.count' matches the number of measurements in version-2 buckets.");
 testCount += 1;
 collName = collNamePrefix + testCount;
-bucketName = bucketNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(db.createCollection(
     collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
 
 // Inserts documents into a bucket. Checks no issues are found.
 TimeseriesTest.insertManyDocs(coll);
-let res = bucket.validate();
+let res = coll.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
@@ -43,12 +39,10 @@ assert.eq(res.warnings.length, 0);
 jsTestLog("Manually changing the 'control.count' of a version-2 bucket.");
 testCount += 1;
 collName = collNamePrefix + testCount;
-bucketName = bucketNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(db.createCollection(
     collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
 // Using insertMany means that these inserts will be performed in the same WriteBatch because the
 // number of documents inserted is less than maxWriteBatchSize.  As a result, they are treated as
 // a single insert into the 'systems.buckets' collection. If we are always using compressed buckets
@@ -60,10 +54,11 @@ coll.insertMany([...Array(1002).keys()].map(i => ({
                                                 "temp": i
                                             })),
                 {ordered: false});
-bucket.updateOne(
+getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 2, 'control.version': TimeseriesTest.BucketVersion.kCompressedSorted},
-    {"$set": {"control.count": 10}});
-res = bucket.validate({checkBSONConformance: true});
+    {"$set": {"control.count": 10}},
+    getRawOperationSpec(db));
+res = coll.validate({checkBSONConformance: true});
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);

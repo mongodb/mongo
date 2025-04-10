@@ -8,6 +8,7 @@
  *   requires_getmore,
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 // Run TTL monitor constantly to speed up this test.
@@ -24,7 +25,6 @@ const defaultBucketMaxRange = 3600;
 
 const testCase = (testFn) => {
     const coll = testDB.getCollection('ts');
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(testDB.createCollection(coll.getName(), {
         timeseries: {
             timeField: timeFieldName,
@@ -33,11 +33,11 @@ const testCase = (testFn) => {
         expireAfterSeconds: expireAfterSeconds,
     }));
 
-    testFn(coll, bucketsColl);
+    testFn(coll);
     assert(coll.drop());
 };
 
-testCase((coll, bucketsColl) => {
+testCase((coll) => {
     // Insert two measurements that end up in the same bucket, but where the minimum is 5 minutes
     // earlier. Expect that the TTL monitor does not delete the data even though the bucket minimum
     // is past the expiry.
@@ -46,14 +46,14 @@ testCase((coll, bucketsColl) => {
     assert.commandWorked(coll.insert({[timeFieldName]: minTime, [metaFieldName]: "localhost"}));
     assert.commandWorked(coll.insert({[timeFieldName]: maxTime, [metaFieldName]: "localhost"}));
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 });
 
-testCase((coll, bucketsColl) => {
+testCase((coll) => {
     // Insert two measurements 5 minutes apart that end up in the same bucket and both are older
     // than the TTL expiry. Expect that the TTL monitor does not delete the data even though the
     // bucket minimum is past the expiry because it is waiting for the maximum bucket range to
@@ -63,14 +63,14 @@ testCase((coll, bucketsColl) => {
     assert.commandWorked(coll.insert({[timeFieldName]: minTime, [metaFieldName]: "localhost"}));
     assert.commandWorked(coll.insert({[timeFieldName]: maxTime, [metaFieldName]: "localhost"}));
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 });
 
-testCase((coll, bucketsColl) => {
+testCase((coll) => {
     // Insert two measurements 5 minutes apart that end up in the same bucket and both are older
     // than the TTL expiry and the maximum bucket range. Expect that the TTL monitor deletes the
     // data because the bucket minimum is past the expiry plus the maximum bucket range.
@@ -81,10 +81,10 @@ testCase((coll, bucketsColl) => {
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(0, coll.find().itcount());
-    assert.eq(0, bucketsColl.find().itcount());
+    assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 });
 
-testCase((coll, bucketsColl) => {
+testCase((coll) => {
     // Insert two measurements using insertMany that end up in the same bucket, but where the
     // minimum is 5 minutes earlier. Expect that the TTL monitor does not delete the data even
     // though the bucket minimum is past the expiry.
@@ -96,14 +96,14 @@ testCase((coll, bucketsColl) => {
     ]));
 
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 });
 
-testCase((coll, bucketsColl) => {
+testCase((coll) => {
     // Insert two measurements with insertMany 5 minutes apart that end up in the same bucket and
     // both are older than the TTL expiry and the maximum bucket range. Expect that the TTL monitor
     // deletes the data because the bucket minimum is past the expiry plus the maximum bucket range.
@@ -116,10 +116,10 @@ testCase((coll, bucketsColl) => {
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(0, coll.find().itcount());
-    assert.eq(0, bucketsColl.find().itcount());
+    assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 });
 
-testCase((coll, bucketsColl) => {
+testCase((coll) => {
     // Inserts measurements that fall into extended time range. Make sure TTL is able to make
     // progress in the presence of these dates. All inserts fall into separate buckets.
 
@@ -149,13 +149,12 @@ testCase((coll, bucketsColl) => {
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(3, coll.find().itcount());
-    assert.eq(3, bucketsColl.find().itcount());
+    assert.eq(3, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 });
 
 // Make a collection TTL using collMod. Ensure data expires correctly.
 (function newlyTTLWithCollMod() {
     const coll = testDB.getCollection('ts');
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(testDB.createCollection(coll.getName(), {
         timeseries: {
             timeField: timeFieldName,
@@ -171,7 +170,7 @@ testCase((coll, bucketsColl) => {
     assert.commandWorked(coll.insert({[timeFieldName]: maxTime, [metaFieldName]: "localhost"}));
 
     assert.eq(2, coll.find().itcount());
-    assert.eq(1, bucketsColl.find().itcount());
+    assert.eq(1, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 
     // Make the collection TTL and expect the data to be deleted because the bucket minimum is past
     // the expiry plus the maximum bucket range.
@@ -182,7 +181,7 @@ testCase((coll, bucketsColl) => {
 
     TTLUtil.waitForPass(coll.getDB("test"));
     assert.eq(0, coll.find().itcount());
-    assert.eq(0, bucketsColl.find().itcount());
+    assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 })();
 
 MongoRunner.stopMongod(conn);

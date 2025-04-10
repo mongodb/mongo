@@ -7,6 +7,7 @@
  * ]
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
@@ -69,8 +70,7 @@ restartReplicationOnSecondaries(replTest);
 awaitInsert();
 
 assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
-const buckets = bucketsColl.find().toArray();
+const buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray();
 assert.eq(buckets.length, 1, 'Expected one bucket but found: ' + tojson(buckets));
 const serverStatus = assert.commandWorked(testDB.serverStatus()).bucketCatalog;
 assert.eq(serverStatus.numOpenBuckets, 1, 'Expected one bucket but found: ' + tojson(serverStatus));

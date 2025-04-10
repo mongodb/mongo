@@ -11,6 +11,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 // This test intentionally corrupts a bucket, so disable testing diagnostics.
 TestData.testingDiagnosticsEnabled = false;
@@ -20,7 +21,6 @@ const conn = MongoRunner.runMongod();
 const collName = jsTestName();
 const db = conn.getDB(collName);
 const coll = db.getCollection(collName);
-const bucketsColl = db.getCollection("system.buckets." + collName);
 
 const timeFieldName = 't';
 
@@ -36,7 +36,7 @@ assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField
 jsTestLog("Insert first measurement");
 assert.commandWorked(coll.insert(measurements[0]));
 
-let bucketId = bucketsColl.find()[0]._id;
+let bucketId = getTimeseriesCollForRawOps(db, coll).find().rawData()[0]._id;
 
 jsTestLog("Insert second measurement, which archives the prior bucket due to kTimeBackward");
 assert.commandWorked(coll.insert(measurements[1]));
@@ -45,8 +45,10 @@ let stats = assert.commandWorked(coll.stats());
 assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats));
 
 jsTestLog("Add uncompressed data field to bucket, thus corrupting a compressed bucket.");
-let res = assert.commandWorked(bucketsColl.updateOne(
-    {_id: bucketId}, {$set: {"data.c.1": 1, "control.min.c": 1, "control.max.c": 1}}));
+let res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
+    {_id: bucketId},
+    {$set: {"data.c.1": 1, "control.min.c": 1, "control.max.c": 1}},
+    getRawOperationSpec(db)));
 assert.eq(res.modifiedCount, 1);
 
 jsTestLog(
@@ -63,8 +65,9 @@ TimeseriesTest.checkBucketReopeningsFailedCounters(
     stats.timeseries, {numBucketReopeningsFailedDueToCompressionFailure: 1});
 
 jsTestLog("Remove the newly created bucket, so it will not be present for the next insert.");
-bucketId = bucketsColl.find({"control.min.a": 2})[0]._id;
-res = assert.commandWorked(bucketsColl.deleteOne({_id: bucketId}));
+bucketId = getTimeseriesCollForRawOps(db, coll).find({"control.min.a": 2}).rawData()[0]._id;
+res = assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).deleteOne({_id: bucketId}, getRawOperationSpec(db)));
 assert.eq(res.deletedCount, 1);
 
 jsTestLog(

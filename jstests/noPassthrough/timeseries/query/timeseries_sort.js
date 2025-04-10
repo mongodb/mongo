@@ -6,8 +6,8 @@
  *   requires_sharding,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
@@ -47,7 +47,6 @@ assert.commandWorked(sDB.adminCommand(
     {movechunk: fullBucketsCollName, find: splitPoint, to: otherShard.name, _waitForDelete: true}));
 
 const coll = sDB.getCollection(collName);
-const bucketsColl = sDB.getCollection(bucketsCollName);
 
 const hasInternalBoundedSort = (explain) => {
     for (const shardName in explain.shards) {
@@ -87,7 +86,7 @@ assert.eq(1, counts[primaryShard.shardName], counts);
 assert.eq(1, counts[otherShard.shardName], counts);
 
 assert.eq(coll.count(), 100);
-assert.eq(bucketsColl.count(), 4);
+assert.eq(getTimeseriesCollForRawOps(sDB, coll).count({}, getRawOperationSpec(sDB)), 4);
 
 // The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
 assert.eq(coll.getIndexes().length, 2);

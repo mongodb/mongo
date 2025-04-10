@@ -9,6 +9,7 @@
  * ]
  */
 
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 (function() {
@@ -21,7 +22,6 @@ rst.initiate();
 const primary = rst.getPrimary();
 const testDB = primary.getDB("test");
 const collName = jsTestName();
-const bucketsCollName = "system.buckets." + collName;
 const coll = testDB.getCollection(collName);
 coll.drop();
 assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t"}}));
@@ -99,13 +99,13 @@ const updateDoc2 = {
 };
 
 // First inserts measurement 0 and 1.
-testDB.getCollection(bucketsCollName).insertOne(insertDocFull);
+getTimeseriesCollForRawOps(testDB, coll).insertOne(insertDocFull, getRawOperationSpec(testDB));
 
 function runTest(runInTxn) {
     // Inserts measurement 0 and 1 again through update oplog entries on the buckets collection.
     // Only two measurements are expected to exist.
     const updCmd = {
-        update: bucketsCollName,
+        update: getTimeseriesCollForRawOps(testDB, coll).getName(),
         updates: [
             {
                 q: {"_id": ObjectId("64d3c7004c83948224c45ddf")},
@@ -115,7 +115,8 @@ function runTest(runInTxn) {
                 q: {"_id": ObjectId("64d3c7004c83948224c45ddf")},
                 u: [{$_internalApplyOplogUpdate: {oplogUpdate: updateDoc2}}]
             },
-        ]
+        ],
+        ...getRawOperationSpec(testDB),
     };
     if (runInTxn) {
         const session = testDB.getMongo().startSession();

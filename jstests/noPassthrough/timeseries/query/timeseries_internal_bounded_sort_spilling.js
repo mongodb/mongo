@@ -8,6 +8,7 @@
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const kSmallMemoryLimit = 1024;
 const conn = MongoRunner.runMongod(
@@ -17,7 +18,6 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 
 const coll = testDB.timeseries_internal_bounded_sort;
-const buckets = testDB['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
@@ -36,7 +36,12 @@ assert.commandWorked(
         assert.commandWorked(coll.insert(batch));
         print(`Inserted ${i + 1} of ${numBatches} batches`);
     }
-    assert.gt(buckets.aggregate([{$count: 'n'}]).next().n, 1, 'Expected more than one bucket');
+    assert.gt(getTimeseriesCollForRawOps(testDB, coll)
+                  .aggregate([{$count: 'n'}], getRawOperationSpec(testDB))
+                  .next()
+                  .n,
+              1,
+              'Expected more than one bucket');
 }
 
 const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
@@ -49,51 +54,49 @@ function assertSorted(result) {
     }
 }
 
+const aggOptions = Object.assign({allowDiskUse: false}, getRawOperationSpec(testDB));
+
 // Test that memory limit would be hit by both implementations, and that both will error out if we
 // don't enable disk use.
 {
-    // buckets.aggregate(...) uses assert.commandWorked internally, so we must use runCommand here
-    // for error checking.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: buckets.getName(),
-        pipeline: [
-            unpackStage,
-            {$_internalInhibitOptimization: {}},
-            {$sort: {t: 1}},
-        ],
-        cursor: {},
-        allowDiskUse: false
-    }),
-                                 ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    assert.throwsWithCode(() => getTimeseriesCollForRawOps(testDB, coll)
+                                    .aggregate(
+                                        [
+                                            unpackStage,
+                                            {$_internalInhibitOptimization: {}},
+                                            {$sort: {t: 1}},
+                                        ],
+                                        aggOptions),
+                          ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: buckets.getName(),
-        pipeline: [
-            {$sort: {'control.min.t': 1}},
-            unpackStage,
-            {
-                $_internalBoundedSort: {
-                    sortKey: {t: 1},
-                    bound: {base: "min"},
-                }
-            },
-        ],
-        cursor: {},
-        allowDiskUse: false
-    }),
-                                 ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    assert.throwsWithCode(() => getTimeseriesCollForRawOps(testDB, coll)
+                                    .aggregate(
+                                        [
+                                            {$sort: {'control.min.t': 1}},
+                                            unpackStage,
+                                            {
+                                                $_internalBoundedSort: {
+                                                    sortKey: {t: 1},
+                                                    bound: {base: "min"},
+                                                }
+                                            },
+                                        ],
+                                        aggOptions),
+                          ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 }
+
+aggOptions.allowDiskUse = true;
 
 // Test sorting the whole collection.
 {
-    const naive = buckets
+    const naive = getTimeseriesCollForRawOps(testDB, coll)
                       .aggregate(
                           [
                               unpackStage,
                               {$_internalInhibitOptimization: {}},
                               {$sort: {t: 1}},
                           ],
-                          {allowDiskUse: true})
+                          aggOptions)
                       .toArray();
     assertSorted(naive);
 
@@ -107,15 +110,16 @@ function assertSorted(result) {
             }
         },
     ];
-    const opt = buckets.aggregate(pipeline, {allowDiskUse: true}).toArray();
+    const opt = getTimeseriesCollForRawOps(testDB, coll).aggregate(pipeline, aggOptions).toArray();
     assertSorted(opt);
 
     assert.eq(naive, opt);
 
     // Let's make sure the execution stats make sense.
-    const stats =
-        getAggPlanStage(buckets.explain("executionStats").aggregate(pipeline, {allowDiskUse: true}),
-                        '$_internalBoundedSort');
+    const stats = getAggPlanStage(getTimeseriesCollForRawOps(testDB, coll)
+                                      .explain("executionStats")
+                                      .aggregate(pipeline, aggOptions),
+                                  '$_internalBoundedSort');
     assert.eq(stats.usedDisk, true);
 
     // We know each doc should have at least 8 bytes for time in both key and document.
@@ -126,16 +130,20 @@ function assertSorted(result) {
     // We know we'll spill if we can't store all the docs from a single bucket within the memory
     // limit, so let's ensure that the total spills are at least what we'd expect if none of the
     // buckets overlap.
-    const docsPerBucket = Math.floor(stats.nReturned / buckets.count());
+    const docsPerBucket =
+        Math.floor(stats.nReturned /
+                   getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)));
     const spillsPerBucket = Math.floor(docsPerBucket / docsToTriggerSpill);
     assert.gt(spillsPerBucket, 0);
     assert.gt(stats.spilledDataStorageSize, 0);
-    assert.gte(stats.spills, buckets.count() * spillsPerBucket);
+    assert.gte(stats.spills,
+               getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)) *
+                   spillsPerBucket);
 }
 
 // Test $sort + $limit.
 {
-    const naive = buckets
+    const naive = getTimeseriesCollForRawOps(testDB, coll)
                       .aggregate(
                           [
                               unpackStage,
@@ -143,20 +151,20 @@ function assertSorted(result) {
                               {$sort: {t: 1}},
                               {$limit: 100},
                           ],
-                          {allowDiskUse: true})
+                          aggOptions)
                       .toArray();
     assertSorted(naive);
     assert.eq(100, naive.length);
 
     const opt =
-        buckets
+        getTimeseriesCollForRawOps(testDB, coll)
             .aggregate(
                 [
                     {$sort: {'control.min.t': 1}},
                     unpackStage,
                     {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}, limit: 100}}
                 ],
-                {allowDiskUse: true})
+                aggOptions)
             .toArray();
     assertSorted(opt);
     assert.eq(100, opt.length);

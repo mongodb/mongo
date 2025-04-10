@@ -7,6 +7,7 @@
  * ]
  */
 
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
@@ -22,10 +23,6 @@ const testDB = function() {
 
 const coll = function(num) {
     return testDB()[jsTestName() + '_' + num];
-};
-
-const bucketsColl = function(num) {
-    return testDB()['system.buckets.' + coll(num).getName()];
 };
 
 const timeFieldName = 'time';
@@ -52,8 +49,10 @@ for (let i = 0; i < numColls; i++) {
 replTest.stepUp(replTest.getSecondary());
 
 // Manually update the bucket for collection 1.
-assert.commandWorked(bucketsColl(1).update({}, {$set: {meta: 1}}));
-assert.commandWorked(bucketsColl(1).update({}, {$set: {meta: 0}}));
+assert.commandWorked(getTimeseriesCollForRawOps(testDB(), coll(1))
+                         .update({}, {$set: {meta: 1}}, getRawOperationSpec(testDB())));
+assert.commandWorked(getTimeseriesCollForRawOps(testDB(), coll(1))
+                         .update({}, {$set: {meta: 0}}, getRawOperationSpec(testDB())));
 
 // Drop, recreate, and reinsert the bucket for collection 2.
 assert(coll(2).drop());
@@ -70,7 +69,7 @@ for (let i = 0; i < numColls; i++) {
 const checkColl = function(num, numBuckets) {
     jsTestLog('Checking collection ' + num);
     assert.docEq(docs, coll(num).find().sort({_id: 1}).toArray());
-    const buckets = bucketsColl(num).find().toArray();
+    const buckets = getTimeseriesCollForRawOps(testDB(), coll(num)).find().rawData().toArray();
     assert.eq(buckets.length,
               numBuckets,
               'Expected ' + numBuckets + ' bucket(s) but found: ' + tojson(buckets));

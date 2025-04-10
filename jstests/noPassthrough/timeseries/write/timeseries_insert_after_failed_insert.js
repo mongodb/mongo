@@ -2,13 +2,13 @@
  * Tests that a failed time-series insert does not leave behind any invalid state.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 
 const testDB = conn.getDB(jsTestName());
 
 const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
@@ -42,7 +42,11 @@ const runTest = function(ordered) {
 
     // There should not be any leftover state from the failed insert.
     assert.docEq([docs[1]], coll.find().toArray());
-    const buckets = bucketsColl.find().sort({['control.min.' + timeFieldName]: 1}).toArray();
+    const buckets = getTimeseriesCollForRawOps(testDB, coll)
+                        .find()
+                        .rawData()
+                        .sort({['control.min.' + timeFieldName]: 1})
+                        .toArray();
     jsTestLog('Checking buckets: ' + tojson(buckets));
     assert.eq(buckets.length, 1);
     assert.eq(buckets[0].control.min._id, docs[1]._id);

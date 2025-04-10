@@ -2,6 +2,7 @@
  * Tests validating a time-series collection with mixed schema buckets.
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB(jsTestName());
@@ -14,7 +15,6 @@ assert.commandWorked(testDB.runCommand({drop: collName}));
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 const coll = testDB[collName];
-const bucketsColl = testDB["system.buckets." + collName];
 
 const bucket = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -50,7 +50,10 @@ const bucket = {
 
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
+// TODO (SERVER-103429): Remove the rawData from TimeseriesTest.bucketsMayHaveMixedSchemaData.
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(testDB, coll),
+                                                       getRawOperationSpec(testDB)),
+          true);
 
 // There should be no reason to have validation errors in the empty collection.
 let res = assert.commandWorked(coll.validate());
@@ -64,7 +67,8 @@ assert(res.valid);
 assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
 assert.eq(res.warnings.length, 0, "Validation warnings detected when there should be none.");
 
-assert.commandWorked(bucketsColl.insert(bucket));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
 // Even though a mixed schema bucket has been inserted, since the mixed schema data is allowed there
 // should be no errors.
 res = assert.commandWorked(coll.validate());

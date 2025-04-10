@@ -3,7 +3,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 // Disable testing diagnostics because bucket compression failure results in a tripwire assertion.
 TestData.testingDiagnosticsEnabled = false;
@@ -22,7 +22,7 @@ let collCount = 0;
 
 const checkAllBucketsCompressed = function(coll) {
     jsTestLog("Confirm all buckets are compressed.");
-    var docs = coll.find().toArray();
+    const docs = coll.find().rawData().toArray();
     for (let i = 0; i < docs.length; ++i) {
         jsTestLog(docs[i]);
         assert(TimeseriesTest.isBucketCompressed(docs[i].control.version));
@@ -33,7 +33,6 @@ const runTest = function(isCorrupted = false) {
     jsTestLog("runTest(isCorrupted: [" + isCorrupted.toString() + "])");
     const collName = "coll_" + collCount++;
     const coll = db[collName];
-    const bucketsColl = db["system.buckets." + coll.getName()];
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
@@ -71,19 +70,20 @@ const runTest = function(isCorrupted = false) {
     };
 
     jsTestLog("Insert uncompressed bucket document.");
-    assert.commandWorked(bucketsColl.insert(uncompressedBucket));
+    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket,
+                                                                        getRawOperationSpec(db)));
     assert.eq(coll.find().itcount(), 2);
-    assert.eq(bucketsColl.find().itcount(), 1);
-    assert.eq(bucketsColl.find().toArray()[0].control.version,
+    assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
+    assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version,
               TimeseriesTest.BucketVersion.kUncompressed);
 
     if (isCorrupted) {
         jsTestLog("Corrupting the bucket by adding an extra data field.");
         // Corrupt the uncompressed bucket by adding an extra data field to it. This
         // will make the bucket uncompressible.
-        let res = assert.commandWorked(
-            bucketsColl.updateOne({_id: uncompressedBucket._id}, {$set: {"data.a.3": 6}}));
-        jsTestLog(bucketsColl.find().toArray());
+        let res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
+            {_id: uncompressedBucket._id}, {$set: {"data.a.3": 6}}, getRawOperationSpec(db)));
+        jsTestLog(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
         assert.eq(res.modifiedCount, 1);
     }
 
@@ -104,15 +104,16 @@ const runTest = function(isCorrupted = false) {
     assert.eq(1, stats.timeseries['numCommits']);
 
     if (isCorrupted) {
-        assert.eq(bucketsColl.find().itcount(), 2);
+        assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 2);
         jsTestLog(
             "Remove corrupted bucket to prevent the validate post-hook from seeing it after the test.");
-        assert.commandWorked(bucketsColl.remove({_id: ObjectId("65a6eb806ffc9fa4280ecac4")}));
+        assert.commandWorked(getTimeseriesCollForRawOps(db, coll).remove(
+            {_id: ObjectId("65a6eb806ffc9fa4280ecac4")}, getRawOperationSpec(db)));
     } else {
-        assert.eq(bucketsColl.find().itcount(), 1);
+        assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
     }
 
-    checkAllBucketsCompressed(bucketsColl);
+    checkAllBucketsCompressed(getTimeseriesCollForRawOps(db, coll));
 };
 
 runTest();

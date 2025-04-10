@@ -3,10 +3,11 @@
  * bucket max span.
  */
 
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
 const collName = jsTestName();
-const bucketName = `system.buckets.${collName}`;
 const currentDate = ISODate('2025-01-23T02:00:00.000Z');
 const outOfRangeDate = ISODate('2025-01-23T03:00:00.000Z');  // currentDate + 3600s
 
@@ -21,8 +22,8 @@ assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.errors.length, 0);
 
 // Sets the max timestamp to outside the bucket max span.
-const bucketColl = db.getCollection(bucketName);
-bucketColl.updateOne({meta: 1}, {$set: {"control.max.time": outOfRangeDate}});
+getTimeseriesCollForRawOps(db, coll).updateOne(
+    {meta: 1}, {$set: {"control.max.time": outOfRangeDate}}, getRawOperationSpec(db));
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);

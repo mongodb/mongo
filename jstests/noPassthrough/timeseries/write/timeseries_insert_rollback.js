@@ -7,6 +7,7 @@
  *     requires_mongobridge,
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const rollbackTest = new RollbackTest(jsTestName());
@@ -14,7 +15,6 @@ const rollbackTest = new RollbackTest(jsTestName());
 const primary = rollbackTest.getPrimary();
 const testDB = primary.getDB('test');
 const coll = testDB[jsTestName()];
-const bucketsColl = testDB['system.buckets.' + coll.getName()];
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
@@ -52,7 +52,7 @@ assert.commandWorked(coll.insert(docs[2], {ordered: true}));
 assert.commandWorked(coll.insert(docs[3], {ordered: false}));
 
 assert.sameMembers(docs.slice(2), coll.find().toArray());
-const buckets = bucketsColl.find().toArray();
+const buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray();
 assert.eq(buckets.length, 2, 'Expected two bucket but found: ' + tojson(buckets));
 
 rollbackTest.stop();

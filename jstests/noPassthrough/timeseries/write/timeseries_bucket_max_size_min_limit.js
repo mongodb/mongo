@@ -5,6 +5,7 @@
  *   requires_wiredtiger,
  * ]
  */
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
@@ -46,6 +47,6 @@ for (let i = 0; i < 50; ++i) {
     // Each measurement takes ~1KB.
     assert.commandWorked(coll2.insert({time: new Date(), tag: 0, strField: 'a'.repeat(1000)}));
 }
-assert.eq(testDB.getCollection(`system.buckets.${collName2}`).count(), 1);
+assert.eq(getTimeseriesCollForRawOps(testDB, coll2).count({}, getRawOperationSpec(testDB)), 1);
 
 rst.stopSet();

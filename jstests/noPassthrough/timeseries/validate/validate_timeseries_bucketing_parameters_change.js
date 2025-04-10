@@ -8,16 +8,14 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const timeseriesBucketingParametersChangedInputValueName =
     "timeseriesBucketingParametersChangedInputValue";
 let testCount = 0;
 const collNamePrefix = jsTestName();
-const bucketNamePrefix = "system.buckets." + jsTestName();
 let collName = collNamePrefix + testCount;
-let bucketName = bucketNamePrefix + testCount;
 let coll = null;
-let bucketsColl = null;
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
@@ -33,7 +31,6 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
                                                          roundedDownTimestamp) {
     testCount *= 2;
     collName = collNamePrefix + testCount;
-    bucketName = bucketNamePrefix + testCount;
     db.getCollection(collName).drop();
     const originalTimeSeriesParams = {
         timeField: "timestamp",
@@ -44,13 +41,12 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     jsTestLog("Create new timeseries collection.");
     assert.commandWorked(db.createCollection(collName, {timeseries: originalTimeSeriesParams}));
     coll = db.getCollection(collName);
-    bucketsColl = db.getCollection(bucketName);
     // You only need to insert one doc because this test checks the minimum value of each bucket
     // and compares them to the bucket's control.min.<time field>
     coll.insert(
         {"metadata": {"sensorId": 1, "type": "temperature"}, "timestamp": timestamp, "temp": 0});
 
-    let bucketDoc = bucketsColl.find().toArray()[0];
+    let bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
@@ -70,13 +66,13 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     // parameters.
     db.runCommand({collMod: collName, timeseries: updatedBucketingParameterConfig});
 
-    bucketDoc = bucketsColl.find().toArray()[0];
+    bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
     // We have to run full validation so we decompress BSON.
-    let res = bucketsColl.validate({full: true});
+    let res = coll.validate({full: true});
     assert(!res.valid, tojson(res));
     assert.eq(res.errors.length, 1);
     assert.contains(
@@ -87,23 +83,21 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
 
     testCount += 1;
     collName = collNamePrefix + testCount;
-    bucketName = bucketNamePrefix + testCount;
     db.getCollection(collName).drop();
 
     jsTestLog("Create new timeseries collection.");
     assert.commandWorked(db.createCollection(collName, {timeseries: originalTimeSeriesParams}));
     coll = db.getCollection(collName);
-    bucketsColl = db.getCollection(bucketName);
     coll.insert(
         {"metadata": {"sensorId": 1, "type": "temperature"}, "timestamp": timestamp, "temp": 0});
 
-    bucketDoc = bucketsColl.find().toArray()[0];
+    bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
-    res = bucketsColl.validate({full: true});
+    res = coll.validate({full: true});
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
 
@@ -119,13 +113,13 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     // we aren't changing the bucketing parameter config.
     db.runCommand({collMod: collName, timeseries: originalBucketingParameterConfig});
 
-    bucketDoc = bucketsColl.find().toArray()[0];
+    bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
-    res = bucketsColl.validate({full: true});
+    res = coll.validate({full: true});
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
     assert.commandWorked(db.adminCommand(
@@ -140,13 +134,13 @@ function validateTimeseriesBucketingParametersChangeFail(testCount,
     }));
     db.runCommand({collMod: collName, timeseries: updatedBucketingParameterConfig});
 
-    bucketDoc = bucketsColl.find().toArray()[0];
+    bucketDoc = getTimeseriesCollForRawOps(db, coll).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
 
     // Check that the minimum bucket timestamp is the rounded-down timestamp.
     assert.eq(roundedDownTimestamp, bucketDoc["control"]["min"]["timestamp"]);
 
-    res = bucketsColl.validate({full: true});
+    res = coll.validate({full: true});
     assert(res.valid, tojson(res));
     assert.eq(res.errors.length, 0, "Validation errors detected when there should be none.");
     assert.commandWorked(db.adminCommand(

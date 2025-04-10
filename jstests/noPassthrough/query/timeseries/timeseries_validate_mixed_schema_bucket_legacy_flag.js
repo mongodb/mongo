@@ -11,6 +11,7 @@
  * validation will flag the collection as needing manual intervention for SERVER-91194.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB(jsTestName());
@@ -22,7 +23,6 @@ assert.commandWorked(testDB.runCommand({drop: collName}));
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: 't', metaField: 'm'}}));
 const coll = testDB[collName];
-const bucketsColl = testDB["system.buckets." + collName];
 
 const bucket = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -58,7 +58,8 @@ const bucket = {
 
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.commandWorked(bucketsColl.insert(bucket));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
 
 // Set the mixed-schema flag only set on the top-level catalog metadata field
 // (md.timeseriesBucketsMayHaveMixedSchemaData), but not on the collection options
@@ -69,7 +70,10 @@ assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
 fpsimulateLegacyTimeseriesMixedSchemaFlag.off();
 
-const bucketsCatalogEntry = bucketsColl.aggregate([{$listCatalog: {}}]).toArray()[0];
+// TODO (SERVER-103429): Remove the rawData from $listCatalog.
+const bucketsCatalogEntry = getTimeseriesCollForRawOps(testDB, coll)
+                                .aggregate([{$listCatalog: {}}], getRawOperationSpec(testDB))
+                                .toArray()[0];
 const wtConfigStr = bucketsCatalogEntry.md.options.storageEngine?.wiredTiger?.configString ?? '';
 assert.eq(true, bucketsCatalogEntry.md.timeseriesBucketsMayHaveMixedSchemaData);
 assert(!wtConfigStr.includes("timeseriesBucketsMayHaveMixedSchemaData"));
@@ -85,12 +89,16 @@ assert.containsPrefix(
     "Validation of mixed schema buckets when they are not allowed should return an error stating such");
 
 // Direct insertion or update of mixed-schema buckets is forbidden
-assert.commandFailedWithCode(
-    bucketsColl.update({_id: bucket._id}, {$set: {"control.max.a": "x", "data.a.0": "x"}}),
-    ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
-
-assert.commandWorked(bucketsColl.deleteOne({_id: bucket._id}));
-assert.commandFailedWithCode(bucketsColl.insert(bucket),
+assert.commandFailedWithCode(getTimeseriesCollForRawOps(testDB, coll)
+                                 .update({_id: bucket._id},
+                                         {$set: {"control.max.a": "x", "data.a.0": "x"}},
+                                         getRawOperationSpec(testDB)),
                              ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
+
+assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
+                         .deleteOne({_id: bucket._id}, getRawOperationSpec(testDB)));
+assert.throwsWithCode(
+    () => getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)),
+    ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
 
 MongoRunner.stopMongod(conn);

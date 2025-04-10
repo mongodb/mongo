@@ -8,6 +8,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 const testDB = conn.getDB(jsTestName());
@@ -42,8 +43,11 @@ TimeseriesTest.run((insert) => {
     jsTestLog('Removal took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
     // Check bucket collection.
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
-    const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(testDB, coll)
+                           .find()
+                           .rawData()
+                           .sort({'control.min._id': 1})
+                           .toArray();
     assert.eq(0, bucketDocs.length, bucketDocs);
 });
 

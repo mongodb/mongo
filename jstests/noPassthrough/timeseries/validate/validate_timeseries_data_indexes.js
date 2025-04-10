@@ -5,11 +5,10 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const collPrefix = jsTestName();
-const bucketPrefix = "system.buckets." + jsTestName();
 let collName = collPrefix;
-let bucketName = bucketPrefix;
 let testCount = 0;
 
 const conn = MongoRunner.runMongod();
@@ -38,7 +37,6 @@ const weatherData = [
 function setUpCollection(data) {
     testCount += 1;
     collName = collPrefix + testCount;
-    bucketName = bucketPrefix + testCount;
     db.getCollection(collName).drop();
     assert.commandWorked(db.createCollection(
         collName,
@@ -51,12 +49,12 @@ function setUpCollection(data) {
     assert(result.nNonCompliantDocuments == 0, tojson(result));
 
     // If we are always writing to time-series collections using the compressed format, replace the
-    // compressed bucket with the decompressed bucket in the system.buckets collection. This allows
-    // this test to directly make updates to bucket measurements in order to test validation.
-    const bucket = db.getCollection(bucketName);
-    const bucketDoc = bucket.find().toArray()[0];
+    // compressed bucket with the decompressed bucket. This allows this test to directly make
+    // updates to bucket measurements in order to test validation.
+    const bucketDoc = getTimeseriesCollForRawOps(db, collection).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
-    bucket.replaceOne({_id: bucketDoc._id}, bucketDoc);
+    getTimeseriesCollForRawOps(db, collection)
+        .replaceOne({_id: bucketDoc._id}, bucketDoc, getRawOperationSpec(db));
 }
 
 // Non-numerical index.
@@ -64,8 +62,8 @@ setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with non-numerical data field indexes on collection " +
           collName);
 let coll = db.getCollection(collName);
-let bucket = db.getCollection(bucketName);
-assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.0": "data.temp.a"}}));
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {}, {"$rename": {"data.temp.0": "data.temp.a"}}, getRawOperationSpec(db)));
 let res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -76,13 +74,16 @@ setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with non-increasing data field indexes on collection " +
           collName);
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
 // This keeps indexes from being reordered by Javascript.
-assert.commandWorked(
-    bucket.update({}, {"$rename": {"data.temp.0": "data.temp.a", "data.temp.1": "data.temp.b"}}));
-assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.a": "data.temp.1"}}));
-assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.b": "data.temp.0"}}));
-printjson(bucket.find().toArray());
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {},
+    {"$rename": {"data.temp.0": "data.temp.a", "data.temp.1": "data.temp.b"}},
+    getRawOperationSpec(db)));
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {}, {"$rename": {"data.temp.a": "data.temp.1"}}, getRawOperationSpec(db)));
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {}, {"$rename": {"data.temp.b": "data.temp.0"}}, getRawOperationSpec(db)));
+printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -93,9 +94,9 @@ setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with out-of-range data field indexes on collection " +
           collName);
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
-assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.1": "data.temp.10"}}));
-printjson(bucket.find().toArray());
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {}, {"$rename": {"data.temp.1": "data.temp.10"}}, getRawOperationSpec(db)));
+printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -105,9 +106,9 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with negative data field indexes on collection " + collName);
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
-assert.commandWorked(bucket.update({}, {"$rename": {"data.temp.0": "data.temp.-1"}}));
-printjson(bucket.find().toArray());
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {}, {"$rename": {"data.temp.0": "data.temp.-1"}}, getRawOperationSpec(db)));
+printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -117,9 +118,9 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with missing time field indexes on collection " + collName);
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
-assert.commandWorked(bucket.update({}, {"$unset": {"data.timestamp.1": ""}}));
-printjson(bucket.find().toArray());
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
+    {}, {"$unset": {"data.timestamp.1": ""}}, getRawOperationSpec(db)));
+printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));

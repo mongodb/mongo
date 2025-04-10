@@ -13,6 +13,8 @@
  * ]
  */
 
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 
@@ -21,7 +23,6 @@ coll.drop();
 
 const timeFieldName = "time";
 assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}));
-const bucketColl = db.getCollection("system.buckets." + jsTestName());
 
 const measurementLength = 1 * 1024;  // 1KB
 const numMeasurements = 121;  // The number of measurements before the bucket rolls over due to size
@@ -36,7 +37,7 @@ for (let i = 0; i < numMeasurements; i++) {
     assert.commandWorked(coll.insert(doc));
 }
 
-let buckets = bucketColl.find().toArray();
+let buckets = getTimeseriesCollForRawOps(db, coll).find().rawData().toArray();
 assert.eq(1, buckets.length);
 assert.eq(0, buckets[0].control.min._id);
 assert.eq(120, buckets[0].control.max._id);
@@ -65,7 +66,7 @@ assert.commandWorked(coll.insert({
     [timeFieldName]: ISODate("2024-03-11T00:00:00.000Z"),
     value: "c".repeat(measurementLength)
 }));
-buckets = bucketColl.find().toArray();
+buckets = getTimeseriesCollForRawOps(db, coll).find().rawData().toArray();
 assert.eq(2, buckets.length);
 
 timeseriesStats = assert.commandWorked(coll.stats()).timeseries;

@@ -19,7 +19,6 @@ assert.commandWorked(db.createCollection(
     jsTestName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
 const coll = db.getCollection(jsTestName());
-const bucketsColl = db.getCollection("system.buckets." + jsTestName());
 
 let t0 = ISODate("2024-04-08T10:00:00.000Z");
 

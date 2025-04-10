@@ -9,17 +9,16 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 
 const dbName = "promoting_buckets";
 const collName = "ts";
-const bucketsCollName = "system.buckets." + collName;
 const timeFieldName = "time";
 
 const testDB = conn.getDB(dbName);
 const coll = testDB[collName];
-const bucketsColl = testDB[bucketsCollName];
 
 coll.drop();
 assert.commandWorked(
@@ -34,10 +33,12 @@ const measurements = [
 assert.commandWorked(coll.insert(measurements[1]));
 
 // Ensure that there is only one bucket, and that its control version is v2.
-assert.eq(bucketsColl.find().length(), 1);
-assert.eq(
-    bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted}).length(),
-    1);
+assert.eq(getTimeseriesCollForRawOps(testDB, coll).find().rawData().length(), 1);
+assert.eq(getTimeseriesCollForRawOps(testDB, coll)
+              .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+              .rawData()
+              .length(),
+          1);
 // Ensure that we have not yet incremented our metric tracking the number of buckets promoted
 // from v2 to v3.
 let stats = assert.commandWorked(coll.stats());
@@ -48,8 +49,10 @@ assert.eq(stats.timeseries['numCompressedBucketsConvertedToUnsorted'], 0);
 assert.commandWorked(coll.insert(measurements[0]));
 
 // Verify that the bucket's version has been updated to v3.
-assert.eq(bucketsColl.find().length(), 1);
-assert.gte(bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressedUnsorted})
+assert.eq(getTimeseriesCollForRawOps(testDB, coll).find().rawData().length(), 1);
+assert.gte(getTimeseriesCollForRawOps(testDB, coll)
+               .find({"control.version": TimeseriesTest.BucketVersion.kCompressedUnsorted})
+               .rawData()
                .length(),
            1);
 

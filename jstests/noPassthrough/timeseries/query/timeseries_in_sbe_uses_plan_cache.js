@@ -3,6 +3,7 @@
  */
 import {assertCacheUsage} from "jstests/libs/query/plan_cache_utils.js";
 import {checkSbeStatus, kSbeRestricted} from "jstests/libs/query/sbe_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 // Start a single mongoD using MongoRunner.
 const conn = MongoRunner.runMongod();
@@ -31,7 +32,7 @@ for (let i = 0; i < 50; ++i) {
     assert.commandWorked(
         coll.insert({_id: i, time: new Date(datePrefix + i * 10), meta: "foobar", x: i, y: i * 2}));
 }
-assert.gt(bucketsColl.count(), 0);
+assert.gt(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), 0);
 
 // assertCacheUsage() requires the profiler.
 assert.commandWorked(db.setProfilingLevel(2));

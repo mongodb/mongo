@@ -7,8 +7,8 @@
  *   requires_fcv_80,
  * ]
  */
-
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.testingDiagnosticsEnabled = false;
@@ -19,7 +19,6 @@ rst.initiate();
 
 const testDB = rst.getPrimary().getDB(jsTestName());
 const coll = testDB.coll;
-const bucketsColl = testDB.system.buckets.coll;
 const time = ISODate("2024-01-16T20:48:39.448Z");
 
 // Check that smallArray is entirely contained by largeArray.
@@ -51,7 +50,7 @@ function runIntermediateDataCheckTest(isOrdered) {
     ]));
 
     // Ensure that we have 3 buckets.
-    assert.eq(bucketsColl.find().itcount(), 3);
+    assert.eq(getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount(), 3);
 
     // Turn on the failpoint that causes the timeseries data integrity check to fail.
     // The failpoint is only hit when we are inserting measurements into an existing bucket. We set
@@ -91,7 +90,7 @@ function runIntermediateDataCheckTest(isOrdered) {
                                  ErrorCodes.TimeseriesBucketCompressionFailed);
 
     let stats = assert.commandWorked(coll.stats()).timeseries;
-    let buckets = bucketsColl.find({}).toArray();
+    let buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray();
 
     if (isOrdered) {
         // 8 Total Measurements Committed : The first 6 are from our initial inserts,

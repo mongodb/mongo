@@ -6,6 +6,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const conn = MongoRunner.runMongod();
@@ -14,7 +15,6 @@ function runTest(conn, failPointConn, shardColl) {
     const testDB = conn.getDB(jsTestName());
 
     const coll = testDB.getCollection('t');
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';
     const metaFieldName = 'meta';
@@ -84,9 +84,10 @@ function runTest(conn, failPointConn, shardColl) {
     // The documents should go into two new buckets due to the failed insert on the existing
     // bucket.
     assert.commandWorked(coll.insert(docs.slice(1, 3), {ordered: false}));
-    assert.eq(bucketsColl.count(),
+    assert.eq(getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
               2,
-              'Expected two buckets but found: ' + tojson(bucketsColl.find().toArray()));
+              'Expected two buckets but found: ' +
+                  tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()));
 }
 
 runTest(conn);

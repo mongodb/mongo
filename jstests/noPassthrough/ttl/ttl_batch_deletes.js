@@ -9,6 +9,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -103,7 +104,6 @@ const triggerCollectionScanTTL = function(testDB, doShardCollection = false) {
     const defaultBucketMaxRange = 3600;
 
     const coll = testDB.getCollection('ts');
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(testDB.createCollection(coll.getName(), {
         timeseries: {
             timeField: timeFieldName,
@@ -129,7 +129,7 @@ const triggerCollectionScanTTL = function(testDB, doShardCollection = false) {
     }, 'TTL index on the cluster key didn\'t delete');
 
     assert.eq(0, coll.find().itcount());
-    assert.eq(0, bucketsColl.find().itcount());
+    assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 };
 
 const testTTLDeleteWithCollectionScanBatched = function(conn) {

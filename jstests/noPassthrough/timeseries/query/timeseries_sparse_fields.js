@@ -8,6 +8,8 @@
  * ]
  */
 
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 const dbName = "test";
 const collName = jsTestName();
 
@@ -18,7 +20,6 @@ const timeField = "t";
 db.createCollection(collName, {timeseries: {timeField: timeField}});
 
 const coll = db.getCollection(collName);
-const bucketsColl = db.getCollection("system.buckets." + collName);
 
 const shallowCompare = (obj1, obj2) => Object.keys(obj1).length === Object.keys(obj2).length &&
     Object.keys(obj1).every(key => obj1[key] === obj2[key]);
@@ -42,7 +43,7 @@ for (const measurement of measurements) {
 }
 
 // All measurements land in the same bucket.
-assert.eq(1, bucketsColl.find().length());
+assert.eq(1, getTimeseriesCollForRawOps(db, coll).find().rawData().length());
 
 // Measurements are returned in insertion order and with the correct fields.
 assert(coll.find().toArray().every((measurement, index) => {
@@ -53,7 +54,7 @@ assert(coll.find().toArray().every((measurement, index) => {
 }));
 
 // Do the same as above but in reverse insertion order.
-assert.commandWorked(bucketsColl.remove({}));
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).remove({}, getRawOperationSpec(db)));
 
 const reversedMeasurements = measurements.reverse();
 for (const measurement of reversedMeasurements) {
@@ -62,7 +63,7 @@ for (const measurement of reversedMeasurements) {
 }
 
 // All measurements land in the same bucket.
-assert.eq(1, bucketsColl.find().length());
+assert.eq(1, getTimeseriesCollForRawOps(db, coll).find().rawData().length());
 
 // Measurements are returned in insertion order and with the correct fields.
 assert(coll.find().toArray().every((measurement, index) => {

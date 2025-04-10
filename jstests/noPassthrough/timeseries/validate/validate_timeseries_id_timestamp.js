@@ -8,13 +8,12 @@
  * ]
  */
 
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 let testCount = 0;
 const collNamePrefix = jsTestName();
-const bucketNamePrefix = "system.buckets." + jsTestName();
 let collName = collNamePrefix + testCount;
-let bucketName = bucketNamePrefix + testCount;
 let coll = null;
-let bucket = null;
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
@@ -23,12 +22,10 @@ jsTestLog(
     "Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.");
 testCount += 1;
 collName = collNamePrefix + testCount;
-bucketName = bucketNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(db.createCollection(
     collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
 
 // Inserts documents into a bucket. Checks no issues are found.
 coll.insertMany(
@@ -47,12 +44,10 @@ assert.eq(res.warnings.length, 0);
 // warnings from validation.
 testCount += 1;
 collName = collNamePrefix + testCount;
-bucketName = bucketNamePrefix + testCount;
 db.getCollection(collName).drop();
 assert.commandWorked(db.createCollection(
     collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
 coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
 coll.insertMany(
     [...Array(10).keys()].map(i => ({
                                   "metadata": {"sensorId": testCount, "type": "temperature"},
@@ -60,7 +55,9 @@ coll.insertMany(
                                   "temp": i
                               })),
     {ordered: false});
-bucket.updateOne({"meta.sensorId": testCount}, {"$set": {"control.min.timestamp": ISODate()}});
+getTimeseriesCollForRawOps(db, coll).updateOne({"meta.sensorId": testCount},
+                                               {"$set": {"control.min.timestamp": ISODate()}},
+                                               getRawOperationSpec(db));
 
 res = coll.validate();
 assert(!res.valid, tojson(res));

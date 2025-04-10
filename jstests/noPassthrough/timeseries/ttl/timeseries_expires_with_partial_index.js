@@ -10,6 +10,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
@@ -18,7 +19,6 @@ assert.commandWorked(testDB.dropDatabase());
 
 TimeseriesTest.run((insert) => {
     const coll = testDB[jsTestName()];
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'tm';
     const metaFieldName = "mm";
@@ -49,7 +49,7 @@ TimeseriesTest.run((insert) => {
 
     const checkInsertion = function(coll, doc, expectDeletion) {
         jsTestLog("Inserting doc into collection.");
-        const prevCount = bucketsColl.find().itcount();
+        const prevCount = getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount();
         assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
         // Wait for the TTL monitor to process the indexes.
@@ -58,7 +58,11 @@ TimeseriesTest.run((insert) => {
 
         // Check the number of bucket documents.
         const expectedCount = (expectDeletion) ? prevCount : prevCount + 1;
-        const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(testDB, coll)
+                               .find()
+                               .rawData()
+                               .sort({'control.min._id': 1})
+                               .toArray();
 
         assert.eq(expectedCount, bucketDocs.length, bucketDocs);
         jsTestLog("Doc deleted: " + expectDeletion + ".");

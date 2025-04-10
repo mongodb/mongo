@@ -6,6 +6,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
@@ -41,12 +42,10 @@ const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
     const testDB = session.getDatabase('test');
 
     const coll = testDB.getCollection('t_' + collCount++);
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
-    jsTestLog('Running test: collection: ' + coll.getFullName() + '; bucket collection: ' +
-              bucketsColl.getFullName() + '; initial measurements: ' + tojson(docsInsert) +
-              '; measurements to append A: ' + tojson(docsUpdateA) +
+    jsTestLog('Running test: collection: ' + coll.getFullName() + '; initial measurements: ' +
+              tojson(docsInsert) + '; measurements to append A: ' + tojson(docsUpdateA) +
               '; measurements to append B: ' + tojson(docsUpdateB));
 
     assert.commandWorked(
@@ -121,12 +120,12 @@ const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
     }
 
     // Check bucket collection.
-    const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
+    const bucketDocs =
+        getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
 
     const bucketDoc = bucketDocs[0];
-    jsTestLog('Bucket for test collection: ' + coll.getFullName() +
-              ': bucket collection: ' + bucketsColl.getFullName() + ': ' + tojson(bucketDoc));
+    jsTestLog('Bucket for test collection: ' + coll.getFullName() + ': ' + tojson(bucketDoc));
 
     // Check bucket.
     TimeseriesTest.decompressBucket(bucketDoc);

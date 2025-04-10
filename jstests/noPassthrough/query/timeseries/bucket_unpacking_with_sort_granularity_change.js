@@ -3,7 +3,7 @@
 // We check that the results are correct, the documents are sorted, and the documents we expect to
 // appear, appear.
 // Note: events in buckets that exceed bucketMaxSpan are not included.
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const dbName = jsTestName();
 
@@ -79,10 +79,10 @@ assert.commandWorked(coll.insert({[timeField]: new Date(minsToMillis(120) + 1)})
 // Turn off the hang.
 setAggHang(off);
 
-jsTestLog(db.system.buckets[dbName].find().toArray());
+jsTestLog(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 
 // Double check that the number of buckets is expected.
-assert.eq(db.system.buckets[dbName].find().toArray().length, 2);
+assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray().length, 2);
 
 // Finish the computation.
 let resNaive = mergeShellNaive();

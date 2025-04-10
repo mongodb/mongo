@@ -8,15 +8,16 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 // Disable testing diagnostics because bucket compression failure results in a tripwire assertion.
 TestData.testingDiagnosticsEnabled = false;
 
-const corruptBucket = function(bucketsColl, bucketId) {
+const corruptBucket = function(db, coll, bucketId) {
     // Corrupt the bucket by adding an out-of-order index in the "a" column. This will make the
     // bucket uncompressible.
-    let res = assert.commandWorked(
-        bucketsColl.updateOne({_id: bucketId}, {$set: {"data.a.0": 0, "control.min.a": 0}}));
+    let res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
+        {_id: bucketId}, {$set: {"data.a.0": 0, "control.min.a": 0}}, getRawOperationSpec(db)));
     assert.eq(res.modifiedCount, 1);
 };
 
@@ -27,7 +28,6 @@ const runTest = function(ordered) {
     const db = conn.getDB(jsTestName());
     const collName = ordered ? "ordered" : "unordered";
     const coll = db[collName];
-    const bucketsColl = db["system.buckets." + collName];
     const timeFieldName = 't';
     const metaFieldName = 'm';
 
@@ -72,9 +72,10 @@ const runTest = function(ordered) {
             },
         }
     };
-    assert.commandWorked(bucketsColl.insert(bucket));
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
 
-    corruptBucket(bucketsColl, bucket._id);
+    corruptBucket(db, coll, bucket._id);
 
     let stats = assert.commandWorked(coll.stats());
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "bucketCount"));
@@ -188,7 +189,11 @@ const runTest = function(ordered) {
     assert.eq(coll.find({[metaFieldName]: 1}).itcount(), 5);
     assert.eq(coll.find({[metaFieldName]: 2}).itcount(), 2);
 
-    const buckets = bucketsColl.find({meta: bucket.meta}).sort({"control.version": 1}).toArray();
+    const buckets = getTimeseriesCollForRawOps(db, coll)
+                        .find({meta: bucket.meta})
+                        .rawData()
+                        .sort({"control.version": 1})
+                        .toArray();
     assert.eq(buckets.length, 2);
     assert.eq(buckets[0].control.version, TimeseriesTest.BucketVersion.kUncompressed);
     assert(buckets[0].data.t.hasOwnProperty("0"));

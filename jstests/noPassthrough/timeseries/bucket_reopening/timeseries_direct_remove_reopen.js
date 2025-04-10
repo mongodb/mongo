@@ -3,6 +3,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -21,7 +22,6 @@ let docs = [
 ];
 
 const coll = testDB.getCollection(collName);
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 
 assert.commandWorked(testDB.createCollection(
@@ -30,7 +30,7 @@ assert.commandWorked(testDB.createCollection(
 assert.commandWorked(coll.insert(docs[0]));
 assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
 
-let buckets = bucketsColl.find().sort({_id: 1}).toArray();
+let buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
 assert.eq(buckets[0].control.max[timeFieldName], times[0]);
@@ -41,11 +41,17 @@ const oldId = buckets[0]._id;
 const fpClear = configureFailPoint(conn, "hangTimeseriesDirectModificationAfterStart");
 const fpOnCommit = configureFailPoint(conn, "hangTimeseriesDirectModificationBeforeFinish");
 const awaitRemove = startParallelShell(
-    funWithArgs(function(dbName, collName, id) {
-        const removeResult = assert.commandWorked(
-            db.getSiblingDB(dbName).getCollection('system.buckets.' + collName).remove({_id: id}));
-        assert.eq(removeResult.nRemoved, 1);
-    }, dbName, coll.getName(), buckets[0]._id), conn.port);
+    funWithArgs(
+        function(dbName, collName, id, getRawOperationSpec) {
+            const removeResult = assert.commandWorked(
+                db.getSiblingDB(dbName)[collName].remove({_id: id}, getRawOperationSpec));
+            assert.eq(removeResult.nRemoved, 1);
+        },
+        dbName,
+        getTimeseriesCollForRawOps(testDB, coll).getName(),
+        buckets[0]._id,
+        getRawOperationSpec(testDB)),
+    conn.port);
 fpClear.wait();
 
 // Start inserting a bucket. We should find that there's no open bucket, since it's been cleared,
@@ -72,7 +78,7 @@ awaitInsert();
 
 assert.docEq(1, coll.find().sort({_id: 1}).toArray().length);
 
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
+buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.neq(buckets[0]._id, oldId);
 

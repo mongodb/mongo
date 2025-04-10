@@ -7,6 +7,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMinCount: 1}});
 
@@ -59,9 +60,11 @@ TimeseriesTest.run((insert) => {
                       'unexpected field x in doc: ' + i + ': ' + tojson(viewDoc));
         }
 
-        // Check bucket collection.
-        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-        const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(db, coll)
+                               .find()
+                               .rawData()
+                               .sort({'control.min._id': 1})
+                               .toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.

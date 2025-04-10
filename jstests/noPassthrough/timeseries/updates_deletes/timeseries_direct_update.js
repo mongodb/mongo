@@ -5,6 +5,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -28,7 +29,6 @@ let docs = [
 ];
 
 const coll = testDB.getCollection(collName);
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 
 assert.commandWorked(testDB.createCollection(
@@ -37,18 +37,20 @@ assert.commandWorked(testDB.createCollection(
 assert.commandWorked(coll.insert(docs[0]));
 assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
 
-let buckets = bucketsColl.find().sort({_id: 1}).toArray();
+let buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
 assert.eq(buckets[0].control.max[timeFieldName], times[0]);
 
 let modified = buckets[0];
 modified.control.closed = true;
-let updateResult = assert.commandWorked(bucketsColl.update({_id: buckets[0]._id}, modified));
+let updateResult =
+    assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
+                             .update({_id: buckets[0]._id}, modified, getRawOperationSpec(testDB)));
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
 
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
+buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
 assert.eq(buckets[0].control.max[timeFieldName], times[0]);
@@ -57,7 +59,7 @@ assert(buckets[0].control.closed);
 assert.commandWorked(coll.insert(docs[1]));
 assert.docEq(docs.slice(0, 2), coll.find().sort({_id: 1}).toArray());
 
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
+buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 2);
 assert.eq(buckets[1].control.min[timeFieldName], times[1]);
 assert.eq(buckets[1].control.max[timeFieldName], times[1]);
@@ -72,7 +74,9 @@ fpInsert.wait();
 
 modified = buckets[1];
 modified.control.closed = true;
-updateResult = assert.commandWorked(bucketsColl.update({_id: buckets[1]._id}, modified));
+updateResult =
+    assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
+                             .update({_id: buckets[1]._id}, modified, getRawOperationSpec(testDB)));
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
 
@@ -81,7 +85,7 @@ awaitInsert();
 
 assert.docEq(docs.slice(0, 3), coll.find().sort({_id: 1}).toArray());
 
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
+buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 3);
 assert.eq(buckets[1].control.min[timeFieldName], times[1]);
 assert.eq(buckets[1].control.max[timeFieldName], times[1]);

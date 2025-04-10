@@ -3,6 +3,7 @@
  * exercising the optimized $sample implementation for $_internalUnpackBucket.
  */
 import {aggPlanHasStage, getAggPlanStage, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 let conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 100}});
 
@@ -69,8 +70,7 @@ function fillBuckets(coll, measurementsPerBucket) {
     }
     assert.commandWorked(bulk.execute());
 
-    const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray();
     assert.eq(nBuckets, buckets.length, buckets);
 
     return numDocs;

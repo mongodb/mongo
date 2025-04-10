@@ -2,6 +2,8 @@
  * Tests that time-series bucket OIDs are generated, and collisions are handled, as expected.
  */
 
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 function incrementOID(oid) {
     const prefix = oid.toString().substr(10, 16);
     const suffix = oid.toString().substr(26, 8);
@@ -17,7 +19,6 @@ const conn = MongoRunner.runMongod();
 const testDB = conn.getDB(jsTestName());
 
 const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
@@ -36,8 +37,8 @@ const runTest = (ordered) => {
         {ordered});
 
     // Check that we get consecutive OIDs.
-    const id1 = bucketsColl.findOne({meta: 1})._id;
-    const id2 = bucketsColl.findOne({meta: 2})._id;
+    const id1 = getTimeseriesCollForRawOps(testDB, coll).find({meta: 1}).rawData()[0]._id;
+    const id2 = getTimeseriesCollForRawOps(testDB, coll).find({meta: 2}).rawData()[0]._id;
     assert.eq(id2, incrementOID(id1));
 
     // Check that the numBucketsOpenedDueToMetadata metric is increased twice, once for
@@ -46,15 +47,16 @@ const runTest = (ordered) => {
     let expectedNumBucketsOpenedDueToMetadata = stats.timeseries['numBucketsOpenedDueToMetadata'];
 
     // Now directly insert a bogus bucket with the next sequential OID.
-    const bogusBucket = bucketsColl.findOne({meta: 2});
+    const bogusBucket = getTimeseriesCollForRawOps(testDB, coll).find({meta: 2}).rawData()[0];
     bogusBucket._id = incrementOID(id2);
-    assert.commandWorked(bucketsColl.insert(bogusBucket));
+    assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
+                             .insertOne(bogusBucket, getRawOperationSpec(testDB)));
 
     // Now insert another measurement that opens a new bucket and check that the ID is no longer
     // sequential.
     assert.commandWorked(coll.insert(
         {[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 3}, {ordered}));
-    const id3 = bucketsColl.findOne({meta: 3})._id;
+    const id3 = getTimeseriesCollForRawOps(testDB, coll).find({meta: 3}).rawData()[0]._id;
     assert.neq(id3, incrementOID(id2));
     assert.neq(id3, incrementOID(incrementOID(id2)));
 

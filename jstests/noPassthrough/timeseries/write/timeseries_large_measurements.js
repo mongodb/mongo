@@ -15,10 +15,11 @@
  * ]
  */
 
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const coll = db.getCollection(jsTestName());
-const bucketColl = db.getCollection("system.buckets." + jsTestName());
 
 const timeFieldName = "time";
 const resetCollection = (() => {
@@ -39,7 +40,8 @@ const checkAverageBucketSize = (() => {
     jsTestLog("Average bucket size: " + timeseriesStats.avgBucketSize);
     assert.lte(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize);
 
-    const firstBucket = bucketColl.find().sort({'control.min._id': 1}).toArray()[0];
+    const firstBucket =
+        getTimeseriesCollForRawOps(db, coll).find().rawData().sort({'control.min._id': 1})[0];
     assert.eq(0, firstBucket.control.min._id);
     assert.eq(9, firstBucket.control.max._id);
 });
