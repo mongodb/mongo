@@ -52,12 +52,13 @@ overview of the different EExpression types:
   As the name suggests, this expression type stores a single, immutable SBE value. An `EConstant`
   manages the value's lifetime (that is, it releases the value's memory on destruction if
   necessary).
-- [EPrimUnary and
-  EPrimBinary](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L324-L414):
-  These expressions represent basic logical, arithmetic, and comparison operations that take one and
-  two arguments, respectively.
+- [EPrimUnary, EPrimBinary and EPrimNary](https://github.com/10gen/mongo/blob/a04e7eea7dea44ee536703dbd98e7f832a495d11/src/mongo/db/exec/sbe/expressions/expression.h#L331-L457):
+  These expressions represent basic logical, arithmetic, and comparison operations that take one,
+  two, and two or more arguments, respectively.
 - [EIf](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L440-L461):
   Represents an 'if then else' expression.
+- [ESwitch](https://github.com/10gen/mongo/blob/a04e7eea7dea44ee536703dbd98e7f832a495d11/src/mongo/db/exec/sbe/expressions/expression.h#L509-L567):
+  Represents a multi-conditional switch expression (a.k.a. if-then-elif-...-else expression).
 - [EFunction](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L416-L438):
   Represents a named, built-in function supported natively by the engine. At the time of writing, there are over [150 such
   functions](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.cpp#L564-L567).
