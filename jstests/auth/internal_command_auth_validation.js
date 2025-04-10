@@ -326,10 +326,16 @@ const internalCommandsMap = {
         command: {_dropConnectionsToMongot: 1, hostAndPort: []},
     },
     _flushDatabaseCacheUpdates: {
+        skip: true,  // This command isn't valid when the shards are authoritative for DB metadata.
+                     // Also, it can not be used during the FCV upgrade. The command will be removed
+                     // in the future.
         testname: "_flushDatabaseCacheUpdates",
         command: {_flushDatabaseCacheUpdates: 'test'},
     },
     _flushDatabaseCacheUpdatesWithWriteConcern: {
+        skip: true,  // This command isn't valid when the shards are authoritative for DB metadata.
+                     // Also, it can not be used during the FCV upgrade. The command will be removed
+                     // in the future.
         testname: "_flushDatabaseCacheUpdatesWithWriteConcern",
         command: {_flushDatabaseCacheUpdatesWithWriteConcern: 'test', writeConcern: {w: 2}},
     },
