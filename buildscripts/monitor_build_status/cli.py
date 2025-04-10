@@ -4,7 +4,6 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from statistics import median
 from typing import Dict, List, Tuple
 
 import structlog
@@ -21,10 +20,6 @@ from buildscripts.monitor_build_status.code_lockdown_config import (
     CodeLockdownConfig,
     IssueThresholds,
 )
-from buildscripts.monitor_build_status.evergreen_service import (
-    EvergreenService,
-    TaskStatusCounts,
-)
 from buildscripts.monitor_build_status.issue_report import IssueCategory, IssueReport
 from buildscripts.monitor_build_status.jira_service import JiraService
 from buildscripts.resmokelib.utils.evergreen_conn import get_evergreen_api
@@ -40,7 +35,6 @@ JIRA_SERVER = "https://jira.mongodb.org"
 DEFAULT_REPO = "10gen/mongo"
 DEFAULT_BRANCH = "master"
 SLACK_CHANNEL = "#10gen-mongo-code-lockdown"
-EVERGREEN_LOOKBACK_DAYS = 14
 
 
 # filter 53085 is all issues in scope
@@ -77,21 +71,16 @@ class MonitorBuildStatusOrchestrator:
     def __init__(
         self,
         jira_service: JiraService,
-        evg_service: EvergreenService,
+        evg_api: EvergreenApi,
         code_lockdown_config: CodeLockdownConfig,
     ) -> None:
         self.jira_service = jira_service
-        self.evg_service = evg_service
+        self.evg_api = evg_api
         self.code_lockdown_config = code_lockdown_config
 
     def evaluate_build_redness(self, repo: str, branch: str, notify: bool) -> None:
-        status_message = f"\n`[STATUS]` '{repo}' repo '{branch}' branch"
+        status_message = f"\n`[STATUS]` Issue count for '{repo}' repo '{branch}' branch"
         scope_percentages: Dict[str, List[float]] = {}
-
-        LOGGER.info("Getting Evergreen projects data")
-        evg_projects_info = self.evg_service.get_evg_project_info(repo, branch)
-        evg_project_names = evg_projects_info.branch_to_projects_map[branch]
-        LOGGER.info("Got Evergreen projects data")
 
         issue_report = self._make_report()
         issue_count_status_msg, issue_count_percentages = self._get_issue_counts_status(
@@ -99,21 +88,6 @@ class MonitorBuildStatusOrchestrator:
         )
         status_message = f"{status_message}\n{issue_count_status_msg}\n"
         scope_percentages.update(issue_count_percentages)
-
-        # We are looking for Evergreen versions that started before the beginning of yesterday
-        # to give them time to complete
-        window_end = datetime.utcnow().replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
-        ) - timedelta(days=1)
-        window_start = window_end - timedelta(days=EVERGREEN_LOOKBACK_DAYS)
-
-        waterfall_report = self._make_waterfall_report(
-            evg_project_names=evg_project_names, window_end=window_end
-        )
-        waterfall_failure_rate_status_msg = self._get_waterfall_redness_status(
-            waterfall_report=waterfall_report, window_start=window_start, window_end=window_end
-        )
-        status_message = f"{status_message}\n{waterfall_failure_rate_status_msg}\n"
 
         summary = self._summarize(scope_percentages)
         status_message = f"{status_message}\n{summary}"
@@ -123,7 +97,7 @@ class MonitorBuildStatusOrchestrator:
 
         if notify:
             LOGGER.info("Notifying slack channel with results", slack_channel=SLACK_CHANNEL)
-            self.evg_service.evg_api.send_slack_message(
+            self.evg_api.send_slack_message(
                 target=SLACK_CHANNEL,
                 msg=status_message.strip(),
             )
@@ -148,7 +122,6 @@ class MonitorBuildStatusOrchestrator:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         percentages: Dict[str, List[float]] = {}
 
-        status_message = "`[STATUS]` The current issue count"
         headers = ["Scope", "Hot Issues", "Cold Issues"]
         table_data = []
 
@@ -234,81 +207,9 @@ class MonitorBuildStatusOrchestrator:
         table_str = tabulate(
             table_data, headers, tablefmt="outline", colalign=("left", "right", "right")
         )
-        status_message = f"{status_message}\n```\n{table_str}\n```"
+        message = f"```\n{table_str}\n```"
 
-        return status_message, percentages
-
-    def _make_waterfall_report(
-        self, evg_project_names: List[str], window_end: datetime
-    ) -> Dict[str, List[TaskStatusCounts]]:
-        task_status_counts = []
-        for day in range(EVERGREEN_LOOKBACK_DAYS):
-            day_window_end = window_end - timedelta(days=day)
-            day_window_start = day_window_end - timedelta(days=1)
-            LOGGER.info(
-                "Getting Evergreen waterfall data",
-                projects=evg_project_names,
-                window_start=day_window_start.isoformat(),
-                window_end=day_window_end.isoformat(),
-            )
-            waterfall_status = self.evg_service.get_waterfall_status(
-                evg_project_names=evg_project_names,
-                window_start=day_window_start,
-                window_end=day_window_end,
-            )
-            task_status_counts.extend(
-                self._accumulate_project_statuses(evg_project_names, waterfall_status)
-            )
-
-        waterfall_report = {evg_project_name: [] for evg_project_name in evg_project_names}
-        for task_status_count in task_status_counts:
-            waterfall_report[task_status_count.project].append(task_status_count)
-
-        return waterfall_report
-
-    @staticmethod
-    def _accumulate_project_statuses(
-        evg_project_names: List[str], build_statuses: List[TaskStatusCounts]
-    ) -> List[TaskStatusCounts]:
-        project_statuses = []
-
-        for evg_project_name in evg_project_names:
-            project_status = TaskStatusCounts(project=evg_project_name)
-            for build_status in build_statuses:
-                if build_status.project == evg_project_name:
-                    project_status = project_status.add(build_status)
-            project_statuses.append(project_status)
-
-        return project_statuses
-
-    @staticmethod
-    def _get_waterfall_redness_status(
-        waterfall_report: Dict[str, List[TaskStatusCounts]],
-        window_start: datetime,
-        window_end: datetime,
-    ) -> str:
-        date_format = "%Y-%m-%d"
-        status_message = (
-            f"`[STATUS]` Evergreen waterfall red and purple boxes median count per day"
-            f" between {window_start.strftime(date_format)}"
-            f" and {window_end.strftime(date_format)}"
-        )
-
-        for evg_project_name, daily_task_status_counts in waterfall_report.items():
-            daily_per_project_red_box_counts = [
-                task_status_counts.failed for task_status_counts in daily_task_status_counts
-            ]
-            LOGGER.info(
-                "Daily per project red box counts",
-                project=evg_project_name,
-                daily_red_box_counts=daily_per_project_red_box_counts,
-            )
-            median_per_day_red_box_count = median(daily_per_project_red_box_counts)
-            status_message = (
-                f"{status_message}\n{evg_project_name}: {median_per_day_red_box_count:.0f}"
-            )
-
-        return status_message
+        return message, percentages
 
     @staticmethod
     def _summarize(scope_percentages: Dict[str, List[float]]) -> str:
@@ -344,17 +245,12 @@ def main(
     ] = False,  # default to the more "quiet" setting
 ) -> None:
     """
-    Analyze Jira BFs count and Evergreen redness data.
+    Analyze Jira BFs count for redness reports.
 
-    For Jira API authentication please use `JIRA_AUTH_PAT` env variable.
+    For Jira API authentication, use `JIRA_AUTH_PAT` env variable.
     More about Jira Personal Access Tokens (PATs) here:
 
     - https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=218995581
-
-    For Evergreen API authentication please create `~/.evergreen.yml`.
-    More about Evergreen auth here:
-
-    - https://spruce.mongodb.com/preferences/cli
 
     Example:
 
@@ -366,11 +262,10 @@ def main(
     evg_api = get_evergreen_api()
 
     jira_service = JiraService(jira_client=jira_client)
-    evg_service = EvergreenService(evg_api=evg_api)
     code_lockdown_config = CodeLockdownConfig.from_yaml_config(CODE_LOCKDOWN_CONFIG)
     orchestrator = MonitorBuildStatusOrchestrator(
         jira_service=jira_service,
-        evg_service=evg_service,
+        evg_api=evg_api,
         code_lockdown_config=code_lockdown_config,
     )
 
