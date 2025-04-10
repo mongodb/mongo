@@ -54,14 +54,21 @@ const queries = {
     findFirstNameEq: qsutils.makeFindQueryInstance({filter: {firstName: "Frodo"}}),
     findFirstNameIn:
         qsutils.makeFindQueryInstance({filter: {firstName: {$in: ["Bilbo", "Frodo"]}}}),
-    aggregateLastNameEq:
-        qsutils.makeAggregateQueryInstance({pipeline: [{$match: {lastName: "Baggins"}}]}),
-    aggregateLastNameIn: qsutils.makeAggregateQueryInstance(
-        {pipeline: [{$match: {lastName: {$in: ["Baggins", "Tuck"]}}}]}),
     aggregateFirstNameEq:
         qsutils.makeAggregateQueryInstance({pipeline: [{$match: {firstName: "Frodo"}}]}),
     aggregateFirstNameIn: qsutils.makeAggregateQueryInstance(
         {pipeline: [{$match: {firstName: {$in: ["Bilbo", "Frodo"]}}}]})
+};
+
+// Unencrypted queries on FLE2 collections will not have encryptionInformation, even
+// if sent on a client with auto-encryption enabled. So they are also subject to query settings.
+const unencryptedQueries = {
+    findLastNameEq: qsutils.makeFindQueryInstance({filter: {lastName: "Baggins"}}),
+    findLastNameIn: qsutils.makeFindQueryInstance({filter: {lastName: {$in: ["Baggins", "Tuck"]}}}),
+    aggregateLastNameEq:
+        qsutils.makeAggregateQueryInstance({pipeline: [{$match: {lastName: "Baggins"}}]}),
+    aggregateLastNameIn: qsutils.makeAggregateQueryInstance(
+        {pipeline: [{$match: {lastName: {$in: ["Baggins", "Tuck"]}}}]}),
 };
 
 // Ensure that encrypted queries ignore query settings.
@@ -119,6 +126,19 @@ const queries = {
                 }
             }
         });
+})();
+
+(function testUnencryptedQueriesOnEncryptedClientRejectedBySettings() {
+    for (const query of Object.values(unencryptedQueries)) {
+        const queryToRun = qsutils.withoutDollarDB(query);
+
+        // Add 'reject' query settings to the base query without encryption.
+        qsutils.withQuerySettings(query, {reject: true}, function() {
+            // Ensure the unencrypted query executed over the encrypted connection is rejected.
+            assert.commandFailedWithCode(encryptedDb.runCommand(queryToRun),
+                                         ErrorCodes.QueryRejectedBySettings);
+        });
+    }
 })();
 
 encryptedClient = undefined;

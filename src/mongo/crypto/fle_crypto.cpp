@@ -1578,6 +1578,7 @@ UniqueMongoCrypt createMongoCrypt() {
     UniqueMongoCrypt crypt(mongocrypt_new());
 
     mongocrypt_setopt_log_handler(crypt.get(), mongocryptLogHandler, nullptr);
+    mongocrypt_setopt_enable_multiple_collinfo(crypt.get());
 
     return crypt;
 }
@@ -1654,9 +1655,37 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                 break;
             }
             case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO: {
-                // We don't expect these states to be reached because mongocrypt_t was already given
-                // the encryptedfield config map via mongocrypt_setopt_encrypted_field_config_map().
-                uasserted(7132301, "MONGOCRYPT_CTX_NEED_MONGO_COLLINFO not supported");
+                // If this state is reached, it is because the command is a $lookup aggregation
+                // where one or more namespaces referenced in the pipeline is an unencrypted
+                // collection; and libmongocrypt, in turn, wants to obtain the collinfo for those
+                // unencrypted namespaces. Since the namespace is unencrypted, we can provide
+                // libmongocrypt with a listCollections reply without any collection options.
+                // For FLE2 namespaces, we don't expect to be reached because mongocrypt_t should
+                // already have the encrypted field config provided to it by the caller via
+                // mongocrypt_setopt_encrypted_field_config_map().
+                MongoCryptBinary opbin = MongoCryptBinary::create();
+                if (!mongocrypt_ctx_mongo_op(ctx, opbin)) {
+                    errorContext = "mongocrypt_ctx_mongo_op failed"_sd;
+                    break;
+                }
+
+                // libmongocrypt supplies {name: <collection name>} filter for listCollections
+                BSONObj opobj = opbin.toBSON();
+                auto collName = opobj.getStringField("name");
+                uassert(10128800,
+                        "Invalid listCollections filter obtained from mongocrypt_ctx_mongo_op",
+                        !collName.empty());
+
+                BSONObjBuilder listCollectionReply;
+                listCollectionReply.append("name", collName);
+                listCollectionReply.append("type", "collection");
+                auto feed = MongoCryptBinary::createFromBSONObj(listCollectionReply.done());
+                auto feedOk = mongocrypt_ctx_mongo_feed(ctx, feed);
+                if (!feedOk) {
+                    errorContext = "mongocrypt_ctx_mongo_feed failed"_sd;
+                } else if (!mongocrypt_ctx_mongo_done(ctx)) {
+                    errorContext = "mongocrypt_ctx_mongo_done failed"_sd;
+                }
                 break;
             }
             case MONGOCRYPT_CTX_NEED_KMS: {
