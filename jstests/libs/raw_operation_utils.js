@@ -8,14 +8,12 @@
  * ```javascript
  *   import {
  *     getTimeseriesCollForRawOps,
- *	   kRawOperationSpec,
+ *	   getRawOperationSpec,
  *	 } from "jstests/libs/raw_operation_utils.js";
  *
  *   const bucketsColl = getTimeseriesCollForRawOps(db, coll);
  *   let rawBucketsDocs = bucketsColl.find().rawData().toArray();
- *   let rawBucketsDocs = bucketsColl.aggregate(
- *                                [{$match: {}}],
- (                                kRawOperationSpec).toArray();
+ *   let rawBucketsDocs = bucketsColl.aggregate([{$match: {}}], getRawOperationSpec(db)).toArray();
  * ```
  * This approach ensures the code works correctly even in versions that
  * do not support raw operations. Specifically:
@@ -58,10 +56,15 @@ export function isBinaryCompatibleFlagEnabledAndStable(db, flagName) {
 }
 
 // TODO SERVER-103187 remove this constant once 9.0 becomes last LTS
-export const kIsRawOperationSupported =
-    isBinaryCompatibleFlagEnabledAndStable(db, 'RawDataCrudOperations');
 export const kRawOperationFieldName = 'rawData';
-export const kRawOperationSpec = kIsRawOperationSupported ? {[kRawOperationFieldName]: true} : {};
+
+// TODO (SERVER-103187): Remove these functions once v9.0 becomes last-LTS.
+export function isRawOperationSupported(db) {
+    return isBinaryCompatibleFlagEnabledAndStable(db, 'RawDataCrudOperations');
+}
+export function getRawOperationSpec(db) {
+    return isRawOperationSupported(db) ? {[kRawOperationFieldName]: true} : {};
+}
 
 /**
  * Given a timeseries collection return its corresponding collection that expose raw data.
@@ -72,11 +75,7 @@ export const kRawOperationSpec = kIsRawOperationSupported ? {[kRawOperationField
  * When rawData is not supported this function returns the underlying system.buckets collection.
  */
 export function getTimeseriesCollForRawOps(db, coll) {
-    jsTest.log(`Receinved parameter '${tojson(coll)}' (${typeof coll})`);
-    if (kIsRawOperationSupported) {
-        return coll;
-    }
-    return getTimeseriesBucketsColl(coll);
+    return isRawOperationSupported(db) ? coll : getTimeseriesBucketsColl(coll);
 }
 
 /**
@@ -91,7 +90,7 @@ if (typeof DBQuery !== 'undefined' && typeof DBQuery.prototype.rawData === 'func
 
     // Override the rawData function
     DBQuery.prototype.rawData = function(value) {
-        if (kIsRawOperationSupported) {
+        if (isRawOperationSupported(this._db)) {
             // Call the original rawData function with the (potentially) modified arguments
             return originalRawData.apply(this, value);
         } else {

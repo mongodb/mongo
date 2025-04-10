@@ -41,16 +41,19 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
+import {
     getAggPlanStage,
     getEngine,
     getPlanStage,
     getSingleNodeExplain,
     isAggregationPlan
 } from "jstests/libs/query/analyze_plan.js";
-import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
 const coll = db[jsTestName()];
-const bucketsColl = getTimeseriesCollForRawOps(db, coll);
+const bucketsColl = getTimeseriesCollForRawOps(coll);
 
 // The lastpoint optimization attempt to pick a bucket that would contain the event with max time
 // and then only unpack that bucket. This function creates a collection with three buckets that

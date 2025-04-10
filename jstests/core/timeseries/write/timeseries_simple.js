@@ -13,8 +13,8 @@
  *   does_not_support_config_fuzzer
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
@@ -105,7 +105,7 @@ TimeseriesTest.run((insert) => {
     assert.eq(numDocs, viewDocs.length, viewDocs);
 
     // Check bucket collection.
-    const bucketsColl = getTimeseriesCollForRawOps(db, coll);
+    const bucketsColl = getTimeseriesCollForRawOps(coll);
     const bucketDocs = bucketsColl.find().rawData().toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];
