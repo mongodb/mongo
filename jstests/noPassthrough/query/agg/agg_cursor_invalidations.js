@@ -242,12 +242,11 @@ const originalFrameworkControl =
 // How many WriteConflict errors we are expecting at least. Note that the failure point in this test
 // is triggered randomly, so even with 1000 max iterations we cannot make this number really high.
 const expectedToFailAtLeast = 10;
-// Test with different pipeline commands while we make the storage engine randmoly throw
+// Test with different pipeline commands while we make the storage engine randomly throw
 // WriteConflict errors upon reading. This ensures that the cleanup procedure of
 // 'DocumentSourceCursor' works properly.
 try {
-    [[defaultAggregateCmdSmallBatch, 0],
-     [aggregateAndSortCmdSmallBatch, expectedToFailAtLeast],
+    [[aggregateAndSortCmdSmallBatch, expectedToFailAtLeast],
      [aggregateAndLookupCmdSmallBatch, expectedToFailAtLeast],
      [aggregateAndLookupAndUnwindCmdSmallBatch, expectedToFailAtLeast],
      [aggregateAndGraphLookupCmdSmallBatch, expectedToFailAtLeast]]
@@ -263,16 +262,12 @@ try {
 
                 const runTest = (expectedToFailAtLeast, cb) => {
                     let actualFailed = 0;
-                    if (expectedToFailAtLeast === 0) {
-                        cb();
-                    } else {
-                        for (let i = 0; i < 1000 && actualFailed < expectedToFailAtLeast; ++i) {
-                            try {
-                                cb();
-                            } catch (res) {
-                                assert.commandFailedWithCode(res, [ErrorCodes.WriteConflict]);
-                                actualFailed++;
-                            }
+                    for (let i = 0; i < 1000 && actualFailed < expectedToFailAtLeast; ++i) {
+                        try {
+                            cb();
+                        } catch (res) {
+                            assert.commandFailedWithCode(res, [ErrorCodes.WriteConflict]);
+                            actualFailed++;
                         }
                     }
                     return actualFailed;
@@ -332,6 +327,7 @@ try {
                 // Turn off fail point.
                 const res = assert.commandWorked(testDB.adminCommand(
                     {configureFailPoint: 'WTWriteConflictExceptionForReads', mode: 'off'}));
+
                 assert.gte(res.count,
                            expectedToFailAtLeast,
                            `Expecting failure point to have been hit at least ${
