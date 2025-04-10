@@ -30,158 +30,6 @@ LINUX_OPT_COPTS = select({
     "//conditions:default": [],
 })
 
-GCC_OR_CLANG_WARNINGS_COPTS = select({
-    "//bazel/config:gcc_or_clang": [
-        # Enable all warnings by default.
-        "-Wall",
-
-        # Warn on comparison between signed and unsigned integer expressions.
-        "-Wsign-compare",
-
-        # Do not warn on unknown pragmas.
-        "-Wno-unknown-pragmas",
-
-        # Warn if a precompiled header (see Precompiled Headers) is found in the
-        # search path but can't be used.
-        "-Winvalid-pch",
-
-        # This warning was added in g++-4.8.
-        "-Wno-unused-local-typedefs",
-
-        # Clang likes to warn about unused functions, which seems a tad
-        # aggressive and breaks -Werror, which we want to be able to use.
-        "-Wno-unused-function",
-
-        # Prevents warning about using deprecated features (such as auto_ptr in
-        # c++11) Using -Wno-error=deprecated-declarations does not seem to work
-        # on some compilers, including at least g++-4.6.
-        "-Wno-deprecated-declarations",
-
-        # New in clang-3.4, trips up things mostly in third_party, but in a few
-        # places in the primary mongo sources as well.
-        "-Wno-unused-const-variable",
-
-        # This has been suppressed in gcc 4.8, due to false positives, but not
-        # in clang. So we explicitly disable it here.
-        "-Wno-missing-braces",
-
-        # SERVER-76472 we don't try to maintain ABI so disable warnings about
-        # possible ABI issues.
-        "-Wno-psabi",
-    ],
-    "//conditions:default": [],
-})
-
-CLANG_WARNINGS_COPTS = select({
-    "//bazel/config:compiler_type_clang": [
-        # SERVER-44856: Our windows builds complain about unused
-        # exception parameters, but GCC and clang don't seem to do
-        # that for us automatically. In the interest of making it more
-        # likely to catch these errors early, add the (currently clang
-        # only) flag that turns it on.
-        "-Wunused-exception-parameter",
-
-        # Clang likes to warn about unused private fields, but some of our
-        # third_party libraries have such things.
-        "-Wno-unused-private-field",
-
-        # As of clang-3.4, this warning appears in v8, and gets escalated to an
-        # error.
-        "-Wno-tautological-constant-out-of-range-compare",
-
-        # As of clang in Android NDK 17, these warnings appears in boost and/or
-        # ICU, and get escalated to errors
-        "-Wno-tautological-constant-compare",
-        "-Wno-tautological-unsigned-zero-compare",
-        "-Wno-tautological-unsigned-enum-zero-compare",
-
-        # Suppress warnings about not consistently using override everywhere in
-        # a class. It seems very pedantic, and we have a fair number of
-        # instances.
-        "-Wno-inconsistent-missing-override",
-
-        # Don't issue warnings about potentially evaluated expressions
-        "-Wno-potentially-evaluated-expression",
-
-        # Disable warning about templates that can't be implicitly instantiated.
-        # It is an attempt to make a link error into an easier-to-debug compiler
-        # failure, but it triggers false positives if explicit instantiation is
-        # used in a TU that can see the full definition. This is a problem at
-        # least for the S2 headers.
-        "-Wno-undefined-var-template",
-
-        # This warning was added in clang-4.0, but it warns about code that is
-        # required on some platforms. Since the warning just states that
-        # 'explicit instantiation of [a template] that occurs after an explicit
-        # specialization has no effect', it is harmless on platforms where it
-        # isn't required
-        "-Wno-instantiation-after-specialization",
-
-        # This warning was added in clang-5 and flags many of our lambdas. Since
-        # it isn't actively harmful to capture unused variables we are
-        # suppressing for now with a plan to fix later.
-        "-Wno-unused-lambda-capture",
-
-        # This warning was added in Apple clang version 11 and flags many
-        # explicitly defaulted move constructors and assignment operators for
-        # being implicitly deleted, which is not useful.
-        "-Wno-defaulted-function-deleted",
-    ],
-    "//conditions:default": [],
-})
-
-GCC_WARNINGS_COPTS = select({
-    "//bazel/config:compiler_type_gcc": [
-        # Disable warning about variables that may not be initialized
-        # Failures are triggered in the case of boost::optional
-        "-Wno-maybe-uninitialized",
-
-        # Prevents warning about unused but set variables found in boost version
-        # 1.49 in boost/date_time/format_date_parser.hpp which does not work for
-        # compilers GCC >= 4.6. Error explained in
-        # https://svn.boost.org/trac/boost/ticket/6136 .
-        "-Wno-unused-but-set-variable",
-    ],
-    "//conditions:default": [],
-})
-
-CLANG_FNO_LIMIT_DEBUG_INFO = select({
-    "//bazel/config:compiler_type_clang": [
-        # We add this flag to make clang emit debug info for c++ stl types so
-        # that our pretty printers will work with newer clang's which omit this
-        # debug info. This does increase the overall debug info size.
-        "-fno-limit-debug-info",
-    ],
-    "//conditions:default": [],
-})
-
-GCC_OR_CLANG_GENERAL_COPTS = select({
-    "//bazel/config:gcc_or_clang": [
-        # Generate unwind table in DWARF format, if supported by target machine.
-        # The table is exact at each instruction boundary, so it can be used for
-        # stack unwinding from asynchronous events (such as debugger or garbage
-        # collector).
-        "-fasynchronous-unwind-tables",
-
-        # For debug builds with tcmalloc, we need the frame pointer so it can
-        # record the stack of allocations. We also need the stack pointer for
-        # stack traces unless libunwind is enabled. Enable frame pointers by
-        # default.
-        "-fno-omit-frame-pointer",
-
-        # Enable strong by default, this may need to be softened to
-        # -fstack-protector-all if we run into compatibility issues.
-        "-fstack-protector-strong",
-
-        # Disable TBAA optimization
-        "-fno-strict-aliasing",
-
-        # Show colors even though bazel captures stdout/stderr
-        "-fdiagnostics-color",
-    ],
-    "//conditions:default": [],
-})
-
 LINUX_PTHREAD_LINKFLAG = select({
     "@platforms//os:linux": [
         # Adds support for multithreading with the pthreads library. This option
@@ -214,18 +62,6 @@ BIND_AT_LOAD_LINKFLAGS = select({
         "-Wl,-z,now",
     ],
     "//conditions:default": [],
-})
-
-# Disable floating-point contractions such as forming of fused multiply-add
-# operations.
-FLOATING_POINT_COPTS = select({
-    "//bazel/config:compiler_type_clang": ["-ffp-contract=off"],
-    "//bazel/config:compiler_type_gcc": ["-ffp-contract=off"],
-
-    # msvc defaults to /fp:precise. Visual Studio 2022 does not emit
-    # floating-point contractions with /fp:precise, but previous versions can.
-    # Disable contractions altogether by using /fp:strict.
-    "//bazel/config:compiler_type_msvc": ["/fp:strict"],
 })
 
 IMPLICIT_FALLTHROUGH_COPTS = select({
@@ -601,11 +437,6 @@ MONGO_LINUX_CC_COPTS = (
     THREAD_SANITIZER_COPTS +
     ANY_SANITIZER_AVAILABLE_COPTS +
     LINUX_OPT_COPTS +
-    GCC_OR_CLANG_WARNINGS_COPTS +
-    GCC_OR_CLANG_GENERAL_COPTS +
-    FLOATING_POINT_COPTS +
-    CLANG_WARNINGS_COPTS +
-    CLANG_FNO_LIMIT_DEBUG_INFO +
     COMPRESS_DEBUG_COPTS +
     DEBUG_TYPES_SECTION_FLAGS +
     IMPLICIT_FALLTHROUGH_COPTS +
@@ -613,7 +444,6 @@ MONGO_LINUX_CC_COPTS = (
     DISABLE_SOURCE_WARNING_AS_ERRORS_COPTS +
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_COPTS +
-    GCC_WARNINGS_COPTS +
     COVERAGE_FLAGS +
     PGO_PROFILE_FLAGS +
     SHARED_ARCHIVE_COPTS +

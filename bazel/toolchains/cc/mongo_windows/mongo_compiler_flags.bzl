@@ -90,6 +90,11 @@ WINDOWS_GENERAL_COPTS = select({
 
         # Don't send error reports in case of internal compiler error
         "/errorReport:none",
+
+        # msvc defaults to /fp:precise. Visual Studio 2022 does not emit
+        # floating-point contractions with /fp:precise, but previous versions can.
+        # Disable contractions altogether by using /fp:strict.
+        "/fp:strict",
     ],
     "//conditions:default": [],
 })
