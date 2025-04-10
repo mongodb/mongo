@@ -42,60 +42,49 @@ static constexpr int128_t add(int128_t lhs, int128_t rhs) {
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     using namespace mongo;
 
-    // We need at least 8 bytes
-    if (Size < sizeof(uint64_t))
-        return 0;
-
-    // Find a contiguous buffer containing valid simple8b selectors
-    size_t i = 0;
-    for (; i < Size - sizeof(uint64_t); i += sizeof(uint64_t)) {
-        uint64_t encoded = mongo::ConstDataView(Data + i).read<LittleEndian<uint64_t>>();
-        auto selector = encoded & simple8b_internal::kBaseSelectorMask;
-        // Selector 0 is not valid
-        if (selector == 0) {
-            break;
-        }
-
-        // Validate extended selectors for selector 7 and 8
-        if (selector == 7) {
-            encoded >>= 4;
-            selector = encoded & simple8b_internal::kBaseSelectorMask;
-            if (selector > 9)
-                break;
-        } else if (selector == 8) {
-            encoded >>= 4;
-            selector = encoded & simple8b_internal::kBaseSelectorMask;
-            if (selector > 13)
-                break;
-        }
-    }
+    // The size of the Simple8b buffer in bytes needs to be a multiple of 8.
+    size_t bufferSize = (Size >> 3) << 3;
 
     // We need at least one simple8b block
-    if (i < sizeof(uint64_t))
+    if (bufferSize < sizeof(uint64_t))
         return 0;
 
     // Verify block sum vs iterator based implementation.
     {
-        Simple8b<uint128_t> s8b(Data, i);
-        int128_t oldSum = 0;
-        for (auto&& val : s8b) {
-            if (val) {
-                oldSum = add(oldSum, Simple8bTypeUtil::decodeInt(*val));
+        auto oldSum = [&]() -> boost::optional<int128_t> {
+            try {
+                int128_t sum = 0;
+                Simple8b<uint128_t> s8b(Data, bufferSize);
+                for (auto&& val : s8b) {
+                    if (val)
+                        sum = add(sum, Simple8bTypeUtil::decodeInt(*val));
+                }
+                return sum;
+            } catch (const DBException&) {
+                return boost::none;
             }
-        }
+        }();
 
-        uint64_t prev = 0xE;  // Previous value 0, this is one simple8b value containing a zero.
-        int128_t sum = simple8b::sum<int128_t>(Data, i, prev);
+        auto sum = [&]() -> boost::optional<int128_t> {
+            try {
+                uint64_t prev =
+                    0xE;  // Previous value 0, this is one simple8b value containing a zero.
+                return simple8b::sum<int128_t>(Data, bufferSize, prev);
+            } catch (const DBException&) {
+                return boost::none;
+            }
+        }();
 
         if (sum != oldSum) {
             LOGV2_DEBUG(8384500,
                         2,
                         "simple8b::sum is different compared to reference implementation",
-                        "input"_attr = hexblob::encode(Data, i),
-                        "sumLow"_attr = absl::Int128Low64(sum),
-                        "sumHigh"_attr = absl::Int128High64(sum),
-                        "oldSumLow"_attr = absl::Int128Low64(oldSum),
-                        "oldSumHigh"_attr = absl::Int128High64(oldSum));
+                        "input"_attr = hexblob::encode(Data, bufferSize),
+                        "sumLow"_attr = sum.map(absl::Int128Low64),
+                        "sumHigh"_attr = sum.map(absl::Int128High64),
+                        "oldSumLow"_attr = oldSum.map(absl::Int128Low64),
+                        "oldSumHigh"_attr = oldSum.map(absl::Int128High64));
+            return 0;
         }
 
         // This will effectively cause the fuzzer to find differences between both implementations
