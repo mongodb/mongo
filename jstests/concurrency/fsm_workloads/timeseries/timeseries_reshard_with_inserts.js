@@ -12,6 +12,8 @@
  *   requires_persistence,
  *   # TODO (SERVER-91251): Run this with stepdowns on TSAN.
  *   tsan_incompatible,
+ *   # This test relies on default timeseries parameters for countDocuments.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
