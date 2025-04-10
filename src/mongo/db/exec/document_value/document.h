@@ -352,7 +352,7 @@ public:
     static Document fromBsonWithMetaData(const BSONObj& bson);
 
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Document& d);
+    friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Document& d);
 
     /** Return the abstract Position of a field, suitable to pass to operator[] or getField().
      *  This can potentially save time if you need to refer to a field multiple times.

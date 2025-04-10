@@ -34,6 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/util/assert_util.h"
@@ -74,11 +75,10 @@ void TenantId::serializeToBSON(BSONArrayBuilder* builder) const {
     builder->append(_oid);
 }
 
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<< <TenantId>(TenantId value) {
-    value.serializeToBSON(_fieldName, _builder);
-    _fieldName = StringData();
-    return *_builder;
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const TenantId& value) {
+    auto& bob = stream.builder();
+    value.serializeToBSON(stream.consumeFieldName(), &bob);
+    return bob;
 }
 
 }  // namespace mongo

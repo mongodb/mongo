@@ -137,18 +137,17 @@ public:
         builder->append(T::field, b.arr());
     }
 
-    friend bool operator==(const AddressRestriction<T>& lhs, const AddressRestriction<T>& rhs) {
-        return lhs.equalityLens() == rhs.equalityLens();
+    friend bool operator==(const AddressRestriction& lhs, const AddressRestriction& rhs) {
+        return lhs._ranges == rhs._ranges;
     }
-    friend bool operator!=(const AddressRestriction<T>& lhs, const AddressRestriction<T>& rhs) {
-        return !(lhs == rhs);
+
+    friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream,
+                                      const AddressRestriction& value) {
+        value.appendToBuilder(&BSONObjBuilder{stream.subobjStart()}.lvalue());
+        return stream.builder();
     }
 
 private:
-    auto equalityLens() const {
-        return std::tie(_ranges);
-    }
-
     void serialize(std::ostream& os) const override {
         os << "{\"" << T::field << "\": [";
         auto sz = _ranges.size() - 1;
@@ -187,26 +186,5 @@ StatusWith<SharedRestrictionDocument> parseAuthenticationRestriction(const BSONA
  * and return a new BSONArray representing a sanitized portion thereof.
  */
 StatusWith<BSONArray> getRawAuthenticationRestrictions(const BSONArray& arr);
-
-
-template <>
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<< <ClientSourceRestriction>(
-    ClientSourceRestriction value) {
-    BSONObjBuilder b;
-    value.appendToBuilder(&b);
-    _builder->append(_fieldName, b.obj());
-    _fieldName = StringData();
-    return *_builder;
-}
-
-template <>
-inline BSONObjBuilder& BSONObjBuilderValueStream::operator<< <ServerAddressRestriction>(
-    ServerAddressRestriction value) {
-    BSONObjBuilder b;
-    value.appendToBuilder(&b);
-    _builder->append(_fieldName, b.obj());
-    _fieldName = StringData();
-    return *_builder;
-}
 
 }  // namespace mongo

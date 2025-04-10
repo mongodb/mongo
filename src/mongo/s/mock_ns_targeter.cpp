@@ -55,13 +55,13 @@ ChunkRange parseRange(const BSONObj& query) {
     } else if (query.firstElement().type() == Object) {
         BSONObj queryRange = query.firstElement().Obj();
 
-        ASSERT(!queryRange[GTE.l_].eoo());
-        ASSERT(!queryRange[LT.l_].eoo());
+        ASSERT(!queryRange[GTE.label()].eoo());
+        ASSERT(!queryRange[LT.label()].eoo());
 
         BSONObjBuilder minKeyB;
-        minKeyB.appendAs(queryRange[GTE.l_], fieldName);
+        minKeyB.appendAs(queryRange[GTE.label()], fieldName);
         BSONObjBuilder maxKeyB;
-        maxKeyB.appendAs(queryRange[LT.l_], fieldName);
+        maxKeyB.appendAs(queryRange[LT.label()], fieldName);
 
         return {minKeyB.obj(), maxKeyB.obj()};
     }

@@ -32,7 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 #include <stdexcept>
 #include <string>
@@ -131,7 +131,6 @@ StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr);
  * Supports use of CIDR with the BSON macro:
  *     BSON("cidr" << cidr) -> { cidr: "..." }
  */
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<< <CIDR>(CIDR value);
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const CIDR& value);
 
 }  // namespace mongo

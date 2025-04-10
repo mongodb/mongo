@@ -167,7 +167,6 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
  * Supports use of TenantId with the BSON macro:
  *     BSON("tenant" << tenantId)
  */
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<< <TenantId>(TenantId value);
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const TenantId& value);
 
 }  // namespace mongo

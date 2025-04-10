@@ -140,11 +140,10 @@ std::string UUID::toString() const {
                        hexblob::encodeLower(&_uuid[10], 6));
 }
 
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<< <UUID>(UUID value) {
-    value.appendToBuilder(_builder, _fieldName);
-    _fieldName = StringData();
-    return *_builder;
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const UUID& value) {
+    auto& bob = stream.builder();
+    value.appendToBuilder(&bob, stream.consumeFieldName());
+    return bob;
 }
 
 }  // namespace mongo

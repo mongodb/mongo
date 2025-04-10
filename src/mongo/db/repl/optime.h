@@ -39,18 +39,11 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
-
-class BSONObj;
-class BSONObjBuilder;
-class BSONObjBuilderValueStream;
-template <typename T>
-class StatusWith;
-
-namespace repl {
+namespace mongo::repl {
 
 /**
  * OpTime encompasses a Timestamp (which itself is composed of two 32-bit integers, which can
@@ -179,6 +172,7 @@ private:
     Timestamp _timestamp;
     long long _term = kInitialTerm;
 };
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const OpTime& value);
 
 class OpTimeAndWallTime {
 public:
@@ -213,13 +207,6 @@ public:
         return opTime.toString() + ", " + wallTime.toString();
     }
 };
+
 std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
-}  // namespace repl
-
-/**
- * Support BSONObjBuilder and BSONArrayBuilder "stream" API.
- */
-BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const repl::OpTime& value);
-
-
-}  // namespace mongo
+}  // namespace mongo::repl

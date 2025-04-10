@@ -26,98 +26,20 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/bson/bsonmisc.h"
 
-#include <cstring>
-#include <memory>
+#include <algorithm>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
-    BSONObjIterator l(lhs);
-    BSONObjIterator r(rhs);
-
-    while (l.more() && r.more()) {
-        if (strcmp(l.next().fieldName(), r.next().fieldName()) != 0) {
-            return false;
-        }
-    }
-
-    return !(l.more() || r.more());  // false if lhs and rhs have diff nFields()
-}
-
-Labeler::Label GT("$gt");
-Labeler::Label GTE("$gte");
-Labeler::Label LT("$lt");
-Labeler::Label LTE("$lte");
-Labeler::Label NE("$ne");
-Labeler::Label NIN("$nin");
-Labeler::Label BSIZE("$size");
-
-GENOIDLabeler GENOID;
-DateNowLabeler DATENOW;
-NullLabeler BSONNULL;
-UndefinedLabeler BSONUndefined;
-
-MinKeyLabeler MINKEY;
-MaxKeyLabeler MAXKEY;
-
-BSONObjBuilderValueStream::BSONObjBuilderValueStream(BSONObjBuilder* builder) {
-    _builder = builder;
-}
-
-void BSONObjBuilderValueStream::reset() {
-    _fieldName = StringData();
-    _subobj.reset();
-}
-
-BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const BSONElement& e) {
-    _builder->appendAs(e, _fieldName);
-    _fieldName = StringData();
-    return *_builder;
-}
-
-BufBuilder& BSONObjBuilderValueStream::subobjStart() {
-    StringData tmp = _fieldName;
-    _fieldName = StringData();
-    return _builder->subobjStart(tmp);
-}
-
-BufBuilder& BSONObjBuilderValueStream::subarrayStart() {
-    StringData tmp = _fieldName;
-    _fieldName = StringData();
-    return _builder->subarrayStart(tmp);
-}
-
-Labeler BSONObjBuilderValueStream::operator<<(const Labeler::Label& l) {
-    return Labeler(l, this);
-}
-
-void BSONObjBuilderValueStream::endField(StringData nextFieldName) {
-    if (haveSubobj()) {
-        MONGO_verify(_fieldName.rawData());
-        _builder->append(_fieldName, subobj()->done());
-        _subobj.reset();
-    }
-    _fieldName = nextFieldName;
-}
-
-BSONObjBuilder* BSONObjBuilderValueStream::subobj() {
-    if (!haveSubobj())
-        _subobj.reset(new BSONObjBuilder());
-    return _subobj.get();
-}
-
-BSONObjBuilder& Labeler::operator<<(const BSONElement& e) {
-    s_->subobj()->appendAs(e, l_.l_);
-    return *s_->_builder;
+bool fieldsMatch(const BSONObj& a, const BSONObj& b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto&& ae, auto&& be) {
+        return ae.fieldNameStringData() == be.fieldNameStringData();
+    });
 }
 
 }  // namespace mongo

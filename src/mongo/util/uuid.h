@@ -41,8 +41,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/logv2/log_attr.h"
@@ -222,7 +222,6 @@ inline StringBuilder& operator<<(StringBuilder& s, const UUID& uuid) {
  * Supports use of UUID with the BSON macro:
  *     BSON("uuid" << uuid) -> { uuid: BinData(4, "...") }
  */
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<< <UUID>(UUID value);
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const UUID& value);
 
 }  // namespace mongo

@@ -296,7 +296,7 @@ public:
     void addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel = 1) const;
 
     // Support BSONObjBuilder and BSONArrayBuilder "stream" API
-    friend BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val);
+    friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Value& val);
 
     /** Coerce a value to a bool using BSONElement::trueValue() rules.
      */

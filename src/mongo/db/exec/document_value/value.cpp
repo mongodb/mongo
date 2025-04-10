@@ -324,7 +324,7 @@ Value Value::operator[](StringData name) const {
     return getDocument()[name];
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val) {
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Value& val) {
     switch (val.getType()) {
         case EOO:
             return builder.builder();  // nothing appended

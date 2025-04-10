@@ -139,19 +139,16 @@ CIDR::CIDR() : _family(AF_UNSPEC), _len(0) {
     _ip.fill(0);
 }
 
-template <>
-BSONObjBuilder& BSONObjBuilderValueStream::operator<< <CIDR>(CIDR value) {
-    _builder->append(_fieldName, value.toString());
-    _fieldName = StringData();
-    return *_builder;
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& stream, const CIDR& value) {
+    return stream << value.toString();
+}
+
+std::ostream& operator<<(std::ostream& s, const CIDR& cidr) {
+    return append(s, cidr._family, cidr._ip, cidr._len);
+}
+
+StringBuilder& operator<<(StringBuilder& s, const CIDR& cidr) {
+    return append(s, cidr._family, cidr._ip, cidr._len);
 }
 
 }  // namespace mongo
-
-std::ostream& mongo::operator<<(std::ostream& s, const CIDR& cidr) {
-    return append(s, cidr._family, cidr._ip, cidr._len);
-}
-
-mongo::StringBuilder& mongo::operator<<(StringBuilder& s, const CIDR& cidr) {
-    return append(s, cidr._family, cidr._ip, cidr._len);
-}

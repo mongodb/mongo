@@ -48,8 +48,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
-namespace repl {
+namespace mongo::repl {
 
 // static
 OpTime OpTime::max() {
@@ -134,10 +133,8 @@ OpTimeAndWallTime OpTimeAndWallTime::parse(const BSONObj& obj) {
     return uassertStatusOK(parseOpTimeAndWallTimeFromOplogEntry(obj));
 }
 
-}  // namespace repl
-
-BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const repl::OpTime& value) {
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const OpTime& value) {
     return builder << value.toBSON();
 }
 
-}  // namespace mongo
+}  // namespace mongo::repl

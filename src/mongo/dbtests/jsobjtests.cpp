@@ -1188,14 +1188,6 @@ class LabelishOr : public LabelBase {
     }
 };
 
-class Unallowed {
-public:
-    void run() {
-        ASSERT_THROWS(BSON(GT << 4), AssertionException);
-        ASSERT_THROWS(BSON("a" << 1 << GT << 4), AssertionException);
-    }
-};
-
 class ElementAppend {
 public:
     void run() {
@@ -1204,6 +1196,10 @@ public:
         ASSERT_EQUALS(NumberInt, a["a"].type());
         ASSERT_EQUALS(NumberInt, b["b"].type());
         ASSERT_EQUALS(17, b["b"].number());
+
+        // Append an element onto a label.
+        ASSERT_BSONOBJ_EQ(BSON("b" << GT << a["a"]),  //
+                          BSON("b" << BSON("$gt" << 17)));
     }
 };
 
@@ -1977,7 +1973,6 @@ public:
         add<ValueStreamTests::LabelSize>();
         add<ValueStreamTests::LabelMulti>();
         add<ValueStreamTests::LabelishOr>();
-        add<ValueStreamTests::Unallowed>();
         add<ValueStreamTests::ElementAppend>();
         add<ValueStreamTests::AllTypes>();
         add<SubObjectBuilder>();

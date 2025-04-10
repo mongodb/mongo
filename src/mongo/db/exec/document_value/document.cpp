@@ -556,7 +556,7 @@ Document::Document(std::vector<std::pair<StringData, Value>> fields) {
     *this = mutableDoc.freeze();
 }
 
-BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Document& doc) {
+BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Document& doc) {
     BSONObjBuilder subobj(builder.subobjStart());
     doc.toBson(&subobj);
     subobj.doneFast();

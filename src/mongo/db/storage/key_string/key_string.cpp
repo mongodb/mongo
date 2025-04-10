@@ -1491,7 +1491,7 @@ void toBson(BufReader* reader,
     while (readType<uint8_t>(reader, inverted) != 0) {
         if (inverted) {
             std::string name = readInvertedCString(reader);
-            BSONObjBuilderValueStream& stream = *builder << name;
+            auto& stream = *builder << name;
             toBsonValue(readType<uint8_t>(reader, inverted),
                         reader,
                         typeBits,
@@ -1501,7 +1501,7 @@ void toBson(BufReader* reader,
                         depth);
         } else {
             StringData name = readCString(reader);
-            BSONObjBuilderValueStream& stream = *builder << name;
+            auto& stream = *builder << name;
             toBsonValue(readType<uint8_t>(reader, inverted),
                         reader,
                         typeBits,
@@ -3026,8 +3026,8 @@ void appendSingleFieldToBSONAs(
     TypeBits typeBits(version);
     TypeBits::Reader typeBitsReader(typeBits);
 
-    BSONObjBuilderValueStream& stream = *builder << fieldName;
-    toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, &stream, depth);
+    toBsonValue(
+        ctype, &reader, &typeBitsReader, inverted, version, &(*builder << fieldName), depth);
 }
 
 void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Version version) {
