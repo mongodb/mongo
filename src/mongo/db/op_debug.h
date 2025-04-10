@@ -113,11 +113,6 @@ public:
         bool equals(const AdditiveMetrics& otherMetrics) const;
 
         /**
-         * Increments writeConflicts by n.
-         */
-        void incrementWriteConflicts(long long n);
-
-        /**
          * Increments temporarilyUnavailableErrors by n.
          */
         void incrementTemporarilyUnavailableErrors(long long n);
@@ -193,7 +188,6 @@ public:
         // these metrics are tracked over the course of a transaction by SingleTransactionStats,
         // which is built on OpDebug.
 
-        AtomicWord<long long> writeConflicts{0};
         AtomicWord<long long> temporarilyUnavailableErrors{0};
 
         // Amount of time spent executing a query.

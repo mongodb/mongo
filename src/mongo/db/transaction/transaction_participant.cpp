@@ -1530,6 +1530,7 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().additiveMetrics,
                                                                 curop->getPrepareReadConflicts(),
+                                                                curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
     }
 
@@ -2211,7 +2212,7 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
     try {
         shard_role_details::getWriteUnitOfWork(opCtx)->commit();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
-        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+        recordWriteConflict(opCtx);
         throw;
     } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
         CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
@@ -2328,6 +2329,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().additiveMetrics,
                                                                 curop->getPrepareReadConflicts(),
+                                                                curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
     }
     // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -2431,6 +2433,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         o(lk).transactionMetricsObserver.onTransactionOperation(opCtx,
                                                                 curop->debug().additiveMetrics,
                                                                 curop->getPrepareReadConflicts(),
+                                                                curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
     }
 
@@ -2895,6 +2898,9 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
     attrs.addDeepCopy("readTimestamp", singleTransactionStats.getReadTimestamp().toString());
 
     singleTransactionStats.getOpDebug()->additiveMetrics.report(&attrs);
+
+    const auto& storageMetrics = singleTransactionStats.getTransactionStorageMetrics();
+    attrs.add("writeConflicts", storageMetrics.writeConflicts.loadRelaxed());
 
     attrs.add("prepareReadConflicts", singleTransactionStats.getPrepareReadConflicts());
 

@@ -317,11 +317,11 @@ void temporarilyYieldCollection(OperationContext* opCtx,
 
             return;
         } catch (const StorageUnavailableException& exception) {
-            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            logWriteConflictAndBackoff(attempt,
-                                       "query yield"_sd,
-                                       exception.reason(),
-                                       NamespaceStringOrUUID(NamespaceString::kEmpty));
+            logAndRecordWriteConflictAndBackoff(opCtx,
+                                                attempt,
+                                                "query yield"_sd,
+                                                exception.reason(),
+                                                NamespaceStringOrUUID(NamespaceString::kEmpty));
         }
     }
 }
@@ -367,7 +367,7 @@ PlanProgress recoverFromNonFatalWriteException(
     try {
         writeFunction();
     } catch (ExceptionFor<ErrorCodes::WriteConflict>& exception) {
-        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+        recordWriteConflict(opCtx);
         return exceptionRecoveryPolicy.recoverIfPossible(exception);
     } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable>& exception) {
         if (opCtx->inMultiDocumentTransaction()) {

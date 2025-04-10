@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -80,20 +81,23 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
     transactionTooLargeForCacheErrorsConvertedToWriteConflict.increment(1);
 
     // Handle as write conflict.
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-    logWriteConflictAndBackoff(
-        writeConflictAttempts, opStr, s.reason(), NamespaceStringOrUUID(nssOrUUID));
+    logAndRecordWriteConflictAndBackoff(
+        opCtx, writeConflictAttempts, opStr, s.reason(), NamespaceStringOrUUID(nssOrUUID));
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 }
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
+void recordWriteConflict(OperationContext* opCtx, int64_t n) {
+    invariant(n > 0);
+    StorageExecutionContext::get(opCtx)->getStorageMetrics().incrementWriteConflicts(n);
+}
+
 void logWriteConflictAndBackoff(size_t attempt,
                                 StringData operation,
                                 StringData reason,
                                 const NamespaceStringOrUUID& nssOrUUID) {
-
     auto severity = ((attempt != 0) && ((attempt % 1000) == 0)) ? logv2::LogSeverity::Info()
                                                                 : logv2::LogSeverity::Debug(1);
 
@@ -105,6 +109,15 @@ void logWriteConflictAndBackoff(size_t attempt,
                   "operation"_attr = operation,
                   "reason"_attr = reason,
                   "namespace"_attr = toStringForLogging(nssOrUUID));
+}
+
+void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
+                                         size_t attempt,
+                                         StringData operation,
+                                         StringData reason,
+                                         const NamespaceStringOrUUID& nssOrUUID) {
+    recordWriteConflict(opCtx);
+    logWriteConflictAndBackoff(attempt, operation, reason, nssOrUUID);
 }
 
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
@@ -122,9 +135,8 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
     // exception and handle it accordingly.
     if (!opCtx->getClient()->isFromUserConnection()) {
         temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
-        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-        logWriteConflictAndBackoff(
-            writeConflictAttempts, opStr, s.reason(), NamespaceStringOrUUID(nssOrUUID));
+        logAndRecordWriteConflictAndBackoff(
+            opCtx, writeConflictAttempts, opStr, s.reason(), NamespaceStringOrUUID(nssOrUUID));
         ++writeConflictAttempts;
         return;
     }
@@ -166,7 +178,7 @@ void convertToWCEAndRethrow(OperationContext* opCtx,
     // WriteConflict to allow users of multi-document transactions to retry without changing
     // any behavior.
     temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+    recordWriteConflict(opCtx);
     throwWriteConflictException(e.reason());
 }
 
@@ -227,7 +239,7 @@ void WriteConflictRetryAlgorithm::_handleStorageUnavailable(const Status& status
  */
 void WriteConflictRetryAlgorithm::_handleWriteConflictException(const Status& s) {
     ++_wceCount;
-    CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+    recordWriteConflict(_opCtx);
     shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
     _emitLog(s.reason());
 

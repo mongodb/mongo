@@ -94,10 +94,6 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
         });
 }
 
-void YieldPolicyCallbacksImpl::handledWriteConflict(OperationContext* opCtx) const {
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-}
-
 void YieldPolicyCallbacksImpl::preCheckInterruptOnly(OperationContext* opCtx) const {
     // If the 'setInterruptOnlyPlansCheckForInterruptHang' fail point is enabled, set the
     // 'failPointMsg' field of this operation's CurOp to signal that we've hit this point.

@@ -64,12 +64,6 @@ public:
     virtual void duringYield(OperationContext*) const = 0;
 
     /**
-     * Called if the PlanYieldPolicy observes a WriteConflictException while attempting to restore
-     * an execution plan.
-     */
-    virtual void handledWriteConflict(OperationContext*) const = 0;
-
-    /**
      * If the yield policy is INTERRUPT_ONLY, this is called prior to checking for interrupt.
      */
     virtual void preCheckInterruptOnly(OperationContext* opCtx) const = 0;

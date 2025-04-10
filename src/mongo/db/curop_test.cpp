@@ -94,8 +94,6 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.keysDeleted = 2;
     currentAdditiveMetrics.executionTime = Microseconds{200};
     additiveMetricsToAdd.executionTime = Microseconds{80};
-    currentAdditiveMetrics.writeConflicts.store(7);
-    additiveMetricsToAdd.writeConflicts.store(0);
     currentAdditiveMetrics.clusterWorkingTime = Milliseconds{30};
     additiveMetricsToAdd.clusterWorkingTime = Milliseconds{10};
     currentAdditiveMetrics.cpuNanos = Nanoseconds{1000};
@@ -131,9 +129,6 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
     ASSERT_EQ(*currentAdditiveMetrics.executionTime,
               *additiveMetricsBeforeAdd.executionTime + *additiveMetricsToAdd.executionTime);
-    ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
-              additiveMetricsBeforeAdd.writeConflicts.load() +
-                  additiveMetricsToAdd.writeConflicts.load());
     ASSERT_EQ(*currentAdditiveMetrics.clusterWorkingTime,
               *additiveMetricsBeforeAdd.clusterWorkingTime +
                   *additiveMetricsToAdd.clusterWorkingTime);
@@ -156,8 +151,6 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
     additiveMetricsToAdd.keysDeleted = 2;
-    currentAdditiveMetrics.writeConflicts.store(7);
-    additiveMetricsToAdd.writeConflicts.store(0);
     additiveMetricsToAdd.cpuNanos = Nanoseconds(1);
 
     // Save the current AdditiveMetrics object before adding.
@@ -199,9 +192,6 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
-    ASSERT_EQ(currentAdditiveMetrics.writeConflicts.load(),
-              additiveMetricsBeforeAdd.writeConflicts.load() +
-                  additiveMetricsToAdd.writeConflicts.load());
 
     // The 'cpuNanos' field for the current AdditiveMetrics object was not initialized, so it
     // should be treated as zero.
@@ -212,12 +202,10 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     OpDebug::AdditiveMetrics additiveMetrics = OpDebug::AdditiveMetrics();
 
     // Initialize field values.
-    additiveMetrics.writeConflicts.store(1);
     additiveMetrics.keysInserted = 2;
     additiveMetrics.nreturned = 3;
 
     // Increment the fields.
-    additiveMetrics.incrementWriteConflicts(1);
     additiveMetrics.incrementKeysInserted(5);
     additiveMetrics.incrementKeysDeleted(0);
     additiveMetrics.incrementNinserted(3);
@@ -225,7 +213,6 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.incrementNreturned(2);
     additiveMetrics.incrementNBatches();
 
-    ASSERT_EQ(additiveMetrics.writeConflicts.load(), 2);
     ASSERT_EQ(*additiveMetrics.keysInserted, 7);
     ASSERT_EQ(*additiveMetrics.keysDeleted, 0);
     ASSERT_EQ(*additiveMetrics.ninserted, 3);

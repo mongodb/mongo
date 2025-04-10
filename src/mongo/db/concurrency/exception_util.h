@@ -54,8 +54,13 @@ namespace mongo {
 extern FailPoint skipWriteConflictRetries;
 
 /**
- * Will log a message if sensible and will do an increasing backoff to make sure
- * we don't hammer the same doc over and over.
+ * Will record an occurrence of write conflict on this operation's metrics.
+ */
+void recordWriteConflict(OperationContext* opCtx, int64_t n = 1);
+
+/**
+ * Will log a message if sensible and will do an increasing backoff to make sure we don't hammer
+ * the same doc over and over. This function does not increases the Write Conflict metric.
  * @param attempt - what attempt is this, 1 based
  * @param operation - e.g. "update"
  */
@@ -63,6 +68,19 @@ void logWriteConflictAndBackoff(size_t attempt,
                                 StringData operation,
                                 StringData reason,
                                 const NamespaceStringOrUUID& nssOrUUID);
+
+/**
+ * Similar to the above function, it will log a message if sensible and will do an increasing
+ * backoff to make sure we don't hammer the same doc over and over. This function will increase the
+ * Write Conflict metrics.
+ * @param attempt - what attempt is this, 1 based
+ * @param operation - e.g. "update"
+ */
+void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
+                                         size_t attempt,
+                                         StringData operation,
+                                         StringData reason,
+                                         const NamespaceStringOrUUID& nssOrUUID);
 
 /**
  * Retries the operation for a fixed number of attempts with linear backoff.
@@ -176,7 +194,7 @@ private:
             }
             throw;
         } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
-            CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            recordWriteConflict(_opCtx);
             throw;
         }
     }

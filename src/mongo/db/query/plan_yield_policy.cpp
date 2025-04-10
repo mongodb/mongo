@@ -188,11 +188,11 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
         } catch (const StorageUnavailableException& e) {
             // Restore '_yieldable' before the retry.
             _yieldable = yieldable;
-            if (_callbacks) {
-                _callbacks->handledWriteConflict(opCtx);
-            }
-            logWriteConflictAndBackoff(
-                attempt, "query yield", e.reason(), NamespaceStringOrUUID(NamespaceString::kEmpty));
+            logAndRecordWriteConflictAndBackoff(opCtx,
+                                                attempt,
+                                                "query yield",
+                                                e.reason(),
+                                                NamespaceStringOrUUID(NamespaceString::kEmpty));
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in

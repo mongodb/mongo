@@ -92,7 +92,7 @@ template <typename F, typename H>
     try {
         return f();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
-        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+        recordWriteConflict(opCtx);
         yieldHandler();
         return PlanStage::NEED_YIELD;
     } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e) {

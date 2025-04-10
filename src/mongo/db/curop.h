@@ -622,6 +622,11 @@ public:
     CurOp* parent() const {
         return _parent;
     }
+
+    bool isTop() const {
+        return parent() == nullptr;
+    }
+
     boost::optional<GenericCursor> getGenericCursor(ClientLock) const {
         return _genericCursor;
     }

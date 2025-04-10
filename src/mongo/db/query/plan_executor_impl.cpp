@@ -480,10 +480,9 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
                 "disabled.");
         }
 
-        CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
         writeConflictsInARow++;
-        logWriteConflictAndBackoff(
-            writeConflictsInARow, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
+        logAndRecordWriteConflictAndBackoff(
+            _opCtx, writeConflictsInARow, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
     }
 
     // Yield next time through the loop.

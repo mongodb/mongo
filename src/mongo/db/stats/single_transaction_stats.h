@@ -205,6 +205,12 @@ public:
         return _prepareReadConflicts.get();
     }
 
+    AtomicStorageMetrics& getTransactionStorageMetrics() {
+        return _storageMetrics;
+    }
+    const AtomicStorageMetrics& getTransactionStorageMetrics() const {
+        return _storageMetrics;
+    }
     /**
      * Returns the LastClientInfo object stored in this SingleTransactionStats instance.
      */
@@ -324,6 +330,8 @@ private:
     OpDebug _opDebug;
 
     AtomicPrepareReadConflicts _prepareReadConflicts;
+
+    AtomicStorageMetrics _storageMetrics;
 
     // Holds information about the last client to run a transaction operation.
     LastClientInfo _lastClientInfo;

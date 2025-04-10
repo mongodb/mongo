@@ -38,6 +38,15 @@ namespace mongo {
 namespace {
 class ExceptionUtilTest : public ServiceContextTest {};
 
+TEST_F(ExceptionUtilTest, RecordWriteConflictIncreasesWriteConflictMetric) {
+    auto opCtx = makeOperationContext();
+    ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
+    recordWriteConflict(opCtx.get());
+    ASSERT_EQUALS(1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
+    recordWriteConflict(opCtx.get(), 4);
+    ASSERT_EQUALS(5LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
+}
+
 TEST_F(ExceptionUtilTest, WriteConflictRetryInstantiatesOK) {
     auto opCtx = makeOperationContext();
     writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [] {});
@@ -47,18 +56,18 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryWriteConflictException) {
     // WriteConflictRetry retries function on WriteConflictException.
     {
         auto opCtx = makeOperationContext();
-        auto&& opDebug = CurOp::get(opCtx.get())->debug();
-        ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
-        ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opDebug] {
-                          if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
-                              throwWriteConflictException(
-                                  str::stream()
-                                  << "Verify that we retry the WriteConflictRetry function when we "
-                                     "encounter a WriteConflictException.");
-                          }
-                          return 100;
-                      }));
-        ASSERT_EQUALS(1LL, opDebug.additiveMetrics.writeConflicts.load());
+        ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
+        ASSERT_EQUALS(
+            100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opCtx] {
+                if (0 == CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts) {
+                    throwWriteConflictException(
+                        str::stream()
+                        << "Verify that we retry the WriteConflictRetry function when we "
+                           "encounter a WriteConflictException.");
+                }
+                return 100;
+            }));
+        ASSERT_EQUALS(1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
     }
 
     // If already in a WriteUnitOfWork, WriteConflictRetry propagates WriteConflictException.
@@ -110,7 +119,7 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
                 }));
             ASSERT_EQUALS(1LL, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
             // Confirm TemporarilyUnavailableException is not converted to WCE.
-            ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
+            ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
         }
 
         // WriteConflictRetry propogates TemporarilyUnavailableException for user connections when
@@ -141,18 +150,19 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
     {
         auto opCtx = makeOperationContext();
         auto&& opDebug = CurOp::get(opCtx.get())->debug();
-        ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
+        ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
         ASSERT_EQUALS(0, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
-        ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opDebug] {
-                          if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
-                              throwTemporarilyUnavailableException(
-                                  str::stream()
-                                  << "Verify that we retry the WriteConflictRetry function when we "
-                                     "encounter a TemporarilyUnavailableException.");
-                          }
-                          return 100;
-                      }));
-        ASSERT_EQUALS(1LL, opDebug.additiveMetrics.writeConflicts.load());
+        ASSERT_EQUALS(
+            100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opCtx] {
+                if (0 == CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts) {
+                    throwTemporarilyUnavailableException(
+                        str::stream()
+                        << "Verify that we retry the WriteConflictRetry function when we "
+                           "encounter a TemporarilyUnavailableException.");
+                }
+                return 100;
+            }));
+        ASSERT_EQUALS(1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
         ASSERT_EQUALS(1LL, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
     }
 
@@ -203,18 +213,18 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTransactionTooLargeForCacheException
     {
         auto opCtx = makeOperationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx.get());
-        auto&& opDebug = CurOp::get(opCtx.get())->debug();
-        ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
-        ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opDebug] {
-                          if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
-                              throwTransactionTooLargeForCache(
-                                  str::stream()
-                                  << "Verify that we retry the WriteConflictRetry function when we "
-                                     "encounter a TransactionTooLargeForCache.");
-                          }
-                          return 100;
-                      }));
-        ASSERT_EQUALS(1LL, opDebug.additiveMetrics.writeConflicts.load());
+        ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
+        ASSERT_EQUALS(
+            100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opCtx] {
+                if (0 == CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts) {
+                    throwTransactionTooLargeForCache(
+                        str::stream()
+                        << "Verify that we retry the WriteConflictRetry function when we "
+                           "encounter a TransactionTooLargeForCache.");
+                }
+                return 100;
+            }));
+        ASSERT_EQUALS(1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
     }
 
     // If writes are replicated, WriteConflictRetry propagates TransactionTooLargeForCacheException.

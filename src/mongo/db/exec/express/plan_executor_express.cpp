@@ -431,6 +431,8 @@ template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
                                                    size_t& numWriteConflictYieldsSinceLastSuccess) {
+    // No increasing write conflict metric as it was already increased before this point
+    // in ExceptionRecoveryPolicy::recoverFromNonFatalWriteException
     logWriteConflictAndBackoff(numWriteConflictYieldsSinceLastSuccess++,
                                "plan execution",
                                "write contention during express execution"_sd,

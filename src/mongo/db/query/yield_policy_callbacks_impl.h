@@ -47,7 +47,6 @@ public:
     ~YieldPolicyCallbacksImpl() override = default;
 
     void duringYield(OperationContext*) const override;
-    void handledWriteConflict(OperationContext*) const override;
     void preCheckInterruptOnly(OperationContext*) const override;
 
 private:

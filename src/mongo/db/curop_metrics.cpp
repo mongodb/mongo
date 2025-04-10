@@ -103,9 +103,8 @@ struct InShard : InBoth {
 
     void recordWriteConflicts(OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
-        auto& debug = curOp->debug();
-        auto& am = debug.additiveMetrics;
-        incrCounter(writeConflicts, am.writeConflicts);
+        const auto& sm = curOp->getOperationStorageMetrics();
+        incrCounter(writeConflicts, sm.writeConflicts);
     }
 
     void record(OperationContext* opCtx) {
@@ -120,11 +119,15 @@ struct InShard : InBoth {
         incrCounter(scanned, am.keysExamined);
         incrCounter(scannedObjects, am.docsExamined);
         incrCounter(scanAndOrder, am.hasSortStage);
-        incrCounter(writeConflicts, am.writeConflicts);
         // Increment oplog metrics if the current request is a change stream or replication request.
         if (debug.isChangeStreamQuery || debug.isReplOplogGetMore) {
             incrCounter(oplogReturned, am.nreturned);
             incrCounter(oplogScannedObjects, am.docsExamined);
+        }
+        // Write Conflicts is recorded at Operation level, not individual CurOp stash,
+        // so we only increment the counters if we are the top level.
+        if (curOp->isTop()) {
+            recordWriteConflicts(opCtx);
         }
 
         _updateExternalStats(opCtx);

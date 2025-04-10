@@ -698,7 +698,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
             return nullptr;
         }();
 
-        auto storageMetrics = getOperationStorageMetrics();
+        const auto& storageMetrics = getOperationStorageMetrics();
 
         logv2::DynamicAttributes attr;
         _debug.report(opCtx,
@@ -940,7 +940,8 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("prepareReadConflicts", n);
     }
 
-    if (auto n = _debug.additiveMetrics.writeConflicts.load(); n > 0) {
+    auto storageMetrics = getOperationStorageMetrics();
+    if (auto n = storageMetrics.writeConflicts; n > 0) {
         builder->append("writeConflicts", n);
     }
     if (auto n = _debug.additiveMetrics.temporarilyUnavailableErrors.load(); n > 0) {
