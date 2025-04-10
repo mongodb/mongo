@@ -642,7 +642,7 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
         for (Bucket* existingBucket : openSet) {
             if (existingBucket->rolloverReason == RolloverReason::kNone) {
                 auto state =
-                    materializeAndGetBucketState(catalog.bucketStateRegistry, unownedBucket);
+                    materializeAndGetBucketState(catalog.bucketStateRegistry, existingBucket);
                 if (state && !conflictsWithInsertions(state.value())) {
                     stats.incNumBucketsClosedDueToReopening();
                     if (allCommitted(*existingBucket)) {
