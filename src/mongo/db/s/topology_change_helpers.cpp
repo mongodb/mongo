@@ -1553,9 +1553,8 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
 void addShardInTransaction(OperationContext* opCtx,
                            const ShardType& newShard,
                            std::vector<DatabaseName>&& databasesInNewShard,
-                           std::vector<CollectionType>&& collectionsInNewShard) {
-
-    const auto existingShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                           std::vector<CollectionType>&& collectionsInNewShard,
+                           std::shared_ptr<executor::TaskExecutor> executor) {
 
     const auto collCreationTime = [&]() {
         const auto currentTime = VectorClock::get(opCtx)->getTime();
@@ -1698,7 +1697,6 @@ void addShardInTransaction(OperationContext* opCtx,
     };
 
     {
-        auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
         txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);

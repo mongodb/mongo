@@ -316,7 +316,8 @@ void commitRemoveShard(const Lock::ExclusiveLock&,
 void addShardInTransaction(OperationContext* opCtx,
                            const ShardType& newShard,
                            std::vector<DatabaseName>&& databasesInNewShard,
-                           std::vector<CollectionType>&& collectionsInNewShard);
+                           std::vector<CollectionType>&& collectionsInNewShard,
+                           std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
  * Updates the "hasTwoOrMoreShard" cluster cardinality parameter. Can only be called while holding
