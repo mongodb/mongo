@@ -7,6 +7,40 @@ set REPO_ROOT=%~dp0..
 
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
+set skip_python="0"
+set bazelCommandCount=0
+for /F "delims=" %%a in (%REPO_ROOT%\bazel\wrapper_hook\bazel_commands.commands) do (
+    set /A bazelCommandCount+=1
+    set "bazel_commands[!bazelCommandCount!]=%%~a"
+)
+
+set argCount=0
+for %%x in (%*) do (
+   set /A argCount+=1
+   set "argVec[!argCount!]=%%~x"
+)
+
+set current_bazel_command=""
+for /L %%i in (1,1,%argCount%) do (
+  for /L %%j in (1,1,%bazelCommandCount%) do (
+    if "!bazel_commands[%%j]!"=="!argVec[%%i]!" (
+      set current_bazel_command="!argVec[%%i]!"
+      goto :found_command
+    )
+  )
+)
+:found_command
+if !current_bazel_command!=="" set skip_python="1"
+
+if !skip_python!=="0" if !current_bazel_command!=="clean" set skip_python="1"
+if !skip_python!=="0" if !current_bazel_command!=="version" set skip_python="1"
+if !skip_python!=="0" if !current_bazel_command!=="shutdown" set skip_python="1"
+
+if !skip_python!=="1" (
+    "%BAZEL_REAL%" %*
+    exit %ERRORLEVEL%
+)
+
 set bazel_python="%REPO_ROOT%\bazel-%cur_dir%\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe"
 set compdb_python="%REPO_ROOT%\.compiledb\compiledb-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
 set python=%bazel_python%

@@ -8,6 +8,7 @@ import os
 import platform
 import stat
 import subprocess
+import sys
 import time
 import urllib.request
 from datetime import datetime
@@ -115,39 +116,61 @@ def authenticate(binary_path: str, verbose: bool) -> bool:
             print("Already authenticated. Skipping authentication.")
         return True
 
-    p = subprocess.Popen(
-        f"{binary_path} login -store=file {CLUSTER}",
-        shell=True,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    login_url = None
-
-    start_time = time.time()
-    while not login_url and time.time() < start_time + CLI_WAIT_TIMEOUT:
-        line = p.stderr.readline().strip()
-        if line.startswith("https://" + CLUSTER):
-            login_url = line
-            break
-
-    if not login_url:
-        print("CLI had unexpected output.")
-        p.kill()
-        return False
-
-    print(
-        f"On any device with a browser, login via the following link to complete EngFlow authentication:\n{login_url}"
-    )
-
     try:
-        p.wait(timeout=LOGIN_TIMEOUT)
-        print("Sucessfully authenticated with EngFlow!")
-    except subprocess.TimeoutExpired:
         print(
-            "Timed out waiting for login attempt. Failed to authenticate with EngFlow. Builds will be run locally..."
+            "Attempting to authenticate with MongoDB remote build service. On any device, login via the following link to complete EngFlow authentication:\nGenerating link url and opening browser in 10 seconds:\n(use CTRL+C or COMMAND+C to skip if not an internal mongodb user)"
         )
-        p.kill()
+        countdown = 10
+        for i in reversed(range(countdown + 1)):
+            if i == 9:
+                sys.stdout.write("\b\b  \b\b")
+            elif i < 9:
+                sys.stdout.write("\b \b")
+            if i == 0:
+                break
+            sys.stdout.write(str(i))
+            sys.stdout.flush()
+            time.sleep(1)
+
+        p = subprocess.Popen(
+            f"{binary_path} login -store=file {CLUSTER}",
+            shell=True,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+
+        login_url = None
+
+        start_time = time.time()
+        while not login_url and time.time() < start_time + CLI_WAIT_TIMEOUT:
+            line = p.stderr.readline().strip()
+            if line.startswith("https://" + CLUSTER):
+                login_url = line
+                break
+
+        if not login_url:
+            print("CLI had unexpected output.")
+            p.kill()
+            return False
+        else:
+            print(login_url)
+
+        try:
+            p.wait(timeout=LOGIN_TIMEOUT)
+            print("Sucessfully authenticated with EngFlow!")
+
+        except subprocess.TimeoutExpired:
+            print(
+                "Timed out waiting for login attempt. Failed to authenticate with EngFlow. Builds will be run locally..."
+            )
+            p.kill()
+            return False
+
+    except KeyboardInterrupt:
+        print(
+            "Skipping authentication, use '--config=local' to skip trying to authenticate in the future."
+        )
+        time.sleep(3)
         return False
 
     return True

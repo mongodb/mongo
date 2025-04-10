@@ -109,6 +109,46 @@ for cert in ${cert_locs[@]}; do
   fi
 done
 
+skip_python=0
+bazel_commands=()
+while IFS= read -r line; do
+  bazel_commands+=("$line")
+done < $REPO_ROOT/bazel/wrapper_hook/bazel_commands.commands
+
+current_bazel_command=""
+for arg do
+  for command in "${bazel_commands[@]}"
+  do
+    if [ "$command" == "$arg" ] ; then
+      current_bazel_command="$arg"
+      break
+    fi
+  done
+  if [ ! -z $current_bazel_command ]; then
+    break
+  fi
+done
+
+if [ -z $current_bazel_command ]; then
+  skip_python=1
+fi
+
+if [ "$skip_python" == "0" ]; then
+  skip_commands=("clean" "version" "shutdown")
+
+  for command in "${skip_commands[@]}"
+  do
+    if [ "$current_bazel_command" == "$command" ] ; then
+      skip_python=1
+      break
+    fi
+  done
+fi
+
+if [ "$skip_python" == "1" ]; then
+  exec "$bazel_real" $@
+fi
+
 cur_dir=$(basename $REPO_ROOT)
 bazel_python="$REPO_ROOT/bazel-$cur_dir/external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
 compdb_python="$REPO_ROOT/.compiledb/compiledb-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"

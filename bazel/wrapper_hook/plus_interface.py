@@ -51,6 +51,15 @@ def get_buildozer_output(autocomplete_query):
     return p.stdout
 
 
+def check_bazel_command_type(args):
+    with open(pathlib.Path(__file__).parent / "bazel_commands.commands") as f:
+        bazel_commands = [line.strip() for line in f.readlines()]
+
+    for arg in args:
+        if arg in bazel_commands:
+            return arg
+
+
 def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_buildozer_output):
     start = time.time()
 
@@ -72,30 +81,7 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     bin_targets = []
     source_targets = {}
 
-    bazel_commands = [
-        "aquery",
-        "build",
-        "canonicalize-flags",
-        "clean",
-        "coverage",
-        "cquery",
-        "dump",
-        "fetch",
-        "help",
-        "info",
-        "license",
-        "mobile-install",
-        "mod",
-        "print_action",
-        "query",
-        "run",
-        "shutdown",
-        "sync",
-        "test",
-        "vendor",
-        "version",
-    ]
-    current_bazel_command = None
+    current_bazel_command = check_bazel_command_type(args)
 
     if autocomplete_query:
         str_args = " ".join(args)
@@ -106,8 +92,6 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
         persistent_compdb = False
 
     for arg in args:
-        if not current_bazel_command and arg in bazel_commands:
-            current_bazel_command = arg
         if arg in compiledb_targets:
             compiledb_target = True
         if arg in lint_targets:
