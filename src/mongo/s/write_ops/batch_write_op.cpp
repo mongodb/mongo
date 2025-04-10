@@ -476,7 +476,8 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
         auto isTimeseriesRetryableUpdate = targeter.isTrackedTimeSeriesBucketsNamespace() &&
             writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
-            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction();
+            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() &&
+            !isRawDataOperation(opCtx);
         if (isTimeseriesRetryableUpdate) {
             if (!batchMap.empty()) {
                 writeOp.resetWriteToReady(opCtx);
