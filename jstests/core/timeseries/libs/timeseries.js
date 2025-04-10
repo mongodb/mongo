@@ -107,8 +107,9 @@ export var TimeseriesTest = class {
         }
     }
 
-    static bucketsMayHaveMixedSchemaData(coll) {
-        const catalog = coll.aggregate([{$listCatalog: {}}]).toArray()[0];
+    // TODO (SERVER-103429): Remove the aggregateOptions parameter.
+    static bucketsMayHaveMixedSchemaData(coll, aggregateOptions = {}) {
+        const catalog = coll.aggregate([{$listCatalog: {}}], aggregateOptions).toArray()[0];
         const tsMixedSchemaOptionNewFormat = catalog.md.options.storageEngine &&
             catalog.md.options.storageEngine.wiredTiger &&
             catalog.md.options.storageEngine.wiredTiger.configString;
