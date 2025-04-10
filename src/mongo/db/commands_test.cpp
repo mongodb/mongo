@@ -563,7 +563,7 @@ public:
     TypeInfoSet registerSomeUniqueNops(CommandConstructionPlan& plan) {
         TypeInfoSet typesAdded;
         auto populateOneCommand = [&]<typename Cmd>(std::type_identity<Cmd>) {
-            *CommandConstructionPlan::EntryBuilder::make<Cmd>().setPlan(&plan);
+            *CommandConstructionPlan::EntryBuilder::make<Cmd>().setPlan_forTest(&plan);
             typesAdded.insert(&typeid(Cmd));
         };
         [&]<int... i>(std::integer_sequence<int, i...>) {
@@ -611,7 +611,7 @@ public:
         auto populateOneCommand = [&]<typename Cmd>(std::type_identity<Cmd>) {
             *CommandConstructionPlan::EntryBuilder::make<Cmd>()
                  .addRoles(serverRole())
-                 .setPlan(&plan);
+                 .setPlan_forTest(&plan);
             typesAdded.insert(&typeid(Cmd));
         };
         [&]<int... i>(std::integer_sequence<int, i...>) {

@@ -1775,7 +1775,7 @@ public:
      * Set the plan into which the entry will be registered. Used for testing.
      * The default is the `globalCommandConstructionPlan()` singleton.
      */
-    EntryBuilder setPlan(CommandConstructionPlan* plan) && {
+    EntryBuilder setPlan_forTest(CommandConstructionPlan* plan) && {
         _plan = plan;
         return std::move(*this);
     }
