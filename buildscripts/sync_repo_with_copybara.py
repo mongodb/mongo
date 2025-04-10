@@ -156,17 +156,22 @@ def get_installation_access_token(
         return None
 
 
-def send_failure_message_to_slack(expansions):
+def send_failure_message_to_slack(expansions, error_message):
     """
     Send a failure message to a specific Slack channel when the Copybara task fails.
 
     :param expansions: Dictionary containing various expansion data.
     """
-    current_version_id = expansions.get("version_id", None)
-    error_msg = (
-        "Evergreen task '* Copybara Sync Between Repos' failed\n"
-        "See troubleshooting doc <http://go/copybara-troubleshoot|here>.\n"
-        f"See task log here: <https://spruce.mongodb.com/version/{current_version_id}|here>."
+    truncated_error_message = error_message[0:200]
+    task_id = expansions.get("task_id", None)
+    error_msg = "\n".join(
+        [
+            "Evergreen task '* Copybara Sync Between Repos' failed",
+            "See troubleshooting doc <http://go/copybara-troubleshoot|here>.",
+            f"See task: <https://spruce.mongodb.com/task/{task_id}|here>.",
+            f"Error message: {truncated_error_message}"
+            + ("... (truncated)" if len(error_message) > 200 else ""),
+        ]
     )
 
     evg_api = RetryingEvergreenApi.get_api(config_file=".evergreen.yml")
@@ -482,7 +487,7 @@ def main():
             return
 
         # Send a failure message to #devprod-build-automation if the Copybara sync task fails.
-        send_failure_message_to_slack(expansions)
+        send_failure_message_to_slack(expansions, error_message)
 
 
 if __name__ == "__main__":
