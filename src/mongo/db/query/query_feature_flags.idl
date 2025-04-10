@@ -36,6 +36,12 @@ feature_flags:
         default: false
         shouldBeFCVGated: true
 
+    featureFlagChangeStreamPreciseShardTargeting:
+        description: "Feature flag to enable improved handling of cluster topology changes in change streams"
+        cpp_varname: gFeatureFlagChangeStreamPreciseShardTargeting
+        default: false
+        shouldBeFCVGated: true
+
     featureFlagSbeFull:
         description:
             "Feature flag for SBE behaviors, features, or extensions that are not yet enabled
