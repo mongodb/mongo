@@ -39,7 +39,16 @@ $extrastylesheet
     },false);
      </script>
 
-     <select id="version_select" onchange="window.location=window.location.href.replace('$projectbrief',this.value);">
+     <script type="text/javascript">
+     function updateLocation(value) {
+       var allowedValues = ["$projectbrief", "stable", "develop", "mongodb-3.2", "mongodb-3.4"];
+       if (allowedValues.includes(value)) {
+         window.location = window.location.href.replace('$projectbrief', value);
+       }
+     }
+     </script>
+
+     <select id="version_select" onchange="updateLocation(this.value);">
        <option name="$projectbrief" value="$projectbrief">$projectnumber</option>
        <option name="stable" value="stable">Latest stable release</option>
        <option name="develop" value="develop">Current develop branch</option>
