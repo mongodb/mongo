@@ -27,33 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/intent_guard.h"
+#include "mongo/db/repl/intent_registry_test_fixture.h"
 
 namespace mongo::rss::consensus {
-IntentGuard::IntentGuard(IntentRegistry::Intent intent, OperationContext* opctx)
-    : _opCtx(opctx),
-      _token(IntentRegistry::get(_opCtx->getServiceContext()).registerIntent(intent, _opCtx)) {}
+IntentRegistryTest::IntentRegistryTest()
+    : _intentRegistry(IntentRegistry::get(getServiceContext())) {}
 
-void IntentGuard::reset() {
-    if (_opCtx) {
-        IntentRegistry::get(_opCtx->getServiceContext()).deregisterIntent(_token);
-        _opCtx = nullptr;
-    }
+bool IntentRegistryTest::containsToken(IntentRegistry::IntentToken token) const {
+    auto& tokenMap = _intentRegistry._tokenMaps[(size_t)token.intent()];
+    stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
+    return tokenMap.map.contains(token.id());
 }
 
-IntentGuard::~IntentGuard() {
-    reset();
-}
-
-const OperationContext* IntentGuard::getOperationContext() const {
-    return _opCtx;
-}
-
-boost::optional<IntentRegistry::Intent> IntentGuard::intent() const {
-    if (!_opCtx) {
-        return boost::none;
-    }
-    return _token.intent();
+size_t IntentRegistryTest::getMapSize(IntentRegistry::Intent intent) const {
+    auto& tokenMap = _intentRegistry._tokenMaps[(size_t)intent];
+    stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
+    return tokenMap.map.size();
 }
 
 }  // namespace mongo::rss::consensus

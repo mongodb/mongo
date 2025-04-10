@@ -2003,6 +2003,21 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "intent_registry_test_fixture",
+    srcs = [
+        "intent_registry_test_fixture.cpp",
+    ],
+    hdrs = [
+        "intent_registry_test_fixture.h",
+    ],
+    deps = [
+        ":intent_registry",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
     name = "repl_coordinator_test_fixture",
     srcs = [
         "replication_coordinator_test_fixture.cpp",
@@ -2175,6 +2190,17 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/dbtests:mocklib",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_intent_registry_test",
+    srcs = [
+        "intent_registry_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":intent_registry_test_fixture",
     ],
 )
 

@@ -27,33 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/intent_guard.h"
+#include <utility>
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_registry.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::rss::consensus {
-IntentGuard::IntentGuard(IntentRegistry::Intent intent, OperationContext* opctx)
-    : _opCtx(opctx),
-      _token(IntentRegistry::get(_opCtx->getServiceContext()).registerIntent(intent, _opCtx)) {}
+/**
+ * Test fixture for the Intent Registration system.
+ */
+class IntentRegistryTest : public ServiceContextMongoDTest {
+public:
+    IntentRegistryTest();
 
-void IntentGuard::reset() {
-    if (_opCtx) {
-        IntentRegistry::get(_opCtx->getServiceContext()).deregisterIntent(_token);
-        _opCtx = nullptr;
-    }
-}
-
-IntentGuard::~IntentGuard() {
-    reset();
-}
-
-const OperationContext* IntentGuard::getOperationContext() const {
-    return _opCtx;
-}
-
-boost::optional<IntentRegistry::Intent> IntentGuard::intent() const {
-    if (!_opCtx) {
-        return boost::none;
-    }
-    return _token.intent();
-}
-
+protected:
+    IntentRegistry& _intentRegistry;
+    bool containsToken(IntentRegistry::IntentToken token) const;
+    size_t getMapSize(IntentRegistry::Intent intent) const;
+};
 }  // namespace mongo::rss::consensus

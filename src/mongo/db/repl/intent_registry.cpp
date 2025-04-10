@@ -81,11 +81,13 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
             "Cannot register intent due to ReplStateChange.",
             _validIntent((intent)));
 
-    bool isWritablePrimary =
-        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet() &&
-        repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-            ->canAcceptWritesFor(opCtx, NamespaceString(DatabaseName::kAdmin));
-    if (intent == Intent::Write) {
+    bool isReplSet =
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
+
+    if (isReplSet && intent == Intent::Write) {
+        bool isWritablePrimary =
+            repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                ->canAcceptWritesFor(opCtx, NamespaceString(DatabaseName::kAdmin));
         uassert(ErrorCodes::NotWritablePrimary,
                 "Cannot register write intent if we are not primary.",
                 isWritablePrimary);
@@ -117,13 +119,13 @@ stdx::future<bool> IntentRegistry::killConflictingOperations(
         if (_activeInterruption) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
-        if (!activeInterruptionCV.wait_for(
-                lock, _drainTimeoutSec, [this] { return !_activeInterruption; })) {
-            LOGV2_ERROR(9945002,
-                        "Timeout while wating on a previous interrupt to drain.",
-                        "last"_attr = _lastInterruption,
-                        "new"_attr = interrupt);
-        }
+        LOGV2(9945005,
+              "Timeout while wating on a previous interrupt to drain.",
+              "last"_attr = _lastInterruption,
+              "new"_attr = interrupt);
+        fassert(9945002, activeInterruptionCV.wait_for(lock, _drainTimeoutSec, [this] {
+            return !_activeInterruption;
+        }));
         _activeInterruption = true;
         _lastInterruption = interrupt;
     }
@@ -219,8 +221,8 @@ bool IntentRegistry::_waitForDrain(IntentRegistry::Intent intent) {
         for (auto& [token, opCtx] : tokenMap.map) {
             LOGV2(9795402, "Registered token:", "token_id"_attr = token);
         }
-        LOGV2_ERROR(9795401, "Timeout while wating on intent queue to drain");
-        return false;
+        LOGV2(9795404, "Timeout while wating on intent queue to drain");
+        fasserted(9795401);
     }
     return true;
 }
