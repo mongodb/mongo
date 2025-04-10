@@ -271,9 +271,7 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "sha_block",
-    srcs = [
-        "hash_block.cpp",
-    ] + select({
+    srcs = select({
         "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [
             "sha_block_{}.cpp".format(mongo_crypto),
         ]

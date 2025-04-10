@@ -56,12 +56,6 @@ struct SHA512BlockTraits {
                             size_t keyLen,
                             std::initializer_list<ConstDataRange> input,
                             HashType* output);
-
-    static void computeHmacWithCtx(HmacContext* ctx,
-                                   const uint8_t* key,
-                                   size_t keyLen,
-                                   std::initializer_list<ConstDataRange> input,
-                                   HashType* output);
 };
 
 using SHA512Block = HashBlock<SHA512BlockTraits>;
