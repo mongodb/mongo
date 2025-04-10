@@ -27,36 +27,38 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/oplog_data.h"
+#include "mongo/db/storage/oplog_truncate_markers.h"
 
 namespace mongo {
 
-class WiredTigerOplogTruncateMarkers;
+OplogData::OplogData(int64_t oplogMaxSize) : _maxSize(oplogMaxSize) {
+    invariant(oplogMaxSize);
+}
 
-// Container for holding oplog-specific metadata.
-class WiredTigerOplogData {
-public:
-    WiredTigerOplogData(const WiredTigerRecordStore::Oplog::Params& params);
+std::shared_ptr<OplogTruncateMarkers> OplogData::getTruncateMarkers() const {
+    return _truncateMarkers;
+}
 
-    std::shared_ptr<WiredTigerOplogTruncateMarkers> getTruncateMarkers() const;
-    void setTruncateMarkers(std::shared_ptr<WiredTigerOplogTruncateMarkers> markers);
+void OplogData::setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers) {
+    _truncateMarkers = std::move(markers);
+}
 
-    int64_t getMaxSize() const;
+int64_t OplogData::getMaxSize() const {
+    return _maxSize.load();
+}
 
-    Status updateSize(int64_t newSize);
+Status OplogData::updateSize(int64_t newSize) {
+    invariant(_maxSize.load());
 
-    // Update this oplog's stats tracker with a new truncation event that
-    // took |micros|-microseconds to complete.
-    void trackTruncateCompletion(int64_t micros);
+    if (_maxSize.load() == newSize) {
+        return Status::OK();
+    }
 
-private:
-    AtomicWord<int64_t> _maxSize;
+    _maxSize.store(newSize);
 
-    // Stores truncate markers for this oplog, can by nullptr e.g. when
-    // the server is read-only.
-    std::shared_ptr<WiredTigerOplogTruncateMarkers> _truncateMarkers;
-};
-
+    invariant(_truncateMarkers);
+    _truncateMarkers->adjust(newSize);
+    return Status::OK();
+}
 }  // namespace mongo

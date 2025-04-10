@@ -67,6 +67,7 @@ class CollectionPtr;
 class CollectionTruncateMarkers;
 class MAdvise;
 class OperationContext;
+class OplogData;
 class RecordStore;
 class RecoveryUnit;
 class ValidateResults;
@@ -618,6 +619,8 @@ public:
      * Storage engines can choose whether to support changing the oplog size online.
      */
     virtual Status updateSize(long long size) = 0;
+
+    virtual const OplogData* getOplogData() const = 0;
 
     /**
      * Returns a new cursor on the oplog, ignoring any visibility semantics specific to forward

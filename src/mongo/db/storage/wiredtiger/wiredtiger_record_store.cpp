@@ -57,6 +57,8 @@
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/oplog_data.h"
+#include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/temporary_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
@@ -66,9 +68,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -831,10 +831,6 @@ void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordI
     _changeNumRecordsAndDataSize(wtRu, -1, -opStats.oldValueLength);
 }
 
-Timestamp WiredTigerRecordStore::getPinnedOplog() const {
-    return _kvEngine->getPinnedOplog();
-}
-
 Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              std::vector<Record>* records,
                                              const std::vector<Timestamp>& timestamps) {
@@ -1550,7 +1546,7 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
               .isChangeCollection = false,
               .sizeStorer = oplogParams.sizeStorer,
               .tracksSizeAdjustments = oplogParams.tracksSizeAdjustments}),
-      _oplog(std::make_unique<WiredTigerOplogData>(oplogParams)) {
+      _oplog(std::make_unique<OplogData>(oplogParams.oplogMaxSize)) {
     invariant(WiredTigerRecordStore::keyFormat() == KeyFormat::Long);
     checkOplogFormatVersion(ru, getURI());
     // The oplog always needs to be marked for size adjustment since it is journaled and also
@@ -1661,13 +1657,12 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(Recover
     return Timestamp(static_cast<uint64_t>(firstRecord.getLong()));
 }
 
-int64_t WiredTigerRecordStore::Oplog::getMaxSize() const {
-    // TODO make TruncateMarkers depend on OplogData (not RecordStore), then move this method.
-    return _oplog->getMaxSize();
+const OplogData* WiredTigerRecordStore::Oplog::getOplogData() const {
+    return _oplog.get();
 }
 
 void WiredTigerRecordStore::Oplog::setTruncateMarkers(
-    std::shared_ptr<WiredTigerOplogTruncateMarkers> markers) {
+    std::shared_ptr<OplogTruncateMarkers> markers) {
     _oplog->setTruncateMarkers(markers);
 }
 

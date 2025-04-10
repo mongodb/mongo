@@ -35,7 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/oplog_data.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
@@ -43,15 +43,16 @@ namespace mongo {
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
-class WiredTigerOplogTruncateMarkers final : public CollectionTruncateMarkers {
+class OplogTruncateMarkers final : public CollectionTruncateMarkers {
 public:
-    WiredTigerOplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
-                                   int64_t partialMarkerRecords,
-                                   int64_t partialMarkerBytes,
-                                   int64_t minBytesPerMarker,
-                                   Microseconds totalTimeSpentBuilding,
-                                   CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
-                                   WiredTigerRecordStore* rs);
+    OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
+                         int64_t partialMarkerRecords,
+                         int64_t partialMarkerBytes,
+                         int64_t minBytesPerMarker,
+                         Microseconds totalTimeSpentBuilding,
+                         CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
+                         const OplogData& oplogData,
+                         const KVEngine& engine);
 
     /**
      * Whether the instance is going to get destroyed.
@@ -90,8 +91,9 @@ public:
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
     RecordId firstRecord;
 
-    static std::shared_ptr<WiredTigerOplogTruncateMarkers> createOplogTruncateMarkers(
-        OperationContext* opCtx, WiredTigerRecordStore* rs);
+    static std::shared_ptr<OplogTruncateMarkers> createOplogTruncateMarkers(OperationContext* opCtx,
+                                                                            const KVEngine& engine,
+                                                                            RecordStore& rs);
     //
     // The following methods are public only for use in tests.
     //
@@ -115,7 +117,8 @@ private:
     // database, and false otherwise.
     bool _isDead = false;
 
-    WiredTigerRecordStore* _rs;
+    const OplogData& _oplogData;  // Owned by RecordStore::Oplog
+    const KVEngine& _engine;      // Owned by StorageEngine
 };
 
 }  // namespace mongo

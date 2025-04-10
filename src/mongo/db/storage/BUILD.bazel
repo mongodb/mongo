@@ -423,6 +423,28 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "oplog_truncate_marker_parameters_gen",
+    src = "oplog_truncate_marker_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "oplog_truncate_markers",
+    srcs = [
+        "oplog_data.cpp",
+        "oplog_truncate_marker_parameters_gen",
+        "oplog_truncate_markers.cpp",
+    ],
+    hdrs = [
+        "oplog_data.h",
+        "oplog_truncate_markers.h",
+        "//src/mongo/db/storage/kv:kv_engine.h",
+    ],
+    deps = [
+        ":record_store_base",
+    ],
+)
+
 mongo_cc_library(
     name = "storage_engine_common",
     srcs = [

@@ -273,6 +273,10 @@ public:
         return Status::OK();
     }
 
+    const OplogData* getOplogData() const override {
+        return nullptr;
+    }
+
     std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
                                                        bool forward) const override {
         return std::make_unique<EmptyRecordCursor>();

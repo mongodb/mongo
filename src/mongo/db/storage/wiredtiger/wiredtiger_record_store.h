@@ -83,12 +83,12 @@
 
 namespace mongo {
 
+class OplogData;
+class OplogTruncateMarkers;
 class RecoveryUnit;
 class TemporaryWiredTigerKVEngine;
 class WiredTigerConnection;
 class WiredTigerKVEngine;
-class WiredTigerOplogData;
-class WiredTigerOplogTruncateMarkers;
 class WiredTigerSizeStorer;
 
 class WiredTigerRecordStoreBase : public RecordStoreBase {
@@ -308,8 +308,6 @@ public:
 
     RecordStore::Oplog* oplog() override;
 
-    Timestamp getPinnedOplog() const;
-
     /*
      * Check the size information for this RecordStore. This function opens a cursor on the
      * RecordStore to determine if it is empty. If it is empty, it will mark the collection as
@@ -482,9 +480,9 @@ public:
 
     StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) override;
 
-    int64_t getMaxSize() const;
+    const OplogData* getOplogData() const override;
 
-    void setTruncateMarkers(std::shared_ptr<WiredTigerOplogTruncateMarkers> markers);
+    void setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers);
 
 private:
     Status _insertRecords(OperationContext*,
@@ -501,7 +499,7 @@ private:
                               int64_t recordsRemoved,
                               int64_t bytesRemoved) override;
 
-    std::unique_ptr<WiredTigerOplogData> _oplog;
+    std::unique_ptr<OplogData> _oplog;
 };
 
 class WiredTigerRecordStoreCursor : public SeekableRecordCursor {

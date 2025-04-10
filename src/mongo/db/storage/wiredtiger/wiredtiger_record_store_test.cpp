@@ -50,12 +50,12 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/oplog_truncation.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -439,8 +439,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     // Initialize the truncate markers.
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-    wtRS->setTruncateMarkers(
-        WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtRS));
+    wtRS->setTruncateMarkers(OplogTruncateMarkers::createOplogTruncateMarkers(
+        opCtx.get(), *harnessHelper->getEngine(), *wtRS));
 
     // Confirm that small oplogs are processed by scanning.
     auto oplogTruncateMarkers = wtRS->oplog()->getCollectionTruncateMarkers();
@@ -490,8 +490,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         wtRS->setNumRecords(1024 * 1024);
         wtRS->setDataSize(1024 * 1024 * 1024);
-        wtRS->setTruncateMarkers(
-            WiredTigerOplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), wtRS));
+        wtRS->setTruncateMarkers(OplogTruncateMarkers::createOplogTruncateMarkers(
+            opCtx.get(), *harnessHelper->getEngine(), *wtRS));
     }
 
     // Confirm that some truncate markers were generated.
