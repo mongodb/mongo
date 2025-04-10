@@ -52,37 +52,42 @@ BSONObj buildConvertIndexStatsStage(const StringData timeField,
     return BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << bob.obj());
 }
 
-/**
- * Determine whether the catalog data indicates that the collection is a viewless timeseries
- * collection.
- */
-inline bool isViewlessTimeseriesCollection(const auto& catalogData) {
-    static_assert(
-        requires { catalogData.isTimeseriesCollection(); } &&
-            requires { catalogData.isNewTimeseriesWithoutView(); },
-        "Catalog information must provide isTimeseriesCollection() and "
-        "isNewTimeseriesWithoutView() when determining whether the collection is a viewless "
-        "timeseries collection.");
-    return catalogData.isTimeseriesCollection() && catalogData.isNewTimeseriesWithoutView();
+// TODO(SERVER-101169): Make this the actual implementation of
+// rewritePipelineForTimeseriesCollection once the API differences no longer require separate
+// implementations.
+std::vector<BSONObj> rewritePipelineForTimeseriesCollectionImpl(
+    const std::vector<BSONObj>& pipeline,
+    const TimeseriesOptions& timeseriesOptions,
+    const bool assumeNoMixedSchemaData,
+    const bool parametersChanged) {
+    const auto timeField = timeseriesOptions.getTimeField();
+    const auto metaField = timeseriesOptions.getMetaField();
+    const auto maxSpanSeconds =
+        timeseriesOptions.getBucketMaxSpanSeconds().get_value_or(getMaxSpanSecondsFromGranularity(
+            timeseriesOptions.getGranularity().get_value_or(BucketGranularityEnum::Seconds)));
+    const auto bucketsAreFixed = areTimeseriesBucketsFixed(timeseriesOptions, parametersChanged);
+
+    if (!pipeline.empty()) {
+        const auto& firstStage = *pipeline.begin();
+        if (const auto firstStageName = firstStage.firstElementFieldName();
+            firstStageName == DocumentSourceCollStats::kStageName) {
+            // Don't insert the $_internalUnpackBucket stage.
+            return pipeline;
+        } else if (firstStageName == DocumentSourceIndexStats::kStageName) {
+            auto newPipeline = std::vector<BSONObj>{};
+            newPipeline.reserve(pipeline.size() + 1);
+            newPipeline.push_back(pipeline[0]);
+            newPipeline.push_back(buildConvertIndexStatsStage(timeField, metaField));
+            newPipeline.insert(newPipeline.begin() + 2, pipeline.begin() + 1, pipeline.end());
+            return newPipeline;
+        }
+    }
+
+    // Default case.
+    return prependUnpackStageToPipeline(
+        pipeline, timeField, metaField, maxSpanSeconds, assumeNoMixedSchemaData, bucketsAreFixed);
 }
 }  // namespace
-
-bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
-                                             const CollectionRoutingInfo& cri) {
-    return !isRawDataOperation(opCtx) && cri.hasRoutingTable() &&
-        isViewlessTimeseriesCollection(cri.getChunkManager());
-}
-
-bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
-                                             const NamespaceString& nss) {
-    if (const auto& criWithStatus =
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-        criWithStatus.isOK()) {
-        return isEligibleForViewlessTimeseriesRewrites(opCtx, criWithStatus.getValue());
-    } else {
-        return false;
-    }
-}
 
 bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
                                              const Collection& coll) {
@@ -101,36 +106,80 @@ bool isEligibleForViewlessTimeseriesRewrites(OperationContext* const opCtx,
                                                 collOrView.getCollection().getCollectionPtr());
 }
 
-std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
+bool isEligibleForViewlessTimeseriesRewritesInRouter(OperationContext* const opCtx,
+                                                     const CollectionRoutingInfo& cri) {
+    return !isRawDataOperation(opCtx) && cri.hasRoutingTable() &&
+        isViewlessTimeseriesCollection(cri.getChunkManager());
+}
+
+bool isEligibleForViewlessTimeseriesRewritesInRouter(OperationContext* const opCtx,
+                                                     const NamespaceString& nss) {
+    if (const auto& criWithStatus =
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+        criWithStatus.isOK()) {
+        return isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, criWithStatus.getValue());
+    } else {
+        return false;
+    }
+}
+
+std::vector<BSONObj> prependUnpackStageToPipeline(
     const std::vector<BSONObj>& pipeline,
     const StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
     const bool assumeNoMixedSchemaData,
     const bool timeseriesBucketsAreFixed) {
-    if (!pipeline.empty()) {
-        const auto& firstStage = *pipeline.begin();
-        if (const auto firstStageName = firstStage.firstElementFieldName();
-            firstStageName == DocumentSourceCollStats::kStageName) {
-            // Don't insert the $_internalUnpackBucket stage.
-            return pipeline;
-        } else if (firstStageName == DocumentSourceIndexStats::kStageName) {
-            auto newPipeline = std::vector<BSONObj>{};
-            newPipeline.reserve(pipeline.size() + 1);
-            newPipeline.push_back(pipeline[0]);
-            newPipeline.push_back(buildConvertIndexStatsStage(timeField, metaField));
-            newPipeline.insert(newPipeline.begin() + 2, pipeline.begin() + 1, pipeline.end());
-            return newPipeline;
-        }
+    auto bob = BSONObjBuilder{};
+
+    bob.append(timeseries::kTimeFieldName, timeField);
+
+    if (metaField) {
+        bob.append(timeseries::kMetaFieldName, *metaField);
     }
 
-    // Default case.
-    return DocumentSourceInternalUnpackBucket::generateStageInPipeline(pipeline,
-                                                                       timeField,
-                                                                       metaField,
-                                                                       bucketMaxSpanSeconds,
-                                                                       assumeNoMixedSchemaData,
-                                                                       timeseriesBucketsAreFixed);
+    bob.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
+               assumeNoMixedSchemaData);
+
+    // Derived from timeseriesBucketingParametersHaveChanged.
+    bob.append(DocumentSourceInternalUnpackBucket::kFixedBuckets, timeseriesBucketsAreFixed);
+
+    if (bucketMaxSpanSeconds) {
+        bob.append(DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds,
+                   *bucketMaxSpanSeconds);
+    }
+
+    // Build the stage and make it the first stage in the pipeline.
+    auto pipelineWithStage =
+        std::vector{BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal << bob.obj())};
+    pipelineWithStage.insert(pipelineWithStage.end(), pipeline.begin(), pipeline.end());
+
+    return pipelineWithStage;
+}
+
+std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
+    const std::vector<BSONObj>& pipeline,
+    // TODO(SERVER-101169): Remove the necessity of this argument.
+    const Collection& coll,
+    const TimeseriesOptions& timeseriesOptions) {
+    const auto assumeNoMixedSchemaData =
+        !coll.getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads();
+    const auto parametersChanged = coll.timeseriesBucketingParametersHaveChanged().value_or(true);
+    return rewritePipelineForTimeseriesCollectionImpl(
+        pipeline, timeseriesOptions, assumeNoMixedSchemaData, parametersChanged);
+}
+
+std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
+    const std::vector<BSONObj>& pipeline,
+    // TODO(SERVER-101169): Remove the necessity of this argument.
+    const TypeCollectionTimeseriesFields& timeseriesFields,
+    const TimeseriesOptions& timeseriesOptions) {
+    const auto assumeNoMixedSchemaData =
+        !timeseriesFields.getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true);
+    const auto parametersChanged =
+        timeseriesFields.getTimeseriesBucketingParametersHaveChanged().value_or(true);
+    return rewritePipelineForTimeseriesCollectionImpl(
+        pipeline, timeseriesOptions, assumeNoMixedSchemaData, parametersChanged);
 }
 
 }  // namespace timeseries

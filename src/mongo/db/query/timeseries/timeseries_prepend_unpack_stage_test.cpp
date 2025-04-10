@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-
-using InternalUnpackBucketGenerateInPipelineTest = AggregationContextFixture;
 
 // Helper datatype to make it easier to write tests by specifying only the arguments of interest.
 struct RewritePipelineHelperArgs {
@@ -49,12 +48,12 @@ std::tuple<std::vector<BSONObj>, BSONObj> rewritePipelineHelper(
     const RewritePipelineHelperArgs& args = {},
     const std::vector<BSONObj>& originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))}) {
     const auto alteredPipeline =
-        DocumentSourceInternalUnpackBucket::generateStageInPipeline(originalPipeline,
-                                                                    args.timeField,
-                                                                    args.metaField,
-                                                                    args.bucketMaxSpanSeconds,
-                                                                    args.assumeNoMixedSchemaData,
-                                                                    args.timeseriesBucketsAreFixed);
+        timeseries::prependUnpackStageToPipeline(originalPipeline,
+                                                 args.timeField,
+                                                 args.metaField,
+                                                 args.bucketMaxSpanSeconds,
+                                                 args.assumeNoMixedSchemaData,
+                                                 args.timeseriesBucketsAreFixed);
 
     ASSERT_EQ(alteredPipeline.size(), originalPipeline.size() + 1);
 
@@ -67,7 +66,7 @@ std::tuple<std::vector<BSONObj>, BSONObj> rewritePipelineHelper(
             firstStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()};
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInReturnedPipeline) {
+TEST(TimeseriesPrependUnpackStageTest, EnsureStageIsGeneratedInReturnedPipeline) {
     const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
     const auto [alteredPipeline, _] = rewritePipelineHelper({}, originalPipeline);
 
@@ -79,7 +78,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInRetur
     }
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFieldCombinations) {
+TEST(TimeseriesPrependUnpackStageTest, ValidateFieldCombinations) {
     const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
         .metaField = "foo"_sd,
         .bucketMaxSpanSeconds = 42,
@@ -94,7 +93,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFieldCombinations) {
                       firstStage);
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateTimeField) {
+TEST(TimeseriesPrependUnpackStageTest, ValidateTimeField) {
     // Default value for timeField.
     {
         const auto [alteredPipeline, firstStage] = rewritePipelineHelper();
@@ -129,7 +128,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateTimeField) {
     }
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateMetaField) {
+TEST(TimeseriesPrependUnpackStageTest, ValidateMetaField) {
     // Meta field should be omitted if not present.
     {
         const auto [alteredPipeline, firstStage] = rewritePipelineHelper();
@@ -165,7 +164,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateMetaField) {
     }
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateAssumeNoMixedSchemaDataField) {
+TEST(TimeseriesPrependUnpackStageTest, ValidateAssumeNoMixedSchemaDataField) {
     {
         const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
             .assumeNoMixedSchemaData = true,
@@ -189,7 +188,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateAssumeNoMixedSchemaDa
     }
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateBucketMaxSpanSecondsField) {
+TEST(TimeseriesPrependUnpackStageTest, ValidateBucketMaxSpanSecondsField) {
     {
         const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
             .bucketMaxSpanSeconds = boost::none,
@@ -224,7 +223,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateBucketMaxSpanSecondsF
     }
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, BucketsFixedTest) {
+TEST(TimeseriesPrependUnpackStageTest, BucketsFixedTest) {
     {
         const auto [_, internalUnpackBucketStage] =
             rewritePipelineHelper({.timeseriesBucketsAreFixed = false});

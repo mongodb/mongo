@@ -451,7 +451,7 @@ public:
             const FindCommandRequest& request,
             const query_settings::QuerySettings& querySettings,
             boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
-            if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, ns())) {
+            if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, ns())) {
                 const auto hasExplain = verbosity.has_value();
                 auto bodyBuilder = result->getBodyBuilder();
                 bodyBuilder.resetToEmpty();

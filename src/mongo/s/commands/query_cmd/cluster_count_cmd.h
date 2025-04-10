@@ -81,7 +81,7 @@ inline bool convertAndRunAggregateIfViewlessTimeseries(
     const CollectionRoutingInfo& cri,
     const NamespaceString& nss,
     boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
-    if (!timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
+    if (!timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
         return false;
     } else {
         // We only need to route the viewless timeseries request to

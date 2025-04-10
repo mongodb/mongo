@@ -300,7 +300,7 @@ public:
             diagnostic_printers::ShardKeyDiagnosticPrinter{
                 cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
-        if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
+        if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
             runDistinctAsAgg(opCtx,
                              std::move(canonicalQuery),
                              boost::none /* resolvedView */,
@@ -397,7 +397,7 @@ public:
                 cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
-        if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
+        if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
             runDistinctAsAgg(opCtx,
                              std::move(canonicalQuery),
                              boost::none /* resolvedView */,

@@ -30,7 +30,6 @@ mongo_cc_library(
         "//src/mongo/db/query:shard_key_diagnostic_printer",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_shape",
-        "//src/mongo/db/query/timeseries:timeseries_rewrites",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/views",
         "//src/mongo/db/views:view_catalog_helpers",

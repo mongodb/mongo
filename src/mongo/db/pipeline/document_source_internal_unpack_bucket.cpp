@@ -1014,38 +1014,6 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     }
 }
 
-std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline(
-    const std::vector<BSONObj>& pipeline,
-    const StringData timeField,
-    const boost::optional<StringData>& metaField,
-    const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const bool assumeNoMixedSchemaData,
-    const bool timeseriesBucketsAreFixed) {
-    auto bob = BSONObjBuilder{};
-
-    bob.append(timeseries::kTimeFieldName, timeField);
-
-    if (metaField) {
-        bob.append(timeseries::kMetaFieldName, *metaField);
-    }
-
-    bob.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
-               assumeNoMixedSchemaData);
-
-    // Derived from timeseriesBucketingParametersHaveChanged.
-    bob.append(kFixedBuckets, timeseriesBucketsAreFixed);
-
-    if (bucketMaxSpanSeconds) {
-        bob.append(kBucketMaxSpanSeconds, *bucketMaxSpanSeconds);
-    }
-
-    // Build the stage and make it the first stage in the pipeline.
-    auto pipelineWithStage = std::vector{BSON(kStageNameInternal << bob.obj())};
-    pipelineWithStage.insert(pipelineWithStage.end(), pipeline.begin(), pipeline.end());
-
-    return pipelineWithStage;
-}
-
 boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMeasure() {
     while (_bucketUnpacker.hasNext()) {
         if (_eventFilter) {

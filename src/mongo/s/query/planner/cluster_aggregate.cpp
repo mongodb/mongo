@@ -472,7 +472,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
 void rewritePipelineIfTimeseries(OperationContext* const opCtx,
                                  AggregateCommandRequest& request,
                                  const CollectionRoutingInfo& cri) {
-    if (timeseries::isEligibleForViewlessTimeseriesRewrites(opCtx, cri)) {
+    if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
         // TypeCollectionTimeseriesFields encapsulates TimeseriesOptions.
         const auto timeseriesFields = cri.getChunkManager().getTimeseriesFields();
         tassert(9949202,
