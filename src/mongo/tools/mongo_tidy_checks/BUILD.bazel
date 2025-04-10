@@ -1,5 +1,3 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
-
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -80,10 +78,8 @@ cc_library(
         "-Werror=date-time",
         "-Wextra",
         "-Wimplicit-fallthrough",
-        "-Wno-class-memaccess",
         "-Wno-comment",
         "-Wno-long-long",
-        "-Wno-maybe-uninitialized",
         "-Wno-missing-field-initializers",
         "-Wno-noexcept-type",
         "-Wno-redundant-move",
@@ -148,8 +144,6 @@ cc_shared_library(
         "-Wno-missing-field-initializers",
         "-Wno-long-long",
         "-Wimplicit-fallthrough",
-        "-Wno-maybe-uninitialized",
-        "-Wno-class-memaccess",
         "-Wno-redundant-move",
         "-Wno-noexcept-type",
         "-Wdelete-non-virtual-dtor",
