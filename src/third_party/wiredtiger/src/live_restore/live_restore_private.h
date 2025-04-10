@@ -96,6 +96,13 @@ struct __wti_live_restore_file_handle {
         __wt_spin_unlock((session), &S2C(session)->live_restore_server->queue_lock); \
     } while (0)
 
+/*
+ * WTI_WITH_LIVE_RESTORE_STATE_LOCK --
+ *	Acquire the state lock, perform an operation, drop the lock.
+ */
+#define WTI_WITH_LIVE_RESTORE_STATE_LOCK(session, lr_fs, op) \
+    WT_WITH_LOCK_WAIT((session), &(lr_fs)->state_lock, WT_SESSION_LOCKED_LIVE_RESTORE_STATE, op)
+
 typedef enum {
     WTI_LIVE_RESTORE_FS_LAYER_DESTINATION,
     WTI_LIVE_RESTORE_FS_LAYER_SOURCE,

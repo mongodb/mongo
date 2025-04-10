@@ -125,6 +125,8 @@ err:
         if (next_ref != NULL)
             WT_TRET(__wt_page_release(session, next_ref, walk_flags));
     }
-
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
+#endif
     return (ret);
 }

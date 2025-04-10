@@ -840,3 +840,12 @@ struct __wt_verbose_dump_cookie {
 struct __wt_sweep_cookie {
     uint64_t now;
 };
+
+/*
+ * WT_CONN_CLOSE_ABORT --
+ *      Whenever conn->close encounters a non-zero return code, abort the process to track where it
+ * came from. This is strictly to be used for debugging purposes.
+ */
+#define WT_CONN_CLOSE_ABORT(s, ret)                                          \
+    if (F_ISSET(S2C(s), WT_CONN_CLOSING) && (ret != 0) && (ret != WT_PANIC)) \
+        __wt_abort(s);

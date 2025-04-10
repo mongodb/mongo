@@ -2765,6 +2765,9 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     if (need_tracking)
         WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
+#endif
     return (ret);
 }
 

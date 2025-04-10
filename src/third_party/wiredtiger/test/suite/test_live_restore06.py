@@ -99,20 +99,24 @@ class test_live_restore06(backup_base):
         meta_cursor.close()
 
         # Now take a backup of the destination.
-        # This requires opening a new connection in non-live restore mode
-        # FIXME-WT-14231 Add a testing for taking backups when live restore in the COMPLETE phase
-        self.reopen_conn(directory="DEST", config="statistics=(all),live_restore=(enabled=false)")
-        os.mkdir("backup")
+        # Test backups when live restore is in the COMPLETE phase
+        self.do_backup_test("backup0","statistics=(all),live_restore=(enabled=true,path=\"SOURCE\")")
+        # Test backups in non-live restore mode
+        self.do_backup_test("backup1","statistics=(all),live_restore=(enabled=false)")
+
+    def do_backup_test(self, backup_dir, backup_conn_config):
+        self.reopen_conn(directory="DEST", config=backup_conn_config)
+        os.mkdir(backup_dir)
         backup_cursor = self.session.open_cursor("backup:")
-        self.take_full_backup("backup", backup_cursor, home=self.conn.get_home())
+        self.take_full_backup(backup_dir, backup_cursor, home=self.conn.get_home())
 
         # Assert that backup/WiredTiger.backup doesn't contain the nbits=-1 string.
         # The backup file is plain text so we can simply grep for the string
-        with open("backup/WiredTiger.backup", "r") as f:
+        with open(backup_dir + "/WiredTiger.backup", "r") as f:
             self.assertTrue("nbits=-1" not in f.read())
 
         # Now open the backup and check all files have been cleaned and contain nbits=0.
-        self.reopen_conn(directory="backup", config="statistics=(all),live_restore=(enabled=false)")
+        self.reopen_conn(directory=backup_dir, config="statistics=(all),live_restore=(enabled=false)")
         meta_cursor = self.session.open_cursor('metadata:', None, None)
         while meta_cursor.next() != 0:
             uri = meta_cursor.get_key()

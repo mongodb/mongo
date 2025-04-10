@@ -279,7 +279,9 @@ __session_close_cursors(WT_SESSION_IMPL *session, WT_CURSOR_LIST *cursors)
         WT_TRET(cursor->close(cursor));
     }
     WT_TAILQ_SAFE_REMOVE_END
-
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
+#endif
     return (ret);
 }
 
@@ -295,6 +297,9 @@ __session_close_cached_cursors(WT_SESSION_IMPL *session)
 
     for (i = 0; i < S2C(session)->hash_size; i++)
         WT_TRET(__session_close_cursors(session, &session->cursor_cache[i]));
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
+#endif
     return (ret);
 }
 
@@ -458,7 +463,9 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
     if (!internal_session)
         WT_TRET(__wt_call_log_print_return(conn, session, ret, ""));
 #endif
-
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(&conn->dummy_session, ret);
+#endif
     return (ret);
 }
 
@@ -692,9 +699,8 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
             WT_RET(__wt_curmetadata_open(session, uri, owner, cfg, cursorp));
         break;
     case 'b':
-        /* FIXME-WT-14231 Allow taking backups when live restore is in the COMPLETE phase. */
         if (WT_PREFIX_MATCH(uri, "backup:")) {
-            if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+            if (__wt_live_restore_migration_in_progress(session))
                 WT_RET_SUB(session, EINVAL, WT_CONFLICT_LIVE_RESTORE,
                   "backup cannot be taken when live restore is enabled");
             WT_RET(__wt_curbackup_open(session, uri, other, cfg, cursorp));
@@ -1968,6 +1974,9 @@ err:
 
 #ifdef HAVE_CALL_LOG
     WT_TRET(__wt_call_log_rollback_transaction(session, config, ret));
+#endif
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
 #endif
     API_END_RET(session, ret);
 }

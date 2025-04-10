@@ -337,4 +337,21 @@ TEST_CASE("Live Restore Directory List", "[live_restore],[live_restore_directory
         // The prefix matches a file's full name but then has additional characters
         REQUIRE(file_list_equals(directory_list_prefix(env, "file_1.txt.txt.txt"), lr_files{}));
     }
+
+    SECTION("Directory list - Test that temporary files aren't returned")
+    {
+        create_file(env.dest_file_path(file_1).c_str());
+        create_file(env.source_file_path(file_2).c_str());
+        create_file(env.dest_file_path(file_1 + ".lr_tmp").c_str());
+        REQUIRE(file_list_equals(directory_list_prefix(env, ""), lr_files{file_1, file_2}));
+
+        // Test that a prefixed search doesn't return temporary files.
+        create_file(env.dest_file_path("WiredTigerLog.lr_tmp"));
+        REQUIRE(file_list_equals(directory_list_prefix(env, "WiredTigerLog"), lr_files{}));
+
+        // A temporary file string without the "." will be returned.
+        create_file(env.dest_file_path("lr_tmp"));
+        REQUIRE(
+          file_list_equals(directory_list_prefix(env, ""), lr_files{file_1, file_2, "lr_tmp"}));
+    }
 }

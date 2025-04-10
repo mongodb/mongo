@@ -23,6 +23,22 @@ __wti_live_restore_migration_complete(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_live_restore_migration_in_progress --
+ *     Return if live restore is in progress stage.
+ */
+bool
+__wt_live_restore_migration_in_progress(WT_SESSION_IMPL *session)
+{
+    /* If live restore is not enabled then background migration is by definition not in progress. */
+    if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+        return (false);
+    WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
+    WTI_LIVE_RESTORE_STATE state = __wti_live_restore_get_state(session, lr_fs);
+
+    return (state == WTI_LIVE_RESTORE_STATE_BACKGROUND_MIGRATION);
+}
+
+/*
  * __live_restore_state_to_string --
  *     Convert a live restore state to its string representation.
  */
@@ -159,19 +175,14 @@ __live_restore_report_state_to_application(WT_SESSION_IMPL *session, WTI_LIVE_RE
 }
 
 /*
- * __wti_live_restore_set_state --
- *     Update the live restore state in memory and persist it to the turtle file.
+ * __live_restore_set_state_int --
+ *     Internal function for setting the live restore state. The caller must hold the state lock.
  */
-int
-__wti_live_restore_set_state(
+static int
+__live_restore_set_state_int(
   WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs, WTI_LIVE_RESTORE_STATE new_state)
 {
-    WT_DECL_RET;
-
-    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
-    if (!reentrant)
-        __wt_spin_lock(session, &lr_fs->state_lock);
-
+    WT_ASSERT_SPINLOCK_OWNED(session, &lr_fs->state_lock);
     /*
      * Validity checking. There is a defined transition of states and we should never skip or repeat
      * a state.
@@ -193,28 +204,34 @@ __wti_live_restore_set_state(
     }
 
     lr_fs->state = new_state;
-
     /* Bumping the turtle file will automatically write the latest live restore state. */
-    WT_ERR(__wt_live_restore_turtle_rewrite(session));
+    WT_RET(__wt_live_restore_turtle_rewrite(session));
     __live_restore_report_state_to_application(session, new_state);
+    return (0);
+}
 
-err:
-    if (!reentrant)
-        __wt_spin_unlock(session, &lr_fs->state_lock);
-
+/*
+ * __wti_live_restore_set_state --
+ *     Update the live restore state in memory and persist it to the turtle file.
+ */
+int
+__wti_live_restore_set_state(
+  WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs, WTI_LIVE_RESTORE_STATE new_state)
+{
+    WT_DECL_RET;
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(
+      session, lr_fs, ret = __live_restore_set_state_int(session, lr_fs, new_state));
     return (ret);
 }
 
 /*
- * __wti_live_restore_init_state --
- *     Initialize the live restore state. Read the state from file if it exists, otherwise we start
- *     in the log copy state and need to create the file on disk.
+ * __live_restore_init_state_int --
+ *     Internal function for initializing the live restore state, expects the state lock to be held.
  */
-int
-__wti_live_restore_init_state(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs)
+static int
+__live_restore_init_state_int(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs)
 {
-    __wt_spin_lock(session, &lr_fs->state_lock);
-
+    WT_ASSERT_SPINLOCK_OWNED(session, &lr_fs->state_lock);
     WT_ASSERT_ALWAYS(session, lr_fs->state == WTI_LIVE_RESTORE_STATE_NONE,
       "Attempting to initialize already initialized state!");
 
@@ -231,9 +248,21 @@ __wti_live_restore_init_state(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_
          * back to this state on a restart if we didn't persist state in the turtle file.
          */
         lr_fs->state = WTI_LIVE_RESTORE_STATE_BACKGROUND_MIGRATION;
-
-    __wt_spin_unlock(session, &lr_fs->state_lock);
     return (0);
+}
+
+/*
+ * __wti_live_restore_init_state --
+ *     Initialize the live restore state. Read the state from file if it exists, otherwise we start
+ *     in the log copy state and need to create the file on disk.
+ */
+int
+__wti_live_restore_init_state(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs)
+{
+    WT_DECL_RET;
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(
+      session, lr_fs, ret = __live_restore_init_state_int(session, lr_fs));
+    return (ret);
 }
 
 /*
@@ -266,21 +295,14 @@ __wt_live_restore_turtle_update(
     WT_DECL_RET;
 
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
-
-    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
-    if (!reentrant)
-        __wt_spin_lock(session, &lr_fs->state_lock);
-
-    if (take_turtle_lock)
-        WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, key, value));
-    else
-        ret = __wt_turtle_update(session, key, value);
-    WT_ERR(ret);
-
-err:
-    if (!reentrant)
-        __wt_spin_unlock(session, &lr_fs->state_lock);
-
+    /* clang-format off */
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(session, lr_fs,
+        if (take_turtle_lock)
+            WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(session, key, value));
+        else
+            ret = __wt_turtle_update(session, key, value);
+    );
+    /* clang-format on */
     return (ret);
 }
 
@@ -294,18 +316,8 @@ __wt_live_restore_turtle_rewrite(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
-
-    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
-    if (!reentrant)
-        __wt_spin_lock(session, &lr_fs->state_lock);
-
-    WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session));
-    WT_ERR(ret);
-
-err:
-    if (!reentrant)
-        __wt_spin_unlock(session, &lr_fs->state_lock);
-
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(
+      session, lr_fs, WT_WITH_TURTLE_LOCK(session, ret = __wt_metadata_turtle_rewrite(session)));
     return (ret);
 }
 
@@ -319,18 +331,8 @@ __wt_live_restore_turtle_read(WT_SESSION_IMPL *session, const char *key, char **
 {
     WT_DECL_RET;
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
-
-    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
-    if (!reentrant)
-        __wt_spin_lock(session, &lr_fs->state_lock);
-
-    WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep));
-    WT_ERR(ret);
-
-err:
-    if (!reentrant)
-        __wt_spin_unlock(session, &lr_fs->state_lock);
-
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(
+      session, lr_fs, WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_read(session, key, valuep)));
     return (ret);
 }
 
@@ -341,19 +343,10 @@ err:
 WTI_LIVE_RESTORE_STATE
 __wti_live_restore_get_state(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS *lr_fs)
 {
-
-    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
-    if (!reentrant)
-        __wt_spin_lock(session, &lr_fs->state_lock);
-
-    WTI_LIVE_RESTORE_STATE state = lr_fs->state;
-
-    if (!reentrant)
-        __wt_spin_unlock(session, &lr_fs->state_lock);
-
+    WTI_LIVE_RESTORE_STATE state = WTI_LIVE_RESTORE_STATE_NONE;
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(session, lr_fs, state = lr_fs->state);
     /* We initialize state on startup. This shouldn't be possible. */
     WT_ASSERT_ALWAYS(session, state != WTI_LIVE_RESTORE_STATE_NONE, "State not initialized!");
-
     return (state);
 }
 

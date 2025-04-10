@@ -893,7 +893,9 @@ __wti_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mar
         WT_TRET(__conn_dhandle_destroy(session, dhandle, final));
         session->dhandle = NULL;
     }
-
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
+#endif
     return (ret);
 }
 

@@ -26,6 +26,8 @@ struct __wt_live_restore_fh_meta {
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
+extern bool __wt_live_restore_migration_in_progress(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_live_restore_clean_metadata_string(WT_SESSION_IMPL *session, char *value)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_live_restore_fh_to_metadata(WT_SESSION_IMPL *session, WT_FILE_HANDLE *fh,

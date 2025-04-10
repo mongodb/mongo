@@ -90,31 +90,22 @@ __live_restore_create_stop_file_path(WT_SESSION_IMPL *session, const char *name,
 }
 
 /*
- * __live_restore_fs_create_stop_file --
- *     Create a stop file for the given file.
+ * __live_restore_fs_create_stop_file_locked --
+ *     Create a stop file for the given file. The live restore state lock must be held.
  */
 static int
-__live_restore_fs_create_stop_file(
-  WT_FILE_SYSTEM *fs, WT_SESSION_IMPL *session, const char *name, uint32_t flags)
+__live_restore_fs_create_stop_file_locked(
+  WTI_LIVE_RESTORE_FS *lr_fs, WT_SESSION_IMPL *session, const char *name, uint32_t flags)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE *fh;
-    WTI_LIVE_RESTORE_FS *lr_fs;
     uint32_t open_flags;
     char *path, *path_marker;
-
-    lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
     path = path_marker = NULL;
 
-    bool reentrant = __wt_spin_owned(session, &lr_fs->state_lock);
-    if (!reentrant)
-        __wt_spin_lock(session, &lr_fs->state_lock);
-
-    if (__wti_live_restore_migration_complete(session)) {
-        if (!reentrant)
-            __wt_spin_unlock(session, &lr_fs->state_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &lr_fs->state_lock);
+    if (__wti_live_restore_migration_complete(session))
         return (0);
-    }
 
     WT_ERR(__live_restore_fs_backing_filename(
       session, lr_fs, WTI_LIVE_RESTORE_FS_LAYER_DESTINATION, name, &path));
@@ -133,10 +124,21 @@ __live_restore_fs_create_stop_file(
 err:
     __wt_free(session, path);
     __wt_free(session, path_marker);
+    return (ret);
+}
 
-    if (!reentrant)
-        __wt_spin_unlock(session, &lr_fs->state_lock);
-
+/*
+ * __live_restore_fs_create_stop_file --
+ *     Create a stop file for the given file.
+ */
+static int
+__live_restore_fs_create_stop_file(
+  WT_FILE_SYSTEM *fs, WT_SESSION_IMPL *session, const char *name, uint32_t flags)
+{
+    WT_DECL_RET;
+    WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK(
+      session, lr_fs, ret = __live_restore_fs_create_stop_file_locked(lr_fs, session, name, flags));
     return (ret);
 }
 
@@ -261,13 +263,7 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
 
     __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
       "DIRECTORY LIST %s (single ? %s) : ", directory, single ? "YES" : "NO");
-
-    /*
-     * We could fail to list a file if the live restore state changes between us walking the
-     * destination and walking the source. Lock around the entire function to keep things simple and
-     * avoid this scenario.
-     */
-    __wt_spin_lock(session, &lr_fs->state_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &lr_fs->state_lock);
 
     /* Get files from destination. */
     WT_ERR(__live_restore_fs_backing_filename(
@@ -281,7 +277,12 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
           lr_fs->os_file_system, wt_session, path_dest, prefix, &dirlist_dest, &num_dest_files));
 
         for (uint32_t i = 0; i < num_dest_files; ++i)
-            if (!WT_SUFFIX_MATCH(dirlist_dest[i], WTI_LIVE_RESTORE_STOP_FILE_SUFFIX)) {
+            /*
+             * The caller utilizes prefix to identify files necessary to it's module. Avoid
+             * returning live restore specific files to the caller.
+             */
+            if (!WT_SUFFIX_MATCH(dirlist_dest[i], WTI_LIVE_RESTORE_STOP_FILE_SUFFIX) &&
+              !WT_SUFFIX_MATCH(dirlist_dest[i], WTI_LIVE_RESTORE_TEMP_FILE_SUFFIX)) {
                 WT_ERR(__wt_realloc_def(session, &dirallocsz, count_dest + 1, &entries));
                 WT_ERR(__wt_strdup(session, dirlist_dest[i], &entries[count_dest]));
                 ++count_dest;
@@ -360,8 +361,6 @@ __live_restore_fs_directory_list_worker(WT_FILE_SYSTEM *fs, WT_SESSION *wt_sessi
 
 done:
 err:
-    __wt_spin_unlock(session, &lr_fs->state_lock);
-
     __wt_free(session, path_dest);
     __wt_free(session, path_src);
     __wt_scr_free(session, &filename);
@@ -387,8 +386,17 @@ static int
 __live_restore_fs_directory_list(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session, const char *directory,
   const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    return (__live_restore_fs_directory_list_worker(
-      fs, wt_session, directory, prefix, dirlistp, countp, false));
+    WT_DECL_RET;
+    WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
+    /*
+     * We could fail to list a file if the live restore state changes between us walking the
+     * destination and walking the source. Lock around the entire function to keep things simple and
+     * avoid this scenario.
+     */
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK((WT_SESSION_IMPL *)wt_session, lr_fs,
+      ret = __live_restore_fs_directory_list_worker(
+        fs, wt_session, directory, prefix, dirlistp, countp, false));
+    return (ret);
 }
 
 /*
@@ -399,8 +407,12 @@ static int
 __live_restore_fs_directory_list_single(WT_FILE_SYSTEM *fs, WT_SESSION *wt_session,
   const char *directory, const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    return (__live_restore_fs_directory_list_worker(
-      fs, wt_session, directory, prefix, dirlistp, countp, true));
+    WT_DECL_RET;
+    WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)fs;
+    WTI_WITH_LIVE_RESTORE_STATE_LOCK((WT_SESSION_IMPL *)wt_session, lr_fs,
+      ret = __live_restore_fs_directory_list_worker(
+        fs, wt_session, directory, prefix, dirlistp, countp, true));
+    return (ret);
 }
 
 /*
@@ -1394,8 +1406,7 @@ __wt_live_restore_clean_metadata_string(WT_SESSION_IMPL *session, char *value)
     WT_CONFIG_ITEM v;
     WT_DECL_RET;
 
-    /* FIXME-WT-14231 Allow taking backups during live restore in the COMPLETE phase. */
-    WT_ASSERT_ALWAYS(session, !F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS),
+    WT_ASSERT_ALWAYS(session, !__wt_live_restore_migration_in_progress(session),
       "Cleaning the metadata string should only be called for non-live restore file systems");
 
     ret = __wt_config_getones(session, value, "live_restore", &v);

@@ -563,6 +563,9 @@ __wt_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN 
     }
 
 err:
+#ifdef HAVE_DIAGNOSTIC
+    WT_CONN_CLOSE_ABORT(session, ret);
+#endif
     __wt_logrec_free(session, &logrec);
     return (ret);
 }

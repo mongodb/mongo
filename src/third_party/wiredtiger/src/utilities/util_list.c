@@ -21,9 +21,7 @@ usage(void)
 {
     static const char *options[] = {"-c",
       "display checkpoints in human-readable format (by default checkpoints are not displayed)",
-      "-f output",
-      "redirect output to the specified file (the default is stdout)"
-      "-v",
+      "-f output", "redirect output to the specified file (the default is stdout)", "-v",
       "display the complete schema table (by default only a subset is displayed)", "-?",
       "show this message", NULL, NULL};
 
