@@ -93,6 +93,11 @@ StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
 
 using std::string;
 
+std::string WiredTigerUtil::buildTableUri(StringData ident) {
+    invariant(ident.find(kTableUriPrefix) == string::npos);
+    return kTableUriPrefix + ident.toString();
+}
+
 void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerSession& session,
                                            const std::string& tableUri,
                                            std::string* type,

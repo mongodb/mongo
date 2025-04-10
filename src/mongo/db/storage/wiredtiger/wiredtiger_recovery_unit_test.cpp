@@ -79,7 +79,7 @@ namespace {
 class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelper {
 public:
     WiredTigerRecoveryUnitHarnessHelper() : _dbpath("wt_test") {
-        WiredTigerKVEngine::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = 1;
         _engine = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
                                                        _dbpath.path(),
@@ -109,8 +109,8 @@ public:
                                                    const std::string& ns) final {
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        std::string uri = WiredTigerKVEngine::kTableUriPrefix + ident;
-        WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
+        std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
+        WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
             getWiredTigerTableConfigFromStartupOptions();
         wtTableConfig.keyFormat = KeyFormat::Long;
         bool isReplSet = getGlobalReplSettings().isReplSet();
@@ -118,7 +118,7 @@ public:
             repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
         wtTableConfig.logEnabled =
             WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+        StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
             std::string{kWiredTigerEngineName},
             NamespaceStringUtil::serializeForCatalog(nss),
             CollectionOptions(),
@@ -137,17 +137,17 @@ public:
         }
 
         WiredTigerRecordStore::Params params;
-        params.ident = ident;
-        params.engineName = std::string{kWiredTigerEngineName};
-        params.keyFormat = KeyFormat::Long;
-        params.overwrite = true;
-        params.inMemory = false;
-        params.isLogged =
+        params.baseParams.ident = ident;
+        params.baseParams.engineName = std::string{kWiredTigerEngineName};
+        params.baseParams.keyFormat = KeyFormat::Long;
+        params.baseParams.overwrite = true;
+        params.baseParams.isLogged =
             WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
+        params.baseParams.forceUpdateWithFullDocument = false;
+        params.inMemory = false;
         params.isChangeCollection = nss.isChangeCollection();
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;
-        params.forceUpdateWithFullDocument = false;
 
         auto ret = std::make_unique<WiredTigerRecordStore>(
             _engine.get(),

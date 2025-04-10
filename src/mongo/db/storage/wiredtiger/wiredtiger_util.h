@@ -94,6 +94,9 @@ private:
 
 public:
     static constexpr StringData kConfigStringField = "configString"_sd;
+    static constexpr StringData kTableUriPrefix = "table:"_sd;
+
+    static std::string buildTableUri(StringData ident);
 
     /**
      * Fetch the type and source fields out of the colgroup metadata.  'tableUri' must be a

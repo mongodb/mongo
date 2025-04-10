@@ -84,17 +84,15 @@
 namespace mongo {
 
 class RecoveryUnit;
+class TemporaryWiredTigerKVEngine;
 class WiredTigerConnection;
 class WiredTigerKVEngine;
 class WiredTigerOplogData;
 class WiredTigerOplogTruncateMarkers;
 class WiredTigerSizeStorer;
 
-class WiredTigerRecordStore : public RecordStoreBase {
+class WiredTigerRecordStoreBase : public RecordStoreBase {
 public:
-    class Capped;
-    class Oplog;
-
     // Encapsulates configuration parameters to configure a WiredTiger table.
     struct WiredTigerTableConfig {
         // This specifies the value for the key_format configuration parameter.
@@ -111,16 +109,19 @@ public:
     struct Params {
         boost::optional<UUID> uuid;
         std::string ident;
+        // Canonical engine name to use for retrieving options
         std::string engineName;
         KeyFormat keyFormat;
+        // Whether or not to allow writes to overwrite existing records with the same RecordId.
         bool overwrite;
-        bool inMemory;
+        // True if WiredTiger is logging updates to this table.
         bool isLogged;
-        bool isChangeCollection;
-        WiredTigerSizeStorer* sizeStorer;
-        bool tracksSizeAdjustments;
+        // TODO (SERVER-57482): Remove special handling of skipping "wiredtiger_calc_modify()".
+        // True if force to update with the full document, and false otherwise.
         bool forceUpdateWithFullDocument;
     };
+
+    typedef std::variant<int64_t, WiredTigerItem> CursorKey;
 
     /**
      * Parses collections options for wired tiger configuration string for table creation.
@@ -145,16 +146,119 @@ public:
         const std::string& engineName,
         StringData tableName,
         const CollectionOptions& options,
-        const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
+        const WiredTigerRecordStoreBase::WiredTigerTableConfig& wtTableConfig,
         bool isOplog = false);
+
+    WiredTigerRecordStoreBase(Params params);
+
+    const char* name() const override {
+        return _engineName.c_str();
+    }
+
+    KeyFormat keyFormat() const override {
+        return _keyFormat;
+    }
+
+    const std::string& getURI() const {
+        return _uri;
+    }
+
+    uint64_t tableId() const {
+        return _tableId;
+    }
+
+protected:
+    // Encapsulates statistics for an operation performed on this RecordStore instance.
+    struct OpStats {
+        int64_t keyLength{0};
+        int64_t oldValueLength{0};
+        int64_t newValueLength{0};
+    };
+
+    /**
+     * Deletes the specified record from this WiredTiger table. Resets 'opStats' before populating
+     * it with statistics corresponding to this operation.
+     */
+    void wtDeleteRecord(OperationContext*,
+                        WiredTigerRecoveryUnit& wtRu,
+                        const RecordId&,
+                        OpStats& opStats);
+
+    /**
+     * Inserts the given record into this WiredTiger table. Returns error if the record could not be
+     * inserted due to errors like duplicate key error. Resets 'opStats' before populating it with
+     * statistics corresponding to this operation.
+     */
+    Status wtInsertRecord(OperationContext*,
+                          WiredTigerRecoveryUnit& wtRu,
+                          WT_CURSOR* c,
+                          const Record& record,
+                          OpStats& opStats);
+
+    /**
+     * Updates the given record in this WiredTiger table. Resets 'opStats' before populating it with
+     * statistics corresponding to this operation.
+     */
+    Status wtUpdateRecord(OperationContext* opCtx,
+                          WiredTigerRecoveryUnit& wtRu,
+                          const RecordId& id,
+                          const char* data,
+                          int len,
+                          OpStats& opStats);
+
+    /**
+     * Deletes all records in this WiredTiger table.
+     */
+    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu);
+
+    /**
+     * Deletes all Records in the range [minRecordId, maxRecordId].
+     */
+    Status wtRangeTruncate(OperationContext* opCtx,
+                           WiredTigerRecoveryUnit& wtRu,
+                           const RecordId& minRecordId = RecordId(),
+                           const RecordId& maxRecordId = RecordId());
+
+    /**
+     * Compacts this WiredTiger table to attempt to reduce its storage space.
+     */
+    StatusWith<int64_t> wtCompact(OperationContext* opCtx,
+                                  WiredTigerRecoveryUnit& wtRu,
+                                  const CompactOptions& options);
+
+    /**
+     * Enforces any record size restrictions when updating records e.g. the RecordStore for oplog
+     * could enforce that an update does not change the size of the record.
+     */
+    virtual Status _checkUpdateSize(int64_t oldSize, int64_t newSize) {
+        return Status::OK();
+    }
+
+    const std::string _uri;
+    const uint64_t _tableId;  // not persisted
+    const std::string _engineName;
+    const KeyFormat _keyFormat;
+    const bool _overwrite;
+    const bool _isLogged;
+    const bool _forceUpdateWithFullDocument;
+};
+
+class WiredTigerRecordStore : public WiredTigerRecordStoreBase {
+public:
+    class Capped;
+    class Oplog;
+
+    struct Params {
+        WiredTigerRecordStoreBase::Params baseParams;
+        bool inMemory;
+        bool isChangeCollection;
+        WiredTigerSizeStorer* sizeStorer;
+        bool tracksSizeAdjustments;
+    };
 
     WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, WiredTigerRecoveryUnit&, Params params);
 
     ~WiredTigerRecordStore() override;
-
-    const char* name() const override;
-
-    KeyFormat keyFormat() const override;
 
     long long dataSize() const override;
 
@@ -204,14 +308,6 @@ public:
 
     RecordStore::Oplog* oplog() override;
 
-    const std::string& getURI() const {
-        return _uri;
-    }
-
-    uint64_t tableId() const {
-        return _tableId;
-    }
-
     Timestamp getPinnedOplog() const;
 
     /*
@@ -234,8 +330,6 @@ public:
      * Sets the new data size and flushes the size storer.
      */
     void setDataSize(long long dataSize);
-
-    typedef std::variant<int64_t, WiredTigerItem> CursorKey;
 
 protected:
     void _deleteRecord(OperationContext*, const RecordId&) override;
@@ -261,8 +355,6 @@ protected:
                           int64_t hintNumRecordsIncrement = 0) override;
 
     StatusWith<int64_t> _compact(OperationContext*, const CompactOptions&) override;
-
-    virtual Status _checkUpdateSize(int64_t oldSize, int64_t newSize);
 
     long long _reserveIdBlock(OperationContext* opCtx, size_t nRecords);
 
@@ -306,26 +398,11 @@ protected:
      */
     void _updateLargestRecordId(OperationContext* opCtx, long long largestSeen);
 
-    const std::string _uri;
-    const uint64_t _tableId;  // not persisted
-
-    // Canonical engine name to use for retrieving options
-    const std::string _engineName;
-    // The format of this RecordStore's RecordId keys.
-    const KeyFormat _keyFormat;
-    // Whether or not to allow writes to overwrite existing records with the same RecordId.
-    const bool _overwrite;
     // True if the storage engine is an in-memory storage engine
     const bool _inMemory;
-    // True if WiredTiger is logging updates to this table
-    const bool _isLogged;
     // True if the namespace of this record store starts with "config.system.change_collection", and
     // false otherwise.
     const bool _isChangeCollection;
-
-    // TODO (SERVER-57482): Remove special handling of skipping "wiredtiger_calc_modify()".
-    // True if force to update with the full document, and false otherwise.
-    const bool _forceUpdateWithFullDocument;
 
     // Protects initialization of the _nextIdNum.
     mutable stdx::mutex _initNextIdMutex;
@@ -430,7 +507,7 @@ private:
 class WiredTigerRecordStoreCursor : public SeekableRecordCursor {
 public:
     WiredTigerRecordStoreCursor(OperationContext* opCtx,
-                                const WiredTigerRecordStore& rs,
+                                const WiredTigerRecordStoreBase& rs,
                                 bool forward);
 
     boost::optional<Record> next() override;
@@ -531,7 +608,7 @@ private:
 class WiredTigerCappedCursorBase : public WiredTigerRecordStoreCursor {
 public:
     WiredTigerCappedCursorBase(OperationContext* opCtx,
-                               const WiredTigerRecordStore& rs,
+                               const WiredTigerRecordStoreBase& rs,
                                bool forward);
 
     boost::optional<Record> next() override;
@@ -588,7 +665,9 @@ private:
  */
 class WiredTigerOplogCursor : public WiredTigerCappedCursorBase {
 public:
-    WiredTigerOplogCursor(OperationContext* opCtx, const WiredTigerRecordStore& rs, bool forward);
+    WiredTigerOplogCursor(OperationContext* opCtx,
+                          const WiredTigerRecordStoreBase& rs,
+                          bool forward);
 
     boost::optional<Record> next() override;
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;

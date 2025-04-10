@@ -132,7 +132,7 @@ public:
             }
         }
 
-        WiredTigerKVEngine::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = cacheMB;
         wtConfig.inMemory = params.inMemory;
         if (params.inMemory) {
@@ -171,7 +171,7 @@ public:
     }
 
     Status validateCollectionStorageOptions(const BSONObj& options) const override {
-        return WiredTigerRecordStore::parseOptionsField(options).getStatus();
+        return WiredTigerRecordStoreBase::parseOptionsField(options).getStatus();
     }
 
     Status validateIndexStorageOptions(const BSONObj& options) const override {

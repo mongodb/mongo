@@ -79,7 +79,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     std::string ident = rs->getIdent();
     std::string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
-    std::string indexUri = WiredTigerKVEngine::kTableUriPrefix + "myindex";
+    std::string indexUri = WiredTigerUtil::kTableUriPrefix + "myindex";
     WiredTigerSizeStorer ss(&harnessHelper->connection(), indexUri);
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
@@ -112,16 +112,16 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         WiredTigerRecordStore::Params params;
-        params.ident = ident;
-        params.engineName = std::string{kWiredTigerEngineName};
-        params.keyFormat = KeyFormat::Long;
-        params.overwrite = true;
+        params.baseParams.ident = ident;
+        params.baseParams.engineName = std::string{kWiredTigerEngineName};
+        params.baseParams.keyFormat = KeyFormat::Long;
+        params.baseParams.overwrite = true;
+        params.baseParams.isLogged = false;
+        params.baseParams.forceUpdateWithFullDocument = false;
         params.inMemory = false;
-        params.isLogged = false;
         params.isChangeCollection = false;
         params.sizeStorer = &ss;
         params.tracksSizeAdjustments = true;
-        params.forceUpdateWithFullDocument = false;
 
         auto ret = new WiredTigerRecordStore(
             nullptr,
@@ -161,8 +161,8 @@ class SizeStorerUpdateTest : public mongo::unittest::Test {
 private:
     void setUp() override {
         harnessHelper.reset(new WiredTigerHarnessHelper());
-        sizeStorer.reset(new WiredTigerSizeStorer(
-            &harnessHelper->connection(), WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
+        sizeStorer.reset(new WiredTigerSizeStorer(&harnessHelper->connection(),
+                                                  WiredTigerUtil::kTableUriPrefix + "sizeStorer"));
         rs = harnessHelper->newRecordStore();
         WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtRS->setSizeStorer(sizeStorer.get());
@@ -286,7 +286,7 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     // Simulate a shutdown and restart, which loads the size storer from disk.
     sizeStorer->flush(true);
     sizeStorer.reset(new WiredTigerSizeStorer(&harnessHelper->connection(),
-                                              WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
+                                              WiredTigerUtil::kTableUriPrefix + "sizeStorer"));
     WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
     wtRS->setSizeStorer(sizeStorer.get());
 

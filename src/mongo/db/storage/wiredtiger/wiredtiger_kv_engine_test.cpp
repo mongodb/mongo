@@ -119,7 +119,7 @@ private:
     std::unique_ptr<StorageEngine> makeEngine() {
         // Use a small journal for testing to account for the unlikely event that the underlying
         // filesystem does not support fast allocation of a file of zeros.
-        WiredTigerKVEngine::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+        WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = 1;
         wtConfig.extraOpenOptions = "log=(file_max=1m,prealloc=false)";
         auto kv = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},

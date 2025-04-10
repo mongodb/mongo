@@ -46,6 +46,8 @@ mongo_cc_library(
     name = "storage_wiredtiger_core",
     srcs = [
         "oplog_truncate_marker_parameters_gen",
+        "temporary_wiredtiger_kv_engine.cpp",
+        "temporary_wiredtiger_record_store.cpp",
         "wiredtiger_begin_transaction_block.cpp",
         "wiredtiger_compiled_configuration.cpp",
         "wiredtiger_connection.cpp",
@@ -72,6 +74,8 @@ mongo_cc_library(
         "wiredtiger_util.cpp",
     ],
     hdrs = [
+        "temporary_wiredtiger_kv_engine.h",
+        "temporary_wiredtiger_record_store.h",
         "wiredtiger_begin_transaction_block.h",
         "wiredtiger_compiled_configuration.h",
         "wiredtiger_connection.h",
@@ -111,6 +115,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/stats:resource_consumption_metrics",
@@ -231,6 +236,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "storage_wiredtiger_record_store_and_index_test",
     srcs = [
+        "temporary_wiredtiger_record_store_test.cpp",
         "wiredtiger_index_test.cpp",
         "wiredtiger_record_store_test.cpp",
         "wiredtiger_standard_index_test.cpp",

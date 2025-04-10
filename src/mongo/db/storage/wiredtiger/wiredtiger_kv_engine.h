@@ -185,27 +185,11 @@ private:
     WT_CONNECTION* _conn{nullptr};
 };
 
+class WiredTigerSessionSweeper;
+
 // Base class of all KVEngine implementations that use WiredTiger.
 class WiredTigerKVEngineBase : public KVEngine {
 public:
-    virtual WiredTigerOplogManager* getOplogManager() const {
-        return nullptr;
-    }
-
-    virtual Status alterMetadata(StringData uri, StringData config) {
-        MONGO_UNREACHABLE;
-    }
-
-    /**
-     * Flushes any WiredTigerSizeStorer updates to the storage engine if necessary.
-     */
-    virtual void sizeStorerPeriodicFlush() {}
-};
-
-class WiredTigerKVEngine final : public WiredTigerKVEngineBase {
-public:
-    static StringData kTableUriPrefix;
-
     // Encapsulates configuration parameters to configure the WiredTiger instance.
     struct WiredTigerConfig {
         // The amount of memory alloted for the WiredTiger cache. This specifies the value for the
@@ -244,6 +228,61 @@ public:
         std::string extraOpenOptions;
     };
 
+    WiredTigerKVEngineBase(const std::string& canonicalName,
+                           const std::string& path,
+                           ClockSource* clockSource,
+                           WiredTigerConfig wtConfig);
+
+    WT_CONNECTION* getConn() {
+        return _conn;
+    }
+
+    WiredTigerConnection& getConnection() {
+        return *_connection;
+    }
+
+    ClockSource* getClockSource() const {
+        return _clockSource;
+    }
+
+    virtual WiredTigerOplogManager* getOplogManager() const {
+        return nullptr;
+    }
+
+    size_t getCacheSizeMB() const override {
+        return _wtConfig.cacheSizeMB;
+    }
+
+    virtual Status alterMetadata(StringData uri, StringData config) {
+        MONGO_UNREACHABLE;
+    }
+
+    Status reconfigureLogging() override;
+
+    /**
+     * Flushes any WiredTigerSizeStorer updates to the storage engine if necessary.
+     */
+    virtual void sizeStorerPeriodicFlush() {}
+
+protected:
+    // Configuration parameters to configure the WiredTiger instance.
+    WiredTigerConfig _wtConfig;
+    std::string _canonicalName;
+    std::string _path;
+
+    WT_CONNECTION* _conn{nullptr};
+    WiredTigerEventHandler _eventHandler;
+    std::unique_ptr<WiredTigerConnection> _connection;
+    ClockSource* const _clockSource{nullptr};
+
+    std::string _wtOpenConfig;
+};
+
+// WiredTigerKVEngineBase implementation for all customer or system tables. Tables created by this
+// class are retained after a restart. This class uses its own WiredTiger instance called "main"
+// WiredTiger instance.
+class WiredTigerKVEngine final : public WiredTigerKVEngineBase {
+public:
     WiredTigerKVEngine(const std::string& canonicalName,
                        const std::string& path,
                        ClockSource* cs,
@@ -462,14 +501,6 @@ public:
     // held by this class
     int reconfigure(const char* str);
 
-    WiredTigerConnection& getConnection() {
-        return *_connection;
-    }
-
-    WT_CONNECTION* getConn() {
-        return _conn;
-    }
-
     void syncSizeInfo(bool sync) const;
 
     /*
@@ -554,10 +585,6 @@ public:
 
     Timestamp getPinnedOplog() const final;
 
-    ClockSource* getClockSource() const {
-        return _clockSource;
-    }
-
     StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
@@ -580,13 +607,9 @@ public:
 
     void dump() const override;
 
-    Status reconfigureLogging() override;
-
     StatusWith<BSONObj> getStorageMetadata(StringData ident) const override;
 
     KeyFormat getKeyFormat(RecoveryUnit&, StringData ident) const override;
-
-    size_t getCacheSizeMB() const override;
 
     bool underCachePressure() override;
 
@@ -594,10 +617,6 @@ public:
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 
-    /**
-     * Flushes any WiredTigerSizeStorer updates to the storage engine if enough time has elapsed, as
-     * dictated by the _sizeStorerSyncTracker.
-     */
     void sizeStorerPeriodicFlush() override;
 
     /**
@@ -636,8 +655,6 @@ public:
     }
 
 private:
-    class WiredTigerSessionSweeper;
-
     struct IdentToDrop {
         std::string uri;
         StorageEngine::DropIdentCallback callback;
@@ -673,8 +690,6 @@ private:
     Status _rebuildIdent(WiredTigerSession& session, const char* uri);
 
     bool _hasUri(WiredTigerSession& session, const std::string& uri) const;
-
-    std::string _uri(StringData ident) const;
 
     /**
      * Uses the 'stableTimestamp', the 'minSnapshotHistoryWindowInSeconds' setting and the
@@ -720,19 +735,9 @@ private:
     StorageEngine::OldestActiveTransactionTimestampCallback
         _oldestActiveTransactionTimestampCallback;
 
-    // Configuration parameters to configure the WiredTiger instance.
-    WiredTigerConfig _wtConfig;
-    WT_CONNECTION* _conn;
     WiredTigerFileVersion _fileVersion;
-    WiredTigerEventHandler _eventHandler;
-    std::unique_ptr<WiredTigerConnection> _connection;
-    ClockSource* const _clockSource;
 
     const std::unique_ptr<WiredTigerOplogManager> _oplogManager;
-
-    std::string _canonicalName;
-    std::string _path;
-    std::string _wtOpenConfig;
 
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
@@ -812,13 +817,22 @@ private:
 };
 
 /**
- * Returns a WiredTigerConfig populated with config values provided at startup.
+ * Generates config string for wiredtiger_open() from the given config options.
  */
-WiredTigerKVEngine::WiredTigerConfig getWiredTigerConfigFromStartupOptions();
+std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
+                                       bool ephemeral);
+
+/**
+ * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at
+ * startup.
+ */
+WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
+    bool usingTemporaryKVEngine = false);
 
 /**
  * Returns a WiredTigerTableConfig populated with config values provided at startup.
  */
-WiredTigerRecordStore::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions();
+WiredTigerRecordStoreBase::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
+    bool usingTemporaryKVEngine = false);
 
 }  // namespace mongo

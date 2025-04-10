@@ -72,14 +72,14 @@ namespace {
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyDocument) {
     BSONObj spec = fromjson("{}");
-    StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+    StatusWith<std::string> result = WiredTigerRecordStoreBase::parseOptionsField(spec);
     ASSERT_OK(result.getStatus());
     ASSERT_EQ(result.getValue(), "");  // "," would also be valid.
 }
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringUnknownField) {
     BSONObj spec = fromjson("{unknownField: 1}");
-    StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+    StatusWith<std::string> result = WiredTigerRecordStoreBase::parseOptionsField(spec);
     const Status& status = result.getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
@@ -87,7 +87,7 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringUnknownField) {
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringNonStringConfig) {
     BSONObj spec = fromjson("{configString: 12345}");
-    StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+    StatusWith<std::string> result = WiredTigerRecordStoreBase::parseOptionsField(spec);
     const Status& status = result.getStatus();
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
@@ -95,19 +95,19 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringNonStringConfig) {
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyConfigString) {
     BSONObj spec = fromjson("{configString: ''}");
-    StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+    StatusWith<std::string> result = WiredTigerRecordStoreBase::parseOptionsField(spec);
     ASSERT_OK(result.getStatus());
     ASSERT_EQ(result.getValue(), ",");  // "" would also be valid.
 }
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringInvalidConfigStringOption) {
     BSONObj spec = fromjson("{configString: 'abc=def'}");
-    ASSERT_EQ(WiredTigerRecordStore::parseOptionsField(spec), ErrorCodes::BadValue);
+    ASSERT_EQ(WiredTigerRecordStoreBase::parseOptionsField(spec), ErrorCodes::BadValue);
 }
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
     BSONObj spec = fromjson("{configString: 'prefix_compression=true'}");
-    ASSERT_EQ(WiredTigerRecordStore::parseOptionsField(spec),
+    ASSERT_EQ(WiredTigerRecordStoreBase::parseOptionsField(spec),
               std::string("prefix_compression=true,"));
 }
 
@@ -762,8 +762,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-    const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
+    const std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
+    WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = KeyFormat::String;
     bool isReplSet = getGlobalReplSettings().isReplSet();
@@ -771,11 +771,11 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
-    const StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    NamespaceStringUtil::serializeForCatalog(nss),
-                                                    CollectionOptions(),
-                                                    wtTableConfig);
+    const StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
+        std::string{kWiredTigerEngineName},
+        NamespaceStringUtil::serializeForCatalog(nss),
+        CollectionOptions(),
+        wtTableConfig);
     ASSERT_TRUE(result.isOK());
     const std::string config = result.getValue();
 
@@ -789,18 +789,18 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     }
 
     WiredTigerRecordStore::Params params;
-    params.uuid = boost::none;
-    params.ident = ns;
-    params.engineName = std::string{kWiredTigerEngineName};
-    params.keyFormat = KeyFormat::String;
-    params.overwrite = false;
-    params.inMemory = false;
-    params.isLogged =
+    params.baseParams.uuid = boost::none;
+    params.baseParams.ident = ns;
+    params.baseParams.engineName = std::string{kWiredTigerEngineName};
+    params.baseParams.keyFormat = KeyFormat::String;
+    params.baseParams.overwrite = false;
+    params.baseParams.isLogged =
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
+    params.baseParams.forceUpdateWithFullDocument = false;
+    params.inMemory = false;
     params.isChangeCollection = false;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
-    params.forceUpdateWithFullDocument = false;
 
     const auto wtKvEngine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     auto rs = std::make_unique<WiredTigerRecordStore>(

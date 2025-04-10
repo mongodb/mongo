@@ -67,7 +67,7 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test") {
-    WiredTigerKVEngine::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
+    WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
     wtConfig.cacheSizeMB = 1;
     wtConfig.extraOpenOptions = _testLoggingSettings(extraStrings.toString());
     _engine = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
@@ -93,21 +93,21 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     WiredTigerRecoveryUnit* ru =
         checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
-    std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
+    std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
     StringData ident = ns;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
+    WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = keyFormat;
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
-    StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    NamespaceStringUtil::serializeForCatalog(nss),
-                                                    collOptions,
-                                                    wtTableConfig,
-                                                    nss.isOplog());
+    StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
+        std::string{kWiredTigerEngineName},
+        NamespaceStringUtil::serializeForCatalog(nss),
+        collOptions,
+        wtTableConfig,
+        nss.isOplog());
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 
@@ -119,17 +119,17 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     }
 
     WiredTigerRecordStore::Params params;
-    params.ident = ident.toString();
-    params.engineName = std::string{kWiredTigerEngineName};
-    params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
-    params.overwrite = collOptions.clusteredIndex ? false : true;
-    params.inMemory = false;
-    params.isLogged =
+    params.baseParams.ident = ident.toString();
+    params.baseParams.engineName = std::string{kWiredTigerEngineName};
+    params.baseParams.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
+    params.baseParams.overwrite = collOptions.clusteredIndex ? false : true;
+    params.baseParams.isLogged =
         WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
+    params.baseParams.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
+    params.inMemory = false;
     params.isChangeCollection = nss.isChangeCollection();
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
-    params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
 
     return std::make_unique<WiredTigerRecordStore>(
         _engine.get(),
@@ -152,18 +152,18 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     WiredTigerRecoveryUnit* ru =
         checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     std::string ident = redactTenant(NamespaceString::kRsOplogNamespace).toString();
-    std::string uri = WiredTigerKVEngine::kTableUriPrefix + ident;
+    std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
 
     CollectionOptions options;
     options.capped = true;
 
     const NamespaceString oplogNss = NamespaceString::kRsOplogNamespace;
-    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
+    WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = KeyFormat::Long;
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(oplogNss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
-    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+    StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
         std::string{kWiredTigerEngineName},
         NamespaceStringUtil::serializeForCatalog(oplogNss),
         options,
