@@ -812,6 +812,7 @@ const keyPatterns = [
     {keyPattern: {_id: 1, "a.b": 1}},
     {keyPattern: {"a.b": 1, _id: 1}},
     {keyPattern: {"a.b": 1}, options: {partialFilterExpression: {a: {$exists: true}}}},
+    {keyPattern: {"a.b": 1}, options: {partialFilterExpression: {'a.b': {$exists: true}}}},
     {keyPattern: {"a.b": 1, _id: 1}, options: {sparse: true}},
     {keyPattern: {"$**": 1}},
     {keyPattern: {"a.$**": 1}}
