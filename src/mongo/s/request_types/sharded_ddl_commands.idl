@@ -866,8 +866,7 @@ commands:
         cpp_name: ShardsvrCommitCreateDatabaseMetadata
         description: "Internal command to commit a createDatabase operation to the shard catalog"
         strict: false
-        namespace: type
-        type: namespacestring
+        namespace: ignored
         api_version: ""
         fields:
             dbVersion:
@@ -880,8 +879,7 @@ commands:
         cpp_name: ShardsvrCommitDropDatabaseMetadata
         description: "Internal command to commit a dropDatabase operation to the shard catalog"
         strict: false
-        namespace: type
-        type: namespacestring
+        namespace: ignored
         api_version: ""
         reply_type: OkReply
 

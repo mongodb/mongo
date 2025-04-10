@@ -511,13 +511,13 @@ const internalCommandsMap = {
     _shardsvrCommitCreateDatabaseMetadata: {
         testname: "_shardsvrCommitCreateDatabaseMetadata",
         command: {
-            _shardsvrCommitCreateDatabaseMetadata: "x.y",
+            _shardsvrCommitCreateDatabaseMetadata: 1,
             dbVersion: {uuid: new UUID(), timestamp: new Timestamp(1, 0), lastMod: NumberInt(1)}
         },
     },
     _shardsvrCommitDropDatabaseMetadata: {
         testname: "_shardsvrCommitDropDatabaseMetadata",
-        command: {_shardsvrCommitDropDatabaseMetadata: "x.y"},
+        command: {_shardsvrCommitDropDatabaseMetadata: 1},
     },
     _shardsvrDropCollection: {
         testname: "_shardsvrDropCollection",

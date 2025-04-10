@@ -141,7 +141,7 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return request().getCommandParameter();
+            return NamespaceString(request().getDbName());
         }
 
         bool supportsWriteConcern() const override {

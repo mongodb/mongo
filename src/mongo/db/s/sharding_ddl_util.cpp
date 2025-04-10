@@ -866,7 +866,7 @@ void commitCreateDatabaseMetadataToShardCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrCommitCreateDatabaseMetadata shardsvrRequest{NamespaceString{db.getDbName()}};
+    ShardsvrCommitCreateDatabaseMetadata shardsvrRequest;
     shardsvrRequest.setDbName(db.getDbName());
     shardsvrRequest.setDbVersion(db.getVersion());
 
@@ -886,7 +886,7 @@ void commitDropDatabaseMetadataToShardCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrCommitDropDatabaseMetadata shardsvrRequest{NamespaceString{dbName}};
+    ShardsvrCommitDropDatabaseMetadata shardsvrRequest;
     shardsvrRequest.setDbName(dbName);
 
     generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
