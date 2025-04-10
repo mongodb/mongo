@@ -3,6 +3,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 1});
@@ -12,7 +13,6 @@ replTest.initiate();
 const primary = replTest.getPrimary();
 const db = primary.getDB(jsTestName());
 const coll = db.coll;
-const bucketsColl = db["system.buckets." + coll.getName()];
 
 const bucket = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -50,17 +50,24 @@ assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 assert.commandWorked(
     db.runCommand({collMod: coll.getName(), timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.commandWorked(bucketsColl.insert(bucket));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
 
 const secondary = replTest.add();
 replTest.reInitiate();
 replTest.awaitSecondaryNodes(null, [secondary]);
 replTest.awaitReplication();
 
-const primaryColl = primary.getDB(db.getName())[bucketsColl.getName()];
-const secondaryColl = secondary.getDB(db.getName())[bucketsColl.getName()];
+const primaryDb = primary.getDB(db.getName());
+const secondaryDb = secondary.getDB(db.getName());
 
-assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(primaryColl));
-assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(secondaryColl));
+const primaryColl = getTimeseriesCollForRawOps(primaryDb, primaryDb[coll.getName()]);
+const secondaryColl = getTimeseriesCollForRawOps(secondaryDb, secondaryDb[coll.getName()]);
+
+// TODO (SERVER-103429): Remove the rawData from TimeseriesTest.bucketsMayHaveMixedSchemaData.
+assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(
+    primaryColl, getRawOperationSpec(primary.getDB(db.getName()))));
+assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(
+    secondaryColl, getRawOperationSpec(secondary.getDB(db.getName()))));
 
 replTest.stopSet();
