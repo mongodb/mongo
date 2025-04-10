@@ -29,6 +29,8 @@ last-continuous:
       ticket: SERVER-97662
     - test_file: jstests/core/query/json_schema/json_schema.js
       ticket: SERVER-98676
+    - test_file: jstests/aggregation/accumulators/group_doing_merge.js
+      ticket: SERVER-99616
     - test_file: jstests/aggregation/sources/setWindowFields/partition_results.js
       ticket: SERVER-96405
     - test_file: jstests/aggregation/sources/sort_by_count_validation.js
@@ -437,6 +439,8 @@ last-lts:
       ticket: SERVER-97662
     - test_file: jstests/core/query/json_schema/json_schema.js
       ticket: SERVER-98676
+    - test_file: jstests/aggregation/accumulators/group_doing_merge.js
+      ticket: SERVER-99616
     - test_file: jstests/aggregation/sources/setWindowFields/partition_results.js
       ticket: SERVER-96405
     - test_file: jstests/aggregation/sources/sort_by_count_validation.js

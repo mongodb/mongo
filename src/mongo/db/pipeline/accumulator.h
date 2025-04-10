@@ -168,6 +168,18 @@ protected:
     /// Update subclass's internal state based on input
     virtual void processInternal(const Value& input, bool merging) = 0;
 
+    /**
+     * When accumulated values are merged, a different type of the input is expected compared to a
+     * normal accumulating pass.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE void assertMergingInputType(const Value& input,
+                                                             BSONType requiredType) const {
+        uassert(9961600,
+                str::stream() << "Unexpected type on the merging pass of the " << getOpName()
+                              << ". This likely happened due to a malformed query.",
+                input.getType() == requiredType);
+    }
+
     auto getExpressionContext() const {
         return _expCtx;
     }

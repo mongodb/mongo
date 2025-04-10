@@ -246,6 +246,7 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
 
 void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     if (merging) {
+        assertMergingInputType(input, Array);
         dynamic_cast<PartialPercentile<Value>*>(_algo.get())->combine(input);
 
         // TODO SERVER-92994: Both uasserts should be removed once spilling is supported while
