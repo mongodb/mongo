@@ -51,6 +51,7 @@ const BSONField<std::string> ChangeLogType::shard("shard");
 const BSONField<std::string> ChangeLogType::clientAddr("clientAddr");
 const BSONField<Date_t> ChangeLogType::time("time");
 const BSONField<std::string> ChangeLogType::what("what");
+const BSONField<BSONObj> ChangeLogType::versionContext("versionContext");
 const BSONField<std::string> ChangeLogType::ns("ns");
 const BSONField<BSONObj> ChangeLogType::details("details");
 
@@ -109,6 +110,17 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
     }
 
     {
+        BSONElement changeLogVersionCtxElem;
+        Status status = bsonExtractField(source, versionContext.name(), &changeLogVersionCtxElem);
+        if (status.isOK())
+            changeLog._versionContext = VersionContext{changeLogVersionCtxElem.Obj()};
+        else if (status == ErrorCodes::NoSuchKey)
+            changeLog._versionContext = boost::none;
+        else
+            return status;
+    }
+
+    {
         std::string changeLogNs;
         Status status = bsonExtractStringFieldWithDefault(source, ns.name(), "", &changeLogNs);
         if (!status.isOK())
@@ -129,29 +141,6 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
     return changeLog;
 }
 
-Status ChangeLogType::validate() const {
-    if (!_changeId.has_value() || _changeId->empty())
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << changeId.name() << " field"};
-
-    if (!_server.has_value() || _server->empty())
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << server.name() << " field"};
-
-    if (!_clientAddr.has_value() || _clientAddr->empty())
-        return {ErrorCodes::NoSuchKey,
-                str::stream() << "missing " << clientAddr.name() << " field"};
-
-    if (!_time.has_value())
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << time.name() << " field"};
-
-    if (!_what.has_value() || _what->empty())
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << what.name() << " field"};
-
-    if (!_details.has_value() || _details->isEmpty())
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << details.name() << " field"};
-
-    return Status::OK();
-}
-
 BSONObj ChangeLogType::toBSON() const {
     BSONObjBuilder builder;
 
@@ -167,6 +156,8 @@ BSONObj ChangeLogType::toBSON() const {
         builder.append(time.name(), getTime());
     if (_what)
         builder.append(what.name(), getWhat());
+    if (_versionContext)
+        builder.append(versionContext.name(), getVersionContext()->toBSON());
     if (_ns)
         builder.append(
             ns.name(),
@@ -200,6 +191,10 @@ void ChangeLogType::setTime(const Date_t& time) {
 void ChangeLogType::setWhat(const std::string& what) {
     invariant(!what.empty());
     _what = what;
+}
+
+void ChangeLogType::setVersionContext(const VersionContext& vCtx) {
+    _versionContext = vCtx;
 }
 
 void ChangeLogType::setNS(const NamespaceString& ns) {

@@ -178,6 +178,11 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     changeLog.setTime(now);
     changeLog.setNS(operationNS);
     changeLog.setWhat(what.toString());
+    // TODO SERVER-99655, SERVER-99552: update once gSnapshotFCVInDDLCoordinators is enabled on the
+    // lastLTS and the OFCV is snapshotted for DDLs that do not pass by coordinators.
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+        changeLog.setVersionContext(vCtx);
+    }
     changeLog.setDetails(detail);
 
     BSONObj changeLogBSON = changeLog.toBSON();

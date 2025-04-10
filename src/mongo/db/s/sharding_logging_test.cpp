@@ -52,6 +52,8 @@ namespace {
 
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
+// (Generic FCV reference): used for testing, should exist across LTS binary versions
+using GenericFCV = multiversion::GenericFCV;
 
 const auto kFooBarNss = NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
 
@@ -61,6 +63,12 @@ protected:
 
     InfoLoggingTest(CollType configCollType, int cappedSize)
         : _configCollType(configCollType), _cappedSize(cappedSize) {}
+
+    void setVersionContextOnOpCtx(const VersionContext& vCtx) {
+        auto opCtx = operationContext();
+        ClientLock lk(opCtx->getClient());
+        VersionContext::setDecoration(lk, opCtx, vCtx);
+    }
 
     /**
      * Waits for an operation which creates a capped config collection with the specified name and
@@ -93,6 +101,7 @@ protected:
                                       StringData collName,
                                       Date_t timestamp,
                                       const std::string& what,
+                                      const boost::optional<VersionContext>& vCtx,
                                       const NamespaceString& ns,
                                       const BSONObj& detail) {
         onCommand([&](const RemoteCommandRequest& request) {
@@ -120,6 +129,7 @@ protected:
             ASSERT_EQUALS(expectedServer, actualChangeLog.getServer());
             ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
             ASSERT_EQUALS(what, actualChangeLog.getWhat());
+            ASSERT_EQUALS(vCtx, actualChangeLog.getVersionContext());
 
             // Handle changeId specially because there's no way to know what OID was generated
             std::string changeId = actualChangeLog.getChangeId();
@@ -157,11 +167,16 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a chunk",
+                                     boost::none,
                                      kFooBarNss,
                                      BSON("min" << 3 << "max" << 4));
 
         // Now wait for the logChange call to return
         future.default_timed_get();
+
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions
+        VersionContext vCtx{GenericFCV::kLastLTS};
+        setVersionContextOnOpCtx(vCtx);
 
         // Now log another change and confirm that we don't re-attempt to create the collection
         future = launchAsync([this] {
@@ -172,6 +187,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
+                                     vCtx,
                                      kFooBarNss,
                                      BSON("min" << 4 << "max" << 5));
 
@@ -193,11 +209,16 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a chunk",
+                                     boost::none,
                                      kFooBarNss,
                                      BSON("min" << 3 << "max" << 4));
 
         // Now wait for the logAction call to return
         future.default_timed_get();
+
+        // (Generic FCV reference): used for testing, should exist across LTS binary versions
+        VersionContext vCtx{GenericFCV::kLastLTS};
+        setVersionContextOnOpCtx(vCtx);
 
         // Now log another change and confirm that we don't re-attempt to create the collection
         future = launchAsync([this] {
@@ -209,6 +230,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
+                                     vCtx,
                                      kFooBarNss,
                                      BSON("min" << 4 << "max" << 5));
 
@@ -242,6 +264,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
+                                     boost::none,
                                      kFooBarNss,
                                      BSON("min" << 4 << "max" << 5));
 
