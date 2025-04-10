@@ -6,3 +6,6 @@ filters:
   - "catalog_and_routing.yml":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "rss_sydney.yml":
+    approvers:
+      - 10gen/server-rss-sydney

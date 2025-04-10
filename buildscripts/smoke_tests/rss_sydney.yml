@@ -1,0 +1,22 @@
+# This suite is used to run the smoke tests for the features owned by the RSS Sydney team.
+# It is intended to be executed locally and should finish in a short time frame (< 10 minutes) with
+# The goal being to provide quick feedback that none of the major features are broken.
+# Should be run in conjunction with the unittests using:
+# bazel test --build_tag_filters=server-rss-sydney-smoke --test_tag_filters=server-rss-sydney-smoke //...
+# This suite can be run with:
+# bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=rss_sydney
+
+test_kind: js_test
+
+suites:
+  disk_wiredtiger:
+    - jstests/disk/killall.js
+    - jstests/disk/repair_clustered_collection.js
+    - jstests/disk/repair_corrupt_document.js
+    - jstests/disk/repair_failure_is_recoverable.js
+    - jstests/disk/repair_removes_invalid_index_options.js
+    - jstests/disk/wt_corrupt_file_errors.js
+    - jstests/disk/wt_repair_corrupt_metadata.js
+    - jstests/disk/wt_repair_orphaned_idents.js
+    - jstests/disk/wt_startup_with_missing_user_collection.js
+    - jstests/disk/wt_verify_config_override.js

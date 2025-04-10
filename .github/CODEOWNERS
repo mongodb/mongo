@@ -160,6 +160,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/smoke_tests/OWNERS.yml
 /buildscripts/smoke_tests/**/server_programmability.yml @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/catalog_and_routing.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/rss_sydney.yml @10gen/server-rss-sydney @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
