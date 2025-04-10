@@ -29,8 +29,13 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 
+#include <algorithm>
+#include <array>
+#include <memory>
+#include <string>
+#include <type_traits>
+
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/compiler.h"
 
 namespace mongo {
 
@@ -89,27 +94,18 @@ constexpr std::array sectionNames{MONGO_EXPAND_TIMED_SECTION_IDS(X)};
 #undef X
 
 template <typename Dur>
-struct SectionNamesWithDurationSuffix {
-    static constexpr auto suffix = Dur::mongoUnitSuffix();
-
-    template <size_t idx>
-    static constexpr auto buf = [] {
-        constexpr auto name = sectionNames[idx];
-        std::array<char, name.size() + suffix.size()> buf;
-        auto pos = buf.begin();
-        pos = std::copy(name.begin(), name.end(), pos);
-        pos = std::copy(suffix.begin(), suffix.end(), pos);
-        return buf;
-    }();
-
-    static constexpr auto value = []<size_t... Is>(std::index_sequence<Is...>) {
-        return std::array{StringData{buf<Is>.data(), buf<Is>.size()}...};
-    }(std::make_index_sequence<sectionNames.size()>{});
-};
+const auto sectionNamesWithDurationSuffix = [] {
+    std::string suffix{Dur::mongoUnitSuffix()};
+    std::array<std::string, sectionNames.size()> arr{};
+    std::transform(sectionNames.begin(), sectionNames.end(), arr.begin(), [&](StringData sec) {
+        return std::string{sec} + suffix;
+    });
+    return arr;
+}();
 
 template <typename Dur>
-constexpr StringData toStringWithDurationSuffix(TimedSectionId id) {
-    return SectionNamesWithDurationSuffix<Dur>::value[toUnderlying(id)];
+StringData toStringWithDurationSuffix(TimedSectionId id) {
+    return sectionNamesWithDurationSuffix<Dur>[toUnderlying(id)];
 }
 
 }  // namespace
