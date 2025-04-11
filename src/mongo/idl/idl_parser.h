@@ -152,7 +152,10 @@ inline auto idlPreparsedValue(stdx::type_identity<multiversion::FeatureCompatibi
 template <typename T, typename... A>
 T preparsedValue(A&&... args) {
     using preparsed_value_adl_barrier::idlPreparsedValue;
+    MONGO_COMPILER_DIAGNOSTIC_PUSH
+    MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_OPTIONAL_UNINITIALIZED
     return idlPreparsedValue(stdx::type_identity<T>{}, std::forward<A>(args)...);
+    MONGO_COMPILER_DIAGNOSTIC_POP
 }
 
 enum DebugEnabled : bool {};

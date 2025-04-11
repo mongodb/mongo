@@ -339,3 +339,12 @@
  */
 #define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE \
     MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow"))
+
+/**
+ * We selectively ignore `-Wuninitialized` on GCC 14 due to a known bug affecting
+ * `boost::optional`. The fix is available upstream:
+ * https://github.com/boostorg/optional/commit/e31cf6f2a8be437330f4547561df5ee8a62e4187.
+ * TODO(SERVER-70000): Once we've upgraded boost to include the fix, remove this suppression.
+ */
+#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_OPTIONAL_UNINITIALIZED \
+    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wuninitialized"))
