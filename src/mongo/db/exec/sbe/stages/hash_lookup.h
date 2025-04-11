@@ -110,6 +110,10 @@ public:
     PlanState getNext() final;
     void close() final;
 
+    void doForceSpill() final {
+        _hashTable.forceSpill();
+    };
+
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;

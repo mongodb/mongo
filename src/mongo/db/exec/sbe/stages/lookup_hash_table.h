@@ -191,6 +191,8 @@ public:
     void doSaveState(bool relinquishCursor);
     void doRestoreState(bool relinquishCursor);
 
+    void forceSpill();
+
     const HashLookupStats* getHashLookupStats() const {
         return &_hashLookupStats;
     }
@@ -213,13 +215,7 @@ public:
      * Opens a new, empty hash table, with a collator if one was provided.
      */
     void open() {
-        if (_collator) {
-            const value::MaterializedRowHasher hasher(_collator);
-            const value::MaterializedRowEq equator(_collator);
-            _memoryHt.emplace(0, hasher, equator);
-        } else {
-            _memoryHt.emplace();
-        }
+        init();
     }
 
     void reset(bool fromClose);
@@ -252,6 +248,16 @@ public:
     LookupHashTableIter htIter{*this};
 
 private:
+    void init() {
+        if (_collator) {
+            const value::MaterializedRowHasher hasher(_collator);
+            const value::MaterializedRowEq equator(_collator);
+            _memoryHt.emplace(0, hasher, equator);
+        } else {
+            _memoryHt.emplace();
+        }
+    }
+
     inline bool hasSpilledBufToDisk() {
         return _recordStoreBuf != nullptr;
     }

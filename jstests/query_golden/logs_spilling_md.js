@@ -135,6 +135,7 @@ outputPipelineAndSlowQueryLog(
 
 coll.drop();
 
+saveParameterToRestore("internalDocumentSourceBucketAutoMaxMemoryBytes");
 section("BucketAuto");
 setServerParameter("internalDocumentSourceBucketAutoMaxMemoryBytes", 1);
 
@@ -143,6 +144,46 @@ outputPipelineAndSlowQueryLog(
     coll, [{$bucketAuto: {groupBy: "$a", buckets: 2, output: {sum: {$sum: "$b"}}}}], "bucketAuto");
 
 coll.drop();
+
+saveParameterToRestore(
+    "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill");
+section("HashLookup");
+setServerParameter("internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1);
+
+const students = db[jsTestName() + "_students"];
+students.drop();
+const people = db[jsTestName() + "_people"];
+people.drop();
+
+const studentsDocs = [
+    {sID: 22001, name: "Alex", year: 1, score: 4.0},
+    {sID: 21001, name: "Bernie", year: 2, score: 3.7},
+    {sID: 20010, name: "Chris", year: 3, score: 2.5},
+    {sID: 22021, name: "Drew", year: 1, score: 3.2},
+    {sID: 17301, name: "Harley", year: 6, score: 3.1},
+    {sID: 21022, name: "Alex", year: 2, score: 2.2},
+    {sID: 20020, name: "George", year: 3, score: 2.8},
+    {sID: 18020, name: "Harley", year: 5, score: 2.8},
+];
+const peopleDocs = [
+    {pID: 1000, name: "Alex"},
+    {pID: 1001, name: "Drew"},
+    {pID: 1002, name: "Justin"},
+    {pID: 1003, name: "Parker"},
+];
+
+assert.commandWorked(students.insertMany(studentsDocs));
+assert.commandWorked(people.insertMany(peopleDocs));
+
+outputPipelineAndSlowQueryLog(
+    people,
+    [{
+        $lookup: {from: students.getName(), localField: "name", foreignField: "name", as: "matched"}
+    }],
+    "$lookup");
+
+students.drop();
+people.drop();
 
 // TODO SERVER-99887 - add $setWindowFields test
 

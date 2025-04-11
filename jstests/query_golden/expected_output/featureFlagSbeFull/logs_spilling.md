@@ -208,3 +208,28 @@
 }
 ```
 
+## 10. HashLookup
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "logs_spilling_md_students",
+			"localField" : "name",
+			"foreignField" : "name",
+			"as" : "matched"
+		}
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"hashLookupSpilledBytes" : "X",
+	"hashLookupSpilledDataStorageSize" : "X",
+	"hashLookupSpilledRecords" : 14,
+	"hashLookupSpills" : 16,
+	"usedDisk" : true
+}
+```
+

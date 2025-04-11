@@ -89,6 +89,14 @@ public:
                 stats->spillingStats);
         }
     }
+    void visit(tree_walker::MaybeConstPtr<true, sbe::HashLookupStats> stats) final {
+        SpillingStats hashLookupSpillingStatsTotal = stats->getTotalSpillingStats();
+        if (hashLookupSpillingStatsTotal.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::HASH_LOOKUP].accumulate(
+                hashLookupSpillingStatsTotal);
+        }
+    }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
     }

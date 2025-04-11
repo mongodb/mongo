@@ -35,6 +35,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo::sbe {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class LookupHashTableIter
@@ -225,13 +227,10 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
     } else {
         // The key is already present in '_memoryHt' so the memory will only grow by one size_t. If
         // we reach the memory limit, the key/value in '_memoryHt' will be evicted from memory and
-        // spilled to
-        // '_recordStoreHt' along with the new index.
-        const long long newMemUsage = _computedTotalMemUsage + sizeof(size_t);
-        if (newMemUsage <= _memoryUseInBytesBeforeSpill) {
-            htIt->second.push_back(valueIndex);
-            _computedTotalMemUsage = newMemUsage;
-        } else {
+        // spilled to '_recordStoreHt' along with the new index.
+        htIt->second.push_back(valueIndex);
+        _computedTotalMemUsage += sizeof(size_t);
+        if (_computedTotalMemUsage > _memoryUseInBytesBeforeSpill) {
             if (!hasSpilledHtToDisk()) {
                 makeTemporaryRecordStore();
             }
@@ -271,10 +270,18 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
     auto& opDebug = CurOp::get(_opCtx)->debug();
     opDebug.hashLookupSpillToDisk += 1;
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
-    lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
-                                                              spillToDiskBytes);
+
+    auto storageSizeBeforeSpillUpdate =
+        _hashLookupStats.spillingBuffStats.getSpilledDataStorageSize();
     _hashLookupStats.spillingBuffStats.updateSpillingStats(
         1, spillToDiskBytes, 1, _recordStoreBuf->storageSize(_opCtx));
+    auto storageSizeAfterSpillUpdate =
+        _hashLookupStats.spillingBuffStats.getSpilledDataStorageSize();
+    lookupPushdownCounters.incrementPerSpilling(1 /* spills */,
+                                                spillToDiskBytes,
+                                                1,
+                                                storageSizeAfterSpillUpdate -
+                                                    storageSizeBeforeSpillUpdate);
 }
 
 size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
@@ -356,11 +363,17 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     auto& opDebug = CurOp::get(_opCtx)->debug();
     opDebug.hashLookupSpillToDisk += 1;
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
-    _hashLookupStats.spillingHtStats.incrementSpills();
-    lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
-                                                              spillToDiskBytes);
+
+    auto storageSizeBeforeSpillUpdate =
+        _hashLookupStats.spillingHtStats.getSpilledDataStorageSize();
     _hashLookupStats.spillingHtStats.updateSpillingStats(
         1 /*spills*/, spillToDiskBytes, update ? 0 : 1, _recordStoreHt->storageSize(_opCtx));
+    auto storageSizeAfterSpillUpdate = _hashLookupStats.spillingHtStats.getSpilledDataStorageSize();
+    lookupPushdownCounters.incrementPerSpilling(1 /* spills */,
+                                                spillToDiskBytes,
+                                                update ? 0 : 1,
+                                                storageSizeAfterSpillUpdate -
+                                                    storageSizeBeforeSpillUpdate);
 }
 
 void LookupHashTable::makeTemporaryRecordStore() {
@@ -453,5 +466,34 @@ void LookupHashTable::doRestoreState(bool relinquishCursor) {
     if (_recordStoreBuf) {
         _recordStoreBuf->restoreState();
     }
+}
+
+void LookupHashTable::forceSpill() {
+    if (!_memoryHt) {
+        LOGV2_DEBUG(9916001, 2, "HashLookupStage has finished its execution");
+        return;
+    }
+
+    if (!hasSpilledHtToDisk()) {
+        makeTemporaryRecordStore();
+    }
+
+    // Every record in the buffer of the inner collection is assigned an index. This index is
+    // used to associate records of the inner collection to those of the outer collection. When
+    // a buffer record is spilled, the index is stored with it. Since the index is increasing as
+    // we read, the first record still in the buffer has index 0.
+    for (size_t spilledValueId = 0; spilledValueId < _buffer.size(); ++spilledValueId) {
+        spillBufferedValueToDisk(_recordStoreBuf.get(), spilledValueId, _buffer[spilledValueId]);
+    }
+    _buffer.clear();
+    _buffer.shrink_to_fit();
+
+    for (const auto& [key, value] : *_memoryHt) {
+        auto [tagKey, valKey] = key.getViewOfValue(0);
+        spillIndicesToRecordStore(_recordStoreHt.get(), tagKey, valKey, value);
+    }
+    _memoryHt.reset();
+    // Initialise the _memoryHt again to make sure it is valid;
+    init();
 }
 }  // namespace mongo::sbe

@@ -133,28 +133,7 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
-    void doForceSpill() final {
-        // If we've already spilled, then there is nothing else to do.
-        if (_recordStore) {
-            return;
-        }
-
-        // Check before advancing _htIt.
-        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-                "Exceeded memory limit for $group, but didn't allow external spilling;"
-                " pass allowDiskUse:true to opt in",
-                _allowDiskUse);
-
-        setIterator();
-
-        spill();
-
-        if (_recordStore) {
-            switchToDisk();
-        }
-
-        doSaveState(true);
-    }
+    void doForceSpill() final;
 
 private:
     /**
@@ -168,7 +147,7 @@ private:
     PlanState getNextSpilled();
 
     // Set the in memory data iterator to the next record that should be returned.
-    void setIterator() {
+    void setIteratorToNextRecord() {
         // We didn't spill. Obtain the next output row from the hash table.
         if (_htIt == _ht->end()) {
             // First invocation of getNext() after open().

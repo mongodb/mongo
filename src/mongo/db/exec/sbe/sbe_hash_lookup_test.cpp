@@ -271,4 +271,114 @@ TEST_F(HashLookupStageTest, BasicTests) {
                  BSONArray(fromjson(R"""([
          ])""")));
 }
+
+TEST_F(HashLookupStageTest, ForceSpillTest) {
+
+    const BSONArray outer{fromjson(R"""([
+      [{_id: 1}, 1],
+      [{_id: 2}, 2],
+      [{_id: 3}, 2],
+      [{_id: 4}, 7]
+   ])""")};
+    const BSONArray inner{fromjson(R"""([
+      [{_id: 11}, 1],
+      [{_id: 12}, 2],
+      [{_id: 13}, 7],
+      [{_id: 14}, 2]
+   ])""")};
+
+    // Build a scan for the outer loop.
+    auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outer);
+    // Build a scan for the inner loop.
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, inner);
+
+    auto ctx = makeCompileCtx();
+
+    auto collatorSlot = generateSlotId();
+    // Setup collator and insert it into the ctx.
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    value::OwnedValueAccessor collatorAccessor;
+    ctx->pushCorrelated(collatorSlot, &collatorAccessor);
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(collator.release()));
+
+    // Build and prepare for execution loop join of the two scan stages.
+    value::SlotId lookupStageOutputSlot = generateSlotId();
+    SlotExprPair agg = std::make_pair(
+        lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+    auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
+                                              std::move(innerScanStage),
+                                              outerScanSlots[1],
+                                              innerScanSlots[1],
+                                              innerScanSlots[0],
+                                              std::move(agg),
+                                              collatorSlot,
+                                              kEmptyPlanNodeId);
+
+    value::SlotVector lookupSlots;
+    lookupSlots.push_back(outerScanSlots[0]);
+    lookupSlots.push_back(lookupStageOutputSlot);
+    auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
+
+    std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> expectedResults;
+    std::vector<std::pair<value::TypeTags, value::Value>> flatValues;
+    while (lookupStage->getNext() == PlanState::ADVANCED) {
+        std::vector<std::pair<value::TypeTags, value::Value>> results{};
+        for (size_t i = 0; i < resultAccessors.size(); ++i) {
+            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue());
+            results.emplace_back(flatValues.back());
+        }
+        expectedResults.emplace_back(std::move(results));
+    }
+
+    // This is used to release the values when the test is done.
+    ValueVectorGuard resultsGuard{flatValues};
+
+    // Close the stage and execute again with spilling.
+    lookupStage->close();
+
+    lookupStage->open(false);
+    int idx = 0;
+    while (lookupStage->getNext() == PlanState::ADVANCED) {
+        for (size_t i = 0; i < resultAccessors.size(); ++i) {
+            const auto [resTag, resValue] = resultAccessors[i]->getViewOfValue();
+            const auto [expectedTag, exprectedValue] = expectedResults[idx][i];
+
+            auto [compTag, compVal] =
+                value::compareValue(expectedTag, exprectedValue, resTag, resValue);
+
+            ASSERT_EQ(value::TypeTags::NumberInt32, compTag);
+            ASSERT_EQ(0, compVal);
+        }
+
+        if (idx == 1) {
+            // Make sure it has not spilled already.
+            auto stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());
+            auto totalSpillingStats = stats->getTotalSpillingStats();
+            ASSERT_FALSE(stats->usedDisk);
+            ASSERT_EQ(0, totalSpillingStats.getSpills());
+            ASSERT_EQ(0, totalSpillingStats.getSpilledRecords());
+
+            // Get ready to yield.
+            lookupStage->saveState(false);
+
+            // Force spill.
+            lookupStage->forceSpill();
+
+            // Check stats to make sure it spilled
+            stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());
+            totalSpillingStats = stats->getTotalSpillingStats();
+            ASSERT_TRUE(stats->usedDisk);
+            ASSERT_EQ(7, totalSpillingStats.getSpills());
+            ASSERT_EQ(7, totalSpillingStats.getSpilledRecords());
+
+            // Get ready to retrieve more records.
+            lookupStage->restoreState(false);
+        }
+        ++idx;
+    }
+
+    lookupStage->close();
+}
 }  // namespace mongo::sbe

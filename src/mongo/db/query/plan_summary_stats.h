@@ -101,6 +101,7 @@ struct PlanSummaryStats {
         SET_WINDOW_FIELDS,
         SORT,
         TEXT_OR,
+        HASH_LOOKUP,
     };
 
     // The accumulated spilling statistics per stage type.

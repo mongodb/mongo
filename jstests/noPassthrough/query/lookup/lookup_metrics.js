@@ -51,13 +51,19 @@ function generateExpectedCounters(
         case lookupStrategy.indexedLoopJoin:
             expected.indexedLoopJoin = NumberLong(expected.indexedLoopJoin + 1);
             break;
-        case lookupStrategy.hashLookup:
+        case lookupStrategy.hashLookup: {
             expected.hashLookup = NumberLong(expected.hashLookup + 1);
-            expected.hashLookupSpillToDisk =
-                NumberLong(expected.hashLookupSpillToDisk + spillToDisk);
-            expected.hashLookupSpillToDiskBytes =
-                NumberLong(expected.hashLookupSpillToDiskBytes + spillToDiskBytes);
-            break;
+
+            const spills = NumberLong(expected.hashLookupSpills + spillToDisk);
+            expected.hashLookupSpillToDisk = spills;  // legacy metric
+            expected.hashLookupSpills = spills;       // new metric
+            // every spill, spills a record unless it is an update when the records do not increase.
+            expected.hashLookupSpilledRecords = spills;
+
+            const spilledBytes = NumberLong(expected.hashLookupSpilledBytes + spillToDiskBytes);
+            expected.hashLookupSpillToDiskBytes = spilledBytes;  // legacy metric
+            expected.hashLookupSpilledBytes = spilledBytes;      // new metric;
+        } break;
     }
     return expected;
 }
@@ -65,6 +71,17 @@ function generateExpectedCounters(
 // Compare the values of the lookup counters to an object that represents the expected values.
 function compareLookupCounters(expectedCounters) {
     let counters = db.serverStatus().metrics.query.lookup;
+
+    // We cannot compute the spilled data storage size accurately, so we just set it the actual
+    // value to make comparison between expected and actual counters more straightforward.
+    expectedCounters.hashLookupSpilledDataStorageSize = counters.hashLookupSpilledDataStorageSize;
+    // The actual value can be 1 less than the expected if the spill did not add a new record but
+    // updated an existing one.
+    assert.between(expectedCounters.hashLookupSpilledRecords - 1,
+                   counters.hashLookupSpilledRecords,
+                   expectedCounters.hashLookupSpilledRecords);
+    expectedCounters.hashLookupSpilledRecords = counters.hashLookupSpilledRecords;
+
     assert.docEq(expectedCounters, counters);
 }
 
@@ -79,40 +96,23 @@ assert.eq(
     4 /* Matching results */);
 compareLookupCounters(expectedCounters);
 
+const pipeline =
+    [{$lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}}];
+
 // Run a lookup pipeline with a hash lookup that gets pushed down to SBE.
 expectedCounters = generateExpectedCounters(lookupStrategy.hashLookup);
-assert.eq(
-    db.people
-        .aggregate([
-            {$lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}}
-        ])
-        .itcount(),
-    4 /* Matching results */);
+assert.eq(db.people.aggregate(pipeline).itcount(), 4 /* Matching results */);
 compareLookupCounters(expectedCounters);
 
 // Run a lookup pipeline without disk use so that it will use NLJ.
 expectedCounters = generateExpectedCounters(lookupStrategy.nestedLoopJoin);
-assert.eq(
-    db.people
-        .aggregate(
-            [{
-                $lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}
-            }],
-            {allowDiskUse: false})
-        .itcount(),
-    4 /* Matching results */);
+assert.eq(db.people.aggregate(pipeline, {allowDiskUse: false}).itcount(), 4 /* Matching results */);
 compareLookupCounters(expectedCounters);
 
 // Create an index for the foreign collection so the query uses INLJ.
 assert.commandWorked(db["students"].createIndex({name: 1}));
 expectedCounters = generateExpectedCounters(lookupStrategy.indexedLoopJoin);
-assert.eq(
-    db.people
-        .aggregate([
-            {$lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}}
-        ])
-        .itcount(),
-    4 /* Matching results */);
+assert.eq(db.people.aggregate(pipeline).itcount(), 4 /* Matching results */);
 compareLookupCounters(expectedCounters);
 
 assert.commandWorked(db["students"].dropIndexes());
@@ -125,13 +125,7 @@ assert.commandWorked(db.adminCommand({
 expectedCounters = generateExpectedCounters(lookupStrategy.hashLookup,
                                             16 /* 2 spills per foreign collection row */,
                                             1130 /* spillToDiskBytes */);
-assert.eq(
-    db.people
-        .aggregate([
-            {$lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}}
-        ])
-        .itcount(),
-    4 /* Matching results */);
+assert.eq(db.people.aggregate(pipeline).itcount(), 4 /* Matching results */);
 compareLookupCounters(expectedCounters);
 
 MongoRunner.stopMongod(conn);

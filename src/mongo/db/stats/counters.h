@@ -455,15 +455,35 @@ public:
         hashLookupCounter.incrementRelaxed(hashLookup);
     }
 
-    void incrementLookupCountersPerSpilling(int64_t spillToDisk, int64_t spillToDiskBytes) {
-        hashLookupSpillToDisk.incrementRelaxed(spillToDisk);
-        hashLookupSpillToDiskBytes.incrementRelaxed(spillToDiskBytes);
-    }
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
+        hashLookupSpills.incrementRelaxed(spills);
+        hashLookupSpilledBytes.incrementRelaxed(spilledBytes);
+        hashLookupSpilledRecords.incrementRelaxed(spilledRecords);
+        hashLookupSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
 
+        //  Counters for backward compatiblity.
+        hashLookupSpillToDisk.incrementRelaxed(spills);
+        hashLookupSpillToDiskBytes.incrementRelaxed(spilledBytes);
+    }
     // Counters for lookup join strategies.
     Counter64& nestedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"};
     Counter64& indexedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"};
     Counter64& hashLookupCounter = *MetricBuilder<Counter64>{"query.lookup.hashLookup"};
+
+
+    Counter64& hashLookupSpills = *MetricBuilder<Counter64>{"query.lookup.hashLookupSpills"};
+    // The spilled storage size after compression might be different from the bytes spilled.
+    Counter64& hashLookupSpilledBytes =
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpilledBytes"};
+    Counter64& hashLookupSpilledRecords =
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpilledRecords"};
+    Counter64& hashLookupSpilledDataStorageSize =
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpilledDataStorageSize"};
+
+    // Duplicate counters, not deleted to maintain backward compatibility.
     // Counter tracking hashLookup spills in lookup stages that get pushed down.
     Counter64& hashLookupSpillToDisk =
         *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"};

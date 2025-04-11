@@ -58,6 +58,8 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 namespace sbe {
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
@@ -395,6 +397,33 @@ void HashAggStage::open(bool reOpen) {
     _htIt = _ht->end();
 }
 
+void HashAggStage::doForceSpill() {
+    // The state has already finished (_ht is set in open and unset in close)
+    if (!_ht) {
+        LOGV2_DEBUG(9916000, 2, "HashAggStage has finished its execution");
+        return;
+    }
+
+    // If we've already spilled, then there is nothing else to do.
+    if (_recordStore) {
+        return;
+    }
+
+    // Check before advancing _htIt.
+    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+            "Exceeded memory limit for $group, but didn't allow external spilling;"
+            " pass allowDiskUse:true to opt in",
+            _allowDiskUse);
+
+    setIteratorToNextRecord();
+
+    spill();
+
+    switchToDisk();
+
+    doSaveState(true);
+}
+
 HashAggBaseStage<HashAggStage>::SpilledRow HashAggStage::deserializeSpilledRecordWithCollation(
     const Record& record, const CollatorInterface& collator) {
     BufReader valReader(record.data.data(), record.data.size());
@@ -476,7 +505,7 @@ PlanState HashAggStage::getNext() {
     }
 
     // We didn't spill. Obtain the next output row from the hash table.
-    setIterator();
+    setIteratorToNextRecord();
 
     if (_htIt == _ht->end()) {
         // The hash table has been drained (and we never spilled to disk) so we're done.

@@ -71,7 +71,7 @@ const stages = {
     bucketAuto: {$bucketAuto: {groupBy: "$_id", buckets: 2, output: {count: {$sum: 1}}}},
 };
 
-function getServerStatusSpillingMetrics(serverStatus, stageName) {
+function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
     if (stageName === '$sort') {
         const sortMetrics = serverStatus.metrics.query.sort;
         return {
@@ -90,18 +90,25 @@ function getServerStatusSpillingMetrics(serverStatus, stageName) {
             spills: setWindowFieldsMetrics.spills,
             spilledBytes: setWindowFieldsMetrics.spilledBytes,
         };
-    } else if (stageName === '$lookup') {
-        const lookupMetrics = serverStatus.metrics.query.lookup;
-        return {
-            spills: lookupMetrics.hashLookupSpillToDisk,
-            spilledBytes: lookupMetrics.hashLookupSpillToDiskBytes,
-        };
     } else if (stageName === '$bucketAuto') {
         const bucketAutoMetrics = serverStatus.metrics.query.bucketAuto;
         return {
             spills: bucketAutoMetrics.spills,
             spilledBytes: bucketAutoMetrics.spilledBytes,
         };
+    } else if (stageName === '$lookup') {
+        const lookupMetrics = serverStatus.metrics.query.lookup;
+        if (getLegacy === true) {
+            return {
+                spills: lookupMetrics.hashLookupSpillToDisk,
+                spilledBytes: lookupMetrics.hashLookupSpillToDiskBytes,
+            };
+        } else {
+            return {
+                spills: lookupMetrics.hashLookupSpills,
+                spilledBytes: lookupMetrics.hashLookupSpilledBytes,
+            };
+        }
     }
     return {
         spills: 0,
@@ -109,7 +116,8 @@ function getServerStatusSpillingMetrics(serverStatus, stageName) {
     };
 }
 
-function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillingMetrics}) {
+function testSpillingMetrics(
+    {stage, expectedSpillingMetrics, expectedSbeSpillingMetrics, getLegacy = false}) {
     // Check whether the aggregation uses SBE.
     const explain = db[collName].explain().aggregate([stage]);
     jsTestLog(explain);
@@ -120,7 +128,7 @@ function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillin
     // Collect the serverStatus metrics before the aggregation runs.
     const stageName = Object.keys(stage)[0];
     const spillingMetrics = [];
-    spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName));
+    spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
     // Run an aggregation and hang at the fail point in the middle of the processing.
     const failPointName =
@@ -134,12 +142,12 @@ function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillin
 
     // Collect the serverStatus metrics once the aggregation hits the fail point.
     failPoint.wait();
-    spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName));
+    spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
     // Turn off the fail point and collect the serverStatus metrics after the aggregation finished.
     failPoint.off();
     awaitShell();
-    spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName));
+    spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
     // Assert spilling metrics are updated during the aggregation.
     for (let prop of ['spills', 'spilledBytes']) {
@@ -174,6 +182,12 @@ if (isSbeEnabled) {
     testSpillingMetrics({
         stage: stages['lookup'],
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 471},
+        getLegacy: true,
+    });
+    testSpillingMetrics({
+        stage: stages['lookup'],
+        expectedSbeSpillingMetrics: {spills: 40, spilledBytes: 942},
+        getLegacy: false,
     });
 }
 testSpillingMetrics({
