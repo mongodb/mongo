@@ -20,7 +20,6 @@ import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js';
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     const data = {
@@ -51,11 +50,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * TODO (SERVER-88275): Revisit this, see whether we still want to accept the QueryPlanKilled
      * error.
      */
-    const handleQueryPlanKilled = function(fn) {
-        let ret;
+    const find = function(db, collName, queryFilter) {
+        let documents;
         assert.soon(() => {
             try {
-                ret = fn();
+                documents = db[collName].find(queryFilter).toArray();
                 return true;
             } catch (e) {
                 if (e.code === ErrorCodes.QueryPlanKilled) {
@@ -65,7 +64,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 throw e;
             }
         });
-        return ret;
+        return documents;
     };
 
     const insert = function(db,
@@ -98,6 +97,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.setControlClosedTrue = function setControlClosedTrue(db, collNameSuffix) {
         const collName = getCollectionName(collNameSuffix);
+        const bucketsCollName = "system.buckets." + collName;
         for (let i = 0; i < data.numBucketsToCloseAtATime; i++) {
             const bucketMeta =
                 Random.randInt($baseConfig.threadCount * data.numBucketMetaFieldsPerThread);
@@ -105,15 +105,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // have its control.closed field set to true, and that is still being inserted into (its
             // count is less than the max amount of documents per bucket).
             const res = assert.commandWorked(db.runCommand({
-                findAndModify: getTimeseriesCollForRawOps(db, collName),
+                findAndModify: bucketsCollName,
                 query: {
                     [data.bucketMetaFieldName]: bucketMeta,
                     "control.closed": {$exists: false},
                 },
                 sort: {"meta": 1, "control.max.timeField": -1},
                 new: true,
-                update: {$set: {"control.closed": true}},
-                ...getRawOperationSpec(db),
+                update: {$set: {"control.closed": true}}
             }));
             if (res.value) {
                 assert.commandWorked(
@@ -186,11 +185,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function(db, collNameSuffix, cluster) {
         $super.teardown.apply(this, [db, collNameSuffix, cluster]);
 
-        const bucketsToValidate =
-            handleQueryPlanKilled(() => db[data.bucketValidationCollName].find().toArray());
+        const bucketsToValidate = find(db, data.bucketValidationCollName, {});
         const collName = getCollectionName(collNameSuffix);
-        const numTotalBuckets = handleQueryPlanKilled(
-            () => getTimeseriesCollForRawOps(db, db[collName]).find().rawData().itcount());
+        const bucketsCollName = "system.buckets." + collName;
+        const numTotalBuckets = find(db, bucketsCollName, {}).length;
         // Let's go through all of the buckets that we had set the control.closed field to true for,
         // and validate that they have not been written to since.
         jsTestLog(`Validating ${
@@ -201,11 +199,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (let i = 0; i < bucketsToValidate.length; i++) {
             const bucket = bucketsToValidate[i];
             numDocsInBucketWhenClosed += bucket.control.count;
-            const bucketsInCollection =
-                handleQueryPlanKilled(() => getTimeseriesCollForRawOps(db, db[collName])
-                                                .find({_id: bucket._id})
-                                                .rawData()
-                                                .toArray());
+            const bucketsInCollection = find(db, bucketsCollName, {_id: bucket._id});
             assert.eq(bucketsInCollection.length, 1);
             const bucketInCollection = bucketsInCollection[0];
             const errMsg = `Expected bucket ${tojson(bucket)} and actual bucket ${tojson(bucketInCollection)} did not match; bucket may have had writes to it after the control.closed field was set.`;

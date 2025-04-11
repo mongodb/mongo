@@ -19,7 +19,6 @@ import {
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -117,8 +116,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        const numBuckets =
-            getTimeseriesCollForRawOps(db, db[collName]).find({}).rawData().itcount();
+        const numBuckets = db[this.bucketPrefix + collName].find({}).itcount();
         const numInitialDocs = db[collName].find().itcount();
 
         jsTestLog("NumBuckets " + numBuckets + ", numDocs on sharded cluster" +
@@ -138,14 +136,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     "bucketMaxSpanSeconds": NumberInt(3600)
                 }
             };
+            const bucketColl = db.getCollection(`system.buckets.${collName}`);
             const numDocsInBuckets =
-                getTimeseriesCollForRawOps(db, db[collName])
-                    .aggregate([{$sort: bucketIndex}, unpackStage], getRawOperationSpec(db))
-                    .itcount();
+                bucketColl.aggregate([{$sort: bucketIndex}, unpackStage]).itcount();
             assert.eq(numInitialDocs, numDocsInBuckets);
-            const plan = getTimeseriesCollForRawOps(db, db[collName])
-                             .explain()
-                             .aggregate([{$sort: bucketIndex}], getRawOperationSpec(db));
+            const plan = bucketColl.explain().aggregate([{$sort: bucketIndex}]);
             const stages = getPlanStages(plan, 'IXSCAN');
             assert(stages.length > 0);
             for (let ixScan of stages) {
