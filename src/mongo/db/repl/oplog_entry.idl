@@ -42,6 +42,7 @@ imports:
     - "mongo/db/multitenancy.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/db/record_id.idl"
+    - "mongo/db/version_context.idl"
 
 enums:
     OpType:
@@ -207,6 +208,11 @@ structs:
                 description:
                     "Marks that checks on field existence are needed for insert operations
                     in the diff update."
+            versionContext:
+                type: version_context
+                optional: true
+                description: "Snapshot of the FCV used by the operation,
+                    which ensures that feature flag checks are stable through its execution."
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.

@@ -61,6 +61,22 @@ public:
     static void setDecoration(ClientLock&, OperationContext* opCtx, const VersionContext& vCtx);
     static void setFromMetadata(ClientLock&, OperationContext* opCtx, const VersionContext& vCtx);
 
+    /**
+     * Sets the VersionContext decoration over the OperationContext over a given scope.
+     * At the end of the scope, the VersionContext decoration is reset to the uninitialized state.
+     * The Client lock over the opCtx's client is automatically taken on creation and destruction.
+     */
+    class ScopedSetDecoration {
+    public:
+        ScopedSetDecoration(OperationContext* opCtx, const VersionContext& vCtx);
+        ScopedSetDecoration(const ScopedSetDecoration&) = delete;
+        ScopedSetDecoration(ScopedSetDecoration&&) = delete;
+        ~ScopedSetDecoration();
+
+    private:
+        OperationContext* _opCtx;
+    };
+
     constexpr VersionContext() : _metadataOrTag(OperationWithoutOFCVTag{}) {}
     explicit constexpr VersionContext(OutsideOperationTag tag) : _metadataOrTag(tag) {}
     explicit constexpr VersionContext(IgnoreOFCVTag tag) : _metadataOrTag(tag) {}
@@ -78,6 +94,8 @@ public:
     void setOperationFCV(FCV fcv);
 
     void setOperationFCV(FCVSnapshot fcv);
+
+    void resetToOperationWithoutOFCV();
 
     inline bool isInitialized() const {
         return !std::holds_alternative<OperationWithoutOFCVTag>(_metadataOrTag);

@@ -833,6 +833,7 @@ OplogEntry makeInvalidateOp(OpTime opTime,
                              uuid,                       // uuid
                              boost::none,                // fromMigrate
                              boost::none,                // checkExistenceForDiffInsert
+                             boost::none,                // versionContext
                              OplogEntry::kOplogVersion,  // version
                              document,                   // o
                              boost::none,                // o2
@@ -3649,6 +3650,35 @@ TEST_F(OplogApplierImplTest,
     ASSERT(onInsertsCalled);
 }
 
+TEST_F(OplogApplierImplTest,
+       OplogApplicationThreadFuncSetsVersionContextDecorationWhileApplyingOperations) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    VersionContext vCtx{serverGlobalParams.featureCompatibility.acquireFCVSnapshot()};
+    auto op =
+        BSON("op" << "c"
+                  << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
+                  << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen()
+                  << OplogEntryBase::kVersionContextFieldName << vCtx.toBSON());
+
+    bool applyCmdCalled = false;
+    _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
+                                            const CollectionPtr&,
+                                            const NamespaceString& collNss,
+                                            const CollectionOptions&,
+                                            const BSONObj&) {
+        applyCmdCalled = true;
+        ASSERT_EQUALS(vCtx, VersionContext::getDecoration(opCtx));
+    };
+    auto entry = OplogEntry(op);
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
+    ASSERT_TRUE(applyCmdCalled);
+
+    // The decoration must be unset after applying, so that it can not have an effect on other ops.
+    ASSERT_EQUALS(VersionContext{}, VersionContext::getDecoration(_opCtx.get()));
+}
+
 TEST_F(
     OplogApplierImplTest,
     OplogApplicationThreadFuncPassesThroughApplyOplogEntryOrGroupedInsertsErrorAfterFailingToApplyOperation) {
@@ -4592,6 +4622,7 @@ public:
             boost::none,    // uuid
             boost::none,    // fromMigrate
             boost::none,    // checkExistenceForDiffInsert
+            boost::none,    // versionContext
             0,              // version
             object,         // o
             object2,        // o2
@@ -4624,6 +4655,7 @@ public:
             boost::none,    // uuid
             true,           // fromMigrate
             boost::none,    // checkExistenceForDiffInsert
+            boost::none,    // versionContext
             0,              // version
             object,         // o
             object2,        // o2

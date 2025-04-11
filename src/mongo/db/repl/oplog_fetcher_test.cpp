@@ -126,6 +126,7 @@ BSONObj makeNoopOplogEntry(OpTime opTime, std::int64_t version = repl::OplogEntr
         boost::none,                                               // uuid
         boost::none,                                               // fromMigrate
         boost::none,                                               // checkExistenceForDiffInsert
+        boost::none,                                               // versionContext
         version,                                                   // version
         BSONObj(),                                                 // o
         boost::none,                                               // o2

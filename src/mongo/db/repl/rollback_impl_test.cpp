@@ -1518,6 +1518,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                                 boost::none,            // uuid
                                                 boost::none,            // fromMigrate
                                                 boost::none,  // checkExistenceForDiffInsert
+                                                boost::none,  // versionContext
                                                 OplogEntry::kOplogVersion,  // version
                                                 partialApplyOpsObj,         // oField
                                                 boost::none,                // o2Field
@@ -1553,6 +1554,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
         boost::none,                // uuid
         boost::none,                // fromMigrate
         boost::none,                // checkExistenceForDiffInsert
+        boost::none,                // versionContext
         OplogEntry::kOplogVersion,  // version
         commitApplyOpsObj,          // oField
         boost::none,                // o2Field
@@ -1611,6 +1613,7 @@ RollbackImplTest::_setUpBatchedRetryableWriteForCountTest(UUID collId) {
                                           boost::none,                // uuid
                                           boost::none,                // fromMigrate
                                           boost::none,                // checkExistenceForDiffInsert
+                                          boost::none,                // versionContext
                                           OplogEntry::kOplogVersion,  // version
                                           applyOps0Obj,               // oField
                                           boost::none,                // o2Field
@@ -1645,6 +1648,7 @@ RollbackImplTest::_setUpBatchedRetryableWriteForCountTest(UUID collId) {
                                           boost::none,                // uuid
                                           boost::none,                // fromMigrate
                                           boost::none,                // checkExistenceForDiffInsert
+                                          boost::none,                // versionContext
                                           OplogEntry::kOplogVersion,  // version
                                           applyOps1Obj,               // oField
                                           boost::none,                // o2Field

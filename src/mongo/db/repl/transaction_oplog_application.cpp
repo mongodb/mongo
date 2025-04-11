@@ -194,6 +194,14 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                 invariant(!op.isCommand());
             }
 
+            // VersionContext fixes a FCV snapshot over the opCtx, making FCV-gated feature
+            // flags checks in secondaries behave as they did on the primary, thus ensuring
+            // correct application even if the FCV changed due to a concurrent setFCV.
+            boost::optional<VersionContext::ScopedSetDecoration> scopedVersionContext;
+            if (op.getVersionContext()) {
+                scopedVersionContext.emplace(opCtx, *op.getVersionContext());
+            }
+
             auto coll = acquireCollection(
                 opCtx,
                 CollectionAcquisitionRequest(op.getNss(),

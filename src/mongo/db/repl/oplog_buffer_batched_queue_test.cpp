@@ -45,6 +45,7 @@ BSONObj makeNoopOplogEntry(int t) {
         boost::none,                                               // uuid
         boost::none,                                               // fromMigrate
         boost::none,                                               // checkExistenceForDiffInsert
+        boost::none,                                               // versionContext
         repl::OplogEntry::kOplogVersion,                           // version
         BSON("count" << t),                                        // o
         boost::none,                                               // o2

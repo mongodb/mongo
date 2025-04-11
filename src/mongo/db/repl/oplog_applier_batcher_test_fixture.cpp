@@ -206,6 +206,7 @@ OplogEntry makeInsertOplogEntry(int t,
                               uuid,                        // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               version,                     // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -237,6 +238,7 @@ OplogEntry makeDBCheckBatchEntry(int t, const NamespaceString& nss, boost::optio
                               uuid,                        // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -269,6 +271,7 @@ OplogEntry makeUpdateOplogEntry(int t,
                               uuid,                        // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -292,6 +295,7 @@ OplogEntry makeNoopOplogEntry(int t, StringData msg) {
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -327,6 +331,7 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField.obj(),                // o
                               boost::none,                 // o2
@@ -374,6 +379,7 @@ OplogEntry makeCommitTransactionOplogEntry(int t,
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -405,6 +411,7 @@ OplogEntry makeAbortTransactionOplogEntry(int t, const DatabaseName& dbName) {
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -466,6 +473,7 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
                               boost::none,                 // checkExistenceForDiffInsert
+                              boost::none,                 // versionContext
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2
@@ -514,6 +522,7 @@ OplogEntry makeLargeRetryableWriteOplogEntries(int t,
                           boost::none,                 // uuid
                           boost::none,                 // fromMigrate
                           boost::none,                 // checkExistenceForDiffInsert
+                          boost::none,                 // versionContext
                           OplogEntry::kOplogVersion,   // version
                           oField,                      // o
                           boost::none,                 // o2

@@ -1127,6 +1127,28 @@ TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
     ASSERT_EQ(uuid, *entry.getUuid());
 }
 
+TEST_F(OpObserverTest, EntriesIncludeVersionContextDecoration) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    auto expectedVCtx = VersionContext{multiversion::GenericFCV::kLastLTS};
+    auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
+
+    // Write to the oplog.
+    {
+        VersionContext::ScopedSetDecoration scopedVersionContext(opCtx.get(), expectedVCtx);
+        AutoGetDb autoDb(opCtx.get(), dbName, MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onDropDatabase(opCtx.get(), dbName, /*markFromMigrate=*/false);
+        wunit.commit();
+    }
+
+    // Ensure that the versionContext field was correctly set.
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    auto vCtxBSON = oplogEntry.getObjectField(repl::OplogEntryBase::kVersionContextFieldName);
+    ASSERT_BSONOBJ_EQ(vCtxBSON, expectedVCtx.toBSON());
+}
+
 /**
  * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
  */

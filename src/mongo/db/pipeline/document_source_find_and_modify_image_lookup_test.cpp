@@ -99,6 +99,7 @@ repl::OplogEntry makeOplogEntry(
                                 uuid,                             // uuid
                                 boost::none,                      // fromMigrate
                                 boost::none,                      // checkExistenceForDiffInsert
+                                boost::none,                      // versionContext
                                 repl::OplogEntry::kOplogVersion,  // version
                                 oField,                           // o
                                 boost::none,                      // o2

@@ -67,6 +67,11 @@ void VersionContext::setOperationFCV(FCVSnapshot fcv) {
     setOperationFCV(fcv.getVersion());
 }
 
+void VersionContext::resetToOperationWithoutOFCV() {
+    invariant(isInitialized());
+    _metadataOrTag = OperationWithoutOFCVTag{};
+}
+
 BSONObj VersionContext::toBSON() const {
     return visit(
         OverloadedVisitor{[](OperationWithoutOFCVTag) { return BSONObj(); },

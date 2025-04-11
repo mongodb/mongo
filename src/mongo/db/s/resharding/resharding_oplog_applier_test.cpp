@@ -352,6 +352,7 @@ public:
                                         kCrudUUID,
                                         false /* fromMigrate */,
                                         boost::none,  // checkExistenceForDiffInsert
+                                        boost::none,  // versionContext
                                         0 /* version */,
                                         obj1,
                                         obj2,

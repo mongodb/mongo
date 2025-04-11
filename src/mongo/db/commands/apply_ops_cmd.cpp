@@ -129,6 +129,10 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     };
 
     OplogApplicationValidity ret = OplogApplicationValidity::kOk;
+    auto demandAuthorization = [&ret](OplogApplicationValidity oplogApplicationValidity) {
+        // Uses the fact that OplogApplicationValidity is ordered by increasing requirements
+        ret = oplogApplicationValidity > ret ? oplogApplicationValidity : ret;
+    };
 
     // Insert the top level applyOps command into the stack.
     toCheck.emplace(std::make_pair(0, cmdObj));
@@ -143,6 +147,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         // Check if the applyOps command is empty. This is probably not something that should
         // happen, so require a superuser to do this.
         if (applyOpsObj.firstElement().Array().empty()) {
+            // TODO(SERVER-96657): Do not return here, as it skips the remaining validations
             return OplogApplicationValidity::kNeedsSuperuser;
         }
 
@@ -155,6 +160,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
                 auto oplogEntry = e.Obj();
                 if (checkCOperationType(oplogEntry, "create"_sd) ||
                     checkCOperationType(oplogEntry, "renameCollection"_sd)) {
+                    // TODO(SERVER-96657): Do not return here, as it skips the remaining validations
                     return OplogApplicationValidity::kNeedsSuperuser;
                 }
             }
@@ -165,15 +171,24 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             checkBSONType(BSONType::Object, element);
             BSONObj opObj = element.Obj();
 
+            // Applying an entry with using a given FCV requires superuser privileges,
+            // as it may create inconsistencies if it doesn't match the current FCV.
+            if (opObj.hasField(repl::OplogEntryBase::kVersionContextFieldName)) {
+                uassert(
+                    10296501, "versionContext is not allowed inside nested applyOps", depth == 0);
+                demandAuthorization(OplogApplicationValidity::kNeedsSuperuser);
+            }
+
             bool opHasUUIDs = operationContainsUUID(opObj);
 
             // If the op uses any UUIDs at all then the user must possess extra privileges.
-            if (opHasUUIDs && ret == OplogApplicationValidity::kOk)
-                ret = OplogApplicationValidity::kNeedsUseUUID;
+            if (opHasUUIDs) {
+                demandAuthorization(OplogApplicationValidity::kNeedsUseUUID);
+            }
             if (opHasUUIDs && checkCOperationType(opObj, "create"_sd)) {
                 // If the op is 'c' and forces the server to ingest a collection
                 // with a specific, user defined UUID.
-                ret = OplogApplicationValidity::kNeedsForceAndUseUUID;
+                demandAuthorization(OplogApplicationValidity::kNeedsForceAndUseUUID);
             }
 
             if (checkCOperationType(opObj, "dropDatabase"_sd)) {

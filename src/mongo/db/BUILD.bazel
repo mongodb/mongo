@@ -4130,6 +4130,7 @@ mongo_cc_unit_test(
         "resource_yielder_test.cpp",
         "service_context_test.cpp",
         "thread_client_test.cpp",
+        "version_context_decoration_test.cpp",
         "version_context_test.cpp",
         "wire_version_test.cpp",
         "//src/mongo/unittest:join_thread.h",

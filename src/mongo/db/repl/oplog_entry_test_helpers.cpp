@@ -73,6 +73,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                     uuid,                             // uuid
                                     boost::none,                      // fromMigrate
                                     boost::none,                      // checkExistenceForDiffInsert
+                                    boost::none,                      // versionContext
                                     repl::OplogEntry::kOplogVersion,  // version
                                     object,                           // o
                                     object2,                          // o2

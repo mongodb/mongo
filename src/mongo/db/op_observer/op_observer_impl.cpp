@@ -125,6 +125,9 @@ repl::OpTime logOperation(OperationContext* opCtx,
     if (assignWallClockTime) {
         oplogEntry->setWallClockTime(getWallClockTimeForOpLog(opCtx));
     }
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+        oplogEntry->setVersionContext(vCtx);
+    }
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
     auto opTime = operationLogger->logOp(opCtx, oplogEntry);
     times.push_back(opTime);

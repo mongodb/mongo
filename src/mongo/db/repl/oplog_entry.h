@@ -387,6 +387,10 @@ public:
         getDurableReplOperation().setCheckExistenceForDiffInsert(true);
     }
 
+    void setVersionContext(boost::optional<VersionContext> value) {
+        getDurableReplOperation().setVersionContext(std::move(value));
+    }
+
     /**
      * Same as setFromMigrate but only set when it is true.
      */
@@ -448,6 +452,7 @@ public:
     using MutableOplogEntry::kTxnNumberFieldName;
     using MutableOplogEntry::kUpsertFieldName;
     using MutableOplogEntry::kUuidFieldName;
+    using MutableOplogEntry::kVersionContextFieldName;
     using MutableOplogEntry::kVersionFieldName;
     using MutableOplogEntry::kWallClockTimeFieldName;
 
@@ -476,6 +481,7 @@ public:
     using MutableOplogEntry::getUpsert;
     using MutableOplogEntry::getUuid;
     using MutableOplogEntry::getVersion;
+    using MutableOplogEntry::getVersionContext;
     using MutableOplogEntry::getWallClockTime;
     using MutableOplogEntry::serialize;
 
@@ -498,6 +504,7 @@ public:
                       const boost::optional<UUID>& uuid,
                       const boost::optional<bool>& fromMigrate,
                       const boost::optional<bool>& checkExistenceForDiffInsert,
+                      const boost::optional<VersionContext>& versionContext,
                       int version,
                       const BSONObj& oField,
                       const boost::optional<BSONObj>& o2Field,
@@ -702,6 +709,7 @@ public:
     static constexpr auto kFromMigrateFieldName = DurableOplogEntry::kFromMigrateFieldName;
     static constexpr auto kCheckExistenceForDiffInsertFieldName =
         DurableOplogEntry::kCheckExistenceForDiffInsertFieldName;
+    static constexpr auto kVersionContextFieldName = DurableOplogEntry::kVersionContextFieldName;
     static constexpr auto kMultiOpTypeFieldName = DurableOplogEntry::kMultiOpTypeFieldName;
     static constexpr auto kTidFieldName = DurableOplogEntry::kTidFieldName;
     static constexpr auto kNssFieldName = DurableOplogEntry::kNssFieldName;
@@ -774,6 +782,7 @@ public:
     std::int64_t getVersion() const;
     boost::optional<bool> getFromMigrate() const&;
     bool getCheckExistenceForDiffInsert() const&;
+    const boost::optional<VersionContext>& getVersionContext() const;
     const boost::optional<mongo::repl::OpTime>& getPrevWriteOpTimeInTransaction() const&;
     const boost::optional<mongo::repl::OpTime>& getPostImageOpTime() const&;
     boost::optional<MultiOplogEntryType> getMultiOpType() const&;

@@ -42,14 +42,34 @@ const VersionContext& VersionContext::getDecoration(const OperationContext* opCt
 void VersionContext::setDecoration(ClientLock&,
                                    OperationContext* opCtx,
                                    const VersionContext& vCtx) {
-    getVersionContext(opCtx) = vCtx;
+    tassert(9955801, "Expected incoming versionContext to be initialized", vCtx.isInitialized());
+
+    // We disallow setting a VersionContext decoration multiple times on the same OperationContext,
+    // even if it's the same one. There is no use case for it, and makes our implementation more
+    // complex (e.g. ScopedSetDecoration would need to have a "no-op" destructor path).
+    auto& originalVCtx = getVersionContext(opCtx);
+    tassert(10296500,
+            "Refusing to set a VersionContext on an operation that already has one",
+            !originalVCtx.isInitialized());
+    originalVCtx = vCtx;
 }
 
-void VersionContext::setFromMetadata(ClientLock&,
+void VersionContext::setFromMetadata(ClientLock& lk,
                                      OperationContext* opCtx,
                                      const VersionContext& vCtx) {
-    tassert(9955801, "Expected incoming versionContext to be initialized", vCtx.isInitialized());
-    getVersionContext(opCtx) = vCtx;
+    VersionContext::setDecoration(lk, opCtx, vCtx);
+}
+
+VersionContext::ScopedSetDecoration::ScopedSetDecoration(OperationContext* opCtx,
+                                                         const VersionContext& vCtx)
+    : _opCtx(opCtx) {
+    ClientLock lk(opCtx->getClient());
+    VersionContext::setDecoration(lk, opCtx, vCtx);
+}
+
+VersionContext::ScopedSetDecoration::~ScopedSetDecoration() {
+    ClientLock lk(_opCtx->getClient());
+    getVersionContext(_opCtx).resetToOperationWithoutOFCV();
 }
 
 }  // namespace mongo

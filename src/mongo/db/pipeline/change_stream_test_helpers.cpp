@@ -107,6 +107,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
                                     uuid,                               // uuid
                                     fromMigrate,                        // fromMigrate
                                     boost::none,                      // checkExistenceForDiffInsert
+                                    boost::none,                      // versionContext
                                     repl::OplogEntry::kOplogVersion,  // version
                                     object,                           // o
                                     object2,                          // o2

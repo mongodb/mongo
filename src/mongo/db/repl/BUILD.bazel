@@ -115,6 +115,7 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:multitenancy_gen",
         "//src/mongo/db:record_id_gen",
+        "//src/mongo/db:version_context_gen",
         "//src/mongo/db/pipeline:value_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/s:sharding_types_gen",

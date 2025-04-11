@@ -1687,6 +1687,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
         boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
         repl::OplogEntry::kOplogVersion,  // version
         BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
         boost::none,                                                              // o2
@@ -2132,6 +2133,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
         boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
         repl::OplogEntry::kOplogVersion,  // version
         BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
         boost::none,                                                              // o2
@@ -2278,6 +2280,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
         boost::none,                      // checkExistenceForDiffInsert
+        boost::none,                      // versionContext
         repl::OplogEntry::kOplogVersion,  // version
         BSON("commitTransaction" << 1 << "commitTimestamp" << kDefaultCommitTs),  // o
         boost::none,                                                              // o2

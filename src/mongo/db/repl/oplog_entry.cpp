@@ -67,6 +67,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<UUID>& uuid,
                           const boost::optional<bool>& fromMigrate,
                           const boost::optional<bool>& checkExistenceForDiffInsert,
+                          const boost::optional<VersionContext>& versionContext,
                           int64_t version,
                           const BSONObj& oField,
                           const boost::optional<BSONObj>& o2Field,
@@ -106,6 +107,9 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     if (checkExistenceForDiffInsert) {
         builder.append(OplogEntryBase::kCheckExistenceForDiffInsertFieldName,
                        checkExistenceForDiffInsert.value());
+    }
+    if (versionContext) {
+        builder.append(OplogEntryBase::kVersionContextFieldName, versionContext.value().toBSON());
     }
     builder.append(OplogEntryBase::kObjectFieldName, oField);
     if (o2Field) {
@@ -372,6 +376,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const boost::optional<UUID>& uuid,
                                      const boost::optional<bool>& fromMigrate,
                                      const boost::optional<bool>& checkExistenceForDiffInsert,
+                                     const boost::optional<VersionContext>& versionContext,
                                      int version,
                                      const BSONObj& oField,
                                      const boost::optional<BSONObj>& o2Field,
@@ -391,6 +396,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                           uuid,
                                           fromMigrate,
                                           checkExistenceForDiffInsert,
+                                          versionContext,
                                           version,
                                           oField,
                                           o2Field,
@@ -721,6 +727,10 @@ boost::optional<bool> OplogEntry::getFromMigrate() const& {
 
 bool OplogEntry::getCheckExistenceForDiffInsert() const& {
     return _entry.getCheckExistenceForDiffInsert().get_value_or(false);
+}
+
+const boost::optional<VersionContext>& OplogEntry::getVersionContext() const {
+    return _entry.getVersionContext();
 }
 
 const boost::optional<mongo::repl::OpTime>& OplogEntry::getPrevWriteOpTimeInTransaction() const& {

@@ -54,12 +54,14 @@
 #include "mongo/db/repl/optime_base_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace repl {
@@ -444,6 +446,8 @@ TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
     auto uuid = UUID::gen();
     std::vector<StmtId> stmtIds{StmtId(0), StmtId(1), StmtId(2)};
     const auto doc = BSON("x" << 1);
+    // (Generic FCV reference): used for testing, should exist across LTS binary versions
+    VersionContext vCtx{multiversion::GenericFCV::kLastLTS};
 
     MutableOplogEntry entry;
     entry.setTid(tid);
@@ -455,6 +459,7 @@ TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
     entry.setOpType(opType);
     entry.setObject(doc);
     entry.setStatementIds(stmtIds);
+    entry.setVersionContext(vCtx);
 
     auto replOp = entry.toReplOperation();
 
@@ -474,6 +479,8 @@ TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
     ASSERT_EQ(replOp.getStatementIds().size(), entry.getStatementIds().size());
     ASSERT_THAT(replOp.getStatementIds(), unittest::match::Eq(stmtIds));
     ASSERT_THAT(replOp.getStatementIds(), unittest::match::Eq(entry.getStatementIds()));
+    ASSERT_EQ(replOp.getVersionContext(), vCtx);
+    ASSERT_EQ(replOp.getVersionContext(), entry.getVersionContext());
 
     // While overwhelmingly set to false, a few sharding scenarios
     // set 'fromMigrate' to true. Therefore, testing it.

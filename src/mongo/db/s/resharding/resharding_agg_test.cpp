@@ -294,6 +294,7 @@ repl::DurableOplogEntry makeApplyOpsOplog(std::vector<BSONObj> operations,
             UUID::gen(),
             false /* fromMigrate */,
             boost::none,  // checkExistenceForDiffInsert
+            boost::none,  // versionContext
             0 /* version */,
             applyOpsBuilder.obj(), /* o */
             boost::none,           /* o2 */
@@ -1608,6 +1609,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
                                   kCrudUUID,
                                   false /* fromMigrate */,
                                   boost::none,  // checkExistenceForDiffInsert
+                                  boost::none,  // versionContext
                                   0 /* version */,
                                   BSON("$set" << BSON("y" << 1)), /* o1 */
                                   BSON("_id" << 2),               /* o2 */

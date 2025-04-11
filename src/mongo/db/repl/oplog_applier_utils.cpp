@@ -445,6 +445,14 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
         invariant(op->getTid() == boost::none);
     }
 
+    // VersionContext fixes a FCV snapshot over the opCtx, making FCV-gated feature
+    // flags checks in secondaries behave as they did on the primary, thus ensuring
+    // correct application even if the FCV changed due to a concurrent setFCV.
+    boost::optional<VersionContext::ScopedSetDecoration> scopedVersionContext;
+    if (op->getVersionContext()) {
+        scopedVersionContext.emplace(opCtx, *op->getVersionContext());
+    }
+
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();
         return Status::OK();

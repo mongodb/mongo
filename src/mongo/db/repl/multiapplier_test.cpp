@@ -91,6 +91,7 @@ OplogEntry makeOplogEntry(int ts) {
                               boost::none,                                            // uuid
                               boost::none,                                            // fromMigrate
                               boost::none,                // checkExistenceForDiffInsert
+                              boost::none,                // versionContext
                               OplogEntry::kOplogVersion,  // version
                               BSONObj(),                  // o
                               boost::none,                // o2

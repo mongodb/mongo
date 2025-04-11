@@ -97,6 +97,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
     size_t groupSize = op->getObject().objsize();
     auto opCount = std::vector<ApplierOperation>::size_type(1);
     auto groupNamespace = op->getNss();
+    auto& groupVCtx = op->getVersionContext();
 
     /**
      * Search for the op that delimits this insert group, and save its position
@@ -121,6 +122,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
             // Only add the op to this group if it passes the criteria.
             return nextOp->getOpType() != OpTypeEnum::kInsert  // Must be an insert.
                 || opNamespace != groupNamespace               // Must be in the same namespace.
+                || nextOp->getVersionContext() != groupVCtx    // Must be in the same Operation FCV.
                 || groupSize > kInsertGroupMaxGroupSize  // Must not create too large an object.
                 || opCount > kInsertGroupMaxOpCount;     // Limit number of ops in a single group.
         });

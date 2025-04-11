@@ -496,6 +496,7 @@ OplogEntry makeOplogEntry(OpTime opTime,
                               uuid,                       // uuid
                               fromMigrate,                // fromMigrate
                               boost::none,                // checkExistenceForDiffInsert
+                              boost::none,                // versionContext
                               OplogEntry::kOplogVersion,  // version
                               o,                          // o
                               o2,                         // o2

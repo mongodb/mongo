@@ -301,6 +301,7 @@ BSONObj _makeOplogEntry(Timestamp ts, long long term) {
                              boost::none,                                            // uuid
                              boost::none,                                            // fromMigrate
                              boost::none,                      // checkExistenceForDiffInsert
+                             boost::none,                      // versionContext
                              repl::OplogEntry::kOplogVersion,  // version
                              BSONObj(),                        // o
                              boost::none,                      // o2
