@@ -148,6 +148,7 @@ TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
         // Create a dummy ShardingDDLCoordinator.
         ShardingDDLCoordinatorMetadata coordinatorMetadata(
             ShardingDDLCoordinatorId(mainNss, DDLCoordinatorTypeEnum::kDropCollection));
+        coordinatorMetadata.setForwardableOpMetadata(ForwardableOperationMetadata{});
 
         auto coordinator = std::make_shared<TestShardingDDLCoordinator>(
             _service.get(), coordinatorMetadata, std::set<NamespaceString>({additionalNss}));

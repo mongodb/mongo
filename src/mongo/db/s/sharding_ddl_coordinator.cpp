@@ -92,6 +92,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
     return AsyncTry([this, resource, lockMode] {
                auto opCtxHolder = cc().makeOperationContext();
                auto* opCtx = opCtxHolder.get();
+               getForwardableOpMetadata().setOn(opCtx);
 
                const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
 
@@ -147,6 +148,7 @@ ExecutorFuture<bool> ShardingDDLCoordinator::_removeDocumentUntillSuccessOrStepd
     return AsyncTry([this, anchor = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto* opCtx = opCtxHolder.get();
+               getForwardableOpMetadata().setOn(opCtx);
 
                return StatusWith(_removeDocument(opCtx));
            })
@@ -205,6 +207,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_translateTimeseriesNss(
     return AsyncTry([this] {
                auto opCtxHolder = cc().makeOperationContext();
                auto* opCtx = opCtxHolder.get();
+               getForwardableOpMetadata().setOn(opCtx);
 
                const auto bucketNss = originalNss().makeTimeseriesBucketsNamespace();
 
@@ -355,6 +358,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         .then([this, executor, token, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
             return _acquireAllLocksAsync(opCtx, executor, token);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
@@ -362,6 +367,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 operationType() != DDLCoordinatorTypeEnum::kCreateDatabase) {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
                 invariant(metadata().getDatabaseVersion());
 
                 ScopedSetShardRole scopedSetShardRole(
@@ -481,6 +488,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         .onCompletion([this, executor, token, anchor = shared_from_this()](const Status& status) {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
 
             // If we are stepping down the token MUST be cancelled. Each implementation of the
             // coordinator must retry remote stepping down errors, unless, we allow finalizing the

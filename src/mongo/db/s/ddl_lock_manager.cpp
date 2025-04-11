@@ -161,11 +161,16 @@ void DDLLockManager::_lock(OperationContext* opCtx,
 
     unregisterResourceExitGuard.dismiss();
 
-    LOGV2(6855301,
-          "Acquired DDL lock",
-          "resource"_attr = ns,
-          "reason"_attr = reason,
-          "mode"_attr = modeName(mode));
+    // TODO SERVER-99655, SERVER-99552: update once gSnapshotFCVInDDLCoordinators is enabled on the
+    // lastLTS and the OFCV is snapshotted for DDLs that do not pass by coordinators.
+    logv2::DynamicAttributes attrs;
+    attrs.add("resource", ns);
+    attrs.add("reason", reason);
+    attrs.add("mode", modeName(mode));
+    if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {
+        attrs.add("versionContext", vCtx);
+    }
+    LOGV2(6855301, "Acquired DDL lock", attrs);
 }
 
 void DDLLockManager::_unlock(
