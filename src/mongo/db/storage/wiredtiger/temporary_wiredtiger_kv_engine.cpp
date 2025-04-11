@@ -37,8 +37,6 @@
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/client.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/wiredtiger/temporary_wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
@@ -85,10 +83,6 @@ TemporaryWiredTigerKVEngine::TemporaryWiredTigerKVEngine(const std::string& cano
     // TODO(SERVER-103355): Disable session caching.
     _connection = std::make_unique<WiredTigerConnection>(_conn, clockSource, this);
 
-    _dbClient = getGlobalServiceContext()
-                    ->getService(ClusterRole::ShardServer)
-                    ->makeClient("TemporaryWiredTigerRecordStore");
-
     // TODO(SERVER-103209): Add support for configuring the internal WiredTiger instance at runtime.
 }
 
@@ -119,8 +113,7 @@ std::unique_ptr<RecordStore> TemporaryWiredTigerKVEngine::getTemporaryRecordStor
     // We don't log writes to temporary record stores.
     params.baseParams.isLogged = false;
     params.baseParams.forceUpdateWithFullDocument = false;
-    return std::make_unique<TemporaryWiredTigerRecordStore>(
-        this, _dbClient->makeOperationContext(), std::move(params));
+    return std::make_unique<TemporaryWiredTigerRecordStore>(this, std::move(params));
 }
 
 std::unique_ptr<RecordStore> TemporaryWiredTigerKVEngine::makeTemporaryRecordStore(

@@ -302,7 +302,7 @@ WiredTigerRecordStoreBase::WiredTigerRecordStoreBase(Params params)
 }
 
 void WiredTigerRecordStoreBase::wtDeleteRecord(OperationContext* opCtx,
-                                               WiredTigerRecoveryUnit& wtRu,
+                                               WiredTigerRecoveryUnitBase& wtRu,
                                                const RecordId& id,
                                                OpStats& opStats) {
     opStats = OpStats{};
@@ -346,7 +346,7 @@ void WiredTigerRecordStoreBase::wtDeleteRecord(OperationContext* opCtx,
 }
 
 Status WiredTigerRecordStoreBase::wtInsertRecord(OperationContext* opCtx,
-                                                 WiredTigerRecoveryUnit& wtRu,
+                                                 WiredTigerRecoveryUnitBase& wtRu,
                                                  WT_CURSOR* c,
                                                  const Record& record,
                                                  OpStats& opStats) {
@@ -385,7 +385,7 @@ Status WiredTigerRecordStoreBase::wtInsertRecord(OperationContext* opCtx,
 }
 
 Status WiredTigerRecordStoreBase::wtUpdateRecord(OperationContext* opCtx,
-                                                 WiredTigerRecoveryUnit& wtRu,
+                                                 WiredTigerRecoveryUnitBase& wtRu,
                                                  const RecordId& id,
                                                  const char* data,
                                                  int len,
@@ -468,7 +468,7 @@ Status WiredTigerRecordStoreBase::wtUpdateRecord(OperationContext* opCtx,
 }
 
 Status WiredTigerRecordStoreBase::wtTruncate(OperationContext* opCtx,
-                                             WiredTigerRecoveryUnit& wtRu) {
+                                             WiredTigerRecoveryUnitBase& wtRu) {
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor startWrap(std::move(cursorParams), _uri, *wtRu.getSession());
     WT_CURSOR* start = startWrap.get();
@@ -489,7 +489,7 @@ Status WiredTigerRecordStoreBase::wtTruncate(OperationContext* opCtx,
 }
 
 Status WiredTigerRecordStoreBase::wtRangeTruncate(OperationContext* opCtx,
-                                                  WiredTigerRecoveryUnit& wtRu,
+                                                  WiredTigerRecoveryUnitBase& wtRu,
                                                   const RecordId& minRecordId,
                                                   const RecordId& maxRecordId) {
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
@@ -533,7 +533,7 @@ Status WiredTigerRecordStoreBase::wtRangeTruncate(OperationContext* opCtx,
 }
 
 StatusWith<int64_t> WiredTigerRecordStoreBase::wtCompact(OperationContext* opCtx,
-                                                         WiredTigerRecoveryUnit& wtRu,
+                                                         WiredTigerRecoveryUnitBase& wtRu,
                                                          const CompactOptions& options) {
     WiredTigerConnection* connection = wtRu.getConnection();
     if (connection->isEphemeral()) {
@@ -589,7 +589,7 @@ public:
         int advanceRet = wiredTigerPrepareConflictRetry(
             *_opCtx,
             StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
-            *shard_role_details::getRecoveryUnit(_opCtx),
+            getRecoveryUnit(),
             [&] { return _cursor->get()->next(_cursor->get()); });
         if (advanceRet == WT_NOTFOUND)
             return {};
@@ -627,14 +627,13 @@ public:
     }
 
     bool restore(bool tolerateCappedRepositioning = true) final {
-        WiredTigerRecoveryUnit* wtRu =
-            WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx));
+        auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit());
 
         if (!_cursor) {
             auto cursorParams = getWiredTigerCursorParams(
-                *wtRu, _tableId, false /* allowOverwrite */, true /* random */);
+                wtRu, _tableId, false /* allowOverwrite */, true /* random */);
             _cursor = std::make_unique<WiredTigerCursor>(
-                std::move(cursorParams), _uri, *wtRu->getSession());
+                std::move(cursorParams), _uri, *wtRu.getSession());
         }
         return true;
     }
@@ -657,6 +656,10 @@ public:
     }
 
 private:
+    RecoveryUnit& getRecoveryUnit() const {
+        return *shard_role_details::getRecoveryUnit(_opCtx);
+    }
+
     std::unique_ptr<WiredTigerCursor> _cursor;
     KeyFormat _keyFormat;
     const std::string _uri;
@@ -772,7 +775,7 @@ int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
     if (_inMemory) {
         return dataSize();
     }
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
+    WiredTigerSession* session = WiredTigerRecoveryUnitBase::get(ru).getSessionNoTxn();
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:" + getURI(), "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     uassertStatusOK(result.getStatus());
@@ -788,7 +791,7 @@ int64_t WiredTigerRecordStore::Capped::storageSize(RecoveryUnit& ru,
 }
 
 int64_t WiredTigerRecordStore::freeStorageSize(RecoveryUnit& ru) const {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
+    WiredTigerSession* session = WiredTigerRecoveryUnitBase::get(ru).getSessionNoTxn();
     return WiredTigerUtil::getIdentReuseSize(*session, getURI());
 }
 
@@ -808,8 +811,12 @@ void WiredTigerRecordStore::_updateLargestRecordId(OperationContext* opCtx, long
     }
 }
 
+RecoveryUnit& WiredTigerRecordStore::getRecoveryUnit(OperationContext* opCtx) const {
+    return *shard_role_details::getRecoveryUnit(opCtx);
+}
+
 void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordId& id) {
-    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
+    invariant(getRecoveryUnit(opCtx).inUnitOfWork());
 
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
@@ -817,7 +824,7 @@ void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordI
         _initNextIdIfNeeded(opCtx);
     }
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
     // getSession() will open a txn if there was no txn active.
     wtRu.getSession();
     wtRu.assertInActiveTxn();
@@ -834,9 +841,9 @@ void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordI
 Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              std::vector<Record>* records,
                                              const std::vector<Timestamp>& timestamps) {
-    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
+    invariant(getRecoveryUnit(opCtx).inUnitOfWork());
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, _overwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
@@ -920,7 +927,7 @@ Status WiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
                                             const RecordId& id,
                                             const char* data,
                                             int len) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
     invariant(wtRu.inUnitOfWork());
 
     // getSession() will open a txn if there was no txn active.
@@ -969,7 +976,7 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContex
         entries[i].size = where->targetSize;
     }
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
@@ -1087,7 +1094,7 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
 }
 
 Status WiredTigerRecordStore::_truncate(OperationContext* opCtx) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
     auto status = wtTruncate(opCtx, wtRu);
     if (!status.isOK()) {
         return status;
@@ -1103,7 +1110,7 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
                                              const RecordId& maxRecordId,
                                              int64_t hintDataSizeDiff,
                                              int64_t hintNumRecordsDiff) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
     auto status = wtRangeTruncate(opCtx, wtRu, minRecordId, maxRecordId);
     if (!status.isOK()) {
         return status;
@@ -1115,7 +1122,7 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
 
 StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
                                                     const CompactOptions& options) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
     return wtCompact(opCtx, wtRu, options);
 }
 
@@ -1266,7 +1273,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
     // required by the largest_key API.
     WiredTigerSession sessRaii(&_kvEngine->getConnection());
 
-    if (shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork()) {
+    if (getRecoveryUnit(opCtx).inUnitOfWork()) {
         // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
         // ourselves. The calling operation may have a session open that has written a large amount
         // of data, and by creating a new session, we are preventing WT from being able to roll back
@@ -1396,7 +1403,9 @@ void WiredTigerRecordStore::setDataSize(long long dataSize) {
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(OperationContext* opCtx,
                                                                        bool forward) const {
-    return std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, forward);
+    auto cursor = std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, forward);
+    cursor->init();
+    return cursor;
 }
 
 RecordStore::Capped* WiredTigerRecordStore::capped() {
@@ -1461,7 +1470,7 @@ void WiredTigerRecordStore::Capped::_truncateAfter(
         firstRemovedId = record->id;
     }
 
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto& ru = getRecoveryUnit(opCtx);
     StorageWriteTransaction txn(ru);
 
     // Compute the number and associated sizes of the records to delete.
@@ -1478,24 +1487,23 @@ void WiredTigerRecordStore::Capped::_truncateAfter(
     // Truncate the collection starting from the record located at 'firstRemovedId' to the end of
     // the collection.
 
-    auto wtRu = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
 
-    auto cursorParams = getWiredTigerCursorParams(*wtRu, _tableId, true /* allowOverwrite */);
-    WiredTigerCursor startwrap(std::move(cursorParams), _uri, *wtRu->getSession());
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+    WiredTigerCursor startwrap(std::move(cursorParams), _uri, *wtRu.getSession());
 
     WT_CURSOR* start = startwrap.get();
     auto key = makeCursorKey(firstRemovedId, _keyFormat);
     setKey(start, &key);
 
-    WiredTigerSession* session =
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getSession();
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx)).getSession();
     invariantWTOK(session->truncate(nullptr, start, nullptr, nullptr), *session);
 
     _changeNumRecordsAndDataSize(ru, -recordsRemoved, -bytesRemoved);
 
     txn.commit();
 
-    _handleTruncateAfter(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+    _handleTruncateAfter(WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx)),
                          lastKeptId,
                          firstRemovedId,
                          recordsRemoved,
@@ -1557,7 +1565,9 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getRawCursor(
     OperationContext* opCtx, bool forward) const {
-    return std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, forward);
+    auto cursor = std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, forward);
+    cursor->init();
+    return cursor;
 }
 
 WiredTigerRecordStore::Oplog::~Oplog() {
@@ -1669,9 +1679,9 @@ void WiredTigerRecordStore::Oplog::setTruncateMarkers(
 Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
                                                     std::vector<Record>* records,
                                                     const std::vector<Timestamp>& timestamps) {
-    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
+    invariant(getRecoveryUnit(opCtx).inUnitOfWork());
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx));
+    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, _overwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
@@ -1728,26 +1738,25 @@ Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
         // Setting this transaction to be unordered will trigger a journal flush. Because these
         // are direct writes into the oplog, the machinery to trigger a journal flush is
         // bypassed. A followup oplog read will require a fres value to make progress.
-        shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(false);
+        getRecoveryUnit(opCtx).setOrderedCommit(false);
         auto oplogKeyTs = Timestamp(record.id.getLong());
         if (!ts.isNull()) {
             invariant(oplogKeyTs == ts);
         }
-        if (!shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull()) {
-            invariant(oplogKeyTs ==
-                      shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp());
+        if (!getRecoveryUnit(opCtx).getCommitTimestamp().isNull()) {
+            invariant(oplogKeyTs == getRecoveryUnit(opCtx).getCommitTimestamp());
         }
 
         if (!ts.isNull()) {
             LOGV2_DEBUG(4017300, 4, "Inserting oplog record with timestamp", "ts"_attr = ts);
-            fassert(4017301, shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts));
+            fassert(4017301, getRecoveryUnit(opCtx).setTimestamp(ts));
         }
         CursorKey key = makeCursorKey(record.id, WiredTigerRecordStore::keyFormat());
         setKey(c, &key);
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.get());
-        int ret = WT_OP_CHECK(wiredTigerCursorInsert(
-            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
+        int ret = WT_OP_CHECK(
+            wiredTigerCursorInsert(WiredTigerRecoveryUnit::get(getRecoveryUnit(opCtx)), c));
         invariant(ret != WT_DUPLICATE_KEY);
         if (ret)
             return wtRCToStatus(ret, c->session, "WiredTigerRecordStore::insertRecord");
@@ -1788,9 +1797,8 @@ Status WiredTigerRecordStore::Oplog::_truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-WiredTigerRecordStoreCursor::WiredTigerRecordStoreCursor(OperationContext* opCtx,
-                                                         const WiredTigerRecordStoreBase& rs,
-                                                         bool forward)
+WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(
+    OperationContext* opCtx, const WiredTigerRecordStoreBase& rs, bool forward)
     : _tableId(rs.tableId()),
       _opCtx(opCtx),
       _uri(rs.getURI()),
@@ -1798,11 +1806,13 @@ WiredTigerRecordStoreCursor::WiredTigerRecordStoreCursor(OperationContext* opCtx
       _keyFormat(rs.keyFormat()),
       _forward(forward),
       _uuid(rs.uuid()),
-      _assertOutOfOrderForTest(MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx));
+      _assertOutOfOrderForTest(MONGO_unlikely(WTRecordStoreUassertOutOfOrder.shouldFail())) {}
+
+void WiredTigerRecordStoreCursorBase::init() {
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit());
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
-    auto metrics = &ResourceConsumption::MetricsCollector::get(opCtx);
+    auto metrics = &ResourceConsumption::MetricsCollector::get(_opCtx);
 
     // Assumption: cursors are always scoped within the context of a scoped metrics collector.
     if (metrics->isCollecting()) {
@@ -1810,7 +1820,7 @@ WiredTigerRecordStoreCursor::WiredTigerRecordStoreCursor(OperationContext* opCtx
     }
 }
 
-boost::optional<Record> WiredTigerRecordStoreCursor::next() {
+boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     auto id = nextIdCommon();
     if (id.isNull()) {
         return boost::none;
@@ -1822,7 +1832,7 @@ boost::optional<Record> WiredTigerRecordStoreCursor::next() {
     return toReturn;
 }
 
-RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
+RecordId WiredTigerRecordStoreCursorBase::nextIdCommon() {
     invariant(_hasRestored);
     if (_eof)
         return {};
@@ -1830,7 +1840,7 @@ RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
     // Ensure an active transaction is open. While WiredTiger supports using cursors on a session
     // without an active transaction (i.e. an implicit transaction), that would bypass configuration
     // options we pass when we explicitly start transactions in the RecoveryUnit.
-    WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
+    WiredTigerRecoveryUnitBase::get(getRecoveryUnit()).getSession();
 
     WT_CURSOR* c = _cursor->get();
 
@@ -1842,7 +1852,7 @@ RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
         int advanceRet = wiredTigerPrepareConflictRetry(
             *_opCtx,
             StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
-            *shard_role_details::getRecoveryUnit(_opCtx),
+            getRecoveryUnit(),
             [&] { return _forward ? c->next(c) : c->prev(c); });
         if (advanceRet == WT_NOTFOUND) {
             _eof = true;
@@ -1860,8 +1870,8 @@ RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
     return id;
 }
 
-void WiredTigerRecordStoreCursor::reportOutOfOrderRead(const RecordId& id,
-                                                       bool failWithOutOfOrderForTest) const {
+void WiredTigerRecordStoreCursorBase::reportOutOfOrderRead(const RecordId& id,
+                                                           bool failWithOutOfOrderForTest) const {
     if (!failWithOutOfOrderForTest) {
         // Crash when testing diagnostics are enabled and not explicitly uasserting on
         // out-of-order keys.
@@ -1869,7 +1879,7 @@ void WiredTigerRecordStoreCursor::reportOutOfOrderRead(const RecordId& id,
     }
 
     auto options = [&] {
-        if (shard_role_details::getRecoveryUnit(_opCtx)->getDataCorruptionDetectionMode() ==
+        if (getRecoveryUnit().getDataCorruptionDetectionMode() ==
             DataCorruptionDetectionMode::kThrow) {
             // uassert with 'DataCorruptionDetected' after logging.
             return logv2::LogOptions{logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
@@ -1888,7 +1898,7 @@ void WiredTigerRecordStoreCursor::reportOutOfOrderRead(const RecordId& id,
                         "uuid"_attr = _uuid);
 }
 
-void WiredTigerRecordStoreCursor::checkOrder(const RecordId& id) const {
+void WiredTigerRecordStoreCursorBase::checkOrder(const RecordId& id) const {
     if (MONGO_unlikely((_forward && _lastReturnedId >= id) ||
                        (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId) ||
                        _assertOutOfOrderForTest)) {
@@ -1896,14 +1906,14 @@ void WiredTigerRecordStoreCursor::checkOrder(const RecordId& id) const {
     }
 }
 
-void WiredTigerRecordStoreCursor::trackReturn(const Record& record) {
+void WiredTigerRecordStoreCursorBase::trackReturn(const Record& record) {
     if (_metrics) {
         _metrics->incrementOneDocRead(_uri, record.data.size() + computeRecordIdSize(record.id));
     }
     _lastReturnedId = record.id;
 }
 
-void WiredTigerRecordStoreCursor::resetCursor() {
+void WiredTigerRecordStoreCursorBase::resetCursor() {
     if (_cursor) {
         WT_CURSOR* c = _cursor->get();
         invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
@@ -1912,8 +1922,8 @@ void WiredTigerRecordStoreCursor::resetCursor() {
     }
 }
 
-boost::optional<Record> WiredTigerRecordStoreCursor::seek(const RecordId& start,
-                                                          BoundInclusion boundInclusion) {
+boost::optional<Record> WiredTigerRecordStoreCursorBase::seek(const RecordId& start,
+                                                              BoundInclusion boundInclusion) {
     auto id = seekIdCommon(start, boundInclusion);
     if (id.isNull()) {
         return boost::none;
@@ -1924,14 +1934,13 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seek(const RecordId& start,
     return toReturn;
 }
 
-RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
-                                                   BoundInclusion boundInclusion,
-                                                   bool restoring) {
+RecordId WiredTigerRecordStoreCursorBase::seekIdCommon(const RecordId& start,
+                                                       BoundInclusion boundInclusion,
+                                                       bool restoring) {
     invariant(_hasRestored || restoring);
 
     // Ensure an active transaction is open.
-    auto session =
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
+    auto session = WiredTigerRecoveryUnitBase::get(getRecoveryUnit()).getSession();
     _skipNextAdvance = false;
 
     // If the cursor is positioned, we need to reset it so that we can set bounds. This is not the
@@ -1956,7 +1965,7 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
     int ret = wiredTigerPrepareConflictRetry(
         *_opCtx,
         StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
-        *shard_role_details::getRecoveryUnit(_opCtx),
+        getRecoveryUnit(),
         [&] { return _forward ? c->next(c) : c->prev(c); });
     if (ret == WT_NOTFOUND) {
         _eof = true;
@@ -1969,18 +1978,17 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
     return getKey(c, _keyFormat);
 }
 
-boost::optional<Record> WiredTigerRecordStoreCursor::seekExact(const RecordId& id) {
+boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
     return seekExactCommon(id);
 }
 
-boost::optional<Record> WiredTigerRecordStoreCursor::seekExactCommon(const RecordId& id) {
+boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExactCommon(const RecordId& id) {
     invariant(_hasRestored);
 
     // Ensure an active transaction is open. While WiredTiger supports using cursors on a session
     // without an active transaction (i.e. an implicit transaction), that would bypass configuration
     // options we pass when we explicitly start transactions in the RecoveryUnit.
-    auto session =
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
+    auto session = WiredTigerRecoveryUnitBase::get(getRecoveryUnit()).getSession();
 
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
@@ -1997,7 +2005,7 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seekExactCommon(const Recor
     int seekRet = wiredTigerPrepareConflictRetry(
         *_opCtx,
         StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
-        *shard_role_details::getRecoveryUnit(_opCtx),
+        getRecoveryUnit(),
         [&] { return c->search(c); });
     if (seekRet == WT_NOTFOUND) {
         _eof = true;
@@ -2012,27 +2020,26 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seekExactCommon(const Recor
     return toReturn;
 }
 
-void WiredTigerRecordStoreCursor::save() {
+void WiredTigerRecordStoreCursorBase::save() {
     resetCursor();
     _hasRestored = false;
 }
 
-void WiredTigerRecordStoreCursor::saveUnpositioned() {
+void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
     save();
     _lastReturnedId = RecordId();
 }
 
-bool WiredTigerRecordStoreCursor::restore(bool tolerateCappedRepositioning) {
+bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
     if (!_cursor) {
-        auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx));
+        auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit());
         auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
         _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
     // This will ensure an active session exists, so any restored cursors will bind to it
-    invariant(
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession() ==
-        _cursor->getSession());
+    invariant(WiredTigerRecoveryUnitBase::get(getRecoveryUnit()).getSession() ==
+              _cursor->getSession());
 
     // If we've hit EOF, then this iterator is done and need not be restored.
     if (_eof || _lastReturnedId.isNull()) {
@@ -2060,7 +2067,7 @@ bool WiredTigerRecordStoreCursor::restore(bool tolerateCappedRepositioning) {
     return true;
 }
 
-void WiredTigerRecordStoreCursor::detachFromOperationContext() {
+void WiredTigerRecordStoreCursorBase::detachFromOperationContext() {
     _opCtx = nullptr;
     _metrics = nullptr;
     if (!_saveStorageCursorOnDetachFromOperationContext) {
@@ -2068,7 +2075,7 @@ void WiredTigerRecordStoreCursor::detachFromOperationContext() {
     }
 }
 
-void WiredTigerRecordStoreCursor::reattachToOperationContext(OperationContext* opCtx) {
+void WiredTigerRecordStoreCursorBase::reattachToOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
     auto metrics = &ResourceConsumption::MetricsCollector::get(opCtx);
     if (metrics->isCollecting()) {
@@ -2077,8 +2084,17 @@ void WiredTigerRecordStoreCursor::reattachToOperationContext(OperationContext* o
     // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
 }
 
+RecoveryUnit& WiredTigerRecordStoreCursorBase::getRecoveryUnit() const {
+    return *shard_role_details::getRecoveryUnit(_opCtx);
+}
+
+WiredTigerRecordStoreCursor::WiredTigerRecordStoreCursor(OperationContext* opCtx,
+                                                         const WiredTigerRecordStore& rs,
+                                                         bool forward)
+    : WiredTigerRecordStoreCursorBase(opCtx, rs, forward) {}
+
 WiredTigerCappedCursorBase::WiredTigerCappedCursorBase(OperationContext* opCtx,
-                                                       const WiredTigerRecordStoreBase& rs,
+                                                       const WiredTigerRecordStore& rs,
                                                        bool forward)
     : WiredTigerRecordStoreCursor(opCtx, rs, forward) {}
 
@@ -2132,17 +2148,16 @@ void WiredTigerCappedCursorBase::save() {
 
 bool WiredTigerCappedCursorBase::restore(bool tolerateCappedRepositioning) {
     if (!_cursor) {
-        auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx));
+        auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit());
         auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
         _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
-    initVisibility(_opCtx);
+    initVisibility();
 
     // This will ensure an active session exists, so any restored cursors will bind to it
-    invariant(
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession() ==
-        _cursor->getSession());
+    invariant(WiredTigerRecoveryUnitBase::get(getRecoveryUnit()).getSession() ==
+              _cursor->getSession());
 
     // If we've hit EOF, then this iterator is done and need not be restored.
     if (_eof || _lastReturnedId.isNull()) {
@@ -2190,7 +2205,8 @@ WiredTigerStandardCappedCursor::WiredTigerStandardCappedCursor(OperationContext*
                                                                const WiredTigerRecordStore& rs,
                                                                bool forward)
     : WiredTigerCappedCursorBase(opCtx, rs, forward) {
-    initVisibility(opCtx);
+    init();
+    initVisibility();
 }
 
 bool WiredTigerStandardCappedCursor::isVisible(const RecordId& id) {
@@ -2203,7 +2219,7 @@ bool WiredTigerStandardCappedCursor::isVisible(const RecordId& id) {
     return true;
 }
 
-void WiredTigerStandardCappedCursor::initVisibility(OperationContext* opCtx) {
+void WiredTigerStandardCappedCursor::initVisibility() {
     if (_forward) {
         // We can't enforce that the caller has initialized the capped snapshot before entering this
         // function because we need to know, for example, what locks are held. So we expect higher
@@ -2217,18 +2233,19 @@ void WiredTigerStandardCappedCursor::resetVisibility() {
 }
 
 WiredTigerOplogCursor::WiredTigerOplogCursor(OperationContext* opCtx,
-                                             const WiredTigerRecordStoreBase& rs,
+                                             const WiredTigerRecordStore& rs,
                                              bool forward)
     : WiredTigerCappedCursorBase(opCtx, rs, forward) {
-    initVisibility(opCtx);
+    init();
+    initVisibility();
 }
 
-void WiredTigerOplogCursor::initVisibility(OperationContext* opCtx) {
-    auto wtRu = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
+void WiredTigerOplogCursor::initVisibility() {
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit());
     if (_forward) {
-        _oplogVisibleTs = wtRu->getOplogVisibilityTs();
+        _oplogVisibleTs = wtRu.getOplogVisibilityTs();
     }
-    boost::optional<Timestamp> readTs = wtRu->getPointInTimeReadTimestamp();
+    boost::optional<Timestamp> readTs = wtRu.getPointInTimeReadTimestamp();
     if (readTs && readTs->asLL() != 0) {
         // One cannot pass a read_timestamp of 0 to WT, but a "0" is commonly understood as
         // every time is visible.
@@ -2270,7 +2287,7 @@ boost::optional<Record> WiredTigerOplogCursor::next() {
             int advanceRet = wiredTigerPrepareConflictRetry(
                 *_opCtx,
                 StorageExecutionContext::get(_opCtx)->getPrepareConflictTracker(),
-                *shard_role_details::getRecoveryUnit(_opCtx),
+                getRecoveryUnit(),
                 [&] { return cur->prev(cur); });
             if (advanceRet == WT_NOTFOUND) {
                 _positioned = false;

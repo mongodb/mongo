@@ -559,7 +559,15 @@ public:
      *
      * Must be reset when the WriteUnitOfWork is either committed or rolled back.
      */
-    virtual void ignoreAllMultiTimestampConstraints() {};
+    virtual void ignoreAllMultiTimestampConstraints() {}
+
+    /**
+     * This function must be called when a write operation is performed on the active transaction
+     * for the first time.
+     *
+     * Must be reset when the active transaction is either committed or rolled back.
+     */
+    virtual void setTxnModified() {}
 
     /**
      * Registers a callback to be called prior to a WriteUnitOfWork committing the storage
@@ -873,6 +881,14 @@ public:
         return _blockingAllowed;
     }
 
+    bool shouldGatherWriteContextForDebugging() const {
+        return _gatherWriteContextForDebugging;
+    }
+
+    void storeWriteContextForDebugging(const BSONObj& info) {
+        _writeContextForDebugging.push_back(info);
+    }
+
 protected:
     RecoveryUnit() = default;
 
@@ -940,7 +956,18 @@ protected:
         _snapshot.reset();
     }
 
-    OperationContext* _opCtx = nullptr;
+    void setGatherWriteContextForDebugging(bool value) {
+        _gatherWriteContextForDebugging = value;
+    }
+
+    std::vector<BSONObj>& getWriteContextForDebugging() {
+        return _writeContextForDebugging;
+    }
+
+    OperationContext* _opCtx{nullptr};
+
+    bool _gatherWriteContextForDebugging{false};
+    std::vector<BSONObj> _writeContextForDebugging;
 
 private:
     virtual void doBeginUnitOfWork() = 0;
@@ -958,9 +985,9 @@ private:
     Changes _changesForTwoPhaseDrop;
     // Is constructed lazily when accessed or when an underlying storage snapshot is opened.
     boost::optional<Snapshot> _snapshot;
-    State _state = State::kInactive;
-    bool _readOnly = false;
-    bool _blockingAllowed = true;
+    State _state{State::kInactive};
+    bool _readOnly{false};
+    bool _blockingAllowed{true};
 };
 
 /**

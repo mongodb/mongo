@@ -72,7 +72,7 @@ logv2::LogSeverity kSlowTransactionSeverity = logv2::LogSeverity::Debug(1);
 MONGO_FAIL_POINT_DEFINE(doUntimestampedWritesForIdempotencyTests);
 
 void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
-    if (ru.gatherWriteContextForDebugging()) {
+    if (ru.shouldGatherWriteContextForDebugging()) {
         BSONObjBuilder builder;
 
         std::string s;
@@ -85,16 +85,39 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
         ru.storeWriteContextForDebugging(builder.obj());
     }
 }
+
 }  // namespace
 
 AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
 
+WiredTigerRecoveryUnitBase::WiredTigerRecoveryUnitBase(WiredTigerConnection* connection)
+    : _connection(connection) {}
+
+void WiredTigerRecoveryUnitBase::_ensureSession() {
+    if (_managedSession) {
+        return;
+    }
+
+    invariant(!_session);
+    if (_opCtx) {
+        _managedSession = _connection->getSession(*_opCtx);
+    } else {
+        _managedSession = _connection->getUninterruptibleSession();
+    }
+    _session = _managedSession.get();
+}
+
+WiredTigerSession* WiredTigerRecoveryUnitBase::getSessionNoTxn() {
+    _ensureSession();
+    return _session;
+}
+
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
     : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
 
-WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc,
+WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* connection,
                                                WiredTigerOplogManager* oplogManager)
-    : _connection(sc), _oplogManager(oplogManager) {}
+    : WiredTigerRecoveryUnitBase(connection), _oplogManager(oplogManager) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork(), toString(_getState()));
@@ -179,20 +202,6 @@ void WiredTigerRecoveryUnit::doAbortUnitOfWork() {
     _abort();
 }
 
-void WiredTigerRecoveryUnit::_ensureSession() {
-    if (_managedSession) {
-        return;
-    }
-
-    invariant(!_session);
-    if (_opCtx) {
-        _managedSession = _connection->getSession(*_opCtx);
-    } else {
-        _managedSession = _connection->getUninterruptibleSession();
-    }
-    _session = _managedSession.get();
-}
-
 void WiredTigerRecoveryUnit::setPrefetching(bool enable) {
     invariant(!_inUnitOfWork(), toString(_getState()));
     invariant(getSessionNoTxn()->cursorsOut() == 0);
@@ -239,11 +248,6 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
     return _session;
 }
 
-WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
-    _ensureSession();
-    return _session;
-}
-
 void WiredTigerRecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     if (_isActive()) {
@@ -268,18 +272,19 @@ void WiredTigerRecoveryUnit::preallocateSnapshot(const OpenSnapshotOptions& opti
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_isActive(), toString(_getState()));
 
-    if (TestingProctor::instance().isEnabled() && _gatherWriteContextForDebugging && commit) {
+    if (TestingProctor::instance().isEnabled() && shouldGatherWriteContextForDebugging() &&
+        commit) {
         LOGV2(5703402,
               "Closing transaction with write context for debugging",
-              "count"_attr = _writeContextForDebugging.size());
-        for (auto const& ctx : _writeContextForDebugging) {
+              "count"_attr = getWriteContextForDebugging().size());
+        for (auto const& ctx : getWriteContextForDebugging()) {
             LOGV2_OPTIONS(5703403,
                           {logv2::LogTruncation::Disabled},
                           "Write context for debugging",
                           "context"_attr = ctx);
         }
 
-        _writeContextForDebugging.clear();
+        getWriteContextForDebugging().clear();
         // We clear the context here, but we don't unset the flag. We need it still set to prevent a
         // WCE loop in the multi-timestamp constraint code below. We are also expecting to hit the
         // LOGV2_FATAL below, and don't really need to worry about re-using this recovery unit. If
@@ -295,8 +300,8 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         // transaction sets multiple timestamps, the first timestamp must be set prior to any
         // writes. Vice-versa, if a transaction writes a document before setting a timestamp, it
         // must not set multiple timestamps.
-        if (TestingProctor::instance().isEnabled() && !_gatherWriteContextForDebugging) {
-            _gatherWriteContextForDebugging = true;
+        if (TestingProctor::instance().isEnabled() && !shouldGatherWriteContextForDebugging()) {
+            setGatherWriteContextForDebugging(true);
             LOGV2_ERROR(5703401,
                         "Found a violation of multi-timestamp constraint. Retrying operation to "
                         "collect extra debugging context for the involved writes.");
@@ -915,14 +920,6 @@ std::unique_ptr<StorageStats> WiredTigerRecoveryUnit::computeOperationStatistics
     return operationStats;
 }
 
-bool WiredTigerRecoveryUnit::gatherWriteContextForDebugging() const {
-    return _gatherWriteContextForDebugging;
-}
-
-void WiredTigerRecoveryUnit::storeWriteContextForDebugging(const BSONObj& info) {
-    _writeContextForDebugging.push_back(info);
-}
-
 void WiredTigerRecoveryUnit::setOperationContext(OperationContext* opCtx) {
     if (_opCtx && _session) {
         _session->detachOperationContext();
@@ -949,7 +946,7 @@ size_t WiredTigerRecoveryUnit::getCacheDirtyBytes() {
     return result.isOK() ? result.getValue() : 0;
 }
 
-WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnitBase& wtRu,
                                                    uint64_t tableID,
                                                    bool allowOverwrite,
                                                    bool random) {

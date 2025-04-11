@@ -198,13 +198,6 @@ public:
 
 private:
     void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);
-
-    // We use this client to create a new OperationContext instance for every
-    // TemporaryWiredTigerRecordStore instance. This is needed because Cursor implementations
-    // extract RecoveryUnit out of OperationContext and caller's OperationContext/RecoveryUnit is
-    // for the main WiredTiger instance.
-    // TODO(SERVER-103131): Remove this Client instance.
-    ServiceContext::UniqueClient _dbClient;
 };
 
 }  // namespace mongo

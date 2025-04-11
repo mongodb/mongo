@@ -44,18 +44,11 @@
 namespace mongo {
 
 TemporaryWiredTigerRecordStore::TemporaryWiredTigerRecordStore(
-    TemporaryWiredTigerKVEngine* kvEngine,
-    ServiceContext::UniqueOperationContext opCtx,
-    Params params)
+    TemporaryWiredTigerKVEngine* kvEngine, Params params)
     : WiredTigerRecordStoreBase(std::move(params.baseParams)),
       _kvEngine(kvEngine),
-      _opCtx(std::move(opCtx)),
-      _sizeInfo(0, 0) {
-    shard_role_details::setRecoveryUnit(_opCtx.get(),
-                                        std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit()),
-                                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-}
-
+      _wtRu(std::make_unique<TemporaryWiredTigerRecoveryUnit>(&kvEngine->getConnection())),
+      _sizeInfo(0, 0) {}
 
 TemporaryWiredTigerRecordStore::~TemporaryWiredTigerRecordStore() {
     // TODO(SERVER-103273): Truncate and drop the table here.
@@ -66,8 +59,9 @@ TemporaryWiredTigerRecordStore::~TemporaryWiredTigerRecordStore() {
 }
 
 std::unique_ptr<SeekableRecordCursor> TemporaryWiredTigerRecordStore::getCursor(
-    OperationContext*, bool forward) const {
-    return std::make_unique<WiredTigerRecordStoreCursor>(_opCtx.get(), *this, forward);
+    OperationContext* opCtx, bool forward) const {
+    return std::make_unique<TemporaryWiredTigerRecordStoreCursor>(
+        opCtx, *this, forward, _wtRu.get());
 }
 
 long long TemporaryWiredTigerRecordStore::dataSize() const {
@@ -83,7 +77,7 @@ long long TemporaryWiredTigerRecordStore::numRecords() const {
 int64_t TemporaryWiredTigerRecordStore::storageSize(RecoveryUnit& ru,
                                                     BSONObjBuilder* extraInfo,
                                                     int infoLevel) const {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx.get()));
+    auto& wtRu = TemporaryWiredTigerRecoveryUnit::get(getRecoveryUnit(nullptr));
     WiredTigerSession* session = wtRu.getSessionNoTxn();
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:" + getURI(), "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
@@ -91,37 +85,40 @@ int64_t TemporaryWiredTigerRecordStore::storageSize(RecoveryUnit& ru,
     return result.getValue();
 }
 
-void TemporaryWiredTigerRecordStore::_deleteRecord(OperationContext*, const RecordId& id) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx.get()));
-    OpStats opStats{};
-    wtDeleteRecord(_opCtx.get(), wtRu, id, opStats);
+RecoveryUnit& TemporaryWiredTigerRecordStore::getRecoveryUnit(OperationContext* opCtx) const {
+    return *_wtRu;
+}
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+void TemporaryWiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordId& id) {
+    auto& wtRu = TemporaryWiredTigerRecoveryUnit::get(getRecoveryUnit(nullptr));
+    OpStats opStats{};
+    wtDeleteRecord(opCtx, wtRu, id, opStats);
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneDocWritten(_uri, opStats.oldValueLength + opStats.keyLength);
 
     _changeNumRecordsAndDataSize(-1, -opStats.oldValueLength);
 }
 
-Status TemporaryWiredTigerRecordStore::_insertRecords(OperationContext*,
+Status TemporaryWiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                                       std::vector<Record>* records,
                                                       const std::vector<Timestamp>&) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx.get()));
+    auto& wtRu = TemporaryWiredTigerRecoveryUnit::get(getRecoveryUnit(nullptr));
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, _overwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
-    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
     auto nRecords = records->size();
     invariant(nRecords != 0);
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     int64_t totalLength = 0;
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = (*records)[i];
         totalLength += record.data.size();
         OpStats opStats{};
-        Status status = wtInsertRecord(_opCtx.get(), wtRu, c, record, opStats);
+        Status status = wtInsertRecord(opCtx, wtRu, c, record, opStats);
         if (!status.isOK()) {
             return status;
         }
@@ -134,13 +131,13 @@ Status TemporaryWiredTigerRecordStore::_insertRecords(OperationContext*,
     return Status::OK();
 }
 
-Status TemporaryWiredTigerRecordStore::_updateRecord(OperationContext*,
+Status TemporaryWiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
                                                      const RecordId& id,
                                                      const char* data,
                                                      int len) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx.get()));
+    auto& wtRu = TemporaryWiredTigerRecoveryUnit::get(getRecoveryUnit(nullptr));
     OpStats opStats{};
-    auto status = wtUpdateRecord(_opCtx.get(), wtRu, id, data, len, opStats);
+    auto status = wtUpdateRecord(opCtx, wtRu, id, data, len, opStats);
     if (!status.isOK()) {
         return status;
     }
@@ -148,16 +145,16 @@ Status TemporaryWiredTigerRecordStore::_updateRecord(OperationContext*,
     // For updates that don't modify the document size, they should count as at least one unit, so
     // just attribute them as 1-byte modifications for simplicity.
     auto sizeDiff = opStats.newValueLength - opStats.oldValueLength;
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
 
     _changeNumRecordsAndDataSize(0, sizeDiff);
     return Status::OK();
 }
 
-Status TemporaryWiredTigerRecordStore::_truncate(OperationContext*) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx.get()));
-    auto status = wtTruncate(_opCtx.get(), wtRu);
+Status TemporaryWiredTigerRecordStore::_truncate(OperationContext* opCtx) {
+    auto& wtRu = TemporaryWiredTigerRecoveryUnit::get(getRecoveryUnit(nullptr));
+    auto status = wtTruncate(opCtx, wtRu);
     if (!status.isOK()) {
         return status;
     }
@@ -166,13 +163,13 @@ Status TemporaryWiredTigerRecordStore::_truncate(OperationContext*) {
     return Status::OK();
 }
 
-Status TemporaryWiredTigerRecordStore::_rangeTruncate(OperationContext*,
+Status TemporaryWiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
                                                       const RecordId& minRecordId,
                                                       const RecordId& maxRecordId,
                                                       int64_t hintDataSizeDiff,
                                                       int64_t hintNumRecordsDiff) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(_opCtx.get()));
-    auto status = wtRangeTruncate(_opCtx.get(), wtRu, minRecordId, maxRecordId);
+    auto& wtRu = TemporaryWiredTigerRecoveryUnit::get(getRecoveryUnit(nullptr));
+    auto status = wtRangeTruncate(opCtx, wtRu, minRecordId, maxRecordId);
     if (!status.isOK()) {
         return status;
     }
@@ -185,6 +182,19 @@ void TemporaryWiredTigerRecordStore::_changeNumRecordsAndDataSize(int64_t numRec
                                                                   int64_t dataSizeDiff) {
     _sizeInfo.numRecords.addAndFetch(numRecordDiff);
     _sizeInfo.dataSize.addAndFetch(dataSizeDiff);
+}
+
+TemporaryWiredTigerRecordStoreCursor::TemporaryWiredTigerRecordStoreCursor(
+    OperationContext* opCtx,
+    const TemporaryWiredTigerRecordStore& rs,
+    bool forward,
+    TemporaryWiredTigerRecoveryUnit* wtRu)
+    : WiredTigerRecordStoreCursorBase(opCtx, rs, forward), _wtRu(wtRu) {
+    init();
+}
+
+RecoveryUnit& TemporaryWiredTigerRecordStoreCursor::getRecoveryUnit() const {
+    return *_wtRu;
 }
 
 }  // namespace mongo

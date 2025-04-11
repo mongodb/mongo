@@ -63,9 +63,44 @@ using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
 extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
 
-class WiredTigerRecoveryUnit final : public RecoveryUnit {
+class WiredTigerRecoveryUnitBase : public RecoveryUnit {
 public:
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc);
+    WiredTigerRecoveryUnitBase(WiredTigerConnection* connection);
+
+    ~WiredTigerRecoveryUnitBase() override = default;
+
+    static WiredTigerRecoveryUnitBase& get(RecoveryUnit& ru) {
+        return checked_cast<WiredTigerRecoveryUnitBase&>(ru);
+    }
+
+    static WiredTigerRecoveryUnitBase* get(RecoveryUnit* ru) {
+        return checked_cast<WiredTigerRecoveryUnitBase*>(ru);
+    }
+
+    WiredTigerConnection* getConnection() {
+        return _connection;
+    }
+
+    virtual WiredTigerSession* getSession() = 0;
+
+    /**
+     * Returns a session without starting a new WT txn on the session. Will not close any already
+     * running session.
+     */
+    WiredTigerSession* getSessionNoTxn();
+
+protected:
+    void _ensureSession();
+
+    WiredTigerConnection* _connection{nullptr};  // not owned
+
+    WiredTigerManagedSession _managedSession;
+    WiredTigerSession* _session{nullptr};
+};
+
+class WiredTigerRecoveryUnit final : public WiredTigerRecoveryUnitBase {
+public:
+    WiredTigerRecoveryUnit(WiredTigerConnection* connection);
 
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
@@ -76,6 +111,14 @@ public:
      */
     WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
     ~WiredTigerRecoveryUnit() override;
+
+    static WiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
+        return checked_cast<WiredTigerRecoveryUnit&>(ru);
+    }
+
+    static WiredTigerRecoveryUnit* get(RecoveryUnit* ru) {
+        return checked_cast<WiredTigerRecoveryUnit*>(ru);
+    }
 
     void prepareUnitOfWork() override;
 
@@ -165,7 +208,7 @@ public:
 
     // ---- WT STUFF
 
-    WiredTigerSession* getSession();
+    WiredTigerSession* getSession() override;
 
     /**
      * Enter a period of wait or computation during which there are no WT calls.
@@ -173,40 +216,12 @@ public:
      */
     void beginIdle();
 
-    /**
-     * Returns a session without starting a new WT txn on the session. Will not close any already
-     * running session.
-     */
-
-    WiredTigerSession* getSessionNoTxn();
-
-    WiredTigerConnection* getConnection() {
-        return _connection;
-    }
-
     void assertInActiveTxn() const;
 
-    /**
-     * This function must be called when a write operation is performed on the active transaction
-     * for the first time.
-     *
-     * Must be reset when the active transaction is either committed or rolled back.
-     */
-    void setTxnModified();
+    void setTxnModified() override;
 
     boost::optional<int64_t> getOplogVisibilityTs() override;
     void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) override;
-
-    static WiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
-        return checked_cast<WiredTigerRecoveryUnit&>(ru);
-    }
-
-    static WiredTigerRecoveryUnit* get(RecoveryUnit* ru) {
-        return checked_cast<WiredTigerRecoveryUnit*>(ru);
-    }
-
-    bool gatherWriteContextForDebugging() const;
-    void storeWriteContextForDebugging(const BSONObj& info);
 
     void setOperationContext(OperationContext* opCtx) override;
 
@@ -220,7 +235,6 @@ private:
     void _abort();
     void _commit();
 
-    void _ensureSession();
     void _txnClose(bool commit);
     void _txnOpen();
 
@@ -256,10 +270,7 @@ private:
      */
     void _updateMultiTimestampConstraint(Timestamp timestamp);
 
-    WiredTigerConnection* _connection;      // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
-    WiredTigerManagedSession _managedSession;
-    WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
 
     // Helpers used to keep track of multi timestamp constraint violations on the transaction.
@@ -300,8 +311,6 @@ private:
     // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
     // committed ('holes'). @see WiredTigerOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
-    bool _gatherWriteContextForDebugging = false;
-    std::vector<BSONObj> _writeContextForDebugging;
 
     WiredTigerStats _sessionStatsAfterLastOperation;
 
@@ -312,7 +321,7 @@ private:
 };
 
 // Constructs a WiredTigerCursor::Params instance from the given params and returns it.
-WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnitBase& wtRu,
                                                    uint64_t tableID,
                                                    bool allowOverwrite = false,
                                                    bool random = false);

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/storage/wiredtiger/temporary_wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
@@ -41,8 +42,9 @@ class TemporaryWiredTigerKVEngine;
  * don't need to be retained after a restart. Use TemporaryWiredTigerKVEngine to create an instance
  * of this class.
  *
- * This class is not thread-safe. A single thread must be interacting with this RecordStore at any
- * given time. This class uses a single RecoveryUnit instance for its entire lifetime.
+ * This class is not thread-safe. A single thread must be interacting with this RecordStore or any
+ * cursors created from it at any given time. This class creates its own RecoveryUnit instance and
+ * uses it for all operations performed through this class.
  */
 class TemporaryWiredTigerRecordStore : public WiredTigerRecordStoreBase {
 public:
@@ -50,9 +52,7 @@ public:
         WiredTigerRecordStoreBase::Params baseParams;
     };
 
-    TemporaryWiredTigerRecordStore(TemporaryWiredTigerKVEngine* kvEngine,
-                                   ServiceContext::UniqueOperationContext opCtx,
-                                   Params params);
+    TemporaryWiredTigerRecordStore(TemporaryWiredTigerKVEngine* kvEngine, Params params);
 
     ~TemporaryWiredTigerRecordStore() override;
 
@@ -68,18 +68,26 @@ private:
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
 
-    void _deleteRecord(OperationContext*, const RecordId&) override;
+    /**
+     * The 'opCtx' param is not used and is allowed to be nullptr.
+     */
+    RecoveryUnit& getRecoveryUnit(OperationContext* opCtx) const override;
+
+    void _deleteRecord(OperationContext* opCtx, const RecordId&) override;
 
     // TODO(SERVER-103259): Remove the timestamp param.
-    Status _insertRecords(OperationContext*,
+    Status _insertRecords(OperationContext* opCtx,
                           std::vector<Record>*,
                           const std::vector<Timestamp>&) override;
 
-    Status _updateRecord(OperationContext*, const RecordId&, const char* data, int len) override;
+    Status _updateRecord(OperationContext* opCtx,
+                         const RecordId&,
+                         const char* data,
+                         int len) override;
 
-    Status _truncate(OperationContext*) override;
+    Status _truncate(OperationContext* opCtx) override;
 
-    Status _rangeTruncate(OperationContext*,
+    Status _rangeTruncate(OperationContext* opCtx,
                           const RecordId& minRecordId = RecordId(),
                           const RecordId& maxRecordId = RecordId(),
                           int64_t hintDataSizeIncrement = 0,
@@ -93,7 +101,7 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    StatusWith<int64_t> _compact(OperationContext*, const CompactOptions&) override {
+    StatusWith<int64_t> _compact(OperationContext* opCtx, const CompactOptions&) override {
         MONGO_UNREACHABLE;
     }
 
@@ -113,7 +121,7 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const override {
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -131,11 +139,13 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    RecordId getLargestKey(OperationContext*) const override {
+    RecordId getLargestKey(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }
 
-    void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) override {
+    void reserveRecordIds(OperationContext* opCtx,
+                          std::vector<RecordId>*,
+                          size_t numRecords) override {
         MONGO_UNREACHABLE;
     }
 
@@ -157,8 +167,26 @@ private:
     void _changeNumRecordsAndDataSize(int64_t numRecordDiff, int64_t dataSizeDiff);
 
     TemporaryWiredTigerKVEngine* _kvEngine{nullptr};
-    ServiceContext::UniqueOperationContext _opCtx;
+    std::unique_ptr<TemporaryWiredTigerRecoveryUnit> _wtRu;
     WiredTigerSizeStorer::SizeInfo _sizeInfo;
+};
+
+/**
+ * WiredTigerRecordStoreCursorBase implementation for TemporaryWiredTigerRecordStore. It uses the
+ * provided RecoveryUnit instance for all operations performed through this class.
+ */
+class TemporaryWiredTigerRecordStoreCursor final : public WiredTigerRecordStoreCursorBase {
+public:
+    TemporaryWiredTigerRecordStoreCursor(OperationContext* opCtx,
+                                         const TemporaryWiredTigerRecordStore& rs,
+                                         bool forward,
+                                         TemporaryWiredTigerRecoveryUnit* wtRu);
+
+protected:
+    RecoveryUnit& getRecoveryUnit() const override;
+
+private:
+    TemporaryWiredTigerRecoveryUnit* _wtRu{nullptr};
 };
 
 }  // namespace mongo

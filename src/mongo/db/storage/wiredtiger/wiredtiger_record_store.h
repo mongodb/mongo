@@ -175,12 +175,14 @@ protected:
         int64_t newValueLength{0};
     };
 
+    virtual RecoveryUnit& getRecoveryUnit(OperationContext* opCtx) const = 0;
+
     /**
      * Deletes the specified record from this WiredTiger table. Resets 'opStats' before populating
      * it with statistics corresponding to this operation.
      */
     void wtDeleteRecord(OperationContext*,
-                        WiredTigerRecoveryUnit& wtRu,
+                        WiredTigerRecoveryUnitBase& wtRu,
                         const RecordId&,
                         OpStats& opStats);
 
@@ -190,7 +192,7 @@ protected:
      * statistics corresponding to this operation.
      */
     Status wtInsertRecord(OperationContext*,
-                          WiredTigerRecoveryUnit& wtRu,
+                          WiredTigerRecoveryUnitBase& wtRu,
                           WT_CURSOR* c,
                           const Record& record,
                           OpStats& opStats);
@@ -200,7 +202,7 @@ protected:
      * statistics corresponding to this operation.
      */
     Status wtUpdateRecord(OperationContext* opCtx,
-                          WiredTigerRecoveryUnit& wtRu,
+                          WiredTigerRecoveryUnitBase& wtRu,
                           const RecordId& id,
                           const char* data,
                           int len,
@@ -209,13 +211,13 @@ protected:
     /**
      * Deletes all records in this WiredTiger table.
      */
-    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu);
+    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnitBase& wtRu);
 
     /**
      * Deletes all Records in the range [minRecordId, maxRecordId].
      */
     Status wtRangeTruncate(OperationContext* opCtx,
-                           WiredTigerRecoveryUnit& wtRu,
+                           WiredTigerRecoveryUnitBase& wtRu,
                            const RecordId& minRecordId = RecordId(),
                            const RecordId& maxRecordId = RecordId());
 
@@ -223,7 +225,7 @@ protected:
      * Compacts this WiredTiger table to attempt to reduce its storage space.
      */
     StatusWith<int64_t> wtCompact(OperationContext* opCtx,
-                                  WiredTigerRecoveryUnit& wtRu,
+                                  WiredTigerRecoveryUnitBase& wtRu,
                                   const CompactOptions& options);
 
     /**
@@ -330,6 +332,8 @@ public:
     void setDataSize(long long dataSize);
 
 protected:
+    RecoveryUnit& getRecoveryUnit(OperationContext* opCtx) const override;
+
     void _deleteRecord(OperationContext*, const RecordId&) override;
 
     Status _insertRecords(OperationContext*,
@@ -502,11 +506,17 @@ private:
     std::unique_ptr<OplogData> _oplog;
 };
 
-class WiredTigerRecordStoreCursor : public SeekableRecordCursor {
+class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {
 public:
-    WiredTigerRecordStoreCursor(OperationContext* opCtx,
-                                const WiredTigerRecordStoreBase& rs,
-                                bool forward);
+    WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
+                                    const WiredTigerRecordStoreBase& rs,
+                                    bool forward);
+
+    /**
+     * Initialize the cursor. We use this separate method for initialization to avoid calling
+     * virtual methods in the constuctor.
+     */
+    void init();
 
     boost::optional<Record> next() override;
 
@@ -536,6 +546,8 @@ public:
     }
 
 protected:
+    virtual RecoveryUnit& getRecoveryUnit() const;
+
     /**
      * Resets the cursor.
      */
@@ -597,6 +609,17 @@ private:
 };
 
 /**
+ * The sole purpose of this class is to take a constructor param of type WiredTigerRecordStore and
+ * thus ensure that only WiredTigerRecordStore attempts to create an instance of this class.
+ */
+class WiredTigerRecordStoreCursor : public WiredTigerRecordStoreCursorBase {
+public:
+    WiredTigerRecordStoreCursor(OperationContext* opCtx,
+                                const WiredTigerRecordStore& rs,
+                                bool forward);
+};
+
+/**
  * WiredTigerCappedCursorBase is an abstract class for a capped cursors. Derived classes must
  * implement a few "visibility" functions to ensure Records are returned correctly following a set
  * of implementation rules.
@@ -606,7 +629,7 @@ private:
 class WiredTigerCappedCursorBase : public WiredTigerRecordStoreCursor {
 public:
     WiredTigerCappedCursorBase(OperationContext* opCtx,
-                               const WiredTigerRecordStoreBase& rs,
+                               const WiredTigerRecordStore& rs,
                                bool forward);
 
     boost::optional<Record> next() override;
@@ -623,7 +646,7 @@ protected:
     /**
      * Initialize any state required to enforce visibility constraints on this cursor.
      */
-    virtual void initVisibility(OperationContext* opCtx) = 0;
+    virtual void initVisibility() = 0;
 
     /**
      * Returns true if a RecordId should be visible to this cursor.
@@ -641,14 +664,14 @@ protected:
  *
  * Note: forward cursors respect visibility rules, reverse cursors do not.
  */
-class WiredTigerStandardCappedCursor : public WiredTigerCappedCursorBase {
+class WiredTigerStandardCappedCursor final : public WiredTigerCappedCursorBase {
 public:
     WiredTigerStandardCappedCursor(OperationContext* opCtx,
                                    const WiredTigerRecordStore& rs,
                                    bool forward);
 
 protected:
-    void initVisibility(OperationContext* opCtx) override;
+    void initVisibility() override;
     bool isVisible(const RecordId& id) override;
     void resetVisibility() override;
 
@@ -661,17 +684,15 @@ private:
  *
  * Note: forward cursors respect visibility rules, reverse cursors do not.
  */
-class WiredTigerOplogCursor : public WiredTigerCappedCursorBase {
+class WiredTigerOplogCursor final : public WiredTigerCappedCursorBase {
 public:
-    WiredTigerOplogCursor(OperationContext* opCtx,
-                          const WiredTigerRecordStoreBase& rs,
-                          bool forward);
+    WiredTigerOplogCursor(OperationContext* opCtx, const WiredTigerRecordStore& rs, bool forward);
 
     boost::optional<Record> next() override;
     boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
 
 protected:
-    void initVisibility(OperationContext* opCtx) override;
+    void initVisibility() override;
     bool isVisible(const RecordId& id) override;
     void resetVisibility() override;
 

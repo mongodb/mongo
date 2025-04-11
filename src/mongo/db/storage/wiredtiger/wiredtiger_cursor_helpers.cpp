@@ -41,8 +41,8 @@
 namespace mongo {
 
 namespace {
-void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
-    if (ru.gatherWriteContextForDebugging()) {
+void handleWriteContextForDebugging(WiredTigerRecoveryUnitBase& ru, WT_CURSOR* cursor) {
+    if (ru.shouldGatherWriteContextForDebugging()) {
         BSONObjBuilder builder;
 
         std::string s;
@@ -57,7 +57,7 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, WT_CURSOR* curso
 }
 }  // namespace
 
-int wiredTigerCursorInsert(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
+int wiredTigerCursorInsert(WiredTigerRecoveryUnitBase& ru, WT_CURSOR* cursor) {
     int ret = cursor->insert(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
@@ -68,7 +68,7 @@ int wiredTigerCursorInsert(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     return ret;
 }
 
-int wiredTigerCursorModify(WiredTigerRecoveryUnit& ru,
+int wiredTigerCursorModify(WiredTigerRecoveryUnitBase& ru,
                            WT_CURSOR* cursor,
                            WT_MODIFY* entries,
                            int nentries) {
@@ -82,7 +82,7 @@ int wiredTigerCursorModify(WiredTigerRecoveryUnit& ru,
     return ret;
 }
 
-int wiredTigerCursorUpdate(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
+int wiredTigerCursorUpdate(WiredTigerRecoveryUnitBase& ru, WT_CURSOR* cursor) {
     int ret = cursor->update(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();
@@ -93,7 +93,7 @@ int wiredTigerCursorUpdate(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
     return ret;
 }
 
-int wiredTigerCursorRemove(WiredTigerRecoveryUnit& ru, WT_CURSOR* cursor) {
+int wiredTigerCursorRemove(WiredTigerRecoveryUnitBase& ru, WT_CURSOR* cursor) {
     int ret = cursor->remove(cursor);
     if (MONGO_likely(ret == 0)) {
         ru.setTxnModified();

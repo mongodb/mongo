@@ -40,9 +40,6 @@ class OperationContext;
 
 class RecoveryUnitNoop : public RecoveryUnit {
 public:
-    RecoveryUnitNoop();
-    ~RecoveryUnitNoop() override;
-
     bool isNoop() const final {
         return true;
     }
