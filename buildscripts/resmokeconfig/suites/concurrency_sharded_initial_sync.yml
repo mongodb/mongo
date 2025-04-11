@@ -178,4 +178,3 @@ executor:
     num_shards: 2
     num_mongos: 2
     enable_balancer: true
-    random_migrations: true
