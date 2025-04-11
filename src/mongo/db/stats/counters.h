@@ -612,6 +612,32 @@ public:
 };
 extern TextOrCounters textOrCounters;
 
+class BucketAutoCounters {
+public:
+    BucketAutoCounters() = default;
+    BucketAutoCounters(BucketAutoCounters&) = delete;
+    BucketAutoCounters& operator=(const BucketAutoCounters&) = delete;
+
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
+        bucketAutoSpills.incrementRelaxed(spills);
+        bucketAutoSpilledBytes.incrementRelaxed(spilledBytes);
+        bucketAutoSpilledRecords.incrementRelaxed(spilledRecords);
+        bucketAutoSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
+    }
+
+    Counter64& bucketAutoSpills = *MetricBuilder<Counter64>{"query.bucketAuto.spills"};
+    // The spilled storage size after compression might be different from the bytes spilled.
+    Counter64& bucketAutoSpilledBytes = *MetricBuilder<Counter64>{"query.bucketAuto.spilledBytes"};
+    Counter64& bucketAutoSpilledRecords =
+        *MetricBuilder<Counter64>{"query.bucketAuto.spilledRecords"};
+    Counter64& bucketAutoSpilledDataStorageSize =
+        *MetricBuilder<Counter64>{"query.bucketAuto.spilledDataStorageSize"};
+};
+extern BucketAutoCounters bucketAutoCounters;
+
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.
  */

@@ -135,6 +135,15 @@ outputPipelineAndSlowQueryLog(
 
 coll.drop();
 
+section("BucketAuto");
+setServerParameter("internalDocumentSourceBucketAutoMaxMemoryBytes", 1);
+
+assert.commandWorked(coll.insertMany([{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}]));
+outputPipelineAndSlowQueryLog(
+    coll, [{$bucketAuto: {groupBy: "$a", buckets: 2, output: {sum: {$sum: "$b"}}}}], "bucketAuto");
+
+coll.drop();
+
 // TODO SERVER-99887 - add $setWindowFields test
 
 for (let restore of parametersToRestore) {

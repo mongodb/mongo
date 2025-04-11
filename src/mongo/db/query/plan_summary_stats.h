@@ -95,6 +95,7 @@ struct PlanSummaryStats {
 
     // Stages that report SpillingStats.
     enum class SpillingStage {
+        BUCKET_AUTO,
         GRAPH_LOOKUP,
         GROUP,
         SET_WINDOW_FIELDS,

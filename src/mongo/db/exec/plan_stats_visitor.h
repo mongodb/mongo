@@ -89,6 +89,7 @@ struct SpoolStats;
 struct EofStats;
 struct DocumentSourceIdLookupStats;
 struct DocumentSourceGraphLookupStats;
+struct DocumentSourceBucketAutoStats;
 
 /**
  * Visitor pattern for PlanStageStats.
@@ -161,6 +162,8 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceIdLookupStats> stats) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceBucketAutoStats> stats) = 0;
 };
 
 /**
@@ -226,6 +229,7 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceIdLookupStats> stats) override {}
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) override {
     }
+    void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceBucketAutoStats> stats) override {}
 };
 
 using PlanStatsMutableVisitor = PlanStatsVisitor<false>;

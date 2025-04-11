@@ -47,6 +47,9 @@ assert.commandWorked(db.adminCommand({
     setParameter: 1,
     internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
 }));
+// Spilling memory threshold for $bucketAuto
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 1}));
 
 const nDocs = 10;
 for (let i = 0; i < nDocs; i++) {
@@ -65,6 +68,7 @@ const stages = {
         }
     },
     lookup: {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}},
+    bucketAuto: {$bucketAuto: {groupBy: "$_id", buckets: 2, output: {count: {$sum: 1}}}},
 };
 
 function getServerStatusSpillingMetrics(serverStatus, stageName) {
@@ -91,6 +95,12 @@ function getServerStatusSpillingMetrics(serverStatus, stageName) {
         return {
             spills: lookupMetrics.hashLookupSpillToDisk,
             spilledBytes: lookupMetrics.hashLookupSpillToDiskBytes,
+        };
+    } else if (stageName === '$bucketAuto') {
+        const bucketAutoMetrics = serverStatus.metrics.query.bucketAuto;
+        return {
+            spills: bucketAutoMetrics.spills,
+            spilledBytes: bucketAutoMetrics.spilledBytes,
         };
     }
     return {
@@ -166,6 +176,11 @@ if (isSbeEnabled) {
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 471},
     });
 }
+testSpillingMetrics({
+    stage: stages['bucketAuto'],
+    expectedSpillingMetrics: {spills: 19, spilledBytes: 4224},
+    expectedSbeSpillingMetrics: {spills: 19, spilledBytes: 4224}
+});
 
 /*
  * Tests that query fails when attempting to spill with insufficient disk space

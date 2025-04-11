@@ -1379,4 +1379,24 @@ struct DocumentSourceGraphLookupStats : public SpecificStats {
     PlanSummaryStats planSummaryStats;
 };
 
+struct DocumentSourceBucketAutoStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const override {
+        return std::make_unique<DocumentSourceBucketAutoStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    SpillingStats spillingStats;
+};
+
 }  // namespace mongo

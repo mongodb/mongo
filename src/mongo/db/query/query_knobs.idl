@@ -651,6 +651,19 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalDocumentSourceBucketAutoMaxMemoryBytes:
+        description: >-
+            Maximum size of the data that the $bucketAuto aggregation stage will cache in-memory
+            before spilling to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalDocumentSourceBucketAutoMaxMemoryBytes"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false
+
     internalDocumentSourceCursorBatchSizeBytes:
         description: >-
             Maximum amount of data that DocumentSourceCursor will cache from the underlying

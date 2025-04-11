@@ -292,7 +292,7 @@ public:
      * Spills not-yet-returned data to disk and returns a new iterator. Invalidates the current
      * iterator.
      */
-    virtual std::unique_ptr<SortIteratorInterface<Key, Value>> spill(
+    [[nodiscard]] virtual std::unique_ptr<SortIteratorInterface<Key, Value>> spill(
         const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) {
         MONGO_UNREACHABLE_TASSERT(9917200);
     }

@@ -155,7 +155,7 @@ protected:
         const size_t maxMemoryUsageBytes = 2000;
         const int numBuckets = 2;
         return DocumentSourceBucketAuto::create(
-            expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
+            expCtx, groupByExpression, numBuckets, maxMemoryUsageBytes);
     }
 
     auto setWindowFields() {

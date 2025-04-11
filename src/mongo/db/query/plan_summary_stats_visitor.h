@@ -117,6 +117,13 @@ public:
 
         accumulate(stats->planSummaryStats);
     }
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceBucketAutoStats> stats) final {
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::BUCKET_AUTO].accumulate(
+                stats->spillingStats);
+        }
+    }
 
 private:
     /**

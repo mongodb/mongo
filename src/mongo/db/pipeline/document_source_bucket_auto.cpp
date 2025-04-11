@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -153,20 +154,25 @@ void DocumentSourceBucketAuto::addVariableRefs(std::set<Variables::Id>* refs) co
     }
 }
 
+SortOptions DocumentSourceBucketAuto::makeSortOptions() {
+    SortOptions opts;
+    opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
+    if (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter()) {
+        opts.extSortAllowed = true;
+        opts.tempDir = pExpCtx->getTempDir();
+        opts.sorterFileStats = &_sorterFileStats;
+    }
+    return opts;
+}
+
 DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     if (!_sorter) {
-        SortOptions opts;
-        opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
-        if (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter()) {
-            opts.extSortAllowed = true;
-            opts.tempDir = pExpCtx->getTempDir();
-        }
         const auto& valueCmp = pExpCtx->getValueComparator();
         auto comparator = [valueCmp](const Value& lhs, const Value& rhs) {
             return valueCmp.compare(lhs, rhs);
         };
 
-        _sorter = Sorter<Value, Document>::make(opts, comparator);
+        _sorter = Sorter<Value, Document>::make(makeSortOptions(), comparator);
     }
 
     auto next = pSource->getNext();
@@ -243,6 +249,15 @@ void DocumentSourceBucketAuto::initializeBucketIteration() {
     // Initialize the iterator on '_sorter'.
     invariant(_sorter);
     _sortedInput = _sorter->done();
+
+    _stats.spillingStats.updateSpillingStats(_sorter->stats().spilledRanges(),
+                                             _sorterFileStats.bytesSpilledUncompressed(),
+                                             _sorter->stats().spilledKeyValuePairs(),
+                                             _sorterFileStats.bytesSpilled());
+    bucketAutoCounters.incrementPerSpilling(_sorter->stats().spilledRanges(),
+                                            _sorterFileStats.bytesSpilledUncompressed(),
+                                            _sorter->stats().spilledKeyValuePairs(),
+                                            _sorterFileStats.bytesSpilled());
 
     _sorter.reset();
 
@@ -394,6 +409,32 @@ void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
 }
 
+void DocumentSourceBucketAuto::doForceSpill() {
+    if (_sorter) {
+        _sorter->spill();
+    } else if (_sortedInput && _sortedInput->spillable()) {
+        SortOptions opts = makeSortOptions();
+        SorterTracker tracker;
+        opts.sorterTracker = &tracker;
+
+        auto previousSpilledBytes = _sorterFileStats.bytesSpilledUncompressed();
+        auto previousSpilledDataStorageSize = _sorterFileStats.bytesSpilled();
+
+        _sortedInput = _sortedInput->spill(opts, Sorter<Value, Document>::Settings{});
+
+        _stats.spillingStats.updateSpillingStats(1,
+                                                 _sorterFileStats.bytesSpilledUncompressed() -
+                                                     previousSpilledBytes,
+                                                 tracker.spilledKeyValuePairs.loadRelaxed(),
+                                                 _sorterFileStats.bytesSpilled());
+        bucketAutoCounters.incrementPerSpilling(
+            1,
+            _sorterFileStats.bytesSpilledUncompressed() - previousSpilledBytes,
+            tracker.spilledKeyValuePairs.loadRelaxed(),
+            _sorterFileStats.bytesSpilled() - previousSpilledDataStorageSize);
+    }
+}
+
 Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
@@ -423,9 +464,9 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
     int numBuckets,
+    uint64_t maxMemoryBytes,
     std::vector<AccumulationStatement> accumulationStatements,
-    const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
-    uint64_t maxMemoryUsageBytes) {
+    const boost::intrusive_ptr<GranularityRounder>& granularityRounder) {
     uassert(40243,
             str::stream() << "The $bucketAuto 'buckets' field must be greater than 0, but found: "
                           << numBuckets,
@@ -445,7 +486,7 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
                                         numBuckets,
                                         std::move(accumulationStatements),
                                         granularityRounder,
-                                        maxMemoryUsageBytes);
+                                        maxMemoryBytes);
 }
 
 DocumentSourceBucketAuto::DocumentSourceBucketAuto(
@@ -456,6 +497,7 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
     uint64_t maxMemoryUsageBytes)
     : DocumentSource(kStageName, pExpCtx),
+      _sorterFileStats(nullptr /*sorterTracker*/),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _groupByExpression(groupByExpression),
       _granularityRounder(granularityRounder),
@@ -559,11 +601,13 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
             "$bucketAuto requires 'groupBy' and 'buckets' to be specified",
             groupByExpression && numBuckets);
 
-    return DocumentSourceBucketAuto::create(pExpCtx,
-                                            groupByExpression,
-                                            numBuckets.value(),
-                                            std::move(accumulationStatements),
-                                            granularityRounder);
+    return DocumentSourceBucketAuto::create(
+        pExpCtx,
+        groupByExpression,
+        numBuckets.value(),
+        internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed(),
+        std::move(accumulationStatements),
+        granularityRounder);
 }
 
 }  // namespace mongo

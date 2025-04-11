@@ -51,7 +51,6 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -392,7 +391,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
-        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
+        expCtx, groupByExpression, numBuckets, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
@@ -413,12 +412,21 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
                        (Document{{"_id", Document{{"min", 2}, {"max", 3}}}, {"count", 2}}));
 
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+    ASSERT_TRUE(bucketAutoStage->usedDisk());
+
+    auto stats =
+        dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
+    ASSERT_NE(stats, nullptr);
+    ASSERT_EQ(stats->spillingStats.getSpills(), 7);
+    ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 13);
+    ASSERT_EQ(stats->spillingStats.getSpilledBytes(), 13910);
+    ASSERT_GT(stats->spillingStats.getSpilledDataStorageSize(), 0);
+    ASSERT_LT(stats->spillingStats.getSpilledDataStorageSize(), 10000);
 }
 
 TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
     auto expCtx = getExpCtx();
 
-    // Allow the $sort stage to spill to disk.
     unittest::TempDir tempDir("DocumentSourceBucketAutoTest");
     expCtx->setTempDir(tempDir.path());
     expCtx->setAllowDiskUse(true);
@@ -429,11 +437,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
-        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
-    auto sort =
-        DocumentSourceSort::create(expCtx,
-                                   {BSON("_id" << -1), expCtx},
-                                   {.limit = 0, .maxMemoryUsageBytes = maxMemoryUsageBytes});
+        expCtx, groupByExpression, numBuckets, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock =
@@ -463,6 +467,114 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
                        (Document{{"_id", Document{{"min", 2}, {"max", 3}}}, {"count", 2}}));
 
     ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+    ASSERT_TRUE(bucketAutoStage->usedDisk());
+}
+
+TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileLoadingDocuments) {
+    auto expCtx = getExpCtx();
+
+    unittest::TempDir tempDir("DocumentSourceBucketAutoTest");
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+
+    VariablesParseState vps = expCtx->variablesParseState;
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
+
+    const int numBuckets = 2;
+    auto bucketAutoStage = DocumentSourceBucketAuto::create(
+        expCtx,
+        groupByExpression,
+        numBuckets,
+        internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed());
+
+    string largeStr(1000, 'x');
+    auto mock =
+        DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 1}, {"largeStr", largeStr}},
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document{{"a", 2}, {"largeStr", largeStr}},
+                                           Document{{"a", 3}, {"largeStr", largeStr}}},
+                                          expCtx);
+    bucketAutoStage->setSource(mock.get());
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    bucketAutoStage->forceSpill();
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", Document{{"min", 0}, {"max", 2}}}, {"count", 2}}));
+
+    next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", Document{{"min", 2}, {"max", 3}}}, {"count", 2}}));
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+    ASSERT_TRUE(bucketAutoStage->usedDisk());
+
+    auto stats =
+        dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
+    ASSERT_NE(stats, nullptr);
+    ASSERT_EQ(stats->spillingStats.getSpills(), 2);
+    ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 4);
+    ASSERT_EQ(stats->spillingStats.getSpilledBytes(), 4280);
+    ASSERT_GT(stats->spillingStats.getSpilledDataStorageSize(), 0);
+    ASSERT_LT(stats->spillingStats.getSpilledDataStorageSize(),
+              stats->spillingStats.getSpilledBytes());
+}
+
+TEST_F(BucketAutoTests, ShouldBeAbleToForceSpillWhileReturningDocuments) {
+    auto expCtx = getExpCtx();
+
+    unittest::TempDir tempDir("DocumentSourceBucketAutoTest");
+    expCtx->setTempDir(tempDir.path());
+    expCtx->setAllowDiskUse(true);
+
+    VariablesParseState vps = expCtx->variablesParseState;
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
+
+    const int numBuckets = 2;
+    auto bucketAutoStage = DocumentSourceBucketAuto::create(
+        expCtx,
+        groupByExpression,
+        numBuckets,
+        internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed());
+
+    string largeStr(1000, 'x');
+    auto mock = DocumentSourceMock::createForTest({Document{{"a", 0}, {"largeStr", largeStr}},
+                                                   Document{{"a", 1}, {"largeStr", largeStr}},
+                                                   Document{{"a", 2}, {"largeStr", largeStr}},
+                                                   Document{{"a", 3}, {"largeStr", largeStr}}},
+                                                  expCtx);
+    bucketAutoStage->setSource(mock.get());
+
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", Document{{"min", 0}, {"max", 2}}}, {"count", 2}}));
+
+    bucketAutoStage->forceSpill();
+
+    next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", Document{{"min", 2}, {"max", 3}}}, {"count", 2}}));
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+    ASSERT_TRUE(bucketAutoStage->usedDisk());
+
+    auto stats =
+        dynamic_cast<const DocumentSourceBucketAutoStats*>(bucketAutoStage->getSpecificStats());
+    ASSERT_NE(stats, nullptr);
+    ASSERT_EQ(stats->spillingStats.getSpills(), 1);
+    ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 1);
+    ASSERT_EQ(stats->spillingStats.getSpilledBytes(), 1070);
+    ASSERT_GT(stats->spillingStats.getSpilledDataStorageSize(), 0);
+    ASSERT_LT(stats->spillingStats.getSpilledDataStorageSize(),
+              stats->spillingStats.getSpilledBytes());
 }
 
 TEST_F(BucketAutoTests, SourceNameIsBucketAuto) {
@@ -583,11 +695,13 @@ TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
 
     // Use the create() helper.
     const int numBuckets = 0;
-    ASSERT_THROWS_CODE(
-        DocumentSourceBucketAuto::create(
-            getExpCtx(), ExpressionConstant::create(getExpCtxRaw(), Value(0)), numBuckets),
-        AssertionException,
-        40243);
+    ASSERT_THROWS_CODE(DocumentSourceBucketAuto::create(
+                           getExpCtx(),
+                           ExpressionConstant::create(getExpCtxRaw(), Value(0)),
+                           numBuckets,
+                           internalDocumentSourceBucketAutoMaxMemoryBytes.loadRelaxed()),
+                       AssertionException,
+                       40243);
 }
 
 TEST_F(BucketAutoTests, FailsWithNonOrInvalidExpressionGroupBy) {
@@ -689,7 +803,7 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
-        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
+        expCtx, groupByExpression, numBuckets, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::createForTest(
@@ -728,7 +842,7 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(
-        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
+        expCtx, groupByExpression, numBuckets, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes / 5, 'x');
     auto mock =

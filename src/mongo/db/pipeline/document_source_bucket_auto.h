@@ -104,8 +104,6 @@ public:
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
-    static const uint64_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
-
     /**
      * Convenience method to create a $bucketAuto stage.
      *
@@ -116,9 +114,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         int numBuckets,
+        uint64_t maxMemoryUsageBytes,
         std::vector<AccumulationStatement> accumulationStatements = {},
-        const boost::intrusive_ptr<GranularityRounder>& granularityRounder = nullptr,
-        uint64_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
+        const boost::intrusive_ptr<GranularityRounder>& granularityRounder = nullptr);
 
     /**
      * Parses a $bucketAuto stage from the user-supplied BSON.
@@ -139,9 +137,19 @@ public:
     const std::vector<AccumulationStatement>& getAccumulationStatements() const;
     std::vector<AccumulationStatement>& getMutableAccumulationStatements();
 
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
+    }
+
+    bool usedDisk() final {
+        return _sorter ? _sorter->stats().spilledRanges() > 0
+                       : _stats.spillingStats.getSpills() > 0;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
+    void doForceSpill() final;
 
 private:
     DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -168,6 +176,8 @@ private:
         boost::optional<Value> previousMax;
         boost::optional<std::pair<Value, Document>> currentMin;
     };
+
+    SortOptions makeSortOptions();
 
     /**
      * Consumes all of the documents from the source in the pipeline and sorts them by their
@@ -202,6 +212,7 @@ private:
      */
     Document makeDocument(const Bucket& bucket);
 
+    SorterFileStats _sorterFileStats;
     std::unique_ptr<Sorter<Value, Document>> _sorter;
     std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
 
@@ -215,6 +226,8 @@ private:
     long long _nDocuments = 0;
     long long _nDocPositions = 0;
     BucketDetails _currentBucketDetails;
+
+    DocumentSourceBucketAutoStats _stats;
 };
 
 }  // namespace mongo

@@ -180,3 +180,31 @@
 }
 ```
 
+## 9. BucketAuto
+### Pipeline
+```json
+[
+	{
+		"$bucketAuto" : {
+			"groupBy" : "$a",
+			"buckets" : 2,
+			"output" : {
+				"sum" : {
+					"$sum" : "$b"
+				}
+			}
+		}
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"bucketAutoSpilledBytes" : "X",
+	"bucketAutoSpilledDataStorageSize" : "X",
+	"bucketAutoSpilledRecords" : 13,
+	"bucketAutoSpills" : 7,
+	"usedDisk" : true
+}
+```
+
