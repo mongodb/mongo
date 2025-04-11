@@ -649,25 +649,34 @@ be invoked as either:
         # has been called >1 times
         assert trace._TRACER_PROVIDER is None
 
+        extra_context = {
+            "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
+            "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
+            "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
+            "evergreen.task.execution": _config.EVERGREEN_EXECUTION
+            if _config.EVERGREEN_TASK_ID
+            else None,  # We need to explicitly set this to None to prevent it from being included even when it makes no sense locally.
+            "evergreen.task.id": _config.EVERGREEN_TASK_ID,
+            "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
+            "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
+            "evergreen.version.id": _config.EVERGREEN_VERSION_ID,
+            "evergreen.revision": _config.EVERGREEN_REVISION,
+            "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
+            "resmoke.cmd.verbatim": " ".join(sys.argv),
+            "resmoke.cmd": values.command,
+            "machine.os": sys.platform,
+        }
+
+        for arg, value in vars(values).items():
+            if arg != "command" and value is not None:
+                extra_context[f"resmoke.cmd.params.{arg}"] = value
+
         try:
             setup_success = _set_up_tracing(
                 _config.OTEL_COLLECTOR_DIR,
                 _config.OTEL_TRACE_ID,
                 _config.OTEL_PARENT_ID,
-                extra_context={
-                    "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
-                    "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
-                    "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
-                    "evergreen.task.execution": _config.EVERGREEN_EXECUTION
-                    if _config.EVERGREEN_TASK_ID
-                    else None,  # We need to explicitly set this to None to prevent it from being included even when it makes no sense locally.
-                    "evergreen.task.id": _config.EVERGREEN_TASK_ID,
-                    "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
-                    "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
-                    "evergreen.version.id": _config.EVERGREEN_VERSION_ID,
-                    "evergreen.revision": _config.EVERGREEN_REVISION,
-                    "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
-                },
+                extra_context=extra_context,
             )
             if not setup_success:
                 print(
