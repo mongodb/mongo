@@ -263,6 +263,8 @@ public:
     boost::optional<repl::ReadConcernArgs> readConcern;
     boost::optional<ShardVersion> shardVersion;
     boost::optional<DatabaseVersion> databaseVersion;
+    std::vector<NamespaceInfoEntry> nsInfoEntries;
+    bool isBulkWriteCommand = false;
 };
 
 /**
@@ -274,7 +276,6 @@ StrippedFields stripReadConcernAndShardAndDbVersions(const BSONObj& cmdObj,
                                                      BSONObjBuilder* cmdWithoutReadConcernBuilder) {
     BSONObjBuilder strippedCmdBuilder;
     StrippedFields strippedFields;
-
     for (auto&& elem : cmdObj) {
         if (elem.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
             strippedFields.readConcern =
@@ -287,12 +288,26 @@ StrippedFields stripReadConcernAndShardAndDbVersions(const BSONObj& cmdObj,
             strippedFields.databaseVersion = DatabaseVersion(elem.embeddedObject());
             continue;
         }
+        // For the BulkWriteCommandRequest we need to strip all the NamespaceInfoEntry so that
+        // we can update the version in each of them. Ensure to extract nsInfo only in case
+        // of bulkWrite.
+        if (elem.fieldNameStringData() == BulkWriteCommandRequest::kCommandName) {
+            strippedFields.isBulkWriteCommand = true;
+        }
+        if (strippedFields.isBulkWriteCommand &&
+            elem.fieldNameStringData() == BulkWriteCommandRequest::kNsInfoFieldName) {
+            for (auto&& nsInfoEntry : elem.embeddedObject()) {
+                IDLParserContext context(BulkWriteCommandRequest::kNsInfoFieldName);
+                strippedFields.nsInfoEntries.emplace_back(
+                    NamespaceInfoEntry::parse(context, nsInfoEntry.embeddedObject()));
+            }
+            continue;
+        }
 
         if (cmdWithoutReadConcernBuilder) {
             cmdWithoutReadConcernBuilder->append(elem);
         }
     }
-
     return strippedFields;
 }
 
@@ -312,6 +327,33 @@ void setPlacementConflictTimeToDatabaseVersionIfNeeded(
     } else if (placementConflictTimeForNonSnapshotReadConcern) {
         databaseVersion.setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
     }
+}
+
+void setPlacementConflictTimeToBulkWrite(std::vector<NamespaceInfoEntry>& nsInfoEntries,
+                                         bool hasTxnCreatedAnyDatabase,
+                                         boost::optional<LogicalTime> placementConflictTime,
+                                         BSONObjBuilder* cmdBob) {
+
+    BSONArrayBuilder arrayBuilder(cmdBob->subarrayStart(BulkWriteCommandRequest::kNsInfoFieldName));
+    for (auto& nsInfoEntry : nsInfoEntries) {
+        BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());
+        auto shardVersion = nsInfoEntry.getShardVersion();
+        auto dbVersion = nsInfoEntry.getDatabaseVersion();
+        if (dbVersion) {
+            setPlacementConflictTimeToDatabaseVersionIfNeeded(
+                placementConflictTime, hasTxnCreatedAnyDatabase, *dbVersion);
+            nsInfoEntry.setDatabaseVersion(dbVersion);
+        }
+        if (shardVersion) {
+            if (placementConflictTime) {
+                shardVersion->setPlacementConflictTime(*placementConflictTime);
+            }
+            nsInfoEntry.setShardVersion(shardVersion);
+        }
+        nsInfoEntry.serialize(&subObjBuilder);
+        subObjBuilder.doneFast();
+    }
+    arrayBuilder.doneFast();
 }
 
 }  // namespace
@@ -564,7 +606,17 @@ BSONObj TransactionRouter::appendFieldsForContinueTransaction(
     const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
     bool hasTxnCreatedAnyDatabase) {
     BSONObjBuilder cmdBob;
-    const auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
+    auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
+
+    // The bulkWrite requires the shard and database versions on an internal field for
+    // every write operation, which has different layout compared to a standard command and it
+    // requires special handling. Update the shard/db version for every nsInfo entry.
+    if (strippedFields.isBulkWriteCommand) {
+        setPlacementConflictTimeToBulkWrite(strippedFields.nsInfoEntries,
+                                            hasTxnCreatedAnyDatabase,
+                                            placementConflictTimeForNonSnapshotReadConcern,
+                                            &cmdBob);
+    }
 
     if (auto shardVersion = strippedFields.shardVersion) {
         if (placementConflictTimeForNonSnapshotReadConcern) {
@@ -583,7 +635,6 @@ BSONObj TransactionRouter::appendFieldsForContinueTransaction(
         BSONObjBuilder dbvBuilder(cmdBob.subobjStart(DatabaseVersion::kDatabaseVersionField));
         databaseVersion->serialize(&dbvBuilder);
     }
-
     return cmdBob.obj();
 }
 
@@ -2421,7 +2472,18 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
     bool hasTxnCreatedAnyDatabase) {
     BSONObjBuilder cmdBob;
 
-    const auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
+    auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
+
+    // The bulkWrite requires the shard and database versions on an internal field for
+    // every write operation, which has different layout compared to a standard command and it
+    // requires special handling. Update the shard/db version for every nsInfo entry.
+    if (strippedFields.isBulkWriteCommand) {
+        setPlacementConflictTimeToBulkWrite(strippedFields.nsInfoEntries,
+                                            hasTxnCreatedAnyDatabase,
+                                            placementConflictTimeForNonSnapshotReadConcern,
+                                            &cmdBob);
+    }
+
     const auto finalReadConcern =
         reconcileReadConcern(strippedFields.readConcern,
                              txnLevelReadConcern,
