@@ -32,7 +32,7 @@ def main():
         enterprise_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "enterprise"
         if not enterprise_mod.exists():
             print(
-                f"{enterprise_mod.relative_to(REPO_ROOT).as_posix()} missing, defaulting to local enterprise build. Create an empty directory to bypass this."
+                f"{enterprise_mod.relative_to(REPO_ROOT).as_posix()} missing, defaulting to local non-enterprise build (--config=local --build_enterprise=False). Add the directory to not automatically add these options."
             )
             args += ["--build_enterprise=False", "--config=local"]
 
