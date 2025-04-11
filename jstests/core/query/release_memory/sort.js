@@ -56,8 +56,6 @@ const classicGroupIncreasedSpillingInitialValue =
     getServerParameter(classicGroupIncreasedSpillingKnob);
 setServerParameter(classicGroupIncreasedSpillingKnob, false);
 
-// TODO SERVER-102896 add bounded sort test
-
 const pipelines = [
     [
         {$sort: {index: 1, padding: 1}},  // Will be pushed down to find.

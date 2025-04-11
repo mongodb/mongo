@@ -1696,7 +1696,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
     this->_stats.incrementMemUsage(memUsage);
     this->_stats.incrementBytesSorted(memUsage);
     if (this->_stats.memUsage() > _opts.maxMemoryUsageBytes)
-        _spill();
+        _spill(_opts.maxMemoryUsageBytes);
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
@@ -1794,7 +1794,7 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
 }
 
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
-void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
+void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryUsageBytes) {
     if (_heap.empty())
         return;
 
@@ -1811,15 +1811,18 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
         }
         _heap.swap(retained);
 
-        if (this->_stats.memUsage() < _opts.maxMemoryUsageBytes) {
+        if (this->_stats.memUsage() < maxMemoryUsageBytes) {
             return;
         }
     }
 
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            str::stream() << "Sort exceeded memory limit of " << this->_opts.maxMemoryUsageBytes
+            str::stream() << "Sort exceeded memory limit of " << maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting.",
             _opts.extSortAllowed);
+
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        _opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
 
     this->_stats.incrementSpilledKeyValuePairs(_heap.size());
     this->_stats.incrementSpilledRanges();

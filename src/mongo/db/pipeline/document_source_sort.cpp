@@ -734,8 +734,11 @@ bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
 }
 
 void DocumentSourceSort::doForceSpill() {
-    if (_sortExecutor.has_value()) {
+    if (_sortExecutor) {
         _sortExecutor->forceSpill();
+    }
+    if (_timeSorter) {
+        _timeSorter->forceSpill();
     }
 }
 

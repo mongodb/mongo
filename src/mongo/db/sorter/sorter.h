@@ -526,6 +526,8 @@ public:
     // But if _checkInput is false, don't do that check.
     // The output will be in the wrong order but otherwise it should work.
     virtual bool checkInput() const = 0;
+
+    virtual void forceSpill() = 0;
 };
 
 /**
@@ -609,13 +611,17 @@ public:
         return _checkInput;
     }
 
+    void forceSpill() override {
+        _spill(0 /*maxMemoryUsageBytes*/);
+    }
+
     const Comparator compare;
     const BoundMaker makeBound;
 
 private:
     using SpillIterator = SortIteratorInterface<Key, Value>;
 
-    void _spill();
+    void _spill(size_t maxMemoryUsageBytes);
 
     bool _checkInput;
 

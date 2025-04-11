@@ -1822,6 +1822,68 @@ TEST_F(BoundedSorterTest, LimitSpill) {
     ASSERT_EQ(sorter->stats().spilledRanges(), 1);
 }
 
+TEST_F(BoundedSorterTest, ForceSpill) {
+    SorterTracker sorterTracker;
+    SorterFileStats fileStats(&sorterTracker);
+    auto options = SortOptions()
+                       .ExtSortAllowed()
+                       .TempDir("unused_temp_dir")
+                       .MaxMemoryUsageBytes(100 * 1024 * 1024)
+                       .Tracker(&sorterTracker)
+                       .FileStats(&fileStats);
+
+    sorter = makeAsc(options);
+    // Sorter stores pointers to sorterTracker and fileStats, it has to be destroyed before them.
+    ScopeGuard sorterReset{[&]() {
+        sorter.reset();
+    }};
+
+    std::vector<Doc> input = {
+        {7},
+        {6},
+        {-2},
+        {-3},
+        {9},  // will return -1
+        {7},
+        {6},
+        {-1},
+        {0},
+        {11},  // will return 0
+        {5},
+        {4},
+        {1},
+        {12},  // will return 1
+        {3},
+        {2},
+    };
+
+    std::vector<Doc> output;
+    for (size_t i = 0; i < input.size(); ++i) {
+        sorter->add(input[i].time, std::move(input[i]));
+        while (sorter->getState() == S::State::kReady) {
+            output.push_back(sorter->next().second);
+        }
+        if (i % 3 == 2) {
+            sorter->forceSpill();
+        }
+    }
+    sorter->done();
+
+    while (sorter->getState() == S::State::kReady) {
+        output.push_back(sorter->next().second);
+    }
+    ASSERT(sorter->getState() == S::State::kDone);
+
+    ASSERT_EQ(output.size(), input.size());
+    assertSorted(output);
+
+    ASSERT_EQ(sorter->stats().spilledRanges(), 5);
+    ASSERT_EQ(sorter->stats().spilledKeyValuePairs(), 13);
+    ASSERT_EQ(fileStats.bytesSpilledUncompressed(), 104);
+    ASSERT_GT(fileStats.bytesSpilled(), 0);
+    ASSERT_LT(fileStats.bytesSpilled(), 1000);
+}
+
 TEST_F(BoundedSorterTest, DescSorted) {
     sorter = makeDesc({});
     auto output = sort({
