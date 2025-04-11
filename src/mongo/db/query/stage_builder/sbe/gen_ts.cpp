@@ -342,10 +342,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
     // Add a TsBucketToCellBlock stage. Among other things, this stage generates a "default" bitmap
     // of all 1s in to this slot. The bitmap represents which documents are present (1) and which
     // have been filtered (0). This bitmap is carried around until the block_to_row stage.
-    auto [stage, bitmapSlot, metaSlot, topLevelSlots, traverseSlots] =
+    auto [stage, bitmapSlot, topLevelSlots, traverseSlots] =
         b.makeTsBucketToCellBlock(std::move(childStage),
                                   bucketSlot,
-                                  false /* reqMeta */,
                                   topLevelReqs,
                                   traverseReqs,
                                   unpackNode->bucketSpec.timeField());

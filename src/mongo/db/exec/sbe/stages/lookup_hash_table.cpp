@@ -450,7 +450,7 @@ void LookupHashTable::reset(bool fromClose) {
     _totalSpilledBytes = 0;
 }
 
-void LookupHashTable::doSaveState(bool relinquishCursor) {
+void LookupHashTable::doSaveState() {
     if (_recordStoreHt) {
         _recordStoreHt->saveState();
     }
@@ -459,7 +459,7 @@ void LookupHashTable::doSaveState(bool relinquishCursor) {
     }
 }
 
-void LookupHashTable::doRestoreState(bool relinquishCursor) {
+void LookupHashTable::doRestoreState() {
     if (_recordStoreHt) {
         _recordStoreHt->restoreState();
     }

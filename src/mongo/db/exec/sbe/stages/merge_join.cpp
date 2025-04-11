@@ -331,11 +331,7 @@ void MergeJoinStage::close() {
     _outerProjectsBuffer.clear();
 }
 
-void MergeJoinStage::doSaveState(bool relinquishCursor) {
-    if (!relinquishCursor) {
-        return;
-    }
-
+void MergeJoinStage::doSaveState() {
     // We only have to save shallow non-owning materialized rows.
     prepareForYielding(_currentOuterKey, true);
     prepareForYielding(_currentInnerKey, true);

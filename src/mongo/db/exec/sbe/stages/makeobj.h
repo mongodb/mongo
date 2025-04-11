@@ -147,7 +147,7 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool relinquishCursor) final;
+    void doSaveState() final;
     bool shouldOptimizeSaveState(size_t) const final {
         return true;
     }

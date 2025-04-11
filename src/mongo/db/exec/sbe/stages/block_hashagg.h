@@ -82,7 +82,7 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
-    void doSaveState(bool relinquishCursor) override {
+    void doSaveState() override {
         // We don't need to store this across yields, as we resize it each time.
         _compoundKeys.clear();
     }

@@ -225,7 +225,7 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
     return ctx.getAccessor(slot);
 }
 
-void ScanStage::doSaveState(bool relinquishCursor) {
+void ScanStage::doSaveState() {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     if (slotsAccessible()) {
         if (_state->recordSlot &&
@@ -241,20 +241,18 @@ void ScanStage::doSaveState(bool relinquishCursor) {
     }
 #endif
 
-    if (relinquishCursor) {
-        if (_state->recordSlot) {
-            prepareForYielding(_recordAccessor, slotsAccessible());
-        }
-        if (_state->recordIdSlot) {
-            // TODO: SERVER-72054
-            // RecordId are currently (incorrectly) accessed after EOF, therefore we must treat them
-            // as always accessible rather than invalidate them when slots are disabled. We should
-            // use slotsAccessible() instead of true, once the bug is fixed.
-            prepareForYielding(_recordIdAccessor, true);
-        }
-        for (auto& accessor : _scanFieldAccessors) {
-            prepareForYielding(accessor, slotsAccessible());
-        }
+    if (_state->recordSlot) {
+        prepareForYielding(_recordAccessor, slotsAccessible());
+    }
+    if (_state->recordIdSlot) {
+        // TODO: SERVER-72054
+        // RecordId are currently (incorrectly) accessed after EOF, therefore we must treat them
+        // as always accessible rather than invalidate them when slots are disabled. We should
+        // use slotsAccessible() instead of true, once the bug is fixed.
+        prepareForYielding(_recordIdAccessor, true);
+    }
+    for (auto& accessor : _scanFieldAccessors) {
+        prepareForYielding(accessor, slotsAccessible());
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -263,19 +261,15 @@ void ScanStage::doSaveState(bool relinquishCursor) {
     }
 #endif
 
-    if (auto cursor = getActiveCursor(); cursor != nullptr && relinquishCursor) {
+    if (auto cursor = getActiveCursor(); cursor != nullptr) {
         cursor->save();
-    }
-
-    if (auto cursor = getActiveCursor()) {
-        cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
 
     _indexCatalogEntryMap.clear();
     _coll.reset();
 }
 
-void ScanStage::doRestoreState(bool relinquishCursor) {
+void ScanStage::doRestoreState() {
     invariant(_opCtx);
 
     if (!_coll.isAcquisition()) {
@@ -287,26 +281,12 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     }
 
     if (auto cursor = getActiveCursor(); cursor != nullptr) {
-        if (relinquishCursor) {
-            const auto tolerateCappedCursorRepositioning = false;
-            const bool couldRestore = cursor->restore(tolerateCappedCursorRepositioning);
-            uassert(
-                ErrorCodes::CappedPositionLost,
+        const auto tolerateCappedCursorRepositioning = false;
+        const bool couldRestore = cursor->restore(tolerateCappedCursorRepositioning);
+        uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",
                 couldRestore);
-        } else if (_coll.getPtr()->isCapped()) {
-            // We cannot check for capped position lost here, as it requires us to reposition the
-            // cursor, which would free the underlying value and break the contract of
-            // restoreState(fullSave=false). So we defer the capped collection position lost check
-            // to the following getNext() call by setting this flag.
-            //
-            // The intention in this codepath is to retain a valid and positioned cursor across
-            // query yields / getMore commands. However, it is safe to reposition the cursor in
-            // getNext() and we must reset the cursor for capped collections in order to check for
-            // CappedPositionLost errors.
-            _needsToCheckCappedPositionLost = true;
-        }
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -455,20 +435,8 @@ PlanState ScanStage::getNext() {
     disableSlotAccess();
 
     // This call to checkForInterrupt() may result in a call to save() or restore() on the entire
-    // PlanStage tree if a yield occurs. It's important that we call checkForInterrupt() before
-    // checking '_needsToCheckCappedPositionLost' since a call to restoreState() may set
-    // '_needsToCheckCappedPositionLost'.
+    // PlanStage tree if a yield occurs.
     checkForInterruptAndYield(_opCtx);
-
-    if (_needsToCheckCappedPositionLost) {
-        _cursor->save();
-        if (!_cursor->restore(false /* do not tolerate capped position lost */)) {
-            uasserted(ErrorCodes::CappedPositionLost,
-                      "CollectionScan died due to position in capped collection being deleted. ");
-        }
-
-        _needsToCheckCappedPositionLost = false;
-    }
 
     // Optimized so the most common case has as short a codepath as possible. Info on bounds edge
     // enforcement:
@@ -933,7 +901,7 @@ value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::Slot
     return ctx.getAccessor(slot);
 }
 
-void ParallelScanStage::doSaveState(bool relinquishCursor) {
+void ParallelScanStage::doSaveState() {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     _lastReturned.clear();
     if (slotsAccessible()) {
@@ -971,7 +939,7 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
     _coll.reset();
 }
 
-void ParallelScanStage::doRestoreState(bool relinquishCursor) {
+void ParallelScanStage::doRestoreState() {
     invariant(_opCtx);
 
     if (!_coll.isAcquisition()) {
@@ -982,7 +950,7 @@ void ParallelScanStage::doRestoreState(bool relinquishCursor) {
         _coll.restoreCollection(_opCtx, _dbName, _collUuid);
     }
 
-    if (_cursor && relinquishCursor) {
+    if (_cursor) {
         const bool couldRestore = _cursor->restore();
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()

@@ -181,8 +181,8 @@ protected:
                 // Yields after 'yieldAfter'th (0-based) documents. Calling saveState() and
                 // restoreState() here is to emulate what happens when the lock is yielded and
                 // unyielded.
-                blockToRow->saveState(false);
-                blockToRow->restoreState(false);
+                blockToRow->saveState();
+                blockToRow->restoreState();
             }
         }
         ASSERT_EQ(expectedData.size(), i);
@@ -811,10 +811,9 @@ void BlockStagesTest::testBlockToBitmap(
             // Test out saveState() and restoreState() for 50% of the documents (the first document,
             // the third document, the fifth document, and so on).
             if (yield && (i % 2 == 0)) {
-                const bool relinquishCursor = true;
                 const bool disableSlotAccess = true;
-                blockToRowPtr->saveState(relinquishCursor, disableSlotAccess);
-                blockToRowPtr->restoreState(relinquishCursor);
+                blockToRowPtr->saveState(disableSlotAccess);
+                blockToRowPtr->restoreState();
             }
         }
     };

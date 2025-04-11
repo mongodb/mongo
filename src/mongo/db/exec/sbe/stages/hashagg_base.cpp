@@ -66,14 +66,9 @@ HashAggBaseStage<Derived>::HashAggBaseStage(StringData stageName,
 }
 
 template <class Derived>
-void HashAggBaseStage<Derived>::doSaveState(bool relinquishCursor) {
-    if (relinquishCursor) {
-        if (_rsCursor) {
-            _recordStore->saveCursor(_opCtx, _rsCursor);
-        }
-    }
+void HashAggBaseStage<Derived>::doSaveState() {
     if (_rsCursor) {
-        _rsCursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
+        _recordStore->saveCursor(_opCtx, _rsCursor);
     }
 
     if (_recordStore) {
@@ -82,13 +77,13 @@ void HashAggBaseStage<Derived>::doSaveState(bool relinquishCursor) {
 }
 
 template <class Derived>
-void HashAggBaseStage<Derived>::doRestoreState(bool relinquishCursor) {
+void HashAggBaseStage<Derived>::doRestoreState() {
     invariant(_opCtx);
     if (_recordStore) {
         _recordStore->restoreState();
     }
 
-    if (_recordStore && _rsCursor && relinquishCursor) {
+    if (_recordStore && _rsCursor) {
         auto couldRestore = _recordStore->restoreCursor(_opCtx, _rsCursor);
         uassert(6196500, "HashAggStage could not restore cursor", couldRestore);
     }

@@ -361,7 +361,7 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
             ASSERT_EQ(0, totalSpillingStats.getSpilledRecords());
 
             // Get ready to yield.
-            lookupStage->saveState(false);
+            lookupStage->saveState();
 
             // Force spill.
             lookupStage->forceSpill();
@@ -374,7 +374,7 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
             ASSERT_EQ(7, totalSpillingStats.getSpilledRecords());
 
             // Get ready to retrieve more records.
-            lookupStage->restoreState(false);
+            lookupStage->restoreState();
         }
         ++idx;
     }

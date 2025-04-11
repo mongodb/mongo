@@ -93,7 +93,7 @@ public:
     void open(bool reOpen) final;
     PlanState getNext() final;
     void close() final;
-    void doSaveState(bool relinquishCursor) final;
+    void doSaveState() final;
 
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;

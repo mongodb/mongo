@@ -185,21 +185,13 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 
 void PlanExecutorSBE::saveState() {
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
-        _root->saveState(false /* NOT relinquishing cursor */);
-
-        // Put the RU into 'kCommit' mode so that subsequent calls to abandonSnapshot() keep
-        // cursors positioned. This ensures that no pointers into memory owned by the storage
-        // engine held by the SBE PlanStage tree become invalid while the executor is in a saved
-        // state.
-        shard_role_details::getRecoveryUnit(_opCtx)->setAbandonSnapshotMode(
-            RecoveryUnit::AbandonSnapshotMode::kCommit);
-        shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        // TODO SERVER-103267 This is no longer supported and related code should be removed.
+        MONGO_UNREACHABLE_TASSERT(9858501);
     } else {
         // Discard the slots as we won't access them before subsequent PlanExecutorSBE::getNext()
         // method call.
-        const bool relinquishCursor = true;
         const bool discardSlotState = true;
-        _root->saveState(relinquishCursor, discardSlotState);
+        _root->saveState(discardSlotState);
     }
 
     if (_yieldPolicy && !_yieldPolicy->usesCollectionAcquisitions()) {
@@ -220,15 +212,10 @@ void PlanExecutorSBE::restoreState(const RestoreContext& context) {
     }
 
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
-        _root->restoreState(false /* NOT relinquishing cursor */);
-
-        // Put the RU back into 'kAbort' mode. Since the executor is now in a restored state, calls
-        // to doAbandonSnapshot() only happen if the query has failed and the executor will not be
-        // used again. In this case, we do not rely on the guarantees provided by 'kCommit' mode.
-        shard_role_details::getRecoveryUnit(_opCtx)->setAbandonSnapshotMode(
-            RecoveryUnit::AbandonSnapshotMode::kAbort);
+        // TODO SERVER-103267 This is no longer supported and related code should be removed.
+        MONGO_UNREACHABLE_TASSERT(9858502);
     } else {
-        _root->restoreState(true /* relinquish cursor */);
+        _root->restoreState();
     }
 }
 

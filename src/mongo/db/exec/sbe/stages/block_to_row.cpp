@@ -230,7 +230,7 @@ void BlockToRowStage::close() {
     _children[0]->close();
 }
 
-void BlockToRowStage::doSaveState(bool relinquishCursor) {
+void BlockToRowStage::doSaveState() {
     // Copy the values no matter whether the slotsAccessible() returns true or not. We do this
     // because, even if the slot is not accessible, it is not clear whether we'll need the remaining
     // values in our input block or not. We make local copies of all unprocessed values, plus the

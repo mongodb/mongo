@@ -216,7 +216,7 @@ size_t TsBucketToCellBlockStage::estimateCompileTimeSize() const {
     return size;
 }
 
-void TsBucketToCellBlockStage::doSaveState(bool) {
+void TsBucketToCellBlockStage::doSaveState() {
     if (!slotsAccessible()) {
         return;
     }
@@ -229,6 +229,10 @@ void TsBucketToCellBlockStage::doSaveState(bool) {
 
         auto [cpyTag, cpyVal] = value::copyValue(cellBlockTag, cellBlockVal);
         _blocksOutAccessor[i].reset(true, cpyTag, cpyVal);
+    }
+
+    if (_metaOutSlotId) {
+        prepareForYielding(_metaOutAccessor, slotsAccessible());
     }
 }
 

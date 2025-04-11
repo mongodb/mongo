@@ -75,7 +75,7 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool relinquishCursor) override;
+    void doSaveState() override;
 
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
         return;

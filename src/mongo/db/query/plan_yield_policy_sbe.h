@@ -92,17 +92,8 @@ private:
                       const Yieldable* yieldable,
                       RestoreContext::RestoreType restoreType) override;
 
-    // TODO SERVER-59620: Remove this.
-    bool useExperimentalCommitTxnBehavior() const override {
-        return _useExperimentalCommitTxnBehavior;
-    }
-
     // The list of plans registered to yield when the configured policy triggers a yield.
     std::vector<sbe::PlanStage*> _yieldingPlans;
-
-    // Whether the experimental behavior which commits transactions across yields instead of
-    // aborting them, should be used.
-    bool _useExperimentalCommitTxnBehavior;
 };
 
 }  // namespace mongo

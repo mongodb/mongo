@@ -164,25 +164,19 @@ value::SlotAccessor* IndexScanStageBase::getAccessor(CompileCtx& ctx, value::Slo
     return ctx.getAccessor(slot);
 }
 
-void IndexScanStageBase::doSaveState(bool relinquishCursor) {
-    if (relinquishCursor) {
-        if (_indexKeySlot && !_key.owned() && slotsAccessible()) {
-            _key = std::move(*_key.makeCopy());
-        }
-        if (_recordIdSlot) {
-            prepareForYielding(_recordIdAccessor, slotsAccessible());
-        }
-        for (auto& accessor : _accessors) {
-            prepareForYielding(accessor, slotsAccessible());
-        }
-
-        if (_cursor) {
-            _cursor->save();
-        }
+void IndexScanStageBase::doSaveState() {
+    if (_indexKeySlot && !_key.owned() && slotsAccessible()) {
+        _key = std::move(*_key.makeCopy());
+    }
+    if (_recordIdSlot) {
+        prepareForYielding(_recordIdAccessor, slotsAccessible());
+    }
+    for (auto& accessor : _accessors) {
+        prepareForYielding(accessor, slotsAccessible());
     }
 
     if (_cursor) {
-        _cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
+        _cursor->save();
     }
 
     // Set the index entry to null, since accessing this pointer is illegal during yield.
@@ -212,7 +206,7 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
     _entry = desc->getEntry();
 }
 
-void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
+void IndexScanStageBase::doRestoreState() {
     invariant(_opCtx);
     if (!_coll.isAcquisition()) {
         invariant(!_coll);
@@ -222,7 +216,7 @@ void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
         }
     }
     restoreCollectionAndIndex();
-    if (_cursor && relinquishCursor) {
+    if (_cursor) {
         _cursor->restore();
     }
 
@@ -517,10 +511,10 @@ void SimpleIndexScanStage::prepare(CompileCtx& ctx) {
     _seekKeyHighHolder.reset();
 }
 
-void SimpleIndexScanStage::doSaveState(bool relinquishCursor) {
+void SimpleIndexScanStage::doSaveState() {
     // Seek points are external to the index scan and must be accessible no matter what as long
     // as the index scan is opened.
-    if (_open && relinquishCursor) {
+    if (_open) {
         if (_seekKeyLow) {
             prepareForYielding(_seekKeyLowHolder, true);
         }
@@ -529,7 +523,7 @@ void SimpleIndexScanStage::doSaveState(bool relinquishCursor) {
         }
     }
 
-    IndexScanStageBase::doSaveState(relinquishCursor);
+    IndexScanStageBase::doSaveState();
 }
 
 void SimpleIndexScanStage::open(bool reOpen) {

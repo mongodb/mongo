@@ -131,8 +131,8 @@ protected:
     // used.
     virtual bool validateKey(const SortedDataKeyValueView& key) = 0;
 
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) final;
+    void doSaveState() override;
+    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
@@ -246,7 +246,7 @@ public:
     size_t estimateCompileTimeSize() const override;
 
 protected:
-    void doSaveState(bool relinquishCursor) override;
+    void doSaveState() override;
     SortedDataKeyValueView seek() override;
     bool validateKey(const SortedDataKeyValueView& key) override;
 

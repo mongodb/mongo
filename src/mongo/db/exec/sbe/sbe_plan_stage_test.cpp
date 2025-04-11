@@ -172,10 +172,9 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).
         if (i % 2 == 0) {
-            const bool relinquishCursor = true;
             const bool disableSlotAccess = true;
-            stage->saveState(relinquishCursor, disableSlotAccess);
-            stage->restoreState(relinquishCursor);
+            stage->saveState(disableSlotAccess);
+            stage->restoreState();
         }
     }
 
@@ -208,10 +207,9 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).
         if (j % 2 == 0) {
-            const bool relinquishCursor = true;
             const bool disableSlotAccess = true;
-            stage->saveState(relinquishCursor, disableSlotAccess);
-            stage->restoreState(relinquishCursor);
+            stage->saveState(disableSlotAccess);
+            stage->restoreState();
         }
     }
 

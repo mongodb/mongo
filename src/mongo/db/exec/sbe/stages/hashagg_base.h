@@ -59,8 +59,8 @@ protected:
                      bool allowDiskUse,
                      bool forceIncreasedSpilling);
 
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) override;
+    void doSaveState() override;
+    void doRestoreState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {

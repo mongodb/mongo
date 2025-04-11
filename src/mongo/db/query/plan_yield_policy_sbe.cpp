@@ -72,17 +72,23 @@ PlanYieldPolicySBE::PlanYieldPolicySBE(
     Milliseconds yieldPeriod,
     std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
-    : PlanYieldPolicy(
-          opCtx, policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)),
-      _useExperimentalCommitTxnBehavior(gYieldingSupportForSBE) {
+    : PlanYieldPolicy(opCtx,
+                      policy,
+                      clockSource,
+                      yieldFrequency,
+                      yieldPeriod,
+                      yieldable,
+                      std::move(callbacks)) {
     uassert(4822879,
             "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
             policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
+
+    // TODO SERVER-103267: Remove gYieldingSupportForSBE.
 }
 
 void PlanYieldPolicySBE::saveState(OperationContext* opCtx) {
     for (auto&& root : _yieldingPlans) {
-        root->saveState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
+        root->saveState();
     }
 }
 
@@ -90,7 +96,7 @@ void PlanYieldPolicySBE::restoreState(OperationContext* opCtx,
                                       const Yieldable*,
                                       RestoreContext::RestoreType restoreType) {
     for (auto&& root : _yieldingPlans) {
-        root->restoreState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
+        root->restoreState();
     }
 }
 }  // namespace mongo

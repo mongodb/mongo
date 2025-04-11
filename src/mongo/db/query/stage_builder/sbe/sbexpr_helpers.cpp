@@ -822,16 +822,13 @@ std::tuple<SbStage, SbSlot, SbSlot> SbBuilder::makeUnwind(SbStage stage,
     return {std::move(stage), unwindOutputSlot, indexOutputSlot};
 }
 
-std::tuple<SbStage, SbSlot, boost::optional<SbSlot>, SbSlotVector, SbSlotVector>
-SbBuilder::makeTsBucketToCellBlock(
+std::tuple<SbStage, SbSlot, SbSlotVector, SbSlotVector> SbBuilder::makeTsBucketToCellBlock(
     SbStage stage,
     SbSlot bucketSlot,
-    bool reqMeta,
     const std::vector<sbe::value::CellBlock::PathRequest>& topLevelReqs,
     const std::vector<sbe::value::CellBlock::PathRequest>& traverseReqs,
     const std::string& timeField) {
     const auto bitmapSlot = SbSlot{_state.slotId()};
-    auto metaSlot = reqMeta ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
 
     SbSlotVector topLevelSlots;
     topLevelSlots.reserve(topLevelReqs.size());
@@ -871,13 +868,12 @@ SbBuilder::makeTsBucketToCellBlock(
                                                             lower(bucketSlot),
                                                             allReqs,
                                                             std::move(allCellSlots),
-                                                            lower(metaSlot),
+                                                            boost::none,  // metaSlot.
                                                             lower(bitmapSlot),
                                                             timeField,
                                                             _nodeId);
 
-    return {
-        std::move(stage), bitmapSlot, metaSlot, std::move(topLevelSlots), std::move(traverseSlots)};
+    return {std::move(stage), bitmapSlot, std::move(topLevelSlots), std::move(traverseSlots)};
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeBlockToRow(SbStage stage,

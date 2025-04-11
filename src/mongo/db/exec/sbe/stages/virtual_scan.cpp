@@ -161,12 +161,10 @@ size_t VirtualScanStage::estimateCompileTimeSize() const {
     return sizeof(*this);
 }
 
-void VirtualScanStage::doSaveState(bool relinquishCursor) {
-    if (relinquishCursor) {
-        for (; _releaseIndex < _index; ++_releaseIndex) {
-            auto [tagElem, valueElem] = _values.at(_releaseIndex);
-            value::releaseValue(tagElem, valueElem);
-        }
+void VirtualScanStage::doSaveState() {
+    for (; _releaseIndex < _index; ++_releaseIndex) {
+        auto [tagElem, valueElem] = _values.at(_releaseIndex);
+        value::releaseValue(tagElem, valueElem);
     }
 }
 }  // namespace mongo::sbe

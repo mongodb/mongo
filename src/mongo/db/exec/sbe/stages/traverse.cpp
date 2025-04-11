@@ -288,7 +288,7 @@ void TraverseStage::close() {
     _children[0]->close();
 }
 
-void TraverseStage::doSaveState(bool relinquishCursor) {
+void TraverseStage::doSaveState() {
     if (_isReadingLeftSide) {
         // If we yield while reading the left side, there is no need to prepareForYielding() data
         // held in the right side, since we will have to re-open it anyway.
@@ -300,14 +300,10 @@ void TraverseStage::doSaveState(bool relinquishCursor) {
         _outFieldOutputAccessor.reset();
     }
 
-    if (!relinquishCursor) {
-        return;
-    }
-
     prepareForYielding(_outFieldOutputAccessor, slotsAccessible());
 }
 
-void TraverseStage::doRestoreState(bool relinquishCursor) {
+void TraverseStage::doRestoreState() {
     if (!slotsAccessible()) {
         return;
     }

@@ -96,7 +96,7 @@ public:
     void runAndAssertForceSpill(mongo::sbe::PlanStage* stage,
                                 const SpillingStats& expectedSpillingStats) {
         // Get ready to yield.
-        stage->saveState(true);
+        stage->saveState();
 
         // Force spill.
         stage->forceSpill();
@@ -109,7 +109,7 @@ public:
                   stats->spillingStats.getSpilledRecords());
 
         // Get ready to retrieve more records.
-        stage->restoreState(true);
+        stage->restoreState();
     }
 
 private:

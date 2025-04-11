@@ -454,7 +454,7 @@ TEST_F(WindowStageTest, ForceSpillWindowTest) {
             ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
             // Get ready to yield.
-            windowStage->saveState(false);
+            windowStage->saveState();
 
             // Force spill.
             windowStage->forceSpill();
@@ -466,7 +466,7 @@ TEST_F(WindowStageTest, ForceSpillWindowTest) {
             ASSERT_EQ(10, stats->spillingStats.getSpilledRecords());
 
             // Get ready to retrieve more records.
-            windowStage->restoreState(false);
+            windowStage->restoreState();
         }
         ++idx;
     }

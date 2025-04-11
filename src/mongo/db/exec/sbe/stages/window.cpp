@@ -119,12 +119,12 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
                                          participateInTrialRunTracking());
 }
 
-void WindowStage::doSaveState(bool relinquishCursor) {
+void WindowStage::doSaveState() {
     if (_recordStore) {
         _recordStore->saveState();
     }
 }
-void WindowStage::doRestoreState(bool relinquishCursor) {
+void WindowStage::doRestoreState() {
     if (_recordStore) {
         _recordStore->restoreState();
     }

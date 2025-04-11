@@ -421,7 +421,7 @@ void HashAggStage::doForceSpill() {
 
     switchToDisk();
 
-    doSaveState(true);
+    doSaveState();
 }
 
 HashAggBaseStage<HashAggStage>::SpilledRow HashAggStage::deserializeSpilledRecordWithCollation(

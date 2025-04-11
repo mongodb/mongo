@@ -292,11 +292,7 @@ PlanState SpoolLazyProducerStage::getNext() {
     return trackPlanState(state);
 }
 
-void SpoolLazyProducerStage::doSaveState(bool relinquishCursor) {
-    if (!relinquishCursor) {
-        return;
-    }
-
+void SpoolLazyProducerStage::doSaveState() {
     for (auto& [slot, accessor] : _outAccessors) {
         prepareForYielding(accessor, slotsAccessible());
     }

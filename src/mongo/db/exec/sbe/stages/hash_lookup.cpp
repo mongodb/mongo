@@ -156,12 +156,12 @@ void HashLookupStage::doDetachFromOperationContext() {
     _hashTable.doDetachFromOperationContext();
 }
 
-void HashLookupStage::doSaveState(bool relinquishCursor) {
-    _hashTable.doSaveState(relinquishCursor);
+void HashLookupStage::doSaveState() {
+    _hashTable.doSaveState();
 }
 
-void HashLookupStage::doRestoreState(bool relinquishCursor) {
-    _hashTable.doRestoreState(relinquishCursor);
+void HashLookupStage::doRestoreState() {
+    _hashTable.doRestoreState();
 }
 
 void HashLookupStage::reset(bool fromClose) {

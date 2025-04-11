@@ -180,36 +180,30 @@ public:
      * It is illegal to call work() or isEOF() when a stage is in the "saved" state. May be called
      * before the first call to open(), before execution of the plan has begun.
      *
+     * The 'disableSlotAccess' parameter indicates whether this stage is allowed to discard slot
+     * state before saving.
+     *
      * Propagates to all children, then calls doSaveState().
      *
-     * The 'relinquishCursor' parameter indicates whether cursors should be reset and all data
-     * should be copied.
-     *
-     * When 'relinquishCursor' is true, the 'disableSlotAccess' parameter indicates whether this
-     * stage is allowed to discard slot state before saving. When 'relinquishCursor' is false, the
-     * 'disableSlotAccess' parameter has no effect.
-     *
-     * TODO SERVER-59620: Remove the 'relinquishCursor' parameter once all callers pass 'false'.
      */
-    void saveState(bool relinquishCursor, bool disableSlotAccess = false) {
+    void saveState(bool disableSlotAccess = false) {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.yields++;
 
-        if (relinquishCursor && disableSlotAccess) {
+        if (disableSlotAccess) {
             stage->disableSlotAccess();
         }
 
-        stage->doSaveState(relinquishCursor);
+        stage->doSaveState();
         // Save the children in a right to left order so dependent stages (i.e. one using correlated
         // slots) are saved first.
         auto& children = stage->_children;
         for (auto idx = children.size(); idx-- > 0;) {
-            children[idx]->saveState(relinquishCursor,
-                                     disableSlotAccess ? shouldOptimizeSaveState(idx) : false);
+            children[idx]->saveState(disableSlotAccess ? shouldOptimizeSaveState(idx) : false);
         }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-        _saveState = relinquishCursor ? SaveState::kSavedFull : SaveState::kSavedNotFull;
+        _saveState = SaveState::kSaved;
 #endif
     }
 
@@ -223,29 +217,21 @@ public:
      * Throws a UserException on failure to restore due to a conflicting event such as a
      * collection drop. May throw a WriteConflictException, in which case the caller may choose to
      * retry.
-     *
-     * The 'relinquishCursor' parameter indicates whether the stages are recovering from a "full
-     * save" or not, as discussed in saveState(). It is the caller's responsibility to pass the same
-     * value for 'relinquishCursor' as was passed in the previous call to saveState().
      */
-    void restoreState(bool relinquishCursor) {
+    void restoreState() {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.unyields++;
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-        if (relinquishCursor) {
-            invariant(_saveState == SaveState::kSavedFull);
-        } else {
-            invariant(_saveState == SaveState::kSavedNotFull);
-        }
+        invariant(_saveState == SaveState::kSaved);
 #endif
 
         for (auto&& child : stage->_children) {
-            child->restoreState(relinquishCursor);
+            child->restoreState();
         }
 
-        stage->doRestoreState(relinquishCursor);
+        stage->doRestoreState();
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-        stage->_saveState = SaveState::kNotSaved;
+        stage->_saveState = SaveState::kActive;
 #endif
     }
 
@@ -254,9 +240,17 @@ protected:
     // per stage. This information is only used for sanity checking, so we only run these
     // checks in debug builds.
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    // TODO SERVER-59620: Remove this.
-    enum class SaveState { kNotSaved, kSavedFull, kSavedNotFull };
-    SaveState _saveState{SaveState::kNotSaved};
+    enum class SaveState {
+        // The "active" state is when the plan can access storage and operations like
+        // open(), getNext(), close() are permitted.
+        kActive,
+
+        // In the "saved" state, the plan is completely detached from the storage engine, but
+        // cannot be executed. In order to bring the plan back into an active state, restoreState()
+        // must be called.
+        kSaved
+    };
+    SaveState _saveState{SaveState::kActive};
 #endif
 
     virtual bool shouldOptimizeSaveState(size_t idx) const {
@@ -802,8 +796,8 @@ private:
 
 protected:
     // Derived classes can optionally override these methods.
-    virtual void doSaveState(bool relinquishCursor) {}
-    virtual void doRestoreState(bool relinquishCursor) {}
+    virtual void doSaveState() {}
+    virtual void doRestoreState() {}
     virtual void doDetachFromOperationContext() {}
     virtual void doAttachToOperationContext(OperationContext* opCtx) {}
 

@@ -134,12 +134,12 @@ void HashLookupUnwindStage::doDetachFromOperationContext() {
     _hashTable.doDetachFromOperationContext();
 }
 
-void HashLookupUnwindStage::doSaveState(bool relinquishCursor) {
-    _hashTable.doSaveState(relinquishCursor);
+void HashLookupUnwindStage::doSaveState() {
+    _hashTable.doSaveState();
 }
 
-void HashLookupUnwindStage::doRestoreState(bool relinquishCursor) {
-    _hashTable.doRestoreState(relinquishCursor);
+void HashLookupUnwindStage::doRestoreState() {
+    _hashTable.doRestoreState();
 }
 
 void HashLookupUnwindStage::reset(bool fromClose) {

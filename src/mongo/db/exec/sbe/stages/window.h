@@ -108,8 +108,8 @@ public:
 
 
 protected:
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) override;
+    void doSaveState() override;
+    void doRestoreState() override;
 
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
         return;
@@ -197,9 +197,9 @@ private:
     void spill();
 
     void doForceSpill() final {
-        doRestoreState(true);
+        doRestoreState();
         spill();
-        doSaveState(true);
+        doSaveState();
     }
 
     const value::SlotVector _currSlots;

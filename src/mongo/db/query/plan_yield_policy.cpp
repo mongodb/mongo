@@ -147,20 +147,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             saveState(opCtx);
 
             boost::optional<ScopeGuard<std::function<void()>>> exitGuard;
-            if (useExperimentalCommitTxnBehavior()) {
-                // All data pointed to by cursors must remain valid across the yield. Setting this
-                // flag for the duration of yield will force any calls to abandonSnapshot() to
-                // commit the transaction, rather than abort it, in order to leave the cursors
-                // valid.
-                shard_role_details::getRecoveryUnit(opCtx)->setAbandonSnapshotMode(
-                    RecoveryUnit::AbandonSnapshotMode::kCommit);
-                exitGuard.emplace([&] {
-                    invariant(shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshotMode() ==
-                              RecoveryUnit::AbandonSnapshotMode::kCommit);
-                    shard_role_details::getRecoveryUnit(opCtx)->setAbandonSnapshotMode(
-                        RecoveryUnit::AbandonSnapshotMode::kAbort);
-                });
-            }
+
+            // TODO SERVER-103267: Remove setAbandonSnapshotMode() and related.
 
             if (getPolicy() == PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY) {
                 // This yield policy doesn't release locks, but it does relinquish our storage

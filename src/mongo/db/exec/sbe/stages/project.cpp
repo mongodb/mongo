@@ -168,11 +168,7 @@ size_t ProjectStage::estimateCompileTimeSize() const {
     return size;
 }
 
-void ProjectStage::doSaveState(bool relinquishCursor) {
-    if (!relinquishCursor) {
-        return;
-    }
-
+void ProjectStage::doSaveState() {
     for (auto& [slotId, codeAndAccessor] : _fields) {
         auto& [code, accessor] = codeAndAccessor;
         prepareForYielding(accessor, slotsAccessible());

@@ -188,8 +188,8 @@ public:
      */
     size_t bufferValueOrSpill(value::MaterializedRow& value);
 
-    void doSaveState(bool relinquishCursor);
-    void doRestoreState(bool relinquishCursor);
+    void doSaveState();
+    void doRestoreState();
 
     void forceSpill();
 

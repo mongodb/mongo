@@ -259,8 +259,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool relinquishCursor) override;
-    void doRestoreState(bool relinquishCursor) override;
+    void doSaveState() override;
+    void doRestoreState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
@@ -363,10 +363,6 @@ private:
 
     ScanStats _specificStats;
 
-    // Flag set upon restoring the stage that indicates whether the cursor's position in the
-    // collection is still valid. Only relevant to capped collections.
-    bool _needsToCheckCappedPositionLost = false;
-
     StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -436,8 +432,8 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doSaveState(bool fullSave) final;
-    void doRestoreState(bool fullSave) final;
+    void doSaveState() final;
+    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;

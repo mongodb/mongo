@@ -317,15 +317,6 @@ private:
                               const Yieldable* yieldable,
                               RestoreContext::RestoreType restoreType) = 0;
 
-    /**
-     * TODO SERVER-59620: Remove this.
-     *
-     * Indicates whether we should use the feature-flag-guarded behavior for
-     * keeping data pinned across yields.
-     */
-    virtual bool useExperimentalCommitTxnBehavior() const {
-        return false;
-    }
 
     /**
      * Relinquishes and reacquires lock manager locks and catalog state. Also responsible for

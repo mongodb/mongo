@@ -225,10 +225,7 @@ std::vector<DebugPrinter::Block> UnwindStage::debugPrint() const {
     return ret;
 }
 
-void UnwindStage::doSaveState(bool relinquishCursor) {
-    if (!relinquishCursor) {
-        return;
-    }
+void UnwindStage::doSaveState() {
     if (_outFieldOutputAccessor) {
         prepareForYielding(*_outFieldOutputAccessor, slotsAccessible());
     }
@@ -237,19 +234,17 @@ void UnwindStage::doSaveState(bool relinquishCursor) {
     }
 }
 
-void UnwindStage::doRestoreState(bool relinquishCursor) {
+void UnwindStage::doRestoreState() {
     if (!_inArray) {
         // If we were once in an array but no longer are, this saves us from doing a refresh() on
         // obsolete slot contents.
         return;
     }
 
-    if (relinquishCursor) {
-        // The child stage will have copied the in-flight contents of this slot because WiredTiger
-        // will free the memory owned by the cursor it points to, so on restore we must update the
-        // embedded array iterator to point to the new memory location.
-        _inArrayAccessor.refresh();
-    }
+    // The child stage will have copied the in-flight contents of this slot because WiredTiger
+    // will free the memory owned by the cursor it points to, so on restore we must update the
+    // embedded array iterator to point to the new memory location.
+    _inArrayAccessor.refresh();
 }
 
 size_t UnwindStage::estimateCompileTimeSize() const {
