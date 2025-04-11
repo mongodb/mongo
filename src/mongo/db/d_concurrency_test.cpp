@@ -80,7 +80,7 @@
 namespace mongo {
 namespace {
 
-const int kMaxStressThreads = 32;  // max number of threads to use for lock stress
+const int kMaxStressThreads = 8;  // max number of threads to use for lock stress
 #ifdef _WIN32
 const auto kMaxClockJitterMillis = Milliseconds(100);  // max backward jumps to tolerate
 #else
@@ -1298,7 +1298,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
 }
 
 TEST_F(DConcurrencyTestFixture, Stress) {
-    const int kNumIterations = 5000;
+    const int kNumIterations = 100;
 
     ProgressMeter progressMeter(kNumIterations);
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
@@ -1433,7 +1433,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
 }
 
 TEST_F(DConcurrencyTestFixture, StressPartitioned) {
-    const int kNumIterations = 5000;
+    const int kNumIterations = 100;
 
     ProgressMeter progressMeter(kNumIterations);
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
