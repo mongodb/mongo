@@ -4,9 +4,14 @@
  * @tags: [
  *   featureFlagRawDataCrudOperations,
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -47,20 +52,26 @@ const assertExplain = function(commandResult, commandName) {
         "Expected not to find TS_MODIFY stage " + tojson(commandResult);
 };
 
-assertExplain(coll.explain().findAndModify({
+assertExplain(getTimeseriesCollForRawOps(coll).explain().findAndModify({
     query: {"control.count": 2},
     update: {$set: {meta: "3"}},
-    rawData: true,
+    ...kRawOperationSpec,
 }),
               "findAndModify");
-assertExplain(coll.explain().remove({"control.count": 2}, {rawData: true}), "delete");
-assertExplain(coll.explain().update({"control.count": 1}, {$set: {meta: "3"}}, {rawData: true}),
+assertExplain(
+    getTimeseriesCollForRawOps(coll).explain().remove({"control.count": 2}, kRawOperationSpec),
+    "delete");
+assertExplain(getTimeseriesCollForRawOps(coll).explain().update(
+                  {"control.count": 1}, {$set: {meta: "3"}}, kRawOperationSpec),
               "update");
 
 // Additionally run explains that issue a cluster write without a shard key in a sharded environment
 // to test that path.
 // TODO SERVER-102697: Cluster write without shard key for findAndModify (if not put into its own
 // test).
-assertExplain(coll.explain().remove({"control.count": 2}, {rawData: true, justOne: true}),
+assertExplain(getTimeseriesCollForRawOps(coll).explain().remove(
+                  {"control.count": 2}, {...kRawOperationSpec, justOne: true}),
               "delete");
-assertExplain(coll.explain().update({"_id": 1}, {$set: {meta: "3"}}, {rawData: true}), "update");
+assertExplain(getTimeseriesCollForRawOps(coll).explain().update(
+                  {"_id": 1}, {$set: {meta: "3"}}, kRawOperationSpec),
+              "update");

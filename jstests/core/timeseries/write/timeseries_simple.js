@@ -105,8 +105,7 @@ TimeseriesTest.run((insert) => {
     assert.eq(numDocs, viewDocs.length, viewDocs);
 
     // Check bucket collection.
-    const bucketsColl = getTimeseriesCollForRawOps(coll);
-    const bucketDocs = bucketsColl.find().rawData().toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];
     TimeseriesTest.decompressBucket(bucketDoc);

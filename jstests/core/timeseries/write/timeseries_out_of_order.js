@@ -8,8 +8,10 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -26,7 +28,6 @@ TimeseriesTest.run((insert) => {
     let collCount = 0;
     const runTest = function(bucketsFn) {
         const coll = db.getCollection(collNamePrefix + collCount++);
-        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         coll.drop();
 
         assert.commandWorked(
@@ -35,7 +36,7 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(insert(coll, docs));
         assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
 
-        const buckets = bucketsColl.find().sort({_id: 1}).toArray();
+        const buckets = getTimeseriesCollForRawOps(coll).find().rawData().sort({_id: 1}).toArray();
         jsTestLog('Checking buckets:' + tojson(buckets));
         bucketsFn(buckets);
     };

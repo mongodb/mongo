@@ -10,8 +10,10 @@
  *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to
  *   # a time-series collection.
  *   requires_fcv_71,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 // Create a times-series collection.
@@ -23,10 +25,6 @@ const timeField = "time";
 assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeField}}));
 coll = db.getCollection(jsTestName());
 
-const bucketPrefix = "system.buckets.";
-const bucketCollName = bucketPrefix + jsTestName();
-const bucketColl = db.getCollection(bucketCollName);
-
 /**
  * Test 1: Verify that an insert will create a compressed bucket in the time-series collection if
  * we are always using compressed buckets for time-series writes.
@@ -35,7 +33,7 @@ const bucketColl = db.getCollection(bucketCollName);
     jsTestLog("Entering insertDocAndCheckCompressed");
     assert.commandWorked(coll.insert({[timeField]: ISODate(), x: 0}));
 
-    const bucketDoc = bucketColl.find().toArray()[0];
+    const bucketDoc = getTimeseriesCollForRawOps(coll).find().rawData().toArray()[0];
     assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
            'Expected bucket to be compressed' + tojson(bucketDoc));
 
@@ -53,7 +51,7 @@ const bucketColl = db.getCollection(bucketCollName);
     // should create a new bucket.
     assert.commandWorked(coll.insert({[timeField]: ISODate("2019-08-11T07:30:10.957Z"), x: 1}));
 
-    const bucketDocs = bucketColl.find().toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(2, bucketDocs.length, "Expected 2 buckets, but got " + bucketDocs.length + "buckets");
 
     // The buckets should be compressed if we are always using the compressed format for

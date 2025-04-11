@@ -7,8 +7,10 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -24,12 +26,10 @@ TimeseriesTest.run((insert) => {
      */
     const runTest = function(docsInsert, docsUpdate) {
         const coll = db.getCollection(collNamePrefix + collCount++);
-        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         coll.drop();
 
-        jsTestLog('Running test: collection: ' + coll.getFullName() + '; bucket collection: ' +
-                  bucketsColl.getFullName() + '; initial measurements: ' + tojson(docsInsert) +
-                  '; measurements to append: ' + tojson(docsUpdate));
+        jsTestLog('Running test: collection: ' + coll.getFullName() + '; initial measurements: ' +
+                  tojson(docsInsert) + '; measurements to append: ' + tojson(docsUpdate));
 
         assert.commandWorked(
             db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
@@ -55,7 +55,11 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check bucket collection.
-        const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
+                               .find()
+                               .rawData()
+                               .sort({'control.min._id': 1})
+                               .toArray();
         assert.eq(1, bucketDocs.length, bucketDocs);
         TimeseriesTest.decompressBucket(bucketDocs[0]);
 

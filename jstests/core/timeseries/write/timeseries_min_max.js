@@ -11,8 +11,10 @@
  *   # Buckets being closed during moveCollection can cause more buckets with different min-max
  *   # ranges than the test expects.
  *   assumes_balancer_off,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -23,11 +25,9 @@ TimeseriesTest.run((insert) => {
 
     let collCount = 0;
     let coll;
-    let bucketsColl;
 
     const clearColl = function() {
         coll = db.getCollection(collNamePrefix + collCount++);
-        bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
         coll.drop();
 
@@ -47,7 +47,7 @@ TimeseriesTest.run((insert) => {
         const measurementId = matchingMeasurements[0]._id;
 
         // Find the bucket the measurement belongs to.
-        const bucketDocs = bucketsColl
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
                                .find({
                                    $and: [
                                        {"control.min._id": {$lte: measurementId}},
@@ -60,6 +60,7 @@ TimeseriesTest.run((insert) => {
                                          ['control.min.' + timeFieldName]: 0,
                                          ['control.max.' + timeFieldName]: 0
                                      })
+                               .rawData()
                                .toArray();
         assert.eq(bucketDocs.length, 1);
 

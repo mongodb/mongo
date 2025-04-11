@@ -13,10 +13,12 @@
  *   # thus different buckets.
  *   does_not_support_stepdowns,
  *   # The config fuzzer can fuzz the bucketMaxCount.
- *   does_not_support_config_fuzzer
+ *   does_not_support_config_fuzzer,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const timeFieldName = "time";
@@ -29,10 +31,9 @@ const numDocs = bucketMaxCount + 100;
 const collNamePrefix = jsTestName() + "_";
 let count = 0;
 let coll;
-let bucketsColl;
 
-function assertBucketsAreCompressed(db, bucketsColl) {
-    const bucketDocs = bucketsColl.find().toArray();
+function assertBucketsAreCompressed(db, coll) {
+    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     bucketDocs.forEach(bucketDoc => {
         assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
                `Expected bucket to be compressed: ${tojson(bucketDoc)}`);
@@ -44,7 +45,6 @@ function prepareCompressedBucket() {
     coll.drop();
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     // Insert enough documents to trigger bucket compression.
     let docs = [];
@@ -60,7 +60,8 @@ function prepareCompressedBucket() {
     assert.commandWorked(coll.insert(docs));
 
     // Check the bucket collection to make sure that it generated the buckets we expect.
-    const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+    const bucketDocs =
+        getTimeseriesCollForRawOps(coll).find().rawData().sort({'control.min._id': 1}).toArray();
     if (!TestData.runningWithBalancer) {
         assert.eq(2, bucketDocs.length, tojson(bucketDocs));
         assert.eq(0,
@@ -103,7 +104,7 @@ assert.eq(coll.countDocuments({updated: 1, str: "even"}),
 assert.eq(coll.countDocuments({updated: 1, str: "odd"}),
           0,
           "Expected records not matching the filter not to be updated.");
-assertBucketsAreCompressed(db, bucketsColl);
+assertBucketsAreCompressed(db, coll);
 
 // Update one record from the compressed bucket.
 prepareCompressedBucket();
@@ -115,4 +116,4 @@ assert.eq(coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
 assert.eq(coll.countDocuments({updated: 1}),
           1,
           "Expected records not matching the filter not to be updated.");
-assertBucketsAreCompressed(db, bucketsColl);
+assertBucketsAreCompressed(db, coll);

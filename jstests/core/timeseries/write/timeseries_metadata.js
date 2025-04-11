@@ -10,8 +10,10 @@
  *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to a
  *   # time-series collection.
  *   requires_fcv_71,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -29,11 +31,9 @@ TimeseriesTest.run((insert) => {
      */
     const runTest = function(docsBucketA, docsBucketB) {
         const coll = db.getCollection(collNamePrefix + collCount++);
-        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         coll.drop();
 
         jsTestLog('Running test: collection: ' + coll.getFullName() +
-                  '; bucket collection: ' + bucketsColl.getFullName() +
                   '; bucketA: ' + tojson(docsBucketA) + '; bucketB: ' + tojson(docsBucketB));
 
         assert.commandWorked(db.createCollection(
@@ -50,7 +50,11 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check bucket collection.
-        const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll)
+                               .find()
+                               .rawData()
+                               .sort({'control.min._id': 1})
+                               .toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.

@@ -5,9 +5,14 @@
  *   # $listCatalog does not include the tenant prefix in its results.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -17,7 +22,6 @@ assert.commandWorked(testDB.runCommand({drop: collName}));
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 const coll = testDB[collName];
-const bucketsColl = testDB["system.buckets." + collName];
 
 const bucket = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -51,14 +55,19 @@ const bucket = {
     }
 };
 
-assert.commandFailedWithCode(bucketsColl.insert(bucket),
+assert.commandFailedWithCode(getTimeseriesCollForRawOps(coll).insert(bucket, kRawOperationSpec),
                              ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), false);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll),
+                                                       kRawOperationSpec),
+          false);
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
-assert.commandWorked(bucketsColl.insert(bucket));
-assert.commandWorked(bucketsColl.deleteOne({_id: bucket._id}));
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll),
+                                                       kRawOperationSpec),
+          true);
+assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(bucket, kRawOperationSpec));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(coll).deleteOne({_id: bucket._id}, kRawOperationSpec));
 
 // The following collMod is not timestamped, so background validations
 // could potentially see it before the previous deletion unless we fsync
@@ -66,4 +75,6 @@ assert.commandWorked(testDB.adminCommand({fsync: 1}));
 
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), false);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll),
+                                                       kRawOperationSpec),
+          false);

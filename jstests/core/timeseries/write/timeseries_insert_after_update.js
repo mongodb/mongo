@@ -13,16 +13,17 @@
  *   # This test depends on stats read from the primary node in replica sets.
  *   assumes_read_preference_unchanged,
  *   # This test depends on the stats tracked by UUID
- *   assumes_stable_collection_uuid
+ *   assumes_stable_collection_uuid,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
     assert.commandWorked(testDB.dropDatabase());
     const coll = testDB["t"];
-    const bucketsColl = testDB["system.buckets." + coll.getName()];
 
     const timeFieldName = "time";
     const metaFieldName = "m";
@@ -50,7 +51,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, docs.slice(1)));
     assert.docEq(docs, coll.find({}, {_id: 0}).sort({[timeFieldName]: 1}).toArray());
 
-    assert.eq(bucketsColl.find().itcount(), 2, bucketsColl.find().toArray());
+    assert.eq(getTimeseriesCollForRawOps(coll).find().rawData().itcount(),
+              2,
+              getTimeseriesCollForRawOps(coll).find().rawData().toArray());
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
     assert.eq(stats.timeseries['bucketCount'], 2);
