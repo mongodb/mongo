@@ -9,6 +9,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 export const $config = (function() {
     const initData = {
@@ -18,10 +19,6 @@ export const $config = (function() {
 
         getCollection: function(db, collName) {
             return db.getCollection(this.getCollectionName(collName));
-        },
-
-        getBucketCollection: function(db, collName) {
-            return db.getCollection("system.buckets." + this.getCollectionName(collName));
         },
     };
 
@@ -72,7 +69,8 @@ export const $config = (function() {
         },
 
         deleteAllBuckets: function deleteAllBuckets(db, collName) {
-            assert.commandWorked(this.getBucketCollection(db, collName).remove({}));
+            assert.commandWorked(getTimeseriesCollForRawOps(db, this.getCollection(db, collName))
+                                     .remove({}, getRawOperationSpec(db)));
         },
     };
 
