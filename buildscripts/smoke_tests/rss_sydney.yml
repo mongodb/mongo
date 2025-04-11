@@ -9,14 +9,26 @@
 test_kind: js_test
 
 suites:
+  no_passthrough:
+    - jstests/noPassthrough/validate/background_validation.js
+    - jstests/noPassthrough/validate/validate_detects_invalid_index_options.js
+    - jstests/noPassthrough/validate/validate_doc_schema.js
+    - jstests/noPassthrough/validate/validate_multikey_failures.js
+    - jstests/noPassthrough/validate/validate_out_of_order.js
+  no_passthrough_with_mongod:
+    - jstests/noPassthroughWithMongod/validate/validate_command.js
+  read_only:
+    - jstests/readonly/validate.js
   disk_wiredtiger:
     - jstests/disk/killall.js
     - jstests/disk/repair_clustered_collection.js
     - jstests/disk/repair_corrupt_document.js
     - jstests/disk/repair_failure_is_recoverable.js
     - jstests/disk/repair_removes_invalid_index_options.js
+    - jstests/disk/validate_bson_inconsistency.js
     - jstests/disk/wt_corrupt_file_errors.js
     - jstests/disk/wt_repair_corrupt_metadata.js
     - jstests/disk/wt_repair_orphaned_idents.js
     - jstests/disk/wt_startup_with_missing_user_collection.js
+    - jstests/disk/wt_validate_corrupt_files.js
     - jstests/disk/wt_verify_config_override.js
