@@ -372,14 +372,20 @@ be invoked as either:
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), [])
     )
 
-    with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
-        # the ENABLED_FEATURE_FLAGS list already excludes the fully disabled features flags
-        # This keeps any feature flags enabled that were manually turned on from being excluded
-        force_disabled_flags = set(yaml.safe_load(fully_disabled_ffs)) - set(
-            _config.ENABLED_FEATURE_FLAGS
-        )
+    _config.INCLUDE_FULLY_DISABLED_FEATURE_TESTS = config.pop(
+        "include_fully_disabled_feature_tests"
+    )
+    if not _config.INCLUDE_FULLY_DISABLED_FEATURE_TESTS:
+        with open(
+            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+        ) as fully_disabled_ffs:
+            # the ENABLED_FEATURE_FLAGS list already excludes the fully disabled features flags
+            # This keeps any feature flags enabled that were manually turned on from being excluded
+            force_disabled_flags = set(yaml.safe_load(fully_disabled_ffs)) - set(
+                _config.ENABLED_FEATURE_FLAGS
+            )
 
-    _config.EXCLUDE_WITH_ANY_TAGS.extend(force_disabled_flags)
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(force_disabled_flags)
 
     if _config.RUN_NO_FEATURE_FLAG_TESTS:
         # Don't run any feature flag tests.

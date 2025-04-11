@@ -1,6 +1,7 @@
 """Test resmoke's handling of test/task timeouts and archival."""
 
 import datetime
+import io
 import json
 import logging
 import os
@@ -15,6 +16,7 @@ from shutil import rmtree
 import yaml
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.idl.gen_all_feature_flag_list import get_all_feature_flags_turned_off_by_default
 from buildscripts.resmokelib import config, core, suitesconfig
 from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import (
     matches_generated_task_pattern,
@@ -548,6 +550,66 @@ class TestSetParameters(_ResmokeSelftest):
                     """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}""",
                 ],
             ).wait(),
+        )
+
+
+class TestDiscovery(_ResmokeSelftest):
+    def setUp(self):
+        super(TestDiscovery, self).setUp()
+        self.output = io.StringIO()
+        handler = logging.StreamHandler(self.output)
+        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+        self.logger.addHandler(handler)
+
+        self.assertIn(
+            "featureFlagToaster",
+            get_all_feature_flags_turned_off_by_default(),
+            "TestDiscovery tests use featureFlagToaster with the assumption that it is turned off by default.",
+        )
+
+        with open(
+            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+        ) as fully_disabled_ffs:
+            self.assertIn(
+                "featureFlagFryer",
+                yaml.safe_load(fully_disabled_ffs),
+                "TestDiscovery tests use featureFlagFryer with the assumption that it is present in fully_disabled_feature_flags.yml.",
+            )
+
+    def execute_resmoke(self, resmoke_args):
+        resmoke_process = core.programs.make_process(
+            self.logger,
+            [sys.executable, "buildscripts/resmoke.py", "test-discovery"] + resmoke_args,
+        )
+        resmoke_process.start()
+        return resmoke_process
+
+    def test_exclude_fully_disabled(self):
+        self.execute_resmoke(
+            ["--suite=buildscripts/tests/resmoke_end2end/suites/resmoke_jstest_tagged.yml"]
+        ).wait()
+        self.assertIn(
+            "buildscripts/tests/resmoke_end2end/testfiles/tagged_with_disabled_feature.js",
+            self.output.getvalue(),
+            "tagged_with_disabled_feature.js should have been included in the discovered tests.",
+        )
+        self.assertNotIn(
+            "buildscripts/tests/resmoke_end2end/testfiles/tagged_with_fully_disabled_feature.js",
+            self.output.getvalue(),
+            "tagged_with_fully_disabled_feature.js should not have been included in the discovered tests.",
+        )
+
+    def test_include_fully_disabled(self):
+        self.execute_resmoke(
+            [
+                "--suite=buildscripts/tests/resmoke_end2end/suites/resmoke_jstest_tagged.yml",
+                "--includeFullyDisabledFeatureTests",
+            ]
+        ).wait()
+        self.assertIn(
+            "buildscripts/tests/resmoke_end2end/testfiles/tagged_with_fully_disabled_feature.js",
+            self.output.getvalue(),
+            "tagged_with_fully_disabled_feature.js should have been included in the discovered tests since --includeFullyDisabledFeatureTests is used.",
         )
 
 

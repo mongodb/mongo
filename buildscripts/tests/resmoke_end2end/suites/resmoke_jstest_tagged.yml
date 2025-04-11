@@ -1,0 +1,11 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/tagged_with_disabled_feature.js
+    - buildscripts/tests/resmoke_end2end/testfiles/tagged_with_fully_disabled_feature.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ""

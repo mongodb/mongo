@@ -108,6 +108,14 @@ class DiscoveryPlugin(PluginInterface):
                 " suite_A_B will also run the same tests."
             ),
         )
+        parser.add_argument(
+            "--includeFullyDisabledFeatureTests",
+            dest="include_fully_disabled_feature_tests",
+            action="store_true",
+            help=(
+                "Include tests tagged with features that are in fully_disabled_feature_flags.yml."
+            ),
+        )
 
         parser = subparsers.add_parser(
             SUITECONFIG_SUBCOMMAND, help="Display configuration of a test suite."

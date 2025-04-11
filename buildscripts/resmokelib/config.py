@@ -68,6 +68,7 @@ DEFAULTS = {
     "force_excluded_tests": False,
     "skip_excluded_tests": False,
     "skip_tests_covered_by_more_complex_suites": False,
+    "include_fully_disabled_feature_tests": False,
     "skip_symbolization": False,
     "fuzz_mongod_configs": None,
     "fuzz_runtime_params": None,
@@ -414,6 +415,10 @@ SKIP_EXCLUDED_TESTS = None
 
 # Only run tests on the given suite that will not be run on a more complex suite.
 SKIP_TESTS_COVERED_BY_MORE_COMPLEX_SUITES = None
+
+# Include tests tagged with features that are in fully_disabled_feature_flags.yml. Used for
+# test discovery during task generation.
+INCLUDE_FULLY_DISABLED_FEATURE_TESTS = None
 
 # Skip symbolizing stacktraces generated during tests.
 SKIP_SYMBOLIZATION = None
