@@ -254,6 +254,12 @@ StatusWith<std::string> WiredTigerRecordStoreBase::generateCreateString(
         ss << "memory_page_max=10m,";
     }
 
+    // By default, WiredTiger silently ignores a create table command if the specified ident already
+    // exists - even if the existing table has a different configuration.
+    //
+    // Enable the 'exclusive' flag so WiredTiger table creation fails if an ident already exists.
+    ss << "exclusive=true,";
+
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
     if (options.clusteredIndex) {

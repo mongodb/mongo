@@ -147,6 +147,32 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
                   "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
     }
 }
+
+// Utilizes the DurableCatalog to allocate and track storage resources for the new collection.
+std::pair<RecordId, std::unique_ptr<RecordStore>> durablyTrackNewCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& collectionOptions) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const bool directoryPerDB = storageEngine->isUsingDirectoryPerDb();
+    const bool directoryPerIndexes = storageEngine->isUsingDirectoryForIndexes();
+
+    const auto ident =
+        ident::generateNewCollectionIdent(nss.dbName(), directoryPerDB, directoryPerIndexes);
+    auto createResult =
+        storageEngine->getDurableCatalog()->createCollection(opCtx, nss, ident, collectionOptions);
+    if (createResult == ErrorCodes::ObjectAlreadyExists) {
+        // Each new ident must uniquely identify the collection's underlying table in the storage
+        // engine. A scenario where the ident collides with a pre-existing ident should never happen
+        // given it was just generated.
+        LOGV2_FATAL(10173100,
+                    "Generated ident cannot uniquely identify a new collection's storage table. "
+                    "The ident maps to an occupied file",
+                    "nss"_attr = nss.toStringForErrorMsg(),
+                    "ident"_attr = ident);
+    }
+    return uassertStatusOK(std::move(createResult));
+}
 }  // namespace
 
 Status DatabaseImpl::validateDBName(const DatabaseName& dbName) {
@@ -738,14 +764,8 @@ Collection* DatabaseImpl::_createCollection(
                                             << "' is already in use.");
             }
 
-            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            const bool directoryPerDB = storageEngine->isUsingDirectoryPerDb();
-            const bool directoryPerIndexes = storageEngine->isUsingDirectoryForIndexes();
-            const auto ident = ident::generateNewCollectionIdent(
-                nss.dbName(), directoryPerDB, directoryPerIndexes);
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-                uassertStatusOK(storageEngine->getDurableCatalog()->createCollection(
-                    opCtx, nss, ident, optionsWithUUID));
+                durablyTrackNewCollection(opCtx, nss, optionsWithUUID);
             auto& catalogId = catalogIdRecordStorePair.first;
 
             auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);

@@ -396,6 +396,30 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     assertPinnedMovesSoon(Timestamp(40, 1));
 }
 
+TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
+    auto opCtxPtr = _makeOperationContext();
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    std::string ident = "collection-1234";
+    CollectionOptions defaultCollectionOptions;
+
+    std::unique_ptr<RecordStore> rs;
+    ASSERT_OK(
+        _helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, defaultCollectionOptions));
+
+    // A new record store must always have its own storage table uniquely identified by the ident.
+    // Otherwise, multiple record stores could point to the same storage resource and lead to data
+    // corruption.
+    //
+    // Validate the server throws when trying to create a new record store with an ident already in
+    // use.
+
+    const auto status =
+        _helper.getWiredTigerKVEngine()->createRecordStore(nss, ident, defaultCollectionOptions);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::ObjectAlreadyExists);
+}
+
 TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 #ifdef _WIN32
     // TODO SERVER-51595: to re-enable this test on Windows.

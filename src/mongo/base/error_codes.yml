@@ -869,6 +869,7 @@ error_codes:
       extra: ClusterUMCErrorWithWriteConcernErrorInfo,
       categories: [InternalOnly],
     }
+  - {code: 447, name: ObjectAlreadyExists, categories: [InternalOnly]}
 
   # Error codes 4000-8999 are reserved.
 
