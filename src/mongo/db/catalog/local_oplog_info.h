@@ -32,6 +32,8 @@
 #include <cstddef>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
@@ -49,7 +51,7 @@ namespace mongo {
 // unusual amounts of time.
 class OplogSlotTimeContext {
     int64_t _batchCount = 0;
-    Timer _timer;
+    boost::optional<Timer> _timer;
     AtomicWord<int64_t> _totalOplogSlotDurationMicros;
 
 public:
@@ -59,7 +61,11 @@ public:
      */
     void incBatchCount() {
         if (!_batchCount++) {
-            _timer.reset();
+            if (!_timer) {
+                _timer.emplace();
+            } else {
+                _timer->reset();
+            }
         }
     }
 
@@ -68,9 +74,10 @@ public:
      * update duration on last batch
      */
     void decBatchCount() {
+        invariant(_timer != boost::none);
         if (!--_batchCount) {
             _totalOplogSlotDurationMicros.fetchAndAdd(
-                durationCount<Microseconds>(_timer.elapsed()));
+                durationCount<Microseconds>(_timer->elapsed()));
             // no need to reset timer here, will be reset in subsequent increment
         }
     }
@@ -88,11 +95,12 @@ public:
     }
 
     const auto& getTimer() const {
-        return _timer;
+        invariant(_timer != boost::none);
+        return *_timer;
     }
 
     void setTickSource(TickSource* ts) {
-        _timer = Timer(ts);
+        _timer.emplace(ts);
     }
 };
 
