@@ -167,16 +167,24 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
     # Restarts initial sync by shutting down the node, clearing its data, and restarting it.
     def __restart_init_sync(self, sync_node):
+        storage_engine = (
+            sync_node.mongo_client().admin.command("serverStatus")["storageEngine"].get("name")
+        )
+        # File copy based initial sync is not supported for in-memory storage engine.
+        if storage_engine == "inMemory":
+            init_sync_method = "logical"
+        else:
+            init_sync_method = random.choice(["logical", "fileCopyBased"])
+
         # Tear down and restart the initial sync node to start initial sync again.
         sync_node.teardown()
 
-        method = random.choice(["logical", "fileCopyBased"])
         self.logger.info(
             "Starting the initial sync node back up again with initial sync method {}".format(
-                method
+                init_sync_method
             )
         )
-        sync_node.mongod_options["set_parameters"]["initialSyncMethod"] = method
+        sync_node.mongod_options["set_parameters"]["initialSyncMethod"] = init_sync_method
         sync_node.setup()
         self.logger.info(fixture_interface.create_fixture_table(self.fixture))
         sync_node.await_ready()
