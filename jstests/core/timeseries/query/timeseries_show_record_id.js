@@ -4,8 +4,10 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -53,6 +55,5 @@ TimeseriesTest.run((insert) => {
     });
     assert.commandFailedWithCode(error, ErrorCodes.InvalidPipelineOperator);
 
-    const bucketsColl = db.getCollection("system.buckets." + coll.getName());
-    checkRecordId(bucketsColl.find().showRecordId().toArray());
+    checkRecordId(getTimeseriesCollForRawOps(coll).find().rawData().showRecordId().toArray());
 });

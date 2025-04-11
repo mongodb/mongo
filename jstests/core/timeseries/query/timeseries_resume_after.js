@@ -17,6 +17,10 @@
  *   does_not_support_config_fuzzer
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -27,8 +31,6 @@ TimeseriesTest.run((insert) => {
 
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-
-    const bucketsColl = db.getCollection("system.buckets." + coll.getName());
 
     Random.setRandomSeed();
 
@@ -47,15 +49,18 @@ TimeseriesTest.run((insert) => {
             tags: host.tags,
         }));
     }
-    assert.eq(1, bucketsColl.count(), "The following tests rely on having a single bucket");
+    assert.eq(1,
+              getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
+              "The following tests rely on having a single bucket");
 
     function testResumeToken(tokenType) {
         // Run the initial query and request to return a resume token.
         let res = assert.commandWorked(db.runCommand({
-            find: bucketsColl.getName(),
+            find: getTimeseriesCollForRawOps(coll).getName(),
             hint: {$natural: 1},
             batchSize: 1,
-            $_requestResumeToken: true
+            $_requestResumeToken: true,
+            ...kRawOperationSpec,
         }));
         assert.neq([], res.cursor.firstBatch, "Expect some data to be returned");
 
@@ -65,15 +70,16 @@ TimeseriesTest.run((insert) => {
         assert.neq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
 
         // Kill the cursor before attempting to resume.
-        assert.commandWorked(
-            db.runCommand({killCursors: bucketsColl.getName(), cursors: [res.cursor.id]}));
+        assert.commandWorked(db.runCommand(
+            {killCursors: getTimeseriesCollForRawOps(coll).getName(), cursors: [res.cursor.id]}));
 
         // Try to resume the query from the saved resume token.
         let resumeCmd = {
-            find: bucketsColl.getName(),
+            find: getTimeseriesCollForRawOps(coll).getName(),
             hint: {$natural: 1},
             batchSize: 1,
-            $_requestResumeToken: true
+            $_requestResumeToken: true,
+            ...kRawOperationSpec,
         };
         resumeCmd[tokenType] = resumeToken;
 

@@ -10,12 +10,15 @@
  * ]
  */
 
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName() + '_normal');
 const tsColl = assertDropAndRecreateCollection(
     db, jsTestName() + '_timeseries', {timeseries: {timeField: 'time', metaField: 'mt'}});
-const bucketsColl = db.getCollection('system.buckets.' + tsColl.getName());
 
 // Tests that we produce the same results for a given 'predicate', with and without timeseries, and
 // regardless of timeseries bucketing placement.
@@ -45,7 +48,7 @@ function checkAllBucketings(predicate, documents) {
         // The ith bit tells you how to assign documents[i].
         const labeledDocs = documents.map(
             (doc, i) => Object.merge(doc, {meta: {bucket: bucketing & (1 << i)}}, true /*deep*/));
-        assert.commandWorked(bucketsColl.deleteMany({}));
+        assert.commandWorked(getTimeseriesCollForRawOps(tsColl).deleteMany({}, kRawOperationSpec));
         assert.commandWorked(tsColl.insert(labeledDocs));
         const tsResult = tsColl.aggregate([{$match: predicate}, {$project: {meta: 0}}]).toArray();
         assert.sameMembers(normalResult, tsResult);

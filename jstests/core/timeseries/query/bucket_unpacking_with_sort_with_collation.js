@@ -18,6 +18,10 @@
  * ]
  */
 import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
+import {
     forwardIxscan,
     runDoesntRewriteTest,
     runRewritesTest
@@ -51,7 +55,7 @@ assert.commandWorked(db.createCollection(ciStringCollName, {
 
 for (const coll of [csStringColl, ciStringColl]) {
     assert.commandWorked(coll.insert(docs));
-    assert.eq(db['system.buckets.' + coll.getName()].count(), 4);
+    assert.eq(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec), 4);
 }
 
 // String collation affects whether an equality query is really a point query.

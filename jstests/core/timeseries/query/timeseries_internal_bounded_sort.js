@@ -18,11 +18,14 @@
  *   assumes_balancer_off,
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
-const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
@@ -46,7 +49,10 @@ assert.commandWorked(coll.createIndex({t: -1}));
         assert.commandWorked(coll.insert(batch));
         print(`Inserted ${i + 1} of ${numBatches} batches`);
     }
-    assert.gt(buckets.aggregate([{$count: 'n'}]).next().n, 1, 'Expected more than one bucket');
+    assert.gt(
+        getTimeseriesCollForRawOps(coll).aggregate([{$count: 'n'}], kRawOperationSpec).next().n,
+        1,
+        'Expected more than one bucket');
 
     TimeseriesTest.ensureDataIsDistributedIfSharded(
         coll, new Date(+start + ((batchSize / 2) * intervalMillis)));
@@ -85,12 +91,14 @@ function checkAgainstReference(reference, pipeline, hint, sortOrder) {
 function runTest(ascending) {
     // Test sorting the whole collection
     {
-        const reference = buckets
-                              .aggregate([
-                                  unpackStage,
-                                  {$_internalInhibitOptimization: {}},
-                                  {$sort: {t: ascending ? 1 : -1}},
-                              ])
+        const reference = getTimeseriesCollForRawOps(coll)
+                              .aggregate(
+                                  [
+                                      unpackStage,
+                                      {$_internalInhibitOptimization: {}},
+                                      {$sort: {t: ascending ? 1 : -1}},
+                                  ],
+                                  kRawOperationSpec)
                               .toArray();
         assertSorted(reference, ascending);
 
@@ -124,50 +132,58 @@ function runTest(ascending) {
 
     // Test $sort + $limit.
     {
-        const naive = buckets
-                          .aggregate([
-                              unpackStage,
-                              {$_internalInhibitOptimization: {}},
-                              {$sort: {t: ascending ? 1 : -1}},
-                              {$limit: 100},
-                          ])
+        const naive = getTimeseriesCollForRawOps(coll)
+                          .aggregate(
+                              [
+                                  unpackStage,
+                                  {$_internalInhibitOptimization: {}},
+                                  {$sort: {t: ascending ? 1 : -1}},
+                                  {$limit: 100},
+                              ],
+                              kRawOperationSpec)
                           .toArray();
         assertSorted(naive, ascending);
         assert.eq(100, naive.length);
 
         const optFromMin =
-            buckets
-                .aggregate([
-                    {$sort: {'control.min.t': ascending ? 1 : -1}},
-                    unpackStage,
-                    {
-                        $_internalBoundedSort: {
-                            sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "min"}
-                                             : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
-                            limit: 100
-                        }
-                    },
-                ])
+            getTimeseriesCollForRawOps(coll)
+                .aggregate(
+                    [
+                        {$sort: {'control.min.t': ascending ? 1 : -1}},
+                        unpackStage,
+                        {
+                            $_internalBoundedSort: {
+                                sortKey: {t: ascending ? 1 : -1},
+                                bound: ascending
+                                    ? {base: "min"}
+                                    : {base: "min", offsetSeconds: bucketMaxSpanSeconds},
+                                limit: 100
+                            }
+                        },
+                    ],
+                    kRawOperationSpec)
                 .toArray();
         assertSorted(optFromMin, ascending);
         assert.eq(100, optFromMin.length);
         assert.eq(naive, optFromMin);
 
         const optFromMax =
-            buckets
-                .aggregate([
-                    {$sort: {'control.max.t': ascending ? 1 : -1}},
-                    unpackStage,
-                    {
-                        $_internalBoundedSort: {
-                            sortKey: {t: ascending ? 1 : -1},
-                            bound: ascending ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
-                                             : {base: "max"},
-                            limit: 100
+            getTimeseriesCollForRawOps(coll)
+                .aggregate(
+                    [
+                        {$sort: {'control.max.t': ascending ? 1 : -1}},
+                        unpackStage,
+                        {
+                            $_internalBoundedSort: {
+                                sortKey: {t: ascending ? 1 : -1},
+                                bound: ascending
+                                    ? {base: "max", offsetSeconds: -bucketMaxSpanSeconds}
+                                    : {base: "max"},
+                                limit: 100
+                            }
                         }
-                    }
-                ])
+                    ],
+                    kRawOperationSpec)
                 .toArray();
         assertSorted(optFromMax, ascending);
         assert.eq(100, optFromMax.length);

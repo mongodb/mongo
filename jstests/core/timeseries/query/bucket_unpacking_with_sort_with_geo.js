@@ -18,6 +18,10 @@
  * ]
  */
 import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
+import {
     runDoesntRewriteTest,
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
@@ -39,7 +43,7 @@ assert.commandWorked(geoColl.insert([
     {t: ISODate('1970-01-01'), m: {area}, loc: [0, 0]},
     {t: ISODate('1970-01-01'), m: {area}, loc: [90, 0]},
 ]));
-assert.eq(db['system.buckets.' + geoCollName].count(), 1);
+assert.eq(getTimeseriesCollForRawOps(geoColl).count({}, kRawOperationSpec), 1);
 
 // Geo indexes are typically multikey, which prevents us from doing the rewrite.
 const indexes = [

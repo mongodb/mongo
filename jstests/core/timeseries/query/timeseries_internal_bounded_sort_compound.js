@@ -19,11 +19,14 @@
  *   assumes_balancer_off,
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
-const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
@@ -58,10 +61,11 @@ assert.commandWorked(coll.createIndex({m: -1, t: -1}));
     }
     const expectedBucketsPerSeries = Math.floor((numBatchesPerSeries * batchSize * intervalMillis) /
                                                 (bucketMaxSpanSeconds * 1000));
-    assert.gte(buckets.aggregate([{$count: 'n'}]).next().n,
-               expectedBucketsPerSeries * numSeries,
-               `Expected at least ${expectedBucketsPerSeries} buckets per series ` +
-                   `(${expectedBucketsPerSeries}*${numSeries} total)`);
+    assert.gte(
+        getTimeseriesCollForRawOps(coll).aggregate([{$count: 'n'}], kRawOperationSpec).next().n,
+        expectedBucketsPerSeries * numSeries,
+        `Expected at least ${expectedBucketsPerSeries} buckets per series ` +
+            `(${expectedBucketsPerSeries}*${numSeries} total)`);
 
     TimeseriesTest.ensureDataIsDistributedIfSharded(
         coll, new Date(+start + ((batchSize / 2) * intervalMillis)));
@@ -139,7 +143,8 @@ function runTest(sortSpec) {
             {$_internalInhibitOptimization: {}},
             {$sort: sortSpec},
         ];
-        const reference = buckets.aggregate(naiveQuery).toArray();
+        const reference =
+            getTimeseriesCollForRawOps(coll).aggregate(naiveQuery, kRawOperationSpec).toArray();
         assertSorted(reference, sortSpec);
 
         // Check plan using control.min.t
@@ -182,7 +187,8 @@ function runTest(sortSpec) {
             {$sort: sortSpec},
             {$limit: 100},
         ];
-        const naive = buckets.aggregate(naiveQuery).toArray();
+        const naive =
+            getTimeseriesCollForRawOps(coll).aggregate(naiveQuery, kRawOperationSpec).toArray();
         assertSorted(naive, sortSpec);
         assert.eq(100, naive.length);
 
@@ -198,7 +204,9 @@ function runTest(sortSpec) {
                 }
             }
         ];
-        const optFromMin = buckets.aggregate(optFromMinQuery).toArray();
+        const optFromMin = getTimeseriesCollForRawOps(coll)
+                               .aggregate(optFromMinQuery, kRawOperationSpec)
+                               .toArray();
         assertSorted(optFromMin, sortSpec);
         assert.eq(100, optFromMin.length);
         assert.eq(naive, optFromMin);
@@ -215,7 +223,9 @@ function runTest(sortSpec) {
                 }
             }
         ];
-        const optFromMax = buckets.aggregate(optFromMaxQuery).toArray();
+        const optFromMax = getTimeseriesCollForRawOps(coll)
+                               .aggregate(optFromMaxQuery, kRawOperationSpec)
+                               .toArray();
         assertSorted(optFromMax, sortSpec);
         assert.eq(100, optFromMax.length);
         assert.eq(naive, optFromMax);

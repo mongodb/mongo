@@ -67,15 +67,25 @@ export function getRawOperationSpec(db) {
 }
 
 /**
- * Given a timeseries collection return its corresponding collection that expose raw data.
+ * Given a timeseries collection, returns its corresponding collection that exposes raw data.
  *
- * When rawData is supported this will return the original collection, as the user can simply invoke
+ * When rawData is supported, returns the original collection as the user can simply invoke
  * rawData operations on the main collection.
  *
  * When rawData is not supported this function returns the underlying system.buckets collection.
  */
 export function getTimeseriesCollForRawOps(db, coll) {
     return isRawOperationSupported(db) ? coll : getTimeseriesBucketsColl(coll);
+}
+
+/**
+ * Given a timeseries collection, returns the expected execution namespace.
+ *
+ * When rawData is supported, this will return the timeseries buckets collection. Otherwise returns
+ * the collection itself.
+ */
+export function getTimeseriesExecutionNamespace(db, coll) {
+    return isRawOperationSupported(db) ? getTimeseriesBucketsColl(coll) : coll;
 }
 
 /**

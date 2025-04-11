@@ -13,3 +13,7 @@ export const kRawOperationSpec = raw.getRawOperationSpec(db);
 export function getTimeseriesCollForRawOps(coll) {
     return raw.getTimeseriesCollForRawOps(db, coll);
 }
+
+export function getTimeseriesExecutionNamespace(coll) {
+    return raw.getTimeseriesExecutionNamespace(db, coll);
+}

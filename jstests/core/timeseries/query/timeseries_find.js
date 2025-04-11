@@ -26,7 +26,6 @@ function runTest(docs, query, results) {
     // Setup our DB & our collections.
     const tsColl = db.getCollection(jsTestName());
     tsColl.drop();
-    const bucketColl = db.getCollection('system.buckets.' + tsColl.getName());
 
     assert.commandWorked(
         db.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));

@@ -12,10 +12,13 @@
  *   requires_getmore,
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
-const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},
@@ -83,13 +86,16 @@ const bucketMaxSpanSeconds =
     }
 
     assert.commandWorked(coll.insert(docs));
-    printjson(buckets.find({}, {_id: 0, meta: 1}).sort({meta: 1}).toArray());
+    printjson(getTimeseriesCollForRawOps(coll)
+                  .find({}, {_id: 0, meta: 1}, kRawOperationSpec)
+                  .sort({meta: 1})
+                  .toArray());
     const numInterestingValues = 1 + interestingValues.length;  // +1 for missing.
     // Some of these interestingValues may be considered equal for bucketing purposes, so
     // we can get fewer than numInterestingValues buckets. But if we get more buckets than expected,
     // that probably means our timestamps are too far apart, which could lead to this test passing
     // for the wrong reason.
-    assert.lte(buckets.count(),
+    assert.lte(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
                numInterestingValues,
                `Expected no more than numInterestingValues (${numInterestingValues}) buckets`);
 }
@@ -106,7 +112,8 @@ function runTest(sortSpec) {
         {$_internalInhibitOptimization: {}},
         {$sort: sortSpec},
     ];
-    const naive = buckets.aggregate(naiveQuery).toArray();
+    const naive =
+        getTimeseriesCollForRawOps(coll).aggregate(naiveQuery, kRawOperationSpec).toArray();
 
     const optFromMinQuery = [
         {
@@ -126,7 +133,8 @@ function runTest(sortSpec) {
             }
         },
     ];
-    const optFromMin = buckets.aggregate(optFromMinQuery).toArray();
+    const optFromMin =
+        getTimeseriesCollForRawOps(coll).aggregate(optFromMinQuery, kRawOperationSpec).toArray();
     assert.eq(naive, optFromMin);
 
     const optFromMaxQuery = [
@@ -147,7 +155,8 @@ function runTest(sortSpec) {
             }
         },
     ];
-    const optFromMax = buckets.aggregate(optFromMaxQuery).toArray();
+    const optFromMax =
+        getTimeseriesCollForRawOps(coll).aggregate(optFromMaxQuery, kRawOperationSpec).toArray();
     assert.eq(naive, optFromMax);
 }
 

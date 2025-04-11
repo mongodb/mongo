@@ -20,6 +20,10 @@
  * ]
  */
 import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
+import {
     getTimeseriesBucketsColl,
     isShardedTimeseries
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
@@ -113,7 +117,10 @@ function insertDocuments() {
         const start = normalMin + i * batchOffset;
         insertBucket(start);
     }
-    assert.gt(buckets.aggregate([{$count: 'n'}]).next().n, 1, 'Expected more than one bucket');
+    assert.gt(
+        getTimeseriesCollForRawOps(coll).aggregate([{$count: 'n'}], kRawOperationSpec).next().n,
+        1,
+        'Expected more than one bucket');
 }
 
 insertDocuments();
@@ -185,12 +192,14 @@ function checkAgainstReferenceBoundedSortExpected(
 }
 
 function runTest(ascending) {
-    const reference = buckets
-                          .aggregate([
-                              unpackStage,
-                              {$_internalInhibitOptimization: {}},
-                              {$sort: {t: ascending ? 1 : -1}},
-                          ])
+    const reference = getTimeseriesCollForRawOps(coll)
+                          .aggregate(
+                              [
+                                  unpackStage,
+                                  {$_internalInhibitOptimization: {}},
+                                  {$sort: {t: ascending ? 1 : -1}},
+                              ],
+                              kRawOperationSpec)
                           .toArray();
     assertSorted(reference, ascending);
 
@@ -212,12 +221,14 @@ function runTest(ascending) {
                                                {"$natural": ascending ? 1 : -1},
                                                ascending);
 
-    const referenceIndexed = bucketsIndexed
-                                 .aggregate([
-                                     unpackStage,
-                                     {$_internalInhibitOptimization: {}},
-                                     {$sort: {t: ascending ? 1 : -1}},
-                                 ])
+    const referenceIndexed = getTimeseriesCollForRawOps(collIndexed)
+                                 .aggregate(
+                                     [
+                                         unpackStage,
+                                         {$_internalInhibitOptimization: {}},
+                                         {$sort: {t: ascending ? 1 : -1}},
+                                     ],
+                                     kRawOperationSpec)
                                  .toArray();
     assertSorted(referenceIndexed, ascending);
 

@@ -17,6 +17,10 @@
  *   requires_fcv_80,
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
     getAggPlanStage,
@@ -60,8 +64,9 @@ TimeseriesTest.run((insert) => {
 
         let expl = assert.commandWorked(db.runCommand({
             explain: {
-                update: "system.buckets." + coll.getName(),
-                updates: [{q: {"_id": dates[5]}, u: {$set: {a: 1}}}]
+                update: getTimeseriesCollForRawOps(coll).getName(),
+                updates: [{q: {"_id": dates[5]}, u: {$set: {a: 1}}}],
+                ...kRawOperationSpec,
             }
         }));
 

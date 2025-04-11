@@ -10,7 +10,6 @@
  */
 
 const coll = db[jsTestName()];
-const bucketsColl = db["system.buckets." + coll.getName()];
 
 const timeField = "t";
 const metaField = "m";
