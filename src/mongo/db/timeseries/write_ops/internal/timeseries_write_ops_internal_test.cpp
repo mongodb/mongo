@@ -333,7 +333,7 @@ void TimeseriesWriteOpsInternalTest::
         const std::vector<BSONObj>& userMeasurementsBatch,
         const std::vector<size_t>& correctIndexOrder,
         stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
-    _assertCollWithoutMetaField(ns, userMeasurementsBatch);
+    _assertCollWithoutMetaField(ns);
     _testBuildBatchedInsertContextWithoutMetaField(
         ns, userMeasurementsBatch, correctIndexOrder, expectedIndicesWithErrors);
 }
@@ -444,7 +444,7 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatchInCollWithoutMetaField
     const UUID& collectionUUID,
     const std::vector<BSONObj>& batchOfMeasurements,
     const std::vector<size_t>& numWriteBatches) const {
-    _assertCollWithoutMetaField(ns, batchOfMeasurements);
+    _assertCollWithoutMetaField(ns);
     _testStageInsertBatch(ns, collectionUUID, batchOfMeasurements, numWriteBatches);
 }
 

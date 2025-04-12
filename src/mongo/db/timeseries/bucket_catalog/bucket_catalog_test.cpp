@@ -497,36 +497,35 @@ void BucketCatalogTest::_testBucketMetadataFieldOrdering(const BSONObj& inputMet
 void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     const NamespaceString& ns,
     const UUID& collectionUUID,
-    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<BSONObj>& measurements,
     const std::vector<size_t>& currBatchedInsertContextsIndex,
     const std::vector<size_t>& numMeasurementsInWriteBatch,
     size_t numBatchedInsertContexts) const {
     ASSERT(numMeasurementsInWriteBatch.size() > 0 && numBatchedInsertContexts > 0);
     // These size values are equivalent to the total number of buckets that should be written to
-    // from the input batchOfMeasurements.
+    // from the input measurements.
     ASSERT(currBatchedInsertContextsIndex.size() == numMeasurementsInWriteBatch.size());
-
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
+
     auto timeseriesOptions = _getTimeseriesOptions(ns);
     std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-
-    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog,
-        collectionUUID,
-        timeseriesOptions,
-        batchOfMeasurements,
-        /*startIndex=*/0,
-        /*numDocsToStage=*/batchOfMeasurements.size(),
-        /*docsToRetry=*/{},
-        errorsAndIndices);
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        collectionUUID,
+                                                        timeseriesOptions,
+                                                        measurements,
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/measurements.size(),
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     ASSERT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
     size_t numMeasurements = 0;
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
         numMeasurements += batchedInsertContexts[i].measurementsTimesAndIndices.size();
     }
-    ASSERT_EQ(numMeasurements, batchOfMeasurements.size());
+    ASSERT_EQ(numMeasurements, measurements.size());
 
     auto currentBatch = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<Date_t>(currentBatch.measurementsTimesAndIndices[0]);
@@ -566,9 +565,9 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
 
     if (numMeasurementsInWriteBatch.size() == 1) {
         ASSERT(successfulInsertion);
-        ASSERT_EQ(currentPosition, batchOfMeasurements.size());
-        ASSERT_EQ(bucketToInsertInto.numMeasurements, batchOfMeasurements.size());
-        ASSERT_EQ(currentPositionFromNumMeasurementsInBatch, batchOfMeasurements.size());
+        ASSERT_EQ(currentPosition, measurements.size());
+        ASSERT_EQ(bucketToInsertInto.numMeasurements, measurements.size());
+        ASSERT_EQ(currentPositionFromNumMeasurementsInBatch, measurements.size());
         return;
     }
 
@@ -626,14 +625,14 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
 void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketWithMetaField(
     const NamespaceString& ns,
     const UUID& collectionUUID,
-    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<BSONObj>& measurements,
     const std::vector<size_t>& currBatchedInsertContextsIndex,
     const std::vector<size_t>& numMeasurementsInWriteBatch,
     size_t numBatchedInsertContexts) const {
-    _assertCollWithMetaField(ns, batchOfMeasurements);
+    _assertCollWithMetaField(ns, measurements);
     _testStageInsertBatchIntoEligibleBucket(ns,
                                             collectionUUID,
-                                            batchOfMeasurements,
+                                            measurements,
                                             currBatchedInsertContextsIndex,
                                             numMeasurementsInWriteBatch,
                                             numBatchedInsertContexts);
@@ -642,14 +641,14 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketWithMetaField(
 void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketInCollWithoutMetaField(
     const NamespaceString& ns,
     const UUID& collectionUUID,
-    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<BSONObj>& measurements,
     const std::vector<size_t>& currBatchedInsertContextsIndex,
     const std::vector<size_t>& numMeasurementsInWriteBatch,
     size_t numBatchedInsertContexts) const {
-    _assertCollWithoutMetaField(ns, batchOfMeasurements);
+    _assertCollWithoutMetaField(ns);
     _testStageInsertBatchIntoEligibleBucket(ns,
                                             collectionUUID,
-                                            batchOfMeasurements,
+                                            measurements,
                                             currBatchedInsertContextsIndex,
                                             numMeasurementsInWriteBatch,
                                             numBatchedInsertContexts);
@@ -658,14 +657,14 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketInCollWithoutMeta
 void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketWithoutMetaFieldInCollWithMetaField(
     const NamespaceString& ns,
     const UUID& collectionUUID,
-    const std::vector<BSONObj>& batchOfMeasurements,
+    const std::vector<BSONObj>& measurements,
     const std::vector<size_t>& currBatchedInsertContextsIndex,
     const std::vector<size_t>& numMeasurementsInWriteBatch,
     size_t numBatchedInsertContexts) const {
-    _assertNoMetaFieldsInCollWithMetaField(ns, batchOfMeasurements);
+    _assertNoMetaFieldsInCollWithMetaField(ns, measurements);
     _testStageInsertBatchIntoEligibleBucket(ns,
                                             collectionUUID,
-                                            batchOfMeasurements,
+                                            measurements,
                                             currBatchedInsertContextsIndex,
                                             numMeasurementsInWriteBatch,
                                             numBatchedInsertContexts);

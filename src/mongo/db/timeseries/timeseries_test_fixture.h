@@ -71,8 +71,7 @@ protected:
     void _assertCollWithMetaField(const NamespaceString& ns,
                                   std::vector<BSONObj> batchOfMeasurements) const;
 
-    void _assertCollWithoutMetaField(const NamespaceString& ns,
-                                     std::vector<BSONObj> batchOfMeasurements) const;
+    void _assertCollWithoutMetaField(const NamespaceString& ns) const;
 
     void _assertNoMetaFieldsInCollWithMetaField(const NamespaceString& ns,
                                                 std::vector<BSONObj> batchOfMeasurements) const;
@@ -121,6 +120,43 @@ protected:
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
                                                   Date_t timeValue,
                                                   StringData metaValue) const;
+
+    bucket_catalog::Bucket* _generateBucketWithBatch(const NamespaceString& ns,
+                                                     const UUID& collectionUUID,
+                                                     bucket_catalog::BatchedInsertContext& batch);
+
+    /**
+     * Without inserting 'batch', asserts that 'batch' doesn't rollover 'bucket'.
+     */
+    void _assertBatchDoesNotRollover(const TimeseriesOptions& options,
+                                     bucket_catalog::BatchedInsertContext& batch,
+                                     bucket_catalog::Bucket* bucket);
+    /**
+     * Performs stageInsertBatchIntoEligibleBucket.
+     * Before staging 'batch', we check that the 'batch' doesn't rollover due to any reason and will
+     * assert otherwise.
+     */
+    void _stageInsertOneBatchIntoEligibleBucketHelper(const NamespaceString& ns,
+                                                      const UUID& collectionUUID,
+                                                      bucket_catalog::BatchedInsertContext& batch,
+                                                      bucket_catalog::Bucket* bucket);
+
+    /**
+     * Creates a vector of buckets. The i-th bucket contains the measurements and rollover reason
+     * from measurementsAndRolloverReasons[i].
+     * We require that for the list of measurements in measurementsAndRolloverReasons[i], we
+     * will not rollover and will assert otherwise.
+     * We require that measurementsAndRolloverReasons have the same meta value or the collection has
+     * no meta value and will assert otherwise.
+     * We require that there is only one kNone reason in measurementsAndRolloverReasons because for
+     * buckets with the same meta field/collections with no meta field value, there can only be one
+     * uncleared kNone bucket.
+     */
+    absl::InlinedVector<bucket_catalog::Bucket*, 8> _generateBucketsWithMeasurements(
+        const NamespaceString& ns,
+        const UUID& collectionUUID,
+        const std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>&
+            measurementsAndRolloverReasons);
 
     struct MeasurementsWithRolloverReasonOptions {
         const bucket_catalog::RolloverReason reason;
