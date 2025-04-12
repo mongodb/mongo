@@ -13,7 +13,6 @@ load(
 )
 load(
     "//bazel/toolchains/cc/mongo_apple:mongo_compiler_flags.bzl",
-    "MONGO_MAC_CC_COPTS",
     "MONGO_MAC_CC_LINKFLAGS",
 )
 
@@ -81,7 +80,7 @@ def package_specific_linkflag(package_name):
         return UBSAN_OPTS_THIRD_PARTY
     return []
 
-MONGO_GLOBAL_COPTS = MONGO_LINUX_CC_COPTS + MONGO_WIN_CC_COPTS + MONGO_MAC_CC_COPTS
+MONGO_GLOBAL_COPTS = MONGO_LINUX_CC_COPTS + MONGO_WIN_CC_COPTS
 
 def get_copts(name, package_name, copts = [], skip_windows_crt_flags = False):
     copts = MONGO_GLOBAL_COPTS + \

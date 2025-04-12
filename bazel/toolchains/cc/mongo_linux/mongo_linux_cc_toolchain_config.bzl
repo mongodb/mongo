@@ -11,6 +11,7 @@ load(
     "with_feature_set",
 )
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("//bazel/toolchains/cc/mongo_linux:mongo_defines.bzl", "DEFINES")
 
 COMPILERS = struct(
     CLANG = "clang",
@@ -504,6 +505,12 @@ def _impl(ctx):
                     flag_group(
                         flags = ["-D%{preprocessor_defines}"],
                         iterate_over = "preprocessor_defines",
+                    ),
+                    flag_group(
+                        flags = [
+                            "-D{}".format(preprocessor_define)
+                            for preprocessor_define in DEFINES
+                        ],
                     ),
                 ],
             ),

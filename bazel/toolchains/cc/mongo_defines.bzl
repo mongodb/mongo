@@ -1,4 +1,4 @@
-"""This module provides a list of defines that is passed in to compiling.
+"""This module provides a list of defines that is passed in to compiling that is agnostic to the OS.
 """
 
 load(
@@ -8,8 +8,6 @@ load(
     "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
     "THREAD_SANITIZER_ERROR_MESSAGE",
 )
-load("//bazel/toolchains/cc/mongo_apple:mongo_defines.bzl", "MACOS_DEFINES")
-load("//bazel/toolchains/cc/mongo_linux:mongo_defines.bzl", "LINUX_DEFINES")
 load("//bazel/toolchains/cc/mongo_windows:mongo_defines.bzl", "WINDOWS_DEFINES")
 
 # Defines are only visible to within //bazel directory where
@@ -106,8 +104,6 @@ TCMALLOC_DEFINES = select({
 })
 
 MONGO_GLOBAL_DEFINES = (
-    MACOS_DEFINES +
-    LINUX_DEFINES +
     WINDOWS_DEFINES +
     DEBUG_DEFINES +
     LIBCXX_DEFINES +

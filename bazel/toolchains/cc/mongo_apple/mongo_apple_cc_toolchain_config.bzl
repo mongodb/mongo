@@ -35,7 +35,14 @@ load("@build_bazel_apple_support//lib:apple_support.bzl", "apple_support")
 
 ###
 # mongodb customization
-load("@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl", "mongo_frameworks_feature")
+load(
+    "@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl",
+    "mongo_frameworks_feature",
+    "mongo_fsized_deallocation_feature",
+    "mongo_general_linkflags_feature",
+    "mongo_general_warnings_feature",
+    "mongo_preprocessor_defines_feature",
+)
 ###
 
 # TODO: Remove when we drop bazel 6.x support
@@ -2686,6 +2693,10 @@ please file an issue at https://github.com/bazelbuild/apple_support/issues/new
         ###
         # mongodb customization
         mongo_frameworks_feature,
+        mongo_preprocessor_defines_feature,
+        mongo_general_warnings_feature,
+        mongo_fsized_deallocation_feature,
+        mongo_general_linkflags_feature,
         ###
         default_link_flags_feature,
         no_deduplicate_feature,

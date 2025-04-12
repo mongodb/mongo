@@ -1,15 +1,12 @@
 """This module provides a list of defines that is passed in to compiling.
 """
 
-visibility(["//bazel/toolchains/cc"])
+visibility(["//bazel/toolchains/cc/mongo_apple"])
 
-MACOS_DEFINES = select({
-    "@platforms//os:macos": [
-        # TODO SERVER-54659 - ASIO depends on std::result_of which was removed
-        # in C++ 20. xcode15 does not have backwards compatibility.
-        "ASIO_HAS_STD_INVOKE_RESULT",
-        # This is needed to compile boost on the newer xcodes
-        "BOOST_NO_CXX98_FUNCTION_BASE",
-    ],
-    "//conditions:default": [],
-})
+DEFINES = [
+    # TODO SERVER-54659 - ASIO depends on std::result_of which was removed
+    # in C++ 20. xcode15 does not have backwards compatibility.
+    "ASIO_HAS_STD_INVOKE_RESULT",
+    # This is needed to compile boost on the newer xcodes
+    "BOOST_NO_CXX98_FUNCTION_BASE",
+]
