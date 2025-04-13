@@ -50,6 +50,12 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
             return true;
         }
 
+        // A transaction aborted due to cache pressure can be retried, though doing so may just
+        // compound the problem.
+        if (e.code == ErrorCodes.TemporarilyUnavailable) {
+            return true;
+        }
+
         if (retryOnKilledSession && KilledSessionUtil.hasKilledSessionError(e)) {
             print("-=-=-=- Retrying transaction after killed session error: " + tojsononeline(e));
             return true;
@@ -182,6 +188,8 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                     assert.commandWorkedOrFailedWithCode(session.abortTransaction_forTesting(), [
                         ErrorCodes.NoSuchTransaction,
                         ErrorCodes.Interrupted,
+                        // Ignore sessions killed due to cache pressure. See SERVER-100367.
+                        ErrorCodes.TemporarilyUnavailable,
                         // Ignore errors that can occur when shards are removed in the background
                         ErrorCodes.HostUnreachable,
                         ErrorCodes.ShardNotFound
