@@ -48,9 +48,11 @@ selector:
     - requires_capped
     - viewless_timeseries_incompatible
   roots:
+    - jstests/core/timeseries/ddl/timeseries_compact.js
     - jstests/core/timeseries/ddl/timeseries_create_collection.js
     - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
     - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
+    - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js
     - jstests/core/timeseries/libs/geo.js
     - jstests/core/timeseries/libs/timeseries.js
     - jstests/core/timeseries/libs/timeseries_agg_helpers.js
@@ -58,14 +60,42 @@ selector:
     - jstests/core/timeseries/libs/timeseries_sort_util.js
     - jstests/core/timeseries/libs/timeseries_writes_util.js
     - jstests/core/timeseries/libs/viewless_timeseries_util.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
+    - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
     - jstests/core/timeseries/query/timeseries_cursor_batches.js
+    - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
     - jstests/core/timeseries/query/timeseries_groupby_reorder.js
     - jstests/core/timeseries/query/timeseries_groupby_reorder_expr.js
     - jstests/core/timeseries/query/timeseries_homogeneous_top_bottom.js
+    - jstests/core/timeseries/query/timeseries_id_range.js
+    - jstests/core/timeseries/query/timeseries_insert_normalize_metadata.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_overflow.js
+    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_release_memory.js
     - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
+    - jstests/core/timeseries/query/timeseries_lastpoint_common_sort_key.js
+    - jstests/core/timeseries/query/timeseries_match_pushdown.js
+    - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
+    - jstests/core/timeseries/query/timeseries_merge.js
+    - jstests/core/timeseries/query/timeseries_project.js
     - jstests/core/timeseries/query/timeseries_project_pushdown.js
+    - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
+    - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
+    - jstests/core/timeseries/query/timeseries_raw_data_queries.js
     - jstests/core/timeseries/query/timeseries_shadowing_meta_project_pushdown.js
+    - jstests/core/timeseries/query/timeseries_show_record_id.js
+    - jstests/core/timeseries/query/timeseries_streaming_group.js
+    - jstests/core/timeseries/query/timeseries_top_k_sort_optimization.js
     - jstests/core/timeseries/write/basic.js
+    - jstests/core/timeseries/write/timeseries_bucket_limit_count.js
+    - jstests/core/timeseries/write/timeseries_bucket_limit_time_range.js
+    - jstests/core/timeseries/write/timeseries_bucket_manual_removal.js
     - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
     - jstests/core/timeseries/write/timeseries_insert.js
+    - jstests/core/timeseries/write/timeseries_insert_compresses_bucket.js
+    - jstests/core/timeseries/write/timeseries_metadata.js
+    - jstests/core/timeseries/write/timeseries_min_max.js
+    - jstests/core/timeseries/write/timeseries_out_of_order.js
+    - jstests/core/timeseries/write/timeseries_simple.js
+    - jstests/core/timeseries/write/timeseries_sparse.js
 test_kind: js_test
