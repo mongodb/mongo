@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
@@ -55,6 +56,52 @@
 #include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {
+
+namespace {
+BSONObj makeSettingsClusterParameter(const QueryShapeConfigurationsWithTimestamp& config) {
+    BSONArrayBuilder settings;
+    for (const auto& queryShapeConfig : config.queryShapeConfigurations) {
+        settings.append(queryShapeConfig.toBSON());
+    }
+    return BSON("_id" << QuerySettingsService::getQuerySettingsClusterParameterName()
+                      << QuerySettingsClusterParameterValue::kSettingsArrayFieldName
+                      << settings.arr()
+                      << QuerySettingsClusterParameterValue::kClusterParameterTimeFieldName
+                      << config.clusterParameterTime.asTimestamp());
+}
+
+BSONObj makeSettingsClusterParameter(
+    const BSONArray& settings, LogicalTime clusterParameterTime = LogicalTime(Timestamp(113, 59))) {
+    return BSON("_id" << QuerySettingsService::getQuerySettingsClusterParameterName()
+                      << QuerySettingsClusterParameterValue::kSettingsArrayFieldName << settings
+                      << QuerySettingsClusterParameterValue::kClusterParameterTimeFieldName
+                      << clusterParameterTime.asTimestamp());
+}
+
+QuerySettings makeQuerySettings(const IndexHintSpecs& indexHints, bool setFramework = true) {
+    QuerySettings settings;
+    if (!indexHints.empty()) {
+        settings.setIndexHints(indexHints);
+    }
+    if (setFramework) {
+        settings.setQueryFramework(mongo::QueryFrameworkControlEnum::kTrySbeEngine);
+    }
+    return settings;
+}
+
+auto makeDbName(StringData dbName) {
+    return DatabaseNameUtil::deserialize(
+        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
+}
+
+NamespaceSpec makeNsSpec(StringData collName) {
+    NamespaceSpec ns;
+    ns.setDb(makeDbName("testDbA"));
+    ns.setColl(collName);
+    return ns;
+}
+
+}  // namespace
 
 static auto const kSerializationContext =
     SerializationContext{SerializationContext::Source::Command,
@@ -71,16 +118,14 @@ public:
         LogicalTime newTime = _previousQueryShapeConfigurationsWithTimestamp.clusterParameterTime;
         newTime.addTicks(1);
 
-        setAllQueryShapeConfigurations(
-            _opCtx,
+        QuerySettingsService::get(_opCtx).setAllQueryShapeConfigurations(
             QueryShapeConfigurationsWithTimestamp{queryShapeConfigurations, newTime},
             boost::none /* tenantId */);
     }
 
     ~QuerySettingsScope() {
-        setAllQueryShapeConfigurations(_opCtx,
-                                       std::move(_previousQueryShapeConfigurationsWithTimestamp),
-                                       boost::none /* tenantId */);
+        QuerySettingsService::get(_opCtx).setAllQueryShapeConfigurations(
+            std::move(_previousQueryShapeConfigurationsWithTimestamp), boost::none /* tenantId */);
     }
 
 private:
@@ -127,17 +172,14 @@ private:
     boost::optional<ExplainOptions::Verbosity> _previousExplain;
 };
 
-class QuerySettingsLoookupTest : public ServiceContextTest {
+class QuerySettingsServiceTest : public ServiceContextTest {
 public:
     static constexpr StringData kCollName = "exampleColl"_sd;
     static constexpr StringData kDbName = "foo"_sd;
 
     void setUp() final {
         // Initialize the query settings.
-        initializeForTest(getServiceContext());
-
         _opCtx = cc().makeOperationContext();
-        _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
     }
 
     OperationContext* opCtx() {
@@ -145,7 +187,15 @@ public:
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx() {
+        if (!_expCtx) {
+            _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
+        }
+
         return _expCtx;
+    }
+
+    QuerySettingsService& service() {
+        return QuerySettingsService::get(opCtx());
     }
 
     static NamespaceString nss() {
@@ -153,26 +203,50 @@ public:
             boost::none, kDbName, kCollName, kSerializationContext);
     }
 
-    QueryShapeConfiguration makeQueryShapeConfiguration(const BSONObj& cmdBSON,
-                                                        const QuerySettings& querySettings) {
-        auto queryShapeHash =
-            createRepresentativeInfo(opCtx(), cmdBSON, boost::none /* tenantId */).queryShapeHash;
+    QueryShapeConfiguration makeQueryShapeConfiguration(
+        const BSONObj& cmdBSON,
+        const QuerySettings& querySettings,
+        boost::optional<TenantId> tenantId = boost::none) {
+        auto queryShapeHash = createRepresentativeInfo(opCtx(), cmdBSON, tenantId).queryShapeHash;
         QueryShapeConfiguration config(queryShapeHash, querySettings);
         config.setRepresentativeQuery(cmdBSON);
         return config;
     }
 
+    std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(TenantId tenantId) {
+        NamespaceSpec ns;
+        ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
+        ns.setColl(kCollName);
+
+        const QuerySettings settings = makeQuerySettings({IndexHintSpec(ns, {IndexHint("a_1")})});
+        QueryInstance queryA =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << 2));
+        QueryInstance queryB =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL));
+        return {makeQueryShapeConfiguration(queryA, settings, tenantId),
+                makeQueryShapeConfiguration(queryB, settings, tenantId)};
+    }
+
     void assertQuerySettingsLookup(const BSONObj& cmdBSON,
                                    const query_shape::DeferredQueryShape& deferredShape,
                                    const NamespaceString& nss) {
-        assertQuerySettingsLookupWithoutRejectionCheck(cmdBSON, deferredShape, nss);
-        assertQuerySettingsLookupWithRejectionCheck(cmdBSON, deferredShape, nss);
+        {
+            initializeForRouter(getServiceContext());
+            assertQuerySettingsLookupWithoutRejectionCheckForRouter(cmdBSON, deferredShape, nss);
+            assertQuerySettingsLookupWithRejectionCheckForRouter(cmdBSON, deferredShape, nss);
+        }
+
+        {
+            initializeForShard(getServiceContext());
+            assertQuerySettingsLookupWithoutRejectionCheckForShard(cmdBSON, deferredShape, nss);
+            assertQuerySettingsLookupWithRejectionCheckForShard(cmdBSON, deferredShape, nss);
+        }
     }
 
     /**
      * Ensures that QuerySettings lookup returns the correct settings for the corresponding query.
      */
-    void assertQuerySettingsLookupWithoutRejectionCheck(
+    void assertQuerySettingsLookupWithoutRejectionCheckForRouter(
         const BSONObj& cmdBSON,
         const query_shape::DeferredQueryShape& deferredShape,
         const NamespaceString& nss) {
@@ -186,10 +260,7 @@ public:
         useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
 
         // Ensure empty settings are returned if no settings are present in the system.
-        ASSERT_EQ(lookupQuerySettingsWithRejectionCheckOnRouter(expCtx(), deferredShape, nss),
-                  QuerySettings());
-        ASSERT_EQ(lookupQuerySettingsWithRejectionCheckOnShard(
-                      expCtx(), deferredShape, nss, QuerySettings()),
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(expCtx(), deferredShape, nss),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdForSettingsBSON'.
@@ -198,12 +269,39 @@ public:
 
         // Ensure that 'forceClassicEngineSettings' are returned during the lookup, after query
         // settings have been populated.
-        ASSERT_EQ(lookupQuerySettingsWithRejectionCheckOnRouter(expCtx(), deferredShape, nss),
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(expCtx(), deferredShape, nss),
                   forceClassicEngineSettings);
+    }
+
+    /**
+     * Ensures that QuerySettings lookup returns the correct settings for the corresponding query.
+     */
+    void assertQuerySettingsLookupWithoutRejectionCheckForShard(
+        const BSONObj& cmdBSON,
+        const query_shape::DeferredQueryShape& deferredShape,
+        const NamespaceString& nss) {
+
+        const bool isExplain = cmdBSON.firstElementFieldNameStringData() == "explain";
+        BSONObj cmdForSettingsBSON = isExplain ? cmdBSON.firstElement().Obj() : cmdBSON;
+
+        QuerySettings forceClassicEngineSettings;
+        forceClassicEngineSettings.setQueryFramework(
+            QueryFrameworkControlEnum::kForceClassicEngine);
+        QuerySettings useSbeEngineSettings;
+        useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
+
+        // Ensure empty settings are returned if no settings are present in the system.
+        ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                      expCtx(), deferredShape, nss, QuerySettings()),
+                  QuerySettings());
+
+        // Set { queryFramework: 'classic' } settings to 'cmdForSettingsBSON'.
+        QuerySettingsScope forceClassicEngineQuerySettingsScope(
+            opCtx(), {makeQueryShapeConfiguration(cmdForSettingsBSON, forceClassicEngineSettings)});
 
         // Ensure that in case of a replica set case, a regular query settings lookup is performed.
         ASSERT_EQ(
-            lookupQuerySettingsWithRejectionCheckOnShard(
+            service().lookupQuerySettingsWithRejectionCheck(
                 expCtx(), deferredShape, nss, boost::none /* querySettingsFromOriginalCommand */),
             forceClassicEngineSettings);
 
@@ -213,13 +311,13 @@ public:
 
             // Ensure that settings passed to the method are being returned as opposed to performing
             // the QuerySettings lookup.
-            ASSERT_EQ(lookupQuerySettingsWithRejectionCheckOnShard(
+            ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                           expCtx(), deferredShape, nss, useSbeEngineSettings),
                       useSbeEngineSettings);
 
             // Ensure that empty settings are returned if original command did not have any settings
             // specified as opposed to performing QuerySettings lookup.
-            ASSERT_EQ(lookupQuerySettingsWithRejectionCheckOnShard(
+            ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                           expCtx(),
                           deferredShape,
                           nss,
@@ -232,7 +330,7 @@ public:
      * Ensures that QuerySettings lookup rejects the queries if the associated settings contain
      * 'reject: true'.
      */
-    void assertQuerySettingsLookupWithRejectionCheck(
+    void assertQuerySettingsLookupWithRejectionCheckForRouter(
         const BSONObj& cmdBSON,
         const query_shape::DeferredQueryShape& deferredShape,
         const NamespaceString& nss) {
@@ -250,13 +348,37 @@ public:
         if (isExplain) {
             ASSERT_DOES_NOT_THROW(
                 lookupQuerySettingsWithRejectionCheckOnRouter(expCtx(), deferredShape, nss));
-            ASSERT_DOES_NOT_THROW(lookupQuerySettingsWithRejectionCheckOnShard(
-                expCtx(), deferredShape, nss, boost::none /* querySettingsFromOriginalCommand */));
         } else {
             ASSERT_THROWS_CODE(
                 lookupQuerySettingsWithRejectionCheckOnRouter(expCtx(), deferredShape, nss),
                 DBException,
                 ErrorCodes::QueryRejectedBySettings);
+        }
+    }
+
+    /**
+     * Ensures that QuerySettings lookup rejects the queries if the associated settings contain
+     * 'reject: true'.
+     */
+    void assertQuerySettingsLookupWithRejectionCheckForShard(
+        const BSONObj& cmdBSON,
+        const query_shape::DeferredQueryShape& deferredShape,
+        const NamespaceString& nss) {
+        const bool isExplain = cmdBSON.firstElementFieldNameStringData() == "explain";
+        BSONObj cmdForSettingsBSON = isExplain ? cmdBSON.firstElement().Obj() : cmdBSON;
+
+        // Set { reject: true } settings to 'cmdForSettingsBSON'.
+        QuerySettings querySettingsWithReject;
+        querySettingsWithReject.setReject(true);
+        QuerySettingsScope rejectQuerySettingsScope(
+            opCtx(), {makeQueryShapeConfiguration(cmdForSettingsBSON, querySettingsWithReject)});
+
+        // Ensure query is not rejected if an explain query is run, otherwise is rejected by
+        // throwing an exception with QueryRejectedBySettings error code.
+        if (isExplain) {
+            ASSERT_DOES_NOT_THROW(lookupQuerySettingsWithRejectionCheckOnShard(
+                expCtx(), deferredShape, nss, boost::none /* querySettingsFromOriginalCommand */));
+        } else {
             ASSERT_THROWS_CODE(lookupQuerySettingsWithRejectionCheckOnShard(
                                    expCtx(),
                                    deferredShape,
@@ -276,12 +398,25 @@ public:
         }
     }
 
+    void assertSanitizeInvalidIndexHints(const IndexHintSpecs& initialSpec,
+                                         const IndexHintSpecs& expectedSpec) {
+        QueryInstance query = BSON("find" << "exampleColl"
+                                          << "$db"
+                                          << "foo");
+        auto initSettings = makeQueryShapeConfiguration(query, makeQuerySettings(initialSpec));
+        std::vector<QueryShapeConfiguration> queryShapeConfigs{initSettings};
+        const auto expectedSettings = makeQuerySettings(expectedSpec);
+        ASSERT_DOES_NOT_THROW(sanitizeQuerySettingsHints(queryShapeConfigs));
+        ASSERT_BSONOBJ_EQ(queryShapeConfigs[0].getSettings().toBSON(), expectedSettings.toBSON());
+    }
+
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
-TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForFind) {
+TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForFind) {
     auto findCmdStr = "{find: 'exampleColl', '$db': 'foo'}"_sd;
     auto findCmdBSON = fromjson(findCmdStr);
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
@@ -298,7 +433,7 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForFind) {
     }
 }
 
-TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForAgg) {
+TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForAgg) {
     auto aggCmdStr =
         "{aggregate: 'exampleColl', pipeline: [{$match: {_id: 0}}], cursor: {}, '$db': 'foo'}"_sd;
     auto aggCmdBSON = fromjson(aggCmdStr);
@@ -317,7 +452,7 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForAgg) {
     }
 }
 
-TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForDistinct) {
+TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForDistinct) {
     auto distinctCmdBSON = fromjson("{distinct: 'exampleColl', key: 'x', $db: 'foo'}");
     auto distinctCmd = std::make_unique<DistinctCommandRequest>(
         DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
@@ -340,6 +475,64 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForDistinct) {
         ExplainScope explainScope(expCtx(), distinctCmdBSON);
         assertQuerySettingsLookup(explainScope.explainCmd(), deferredShape, nss());
     }
+}
+
+/**
+ * Tests that valid index hint specs are the same before and after index hint sanitization.
+ */
+TEST_F(QuerySettingsServiceTest, ValidIndexHintsAreTheSameBeforeAndAfterSanitization) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(
+        makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 1)), IndexHint(BSON("b" << -1.0))})};
+    assertSanitizeInvalidIndexHints(indexHintSpec, indexHintSpec);
+}
+
+/**
+ * Tests that invalid key-pattern are removed after sanitization.
+ */
+TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitization) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                               {IndexHint(BSON("a" << 1 << "c"
+                                                                   << "invalid")),
+                                                IndexHint(BSON("b" << -1.0))})};
+    IndexHintSpecs expectedHintSpec{
+        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("b" << -1.0))})};
+    assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
+}
+
+/**
+ * Same as the above test but with more complex examples.
+ */
+TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitizationComplex) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                               {
+                                                   IndexHint(BSON("a" << 1 << "c"
+                                                                      << "invalid")),
+                                                   IndexHint(BSON("b" << -1.0)),
+                                                   IndexHint(BSON("c" << -2.0 << "b" << 4)),
+                                                   IndexHint("index_name"),
+                                                   IndexHint(BSON("$natural" << 1)),
+                                                   IndexHint(BSON("$natural" << -1 << "a" << 2)),
+                                                   IndexHint(BSON("a" << -1 << "$natural" << 1)),
+                                               })};
+    IndexHintSpecs expectedHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                                  {IndexHint(BSON("b" << -1.0)),
+                                                   IndexHint(BSON("c" << -2.0 << "b" << 4)),
+                                                   IndexHint("index_name")})};
+    assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
+}
+
+/**
+ * Tests that invalid key-pattern are removed after sanitization and the resulted index hints are
+ * empty.
+ */
+TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitizationEmptyHints) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                               {
+                                                   IndexHint(BSON("a" << 1 << "c"
+                                                                      << "invalid")),
+                                               })};
+    IndexHintSpecs expectedHintSpec;
+    assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
 }
 
 }  // namespace mongo::query_settings

@@ -56,6 +56,7 @@ idl_generator(
 mongo_cc_library(
     name = "query_settings_service",
     srcs = [
+        "query_settings_cluster_parameter_impl.cpp",
         "query_settings_hash.cpp",
         "query_settings_manager.cpp",
         "query_settings_manager.h",
@@ -90,6 +91,7 @@ mongo_cc_unit_test(
     srcs = [
         "index_hints_serialization_test.cpp",
         "query_framework_serialization_test.cpp",
+        "query_settings_cluster_parameter_impl_test.cpp",
         "query_settings_hash_test.cpp",
         "query_settings_manager_test.cpp",
         "query_settings_service_test.cpp",

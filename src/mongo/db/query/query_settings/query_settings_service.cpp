@@ -75,6 +75,11 @@ const stdx::unordered_set<StringData, StringMapHasher> rejectionIncompatibleStag
     "$operationMetrics"_sd,
 };
 
+const auto getQuerySettingsService =
+    ServiceContext::declareDecoration<std::unique_ptr<QuerySettingsService>>();
+
+static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
+
 MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
 
 /**
@@ -380,6 +385,144 @@ void sanitizeKeyPatternIndexHints(QueryShapeConfiguration& queryShapeItem) {
 }
 }  // namespace
 
+class QuerySettingsRouterService : public QuerySettingsService {
+public:
+    QuerySettingsRouterService() : QuerySettingsService() {}
+
+    QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
+        const boost::optional<TenantId>& tenantId) const final {
+        return _manager.getAllQueryShapeConfigurations(tenantId);
+    }
+
+    void setAllQueryShapeConfigurations(QueryShapeConfigurationsWithTimestamp&& config,
+                                        const boost::optional<TenantId>& tenantId) final {
+        _manager.setAllQueryShapeConfigurations(std::move(config), tenantId);
+    }
+
+    void removeAllQueryShapeConfigurations(const boost::optional<TenantId>& tenantId) final {
+        _manager.removeAllQueryShapeConfigurations(tenantId);
+    }
+
+    LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const final {
+        return _manager.getClusterParameterTime(tenantId);
+    }
+
+    QuerySettings lookupQuerySettingsWithRejectionCheck(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const query_shape::DeferredQueryShape& deferredShape,
+        const NamespaceString& nss,
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
+            boost::none) const override {
+        QuerySettings settings = [&]() {
+            try {
+                // No query settings lookup for IDHACK queries.
+                if (expCtx->isIdHackQuery()) {
+                    return QuerySettings();
+                }
+
+                // No query settings for queries with encryption information.
+                if (expCtx->isFleQuery()) {
+                    return QuerySettings();
+                }
+
+                // No query settings lookup on internal dbs or system collections in user dbs.
+                if (nss.isOnInternalDb() || nss.isSystem()) {
+                    return QuerySettings();
+                }
+
+                // Force shape computation and early exit with empty settings if shape computation
+                // has failed.
+                const auto& shapePtr = deferredShape();
+                if (!shapePtr.isOK()) {
+                    return QuerySettings();
+                }
+
+                // Compute the QueryShapeHash and store it in CurOp.
+                auto* opCtx = expCtx->getOperationContext();
+                QueryShapeHash hash = shapePtr.getValue()->sha256Hash(opCtx, kSerializationContext);
+                setQueryShapeHash(opCtx, hash);
+
+                // Return the found query settings or an empty one.
+                return _manager.getQuerySettingsForQueryShapeHash(hash, nss.tenantId())
+                    .get_value_or({});
+            } catch (const DBException& ex) {
+                LOGV2_WARNING_OPTIONS(10153400,
+                                      {logv2::LogComponent::kQuery},
+                                      "Failed to perform query settings lookup",
+                                      "error"_attr = ex.toString());
+                return QuerySettings();
+            }
+        }();
+
+        // Fail the current command, if 'reject: true' flag is present.
+        failIfRejectedBySettings(expCtx, settings);
+
+        return settings;
+    }
+
+    void refreshQueryShapeConfigurations(OperationContext* opCtx) override {
+        // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of
+        // the parameter after that modification should observe results of preceeding
+        // writes.
+        const bool kEnsureReadYourWritesConsistency = true;
+        auto refreshStatus = ClusterServerParameterRefresher::get(opCtx)->refreshParameters(
+            opCtx, kEnsureReadYourWritesConsistency);
+        if (!refreshStatus.isOK()) {
+            LOGV2_WARNING(8472500,
+                          "Error occurred when fetching the latest version of query settings",
+                          "error_code"_attr = refreshStatus.code(),
+                          "reason"_attr = refreshStatus.reason());
+        }
+    }
+
+private:
+    QuerySettingsManager _manager;
+};
+
+class QuerySettingsShardService : public QuerySettingsRouterService {
+public:
+    QuerySettingsShardService() : QuerySettingsRouterService() {}
+
+    QuerySettings lookupQuerySettingsWithRejectionCheck(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const query_shape::DeferredQueryShape& queryShape,
+        const NamespaceString& nss,
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
+            boost::none) const override {
+        // No query settings lookup for IDHACK queries.
+        if (expCtx->isIdHackQuery()) {
+            return QuerySettings();
+        }
+
+        auto* opCtx = expCtx->getOperationContext();
+        if (requestComesFromRouterOrSentDirectlyToShard(opCtx->getClient()) ||
+            querySettingsFromOriginalCommand.has_value()) {
+            return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
+        }
+
+        // The underlying shard does not belong to a sharded cluster, therefore proceed by
+        // performing the lookup as a router.
+        return QuerySettingsRouterService::lookupQuerySettingsWithRejectionCheck(
+            expCtx, queryShape, nss);
+    }
+
+    void refreshQueryShapeConfigurations(OperationContext* opCtx) override {
+        /* no-op */
+    }
+};
+
+QuerySettingsService& QuerySettingsService::get(ServiceContext* service) {
+    return *getQuerySettingsService(service);
+}
+
+QuerySettingsService& QuerySettingsService::get(OperationContext* opCtx) {
+    return *getQuerySettingsService(opCtx->getServiceContext());
+}
+
+std::string QuerySettingsService::getQuerySettingsClusterParameterName() {
+    return kQuerySettingsClusterParameterName.toString();
+}
+
 RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
                                                  const BSONObj& cmd,
                                                  const boost::optional<TenantId>& tenantId) {
@@ -397,81 +540,25 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
 }
 
 void initializeForRouter(ServiceContext* serviceContext) {
-    QuerySettingsManager::create(
-        serviceContext,
-        [](OperationContext* opCtx) {
-            // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of the
-            // parameter after that modification should observe results of preceeding writes.
-            const bool kEnsureReadYourWritesConsistency = true;
-            auto refreshStatus = ClusterServerParameterRefresher::get(opCtx)->refreshParameters(
-                opCtx, kEnsureReadYourWritesConsistency);
-            if (!refreshStatus.isOK()) {
-                LOGV2_WARNING(8472500,
-                              "Error occurred when fetching the latest version of query settings",
-                              "error_code"_attr = refreshStatus.code(),
-                              "reason"_attr = refreshStatus.reason());
-            }
-        },
-        sanitizeQuerySettingsHints);
+    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
 }
 
 void initializeForShard(ServiceContext* serviceContext) {
-    query_settings::QuerySettingsManager::create(serviceContext, {}, sanitizeQuerySettingsHints);
+    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsShardService>();
 }
 
 void initializeForTest(ServiceContext* serviceContext) {
-    query_settings::QuerySettingsManager::create(serviceContext, {}, {});
+    initializeForShard(serviceContext);
 }
 
 QuerySettings lookupQuerySettingsWithRejectionCheckOnRouter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss) {
-    QuerySettings settings = [&]() {
-        try {
-            // No query settings lookup for IDHACK queries.
-            if (expCtx->isIdHackQuery()) {
-                return QuerySettings();
-            }
-
-            // No query settings for queries with encryption information.
-            if (expCtx->isFleQuery()) {
-                return QuerySettings();
-            }
-
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return QuerySettings();
-            }
-
-            // Force shape computation and early exit with empty settings if shape computation has
-            // failed.
-            const auto& shapePtr = deferredShape();
-            if (!shapePtr.isOK()) {
-                return QuerySettings();
-            }
-
-            // Compute the QueryShapeHash and store it in CurOp.
-            auto* opCtx = expCtx->getOperationContext();
-            QueryShapeHash hash = shapePtr.getValue()->sha256Hash(opCtx, kSerializationContext);
-            setQueryShapeHash(opCtx, hash);
-
-            // Return the found query settings or an empty one.
-            auto& manager = QuerySettingsManager::get(opCtx);
-            return manager.getQuerySettingsForQueryShapeHash(hash, nss.tenantId()).get_value_or({});
-        } catch (const DBException& ex) {
-            LOGV2_WARNING_OPTIONS(10153400,
-                                  {logv2::LogComponent::kQuery},
-                                  "Failed to perform query settings lookup",
-                                  "error"_attr = ex.toString());
-            return QuerySettings();
-        }
-    }();
-
-    // Fail the current command, if 'reject: true' flag is present.
-    failIfRejectedBySettings(expCtx, settings);
-
-    return settings;
+    auto* service =
+        getQuerySettingsService(expCtx->getOperationContext()->getServiceContext()).get();
+    dassert(dynamic_cast<QuerySettingsRouterService*>(service));
+    return service->lookupQuerySettingsWithRejectionCheck(expCtx, deferredShape, nss);
 }
 
 QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
@@ -479,40 +566,24 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss,
     const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) {
-    // No query settings lookup for IDHACK queries.
-    if (expCtx->isIdHackQuery()) {
-        return QuerySettings();
-    }
-
-    auto* opCtx = expCtx->getOperationContext();
-    if (requestComesFromRouterOrSentDirectlyToShard(opCtx->getClient()) ||
-        querySettingsFromOriginalCommand.has_value()) {
-        return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
-    }
-
-    // The underlying shard does not belong to a sharded cluster, therefore proceed by performing
-    // the lookup as a router.
-    return lookupQuerySettingsWithRejectionCheckOnRouter(expCtx, deferredShape, nss);
+    auto* service =
+        getQuerySettingsService(expCtx->getOperationContext()->getServiceContext()).get();
+    dassert(dynamic_cast<QuerySettingsShardService*>(service));
+    return service->lookupQuerySettingsWithRejectionCheck(
+        expCtx, deferredShape, nss, querySettingsFromOriginalCommand);
 }
 
 QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    return QuerySettingsManager::get(opCtx).getAllQueryShapeConfigurations(tenantId);
-}
-
-void setAllQueryShapeConfigurations(OperationContext* opCtx,
-                                    QueryShapeConfigurationsWithTimestamp&& config,
-                                    const boost::optional<TenantId>& tenantId) {
-    QuerySettingsManager::get(opCtx).setQueryShapeConfigurations(
-        std::move(config.queryShapeConfigurations), config.clusterParameterTime, tenantId);
+    return QuerySettingsService::get(opCtx).getAllQueryShapeConfigurations(tenantId);
 }
 
 void refreshQueryShapeConfigurations(OperationContext* opCtx) {
-    QuerySettingsManager::get(opCtx).refreshQueryShapeConfigurations(opCtx);
+    QuerySettingsService::get(opCtx).refreshQueryShapeConfigurations(opCtx);
 }
 
 std::string getQuerySettingsClusterParameterName() {
-    return QuerySettingsManager::kQuerySettingsClusterParameterName.toString();
+    return kQuerySettingsClusterParameterName.toString();
 }
 
 const stdx::unordered_set<StringData, StringMapHasher>& getRejectionIncompatibleStages() {
@@ -626,5 +697,4 @@ void sanitizeQuerySettingsHints(std::vector<QueryShapeConfiguration>& queryShape
         return false;
     });
 }
-
 }  // namespace mongo::query_settings
