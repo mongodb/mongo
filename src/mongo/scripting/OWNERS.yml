@@ -3,13 +3,3 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-extensions
-  - "OWNERS.yml":
-    approvers:
-      - 10gen/server-programmability
-      - 10gen/query-integration-extensions
-  - "dbdirectclient_factory.*":
-    approvers:
-      - 10gen/server-programmability
-  - "deadline_monitor*": # note this wants to match _test.cpp and .idl files too
-    approvers:
-      - 10gen/server-programmability

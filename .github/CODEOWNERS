@@ -2638,9 +2638,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
 /src/mongo/scripting/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
-/src/mongo/scripting/**/OWNERS.yml @10gen/query-integration-extensions @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/scripting/**/deadline_monitor* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/scripting/mozjs/OWNERS.yml
 /src/mongo/scripting/mozjs/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
