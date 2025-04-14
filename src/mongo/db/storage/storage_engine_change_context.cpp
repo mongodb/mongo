@@ -143,7 +143,7 @@ void StorageEngineChangeContext::changeStorageEngine(ServiceContext* service,
     // The lock is released at end of scope, allowing OperationContexts to be created again.
 }
 
-void StorageEngineChangeContext::notifyOpCtxDestroyed() {
+void StorageEngineChangeContext::notifyOpCtxDestroyed() noexcept {
     stdx::unique_lock lk(_mutex);
     invariant(--_numOpCtxtsToWaitFor >= 0);
     LOGV2_DEBUG(5781191,
