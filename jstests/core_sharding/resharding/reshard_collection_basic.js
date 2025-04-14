@@ -120,7 +120,7 @@ assert.commandFailedWithCode(db.adminCommand({
 
 assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
-    key: {newKey: 1},
+    key: {oldKey: 1},
     forceRedistribution: true,
     zones: [
         {zone: newZoneName, min: {newKey: 'MinKey'}, max: {newKey: '0'}},
@@ -137,6 +137,23 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation) {
     assert.commandFailedWithCode(
         db.getSiblingDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
         [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
+}
+
+// TODO SERVER-103461 Remove version check when 9.0 becomes last LTS.
+const binVersion = assert
+                       .commandWorked(db.adminCommand({
+                           serverStatus: 1,
+                       }))
+                       .version;
+if (MongoRunner.compareBinVersions(binVersion, "8.2") >= 0) {
+    jsTest.log(
+        "Fail if using forceRedistribution and provide a different key than the existing shard key.");
+    assert.commandFailedWithCode(db.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        forceRedistribution: true,
+    }),
+                                 ErrorCodes.InvalidOptions);
 }
 
 /**

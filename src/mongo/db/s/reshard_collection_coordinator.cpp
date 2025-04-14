@@ -218,6 +218,16 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 uassert(ErrorCodes::NamespaceNotSharded,
                         "Collection has to be a sharded collection.",
                         cmOld.isSharded());
+
+                if (_doc.getForceRedistribution() && *_doc.getForceRedistribution()) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            str::stream()
+                                << "The new shard key must be the same as the original shard key "
+                                   "when using the forceRedistribution option. The "
+                                   "forceRedistribution option is meant for redistributing the "
+                                   "collection to a different set of shards.",
+                            cmOld.getShardKeyPattern().isShardKey(_doc.getKey()));
+                }
             }
 
             configsvrReshardCollection.setProvenance(provenance);

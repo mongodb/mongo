@@ -118,9 +118,9 @@ const testShardDistribution = (mongos) => {
         "reshardCollection cmd should fail when the shardId in shardDistribution is a shard url.");
     assert.commandFailedWithCode(mongos.adminCommand({
         reshardCollection: ns,
-        key: {newKey: 1},
-        forceRedistribution: true,
-        shardDistribution: [{shard: shardHosts[0], min: {newKey: MinKey}, max: {newKey: MaxKey}}]
+        key: {oldKey: 1},
+        forceRedistribution: false,
+        shardDistribution: [{shard: shardHosts[0], min: {oldKey: MinKey}, max: {oldKey: MaxKey}}]
     }),
                                  ErrorCodes.ShardNotFound);
 
