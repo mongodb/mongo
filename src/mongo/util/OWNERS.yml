@@ -28,13 +28,13 @@ filters:
       - 10gen/query-execution-sbe
   - "generate_icu_init_cpp.py":
     approvers:
-      - 10gen/query-execution-collation
+      - 10gen/query-execution
   - "icu*":
     approvers:
-      - 10gen/query-execution-collation
+      - 10gen/query-execution
   - "pcre*":
     approvers:
-      - 10gen/query-execution-regex
+      - 10gen/query-execution
   - "log_with_sampling*":
     approvers:
       - 10gen/query-integration-observability

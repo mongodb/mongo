@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution-index-access-stats
+      - 10gen/query-execution-write-exec
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads

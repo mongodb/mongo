@@ -11,10 +11,10 @@ filters:
       - 10gen/query-execution-query-settings
   - "implicit_wildcard_indexes.js":
     approvers:
-      - 10gen/query-execution-indexing
+      - 10gen/query-execution-write-exec
   - "implicitly_wrap_pipelines_in_facets.js":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "*bulk_write.js":
     approvers:
       - 10gen/query-execution-write-exec

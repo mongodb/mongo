@@ -5,7 +5,7 @@ filters:
       - 10gen/query
   - "error_during_agg_getmore.js":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "agg_currentop.js":
     approvers:
       - 10gen/query-integration-observability

@@ -50,7 +50,7 @@ filters:
       - 10gen/server-programmability
   - "index_names.*":
     approvers:
-      - 10gen/query-execution-indexing
+      - 10gen/query-execution-write-exec
   - "json.*":
     approvers:
       - 10gen/server-programmability
@@ -174,10 +174,10 @@ filters:
       - 10gen/query-execution-change-streams
   - "aggregated_index_usage_tracker*":
     approvers:
-      - 10gen/query-execution-index-access-stats
+      - 10gen/query-execution-write-exec
   - "collection_index_usage_tracker*":
     approvers:
-      - 10gen/query-execution-index-access-stats
+      - 10gen/query-execution-write-exec
   - "curop*":
     approvers:
       - 10gen/query-integration-observability
@@ -285,7 +285,7 @@ filters:
       - 10gen/query-execution-change-streams
   - "multi_key_path_tracker*":
     approvers:
-      - 10gen/query-execution-indexing
+      - 10gen/query-execution-write-exec
   - "yieldable.h":
     approvers:
       - 10gen/query-execution-yielding

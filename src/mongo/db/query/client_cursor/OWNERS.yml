@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution-client-cursor
+      - 10gen/query-execution
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads

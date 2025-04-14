@@ -120,7 +120,7 @@ filters:
       - 10gen/server-oplog
   - "document_validation*":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution
   - "external_data_source_scope_guard*":
     approvers:
       - 10gen/query-integration-extensions

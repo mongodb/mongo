@@ -41,7 +41,7 @@ filters:
       - 10gen/query-execution
   - "documentsourcetests.cpp":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "extensions_callback_real_test.cpp":
     approvers:
       - 10gen/query-integration-search

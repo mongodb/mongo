@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "allow_partial_results_with_maxTimeMS*":
     approvers:
-      - 10gen/query-execution-router-query-exec
+      - 10gen/query-execution-router
   - "out_max_time_ms.js":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic

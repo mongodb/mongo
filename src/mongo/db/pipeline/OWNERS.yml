@@ -22,7 +22,7 @@ filters:
       - 10gen/query-optimization
   - "accumulator*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "aggregation_request*":
     approvers:
       - 10gen/query-optimization
@@ -67,7 +67,7 @@ filters:
       - 10gen/query-integration-search
   - "document_source_index_stats*":
     approvers:
-      - 10gen/query-execution-index-access-stats
+      - 10gen/query-execution-write-exec
   - "document_source_internal_unpack_bucket*":
     approvers:
       - 10gen/query-integration-timeseries
@@ -103,7 +103,7 @@ filters:
       - 10gen/query-execution-query-settings
   - "document_source_sequential_document_cache*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "document_source_set_variable_from_subpipeline*":
     approvers:
       - 10gen/query-integration-search
@@ -115,7 +115,7 @@ filters:
       - 10gen/query-optimization
   - "expression_find_internal*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "expression_from_accumulator_quantile.h":
     approvers:
       - 10gen/query-integration-analytic-extensions
@@ -148,19 +148,19 @@ filters:
       - 10gen/query-optimization
   - "granularity_rounder*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "javascript_execution*":
     approvers:
       - 10gen/query-integration-extensions
   - "initialize_auto_get_helper.h":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "lookup_set_cache*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "memory_token_container_util.h":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "monotonic_expression*":
     approvers:
       - 10gen/query-optimization
@@ -172,10 +172,10 @@ filters:
       - 10gen/query-integration-extensions
   - "*_processor*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "group_processor*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "lite_parsed*":
     approvers:
       - 10gen/query-optimization
@@ -229,7 +229,7 @@ filters:
       - 10gen/query-optimization
   - "merge_processor*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   # Percentile calculations fall under the umbrella of "analytical extensions" which are owned by
   # QI.
   - "percentile_algo*":
@@ -243,7 +243,7 @@ filters:
       - 10gen/query-optimization
   - "plan_executor_pipeline*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "resume_token*":
     approvers:
       - 10gen/query-execution-change-streams
@@ -255,13 +255,13 @@ filters:
       - 10gen/query-optimization
   - "sequential_document_cache*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "tee_buffer*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "value.idl":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "document_source_coll_stats*":
     approvers:
       - 10gen/server-catalog-and-routing

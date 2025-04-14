@@ -19,22 +19,22 @@ filters:
       - 10gen/query-optimization
   - "aggregation_facet_unwind_passthrough.yml":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "aggregation_sharded_collections_embedded_router_jscore_passthrough.yml":
     approvers:
       - 10gen/query-optimization
   - "aggregation_secondary_reads.yml":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "benchmarks_abt_lowering.yml":
     approvers:
       - 10gen/query-execution-sbe
   - "benchmarks_expression.yml":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "benchmarks_expression_sbe.yml":
     approvers:
       - 10gen/query-execution-sbe
@@ -46,7 +46,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "bulk_write_multi_op_sharded_collections_jscore_passthrough.yml":
     approvers:
-      - 10gen/query-execution-router-write-exec
+      - 10gen/query-execution-router
   - "change_streams*":
     approvers:
       - 10gen/query-execution-change-streams
@@ -55,7 +55,7 @@ filters:
       - 10gen/query-execution
   - "core_wildcard_indexes.yml":
     approvers:
-      - 10gen/query-execution-indexing
+      - 10gen/query-execution-write-exec
   - "fle*":
     approvers:
       - 10gen/query-integration-extensions
@@ -76,7 +76,7 @@ filters:
       - 10gen/query-integration-search
   - "sharding_clustered_collections.yml":
     approvers:
-      - 10gen/query-execution-router-query-exec
+      - 10gen/query-execution-router
   - "unittests_query.yml":
     approvers:
       - 10gen/query

@@ -14,7 +14,7 @@ filters:
       - 10gen/query-optimization
   - "doc_validation_options_logging.js":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution
   - "query_settings*":
     approvers:
       - 10gen/query-execution-query-settings
@@ -56,7 +56,7 @@ filters:
       - 10gen/query-integration-extensions
   - "fail_point_getmore_after_cursor_checkout.js":
     approvers:
-      - 10gen/query-execution-client-cursor
+      - 10gen/query-execution
   - "external_sort_find.js":
     approvers:
       - 10gen/query-execution
@@ -65,10 +65,10 @@ filters:
       - 10gen/query-execution
   - "kill_pinned_cursor.js":
     approvers:
-      - 10gen/query-execution-client-cursor
+      - 10gen/query-execution-router
   - "missing_shard_key.js":
     approvers:
-      - 10gen/query-execution-router-query-exec
+      - 10gen/query-execution-router
   - "parse_zone_info.js":
     approvers:
-      - 10gen/query-execution-datetime
+      - 10gen/query-execution

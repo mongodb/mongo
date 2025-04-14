@@ -16,7 +16,7 @@ filters:
       - 10gen/query-optimization
   - "collection_index_usage_tracker*":
     approvers:
-      - 10gen/query-execution-index-access-stats
+      - 10gen/query-execution-write-exec
   - "collection_query_info*":
     approvers:
       - 10gen/query-optimization
@@ -49,10 +49,10 @@ filters:
       - 10gen/query-execution-yielding
   - "*plan_executor*":
     approvers:
-      - 10gen/query-execution-classic-engine
+      - 10gen/query-execution-classic
   - "plan_insert_listener*":
     approvers:
-      - 10gen/query-execution-classic-engine
+      - 10gen/query-execution-classic
   - "sbe*":
     approvers:
       - 10gen/query-execution-sbe

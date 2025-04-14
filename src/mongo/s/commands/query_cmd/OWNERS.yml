@@ -16,10 +16,10 @@ filters:
       - 10gen/query-integration-observability
   - "cluster_getmore_cmd*":
     approvers:
-      - 10gen/query-execution-client-cursor
+      - 10gen/query-execution-router
   - "cluster_killcursors_cmd.cpp":
     approvers:
-      - 10gen/query-execution-client-cursor
+      - 10gen/query-execution-router
   - "cluster_map_reduce_agg*":
     approvers:
       - 10gen/query-integration-analytic-extensions
@@ -35,4 +35,4 @@ filters:
   - "cluster_release_memory_cmd.cpp":
     approvers:
       - 10gen/query-execution
-      - 10gen/query-execution-client-cursor
+      - 10gen/query-execution-router

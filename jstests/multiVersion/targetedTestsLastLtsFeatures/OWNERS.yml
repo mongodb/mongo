@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "bindata_convert_numeric_view_upgrade_downgrade.js":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
   - "error_and_log_validation_action.js":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution

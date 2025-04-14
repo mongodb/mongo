@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
       - 10gen/query-optimization
       - 10gen/query-integration
   - "OWNERS.yml":

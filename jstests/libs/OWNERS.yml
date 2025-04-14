@@ -17,13 +17,13 @@ filters:
       - 10gen/server-catalog-and-routing
   - "assert_schema_match.js":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution
   - "doc_validation_utils.js":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution
   - "json_schema_test_runner.js":
     approvers:
-      - 10gen/query-execution-doc-validation
+      - 10gen/query-execution
   - "*bulk_write*":
     approvers:
       - 10gen/query-execution-write-exec
@@ -32,7 +32,7 @@ filters:
       - 10gen/query-integration-observability
   - "dateutil.js":
     approvers:
-      - 10gen/query-execution-datetime
+      - 10gen/query-execution
   - "fts.js":
     approvers:
       - 10gen/query-integration-search

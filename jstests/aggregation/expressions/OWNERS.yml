@@ -3,7 +3,7 @@ filters:
   # These tests cover parsing, optimization, and execution. As such, they are jointly owned by QE and QO.
   - "*":
     approvers:
-      - 10gen/query-execution-aggregation
+      - 10gen/query-execution-classic
       - 10gen/query-optimization
   - "OWNERS.yml":
     approvers:
@@ -12,7 +12,7 @@ filters:
       - 10gen/query-integration-staff-leads
   - "collation_expressions.js":
     approvers:
-      - 10gen/query-execution-collation
+      - 10gen/query-execution
   - "internal_js*":
     approvers:
       - 10gen/query-integration-extensions
