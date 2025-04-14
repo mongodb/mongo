@@ -6,12 +6,6 @@ filters:
   - "dbcheck*":
     approvers:
       - 10gen/server-dbcheck
-  - "*initial_sync*":
-    approvers:
-      - 10gen/server-initial-sync
-  - "*cloner*":
-    approvers:
-      - 10gen/server-initial-sync
   - "*oplog*":
     approvers:
       - 10gen/server-oplog

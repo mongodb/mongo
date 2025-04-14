@@ -69,7 +69,7 @@
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/cloner_utils.h"
+#include "mongo/db/repl/initial_sync/cloner_utils.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"

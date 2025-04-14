@@ -3612,7 +3612,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/stats",
-        "//src/mongo/db/repl:initial_syncer",
+        "//src/mongo/db/repl/initial_sync:initial_syncer",
         "//src/mongo/db/repl:repl_coordinator_impl",
         "//src/mongo/db/repl:replication_recovery",
         "//src/mongo/db/repl:serveronly_repl",

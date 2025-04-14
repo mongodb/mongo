@@ -36,7 +36,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/repl/initial_syncer.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/stdx/mutex.h"

@@ -1,0 +1,224 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "database_cloner_gen",
+    src = "database_cloner.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cloner_utils",
+    srcs = [
+        "cloner_utils.cpp",
+        "database_cloner_common.cpp",
+        "database_cloner_gen",
+    ],
+    hdrs = [
+        "cloner_utils.h",
+        "database_cloner_common.h",
+    ],
+    deps = [
+        "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/catalog:collection_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_sync_shared_data",
+    srcs = [
+        "initial_sync_shared_data.cpp",
+        "repl_sync_shared_data.cpp",
+    ],
+    hdrs = [
+        "initial_sync_shared_data.h",
+        "repl_sync_shared_data.h",
+        "//src/mongo:core_headers",
+        "//src/mongo/db:wire_version.h",
+        "//src/mongo/db/query/client_cursor:cursor_id.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "base_cloner",
+    srcs = [
+        "base_cloner.cpp",
+    ],
+    hdrs = [
+        "base_cloner.h",
+    ],
+    deps = [
+        ":repl_sync_shared_data",
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:replication_auth",
+        "//src/mongo/db/repl:replication_consistency_markers_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "initial_sync_cloners",
+    srcs = [
+        "all_database_cloner.cpp",
+        "collection_cloner.cpp",
+        "database_cloner.cpp",
+        "initial_sync_base_cloner.cpp",
+    ],
+    hdrs = [
+        "all_database_cloner.h",
+        "collection_cloner.h",
+        "database_cloner.h",
+        "initial_sync_base_cloner.h",
+    ],
+    deps = [
+        ":base_cloner",
+        ":cloner_utils",
+        ":repl_sync_shared_data",
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/commands:list_collections_filter",
+        "//src/mongo/db/index_builds:index_build_entry_helpers",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/repl:member_data",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:replication_auth",
+        "//src/mongo/db/repl:replication_consistency_markers_impl",
+        "//src/mongo/db/repl:task_runner",
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "initial_syncer",
+    srcs = [
+        "initial_syncer.cpp",
+        "initial_syncer_common_stats.cpp",
+        "initial_syncer_factory.cpp",
+    ],
+    hdrs = [
+        "callback_completion_guard.h",
+        "initial_sync_state.h",
+        "initial_syncer.h",
+        "initial_syncer_common_stats.h",
+        "initial_syncer_factory.h",
+        "initial_syncer_interface.h",
+        "//src/mongo/dbtests/mock:mock_dbclient_connection.h",
+        "//src/mongo/dbtests/mock:mock_remote_db_server.h",
+    ],
+    deps = [
+        ":initial_sync_cloners",
+        ":repl_sync_shared_data",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/repl:multiapplier",
+        "//src/mongo/db/repl:oplog",
+        "//src/mongo/db/repl:oplog_application_interface",
+        "//src/mongo/db/repl:oplog_buffer_blocking_queue",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/repl:oplog_fetcher",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:rollback_checker",
+        "//src/mongo/db/repl:storage_interface",
+        "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/transaction",
+        "//src/mongo/executor:scoped_task_executor",
+        "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "initial_syncer_test",
+    size = "small",
+    srcs = [
+        "initial_syncer_test.cpp",
+        "//src/mongo/db/storage:storage_engine_mock.h",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":initial_syncer",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
+        "//src/mongo/db/repl:abstract_async_component",
+        "//src/mongo/db/repl:data_replicator_external_state_mock",
+        "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
+        "//src/mongo/db/repl:oplog_fetcher",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:sync_source_resolver",
+        "//src/mongo/db/repl:sync_source_selector_mock",
+        "//src/mongo/db/repl:task_executor_mock",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/executor:network_interface_mock",
+        "//src/mongo/executor:thread_pool_task_executor_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "cloner_test_fixtures",
+    srcs = [
+        "cloner_test_fixture.cpp",
+        "initial_sync_cloner_test_fixture.cpp",
+    ],
+    hdrs = [
+        "cloner_test_fixture.h",
+        "initial_sync_cloner_test_fixture.h",
+    ],
+    deps = [
+        "//src/mongo/db/repl:repl_server_parameters",
+        ":repl_sync_shared_data",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl:storage_interface_impl",
+        # Required for service context test fixture
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/dbtests:mocklib",
+        "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_cloners_test",
+    size = "small",
+    srcs = [
+        "all_database_cloner_test.cpp",
+        "collection_cloner_test.cpp",
+        "database_cloner_test.cpp",
+        "initial_sync_shared_data_test.cpp",
+    ],
+    tags = [
+        "compile_requires_large_memory_gcc",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        ":cloner_test_fixtures",
+        ":initial_sync_cloners",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/idl:server_parameter_test_util",
+    ],
+)

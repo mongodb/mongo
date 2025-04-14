@@ -2122,8 +2122,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/repl/OWNERS.yml
 /src/mongo/db/repl/**/* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/repl/**/dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
-/src/mongo/db/repl/**/*initial_sync* @10gen/server-initial-sync @svc-auto-approve-bot
-/src/mongo/db/repl/**/*cloner* @10gen/server-initial-sync @svc-auto-approve-bot
 /src/mongo/db/repl/**/*oplog* @10gen/server-oplog @svc-auto-approve-bot
 /src/mongo/db/repl/**/*noop_writer* @10gen/server-oplog @svc-auto-approve-bot
 /src/mongo/db/repl/**/*bgsync* @10gen/server-oplog @svc-auto-approve-bot
@@ -2139,6 +2137,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/*external_state* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*heartbeat* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*topology_coordinator* @10gen/server-replication-coordinator @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/repl/initial_sync/OWNERS.yml
+/src/mongo/db/repl/initial_sync/**/* @10gen/server-initial-sync @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/repl/split_horizon/OWNERS.yml
 /src/mongo/db/repl/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot

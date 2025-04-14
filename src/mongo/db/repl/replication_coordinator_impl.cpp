@@ -77,7 +77,7 @@
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/hello_response.h"
-#include "mongo/db/repl/initial_syncer_factory.h"
+#include "mongo/db/repl/initial_sync/initial_syncer_factory.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_config_gen.h"

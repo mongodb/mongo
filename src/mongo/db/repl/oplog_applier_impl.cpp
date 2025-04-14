@@ -58,7 +58,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
-#include "mongo/db/repl/initial_syncer.h"
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
