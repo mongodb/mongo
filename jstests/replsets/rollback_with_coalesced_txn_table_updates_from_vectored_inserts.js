@@ -3,14 +3,12 @@
  * with the node data at the 'stableTimestamp', specifically in the case where multiple derived ops
  * to the 'config.transactions' table were coalesced into a single operation when performing
  * vectored inserts on the primary.
- * Note that when the 'ReplicateVectoredInsertsTransactionally' feature flag is enabled, updates to
- * the 'config.transactions' table are not coalesced on the primary. However, we are still testing
- * this as a sanity check in case the behavior changes in the future.
+ * Updates to the 'config.transactions' table are not coalesced on the primary. However, we are
+ * still testing this as a sanity check in case the behavior changes in the future.
  * @tags: [requires_persistence]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
@@ -45,28 +43,23 @@ const [secondary1, secondary2] = rst.getSecondaries();
 // will only apply up to insertBatchMajorityCommitted oplog entries.
 
 let insertBatchTotal = 40;
-// Using an odd number ensures that when the 'ReplicateVectoredInsertsTransactionally' feature flag
-// is enabled, insertBatchMajorityCommitted + 1 will be in a different oplog entry. This is because
-// we're using an internal batching size of 2, resulting in pairs like [0, 1], [2, 3], etc.
+// Using an odd number ensures that when batching inserts, insertBatchMajorityCommitted + 1 will be
+// in a different oplog entry. This is because we're using an internal batching size of 2, resulting
+// in pairs like [0, 1], [2, 3], etc.
 let insertBatchMajorityCommitted = insertBatchTotal - 5;
 let stopReplProducerOnDocumentFailpoints = [secondary1, secondary2].map(
     conn => configureFailPoint(
         conn, 'stopReplProducerOnDocument', {document: {"_id": insertBatchMajorityCommitted + 1}}));
 let oplogFilterForMajority;
 
-// When ReplicateVectoredInsertsTransactionally is enabled, inserts are batched into applyOps
-// entries, so we need to insert more documents and stop on a different one.
-if (FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicateVectoredInsertsTransactionally")) {
-    // Set the batch size to 2 so we're testing batching but don't have to insert a huge number
-    // of documents
-    assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
-    oplogFilterForMajority = {
-        "o.applyOps.ns": ns,
-        "o.applyOps.o._id": insertBatchMajorityCommitted
-    };
-} else {
-    oplogFilterForMajority = {ns: ns, "o._id": insertBatchMajorityCommitted};
-}
+// Inserts are batched into applyOps entries, so we need to insert more documents and stop on a
+// different one. Set the batch size to 2 so we're testing batching but don't have to insert a huge
+// number of documents
+assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
+oplogFilterForMajority = {
+    "o.applyOps.ns": ns,
+    "o.applyOps.o._id": insertBatchMajorityCommitted
+};
 
 const lsid = ({id: UUID()});
 

@@ -3,7 +3,6 @@
  * statement id after executing a write command. Also tests that the session table is properly
  * updated after the write operations.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 const kNodes = 2;
@@ -94,30 +93,19 @@ var runTests = function(mainConn, priConn, secConn) {
 
     oplog = priConn.getDB('local').oplog.rs;
 
-    if (FeatureFlagUtil.isPresentAndEnabled(priConn, "ReplicateVectoredInsertsTransactionally")) {
-        firstDoc = oplog.findOne({
-            $and: [
-                {"o.applyOps": {$elemMatch: {ns: 'test.user', 'o._id': 10}}},
-                {"o.applyOps": {$elemMatch: {ns: 'test.user', 'o._id': 30}}}
-            ]
-        });
-        checkOplog(firstDoc, lsid, uid, txnNumber, undefined /* stmtId */, Timestamp(0, 0), -1);
-        // Statement IDs are defined on the inner operation for vectored inserts.
-        assert.eq(firstDoc.o.applyOps[0].stmtId, 0);
-        assert.eq(firstDoc.o.applyOps[1].stmtId, 1);
+    firstDoc = oplog.findOne({
+        $and: [
+            {"o.applyOps": {$elemMatch: {ns: 'test.user', 'o._id': 10}}},
+            {"o.applyOps": {$elemMatch: {ns: 'test.user', 'o._id': 30}}}
+        ]
+    });
+    checkOplog(firstDoc, lsid, uid, txnNumber, undefined /* stmtId */, Timestamp(0, 0), -1);
+    // Statement IDs are defined on the inner operation for vectored inserts.
+    assert.eq(firstDoc.o.applyOps[0].stmtId, 0);
+    assert.eq(firstDoc.o.applyOps[1].stmtId, 1);
 
-        checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
-        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
-    } else {
-        firstDoc = oplog.findOne({ns: 'test.user', 'o._id': 10});
-        checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0), -1);
-
-        var secondDoc = oplog.findOne({ns: 'test.user', 'o._id': 30});
-        checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts, firstDoc.t);
-
-        checkSessionCatalog(priConn, lsid, uid, txnNumber, secondDoc.ts, secondDoc.t);
-        checkSessionCatalog(secConn, lsid, uid, txnNumber, secondDoc.ts, secondDoc.t);
-    }
+    checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+    checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
 
     ////////////////////////////////////////////////////////////////////////
     // Test update command
@@ -141,7 +129,7 @@ var runTests = function(mainConn, priConn, secConn) {
     firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 10});
     checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0), -1);
 
-    secondDoc = oplog.findOne({ns: 'test.user', op: 'i', 'o._id': 20});
+    let secondDoc = oplog.findOne({ns: 'test.user', op: 'i', 'o._id': 20});
     checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts, firstDoc.t);
 
     var thirdDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 30});

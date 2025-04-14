@@ -352,13 +352,9 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     const bool oplogDisabled = replCoord->isOplogDisabledFor(opCtx, collection.nss());
     WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool replicateVectoredInsertsTransactionally = fcvSnapshot.isVersionInitialized() &&
-        repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabled(fcvSnapshot);
     // For multiple inserts not part of a multi-document transaction, the inserts will be
     // batched into a single applyOps oplog entry.
-    if (replicateVectoredInsertsTransactionally && !inTransaction && batchSize > 1 &&
-        !oplogDisabled) {
+    if (!inTransaction && batchSize > 1 && !oplogDisabled) {
         oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
     }
 
@@ -371,8 +367,7 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     // has un-timestamped writes (which is a violation of multi-timestamp constraints),
     // we must reserve the timestamp for the insert in advance.
     if (oplogEntryGroupType != WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
-        !inTransaction && !oplogDisabled &&
-        (!replicateVectoredInsertsTransactionally || collection.getCollectionPtr()->isCapped())) {
+        !inTransaction && !oplogDisabled && collection.getCollectionPtr()->isCapped()) {
         acquireOplogSlotsForInserts(opCtx, collection, begin, end);
     }
 

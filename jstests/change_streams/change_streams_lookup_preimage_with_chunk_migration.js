@@ -56,8 +56,7 @@ const coll = (() => {
     return coll;
 })();
 
-// Events may be batched in an applyOps when featureFlagReplicateVectoredInsertsTransactionally
-// is enabled; expand them here, and filter the expanded events by docId.
+// Events may be batched in an applyOps; expand them here, and filter the expanded events by docId.
 function _expandAndFilterEvents(oplogEvents, docId) {
     let expandedEvents = Array();
     for (let idx = 0; idx < oplogEvents.length; idx++) {

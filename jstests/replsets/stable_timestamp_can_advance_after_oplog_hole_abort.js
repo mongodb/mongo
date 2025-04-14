@@ -7,7 +7,6 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -98,52 +97,6 @@ function testCreateCollection() {
 }
 
 //
-// Test insert abort.
-//
-
-// Insert a single document into a given collection.
-function insertFn(host, dbName, collName, doc, expectedErrCode) {
-    const testDB = new Mongo(host).getDB(dbName);
-    const testColl = testDB.getCollection(collName);
-
-    // Create the new collection.
-    jsTestLog("Inserting document: " + tojson(doc));
-    assert.commandFailedWithCode(testColl.insert(doc), expectedErrCode);
-}
-
-function testInsert() {
-    jsTestLog("Running insert test.");
-
-    const failPoint = configureFailPoint(primary,
-                                         "hangAndFailAfterDocumentInsertsReserveOpTimes",
-                                         {collectionNS: testColl.getFullName()});
-
-    // Start operation T1.
-    jsTestLog("Starting the insert operation.");
-    const insert = new Thread(insertFn, primary.host, dbName, collName, {insert: 1}, 51269);
-    insert.start();
-    failPoint.wait();
-
-    // Start operation T2, the majority write.
-    jsTestLog("Starting the majority write operation.");
-    const doc = {_id: id++};
-    const majorityWrite =
-        new Thread(majorityWriteFn, primary.host, dbName, majorityWriteCollName, doc);
-    majorityWrite.start();
-
-    // Wait until the majority write operation has completed and is waiting for write concern.
-    jsTestLog("Waiting until the majority write is visible.");
-    assert.soon(() => majorityWriteColl.find(doc).itcount() === 1);
-
-    jsTestLog("Releasing the failpoint.");
-    failPoint.off();
-
-    jsTestLog("Waiting for the operations to complete.");
-    insert.join();
-    majorityWrite.join();
-}
-
-//
 // Test unprepared transaction commit abort.
 //
 
@@ -190,12 +143,6 @@ function testUnpreparedTransactionCommit() {
 
 // Execute all the tests.
 testCreateCollection();
-// TODO(SERVER-84271):
-// Remove this call and testInsert() and associated code.  With this feature flag enabled,
-// insert does not create a long-lived oplog hole and so we do not need to test this case.
-if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "ReplicateVectoredInsertsTransactionally")) {
-    testInsert();
-}
 testUnpreparedTransactionCommit();
 
 replTest.stopSet();

@@ -7,19 +7,15 @@
  * @tags: [requires_persistence]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     runTests
 } from
     "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
 
 const initFunc = (primary, ns, counterTotal) => {
-    if (FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicateVectoredInsertsTransactionally")) {
-        // Set the batch size to 2 so we're testing batching but don't have to insert a huge number
-        // of documents
-        assert.commandWorked(
-            primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
-    }
+    // Set the batch size to 2 so we're testing batching but don't have to insert a huge number
+    // of documents
+    assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
 };
 
 const stopReplProducerOnDocumentFunc = (counterMajorityCommitted) => {
@@ -35,11 +31,7 @@ const opsFunc = (primary, ns, counterTotal, lsid) => {
 };
 
 const stmtMajorityCommittedFunc = (primary, ns, counterMajorityCommitted) => {
-    if (FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicateVectoredInsertsTransactionally")) {
-        return {"o.applyOps.ns": ns, "o.applyOps.o._id": counterMajorityCommitted};
-    } else {
-        return {ns: ns, "o._id": counterMajorityCommitted};
-    }
+    return {"o.applyOps.ns": ns, "o.applyOps.o._id": counterMajorityCommitted};
 };
 
 const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, lsid) => {

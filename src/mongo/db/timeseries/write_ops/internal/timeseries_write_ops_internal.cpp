@@ -861,12 +861,8 @@ Status performAtomicTimeseriesWrites(
 
     mongo::write_ops_exec::assertCanWrite_inlock(opCtx, ns);
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool replicateVectoredInsertsTransactionally = fcvSnapshot.isVersionInitialized() &&
-        repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabled(fcvSnapshot);
-
     WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
-    if (replicateVectoredInsertsTransactionally && insertOps.size() > 1 && updateOps.empty() &&
+    if (insertOps.size() > 1 && updateOps.empty() &&
         !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
         oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
     }
@@ -874,7 +870,7 @@ Status performAtomicTimeseriesWrites(
 
     std::vector<repl::OpTime> oplogSlots;
     boost::optional<std::vector<repl::OpTime>::iterator> slot;
-    if (!replicateVectoredInsertsTransactionally || !updateOps.empty()) {
+    if (!updateOps.empty()) {
         if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
             oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
             slot = oplogSlots.begin();

@@ -21,7 +21,6 @@ import {
     unpauseMigrateAtStep,
     waitForMigrateStep,
 } from "jstests/libs/chunk_manipulation_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var staticMongod = MongoRunner.runMongod({});
@@ -174,38 +173,27 @@ assertEqAndDumpOpLog(1,
 
 let recipientOplogRes =
     recipientLocal.oplog.rs.find({op: 'i', fromMigrate: true, 'o._id': 2}).count();
-if (FeatureFlagUtil.isPresentAndEnabled(recipientLocal,
-                                        "ReplicateVectoredInsertsTransactionally")) {
-    // Expect to see one insert oplog entry for _id:2 because that doc was cloned on its own as part
-    // of the failed migrate.  Also expect to see one applyOps entry containing _id:2 as part of a
-    // batched insert from the second migrate
-    assertEqAndDumpOpLog(1,
-                         recipientOplogRes,
-                         "fromMigrate flag wasn't set on the recipient shard's " +
-                             "oplog for migrating insert op on {_id: 2}! Test #3 failed.");
+// Expect to see one insert oplog entry for _id:2 because that doc was cloned on its own as part
+// of the failed migrate.  Also expect to see one applyOps entry containing _id:2 as part of a
+// batched insert from the second migrate
+assertEqAndDumpOpLog(1,
+                     recipientOplogRes,
+                     "fromMigrate flag wasn't set on the recipient shard's " +
+                         "oplog for migrating insert op on {_id: 2}! Test #3 failed.");
 
-    // Note we expect the applyOps to have fromMigrate set, and also the operation within the
-    // applyOps to have fromMigrate set.
-    recipientOplogRes = recipientLocal.oplog.rs
-                            .find({
-                                op: 'c',
-                                fromMigrate: true,
-                                'o.applyOps': {$elemMatch: {fromMigrate: true, 'o._id': 2}}
-                            })
-                            .count();
-    assertEqAndDumpOpLog(1,
-                         recipientOplogRes,
-                         "fromMigrate flag wasn't set on the recipient shard's " +
-                             "applyOps entry for migrating insert op on {_id: 2}! Test #3 failed.");
-
-} else {
-    // Expect to see two oplog entries for {_id: 2} with 'fromMigrate: true' because this doc was
-    // cloned as part of the first failed migration as well as the second successful migration.
-    assertEqAndDumpOpLog(2,
-                         recipientOplogRes,
-                         "fromMigrate flag wasn't set on the recipient shard's " +
-                             "oplog for migrating insert op on {_id: 2}! Test #3 failed.");
-}
+// Note we expect the applyOps to have fromMigrate set, and also the operation within the
+// applyOps to have fromMigrate set.
+recipientOplogRes = recipientLocal.oplog.rs
+                        .find({
+                            op: 'c',
+                            fromMigrate: true,
+                            'o.applyOps': {$elemMatch: {fromMigrate: true, 'o._id': 2}}
+                        })
+                        .count();
+assertEqAndDumpOpLog(1,
+                     recipientOplogRes,
+                     "fromMigrate flag wasn't set on the recipient shard's " +
+                         "applyOps entry for migrating insert op on {_id: 2}! Test #3 failed.");
 
 recipientOplogRes = recipientLocal.oplog.rs.find({op: 'd', fromMigrate: true, 'o._id': 2}).count();
 assertEqAndDumpOpLog(1,

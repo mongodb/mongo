@@ -2,7 +2,6 @@
  * Test that _getNextSessionMods filters out unrelated oplog entries.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -44,20 +43,11 @@ assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
-// If the feature is enabled, we will test both the cases where the inserts are in separate
-// oplog entries and where they are batched together.
-const isBatchingVectoredInserts =
-    FeatureFlagUtil.isPresentAndEnabled(testDB, "ReplicateVectoredInsertsTransactionally");
-
-if (isBatchingVectoredInserts) {
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 'hashed'}}));
-}
+assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 'hashed'}}));
 
 // Docs are expected to go to the same shards but different chunks.
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(10)}}));
-if (isBatchingVectoredInserts) {
-    assert.commandWorked(st.s.adminCommand({split: ns2, middle: {x: convertShardKeyToHashed(10)}}));
-}
+assert.commandWorked(st.s.adminCommand({split: ns2, middle: {x: convertShardKeyToHashed(10)}}));
 
 let docs = [{x: -1000}, {x: 10}];
 let shards = [];
@@ -116,12 +106,8 @@ function testChunkMove(dbName, collName, findSourceOperation) {
     assert.eq(1, toShard.getCollection(ns).find(docs[0]).count());
 }
 
-if (isBatchingVectoredInserts) {
-    testChunkMove(dbName, collName, findOplogOperationForBatchedVectoredInserts);
-    assert.commandWorked(shards[0].adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
-    testChunkMove(dbName, collName2, findOplogEntry);
-} else {
-    testChunkMove(dbName, collName, findOplogEntry);
-}
+testChunkMove(dbName, collName, findOplogOperationForBatchedVectoredInserts);
+assert.commandWorked(shards[0].adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
+testChunkMove(dbName, collName2, findOplogEntry);
 
 st.stop();

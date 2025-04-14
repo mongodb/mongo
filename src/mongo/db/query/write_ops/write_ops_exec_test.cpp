@@ -389,9 +389,7 @@ public:
 class WriteOpsExecOplogTest : public CatalogTestFixture {
 public:
     explicit WriteOpsExecOplogTest(Options options = {})
-        : CatalogTestFixture(options.useReplSettings(true)),
-          _replicateVectoredInsertsTransactionally(
-              "featureFlagReplicateVectoredInsertsTransactionally", true) {}
+        : CatalogTestFixture(options.useReplSettings(true)) {}
 
 protected:
     void setUp() override {
@@ -404,7 +402,6 @@ protected:
     }
 
     OpObserverMock* _opObserverMock;
-    RAIIServerParameterControllerForTest _replicateVectoredInsertsTransactionally;
 };
 
 

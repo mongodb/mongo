@@ -45,7 +45,7 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     ]));
 
     // We test both updates, which use 'u' oplog entries, and vectored inserts, which use 'applyOps'
-    // oplog entries when featureFlagReplicateVectoredInsertsTransactionally is turned on.
+    // oplog entries.
     const mongos = sourceCollection.getMongo();
     const session = mongos.startSession({causalConsistency: false, retryWrites: false});
     const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())

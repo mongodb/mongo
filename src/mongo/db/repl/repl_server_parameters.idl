@@ -697,16 +697,6 @@ feature_flags:
         default: true
         shouldBeFCVGated: false
 
-    featureFlagReplicateVectoredInsertsTransactionally:
-        description: >-
-            When enabled, multiple inserts as part a single command will be batched in one or more
-            applyOps oplog entries rather than making a single oplog entry per insert.
-        cpp_varname: feature_flags::gReplicateVectoredInsertsTransactionally
-        default: true
-        version: 8.0
-        shouldBeFCVGated: true
-        fcv_context_unaware: true
-
     featureFlagOplogVisibility:
         description: When enabled, the Oplog visibility will be tracked at the Replication layer.
         cpp_varname: feature_flags::gFeatureFlagOplogVisibility

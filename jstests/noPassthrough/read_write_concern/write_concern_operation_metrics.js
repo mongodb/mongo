@@ -16,24 +16,6 @@
 //  | Writer 1          | Writer 2     |
 //  |-------------------+--------------|
 //  | BeginTxn          |              |
-//  | Timestamp 10      |              |
-//  |                   | BeginTxn     |
-//  | Write A           |              |
-//  |                   | Update B     |
-//  |                   | Timestamp 11 |
-//  | Commit            |              |
-//  | OnCommit hooks    |              |
-//  |                   | Commit       |
-//  | WaitForTopOfOplog |              |
-//
-// TODO(SERVER-84271): Remove the diagram above and keep only the section about when
-//                     featureFlagReplicateVectoredInsertsTransactionally is set.
-//
-// When featureFlagReplicateVectoredInsertsTransactionally is set, the potential for the issue
-// happening is smaller but can still occur:
-//  | Writer 1          | Writer 2     |
-//  |-------------------+--------------|
-//  | BeginTxn          |              |
 //  | Write A           |              |
 //  | Timestamp 10      |              |
 //  | Commit            |              |

@@ -66,10 +66,9 @@ let runTest = function(crashAfterRollbackTruncation,
     const stopReplProducerFailpoints = [secondary1, secondary2, secondary3, secondary4].map(
         conn => configureFailPoint(conn, 'stopReplProducer'));
 
-    // Using an odd number ensures that when the 'ReplicateVectoredInsertsTransactionally' feature
-    // flag is enabled, counterMajorityCommitted + 1 will be in a different oplog entry. This is
-    // because we're using an internal batching size of 2, resulting in pairs like [0, 1], [2, 3],
-    // etc.
+    // Using an odd number ensures that in the insert batch counterMajorityCommitted + 1 will be
+    // in a different oplog entry. This is because we're using an internal batching size of 2,
+    // resulting in pairs like [0, 1], [2, 3], etc.
     const counterMajorityCommitted = counterTotal - 5;
 
     // While replication is still entirely disabled, additionally disable replication partway into

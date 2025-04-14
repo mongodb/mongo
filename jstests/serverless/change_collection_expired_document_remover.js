@@ -6,7 +6,6 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     ChangeStreamMultitenantReplicaSetTest
 } from "jstests/serverless/libs/change_collection_util.js";
@@ -35,11 +34,9 @@ const replSet = new ChangeStreamMultitenantReplicaSetTest({
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondary();
 
-if (FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicateVectoredInsertsTransactionally")) {
-    // Reduce the batch size so we're testing multiple oplog entries while still testing batched
-    // inserts.
-    assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
-}
+// Reduce the batch size so we're testing multiple oplog entries while still testing batched
+// inserts.
+assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
 
 // Assert that the change collection contains all documents in 'expectedRetainedDocs' and no
 // document in 'expectedDeletedDocs' for the collection 'stocksColl'.

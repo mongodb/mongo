@@ -802,8 +802,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                 for (const auto& doc : documents) {
                     const auto& obj = doc["o"].Obj();
                     std::vector<BSONObj> objToBeMatched;
-                    // When the 'ReplicateVectoredInsertsTransactionally' feature flag is enabled,
-                    // we batch inserts into a single applyOps oplog entry with an internal array of
+                    // We batch inserts into a single applyOps oplog entry with an internal array of
                     // operations as inserts, and set the 'multiOpType' flag.
                     if (doc.hasField("multiOpType") &&
                         doc["multiOpType"].numberInt() ==

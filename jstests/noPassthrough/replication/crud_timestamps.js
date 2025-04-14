@@ -3,7 +3,6 @@
 // Test the correct timestamping of insert, update, and delete writes along with their accompanying
 // index updates.
 //
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
@@ -105,27 +104,15 @@ request = {
     documents: [{_id: 5}, {_id: 6}, {_id: 7}],
     ordered: false
 };
-if (FeatureFlagUtil.isEnabled(testDB, "ReplicateVectoredInsertsTransactionally")) {
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
-    assert.commandWorked(coll.runCommand(request));
-    // First two inserts will be in an applyOps, last will be on its own.
-    ts1 = oplog.findOne({"o.applyOps.o": {_id: 5}}).ts;
-    ts2 = oplog.findOne({o: {_id: 7}}).ts;
+assert.commandWorked(testDB.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
+assert.commandWorked(coll.runCommand(request));
+// First two inserts will be in an applyOps, last will be on its own.
+ts1 = oplog.findOne({"o.applyOps.o": {_id: 5}}).ts;
+ts2 = oplog.findOne({o: {_id: 7}}).ts;
 
-    check(startTime, []);
-    check(ts1, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}, {_id: 6}]);
-    check(ts2, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}, {_id: 6}, {_id: 7}]);
-} else {
-    assert.commandWorked(coll.runCommand(request));
-    ts1 = oplog.findOne({o: {_id: 5}}).ts;
-    ts2 = oplog.findOne({o: {_id: 6}}).ts;
-    let ts3 = oplog.findOne({o: {_id: 7}}).ts;
-
-    check(startTime, []);
-    check(ts1, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}]);
-    check(ts2, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}, {_id: 6}]);
-    check(ts3, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}, {_id: 6}, {_id: 7}]);
-}
+check(startTime, []);
+check(ts1, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}, {_id: 6}]);
+check(ts2, [{_id: 1}, {_id: 2}, {_id: 3, a: 4}, {_id: 4, a: 5}, {_id: 5}, {_id: 6}, {_id: 7}]);
 
 // delete
 

@@ -37,7 +37,6 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -46,16 +45,12 @@ namespace {
 class TimeseriesWriteOpsTest : public CatalogTestFixture {
 public:
     explicit TimeseriesWriteOpsTest(Options options = {})
-        : CatalogTestFixture(options.useReplSettings(true)),
-          _replicateVectoredInsertsTransactionally(
-              "featureFlagReplicateVectoredInsertsTransactionally", true) {}
+        : CatalogTestFixture(options.useReplSettings(true)) {}
 
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
     }
-
-    RAIIServerParameterControllerForTest _replicateVectoredInsertsTransactionally;
 };
 
 
