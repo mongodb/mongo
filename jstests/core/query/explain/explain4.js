@@ -1,6 +1,7 @@
 // Test that limit is applied by explain.
 // @tags: [
 //   assumes_read_concern_local,
+//   requires_fcv_82,
 // ]
 
 let t = db.jstests_explain4;

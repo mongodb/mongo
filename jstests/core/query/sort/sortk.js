@@ -3,6 +3,7 @@
 
 // @tags: [
 //   assumes_balancer_off,
+//   requires_fcv_82,
 //   requires_non_retryable_writes,
 //   # Uses $where operator
 //   requires_scripting,
