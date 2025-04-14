@@ -221,7 +221,6 @@ bool IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
     auto& tokenMap = _tokenMaps[(size_t)intent];
     stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
     if (!tokenMap.cv.wait_for(lock, timeout, [&tokenMap] { return tokenMap.map.empty(); })) {
-        // TODO SERVER-103389: Use one timer for all draining operations in intent registry.
         LOGV2(
             9795403, "There are still registered intents", "Intent"_attr = _intentToString(intent));
         for (auto& [token, opCtx] : tokenMap.map) {
