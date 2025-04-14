@@ -60,16 +60,26 @@ struct ClientSummary {
     explicit ClientSummary(const Client* c)
         : uuid(c->getUUID()),
           remote(c->session()->remote()),
+          sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
           isLoadBalanced(c->session()->isLoadBalancerPeer()) {}
 
-    friend auto logAttrs(const ClientSummary& m) {
-        return logv2::multipleAttrs(
-            "remote"_attr = m.remote, "uuid"_attr = m.uuid, "connectionId"_attr = m.id);
+    friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
+        logv2::DynamicAttributes attrs;
+        attrs.add("remote", m.remote);
+        attrs.add("isLoadBalanced", m.isLoadBalanced);
+        if (m.isLoadBalanced) {
+            attrs.add("sourceClient", m.sourceClient);
+        }
+        attrs.add("uuid", m.uuid);
+        attrs.add("connectionId", m.id);
+
+        return attrs;
     }
 
     UUID uuid;
     HostAndPort remote;
+    HostAndPort sourceClient;
     SessionId id;
     bool isLoadBalanced;
 };
@@ -281,8 +291,8 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         if (verbose) {
             LOGV2(22943,
                   "Connection accepted",
-                  logAttrs(iter->second.summary),
-                  "connectionCount"_attr = sync.size());
+                  logv2::DynamicAttributes{logAttrs(iter->second.summary),
+                                           "connectionCount"_attr = sync.size()});
         }
     }
 
@@ -384,7 +394,9 @@ void SessionManagerCommon::endSessionByClient(Client* client) {
     iter->second.workflow->terminate();
     sync.erase(iter);
     if (!quiet()) {
-        LOGV2(22944, "Connection ended", logAttrs(summary), "connectionCount"_attr = sync.size());
+        LOGV2(22944,
+              "Connection ended",
+              logv2::DynamicAttributes{logAttrs(summary), "connectionCount"_attr = sync.size()});
     }
 }
 
