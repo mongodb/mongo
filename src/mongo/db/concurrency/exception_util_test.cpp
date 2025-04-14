@@ -30,6 +30,7 @@
 
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -45,6 +46,19 @@ TEST_F(ExceptionUtilTest, RecordWriteConflictIncreasesWriteConflictMetric) {
     ASSERT_EQUALS(1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
     recordWriteConflict(opCtx.get(), 4);
     ASSERT_EQUALS(5LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
+}
+
+TEST_F(ExceptionUtilTest,
+       RecordTemporarilyUnavailableErrorsIncreasesTemporarilyUnavailableErrorsMetric) {
+    auto opCtx = makeOperationContext();
+    ASSERT_EQUALS(
+        0, CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
+    recordTemporarilyUnavailableErrors(opCtx.get());
+    ASSERT_EQUALS(
+        1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
+    recordTemporarilyUnavailableErrors(opCtx.get(), 4);
+    ASSERT_EQUALS(
+        5LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
 }
 
 TEST_F(ExceptionUtilTest, WriteConflictRetryInstantiatesOK) {
@@ -99,17 +113,21 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
         auto clientUserConn =
             serviceContext->getService()->makeClient("userconn", transportLayer.createSession());
         auto opCtx = clientUserConn->makeOperationContext();
-        auto&& opDebug = CurOp::get(opCtx.get())->debug();
 
         // Lower sleep time to retry immediately.
         gTemporarilyUnavailableExceptionRetryBackoffBaseMs.store(0);
 
         // WriteConflictRetry retries function on TemporarilyUnavailableException.
         {
-            ASSERT_EQUALS(0, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
             ASSERT_EQUALS(
-                100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opDebug] {
-                    if (0 == opDebug.additiveMetrics.temporarilyUnavailableErrors.load()) {
+                0,
+                CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
+            ASSERT_EQUALS(
+                100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opCtx] {
+                    if (0 ==
+                        CurOp::get(opCtx.get())
+                            ->getOperationStorageMetrics()
+                            .temporarilyUnavailableErrors) {
                         throwTemporarilyUnavailableException(
                             str::stream()
                             << "Verify that we retry the WriteConflictRetry function when we "
@@ -117,7 +135,9 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
                     }
                     return 100;
                 }));
-            ASSERT_EQUALS(1LL, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
+            ASSERT_EQUALS(
+                1LL,
+                CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
             // Confirm TemporarilyUnavailableException is not converted to WCE.
             ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
         }
@@ -125,13 +145,15 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
         // WriteConflictRetry propogates TemporarilyUnavailableException for user connections when
         // max retries exceeded.
         {
-            ASSERT_EQUALS(1, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
+            ASSERT_EQUALS(
+                1LL,
+                CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
             ASSERT_THROWS(
                 writeConflictRetry(
                     opCtx.get(),
                     "",
                     NamespaceString::kEmpty,
-                    [&opDebug] {
+                    [] {
                         throwTemporarilyUnavailableException(
                             str::stream()
                             << "Verify that TemporarilyUnavailableExceptions are propogated when "
@@ -140,8 +162,9 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
                 TemporarilyUnavailableException);
             // Total temporarilyUnavailableErrors exceeds max retries by 2 because we already
             // accumulated 1 error prior to this writeConflictRetry.
-            ASSERT_EQUALS(2 + gTemporarilyUnavailableExceptionMaxRetryAttempts.load(),
-                          opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
+            ASSERT_EQUALS(
+                2 + gTemporarilyUnavailableExceptionMaxRetryAttempts.load(),
+                CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
         }
     }
 
@@ -149,9 +172,9 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
     // retries on internal operations.
     {
         auto opCtx = makeOperationContext();
-        auto&& opDebug = CurOp::get(opCtx.get())->debug();
         ASSERT_EQUALS(0, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
-        ASSERT_EQUALS(0, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
+        ASSERT_EQUALS(
+            0, CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
         ASSERT_EQUALS(
             100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opCtx] {
                 if (0 == CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts) {
@@ -163,7 +186,9 @@ TEST_F(ExceptionUtilTest, WriteConflictRetryTemporarilyUnavailableException) {
                 return 100;
             }));
         ASSERT_EQUALS(1LL, CurOp::get(opCtx.get())->getOperationStorageMetrics().writeConflicts);
-        ASSERT_EQUALS(1LL, opDebug.additiveMetrics.temporarilyUnavailableErrors.load());
+        ASSERT_EQUALS(
+            1LL,
+            CurOp::get(opCtx.get())->getOperationStorageMetrics().temporarilyUnavailableErrors);
     }
 
     // If already in a WriteUnitOfWork, WriteConflictRetry propagates

@@ -944,7 +944,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
     if (auto n = storageMetrics.writeConflicts; n > 0) {
         builder->append("writeConflicts", n);
     }
-    if (auto n = _debug.additiveMetrics.temporarilyUnavailableErrors.load(); n > 0) {
+    if (auto n = storageMetrics.temporarilyUnavailableErrors; n > 0) {
         builder->append("temporarilyUnavailableErrors", n);
     }
 

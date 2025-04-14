@@ -94,6 +94,12 @@ void recordWriteConflict(OperationContext* opCtx, int64_t n) {
     StorageExecutionContext::get(opCtx)->getStorageMetrics().incrementWriteConflicts(n);
 }
 
+void recordTemporarilyUnavailableErrors(OperationContext* opCtx, int64_t n) {
+    invariant(n > 0);
+    StorageExecutionContext::get(opCtx)->getStorageMetrics().incrementTemporarilyUnavailableErrors(
+        n);
+}
+
 void logWriteConflictAndBackoff(size_t attempt,
                                 StringData operation,
                                 StringData reason,
@@ -126,7 +132,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& nssOrUUID,
                                            const Status& s,
                                            size_t& writeConflictAttempts) {
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
+    recordTemporarilyUnavailableErrors(opCtx);
 
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     temporarilyUnavailableErrors.increment(1);

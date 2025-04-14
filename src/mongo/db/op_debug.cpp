@@ -330,8 +330,9 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("storageInterruptResponseNanos", storageMetrics.interruptResponseNs);
     }
 
-    OPDEBUG_TOATTR_HELP_ATOMIC("temporarilyUnavailableErrors",
-                               additiveMetrics.temporarilyUnavailableErrors);
+    if (storageMetrics.temporarilyUnavailableErrors > 0) {
+        pAttrs->add("temporarilyUnavailableErrors", storageMetrics.temporarilyUnavailableErrors);
+    }
 
     pAttrs->add("numYields", curop.numYields());
     OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", additiveMetrics.nreturned);
@@ -573,8 +574,9 @@ void OpDebug::append(OperationContext* opCtx,
     if (storageMetrics.interruptResponseNs > 0) {
         b.append("storageInterruptResponseNanos", storageMetrics.interruptResponseNs);
     }
-    OPDEBUG_APPEND_ATOMIC(
-        b, "temporarilyUnavailableErrors", additiveMetrics.temporarilyUnavailableErrors);
+    if (storageMetrics.temporarilyUnavailableErrors > 0) {
+        b.append("temporarilyUnavailableErrors", storageMetrics.temporarilyUnavailableErrors);
+    }
 
     OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputLastSecond", dataThroughputLastSecond);
     OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputAverage", dataThroughputAverage);
@@ -897,7 +899,11 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("temporarilyUnavailableErrors", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.temporarilyUnavailableErrors);
+        const auto& storageMetrics = args.curop.getOperationStorageMetrics();
+
+        if (storageMetrics.temporarilyUnavailableErrors > 0) {
+            b.append(field, storageMetrics.temporarilyUnavailableErrors);
+        }
     });
 
     addIfNeeded("dataThroughputLastSecond", [](auto field, auto args, auto& b) {
@@ -1323,7 +1329,6 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     readingTime = addOptionals(readingTime, otherMetrics.readingTime);
     clusterWorkingTime = addOptionals(clusterWorkingTime, otherMetrics.clusterWorkingTime);
     cpuNanos = addOptionals(cpuNanos, otherMetrics.cpuNanos);
-    temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
     executionTime = addOptionals(executionTime, otherMetrics.executionTime);
 
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
@@ -1397,7 +1402,6 @@ void OpDebug::AdditiveMetrics::reset() {
     nUpserted = boost::none;
     keysInserted = boost::none;
     keysDeleted = boost::none;
-    temporarilyUnavailableErrors.store(0);
     executionTime = boost::none;
 }
 
@@ -1407,13 +1411,7 @@ bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const
         nBatches == otherMetrics.nBatches && nModified == otherMetrics.nModified &&
         ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
         nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
-        keysDeleted == otherMetrics.keysDeleted &&
-        temporarilyUnavailableErrors.load() == otherMetrics.temporarilyUnavailableErrors.load() &&
-        executionTime == otherMetrics.executionTime;
-}
-
-void OpDebug::AdditiveMetrics::incrementTemporarilyUnavailableErrors(long long n) {
-    temporarilyUnavailableErrors.fetchAndAdd(n);
+        keysDeleted == otherMetrics.keysDeleted && executionTime == otherMetrics.executionTime;
 }
 
 void OpDebug::AdditiveMetrics::incrementKeysInserted(long long n) {
@@ -1479,7 +1477,6 @@ std::string OpDebug::AdditiveMetrics::report() const {
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nUpserted", nUpserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysInserted", keysInserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", keysDeleted);
-    OPDEBUG_TOSTRING_HELP_ATOMIC("temporarilyUnavailableErrors", temporarilyUnavailableErrors);
     if (executionTime) {
         s << " durationMillis:" << durationCount<Milliseconds>(*executionTime);
     }
@@ -1499,7 +1496,6 @@ void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
     OPDEBUG_TOATTR_HELP_OPTIONAL("nUpserted", nUpserted);
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", keysInserted);
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", keysDeleted);
-    OPDEBUG_TOATTR_HELP_ATOMIC("temporarilyUnavailableErrors", temporarilyUnavailableErrors);
     if (executionTime) {
         pAttrs->add("durationMillis", durationCount<Milliseconds>(*executionTime));
     }
@@ -1518,7 +1514,6 @@ BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
     OPDEBUG_APPEND_OPTIONAL(b, "nUpserted", nUpserted);
     OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", keysInserted);
     OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", keysDeleted);
-    OPDEBUG_APPEND_ATOMIC(b, "temporarilyUnavailableErrors", temporarilyUnavailableErrors);
     if (executionTime) {
         b.appendNumber("durationMillis", durationCount<Milliseconds>(*executionTime));
     }

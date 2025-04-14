@@ -91,6 +91,18 @@ public:
      */
     CounterType writeConflicts{0};
 
+    /**
+     * Increments temporarilyUnavailableErrors by n.
+     */
+    void incrementTemporarilyUnavailableErrors(CounterType n) {
+        counter_ops::add(temporarilyUnavailableErrors, n);
+    }
+
+    /**
+     * Number of write conflicts.
+     */
+    CounterType temporarilyUnavailableErrors{0};
+
     template <typename LhsType, typename RhsType>
     friend bool operator==(const StorageMetrics<LhsType>& lhs, const StorageMetrics<RhsType>& rhs);
 
@@ -99,6 +111,7 @@ private:
     StorageMetrics& set(const StorageMetrics<OtherType>& other) {
         counter_ops::set(interruptResponseNs, other.interruptResponseNs);
         counter_ops::set(writeConflicts, other.writeConflicts);
+        counter_ops::set(temporarilyUnavailableErrors, other.temporarilyUnavailableErrors);
         return *this;
     }
 
@@ -113,6 +126,10 @@ private:
 
         incrementWriteConflicts(positive ? counter_ops::get(other.writeConflicts)
                                          : -counter_ops::get(other.writeConflicts));
+
+        incrementTemporarilyUnavailableErrors(
+            positive ? counter_ops::get(other.temporarilyUnavailableErrors)
+                     : -counter_ops::get(other.temporarilyUnavailableErrors));
         return *this;
     }
 };
@@ -124,6 +141,8 @@ template <typename LhsType, typename RhsType>
 bool operator==(const StorageMetrics<LhsType>& lhs, const StorageMetrics<RhsType>& rhs) {
     return (counter_ops::get(lhs.interruptResponseNs) ==
                 counter_ops::get(rhs.interruptResponseNs) &&
-            counter_ops::get(lhs.writeConflicts) == counter_ops::get(rhs.writeConflicts));
+            counter_ops::get(lhs.writeConflicts) == counter_ops::get(rhs.writeConflicts) &&
+            counter_ops::get(lhs.temporarilyUnavailableErrors) ==
+                counter_ops::get(rhs.temporarilyUnavailableErrors));
 }
 }  // namespace mongo

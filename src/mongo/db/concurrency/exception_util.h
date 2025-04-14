@@ -37,7 +37,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -57,6 +56,11 @@ extern FailPoint skipWriteConflictRetries;
  * Will record an occurrence of write conflict on this operation's metrics.
  */
 void recordWriteConflict(OperationContext* opCtx, int64_t n = 1);
+
+/**
+ * Will record an occurrence of temporarility unavailable error on this operation's metrics.
+ */
+void recordTemporarilyUnavailableErrors(OperationContext* opCtx, int64_t n = 1);
 
 /**
  * Will log a message if sensible and will do an increasing backoff to make sure we don't hammer

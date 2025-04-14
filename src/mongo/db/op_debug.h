@@ -183,13 +183,6 @@ public:
         // Number of index keys removed.
         boost::optional<long long> keysDeleted;
 
-        // The following fields are atomic because they are reported by CurrentOp. This is an
-        // exception to the prescription that OpDebug only be used by the owning thread because
-        // these metrics are tracked over the course of a transaction by SingleTransactionStats,
-        // which is built on OpDebug.
-
-        AtomicWord<long long> temporarilyUnavailableErrors{0};
-
         // Amount of time spent executing a query.
         boost::optional<Microseconds> executionTime;
 
