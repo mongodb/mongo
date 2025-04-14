@@ -36,19 +36,19 @@ namespace mongo {
 class ClockSource;
 
 /**
- * WiredTigerKVEngineBase implementation for temporary tables. Temporary tables are tables that
- * don't need to be retained after a restart. This class uses its own WiredTiger instance called
- * "internal" WiredTiger instance. Journaling is disabled for this WiredTiger instance. The cache
- * size of this WiredTiger instance is also configured to be very small.
+ * WiredTigerKVEngineBase implementation for creating SpillRecordStores. This class uses its own
+ * WiredTiger instance called "spill" WiredTiger instance. Journaling is disabled for this
+ * WiredTiger instance. The cache size of this WiredTiger instance is also configured to be very
+ * small.
  */
-class TemporaryWiredTigerKVEngine final : public WiredTigerKVEngineBase {
+class SpillKVEngine final : public WiredTigerKVEngineBase {
 public:
-    TemporaryWiredTigerKVEngine(const std::string& canonicalName,
-                                const std::string& path,
-                                ClockSource* clockSource,
-                                WiredTigerConfig wtConfig);
+    SpillKVEngine(const std::string& canonicalName,
+                  const std::string& path,
+                  ClockSource* clockSource,
+                  WiredTigerConfig wtConfig);
 
-    ~TemporaryWiredTigerKVEngine() override;
+    ~SpillKVEngine() override;
 
     std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
                                                          StringData ident,

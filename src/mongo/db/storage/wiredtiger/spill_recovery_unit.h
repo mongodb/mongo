@@ -39,17 +39,17 @@ namespace mongo {
  * related to these will trigger an assertion. The primary functionality this class provides is a
  * way to obtain a WiredTigerSession instance via getSession().
  */
-class TemporaryWiredTigerRecoveryUnit final : public WiredTigerRecoveryUnitBase {
+class SpillRecoveryUnit final : public WiredTigerRecoveryUnitBase {
 public:
-    explicit TemporaryWiredTigerRecoveryUnit(WiredTigerConnection* connection)
+    explicit SpillRecoveryUnit(WiredTigerConnection* connection)
         : WiredTigerRecoveryUnitBase(connection) {}
 
-    static TemporaryWiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
-        return checked_cast<TemporaryWiredTigerRecoveryUnit&>(ru);
+    static SpillRecoveryUnit& get(RecoveryUnit& ru) {
+        return checked_cast<SpillRecoveryUnit&>(ru);
     }
 
-    static TemporaryWiredTigerRecoveryUnit* get(RecoveryUnit* ru) {
-        return checked_cast<TemporaryWiredTigerRecoveryUnit*>(ru);
+    static SpillRecoveryUnit* get(RecoveryUnit* ru) {
+        return checked_cast<SpillRecoveryUnit*>(ru);
     }
 
     WiredTigerSession* getSession() override {

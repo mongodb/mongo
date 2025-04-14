@@ -33,7 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/temporary_wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -42,15 +42,15 @@
 namespace mongo {
 namespace {
 
-class TemporaryWiredTigerRecordStoreTest : public ServiceContextTest {
+class SpillRecordStoreTest : public ServiceContextTest {
 protected:
-    TemporaryWiredTigerRecordStoreTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {
+    SpillRecordStoreTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
             getWiredTigerConfigFromStartupOptions(true /* usingTemporaryKVEngine */);
         wtConfig.cacheSizeMB = 1;
         wtConfig.inMemory = true;
         wtConfig.logEnabled = false;
-        _kvEngine = std::make_unique<TemporaryWiredTigerKVEngine>(
+        _kvEngine = std::make_unique<SpillKVEngine>(
             std::string{kWiredTigerEngineName}, _dbpath.path(), &_clockSource, std::move(wtConfig));
 
         _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
@@ -69,13 +69,13 @@ protected:
 
     unittest::TempDir _dbpath;
     ClockSourceMock _clockSource;
-    std::unique_ptr<TemporaryWiredTigerKVEngine> _kvEngine;
+    std::unique_ptr<SpillKVEngine> _kvEngine;
     std::unique_ptr<RecordStore> _recordStore;
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
 // Test that insertRecord() works as expected.
-TEST_F(TemporaryWiredTigerRecordStoreTest, InsertRecord) {
+TEST_F(SpillRecordStoreTest, InsertRecord) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -103,7 +103,7 @@ TEST_F(TemporaryWiredTigerRecordStoreTest, InsertRecord) {
 }
 
 // Test that updateRecord() works as expected.
-TEST_F(TemporaryWiredTigerRecordStoreTest, UpdateRecord) {
+TEST_F(SpillRecordStoreTest, UpdateRecord) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -141,7 +141,7 @@ TEST_F(TemporaryWiredTigerRecordStoreTest, UpdateRecord) {
 }
 
 // Test that deleteRecord() works as expected.
-TEST_F(TemporaryWiredTigerRecordStoreTest, DeleteRecord) {
+TEST_F(SpillRecordStoreTest, DeleteRecord) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -179,7 +179,7 @@ TEST_F(TemporaryWiredTigerRecordStoreTest, DeleteRecord) {
 }
 
 // Test that truncate() works as expected.
-TEST_F(TemporaryWiredTigerRecordStoreTest, Truncate) {
+TEST_F(SpillRecordStoreTest, Truncate) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -212,7 +212,7 @@ TEST_F(TemporaryWiredTigerRecordStoreTest, Truncate) {
 }
 
 // Test that rangeTruncate() works as expected.
-TEST_F(TemporaryWiredTigerRecordStoreTest, RangeTruncate) {
+TEST_F(SpillRecordStoreTest, RangeTruncate) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -254,7 +254,7 @@ TEST_F(TemporaryWiredTigerRecordStoreTest, RangeTruncate) {
 }
 
 // Test that RecordCursor works as expected.
-TEST_F(TemporaryWiredTigerRecordStoreTest, RecordCursor) {
+TEST_F(SpillRecordStoreTest, RecordCursor) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);

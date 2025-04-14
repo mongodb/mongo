@@ -3103,7 +3103,7 @@ Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, co
 
 WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     bool usingTemporaryKVEngine) {
-    // TODO(SERVER-103279): Optimally configure TemporaryWiredTigerKVEngine.
+    // TODO(SERVER-103279): Optimally configure SpillKVEngine.
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig;
     wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
     wtConfig.evictionDirtyTargetMB = wiredTigerGlobalOptions.evictionDirtyTargetGB * 1024;
@@ -3120,7 +3120,7 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
 
 WiredTigerRecordStoreBase::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
     bool usingTemporaryKVEngine) {
-    // TODO(SERVER-103279): Optimally configure TemporaryWiredTigerRecordStore.
+    // TODO(SERVER-103279): Optimally configure SpillRecordStore.
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     return wtTableConfig;

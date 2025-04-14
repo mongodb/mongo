@@ -60,7 +60,7 @@
 #include "mongo/db/storage/oplog_data.h"
 #include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/temporary_wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"

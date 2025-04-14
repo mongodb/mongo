@@ -32,13 +32,13 @@
 #define NVALGRIND
 #endif
 
-#include "mongo/db/storage/wiredtiger/temporary_wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
 
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/wiredtiger/temporary_wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/spill_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -64,66 +64,67 @@ constexpr bool kThreadSanitizerEnabled = false;
 
 }  // namespace
 
-TemporaryWiredTigerKVEngine::TemporaryWiredTigerKVEngine(const std::string& canonicalName,
-                                                         const std::string& path,
-                                                         ClockSource* clockSource,
-                                                         WiredTigerConfig wtConfig)
+SpillKVEngine::SpillKVEngine(const std::string& canonicalName,
+                             const std::string& path,
+                             ClockSource* clockSource,
+                             WiredTigerConfig wtConfig)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)) {
     invariant(_wtConfig.inMemory);
 
     std::string config = generateWTOpenConfigString(_wtConfig, true /* ephemeral */);
-    LOGV2(10158000, "Opening temporary WiredTiger", "config"_attr = config);
+    LOGV2(10158000, "Opening spill WiredTiger", "config"_attr = config);
 
     auto startTime = Date_t::now();
     _openWiredTiger(path, config);
-    LOGV2(10158001, "Temporary WiredTiger opened", "duration"_attr = Date_t::now() - startTime);
+    LOGV2(10158001, "Spill WiredTiger opened", "duration"_attr = Date_t::now() - startTime);
     _eventHandler.setStartupSuccessful();
     _wtOpenConfig = config;
 
     // TODO(SERVER-103355): Disable session caching.
     _connection = std::make_unique<WiredTigerConnection>(_conn, clockSource, this);
 
-    // TODO(SERVER-103209): Add support for configuring the internal WiredTiger instance at runtime.
+    // TODO(SERVER-103209): Add support for configuring the spill WiredTiger instance at runtime.
 }
 
-TemporaryWiredTigerKVEngine::~TemporaryWiredTigerKVEngine() {
+SpillKVEngine::~SpillKVEngine() {
     cleanShutdown();
 }
 
-void TemporaryWiredTigerKVEngine::_openWiredTiger(const std::string& path,
-                                                  const std::string& wtOpenConfig) {
+void SpillKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
     auto wtEventHandler = _eventHandler.getWtEventHandler();
 
     int ret = wiredtiger_open(path.c_str(), wtEventHandler, wtOpenConfig.c_str(), &_conn);
     if (ret) {
         LOGV2_FATAL_NOTRACE(10158002,
-                            "Failed to open the temporary WiredTiger instance",
+                            "Failed to open the spill WiredTiger instance",
                             "details"_attr = wtRCToStatus(ret, nullptr).reason());
     }
 }
 
-std::unique_ptr<RecordStore> TemporaryWiredTigerKVEngine::getTemporaryRecordStore(
-    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
-    TemporaryWiredTigerRecordStore::Params params;
+std::unique_ptr<RecordStore> SpillKVEngine::getTemporaryRecordStore(OperationContext* opCtx,
+                                                                    StringData ident,
+                                                                    KeyFormat keyFormat) {
+    SpillRecordStore::Params params;
     params.baseParams.uuid = boost::none;
     params.baseParams.ident = ident.toString();
     params.baseParams.engineName = _canonicalName;
     params.baseParams.keyFormat = keyFormat;
     params.baseParams.overwrite = true;
-    // We don't log writes to temporary record stores.
+    // We don't log writes to spill tables.
     params.baseParams.isLogged = false;
     params.baseParams.forceUpdateWithFullDocument = false;
-    return std::make_unique<TemporaryWiredTigerRecordStore>(this, std::move(params));
+    return std::make_unique<SpillRecordStore>(this, std::move(params));
 }
 
-std::unique_ptr<RecordStore> TemporaryWiredTigerKVEngine::makeTemporaryRecordStore(
-    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> SpillKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
+                                                                     StringData ident,
+                                                                     KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
 
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions(true /* usingTemporaryKVEngine */);
     wtTableConfig.keyFormat = keyFormat;
-    // We don't log writes to temporary record stores.
+    // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
     StatusWith<std::string> swConfig = WiredTigerRecordStoreBase::generateCreateString(
         _canonicalName, {} /* internal table */, CollectionOptions(), wtTableConfig);
@@ -142,12 +143,12 @@ std::unique_ptr<RecordStore> TemporaryWiredTigerKVEngine::makeTemporaryRecordSto
     return getTemporaryRecordStore(opCtx, ident, keyFormat);
 }
 
-std::unique_ptr<RecoveryUnit> TemporaryWiredTigerKVEngine::newRecoveryUnit() {
+std::unique_ptr<RecoveryUnit> SpillKVEngine::newRecoveryUnit() {
     return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
 }
 
-void TemporaryWiredTigerKVEngine::cleanShutdown() {
-    LOGV2(10158003, "TemporaryWiredTigerKVEngine shutting down");
+void SpillKVEngine::cleanShutdown() {
+    LOGV2(10158003, "SpillKVEngine shutting down");
 
     if (!_conn) {
         return;
@@ -168,11 +169,11 @@ void TemporaryWiredTigerKVEngine::cleanShutdown() {
     }
 
     auto startTime = Date_t::now();
-    LOGV2(10158006, "Closing temporary WiredTiger", "closeConfig"_attr = closeConfig);
+    LOGV2(10158006, "Closing spill WiredTiger", "closeConfig"_attr = closeConfig);
     // WT_CONNECTION::close() takes a checkpoint. To ensure this is fast, we delete the tables
-    // created by this KVEngine in TemporaryWiredTigerRecordStore destructor.
+    // created by this KVEngine in SpillRecordStore destructor.
     invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
-    LOGV2(10158007, "Closed temporary WiredTiger ", "duration"_attr = Date_t::now() - startTime);
+    LOGV2(10158007, "Closed spill WiredTiger ", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;
 }
 

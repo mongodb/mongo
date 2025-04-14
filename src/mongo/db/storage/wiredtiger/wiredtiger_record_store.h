@@ -86,7 +86,7 @@ namespace mongo {
 class OplogData;
 class OplogTruncateMarkers;
 class RecoveryUnit;
-class TemporaryWiredTigerKVEngine;
+class SpillKVEngine;
 class WiredTigerConnection;
 class WiredTigerKVEngine;
 class WiredTigerSizeStorer;
