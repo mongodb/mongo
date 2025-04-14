@@ -30,17 +30,15 @@ __live_restore_fs_backing_filename(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FS
 {
     WT_DECL_RET;
     size_t len;
-    char *buf, *filename;
-
-    buf = filename = NULL;
+    char *buf = NULL;
+    const char *filename = name;
 
     /*
      * Name must start with the destination directory. If name is an absolute path like
      * "/home/dest_home/file.txt" then destination directory which is derived from conn->home will
      * be "/home/dest_home".
      */
-    filename = strstr(name, lr_fs->destination.home);
-    WT_ASSERT_ALWAYS(session, filename == name,
+    WT_ASSERT_ALWAYS(session, WT_PREFIX_MATCH(name, lr_fs->destination.home),
       "Provided name '%s' does not start with the destination home folder path '%s'", name,
       lr_fs->destination.home);
 

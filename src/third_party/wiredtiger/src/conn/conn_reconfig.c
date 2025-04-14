@@ -312,6 +312,12 @@ __wti_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
     flags = 0;
     set = 0;
     if ((ret = __wt_config_subgets(session, &cval, "none", &sval)) == 0 && sval.val != 0) {
+        if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+            /*
+             * Live restore uses statistics to inform the user when migration has completed. They
+             * must be enabled.
+             */
+            WT_RET_MSG(session, EINVAL, "Statistics must be enabled when live restore is active.");
         flags = 0;
         ++set;
     }

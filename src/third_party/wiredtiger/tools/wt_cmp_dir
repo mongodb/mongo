@@ -56,20 +56,20 @@ init_wt_utility() {
 }
 
 wtfiles() {
-    local tmpa=/tmp/wcd$$a
-    local tmpb=/tmp/wcd$$b
+    local tmpout=/tmp/wcd$$out
+    local tmperr=/tmp/wcd$$err
 
     #TODO: check for corruption
-    $wt -h "$1" list >$tmpa 2>$tmpb
-    if [ "$?" != 0 -o -s $tmpb ]; then
+    $wt -h "$1" list -f $tmpout > /dev/null 2>$tmperr
+    if [ "$?" != 0 -o -s $tmperr ]; then
         echo failed command: $wt -h "$1" list >&2
-        cat $tmpb
-        rm -f $tmpa $tmpb
+        cat $tmperr
+        rm -f $tmpout $tmperr
         exit 1
     fi
     # The uris are a simple list, for example: "colgroup:table1 file:table1.wt table:table1"
-    uris=$(cat $tmpa)
-    rm -f $tmpa $tmpb
+    uris=$(cat $tmpout)
+    rm -f $tmpout $tmperr
     results=""
     for uri in $uris; do
         case "$uri" in

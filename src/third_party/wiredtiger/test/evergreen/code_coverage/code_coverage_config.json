@@ -254,6 +254,7 @@
     "./wt -h WT_HOME_COVERAGE copyright",
     "test/csuite/wt3363_checkpoint_op_races/test_wt3363_checkpoint_op_races",
     "./wt -?",
-    "test/csuite/wt4117_checksum/test_wt4117_checksum"
+    "test/csuite/wt4117_checksum/test_wt4117_checksum",
+    "python3 ../test/suite/run.py test_live_restore01"
   ]
 }

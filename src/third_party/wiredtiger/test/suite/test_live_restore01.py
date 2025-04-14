@@ -48,7 +48,9 @@ class test_live_restore01(backup_base):
     def expect_failure(self, config_str, expected_error):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.open_conn("DEST", config=config_str), expected_error)
-        # No need to clean up the destination as WiredTiger failed to open.
+        # Clean out the destination. Subsequent live_restore opens will expect it to contain nothing.
+        shutil.rmtree("DEST")
+        os.mkdir("DEST")
 
     def test_live_restore01(self):
         # Close the default connection.
@@ -98,3 +100,12 @@ class test_live_restore01(backup_base):
 
         # Specify salvage is enabled.
         self.expect_failure("salvage=true,live_restore=(enabled=true,path=SOURCE)", "/Live restore is not compatible with salvage/")
+
+        # Specify statistics are disabled.
+        self.expect_failure("statistics=(none),live_restore=(enabled=true,path=SOURCE)", "/Statistics must be enabled when live restore is active./")
+
+        # Expect a failure if statistics are disabled via a reconfigure call.
+        self.open_conn("DEST", config="live_restore=(enabled=true,path=SOURCE)")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.reconfigure("statistics=(none)"), "/Statistics must be enabled when live restore is active./")
+        self.close_conn()
