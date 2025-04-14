@@ -52,6 +52,12 @@ void FeatureFlagServerParameter::append(OperationContext* opCtx,
     _flag->appendFlagValueAndMetadata(flagBuilder);
 }
 
+void FeatureFlagServerParameter::appendDetails(OperationContext* opCtx,
+                                               BSONObjBuilder* detailsBuilder,
+                                               const boost::optional<TenantId>&) {
+    _flag->appendFlagDetails(*detailsBuilder);
+}
+
 void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opCtx,
                                                            BSONObjBuilder* b,
                                                            StringData name,
@@ -90,6 +96,10 @@ Status FeatureFlagServerParameter::setFromString(StringData str, const boost::op
     }
 
     return Status::OK();
+}
+
+bool FeatureFlagServerParameter::isForIncrementalFeatureRollout() const {
+    return _flag->isForIncrementalFeatureRollout();
 }
 
 void FeatureFlagServerParameter::onRegistrationWithProcessGlobalParameterList() {

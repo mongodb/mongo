@@ -56,6 +56,12 @@ public:
     virtual void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const = 0;
 
     /**
+     * Add any feature properties to the "details" object that are limited to verbose descriptions
+     * of the flag.
+     */
+    virtual void appendFlagDetails(BSONObjBuilder& detailsBuilder) const {};
+
+    /**
      * Returns the boolean value representing the flag's user-configured value, which does not
      * necessarily indicate whether the feature is enabled.
      *
@@ -71,6 +77,13 @@ public:
      * flag. Do not use this interface to udpate the flag.
      */
     virtual void setForServerParameter(bool enabled) = 0;
+
+    /**
+     * Returns true if the flag is an Incremental Feature Rollout (IFR) flag.
+     */
+    virtual bool isForIncrementalFeatureRollout() const {
+        return false;
+    }
 
     /**
      * Add the flag to any process-global registry that it belongs to.
@@ -326,6 +339,8 @@ public:
 
     void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override;
 
+    void appendFlagDetails(BSONObjBuilder& detailsBuilder) const override;
+
     bool getForServerParameter() const override {
         return _value.loadRelaxed();
     }
@@ -335,6 +350,10 @@ public:
      * increment the process-wide counter for how many times the flag was toggled.
      */
     void setForServerParameter(bool value) override;
+
+    bool isForIncrementalFeatureRollout() const override {
+        return true;
+    }
 
     void registerFlag() override {
         registerFlag(this);

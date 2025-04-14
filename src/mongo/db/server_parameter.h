@@ -161,6 +161,10 @@ public:
                         StringData name,
                         const boost::optional<TenantId>& tenantId) = 0;
 
+    virtual void appendDetails(OperationContext* opCtx,
+                               BSONObjBuilder* detailsBuilder,
+                               const boost::optional<TenantId>& tenantId) {};
+
     virtual void appendSupportingRoundtrip(OperationContext* opCtx,
                                            BSONObjBuilder* b,
                                            StringData name,
@@ -220,6 +224,14 @@ public:
      */
     virtual LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const {
         return LogicalTime::kUninitialized;
+    }
+
+    /**
+     * Returns true if the parameter should be advertised as an Incremental Feature Rollout (IFR)
+     * flag.
+     */
+    virtual bool isForIncrementalFeatureRollout() const {
+        return false;
     }
 
     bool isTestOnly() const {

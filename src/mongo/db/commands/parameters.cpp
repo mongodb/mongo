@@ -276,40 +276,44 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const auto options = parseGetParameterOptions(cmdObj.firstElement());
-        const bool all = options.getAllParameters();
+
+        bool requireNameMatch = !options.getAllParameters();
+        bool requireIFR = options.getForIncrementalFeatureRollout();
 
         // If the "setAt" option has been set, then only include the parameter in the
         // response if it matches the parameter's settability. If the "setAt" option has
         // been omitted, then include all requested parameters.
         boost::optional<SetAtOptionEnum> setAtOption = options.getSetAt();
-        bool isOptionRequestingRuntime =
-            setAtOption && (setAtOption.value() == SetAtOptionEnum::kRuntime);
-        bool isOptionRequestingStartup =
-            setAtOption && (setAtOption.value() == SetAtOptionEnum::kStartup);
+        bool requireRuntimeSettable = setAtOption && (*setAtOption == SetAtOptionEnum::kRuntime);
+        bool requireStartupSettable = setAtOption && (*setAtOption == SetAtOptionEnum::kStartup);
 
-        int before = result.len();
-
+        bool foundFlag = false;
         const ServerParameter::Map& m = ServerParameterSet::getNodeParameterSet()->getMap();
         for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
-            if (i->second->isEnabled() && (all || cmdObj.hasElement(i->first.c_str()))) {
-                if (!setAtOption ||
-                    (isOptionRequestingRuntime && i->second->allowedToChangeAtRuntime()) ||
-                    (isOptionRequestingStartup && i->second->allowedToChangeAtStartup())) {
-                    if (options.getShowDetails()) {
-                        BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
-                        i->second->append(opCtx, &detailBob, "value", boost::none);
-                        detailBob.appendBool("settableAtRuntime",
-                                             i->second->allowedToChangeAtRuntime());
-                        detailBob.appendBool("settableAtStartup",
-                                             i->second->allowedToChangeAtStartup());
-                        detailBob.doneFast();
-                    } else {
-                        i->second->append(opCtx, &result, i->second->name(), boost::none);
-                    }
-                }
+            // Skip any parameters that should be filtered out according to the command options, as
+            // well as any disabled parameters.
+            if (!i->second->isEnabled() ||
+                (requireNameMatch && !cmdObj.hasElement(i->first.c_str())) ||
+                (requireRuntimeSettable && !i->second->allowedToChangeAtRuntime()) ||
+                (requireStartupSettable && !i->second->allowedToChangeAtStartup()) ||
+                (requireIFR && !i->second->isForIncrementalFeatureRollout())) {
+                continue;
             }
+
+            if (options.getShowDetails()) {
+                BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
+                i->second->append(opCtx, &detailBob, "value", boost::none);
+                detailBob.appendBool("settableAtRuntime", i->second->allowedToChangeAtRuntime());
+                detailBob.appendBool("settableAtStartup", i->second->allowedToChangeAtStartup());
+                i->second->appendDetails(opCtx, &detailBob, boost::none);
+                detailBob.doneFast();
+            } else {
+                i->second->append(opCtx, &result, i->second->name(), boost::none);
+            }
+
+            foundFlag = true;
         }
-        uassert(ErrorCodes::InvalidOptions, "no option found to get", before != result.len());
+        uassert(ErrorCodes::InvalidOptions, "no option found to get", foundFlag);
         return true;
     }
 };

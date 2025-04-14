@@ -22,10 +22,9 @@
 // Call the getParameter command, verify that it returns a document for the given flag, and return
 // the value for that flag.
 function queryIncrementalFeatureFlagViaGetParameter(flagName) {
-    const flagValue = assert.commandWorked(
-        db.adminCommand({getParameter: 1, featureFlagInDevelopmentForTest: {}}));
-    assert("featureFlagInDevelopmentForTest" in flagValue, flagValue);
-    return flagValue.featureFlagInDevelopmentForTest.value;
+    const flagValue = assert.commandWorked(db.adminCommand({getParameter: 1, [flagName]: 1}));
+    assert(flagName in flagValue, flagValue);
+    return flagValue[flagName].value;
 }
 
 // Call the serverStatus command, verify that is has an "incrementalRollout" section, verify that
@@ -78,3 +77,42 @@ assert.commandWorked(db.adminCommand(
     {setParameter: 1, featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue}));
 assert.docEq(queryIncrementalFeatureFlagViaServerStatus("featureFlagInDevelopmentForTest"),
              updatedDishStatus);
+
+// Check that the featureFlagInDevelopmentForTest "details" include the correct rollout phase.
+const featureFlagInDevelopmentDetails = assert.commandWorked(
+    db.adminCommand({getParameter: {showDetails: true}, featureFlagInDevelopmentForTest: 1}));
+assert("featureFlagInDevelopmentForTest" in featureFlagInDevelopmentDetails,
+       featureFlagInDevelopmentDetails);
+assert.eq(
+    featureFlagInDevelopmentDetails.featureFlagInDevelopmentForTest.incrementalFeatureRolloutPhase,
+    "inDevelopment",
+    featureFlagInDevelopmentDetails);
+
+// Check that the featureFlagInDevelopmentForTest "details" include the correct rollout phase.
+const featureFlagReleasedDetails = assert.commandWorked(
+    db.adminCommand({getParameter: {showDetails: true}, featureFlagReleasedForTest: 1}));
+assert("featureFlagReleasedForTest" in featureFlagReleasedDetails, featureFlagReleasedDetails);
+assert.eq(featureFlagReleasedDetails.featureFlagReleasedForTest.incrementalFeatureRolloutPhase,
+          "released",
+          featureFlagReleasedDetails);
+
+// Check that it's possible to query the list of IFR parameters.
+const allIFRParams = assert.commandWorked(db.adminCommand(
+    {getParameter: {allParameters: true, forIncrementalFeatureRollout: true, showDetails: true}}));
+delete allIFRParams.ok;
+delete allIFRParams.operationTime;
+delete allIFRParams["$clusterTime"];
+
+// All the returned parameters should specify an IFR phase.
+assert(Object.values(allIFRParams).every(value => "incrementalFeatureRolloutPhase" in value),
+       allIFRParams);
+
+// IFR parameters should always be runtime settable.
+assert(Object.values(allIFRParams).every(value => value.settableAtRuntime), allIFRParams);
+
+// IFR parameters should always be startup settable.
+assert(Object.values(allIFRParams).every(value => value.settableAtStartup), allIFRParams);
+
+// Each of the "test" IFR flags should appear in the output.
+assert("featureFlagInDevelopmentForTest" in allIFRParams, allIFRParams);
+assert("featureFlagReleasedForTest" in allIFRParams, allIFRParams);

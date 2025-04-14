@@ -60,6 +60,10 @@ public:
                 StringData name,
                 const boost::optional<TenantId>&) final;
 
+    void appendDetails(OperationContext* opCtx,
+                       BSONObjBuilder* detailsBuilder,
+                       const boost::optional<TenantId>& tenantId) final;
+
     /**
      * Encode the feature flag value into a BSON object, discarding the version.
      */
@@ -82,6 +86,8 @@ public:
      * Typically invoked from commandline --setParameter usage.
      */
     Status setFromString(StringData str, const boost::optional<TenantId>&) final;
+
+    bool isForIncrementalFeatureRollout() const final;
 
     void onRegistrationWithProcessGlobalParameterList() override;
 

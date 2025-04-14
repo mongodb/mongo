@@ -58,6 +58,11 @@ structs:
                     runtime-settable parameters are returned from the requested ones.
                 type: SetAtOption
                 optional: true
+            forIncrementalFeatureRollout:
+                description: >-
+                    Return only server parameters that can participate in Incremental Feature Rollout (IFR).
+                type: safeBool
+                default: false
             allParameters:
                 description: "Return all server parameters, not just the ones specified"
                 type: safeBool

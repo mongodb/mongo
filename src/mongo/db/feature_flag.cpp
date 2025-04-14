@@ -245,6 +245,21 @@ void IncrementalRolloutFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& f
     }
 }
 
+void IncrementalRolloutFeatureFlag::appendFlagDetails(BSONObjBuilder& detailsBuilder) const {
+    std::string phaseName = [&]() {
+        switch (_phase) {
+            case RolloutPhase::inDevelopment:
+                return "inDevelopment";
+            case RolloutPhase::rollout:
+                return "rollout";
+            case RolloutPhase::released:
+                return "released";
+        }
+        MONGO_UNREACHABLE_TASSERT(101023);
+    }();
+    detailsBuilder.append("incrementalFeatureRolloutPhase", phaseName);
+}
+
 void IncrementalRolloutFeatureFlag::setForServerParameter(bool value) {
     auto previousValue = _value.swap(value);
 
