@@ -4,6 +4,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+sys.path.append("bazel")
+from bazelisk import get_bazel_path, make_bazel_cmd
+
 # WARNING: this file is imported from outside of any virtual env so the main import block MUST NOT
 # import any third-party non-std libararies. Libraries needed when running as a script can be
 # conditionally imported below.
@@ -13,7 +16,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 
-SUPPORTED_VERSIONS = ("v4", "v5")
+SUPPORTED_VERSIONS = "v5"
 
 
 class MongoToolchainError(RuntimeError):
@@ -76,13 +79,20 @@ class MongoToolchain:
         return self._root_dir / "lib"
 
 
-def _run_command(cmd: str) -> str:
-    return subprocess.check_output(cmd, shell=True, text=True).strip()
+def _execute_bazel(argv):
+    bazel_cmd = make_bazel_cmd(get_bazel_path(), argv)
+    cmd = f"{bazel_cmd['exec']} {' '.join(bazel_cmd['args'])}"
+    return subprocess.check_output(
+        cmd,
+        env=bazel_cmd["env"],
+        shell=True,
+        text=True,
+    ).strip()
 
 
 def _fetch_bazel_toolchain(version: str) -> None:
     try:
-        _run_command(f"bazel build --config=local @mongo_toolchain_{version}//:all")
+        _execute_bazel(["build", "--config=local", f"@mongo_toolchain_{version}//:all"])
     except subprocess.CalledProcessError as e:
         raise MongoToolchainNotFoundError(
             f"Failed to fetch bazel toolchain: `{e.cmd}` exited with code {e.returncode}"
@@ -91,13 +101,12 @@ def _fetch_bazel_toolchain(version: str) -> None:
 
 def _get_bazel_execroot() -> Path:
     try:
-        execroot_str = _run_command("bazel info execution_root")
+        execroot_str = _execute_bazel(["info", "execution_root"])
     except subprocess.CalledProcessError as e:
         raise MongoToolchainNotFoundError(
             f"Couldn't find bazel execroot: `{e.cmd}` exited with code {e.returncode}"
         )
-    execroot = Path(execroot_str)
-    return execroot
+    return Path(execroot_str)
 
 
 def _get_bazel_toolchain_path(version: str) -> Path:
@@ -139,15 +148,15 @@ def get_mongo_toolchain(
     if toolchain_path is not None:
         return _get_toolchain_from_path(toolchain_path)
 
-    # If no version given, look in the environment or default to v4.
+    # If no version given, look in the environment or default to v5.
     if version is None:
-        version = os.environ.get("MONGO_TOOLCHAIN_VERSION", "v4")
+        version = os.environ.get("MONGO_TOOLCHAIN_VERSION", "v5")
     assert version is not None
     if version not in SUPPORTED_VERSIONS:
         raise MongoToolchainNotFoundError(f"Unknown toolchain version {version}")
 
-    # If from_bazel is unspecified. Look in the environment or fall back to a default based on
-    # the version (v4 -> not from bazel, v5 -> from bazel).
+    # If from_bazel is unspecified, let's query from bazel where querying toolchain
+    # version is supported since v5.
     def _parse_from_bazel_envvar(value: str) -> bool:
         v = value.lower()
         if v in ("true", "1"):
@@ -158,8 +167,7 @@ def get_mongo_toolchain(
             raise ValueError(f"Invalid value {value} for MONGO_TOOLCHAIN_FROM_BAZEL")
 
     if from_bazel is None:
-        from_bazel_default = "false" if version == "v4" else "true"
-        from_bazel_value = os.environ.get("MONGO_TOOLCHAIN_FROM_BAZEL", from_bazel_default)
+        from_bazel_value = os.environ.get("MONGO_TOOLCHAIN_FROM_BAZEL", "true")
         from_bazel = _parse_from_bazel_envvar(from_bazel_value)
 
     if from_bazel:

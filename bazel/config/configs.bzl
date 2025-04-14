@@ -26,17 +26,17 @@ compiler_type = rule(
 # mongo_toolchain_version
 # =========
 
-mongo_toolchain_version_values = ["v4", "v5"]
+mongo_toolchain_version_values = ["v5"]
 
 mongo_toolchain_version_provider = provider(
-    doc = "Select the mongo toolchain version (e.g.: v4)",
-    fields = {"mongo_toolchain_version": "Choose one of [v4, v5]"},
+    doc = "Select the mongo toolchain version (e.g.: v5)",
+    fields = {"mongo_toolchain_version": "Choose one of " + ".".join(mongo_toolchain_version_values)},
 )
 
 def mongo_toolchain_version_impl(ctx):
     mongo_toolchain_version_value = ctx.build_setting_value
     if mongo_toolchain_version_value not in mongo_toolchain_version_values:
-        fail(str(ctx.label) + " mongo_toolchain_version allowed to take values {" + ", ".join(mongo_toolchain_version_value) + "} but was set to unallowed value " + mongo_toolchain_version_value)
+        fail(str(ctx.label) + " mongo_toolchain_version allowed to take values {" + ", ".join(mongo_toolchain_version_values) + "} but was set to unallowed value " + mongo_toolchain_version_value)
     return mongo_toolchain_version_provider(mongo_toolchain_version = mongo_toolchain_version_value)
 
 mongo_toolchain_version = rule(

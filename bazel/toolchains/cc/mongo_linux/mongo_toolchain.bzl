@@ -119,7 +119,7 @@ toolchain_download = repository_rule(
             doc = "Host architecture.",
         ),
         "version": attr.string(
-            values = ["v4", "v5"],
+            values = ["v5"],
             doc = "Mongodbtoolchain version.",
             mandatory = True,
         ),
@@ -136,19 +136,12 @@ toolchain_download = repository_rule(
 
 def setup_mongo_toolchains():
     toolchain_download(
-        name = "mongo_toolchain_v4",
-        version = "v4",
-        flags_tpl = "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v4.bzl",
-    )
-
-    toolchain_download(
         name = "mongo_toolchain_v5",
         version = "v5",
         flags_tpl = "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_flags_v5.bzl",
     )
 
     native.register_toolchains(
-        "@mongo_toolchain_v4//:all",
         "@mongo_toolchain_v5//:all",
     )
 
@@ -170,11 +163,8 @@ def setup_mongo_toolchain_aliases():
     for target in toolchain_targets:
         selects[target] = {}
 
-    for version in ("v4", "v5"):
-        toolchain_name = "mongo_toolchain_{}".format(version)
-        option_name = "//bazel/config:mongo_toolchain_{}".format(version)
-        for target in toolchain_targets:
-            selects[target][option_name] = "@{}//:{}".format(toolchain_name, target)
+    for target in toolchain_targets:
+        selects[target]["//bazel/config:mongo_toolchain_v5"] = "@mongo_toolchain_v5//:{}".format(target)
 
     for target, local_alias in toolchain_targets.items():
         native.alias(

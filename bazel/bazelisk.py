@@ -231,7 +231,7 @@ def resolve_latest_version(version_history, offset):
     if offset >= len(version_history):
         version = "latest-{}".format(offset) if offset else "latest"
         raise Exception(
-            'Cannot resolve version "{}": There are only {} Bazel ' "releases.".format(
+            'Cannot resolve version "{}": There are only {} Bazel releases.'.format(
                 version, len(version_history)
             )
         )
