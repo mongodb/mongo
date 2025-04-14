@@ -97,9 +97,9 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
-        "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/timeseries:timeseries_test_fixture",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
         "//src/mongo/idl:server_parameter_test_util",
     ],

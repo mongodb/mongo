@@ -38,13 +38,13 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/oplog.h"
@@ -53,6 +53,8 @@
 #include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -62,33 +64,29 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.ts");
 
-class BucketCatalogHelpersTest : public CatalogTestFixture {
+class BucketCatalogHelpersTest : public TimeseriesTestFixture {
 protected:
-    StringData _timeField = "time";
-    StringData _metaField = "mm";
-
-    void _insertIntoBucketColl(const BSONObj& bucketDoc);
-    BSONObj _findSuitableBucket(OperationContext* opCtx,
-                                const NamespaceString& bucketNss,
+    void _insertIntoBucketColl(const NamespaceString& ns, const BSONObj& bucketDoc);
+    BSONObj _findSuitableBucket(const NamespaceString& bucketNss,
                                 const TimeseriesOptions& options,
                                 const BSONObj& measurementDoc);
 };
 
-void BucketCatalogHelpersTest::_insertIntoBucketColl(const BSONObj& bucketDoc) {
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IX);
+void BucketCatalogHelpersTest::_insertIntoBucketColl(const NamespaceString& ns,
+                                                     const BSONObj& bucketDoc) {
+    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IX);
     const CollectionPtr& coll = autoColl.getCollection();
     OpDebug* const nullOpDebug = nullptr;
 
     {
-        WriteUnitOfWork wuow(operationContext());
+        WriteUnitOfWork wuow(_opCtx);
         ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(bucketDoc), nullOpDebug));
+            _opCtx, coll, InsertStatement(bucketDoc), nullOpDebug));
         wuow.commit();
     }
 }
 
-BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
-                                                      const NamespaceString& bucketNss,
+BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& bucketNss,
                                                       const TimeseriesOptions& options,
                                                       const BSONObj& measurementDoc) {
     uassert(ErrorCodes::InvalidOptions,
@@ -132,7 +130,7 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
     AggregateCommandRequest aggRequest(bucketNss, aggregationPipeline);
 
     // Run an aggregation to find a suitable bucket to reopen.
-    DBDirectClient client(opCtx);
+    DBDirectClient client(_opCtx);
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
         &client, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
     if (cursor->more()) {
@@ -143,12 +141,7 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {::mongo::fromjson(R"({})"),
@@ -168,12 +161,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {
@@ -200,7 +188,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) {
-    ASSERT_OK(createCollection(operationContext(),
+    ASSERT_OK(createCollection(_opCtx,
                                kNss.dbName(),
                                BSON("create" << kNss.coll() << "timeseries"
                                              << BSON("timeField" << _timeField) << "collation"
@@ -208,7 +196,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
                                                               << "caseFirst"
                                                               << "lower"))));
 
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // Lowercase compares less than uppercase with a {caseFirst: "lower"} collator.
@@ -222,10 +210,11 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
 
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("min"), minmax.min());
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("max"), minmax.max());
+    _addNsToValidate(kNss);
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) {
-    ASSERT_OK(createCollection(operationContext(),
+    ASSERT_OK(createCollection(_opCtx,
                                kNss.dbName(),
                                BSON("create" << kNss.coll() << "timeseries"
                                              << BSON("timeField" << _timeField) << "collation"
@@ -233,7 +222,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
                                                               << "caseFirst"
                                                               << "upper"))));
 
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // Uppercase compares less than lowercase with a {caseFirst: "upper"} collator.
@@ -247,15 +236,11 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
 
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("min"), minmax.min());
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("max"), minmax.max());
+    _addNsToValidate(kNss);
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocumentTest) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: {}}}})"),
@@ -271,12 +256,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocu
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumentTest) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: {}}}})"),
@@ -292,12 +272,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumen
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // First item: Bucket document to generate the schema representation of.
@@ -338,12 +313,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // First item: Bucket document to generate the schema representation of.
@@ -374,13 +344,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries"
-                      << BSON("timeField" << _timeField << "metaField" << _metaField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
 
     auto tsOptions = *autoColl->getTimeseriesOptions();
@@ -388,45 +352,49 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 
     std::vector<BSONObj> bucketDocs = {mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
+            "_id":{"$oid":"61067eb0de4e031499bc4046"},
             "control":{"version":1,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
-                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
+                                   "max":{"_id":3,"time":{"$date":"2021-08-01T11:00:00Z"},"a":3},
                        "closed":false},
             "meta":1,
             "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
                             "1":{"$date":"2021-08-01T11:00:00Z"},
                             "2":{"$date":"2021-08-01T11:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id": {"0":1,"1":2,"2":3}}})"),
                                        mongo::fromjson(
                                            R"(
-            {"_id":{"$oid":"62e7eee4f33f295800073138"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3}},
+            {"_id":{"$oid":"61068cc0de4e031499bc4047"},
+            "control":{"version":1,"min":{"_id":4,"time":{"$date":"2021-08-01T12:00:00Z"},"a":1},
+                                   "max":{"_id":6,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3}},
             "meta":2,
-            "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
-                            "1":{"$date":"2022-08-01T12:00:00Z"},
-                            "2":{"$date":"2022-08-01T12:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+            "data":{"time":{"0":{"$date":"2021-08-01T12:00:00Z"},
+                            "1":{"$date":"2021-08-01T12:00:00Z"},
+                            "2":{"$date":"2021-08-01T12:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id": {"0":4,"1":5,"2":6}
+                    }})"),
                                        mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"61069ad0de4e031499bc404b"},
+            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2021-08-01T13:00:00Z"},"a":1},
+                                   "max":{"_id":9,"time":{"$date":"2021-08-01T13:00:00Z"},"a":3},
                        "closed":false},
             "meta":3,
-            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
-                            "1":{"$date":"2023-08-01T13:00:00Z"},
-                            "2":{"$date":"2023-08-01T13:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})")};
+            "data":{"time":{"0":{"$date":"2021-08-01T13:00:00Z"},
+                            "1":{"$date":"2021-08-01T13:00:00Z"},
+                            "2":{"$date":"2021-08-01T13:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id": {"0":7,"1":8,"2":9}}})")};
 
     // Insert bucket documents into the system.buckets collection.
     for (const auto& doc : bucketDocs) {
-        _insertIntoBucketColl(doc);
+        _insertIntoBucketColl(_ns1, doc);
     }
 
     auto time1 = dateFromISOString("2021-08-01T11:30:00Z");
-    auto time2 = dateFromISOString("2022-08-01T12:30:00Z");
-    auto time3 = dateFromISOString("2023-08-01T13:30:00Z");
+    auto time2 = dateFromISOString("2021-08-01T12:30:00Z");
+    auto time3 = dateFromISOString("2021-08-01T13:30:00Z");
     std::vector<BSONObj> docsWithSuitableBuckets = {
         BSON("_id" << 1 << _timeField << time1.getValue() << _metaField << 1),
         BSON("_id" << 2 << _timeField << time2.getValue() << _metaField << 2),
@@ -436,8 +404,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     // insert into.
     for (size_t i = 0; i < docsWithSuitableBuckets.size(); ++i) {
         const auto& doc = docsWithSuitableBuckets[i];
-        auto result = _findSuitableBucket(
-            operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
+        auto result = _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, doc);
         ASSERT_FALSE(result.isEmpty());
         ASSERT_EQ(bucketDocs[i]["_id"].OID(), result["_id"].OID());
     }
@@ -452,8 +419,8 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 
         for (size_t i = 0; i < docsWithOutMeta.size(); ++i) {
             const auto& doc = docsWithOutMeta[i];
-            auto result = _findSuitableBucket(
-                operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
+            auto result =
+                _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, doc);
             ASSERT(result.isEmpty());
         }
 
@@ -462,18 +429,19 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
         auto metalessDoc = BSON("_id" << 4 << _timeField << time3.getValue());
         auto metalessBucket = mongo::fromjson(
             R"({
-            "_id":{"$oid":"629e1e680958e279dc29a518"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"61069ad0de4e031499bc404c"},
+            "control":{"version":1,"min":{"_id":10,"time":{"$date":"2021-08-01T13:00:00Z"},"a":1},
+                                   "max":{"_id":12,"time":{"$date":"2021-08-01T13:00:00Z"},"a":3},
                        "closed":false},
-            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
-                            "1":{"$date":"2023-08-01T13:00:00Z"},
-                            "2":{"$date":"2023-08-01T13:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})");
-        _insertIntoBucketColl(metalessBucket);
+            "data":{"time":{"0":{"$date":"2021-08-01T13:00:00Z"},
+                            "1":{"$date":"2021-08-01T13:00:00Z"},
+                            "2":{"$date":"2021-08-01T13:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                     "_id": {"0":10,"1":11,"2":12}}})");
+        _insertIntoBucketColl(_ns1, metalessBucket);
 
-        auto result = _findSuitableBucket(
-            operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, metalessDoc);
+        auto result =
+            _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, metalessDoc);
         ASSERT_FALSE(result.isEmpty());
         ASSERT_EQ(metalessBucket["_id"].OID(), result["_id"].OID());
     }
@@ -489,62 +457,56 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     for (const auto& doc : docsWithoutSuitableBuckets) {
         BSONObj measurementMeta =
             (doc.hasField(metaFieldName)) ? doc.getField(metaFieldName).wrap() : BSONObj();
-        auto result = _findSuitableBucket(
-            operationContext(), kNss.makeTimeseriesBucketsNamespace(), tsOptions, doc);
+        auto result = _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, doc);
         ASSERT(result.isEmpty());
     }
 }
 
 TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries"
-                      << BSON("timeField" << _timeField << "metaField" << _metaField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
 
-    std::vector<BSONObj> bucketDocs = {mongo::fromjson(
-                                           R"({
-            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
+    std::vector<BSONObj> bucketDocs = {mongo::fromjson(R"({
+            "_id":{"$oid":"61067eb0de4e031499bc4046"},
             "control":{"version":1,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
-                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
+                                   "max":{"_id":3,"time":{"$date":"2021-08-01T11:00:00Z"},"a":3},
                        "closed":false},
             "meta":1,
             "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
                             "1":{"$date":"2021-08-01T11:00:00Z"},
                             "2":{"$date":"2021-08-01T11:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id":{"0":1,"1":2,"2":3}}})"),
                                        mongo::fromjson(
                                            R"(
-            {"_id":{"$oid":"62e7eee4f33f295800073138"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3}},
+            {"_id":{"$oid":"61068cc0de4e031499bc4047"},
+            "control":{"version":1,"min":{"_id":4,"time":{"$date":"2021-08-01T12:00:00Z"},"a":1},
+                                   "max":{"_id":6,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3}},
             "meta":2,
-            "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
-                            "1":{"$date":"2022-08-01T12:00:00Z"},
-                            "2":{"$date":"2022-08-01T12:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})"),
+            "data":{"time":{"0":{"$date":"2021-08-01T12:00:00Z"},
+                            "1":{"$date":"2021-08-01T12:00:00Z"},
+                            "2":{"$date":"2021-08-01T12:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id":{"0":4,"1":5,"2":6}}})"),
                                        mongo::fromjson(
                                            R"({
-            "_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
-                                   "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
+            "_id":{"$oid":"61069ad0de4e031499bc4048"},
+            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2021-08-01T13:00:00Z"},"a":1},
+                                   "max":{"_id":9,"time":{"$date":"2021-08-01T13:00:00Z"},"a":3},
                        "closed":false},
             "meta":3,
-            "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
-                            "1":{"$date":"2023-08-01T13:00:00Z"},
-                            "2":{"$date":"2023-08-01T13:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})")};
+            "data":{"time":{"0":{"$date":"2021-08-01T13:00:00Z"},
+                            "1":{"$date":"2021-08-01T13:00:00Z"},
+                            "2":{"$date":"2021-08-01T13:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "_id":{"0":7,"1":8,"2":9}}})")};
 
     // Insert bucket documents into the system.buckets collection.
     for (const auto& doc : bucketDocs) {
-        _insertIntoBucketColl(doc);
+        _insertIntoBucketColl(_ns1, doc);
     }
 
-    auto findDocFromOID = [opCtx = operationContext(),
-                           coll = (*autoColl).get()](const OID& bucketId) {
+    auto findDocFromOID = [opCtx = _opCtx, coll = (*autoColl).get()](const OID& bucketId) {
         Snapshotted<BSONObj> bucketObj;
         auto rid = record_id_helpers::keyForOID(bucketId);
         return (coll->findDoc(opCtx, rid, &bucketObj)) ? bucketObj.value() : BSONObj();
@@ -570,41 +532,27 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
 }
 
 TEST_F(BucketCatalogHelpersTest, FindSuitableCompressedBucketForMeasurement) {
-    ASSERT_OK(createCollection(
-        operationContext(),
-        kNss.dbName(),
-        BSON("create" << kNss.coll() << "timeseries"
-                      << BSON("timeField" << _timeField << "metaField" << _metaField))));
-
-    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
-
     auto tsOptions = *autoColl->getTimeseriesOptions();
-
-    // control.version indicates the bucket is compressed.
-    BSONObj bucketDoc = mongo::fromjson(R"({
-            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
-            "control":{"version":2,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
-                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
-                       "closed":false},
-            "meta":1,
-            "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
-                            "1":{"$date":"2021-08-01T11:00:00Z"},
-                            "2":{"$date":"2021-08-01T11:00:00Z"}},
-                    "a":{"0":1,"1":2,"2":3}}})");
+    BSONObj bucketDoc = mongo::fromjson(R"({"_id":{"$oid":"61068cc0de4e031499bc4049"},
+        "control":{"version":2,"min":{"time":{"$date":"2021-08-01T12:00:00Z"},"_id":ObjectId('67f6e10b91f966678d89720b'),"a":1},
+                               "max":{"time":{"$date":"2021-08-01T12:00:00Z"},"_id":ObjectId('67f6e14691f966678d89720f'),"a":3},
+        "count":3},
+        "meta":0,"data":{"time":{"$binary":"CQAAzpUBewEAAIANAAAAAAAAAAA=","$type":"07"},
+        "_id":{"$binary":"BwBn9uELkflmZ42JcguATQAHAPynAQAA","$type":"07"},
+        "a":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
 
     // Insert bucket document into the system.buckets collection.
-    _insertIntoBucketColl(bucketDoc);
+    _insertIntoBucketColl(_ns1, bucketDoc);
 
-    auto time = dateFromISOString("2021-08-01T11:30:00Z");
+    auto time = dateFromISOString("2021-08-01T12:00:00Z");
     BSONObj docWithSuitableBucket =
-        BSON("_id" << 1 << _timeField << time.getValue() << _metaField << 1);
+        BSON("_id" << 1 << _timeField << time.getValue() << _metaField << 0);
 
     // Verify that we can find a suitable bucket to insert into.
-    auto result = _findSuitableBucket(operationContext(),
-                                      kNss.makeTimeseriesBucketsNamespace(),
-                                      tsOptions,
-                                      docWithSuitableBucket);
+    auto result = _findSuitableBucket(
+        _ns1.makeTimeseriesBucketsNamespace(), tsOptions, docWithSuitableBucket);
     ASSERT_FALSE(result.isEmpty());
     ASSERT_EQ(bucketDoc["_id"].OID(), result["_id"].OID());
 }

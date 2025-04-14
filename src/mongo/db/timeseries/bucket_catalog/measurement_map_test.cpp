@@ -39,9 +39,6 @@
 #include "mongo/util/tracking/context.h"
 
 namespace mongo::timeseries::bucket_catalog {
-const std::string testDbName = "db_timeseries_measurement_map_test";
-const TimeseriesOptions kTimeseriesOptions("time");
-
 class MeasurementMapTest : public unittest::Test {
 public:
     MeasurementMapTest() : measurementMap(trackingContext) {}

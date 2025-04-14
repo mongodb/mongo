@@ -36,7 +36,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -58,7 +58,7 @@
 namespace mongo::timeseries::bucket_catalog {
 namespace {
 
-class BucketStateRegistryTest : public GlobalBucketCatalog, public CatalogTestFixture {
+class BucketStateRegistryTest : public GlobalBucketCatalog, public TimeseriesTestFixture {
 public:
     BucketStateRegistryTest() {}
 

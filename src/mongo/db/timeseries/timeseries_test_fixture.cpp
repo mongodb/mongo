@@ -75,7 +75,7 @@ void TimeseriesTestFixture::setUpCollectionsHelper(
 }
 
 void TimeseriesTestFixture::validateCollectionsHelper(
-    const std::vector<NamespaceString>& collections) {
+    const std::set<NamespaceString>& collections) {
     ValidateResults validateResults;
     for (const NamespaceString& nss : collections) {
         ASSERT_OK(CollectionValidation::validate(
@@ -154,7 +154,6 @@ void TimeseriesTestFixture::tearDown() {
     // Validate that all tracked execution stats adds up to what is being tracked globally.
     bucket_catalog::ExecutionStats accumulated;
     for (auto&& execStats : _bucketCatalog->executionStats) {
-
         addCollectionExecutionGauges(accumulated, *execStats.second);
     }
 
@@ -174,13 +173,9 @@ void TimeseriesTestFixture::tearDown() {
     ASSERT_EQ(0, execStatsToBSON(global).woCompare(execStatsToBSON(accumulated)));
 
     // Validate all collections.
-    validateCollectionsHelper(getNamespaceStrings());
+    validateCollectionsHelper(_collections);
 
     CatalogTestFixture::tearDown();
-}
-
-std::vector<NamespaceString> TimeseriesTestFixture::getNamespaceStrings() {
-    return {_ns1, _ns2, _nsNoMeta};
 }
 
 BSONObj TimeseriesTestFixture::_makeTimeseriesOptionsForCreate() const {
@@ -646,6 +641,10 @@ TimeseriesTestFixture::_generateBucketsWithMeasurements(
 uint64_t TimeseriesTestFixture::_getStorageCacheSizeBytes() const {
     return _opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
         1024;
+}
+
+void TimeseriesTestFixture::_addNsToValidate(const NamespaceString& ns) {
+    _collections.insert(ns);
 }
 
 long long TimeseriesTestFixture::_getExecutionStat(const UUID& uuid, StringData stat) {

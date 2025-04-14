@@ -29,12 +29,12 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/unittest/unittest.h"
@@ -42,27 +42,9 @@
 namespace mongo {
 namespace {
 
-class TimeseriesWriteOpsTest : public CatalogTestFixture {
-public:
-    explicit TimeseriesWriteOpsTest(Options options = {})
-        : CatalogTestFixture(options.useReplSettings(true)) {}
-
-protected:
-    void setUp() override {
-        CatalogTestFixture::setUp();
-    }
-};
-
+class TimeseriesWriteOpsTest : public timeseries::TimeseriesTestFixture {};
 
 TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
-    NamespaceString ns =
-        NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "ts");
-    auto opCtx = operationContext();
-    ASSERT_OK(createCollection(
-        opCtx,
-        ns.dbName(),
-        BSON("create" << ns.coll() << "timeseries" << BSON("timeField" << "time"))));
-
     // We're going to insert a compressed bucket and ensure we can successfully decompress it via a
     // transform update using performAtomicTimeseriesWrites.
     const BSONObj bucketDoc = ::mongo::fromjson(
@@ -75,16 +57,17 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
-    auto compressionResult = timeseries::compressBucket(bucketDoc, "time", ns, false);
+    auto compressionResult = timeseries::compressBucket(bucketDoc, "time", _nsNoMeta, false);
     ASSERT_TRUE(compressionResult.compressedBucket.has_value());
     const BSONObj compressedBucket = compressionResult.compressedBucket.value();
 
     // Insert the compressed bucket.
-    AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection bucketsColl(
+        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
-        WriteUnitOfWork wunit{opCtx};
+        WriteUnitOfWork wunit{_opCtx};
         ASSERT_OK(collection_internal::insertDocument(
-            opCtx, *bucketsColl, InsertStatement{compressedBucket}, nullptr));
+            _opCtx, *bucketsColl, InsertStatement{compressedBucket}, nullptr));
         wunit.commit();
     }
 
@@ -97,7 +80,7 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
 
         write_ops::UpdateModification u(std::move(bucketDecompressionFunc));
         write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
-        write_ops::UpdateCommandRequest op(ns.makeTimeseriesBucketsNamespace(), {update});
+        write_ops::UpdateCommandRequest op(_nsNoMeta.makeTimeseriesBucketsNamespace(), {update});
 
         write_ops::WriteCommandRequestBase base;
         base.setBypassDocumentValidation(true);
@@ -106,13 +89,13 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
         op.setWriteCommandRequestBase(std::move(base));
         op.setCollectionUUID(bucketsColl->uuid());
 
-        ASSERT_OK(timeseries::write_ops::internal::performAtomicTimeseriesWrites(opCtx, {}, {op}));
+        ASSERT_OK(timeseries::write_ops::internal::performAtomicTimeseriesWrites(_opCtx, {}, {op}));
     }
 
     // Check the document is actually decompressed on disk.
     {
         auto recordId = record_id_helpers::keyForOID(bucketId);
-        auto retrievedBucket = bucketsColl->docFor(opCtx, recordId);
+        auto retrievedBucket = bucketsColl->docFor(_opCtx, recordId);
 
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(retrievedBucket.value(), bucketDoc));
@@ -121,28 +104,22 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
 
 TEST_F(TimeseriesWriteOpsTest, TimeseriesWritesMismatchedUUID) {
     // Ordered
-    auto opCtx = operationContext();
-    auto ns = NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "ts");
-    ASSERT_OK(createCollection(
-        opCtx,
-        ns.dbName(),
-        BSON("create" << ns.coll() << "timeseries" << BSON("timeField" << "time"))));
-
-    auto insertCommandReq = write_ops::InsertCommandRequest(ns.makeTimeseriesBucketsNamespace());
+    auto insertCommandReq =
+        write_ops::InsertCommandRequest(_nsNoMeta.makeTimeseriesBucketsNamespace());
     insertCommandReq.setCollectionUUID(UUID::gen());
     ASSERT_THROWS_CODE(
         timeseries::write_ops::internal::performAtomicTimeseriesWrites(
-            opCtx, std::vector<write_ops::InsertCommandRequest>{insertCommandReq}, {}),
+            _opCtx, std::vector<write_ops::InsertCommandRequest>{insertCommandReq}, {}),
         DBException,
         9748800);
 
     // Unordered
     auto insertStatements = std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0}")}};
-    auto fixer = write_ops_exec::LastOpFixer(opCtx);
+    auto fixer = write_ops_exec::LastOpFixer(_opCtx);
     write_ops_exec::WriteResult result;
     ASSERT_THROWS_CODE(
-        write_ops_exec::insertBatchAndHandleErrors(opCtx,
-                                                   ns,
+        write_ops_exec::insertBatchAndHandleErrors(_opCtx,
+                                                   _nsNoMeta,
                                                    UUID::gen(),
                                                    false,
                                                    insertStatements,
@@ -154,12 +131,12 @@ TEST_F(TimeseriesWriteOpsTest, TimeseriesWritesMismatchedUUID) {
 
     // Update
     auto updateCommandRequest =
-        write_ops::UpdateCommandRequest(ns.makeTimeseriesBucketsNamespace());
+        write_ops::UpdateCommandRequest(_nsNoMeta.makeTimeseriesBucketsNamespace());
     updateCommandRequest.setUpdates(
         {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification())});
     updateCommandRequest.setCollectionUUID(UUID::gen());
     result = write_ops_exec::performUpdates(
-        opCtx, updateCommandRequest, OperationSource::kTimeseriesInsert);
+        _opCtx, updateCommandRequest, OperationSource::kTimeseriesInsert);
     ASSERT_EQ(1, result.results.size());
     ASSERT_EQ(9748802, result.results[0].getStatus().code());
 }
@@ -175,15 +152,14 @@ TEST_F(TimeseriesWriteOpsTest, TimeseriesWritesMismatchedUUID) {
 // scenarios. This is ticketed out to clarify that these tests are not exhaustive.
 
 TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
-    auto opCtx = operationContext();
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.batch_insert_missing");
     auto insertStatements =
         std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0, foo: 1}")}};
-    auto fixer = write_ops_exec::LastOpFixer(opCtx);
+    auto fixer = write_ops_exec::LastOpFixer(_opCtx);
     write_ops_exec::WriteResult result;
     auto shouldInsertMore =
-        write_ops_exec::insertBatchAndHandleErrors(opCtx,
+        write_ops_exec::insertBatchAndHandleErrors(_opCtx,
                                                    nss,
                                                    boost::none,
                                                    true,
@@ -200,7 +176,7 @@ TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
     insertStatements.push_back(InsertStatement{fromjson("{_id: 2, foo: 3}")});
 
     shouldInsertMore =
-        write_ops_exec::insertBatchAndHandleErrors(opCtx,
+        write_ops_exec::insertBatchAndHandleErrors(_opCtx,
                                                    nss,
                                                    boost::none,
                                                    true,
@@ -214,59 +190,55 @@ TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformInsertsNoCollection) {
-    auto opCtx = operationContext();
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.perform_inserts_no_collection");
     write_ops::InsertCommandRequest request(nss);
     request.setDocuments({fromjson("{_id: 0, foo: 1}")});
     auto source = OperationSource::kTimeseriesInsert;
-    auto writeResult = write_ops_exec::performInserts(opCtx, request, source);
+    auto writeResult = write_ops_exec::performInserts(_opCtx, request, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesUpdatesNoCollection) {
-    auto opCtx = operationContext();
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.perform_timeseries_updates_no_collection");
     write_ops::UpdateCommandRequest request(nss);
     request.setUpdates(
         {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification())});
     auto source = OperationSource::kTimeseriesUpdate;
-    auto writeResult = write_ops_exec::performUpdates(opCtx, request, source);
+    auto writeResult = write_ops_exec::performUpdates(_opCtx, request, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesDeletesNoCollection) {
-    auto opCtx = operationContext();
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.perform_timeseries_deletes_no_collection");
     write_ops::DeleteCommandRequest request(nss);
     request.setDeletes(
         {write_ops::DeleteOpEntry(BSON("_id" << 0), false /* multi */, boost::none)});
     auto source = OperationSource::kTimeseriesDelete;
-    auto writeResult = write_ops_exec::performDeletes(opCtx, request, source);
+    auto writeResult = write_ops_exec::performDeletes(_opCtx, request, source);
     ASSERT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
     ASSERT_EQ(8555700, writeResult.results[0].getStatus().code());
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesWritesNoCollection) {
-    auto opCtx = operationContext();
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.perform_timeseries_writes_no_collection");
     write_ops::InsertCommandRequest request(nss);
     ASSERT_THROWS_CODE(
-        timeseries::write_ops::performTimeseriesWrites(opCtx, request), DBException, 8555700);
+        timeseries::write_ops::performTimeseriesWrites(_opCtx, request), DBException, 8555700);
 
     write_ops::InsertCommandRequest requestUnordered(nss);
     requestUnordered.setOrdered(false);
 
     ASSERT_THROWS_CODE(
-        timeseries::write_ops::performTimeseriesWrites(opCtx, request), DBException, 8555700);
+        timeseries::write_ops::performTimeseriesWrites(_opCtx, request), DBException, 8555700);
 }
 
 }  // namespace

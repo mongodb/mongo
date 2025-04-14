@@ -56,8 +56,6 @@ protected:
     void setUp() override;
     void tearDown() override;
 
-    virtual std::vector<NamespaceString> getNamespaceStrings();
-
     virtual BSONObj _makeTimeseriesOptionsForCreate() const;
 
     virtual BSONObj _makeTimeseriesOptionsForCreateNoMetaField() const;
@@ -66,7 +64,7 @@ protected:
         std::initializer_list<std::pair<NamespaceString*, UUID*>> collectionMetadata,
         std::function<BSONObj()> makeTimeseriesOptionsForCreateFn);
 
-    virtual void validateCollectionsHelper(const std::vector<NamespaceString>& collections);
+    virtual void validateCollectionsHelper(const std::set<NamespaceString>& collections);
 
     void _assertCollWithMetaField(const NamespaceString& ns,
                                   std::vector<BSONObj> batchOfMeasurements) const;
@@ -219,6 +217,13 @@ protected:
         NamespaceString::createNamespaceString_forTest("timeseries_test_fixture_1", "t_2");
     NamespaceString _nsNoMeta = NamespaceString::createNamespaceString_forTest(
         "timeseries_test_fixture_no_meta_field_1", "t_1");
+
+    std::set<NamespaceString> _collections = {_ns1, _ns2, _nsNoMeta};
+
+    // Helper function to add a collection ns to be validated in TimeseriesTestFixture::tearDown().
+    // Used when _ns1, _ns2, or _nsNoMeta shouldn't be used due to using different collection
+    // configurations.
+    void _addNsToValidate(const NamespaceString& ns);
 
     UUID _uuid1 = UUID::gen();
     UUID _uuid2 = UUID::gen();

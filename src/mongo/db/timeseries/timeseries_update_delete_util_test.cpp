@@ -35,8 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -44,13 +43,8 @@
 namespace mongo {
 namespace {
 
-class TimeseriesUpdateDeleteUtilTest : public ServiceContextMongoDTest {
+class TimeseriesUpdateDeleteUtilTest : public timeseries::TimeseriesTestFixture {
 protected:
-    void setUp() override {
-        ServiceContextMongoDTest::setUp();
-        _opCtx = cc().makeOperationContext();
-    }
-
     BSONObj _toBSON(const char* obj) const {
         return fromjson(fmt::format(fmt::runtime(obj), _metaField));
     }
@@ -103,11 +97,6 @@ protected:
     void _testTranslateUpdate(const char* update) const {
         _testTranslate(update, [this](const BSONObj& update) { return _translateUpdate(update); });
     }
-
-    ServiceContext::UniqueOperationContext _opCtx;
-    StringData _metaField = "tag";
-    NamespaceString _ns = NamespaceString::createNamespaceString_forTest(
-        "timeseries_update_delete_util_test", "system.buckets.t");
 };
 
 TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQueryEmpty) {
