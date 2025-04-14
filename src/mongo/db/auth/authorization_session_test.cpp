@@ -375,7 +375,8 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
 void AuthorizationSessionTest::testInvalidateUser() {
     const std::shared_ptr<transport::Session> session =
         transport::MockSession::create(&transportLayer);
-    const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+    auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+    sslPeerInfo = std::make_shared<SSLPeerInfo>();
 
     std::unique_ptr<UserRequest> userRequest = std::move(
         UserRequestX509::makeUserRequestX509(kSpencerTest, boost::none, sslPeerInfo).getValue());

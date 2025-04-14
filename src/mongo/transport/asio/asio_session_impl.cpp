@@ -421,7 +421,11 @@ Future<void> CommonAsioSession::handshakeSSLForEgress(const HostAndPort& target,
         return getSSLManager()
             ->parseAndValidatePeerCertificate(
                 _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target, reactor)
-            .then([this](SSLPeerInfo info) { SSLPeerInfo::forSession(shared_from_this()) = info; });
+            .then([this](SSLPeerInfo info) {
+                auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
+                tassert(10355701, "SSLPeerInfo is not empty during egress handshake", !sslPeerInfo);
+                sslPeerInfo = std::make_shared<SSLPeerInfo>(info);
+            });
     });
 }
 #endif
@@ -838,12 +842,17 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
             }
             totalIngressTLSConnections.increment(1);
             totalIngressTLSHandshakeTimeMillis.increment(handshakeDurationMillis);
-            if (SSLPeerInfo::forSession(shared_from_this()).subjectName().empty()) {
+            auto sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
+            if (!sslPeerInfo) {
                 return getSSLManager()
                     ->parseAndValidatePeerCertificate(
                         _sslSocket->native_handle(), _sslSocket->get_sni(), "", _remote, nullptr)
-                    .then([this](SSLPeerInfo info) -> bool {
-                        SSLPeerInfo::forSession(shared_from_this()) = info;
+                    .then([shared_this = shared_from_this()](SSLPeerInfo info) -> bool {
+                        auto& sslPeerInfo = SSLPeerInfo::forSession(shared_this);
+                        tassert(10355700,
+                                "SSLPeerInfo is not empty during ingress handshake",
+                                !sslPeerInfo);
+                        sslPeerInfo = std::make_shared<SSLPeerInfo>(info);
                         return true;
                     });
             }

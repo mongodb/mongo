@@ -190,7 +190,8 @@ public:
     }
 
     boost::optional<std::string> getSniNameForSession() const {
-        return _session ? SSLPeerInfo::forSession(_session).sniName() : boost::none;
+        auto sslPeerInfo = _session ? SSLPeerInfo::forSession(_session) : nullptr;
+        return sslPeerInfo ? sslPeerInfo->sniName() : boost::none;
     }
 
     std::shared_ptr<transport::Session> session() && {

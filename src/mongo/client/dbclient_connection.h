@@ -118,8 +118,6 @@ public:
     const SSLConfiguration* getSSLConfiguration() override;
 
     bool isUsingTransientSSLParams() const override;
-
-    bool isTLS() override;
 #endif
 
 protected:
