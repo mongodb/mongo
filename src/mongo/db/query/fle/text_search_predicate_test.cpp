@@ -150,6 +150,16 @@ std::unique_ptr<Expression> makeEncStrContainsAggExpr(ExpressionContext* const e
         expCtx, std::move(fieldpath), std::move(textExpr));
 }
 
+std::unique_ptr<Expression> makeEncStrNormalizedEqAggExpr(ExpressionContext* const expCtx,
+                                                          StringData path,
+                                                          Value value) {
+    auto fieldpath = ExpressionFieldPath::createPathFromString(
+        expCtx, path.toString(), expCtx->variablesParseState);
+    auto textExpr = make_intrusive<ExpressionConstant>(expCtx, value);
+    return std::make_unique<ExpressionEncStrNormalizedEq>(
+        expCtx, std::move(fieldpath), std::move(textExpr));
+}
+
 TEST_F(TextSearchPredicateRewriteTest, Enc_Starts_With_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
         makeEncStrStartsWithAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
@@ -270,6 +280,46 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Contains_Expr) {
         actualBson);
 }
 
+TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_NoFFP_Expr) {
+    std::unique_ptr<Expression> input =
+        makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+    ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
+}
+
+TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_Expr) {
+    std::unique_ptr<Expression> input =
+        makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+    std::vector<PrfBlock> tags = {{1}, {2}};
+
+    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+
+    auto actual = _predicate.rewrite(input.get());
+    auto actualBson = actual->serialize().getDocument().toBson();
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$or": [
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                },
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                }
+            ]
+        })",
+        actualBson);
+}
+
 class TextSearchPredicateCollScanRewriteTest : public EncryptedPredicateRewriteTest {
 public:
     TextSearchPredicateCollScanRewriteTest() : _predicate(&_mock) {
@@ -323,6 +373,26 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Ends_With_Expr) {
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Contains_Expr) {
     std::unique_ptr<Expression> input =
         makeEncStrContainsAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+
+    // Serialize the expression before any rewrites occur to validate later.
+    auto expressionPreRewrite = input->serialize().getDocument().toBson();
+
+    std::vector<PrfBlock> tags = {{1}, {2}};
+    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+
+    auto result = _predicate.rewrite(input.get());
+
+    // Since we don't rewrite the expression when we force a collection scan, the result will be
+    // null.
+    ASSERT(!result);
+
+    // Make sure the original expression hasn't changed.
+    ASSERT_BSONOBJ_EQ(input->serialize().getDocument().toBson(), expressionPreRewrite);
+}
+
+TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_NormalizedEq_Expr) {
+    std::unique_ptr<Expression> input =
+        makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();

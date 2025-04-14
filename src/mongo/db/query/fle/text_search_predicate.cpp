@@ -46,6 +46,9 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrEndsWith,
 REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrContains,
                                                    TextSearchPredicate,
                                                    gFeatureFlagQETextSearchPreview);
+REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrNormalizedEq,
+                                                   TextSearchPredicate,
+                                                   gFeatureFlagQETextSearchPreview);
 
 std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload) const {
     // TODO SERVER-101128: Update to generate the correct tags.
