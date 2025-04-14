@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/server-catalog-and-routing
   - "deferred_writer*":
     approvers:
       - 10gen/server-dbcheck
@@ -12,12 +12,6 @@ filters:
   - "flow_control_ticketholder*":
     approvers:
       - 10gen/server-workload-scheduling
-  - "lock*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "replication_state_transition_lock_guard*":
     approvers:
       - 10gen/server-replication
-  - "resource_catalog*":
-    approvers:
-      - 10gen/server-catalog-and-routing
