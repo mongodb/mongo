@@ -235,6 +235,17 @@ class BinaryOpPrinter(FixedArityNodePrinter):
         return "BinaryOp[{}]".format(strip_namespace(self.val["_op"]))
 
 
+class NaryOpPrinter(DynamicArityNodePrinter):
+    """Pretty-printer for NaryOp."""
+
+    def __init__(self, val):
+        """Initialize NaryOpPrinter."""
+        super().__init__(val, 0, "NaryOp")
+
+    def to_string(self):
+        return "NaryOp[{}]".format(strip_namespace(self.val["_op"]))
+
+
 class BlackholePrinter(FixedArityNodePrinter):
     """Pretty-printer for Blackhole."""
 
@@ -257,6 +268,14 @@ class LetPrinter(FixedArityNodePrinter):
     def __init__(self, val):
         """Initialize LetPrinter."""
         super().__init__(val, 2, "Let")
+
+
+class MultiLetPrinter(DynamicArityNodePrinter):
+    """Pretty-printer for MultiLet."""
+
+    def __init__(self, val):
+        """Initialize MultiLetPrinter."""
+        super().__init__(val, 0, "MultiLet")
 
 
 class LambdaAbstractionPrinter(FixedArityNodePrinter):
@@ -284,6 +303,14 @@ class SourcePrinter(FixedArityNodePrinter):
     def __init__(self, val):
         """Initialize SourcePrinter."""
         super().__init__(val, 0, "Source")
+
+
+class SwitchPrinter(DynamicArityNodePrinter):
+    """Pretty-printer for Switch."""
+
+    def __init__(self, val):
+        """Initialize SwitchPrinter."""
+        super().__init__(val, 0, "Switch")
 
 
 class ReferencesPrinter(DynamicArityNodePrinter):
@@ -376,12 +403,15 @@ def register_optimizer_printers(pp):
         "Variable",
         "UnaryOp",
         "BinaryOp",
+        "NaryOp",
         "If",
         "Let",
+        "MultiLet",
         "LambdaAbstraction",
         "LambdaApplication",
         "FunctionCall",
         "Source",
+        "Switch",
         "References",
         "ExpressionBinder",
     ]
