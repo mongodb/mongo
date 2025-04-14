@@ -1,8 +1,6 @@
 /**
  * Wrapper around ReplSetTest to test dbCheck with old format unique index keys
  */
-import "jstests/multiVersion/libs/multi_rs.js";
-import "jstests/multiVersion/libs/verify_versions.js";
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -19,47 +17,14 @@ function loadDummyData() {
     return testData;
 }
 
-// TODO (SERVER-66611): Automatically modify this list.
-const upgradeVersions = {
-    "3.6": {"fcv": "4.0", "nextVersion": "4.0"},
-    "4.0": {"fcv": "4.2", "nextVersion": "4.2"},
-    "4.2": {"fcv": "4.4", "nextVersion": "4.4"},
-    "4.4": {"fcv": "5.0", "nextVersion": "5.0"},
-    "5.0": {"fcv": "6.0", "nextVersion": "6.0"},
-    "6.0": {"fcv": "7.0", "nextVersion": "7.0"},
-    "7.0": {"fcv": "8.0", "nextVersion": "8.0"},
-    // Always use latestFCV when upgrading from lastLTS so we future-proof against
-    // lastContinuous releases and don't have to change this fcv value each time.
-    "8.0": {"fcv": latestFCV, "nextVersion": "latest"},
-    // TODO (SERVER-66611): Automate modifying this list.
-    "latest": {}
-};
-
 export class DbCheckOldFormatKeysTest {
     constructor({
         name = "DbCheckOldFormatKeysTest",
-        binVersion = "4.2",
-        initiateWithHighElectionTimeout = true,
     }) {
-        assert(binVersion in upgradeVersions);
-        function performSetUp() {
-            const nodes = {
-                n1: {binVersion},
-                n2: {binVersion},
-                n3: {binVersion},
-            };
-            const rst = new ReplSetTest({name, nodes});
-            rst.startSet();
-            if (initiateWithHighElectionTimeout) {
-                rst.initiate();
-            } else {
-                rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
-            }
-            return rst;
-        }
-
-        this._rst = performSetUp();
-        this._binVersion = binVersion;
+        const rst = new ReplSetTest({name, nodes: 3});
+        rst.startSet();
+        rst.initiate();
+        this._rst = rst;
     }
 
     getRst() {
@@ -78,6 +43,14 @@ export class DbCheckOldFormatKeysTest {
         jsTestLog("Creating indexes on: " + tojson(indexSpecs));
         const primary = this.getRst().getPrimary();
         const db = primary.getDB(dbName);
+
+        let fps = [];
+
+        for (let n of this.getRst().nodes) {
+            fps.push(configureFailPoint(n, "WTIndexCreateUniqueIndexesInOldFormat"));
+            fps.push(configureFailPoint(n, "WTIndexInsertUniqueKeysInOldFormat"));
+        }
+
         for (const indexSpec of indexSpecs) {
             assert.commandWorked(db.getCollection(collName).createIndex(indexSpec, {unique: true}));
         }
@@ -88,6 +61,18 @@ export class DbCheckOldFormatKeysTest {
         this.getRst().awaitReplication();
         assert.eq(db.getCollection(collName).find({}).count(), data.length);
         jsTestLog(`Inserted with w: majority, opTime ${tojson(res.operationTime)}`);
+
+        for (let fp of fps) {
+            fp.off();
+        }
+
+        forEachNonArbiterNode(this.getRst(), function(node) {
+            assert.commandWorked(node.adminCommand({
+                setParameter: 1,
+                logComponentVerbosity: {command: 3},
+                dbCheckHealthLogEveryNBatches: 1
+            }));
+        });
     }
 
     /**
@@ -98,22 +83,7 @@ export class DbCheckOldFormatKeysTest {
                               collName,
                               indexSpecs = [{a: 1}, {b: -1}],
                               data = loadDummyData()) {
-        const primary = this.getPrimary();
-        if (this._binVersion === "4.2") {
-            // Downgrade FCV down to 4.0 so that insertion into a unique index uses the old
-            // keystring format.
-            assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-            this._rst.awaitReplication();
-        }
-
         this.insertIndexAndData(dbName, collName, indexSpecs, data);
-
-        if (this._binVersion === "4.2") {
-            // Reupgrade FCV to 4.2 if it was downgraded.
-            assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
-            this.getRst().awaitReplication();
-            this.getRst().awaitLastOpCommitted();
-        }
     }
 
     /**
@@ -173,8 +143,7 @@ export class DbCheckOldFormatKeysTest {
 
         if (failpointName == "skipUnindexingDocumentWhenDeleted") {
             // Call delete on the docs. Deletes all documents if no filter is specified. Any nodes
-            // that
-            // haven't set the failpoints will simply delete all documents.
+            // that haven't set the failpoints will simply delete all documents.
 
             assert.commandWorked(coll.deleteMany(docFilter));
 
@@ -213,57 +182,6 @@ export class DbCheckOldFormatKeysTest {
 
     createExtraKeysRecordNotFoundOnAllNodes(dbName, collName, docFilter = {}) {
         this.createExtraKeysRecordNotFound(this.getRst().nodes, dbName, collName, docFilter);
-    }
-
-    /**
-     * Upgrades the replica set all the way to latest.
-     */
-    upgradeRst() {
-        assert(this._binVersion in upgradeVersions);
-        while (this._binVersion != "latest") {
-            const {fcv, nextVersion} = upgradeVersions[this._binVersion];
-            jsTestLog("Upgrading to version: " + nextVersion);
-
-            const rst = this.getRst();
-            rst.upgradeSet({binVersion: nextVersion});
-
-            if (fcv) {
-                jsTestLog("Upgrading fcv: " + fcv);
-                const primary = rst.getPrimary();
-                const res = primary.adminCommand({"setFeatureCompatibilityVersion": fcv});
-                if (!res.ok && res.code === 7369100) {
-                    // We failed due to requiring 'confirm: true' on the command. This will only
-                    // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
-                    // setFCV command with 'confirm: true'.
-                    assert.commandWorked(primary.adminCommand(
-                        {"setFeatureCompatibilityVersion": fcv, confirm: true}));
-                } else {
-                    assert.commandWorked(res);
-                }
-                rst.awaitReplication();
-                // We need to ensure that the FCV is committed to the oplog before we shut down.
-                // Otherwise the nodes may start up post-upgrade and check FCV before reconstructing
-                // the journal, which will raise an invalid version error because they will see the
-                // old FCV.
-                rst.awaitLastOpCommitted();
-
-                this._fcv = fcv;
-            }
-            this._binVersion = nextVersion;
-        }
-        // Verify that we have upgraded to latest.
-        assert.eq("latest", this._binVersion);
-        const fcvDoc = this.getRst().getPrimary().adminCommand(
-            {getParameter: 1, featureCompatibilityVersion: 1});
-        assert.eq(this._fcv, fcvDoc.featureCompatibilityVersion.version);
-
-        forEachNonArbiterNode(this.getRst(), function(node) {
-            assert.commandWorked(node.adminCommand({
-                setParameter: 1,
-                logComponentVerbosity: {command: 3},
-                dbCheckHealthLogEveryNBatches: 1
-            }));
-        });
     }
 
     stop() {

@@ -10,7 +10,7 @@
 import {
     DbCheckOldFormatKeysTest,
     defaultNumDocs
-} from "jstests/multiVersion/libs/dbcheck_old_format_keys_test.js";
+} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
 import {
     assertCompleteCoverage,
     checkHealthLog,
@@ -30,7 +30,6 @@ const collName = "oldFormatIndexKeyTestColl";
 
 const dbCheckTest = new DbCheckOldFormatKeysTest({});
 dbCheckTest.insertOldFormatKeyStrings(dbName, collName);
-dbCheckTest.upgradeRst();
 dbCheckTest.createExtraKeysRecordDoesNotMatchOnPrimary(dbName, collName);
 
 const rst = dbCheckTest.getRst();

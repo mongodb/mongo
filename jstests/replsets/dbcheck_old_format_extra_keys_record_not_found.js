@@ -1,5 +1,5 @@
 /**
- * Tests dbCheck with old format index keys and verifies extra index keys with record does not match
+ * Tests dbCheck with old format index keys and verifies extra index keys with record not found
  * error are checked.
  *
  * @tags: [
@@ -10,7 +10,7 @@
 import {
     DbCheckOldFormatKeysTest,
     defaultNumDocs
-} from "jstests/multiVersion/libs/dbcheck_old_format_keys_test.js";
+} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
 import {
     assertCompleteCoverage,
     checkHealthLog,
@@ -18,7 +18,7 @@ import {
     logQueries,
     resetSnapshotSize,
     runDbCheck,
-    setSnapshotSize,
+    setSnapshotSize
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 // Skipping data consistency checks because data is inserted into primary and secondary separately.
@@ -30,19 +30,18 @@ const collName = "oldFormatIndexKeyTestColl";
 
 const dbCheckTest = new DbCheckOldFormatKeysTest({});
 dbCheckTest.insertOldFormatKeyStrings(dbName, collName);
-dbCheckTest.upgradeRst();
-dbCheckTest.createExtraKeysRecordDoesNotMatchOnAllNodes(dbName, collName);
+dbCheckTest.createExtraKeysRecordNotFoundOnAllNodes(dbName, collName);
 
 const rst = dbCheckTest.getRst();
 const primary = dbCheckTest.getPrimary();
 
 forEachNonArbiterSecondary(rst, function(node) {
-    assert.eq(node.getDB(dbName).getCollection(collName).find({}).count(), defaultNumDocs);
+    assert.eq(node.getDB(dbName).getCollection(collName).find({}).count(), 0);
 });
 
 // Check that batching and snapshotting works properly.
 const batchSize = 3;
-const snapshotSize = 3;
+const snapshotSize = 4;
 setSnapshotSize(rst, snapshotSize);
 
 jsTestLog("Running dbCheck extraIndexKeysCheck");
@@ -52,12 +51,11 @@ runDbCheck(rst,
            {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxDocsPerBatch: batchSize},
            true /*awaitCompletion*/);
 
-// Check for record does not match on primary.
+// Check for record not found on primary.
 const numBatches = Math.ceil(defaultNumDocs / batchSize);
 const primaryHealthLog = primary.getDB("local").system.healthlog;
-checkHealthLog(primaryHealthLog, logQueries.recordDoesNotMatchQuery, defaultNumDocs);
+checkHealthLog(primaryHealthLog, logQueries.recordNotFoundQuery, defaultNumDocs);
 checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, defaultNumDocs);
-
 checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, numBatches);
 assertCompleteCoverage(primaryHealthLog,
                        defaultNumDocs,
@@ -66,8 +64,7 @@ assertCompleteCoverage(primaryHealthLog,
                        null /* start */,
                        null /* end */);
 
-// Verify that no error or warning health log entries were logged on
-// secondary.
+// Verify that no error or warning health log entries were logged on secondary.
 forEachNonArbiterSecondary(rst, function(node) {
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.infoBatchQuery, numBatches);
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, 0);
