@@ -206,6 +206,10 @@ public:
         return _serverAddress;
     }
 
+    std::string getLocalAddress() const override {
+        return _session->local().toString();
+    }
+
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
     Status recv(Message& m, int lastRequestId) override;
 

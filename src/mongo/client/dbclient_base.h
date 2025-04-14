@@ -103,6 +103,8 @@ public:
 
     virtual std::string getServerAddress() const = 0;
 
+    virtual std::string getLocalAddress() const = 0;
+
     /**
      * Reconnect if needed and allowed.
      */

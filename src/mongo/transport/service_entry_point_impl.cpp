@@ -89,16 +89,26 @@ struct ClientSummary {
     explicit ClientSummary(const Client* c)
         : uuid(c->getUUID()),
           remote(c->session()->remote()),
+          sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
           isLoadBalanced(c->session()->isLoadBalancerPeer()) {}
 
-    friend auto logAttrs(const ClientSummary& m) {
-        return logv2::multipleAttrs(
-            "remote"_attr = m.remote, "uuid"_attr = m.uuid, "connectionId"_attr = m.id);
+    friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
+        logv2::DynamicAttributes attrs;
+        attrs.add("remote", m.remote);
+        attrs.add("isLoadBalanced", m.isLoadBalanced);
+        if (m.isLoadBalanced) {
+            attrs.add("sourceClient", m.sourceClient);
+        }
+        attrs.add("uuid", m.uuid);
+        attrs.add("connectionId", m.id);
+
+        return attrs;
     }
 
     UUID uuid;
     HostAndPort remote;
+    HostAndPort sourceClient;
     transport::SessionId id;
     bool isLoadBalanced;
 };
@@ -333,10 +343,9 @@ void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> ses
         workflow = transport::SessionWorkflow::make(std::move(client));
         auto iter = sync.insert(workflow);
         if (!quiet()) {
-            LOGV2(22943,
-                  "Connection accepted",
-                  logAttrs(iter->second.summary),
-                  "connectionCount"_attr = sync.size());
+            logv2::DynamicAttributes attrs = logAttrs(iter->second.summary);
+            attrs.add("connectionCount", sync.size());
+            LOGV2(22943, "Connection accepted", attrs);
         }
     }
 
@@ -354,8 +363,10 @@ void ServiceEntryPointImpl::onClientDisconnect(Client* client) {
     auto iter = sync.find(client);
     auto summary = iter->second.summary;
     sync.erase(iter);
+    logv2::DynamicAttributes attrs = logAttrs(summary);
+    attrs.add("connectionCount", sync.size());
     if (!quiet()) {
-        LOGV2(22944, "Connection ended", logAttrs(summary), "connectionCount"_attr = sync.size());
+        LOGV2(22944, "Connection ended", attrs);
     }
 }
 

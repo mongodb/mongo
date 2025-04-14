@@ -95,6 +95,10 @@ std::string DBDirectClient::getServerAddress() const {
     return "localhost";  // TODO: should this have the port?
 }
 
+std::string DBDirectClient::getLocalAddress() const {
+    MONGO_UNIMPLEMENTED;
+}
+
 // Returned version should match the incoming connections restrictions.
 int DBDirectClient::getMinWireVersion() {
     return WireSpec::instance().get()->incomingExternalClient.minWireVersion;

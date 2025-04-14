@@ -175,6 +175,7 @@ public:
     }
 
     std::string getServerAddress() const override;
+    std::string getLocalAddress() const override;
 
     ConnectionString::ConnectionType type() const override {
         return ConnectionString::ConnectionType::kReplicaSet;

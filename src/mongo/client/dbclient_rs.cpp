@@ -135,6 +135,10 @@ string DBClientReplicaSet::getServerAddress() const {
     return _rsm->getServerAddress();
 }
 
+string DBClientReplicaSet::getLocalAddress() const {
+    MONGO_UNIMPLEMENTED;
+}
+
 HostAndPort DBClientReplicaSet::getSuspectedPrimaryHostAndPort() const {
     if (!_primary) {
         return HostAndPort();

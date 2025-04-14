@@ -84,6 +84,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_setOIDCIdPAuthCallback, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_refreshAccessToken, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getShellPort, MongoExternalInfo),
     JS_FS_END,
 };
 
@@ -722,6 +723,12 @@ void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallA
     ReplicaSetMonitorManager::get()->removeMonitor(rsName);
 
     args.rval().setUndefined();
+}
+
+void MongoBase::Functions::getShellPort::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+    HostAndPort hostAndPort{conn->getLocalAddress()};
+    args.rval().setInt32(hostAndPort.port());
 }
 
 }  // namespace mozjs
