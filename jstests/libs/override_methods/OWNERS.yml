@@ -23,6 +23,7 @@ filters:
       - 10gen/query-integration-timeseries
   - "query_shape_hash_stability.js":
     approvers:
+      - 10gen/query-execution-query-settings
       - 10gen/query-integration-observability
   - "rerun_queries.js":
     approvers:

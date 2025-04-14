@@ -727,7 +727,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicitly_wrap_pipelines_in_facets.js @10gen/query-execution-aggregation @svc-auto-approve-bot
 /jstests/libs/override_methods/**/*bulk_write.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicit_timeseries_collections.js @10gen/query-integration-timeseries @svc-auto-approve-bot
-/jstests/libs/override_methods/**/query_shape_hash_stability.js @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/libs/override_methods/**/query_shape_hash_stability.js @10gen/query-execution-query-settings @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/override_methods/**/rerun_queries.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/override_methods/**/set_api* @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/override_methods/**/send_command_to_initial_sync_node* @10gen/server-initial-sync @svc-auto-approve-bot
