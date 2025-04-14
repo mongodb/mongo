@@ -25,11 +25,6 @@ export class WorkloadSwitch extends PipelineWorkload {
      * $switch with many branches. We explicitly generate conditions that
      * are false in order to cause all branches to be attempted.
      */
-    scale() {
-        // SERVER-96119 SBE: Stack overflow with many conditions to a $match, index
-        return Math.min(1000, super.scale());
-    }
-
     pipeline() {
         let branches = [];
 

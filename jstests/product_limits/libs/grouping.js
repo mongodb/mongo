@@ -58,10 +58,6 @@ export class WorkloadManyAccumulatorsManyFields extends PipelineWorkload {
 
 export class WorkloadBucketManyBoundaries extends PipelineWorkload {
     /** Many boundaries in a single $bucket stage */
-    scale() {
-        // SERVER-95977 Stack overflow with many boundaries in $bucket
-        return Math.min(1000, super.scale());
-    }
     pipeline() {
         let boundaries = range(this.scale() + 1);
         return [{
