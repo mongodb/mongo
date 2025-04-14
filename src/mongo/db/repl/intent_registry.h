@@ -139,7 +139,7 @@ private:
 
     bool _validIntent(Intent intent) const;
     bool _killOperationsByIntent(Intent intent);
-    bool _waitForDrain(Intent intent);
+    bool _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
     static std::string _intentToString(Intent intent);
 
     bool _enabled = true;

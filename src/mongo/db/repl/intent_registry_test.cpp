@@ -33,6 +33,8 @@
 
 namespace mongo {
 using namespace rss::consensus;
+using namespace std::chrono_literals;
+
 // Helper function for performing a function f for each intent type, for numIterations.
 auto executePerIntent = [](const std::function<void(IntentRegistry::Intent)>& f,
                            const size_t numIterations = 1) {
@@ -154,6 +156,94 @@ DEATH_TEST_F(IntentRegistryTest, KillConflictingOperationsDrainTimeout, "9795401
     auto kill =
         _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::Shutdown);
     kill.get();
+}
+
+DEATH_TEST_F(IntentRegistryTest, KillConflictingOperationsDrainSingleTimerTimeout, "9795401") {
+    // This test checks that killConflictingOperations correctly fasserts when there is an interrupt
+    // and it takes each intent to be deregistered less than a timeout period,
+    // but total time it takes all three types of intents to deregister excceeds that period
+    _intentRegistry.enable();
+    _intentRegistry.setDrainTimeout(2);
+    auto serviceContext = getServiceContext();
+    size_t client_i = 0;
+
+    std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
+        contexts;
+    std::vector<std::unique_ptr<IntentGuard>> guards;
+
+    // Create and register 10 IntentGuards of each Intent type.
+    auto createIntentGuards = [&](IntentRegistry::Intent intent) {
+        contexts.emplace_back();
+        contexts.back().first =
+            serviceContext->getService()->makeClient(std::to_string(client_i++));
+        contexts.back().second = contexts.back().first->makeOperationContext();
+        auto opCtx = contexts.back().second.get();
+        guards.emplace_back(std::make_unique<IntentGuard>(intent, opCtx));
+        ASSERT_TRUE(guards.back()->intent() != boost::none);
+    };
+    executePerIntent(createIntentGuards, 1);
+    // guards = {Write, LocalWrite, Read}
+    // kill order: Write, Read, LocalWrite
+
+    // killConflictingOperations will timeout if there is an existing kill and the intents are not
+    // deregistered within the drain timeout.
+    auto kill =
+        _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::Shutdown);
+    // total deregister time 2.1s > 2s
+    std::this_thread::sleep_for(1s);
+    // Deregister Write
+    guards[0].reset();
+    std::this_thread::sleep_for(0.8s);
+    // Deregister Read
+    guards[2].reset();
+    std::this_thread::sleep_for(0.3s);
+    // Deregister LocalWrite
+    guards[1].reset();
+    kill.get();
+}
+
+TEST_F(IntentRegistryTest, KillConflictingOperationsDrainSingleTimerNoTimeout) {
+    // This test checks that killConflictingOperations correctly fasserts when there is an interrupt
+    // and the total time it takes all three types of intents to deregister is within the timeout
+    // period
+    _intentRegistry.enable();
+    _intentRegistry.setDrainTimeout(2);
+    auto serviceContext = getServiceContext();
+    size_t client_i = 0;
+
+    std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
+        contexts;
+    std::vector<std::unique_ptr<IntentGuard>> guards;
+
+    // Create and register 10 IntentGuards of each Intent type.
+    auto createIntentGuards = [&](IntentRegistry::Intent intent) {
+        contexts.emplace_back();
+        contexts.back().first =
+            serviceContext->getService()->makeClient(std::to_string(client_i++));
+        contexts.back().second = contexts.back().first->makeOperationContext();
+        auto opCtx = contexts.back().second.get();
+        guards.emplace_back(std::make_unique<IntentGuard>(intent, opCtx));
+        ASSERT_TRUE(guards.back()->intent() != boost::none);
+    };
+    executePerIntent(createIntentGuards, 1);
+    // guards = {Write, LocalWrite, Read}
+    // kill order: Write, Read, LocalWrite
+
+    // killConflictingOperations will timeout if there is an existing kill and the intents are not
+    // deregistered within the drain timeout.
+    auto kill =
+        _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::Shutdown);
+    // total deregister time: 1.5s < 2.s
+    std::this_thread::sleep_for(0.5s);
+    // Deregister Write
+    guards[0].reset();
+    std::this_thread::sleep_for(0.5s);
+    // Deregister Read
+    guards[2].reset();
+    std::this_thread::sleep_for(0.5s);
+    // Deregister LocalWrite
+    guards[1].reset();
+    ASSERT_TRUE(kill.get());
 }
 
 DEATH_TEST_F(IntentRegistryTest, KillConflictingOperationsOngoingKillTimeout, "9945002") {

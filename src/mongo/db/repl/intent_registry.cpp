@@ -152,8 +152,14 @@ stdx::future<bool> IntentRegistry::killConflictingOperations(
             for (auto intent : *intents) {
                 result &= _killOperationsByIntent(intent);
             }
+            Timer timer;
+            auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(_drainTimeoutSec);
             for (auto intent : *intents) {
-                result &= _waitForDrain(intent);
+                result &= _waitForDrain(intent, timeout);
+                // Negative duration to cv::wait_for can cause undefined behavior
+                timeout -= std::min(
+                    std::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
+                    timeout);
             }
         }
         return result;
@@ -210,11 +216,11 @@ bool IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent) {
     return true;
 }
 
-bool IntentRegistry::_waitForDrain(IntentRegistry::Intent intent) {
+bool IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
+                                   std::chrono::milliseconds timeout) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
     stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
-    if (!tokenMap.cv.wait_for(
-            lock, _drainTimeoutSec, [&tokenMap] { return tokenMap.map.empty(); })) {
+    if (!tokenMap.cv.wait_for(lock, timeout, [&tokenMap] { return tokenMap.map.empty(); })) {
         // TODO SERVER-103389: Use one timer for all draining operations in intent registry.
         LOGV2(
             9795403, "There are still registered intents", "Intent"_attr = _intentToString(intent));
