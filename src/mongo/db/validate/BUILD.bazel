@@ -122,6 +122,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "mongo_unittest_first_group",
+        "server-rss-sydney-smoke",
     ],
     deps = [
         ":collection_validation",

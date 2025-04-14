@@ -2228,7 +2228,6 @@ mongo_cc_unit_test(
     srcs = [
         "abstract_async_component_test.cpp",
         "apply_ops_test.cpp",
-        "dbcheck_test.cpp",
         "delayable_timeout_callback_test.cpp",
         "get_next_optimes_test.cpp",
         "idempotency_document_structure_test.cpp",
@@ -2328,6 +2327,32 @@ mongo_cc_unit_test(
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:transport_layer_mock",
+        "//src/mongo/unittest",
+        "//src/mongo/unittest:task_executor_proxy",
+        "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "dbcheck_test",
+    srcs = [
+        "dbcheck_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-rss-sydney-smoke",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_wiredtiger_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":dbcheck",
+        ":dbcheck_test_fixture",
+        "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:health_log",
         "//src/mongo/unittest",
         "//src/mongo/unittest:task_executor_proxy",
         "//src/mongo/util:clock_source_mock",
