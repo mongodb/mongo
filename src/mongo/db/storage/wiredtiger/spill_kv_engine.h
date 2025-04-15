@@ -109,8 +109,9 @@ public:
 
     Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
-                             const CollectionOptions& options,
-                             KeyFormat keyFormat = KeyFormat::Long) override {
+                             KeyFormat keyFormat = KeyFormat::Long,
+                             bool isTimeseries = false,
+                             const BSONObj& storageEngineCollectionOptions = BSONObj()) override {
         MONGO_UNREACHABLE;
     }
 

@@ -117,11 +117,29 @@ public:
      * called if a create is rolled back. A higher-level drop operation will only propagate to a
      * drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
      * back and it is safe to immediately reclaim storage.
+     *
+     *      . 'keyFormat': Defaults to the key format of a regular collection, 'KeyFormat::Long'.
+     *      Callers must specify 'KeyFormat::String' when creating a RecordStore for a clustered
+     *      collection.
+     *
+     *      . 'isTimeseries': True when the RecordStore is for a timeseries collection. Timeseries
+     *      collections require specialized storage engine table configuration. TODO SERVER-100964:
+     *      Remove timeseries concept from KvEngine.
+     *
+     *      . 'storageEngineCollectionOptions': Empty by default. Holds collection-specific storage
+     *      engine configuration options. For example, the 'storageEngine' options passed into
+     *      `db.createCollection()`. Expected to be mirror the 'CollectionOptions::storageEngine'
+     *      format { storageEngine: { <storage engine name> : { configString:
+     *      "<option>=<setting>,..."} } }.
+     *
+     * Creates a 'RecordStore' and its underlying storage engine table with the designated
+     * 'keyFormat' and 'storageEngineCollectionOptions'.
      */
     virtual Status createRecordStore(const NamespaceString& nss,
                                      StringData ident,
-                                     const CollectionOptions& options,
-                                     KeyFormat keyFormat = KeyFormat::Long) = 0;
+                                     KeyFormat keyFormat = KeyFormat::Long,
+                                     bool isTimeseries = false,
+                                     const BSONObj& storageEngineCollectionOptions = BSONObj()) = 0;
 
     /**
      * RecordStores initially created with `makeTemporaryRecordStore` must be opened with
@@ -250,8 +268,11 @@ public:
      */
     virtual Status recoverOrphanedIdent(const NamespaceString& nss,
                                         StringData ident,
-                                        const CollectionOptions& options) {
-        auto status = createRecordStore(nss, ident, options);
+                                        KeyFormat keyFormat = KeyFormat::Long,
+                                        bool isTimeseries = false,
+                                        const BSONObj& storageEngineCollectionOptions = BSONObj()) {
+        auto status =
+            createRecordStore(nss, ident, keyFormat, isTimeseries, storageEngineCollectionOptions);
         if (status.isOK()) {
             return {ErrorCodes::DataModifiedByRepair, "Orphan recovery created a new record store"};
         }

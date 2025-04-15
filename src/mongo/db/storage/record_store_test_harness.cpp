@@ -641,7 +641,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
@@ -749,7 +749,7 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreCreation) {
     options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
     options.expireAfterSeconds = 1;
     options.capped = true;
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 }
 
@@ -759,7 +759,7 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
     CollectionOptions options;
     options.capped = true;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
@@ -821,26 +821,6 @@ TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreSeek) {
         ASSERT(rec);
         ASSERT_LT(rec->id, rid);
     }
-}
-
-TEST(RecordStoreTestHarness, ClusteredRecordMismatchedKeyFormat) {
-    const auto harnessHelper = newRecordStoreHarnessHelper();
-    const std::string ns = "test.system.buckets.a";
-    CollectionOptions options;
-    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    // Cannot create a clustered record store without KeyFormat::String.
-    bool failAsExpected = false;
-    try {
-        auto rs = harnessHelper->newRecordStore(ns, options);
-    } catch (DBException& e) {
-        // 6144101: WiredTiger-specific error code
-        // 6144102: Ephemeral For Test-specific error code
-        ASSERT_GTE(e.toStatus().code(), 6144101);
-        ASSERT_LTE(e.toStatus().code(), 6144102);
-        failAsExpected = true;
-    }
-
-    ASSERT_EQ(failAsExpected, true);
 }
 
 // Verify that a failed restore leaves the _hasRestored flag unset.

@@ -482,7 +482,8 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
         }
         return KeyFormat::Long;
     }();
-    Status status = _engine->createRecordStore(nss, entry.ident, options, keyFormat);
+    Status status = _engine->createRecordStore(
+        nss, entry.ident, keyFormat, options.timeseries.has_value(), options.storageEngine);
     if (!status.isOK())
         return status;
 

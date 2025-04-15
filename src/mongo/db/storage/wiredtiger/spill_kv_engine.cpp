@@ -126,11 +126,8 @@ std::unique_ptr<RecordStore> SpillKVEngine::makeTemporaryRecordStore(OperationCo
     wtTableConfig.keyFormat = keyFormat;
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
-    StatusWith<std::string> swConfig = WiredTigerRecordStoreBase::generateCreateString(
-        _canonicalName, {} /* internal table */, CollectionOptions(), wtTableConfig);
-    uassertStatusOK(swConfig.getStatus());
-
-    std::string config = swConfig.getValue();
+    std::string config =
+        WiredTigerRecordStoreBase::generateCreateString({} /* internal table */, wtTableConfig);
 
     std::string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(10158008,

@@ -204,10 +204,8 @@ StatusWith<std::string> WiredTigerRecordStoreBase::parseOptionsField(const BSONO
     return StatusWith<std::string>(ss.str());
 }
 
-StatusWith<std::string> WiredTigerRecordStoreBase::generateCreateString(
-    const std::string& engineName,
+std::string WiredTigerRecordStoreBase::generateCreateString(
     StringData tableName,
-    const CollectionOptions& options,
     const WiredTigerRecordStoreBase::WiredTigerTableConfig& wtTableConfig,
     bool isOplog) {
 
@@ -225,27 +223,12 @@ StatusWith<std::string> WiredTigerRecordStoreBase::generateCreateString(
 
     ss << "checksum=on,";
 
-    ss << "block_compressor=";
-    if (options.timeseries) {
-        // Time-series collections use zstd compression by default.
-        ss << WiredTigerGlobalOptions::kDefaultTimeseriesCollectionCompressor;
-    } else {
-        // All other collections use the globally configured default.
-        ss << wtTableConfig.blockCompressor;
-    }
-    ss << ",";
+    ss << "block_compressor=" << wtTableConfig.blockCompressor << ",";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(tableName);
 
     ss << wtTableConfig.extraCreateOptions << ",";
-
-    StatusWith<std::string> customOptions =
-        parseOptionsField(options.storageEngine.getObjectField(engineName));
-    if (!customOptions.isOK())
-        return customOptions;
-
-    ss << customOptions.getValue();
 
     if (isOplog) {
         // force file for oplog
@@ -262,14 +245,6 @@ StatusWith<std::string> WiredTigerRecordStoreBase::generateCreateString(
 
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
-    if (options.clusteredIndex) {
-        // A clustered collection requires both CollectionOptions.clusteredIndex and
-        // KeyFormat::String. For a clustered record store that is not associated with a clustered
-        // collection KeyFormat::String is sufficient.
-        uassert(6144101,
-                "RecordStore with CollectionOptions.clusteredIndex requires KeyFormat::String",
-                wtTableConfig.keyFormat == KeyFormat::String);
-    }
     if (wtTableConfig.keyFormat == KeyFormat::String) {
         // If the RecordId format is a String, assume a byte array key format.
         ss << "key_format=u";
@@ -277,7 +252,6 @@ StatusWith<std::string> WiredTigerRecordStoreBase::generateCreateString(
         // All other collections use an int64_t as their table keys.
         ss << "key_format=q";
     }
-    ss << ",value_format=u";
 
     // Record store metadata
     ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
@@ -292,7 +266,7 @@ StatusWith<std::string> WiredTigerRecordStoreBase::generateCreateString(
         ss << ",log=(enabled=false)";
     }
 
-    return StatusWith<std::string>(ss);
+    return ss;
 }
 
 WiredTigerRecordStoreBase::WiredTigerRecordStoreBase(Params params)

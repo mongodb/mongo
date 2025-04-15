@@ -132,20 +132,12 @@ public:
 
     /**
      * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
-     * It is possible for 'ns' to be an empty string, in the case of internal-only temporary tables.
-     * Configuration string is constructed from:
-     *     built-in defaults
-     *     storageEngine.wiredTiger.configString in 'options'
-     *     'extraStrings'
-     * Performs simple validation on the supplied parameters.
-     * Returns error status if validation fails.
-     * Note that even if this function returns an OK status, WT_SESSION:create() may still
-     * fail with the constructed configuration string.
+     * It is possible for 'tableName' to be an empty string, in the case of internal-only temporary
+     * tables. Configuration string is constructed from the parameters of 'wtTableConfig', with
+     * extra settings when 'isOplog' is true.
      */
-    static StatusWith<std::string> generateCreateString(
-        const std::string& engineName,
+    static std::string generateCreateString(
         StringData tableName,
-        const CollectionOptions& options,
         const WiredTigerRecordStoreBase::WiredTigerTableConfig& wtTableConfig,
         bool isOplog = false);
 

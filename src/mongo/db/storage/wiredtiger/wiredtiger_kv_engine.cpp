@@ -1486,8 +1486,9 @@ void WiredTigerKVEngine::setSortedDataInterfaceExtraOptions(const std::string& o
 
 Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
                                              StringData ident,
-                                             const CollectionOptions& options,
-                                             KeyFormat keyFormat) {
+                                             KeyFormat keyFormat,
+                                             bool isTimeseries,
+                                             const BSONObj& storageEngineCollectionOptions) {
     WiredTigerSession session(_connection.get());
 
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
@@ -1500,27 +1501,29 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
 
-    StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
-        _canonicalName,
-        NamespaceStringUtil::serializeForCatalog(nss),
-        options,
-        wtTableConfig,
-        nss.isOplog());
-
-    if (options.clusteredIndex) {
-        // A clustered collection requires both CollectionOptions.clusteredIndex and
-        // KeyFormat::String. For a clustered record store that is not associated with a clustered
-        // collection KeyFormat::String is sufficient.
-        uassert(6144100,
-                "RecordStore with CollectionOptions.clusteredIndex requires KeyFormat::String",
-                keyFormat == KeyFormat::String);
+    if (isTimeseries) {
+        // Time-series collections use zstd compression by default while all other collections use
+        // the globally configured default.
+        wtTableConfig.blockCompressor =
+            WiredTigerGlobalOptions::kDefaultTimeseriesCollectionCompressor.toString();
     }
 
-    if (!result.isOK()) {
-        return result.getStatus();
+    auto customConfigString = WiredTigerRecordStore::parseOptionsField(
+        storageEngineCollectionOptions.getObjectField(_canonicalName));
+    if (!customConfigString.isOK()) {
+        return customConfigString.getStatus();
     }
-    std::string config = result.getValue();
 
+    // It's imperative that any custom options, beyond the default '_rsOptions' are appended at the
+    // end of the 'extraCreateOptions' for table configuration. WiredTiger will take the last
+    // value specified of a field in the config string. For example: if '_rsOptions' and the
+    // 'customConfigString' both specify field 'blockCompressor=<value>', the latter <value> will be
+    // used by WiredTiger.
+    wtTableConfig.extraCreateOptions = str::stream()
+        << _rsOptions << "," << customConfigString.getValue();
+
+    std::string config = WiredTigerRecordStoreBase::generateCreateString(
+        NamespaceStringUtil::serializeForCatalog(nss), wtTableConfig, nss.isOplog());
     string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(22331,
                 2,
@@ -1554,7 +1557,9 @@ Status WiredTigerKVEngine::importRecordStore(StringData ident,
 
 Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
                                                 StringData ident,
-                                                const CollectionOptions& options) {
+                                                KeyFormat keyFormat,
+                                                bool isTimeseries,
+                                                const BSONObj& storageEngineCollectionOptions) {
 #ifdef _WIN32
     return {ErrorCodes::CommandNotSupported, "Orphan file recovery is not supported on Windows"};
 #else
@@ -1584,9 +1589,9 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
         return status;
     }
 
-    LOGV2(22333, "Creating new RecordStore", logAttrs(nss), "uuid"_attr = options.uuid);
+    LOGV2(22333, "Creating new RecordStore", logAttrs(nss));
 
-    status = createRecordStore(nss, ident, options);
+    status = createRecordStore(nss, ident, keyFormat, isTimeseries, storageEngineCollectionOptions);
     if (!status.isOK()) {
         return status;
     }
@@ -1852,11 +1857,8 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     wtTableConfig.logEnabled = false;
     wtTableConfig.extraCreateOptions = _rsOptions;
 
-    StatusWith<std::string> swConfig = WiredTigerRecordStoreBase::generateCreateString(
-        _canonicalName, {} /* internal table */, CollectionOptions(), wtTableConfig);
-    uassertStatusOK(swConfig.getStatus());
-
-    std::string config = swConfig.getValue();
+    std::string config =
+        WiredTigerRecordStoreBase::generateCreateString({} /* internal table */, wtTableConfig);
 
     std::string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(22337,

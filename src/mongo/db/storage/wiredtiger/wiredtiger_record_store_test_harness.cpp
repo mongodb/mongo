@@ -89,52 +89,15 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
-    const std::string& ns, const CollectionOptions& collOptions, KeyFormat keyFormat) {
+    const std::string& ns, const CollectionOptions& collOptions) {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    WiredTigerRecoveryUnit* ru =
-        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
-    std::string uri = WiredTigerUtil::kTableUriPrefix + ns;
     StringData ident = ns;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
-    WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
-    wtTableConfig.keyFormat = keyFormat;
-    wtTableConfig.logEnabled =
-        WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
-    StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
-        std::string{kWiredTigerEngineName},
-        NamespaceStringUtil::serializeForCatalog(nss),
-        collOptions,
-        wtTableConfig,
-        nss.isOplog());
-    ASSERT_TRUE(result.isOK());
-    std::string config = result.getValue();
-
-    {
-        StorageWriteTransaction txn(*ru);
-        WiredTigerSession* s = ru->getSession();
-        invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
-        txn.commit();
-    }
-
-    WiredTigerRecordStore::Params params;
-    params.baseParams.ident = ident.toString();
-    params.baseParams.engineName = std::string{kWiredTigerEngineName};
-    params.baseParams.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
-    params.baseParams.overwrite = collOptions.clusteredIndex ? false : true;
-    params.baseParams.isLogged =
-        WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
-    params.baseParams.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
-    params.inMemory = false;
-    params.isChangeCollection = nss.isChangeCollection();
-    params.sizeStorer = nullptr;
-    params.tracksSizeAdjustments = true;
-
-    return std::make_unique<WiredTigerRecordStore>(
-        _engine.get(),
-        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
-        params);
+    const auto keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
+    const auto res = _engine->createRecordStore(
+        nss, ident, keyFormat, collOptions.timeseries.has_value(), collOptions.storageEngine);
+    return _engine->getRecordStore(opCtx.get(), nss, ident, collOptions);
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
@@ -164,11 +127,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(oplogNss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
     StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
-        std::string{kWiredTigerEngineName},
-        NamespaceStringUtil::serializeForCatalog(oplogNss),
-        options,
-        wtTableConfig,
-        true);
+        NamespaceStringUtil::serializeForCatalog(oplogNss), wtTableConfig, true);
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 

@@ -109,51 +109,8 @@ public:
                                                    const std::string& ns) final {
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
-        WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
-            getWiredTigerTableConfigFromStartupOptions();
-        wtTableConfig.keyFormat = KeyFormat::Long;
-        bool isReplSet = getGlobalReplSettings().isReplSet();
-        bool shouldRecoverFromOplogAsStandalone =
-            repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
-        wtTableConfig.logEnabled =
-            WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
-        StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
-            std::string{kWiredTigerEngineName},
-            NamespaceStringUtil::serializeForCatalog(nss),
-            CollectionOptions(),
-            wtTableConfig,
-            nss.isOplog());
-        ASSERT_TRUE(result.isOK());
-        std::string config = result.getValue();
-
-        {
-            auto& ru =
-                *checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
-            StorageWriteTransaction txn(ru);
-            WiredTigerSession* s = ru.getSession();
-            invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
-            txn.commit();
-        }
-
-        WiredTigerRecordStore::Params params;
-        params.baseParams.ident = ident;
-        params.baseParams.engineName = std::string{kWiredTigerEngineName};
-        params.baseParams.keyFormat = KeyFormat::Long;
-        params.baseParams.overwrite = true;
-        params.baseParams.isLogged =
-            WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
-        params.baseParams.forceUpdateWithFullDocument = false;
-        params.inMemory = false;
-        params.isChangeCollection = nss.isChangeCollection();
-        params.sizeStorer = nullptr;
-        params.tracksSizeAdjustments = true;
-
-        auto ret = std::make_unique<WiredTigerRecordStore>(
-            _engine.get(),
-            WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
-            params);
-        return std::move(ret);
+        const auto res = _engine->createRecordStore(nss, ident);
+        return _engine->getRecordStore(opCtx, nss, ident, CollectionOptions());
     }
 
     WiredTigerKVEngine* getEngine() {

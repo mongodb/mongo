@@ -771,14 +771,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
-    const StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
-        std::string{kWiredTigerEngineName},
-        NamespaceStringUtil::serializeForCatalog(nss),
-        CollectionOptions(),
-        wtTableConfig);
-    ASSERT_TRUE(result.isOK());
-    const std::string config = result.getValue();
-
+    const std::string config = WiredTigerRecordStoreBase::generateCreateString(
+        NamespaceStringUtil::serializeForCatalog(nss), wtTableConfig);
     {
         StorageWriteTransaction txn(ru);
         WiredTigerRecoveryUnit* ru =
@@ -964,14 +958,8 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveSameConfiguration) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testRecordStore");
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
-    const StatusWith<std::string> wtTableCreateStringWithStatus =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    nss.toString_forTest(),
-                                                    CollectionOptions(),
-                                                    wtTableConfig);
-    ASSERT_TRUE(wtTableCreateStringWithStatus.isOK());
-
-    const std::string config = wtTableCreateStringWithStatus.getValue();
+    const auto config =
+        WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), wtTableConfig);
     const std::string ident = "uniqueIdentifierForTableFile";
     const std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
 
@@ -996,14 +984,8 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveDifferentConfiguratio
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testRecordStore");
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
-    const StatusWith<std::string> wtTableCreateStringWithStatus =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    nss.toString_forTest(),
-                                                    CollectionOptions(),
-                                                    wtTableConfig);
-    ASSERT_TRUE(wtTableCreateStringWithStatus.isOK());
-
-    const std::string config = wtTableCreateStringWithStatus.getValue();
+    const std::string config =
+        WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), wtTableConfig);
     const std::string ident = "uniqueIdentifierForTableFile";
     const std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
 
@@ -1016,13 +998,8 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveDifferentConfiguratio
     // Generate a different table configuration than the original.
     WiredTigerRecordStore::WiredTigerTableConfig newWtTableConfig = wtTableConfig;
     newWtTableConfig.keyFormat = KeyFormat::String;
-    const StatusWith<std::string> newWtTableCreateStringWithStatus =
-        WiredTigerRecordStore::generateCreateString(std::string{kWiredTigerEngineName},
-                                                    nss.toString_forTest(),
-                                                    CollectionOptions(),
-                                                    newWtTableConfig);
-    ASSERT_TRUE(newWtTableCreateStringWithStatus.isOK());
-    const std::string newConfig = newWtTableCreateStringWithStatus.getValue();
+    const std::string newConfig =
+        WiredTigerRecordStore::generateCreateString(nss.toString_forTest(), newWtTableConfig);
     ASSERT_NE(newConfig, config);
 
     // The uri for the ident is occupied, fail to create a new table with the ident.

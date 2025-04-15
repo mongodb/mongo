@@ -64,8 +64,7 @@ public:
     }
 
     std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
-                                                const CollectionOptions& collOptions,
-                                                KeyFormat keyFormat = KeyFormat::Long) override;
+                                                const CollectionOptions& collOptions) override;
 
     std::unique_ptr<RecordStore> newOplogRecordStore() override;
 

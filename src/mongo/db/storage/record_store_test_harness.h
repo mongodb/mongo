@@ -54,8 +54,7 @@ public:
     }
 
     virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
-                                                        const CollectionOptions& options,
-                                                        KeyFormat keyFormat = KeyFormat::Long) = 0;
+                                                        const CollectionOptions& options) = 0;
 
     virtual std::unique_ptr<RecordStore> newOplogRecordStore() = 0;
 

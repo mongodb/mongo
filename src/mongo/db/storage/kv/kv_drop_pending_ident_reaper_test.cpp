@@ -90,8 +90,9 @@ public:
 
     Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
-                             const CollectionOptions& options,
-                             KeyFormat keyFormat) override {
+                             KeyFormat keyFormat,
+                             bool isTimeseries,
+                             const BSONObj& storageEngineCollectionOptions) override {
         return Status::OK();
     }
 

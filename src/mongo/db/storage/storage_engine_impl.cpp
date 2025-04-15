@@ -174,8 +174,7 @@ void StorageEngineImpl::loadDurableCatalog(OperationContext* opCtx,
     if (!catalogExists) {
         WriteUnitOfWork uow(opCtx);
 
-        auto status =
-            _engine->createRecordStore(kCatalogInfoNamespace, kCatalogInfo, CollectionOptions());
+        auto status = _engine->createRecordStore(kCatalogInfoNamespace, kCatalogInfo);
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -421,7 +420,13 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     const auto catalogEntry = _catalog->getParsedCatalogEntry(opCtx, catalogId);
     const auto md = catalogEntry->metadata;
-    Status status = _engine->recoverOrphanedIdent(collectionName, collectionIdent, md->options);
+    const auto options = md->options;
+    const auto keyFormat = options.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
+    Status status = _engine->recoverOrphanedIdent(collectionName,
+                                                  collectionIdent,
+                                                  keyFormat,
+                                                  options.timeseries.has_value(),
+                                                  options.storageEngine);
 
     bool dataModified = status.code() == ErrorCodes::DataModifiedByRepair;
     if (!status.isOK() && !dataModified) {

@@ -332,8 +332,9 @@ public:
 
     Status createRecordStore(const NamespaceString& ns,
                              StringData ident,
-                             const CollectionOptions& options,
-                             KeyFormat keyFormat = KeyFormat::Long) override;
+                             KeyFormat keyFormat = KeyFormat::Long,
+                             bool isTimeseries = false,
+                             const BSONObj& storageEngineCollectionOptions = BSONObj()) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
@@ -423,7 +424,9 @@ public:
 
     Status recoverOrphanedIdent(const NamespaceString& nss,
                                 StringData ident,
-                                const CollectionOptions& options) override;
+                                KeyFormat keyFormat = KeyFormat::Long,
+                                bool isTimeseries = false,
+                                const BSONObj& storageEngineCollectionOptions = BSONObj()) override;
 
     bool hasIdent(RecoveryUnit&, StringData ident) const override;
 
