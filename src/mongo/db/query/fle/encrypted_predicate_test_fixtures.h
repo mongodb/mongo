@@ -52,8 +52,8 @@ namespace mongo::fle {
  * RAIIServerParameterControllerForTest() does not solve the issue because the registration logic is
  * not re-hit.
  *
- * TODO SERVER-59280: delete this manual registration of the $encStrStartsWith expression and any
- * callers once the feature flag is enabled.
+ * TODO SERVER-59280: delete this manual registration of the encTextSearch expressions
+ * ($encStrStartsWith, etc.) expression and any callers once the feature flag is enabled.
  */
 inline void registerEncTextSearchExpressions() {
     try {
@@ -62,11 +62,16 @@ inline void registerEncTextSearchExpressions() {
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
                                        kDoesNotRequireFeatureFlag);
+        Expression::registerExpression("$encStrEndsWith",
+                                       ExpressionEncStrEndsWith::parse,
+                                       AllowedWithApiStrict::kNeverInVersion1,
+                                       AllowedWithClientType::kAny,
+                                       kDoesNotRequireFeatureFlag);
     } catch (...) {
-        // registering $encStrStartsWith will throw if a duplicate registration is attempted. We
-        // catch and ignore this here. This is so that we can add registerEncTextSearchExpressions()
-        // to each test that could require it, so that we don't rely on the ordering of the tests to
-        // ensure the expression is registered.
+        // registering encTextSearch expressions will throw if a duplicate registration is
+        // attempted. We catch and ignore this here. This is so that we can add
+        // registerEncTextSearchExpressions() to each test that could require it, so that we don't
+        // rely on the ordering of the tests to ensure the expression is registered.
     }
 }
 

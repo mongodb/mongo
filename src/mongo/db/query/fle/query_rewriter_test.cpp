@@ -288,6 +288,19 @@ protected:
             // string.
             return std::make_unique<ExpressionEncStrStartsWith>(
                 expCtx, std::move(encStrStartsWithExpr->getChildren()[0]), std::move(textExpr));
+        } else if (auto encStrEndsWithExpr = dynamic_cast<ExpressionEncStrEndsWith*>(expr);
+                   encStrEndsWithExpr) {
+            if (!isPayload(encStrEndsWithExpr->getText().getValue())) {
+                return nullptr;
+            }
+
+            auto expCtx = encStrEndsWithExpr->getExpressionContext();
+            auto textExpr = make_intrusive<ExpressionConstant>(expCtx, Value(kRewrittenText));
+
+            // Return a new ExpressionEncStrEndsWithExpr with the same input, and rewritten suffix
+            // string.
+            return std::make_unique<ExpressionEncStrEndsWith>(
+                expCtx, std::move(encStrEndsWithExpr->getChildren()[0]), std::move(textExpr));
         }
         MONGO_UNREACHABLE_TASSERT(10184102);
     }
@@ -324,6 +337,9 @@ static const fle::ExpressionToRewriteMap aggRewriteMap{
           return OtherMockPredicateRewriter{rewriter}.rewrite(expr);
       }}},
     {typeid(ExpressionEncStrStartsWith), {[](auto* rewriter, auto* expr) {
+         return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
+     }}},
+    {typeid(ExpressionEncStrEndsWith), {[](auto* rewriter, auto* expr) {
          return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
      }}}};
 
@@ -506,6 +522,56 @@ TEST_FLE_REWRITE_MATCH(
     "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
     "{$expr: {$encStrStartsWith: {input: '$otherSsn', prefix: {$const: 'other'}}}}]}")
 
+TEST_FLE_REWRITE_AGG(Basic_FleEncStrEndsWith,
+                     "{$encStrEndsWith: {input: '$ssn', suffix: 'original'}}",
+                     "{$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}")
+
+TEST_FLE_REWRITE_AGG(
+    Nested_FleEncStrEndsWith_FullyRewrite,
+    "{$or: [{$encStrEndsWith: {input: '$ssn', suffix: 'original'}}, {$encStrEndsWith: {input: "
+    "'$otherSsn', suffix: 'original'}}]}",
+    "{$or: [{$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}, "
+    "{$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'rewritten'}}}]}")
+
+TEST_FLE_REWRITE_AGG(
+    Nested_FleEncStrEndsWith_PartiallyRewrite,
+    "{$and: [{$encStrEndsWith: {input: '$ssn', suffix: 'original'}}, {$encStrEndsWith: {input: "
+    "'$otherSsn', suffix: 'other'}}]}",
+    "{$and: [{$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}, "
+    "{$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}]}")
+
+TEST_FLE_REWRITE_MATCH(
+    Match_FleEncStrEndsWith_Expr,
+    "{$expr: {$encStrEndsWith: {input: '$ssn', suffix: 'original'}}}",
+    "{$expr: {$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}}");
+
+TEST_FLE_REWRITE_MATCH(
+    Match_Nested_FleEncStrEndsWith_Expr,
+    "{$and: [{$expr: {$encStrEndsWith: {input: '$ssn', suffix: 'original'}}}, {$expr: "
+    "{$encStrEndsWith: {input: "
+    "'$otherSsn', suffix: 'other'}}}]}",
+    "{$and: [{$expr: {$encStrEndsWith: {input: '$ssn', suffix: {$const: 'rewritten'}}}}, "
+    "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}]}")
+
+// TODO SERVER-102098 Add $encStrContains to the combined test
+// TODO SERVER-102565 Add $encStrNormalizedEq to the combined test
+TEST_FLE_REWRITE_MATCH(
+    Match_FleEncStrCombined_Exprs_FullyRewrite,
+    "{$or: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}, {$expr: "
+    "{$encStrEndsWith: {input: "
+    "'$otherSsn', suffix: 'original'}}}]}",
+    "{$or: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
+    "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'rewritten'}}}}]}")
+
+// TODO SERVER-102098 Add $encStrContains to the combined test
+// TODO SERVER-102565 Add $encStrNormalizedEq to the combined test
+TEST_FLE_REWRITE_MATCH(
+    Match_FleEncStrCombined_Exprs_PartiallyRewrite,
+    "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}, {$expr: "
+    "{$encStrEndsWith: {input: "
+    "'$otherSsn', suffix: 'other'}}}]}",
+    "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
+    "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}]}")
 
 // Test that the rewriter will work from any rewrite registered to an expression. The test rewriter
 // has two rewrites registered on $eq.
