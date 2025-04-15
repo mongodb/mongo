@@ -228,11 +228,9 @@ void removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(
     auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
                                   WriteConcernOptions::SyncMode::UNSET,
                                   WriteConcernOptions::kNoTimeout};
-    // This always runs in the shard role so should use a cluster transaction to guarantee targeting
-    // the config server.
-    bool useClusterTransaction = true;
+
     sharding_ddl_util::runTransactionOnShardingCatalog(
-        opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
+        opCtx, std::move(transactionChain), wc, osi, executor);
 }
 
 bool isDbAlreadyDropped(OperationContext* opCtx,
@@ -285,9 +283,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
             opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
 
-    // This always runs in the shard role so should use a cluster transaction to guarantee
-    // targeting the config server.
-    bool useClusterTransaction = true;
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
         opCtx,
         Grid::get(opCtx)->shardRegistry()->getConfigShard(),
@@ -295,7 +290,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         coll,
         defaultMajorityWriteConcernDoNotUse(),
         getNewSession(opCtx),
-        useClusterTransaction,
         **executor);
 
     {

@@ -194,8 +194,7 @@ void deleteCollection(OperationContext* opCtx,
                       const UUID& uuid,
                       const WriteConcernOptions& writeConcern,
                       const OperationSessionInfo& osi,
-                      const std::shared_ptr<executor::TaskExecutor>& executor,
-                      bool useClusterTransaction) {
+                      const std::shared_ptr<executor::TaskExecutor>& executor) {
     /* Perform a transaction to delete the collection and append a new placement entry.
      * NOTE: deleteCollectionFn may be run on a separate thread than the one serving
      * deleteCollection(). For this reason, all the referenced parameters have to
@@ -253,7 +252,7 @@ void deleteCollection(OperationContext* opCtx,
     };
 
     runTransactionOnShardingCatalog(
-        opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+        opCtx, std::move(transactionChain), writeConcern, osi, executor);
 }
 
 void deleteShardingIndexCatalogMetadata(OperationContext* opCtx,
@@ -432,7 +431,6 @@ void removeCollAndChunksMetadataFromConfig(
     const CollectionType& coll,
     const WriteConcernOptions& writeConcern,
     const OperationSessionInfo& osi,
-    bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& executor) {
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto& nss = coll.getNss();
@@ -446,7 +444,7 @@ void removeCollAndChunksMetadataFromConfig(
     config.placementHistory. In case this operation is run by a ddl coordinator, we can re-use the
     osi in the transaction to guarantee the replay protection.
     */
-    deleteCollection(opCtx, nss, uuid, writeConcern, osi, executor, useClusterTransaction);
+    deleteCollection(opCtx, nss, uuid, writeConcern, osi, executor);
 
     deleteChunks(opCtx, configShard, uuid, writeConcern);
 
@@ -623,7 +621,6 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
                                      txn_api::Callback&& transactionChain,
                                      const WriteConcernOptions& writeConcern,
                                      const OperationSessionInfo& osi,
-                                     bool useClusterTransaction,
                                      const std::shared_ptr<executor::TaskExecutor>& inputExecutor) {
     // The Internal Transactions API receives the write concern option and osi through the
     // passed Operation context. We opt for creating a new one to avoid any possible side
@@ -660,14 +657,6 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
     auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
-        if (!useClusterTransaction) {
-            tassert(7591900,
-                    "Can only use local transaction client for sharding catalog operations on a "
-                    "config server",
-                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-            return nullptr;
-        }
-
         auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
         return std::make_unique<txn_api::details::SEPTransactionClient>(
             newOpCtx,
@@ -826,11 +815,8 @@ void runTransactionWithStmtIdsOnShardingCatalog(
                                   WriteConcernOptions::SyncMode::UNSET,
                                   WriteConcernOptions::kNoTimeout};
 
-    // This always runs in the shard role so should use a cluster transaction to guarantee targeting
-    // the config server.
-    bool useClusterTransaction = true;
     sharding_ddl_util::runTransactionOnShardingCatalog(
-        opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
+        opCtx, std::move(transactionChain), wc, osi, executor);
 }
 
 void assertDataMovementAllowed() {

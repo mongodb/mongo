@@ -133,7 +133,6 @@ void removeCollAndChunksMetadataFromConfig(
     const CollectionType& coll,
     const WriteConcernOptions& writeConcern,
     const OperationSessionInfo& osi,
-    bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& executor = nullptr);
 
 /**
@@ -254,7 +253,6 @@ void runTransactionOnShardingCatalog(
     txn_api::Callback&& transactionChain,
     const WriteConcernOptions& writeConcern,
     const OperationSessionInfo& osi,
-    bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& inputExecutor = nullptr);
 
 /*

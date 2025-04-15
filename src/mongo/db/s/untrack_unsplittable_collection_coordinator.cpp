@@ -122,10 +122,6 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
     }
 
-    // This always runs in the shard role so should use a cluster transaction to
-    // guarantee targeting the config server
-    const bool useClusterTransaction{true};
-
     {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
@@ -135,7 +131,6 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             _doc.getOptCollType().get(),
             defaultMajorityWriteConcernDoNotUse(),
             session,
-            useClusterTransaction,
             **executor);
     }
 

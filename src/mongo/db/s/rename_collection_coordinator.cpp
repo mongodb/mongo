@@ -662,9 +662,8 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                 })
                 .semi();
         };
-        const bool useClusterTransaction = true;
         sharding_ddl_util::runTransactionOnShardingCatalog(
-            opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+            opCtx, std::move(transactionChain), writeConcern, osi, executor);
 
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
@@ -715,9 +714,8 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                 .semi();
         };
 
-        const bool useClusterTransaction = true;
         sharding_ddl_util::runTransactionOnShardingCatalog(
-            opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+            opCtx, std::move(transactionChain), writeConcern, osi, executor);
 
         ShardingLogging::get(opCtx)->logChange(
             opCtx,

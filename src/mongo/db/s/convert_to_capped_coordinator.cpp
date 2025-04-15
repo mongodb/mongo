@@ -347,10 +347,6 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 }();
 
                 if (_doc.getOriginalCollection().has_value()) {
-                    // This always runs in the shard role so should use a cluster transaction to
-                    // guarantee targeting the config server
-                    const bool useClusterTransaction{true};
-
                     {
                         const auto session = getNewSession(opCtx);
                         // Delete the sharding catalog entries referring the previous incarnation
@@ -361,7 +357,6 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             *_doc.getOriginalCollection(),
                             defaultMajorityWriteConcernDoNotUse(),
                             session,
-                            useClusterTransaction,
                             **executor);
                     }
 
