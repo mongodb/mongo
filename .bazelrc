@@ -367,7 +367,7 @@ common:windows --cxxopt=-UCOMPILER_MSVC
 # the engflow cluster. External builders should use the --config=local option
 
 # Enable remote build execution:
-common --remote_executor=grpcs://sodalite.cluster.engflow.com
+common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
 common:windows --remote_executor=
 common:macos --remote_executor=
 

@@ -7,6 +7,7 @@ set REPO_ROOT=%~dp0..
 
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
+REM skip python if the bazel command type is in a known list of commands to skip
 set skip_python="0"
 set bazelCommandCount=0
 for /F "delims=" %%a in (%REPO_ROOT%\bazel\wrapper_hook\bazel_commands.commands) do (
@@ -40,14 +41,12 @@ if !skip_python!=="1" (
     "%BAZEL_REAL%" %*
     exit %ERRORLEVEL%
 )
-
-set bazel_python="%REPO_ROOT%\bazel-%cur_dir%\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe"
-set compdb_python="%REPO_ROOT%\.compiledb\compiledb-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
-set python=%bazel_python%
-if not exist "%python%" (
-    set python=%compdb_python%
+REM find existing python installs
+set python=""
+if exist %REPO_ROOT%\bazel-%cur_dir% (
+     call :find_pyhon
 )
-if not exist "%python%" (
+if not exist "!python!" (
     echo python prereq missing, using bazel to install python... 1>&2
     "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all 1>&2
     
@@ -58,10 +57,11 @@ if not exist "%python%" (
         exit %ERRORLEVEL%
     )
 )
-set python=%bazel_python%
-if not exist "%python%" (
-    set python=%compdb_python%
+
+if not exist "!python!" (
+    call :find_pyhon
 )
+
 SET STARTTIME=%TIME%
 
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
@@ -109,3 +109,15 @@ if "%MONGO_BAZEL_WRAPPER_DEBUG%"=="1" (
 )
 
 "%BAZEL_REAL%" !new_args!
+
+EXIT /B %ERRORLEVEL%
+
+:: Functions
+
+:find_pyhon
+dir %REPO_ROOT% | C:\Windows\System32\find.exe "bazel-%cur_dir%" > %REPO_ROOT%\tmp_bazel_symlink_dir.txt
+for /f "tokens=2 delims=[" %%i in (%REPO_ROOT%\tmp_bazel_symlink_dir.txt) do set bazel_real_dir=%%i
+del %REPO_ROOT%\tmp_bazel_symlink_dir.txt
+set bazel_real_dir=!bazel_real_dir:~0,-1!
+set python="!bazel_real_dir!\..\..\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe" 
+EXIT /B 0

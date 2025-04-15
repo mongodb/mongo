@@ -73,6 +73,7 @@ if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]]; then
     wrapper_start_time="$(date -u +%s.%N)"
 fi
  
+# detect os and arch so we can try to find python later
 if [[ "$OSTYPE" == "linux"* ]]; then
   os="linux"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -92,7 +93,7 @@ else
   ARCH="x86_64"
 fi
 
-
+# setup usual locations to look for certs for python to use
 declare -a cert_locs=()
 cert_locs+=("/etc/ssl/certs/ca-certificates.crt")                # Debian/Ubuntu/Gentoo etc.
 cert_locs+=("/etc/pki/tls/certs/ca-bundle.crt")                  # Fedora/RHEL 6
@@ -109,6 +110,7 @@ for cert in ${cert_locs[@]}; do
   fi
 done
 
+# skip python if the bazel command type is in a known list of commands to skip
 skip_python=0
 bazel_commands=()
 while IFS= read -r line; do
@@ -134,6 +136,7 @@ if [ -z $current_bazel_command ]; then
 fi
 
 if [ "$skip_python" == "0" ]; then
+  # known list of commands to skip
   skip_commands=("clean" "version" "shutdown")
 
   for command in "${skip_commands[@]}"
@@ -149,14 +152,20 @@ if [ "$skip_python" == "1" ]; then
   exec "$bazel_real" $@
 fi
 
+# find existing python installs
 cur_dir=$(basename $REPO_ROOT)
-bazel_python="$REPO_ROOT/bazel-$cur_dir/external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
-compdb_python="$REPO_ROOT/.compiledb/compiledb-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
-python=$bazel_python
-if [ ! -f $python ]; then
-  python=$compdb_python
+python=""
+standard_python_loc="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
+if [ -d $REPO_ROOT/bazel-$cur_dir ]; then
+  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
+else
+  if [ -d $REPO_ROOT/.compiledb/compiledb-$cur_dir ]; then
+    python="$(readlink "$REPO_ROOT/.compiledb/compiledb-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
+  fi
 fi
-if [ ! -f $python ]; then
+
+# if no python use bazel to install one
+if [[ "$python" = "" ]] || [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
   >&2 $bazel_real build --config=local @py_${os}_${ARCH}//:all
   if [[ $? != 0 ]]; then
@@ -168,9 +177,10 @@ if [ ! -f $python ]; then
     fi
   fi
 fi
-python=$bazel_python
-if [ ! -f $python ]; then
-  python=$compdb_python
+
+# update python location if it was missing and we had to install it
+if [[ "$python" = "" ]] || [ ! -f $python ]; then
+  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
 fi
 
 autocomplete_query=0
