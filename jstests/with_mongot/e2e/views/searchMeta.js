@@ -5,10 +5,8 @@
  * (which performs view transforms for other mongot operators).
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
-// TODO SERVER-100355 remove import
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.hotelAccounting;
@@ -80,8 +78,6 @@ let expectedResults = [{
 let results = totalPriceView.aggregate(facetQuery).toArray();
 assert.eq(results, expectedResults);
 
-// TODO SERVER-100355 Re-enable the below aggregations once we support mongot queries in
-// subpipelines.
 // $lookup.$searchMeta for good measure!
 const collBase = testDb.base;
 collBase.drop();
@@ -94,16 +90,30 @@ assert.commandWorked(collBase.insert({_id: 1}));
  * isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
  * output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
  */
-// explain = collBase.explain().aggregate(
-// [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}]);
+explain = collBase.explain().aggregate(
+    [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}]);
+
 /**
  * The first stage is a $cursor, which represents the intermediate results of the outer coll
  * that will be streamed through the rest of the pipeline. But we don't need it to validate how
  * the view was applied.
  */
-// explain.stages.shift();
-// assert(explain.stages.length == 1);
-// assert(Object.keys(explain.stages[0])[0], "$lookup");
+if (explain.stages) {
+    // Single node.
+    explain.stages.shift();
+    assert(explain.stages.length == 1);
+    assert(Object.keys(explain.stages[0])[0], "$lookup");
+} else if (explain.splitPipeline) {
+    // Multi-shard.
+    explain.splitPipeline.mergerPart.shift();
+    assert(explain.splitPipeline.mergerPart.length == 1);
+    assert(Object.keys(explain.splitPipeline.mergerPart[0])[0], "$lookup");
+} else {
+    // Single shard.
+    explain.shards["shard-rs0"].stages.shift();
+    assert(explain.shards["shard-rs0"].stages.length == 1);
+    assert(Object.keys(explain.shards["shard-rs0"].stages[0])[0], "$lookup");
+}
 
 expectedResults = [
     {
@@ -138,16 +148,9 @@ expectedResults = [
     }
 ];
 
-assert.commandFailedWithCode(collBase.runCommand("aggregate", {
-    pipeline: [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}],
-    cursor: {}
-}),
-                             ErrorCodes.QueryFeatureNotAllowed);
-
-// results =
-//     collBase
-//         .aggregate([{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}])
-//         .toArray();
-// assert.eq(expectedResults, results);
+results =
+    collBase.aggregate([{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}])
+        .toArray();
+assert.eq(expectedResults, results);
 
 dropSearchIndex(totalPriceView, {name: "totalPriceIndex"});

@@ -86,6 +86,16 @@ public:
         return id;
     }
 
+    // A custom clone implementation is necessary to ensure that the _view information gets passed
+    // along to the new object. In sharded scenarios, if _view doesn't exist on the object then
+    // expCtx is checked for the view, which could hold incorrect information (see:
+    // createFromBson()).
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
+        auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
+        return make_intrusive<DocumentSourceSearch>(expCtx, _spec, _view);
+    }
+
     auto isStoredSource() const {
         auto storedSourceElem = _spec.getMongotQuery()[mongot_cursor::kReturnStoredSourceArg];
         return !storedSourceElem.eoo() && storedSourceElem.Bool();

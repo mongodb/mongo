@@ -3,9 +3,6 @@
  * purpose is to verify that the nested unions and searches return the correct results across all
  * views.
  *
- * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
- * views in both sharded and non-sharded environments
- *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -115,11 +112,8 @@ let expectedResults = [
     }
 ];
 
-assert.commandFailedWithCode(bestActressView.runCommand("aggregate", {pipeline, cursor: {}}),
-                             ErrorCodes.QueryFeatureNotAllowed);
-
-// let results = bestActressView.aggregate(pipeline).toArray();
-// assertArrayEq({actual: results, expected: expectedResults});
+let results = bestActressView.aggregate(pipeline).toArray();
+assertArrayEq({actual: results, expected: expectedResults});
 
 dropSearchIndex(bestActressView, {name: "default"});
 dropSearchIndex(bestPictureView, {name: "default"});

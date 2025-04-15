@@ -2,30 +2,35 @@
  * Utility functions for explain() results of search + non-search queries run on a view.
  */
 
-import {
-    getAggPlanStages,
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {
     checkSbeRestrictedOrFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
 import {
+    prepareUnionWithExplain,
     validateMongotStageExplainExecutionStats,
     verifyShardsPartExplainOutput
 } from "jstests/with_mongot/common_utils.js";
 
-function assertIdLookupContainsViewPipeline(explainStages, viewPipeline) {
-    assert(explainStages[1].hasOwnProperty("$_internalSearchIdLookup"));
-    assert(explainStages[1]["$_internalSearchIdLookup"].hasOwnProperty("subPipeline"));
-    let idLookupFullSubPipe = explainStages[1]["$_internalSearchIdLookup"]["subPipeline"];
-    // The _idLookup subPipeline should be a $match on _id followed by the view stages.
-    let idLookupStage = {"$match": {"_id": {"$eq": "_id placeholder"}}};
-    assert.eq(idLookupFullSubPipe[0], idLookupStage);
-    // Make sure that idLookup subpipeline contains all of the view stages.
-    let idLookupViewStages = idLookupFullSubPipe.slice(-(idLookupFullSubPipe.length - 1));
-    assert.eq(idLookupViewStages.length, viewPipeline.length);
-    for (let i = 0; i < idLookupViewStages.length; i++) {
-        let stageName = Object.keys(viewPipeline[i])[0];
-        assert(idLookupViewStages[i].hasOwnProperty(stageName));
+function assertIdLookupContainsViewPipeline(explain, viewPipeline) {
+    let stages = getAggPlanStages(explain, "$_internalSearchIdLookup");
+    assert(
+        stages.length > 0,
+        "There should be at least one stage corresponding to $_internalSearchIdLookup in the explain output. " +
+            tojson(explain));
+
+    for (let stage of stages) {
+        let idLookupFullSubPipe = stage["$_internalSearchIdLookup"]["subPipeline"];
+        // The _idLookup subPipeline should be a $match on _id followed by the view stages.
+        let idLookupStage = {"$match": {"_id": {"$eq": "_id placeholder"}}};
+        assert.eq(idLookupFullSubPipe[0], idLookupStage);
+        // Make sure that idLookup subpipeline contains all of the view stages.
+        let idLookupViewStages = idLookupFullSubPipe.slice(-(idLookupFullSubPipe.length - 1));
+        assert.eq(idLookupViewStages.length, viewPipeline.length);
+        for (let i = 0; i < idLookupViewStages.length; i++) {
+            let stageName = Object.keys(viewPipeline[i])[0];
+            assert(idLookupViewStages[i].hasOwnProperty(stageName));
+        }
     }
 }
 
@@ -50,7 +55,7 @@ function assertViewAppliedCorrectlyInExplainStages(explainOutput, userPipeline, 
         // The view pipeline is pushed down to a desugared stage, $_internalSearchdLookup. Therefore
         // we inspect the stages (which represent the fully desugared pipeline from the user) to
         // ensure the view was successfully pushed down.
-        return assertIdLookupContainsViewPipeline(explainOutput.stages, viewPipeline);
+        return assertIdLookupContainsViewPipeline(explainOutput, viewPipeline);
     }
     // Whereas view transforms for mongot queries happen after desugaring, regular queries apply the
     // view transforms during query expansion. For this reason, we can just inspect the explain's
@@ -99,7 +104,12 @@ export function assertViewNotApplied(explainOutput, viewPipeline) {
      * Assert that the view pipeline wasn't pushed down to $_internalSearchIdLookup by ensuring
      * there is no $_internalSearchIdLookup stage.
      */
-    assert(!explainOutput.stages[1].hasOwnProperty("$_internalSearchIdLookup"));
+    let stages = getAggPlanStages(explainOutput, "$_internalSearchIdLookup");
+    assert(
+        stages.length == 0,
+        "There should not be any stages corresponding to $_internalSearchIdLookup in the explain output. " +
+            tojson(explainOutput));
+
     /**
      * If a view pipeline isn't pushed down to idLookup, there is a risk it was appened to the user
      * pipeline (as is the case for non-search queries on views). It's important to call out that
@@ -107,7 +117,9 @@ export function assertViewNotApplied(explainOutput, viewPipeline) {
      * pipeline isn't desugared and none of the view stages are pushed down or otherwise rearranged
      * during optimization.
      */
-    assert.neq(explainOutput.stages.slice(0, viewPipeline.length), viewPipeline);
+    if (explainOutput.hasOwnProperty("stages")) {
+        assert.neq(explainOutput.stages.slice(0, viewPipeline.length), viewPipeline);
+    }
 }
 
 export function extractUnionWithSubPipelineExplainOutput(explainStages) {
@@ -127,10 +139,12 @@ export function extractUnionWithSubPipelineExplainOutput(explainStages) {
 export function assertUnionWithSearchPipelinesApplyViews(
     explain, outerViewPipeline, innerViewPipeline) {
     // This will assert that the top-level search has the view correctly pushed down to idLookup.
-    assertIdLookupContainsViewPipeline(explain.stages, outerViewPipeline);
-    let unionWithSubPipeExplain = extractUnionWithSubPipelineExplainOutput(explain.stages);
+    assertIdLookupContainsViewPipeline(explain, outerViewPipeline);
+
     // Make sure the $unionWith.search subpipeline has the view correctly pushed down to idLookup.
-    assertIdLookupContainsViewPipeline(unionWithSubPipeExplain.stages, innerViewPipeline);
+    let unionWithStage = getUnionWithStage(explain);
+    let unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
+    assertIdLookupContainsViewPipeline(unionWithExplain, innerViewPipeline);
 }
 
 /**

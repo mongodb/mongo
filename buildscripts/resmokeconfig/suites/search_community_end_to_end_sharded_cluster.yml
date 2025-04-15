@@ -23,11 +23,6 @@ selector:
     - jstests/with_mongot/e2e/**/*.js
     - jstests/with_mongot/e2e_infrastructure_tests/*.js
     - jstests/with_mongot/e2e_lib/*_test.js
-  exclude_files:
-    # TODO SERVER-100355 the below test files should always run once we support mongot queries in subpipelines on sharded,
-    # mongot-indexed views.
-    - jstests/with_mongot/e2e/views/lookup*.js
-    - jstests/with_mongot/e2e/views/unionWith*.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
 

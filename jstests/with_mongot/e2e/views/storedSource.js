@@ -99,7 +99,6 @@ let expectedResults = [
 let results = addFieldsView.aggregate(pipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});
 
-// TODO SERVER-100355 Re-enable the below aggregations once we support mongot queries in
 // Make sure if storedSource query is part of a inner subpipeline, the view transforms aren't
 // applied by mongod.
 const baseColl = testDb.baseColl;
@@ -118,8 +117,9 @@ let storedSourceAsSubPipe = [
         }
     }, {$project: {_id: 0, "state_facts.state": 0}}
 ];
-// explain = baseColl.explain().aggregate(storedSourceAsSubPipe);
-// assertViewNotApplied(explain, viewPipeline);
+
+explain = baseColl.explain().aggregate(storedSourceAsSubPipe);
+assertViewNotApplied(explain, viewPipeline);
 
 expectedResults = [
     {
@@ -149,9 +149,8 @@ expectedResults = [
         }]
     }
 ];
-assert.commandFailedWithCode(
-    baseColl.runCommand("aggregate", {pipeline: storedSourceAsSubPipe, cursor: {}}),
-    ErrorCodes.QueryFeatureNotAllowed);
-// results = baseColl.aggregate(storedSourceAsSubPipe).toArray();
-// assertArrayEq({actual: results, expected: expectedResults});
+
+results = baseColl.aggregate(storedSourceAsSubPipe).toArray();
+assertArrayEq({actual: results, expected: expectedResults});
+
 dropSearchIndex(addFieldsView, {name: "storedSourceIx"});

@@ -228,9 +228,7 @@ runRequiresSearchMetaCursorTest({
     expectedDocs: [{_id: 1, x: "ow"}, {_id: 14, x: "cow", y: "lorem ipsum"}],
     subPipelinePlanShardedSearchDispatchedToShards: true,
     outerPipelineShouldRequireSearchMetaCursor: false,
-    // TODO SERVER-87079 Fix queries where $search is in a subpipeline to not create unnecessary
-    // meta cursor.
-    innerPipelineShouldRequireSearchMetaCursor: true
+    innerPipelineShouldRequireSearchMetaCursor: false
 });
 
 // Run a pipeline with references to $$SEARCH_META in the top-level and sub-pipelines.
@@ -310,9 +308,7 @@ runRequiresSearchMetaCursorTest({
     // This usage of $lookup after $search will dispatch both planShardedSearch requests from mongos.
     subPipelinePlanShardedSearchDispatchedToShards: false,
     outerPipelineShouldRequireSearchMetaCursor: true,
-    // TODO SERVER-87079 Fix queries where $search is in a subpipeline to not create unnecessary
-    // meta cursor.
-    innerPipelineShouldRequireSearchMetaCursor: true
+    innerPipelineShouldRequireSearchMetaCursor: false
 });
 
 stWithMock.stop();

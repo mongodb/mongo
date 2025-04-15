@@ -3,9 +3,6 @@
  * resolution. In this test, we create a lookup view where the foreign collection is another view
  * and the subpipeline contains $search.
  *
- * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
- * views in both sharded and non-sharded environments
- *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
@@ -104,12 +101,8 @@ let expectedResults = [
     }
 ];
 
-assert.commandFailedWithCode(
-    usersTotalPostsViewWithMetrics.runCommand("aggregate", {pipeline: [], cursor: {}}),
-    ErrorCodes.QueryFeatureNotAllowed);
-
-// let results = usersTotalPostsViewWithMetrics.aggregate().toArray();
-// assert.sameMembers(expectedResults, results);
+let results = usersTotalPostsViewWithMetrics.aggregate().toArray();
+assert.sameMembers(expectedResults, results);
 
 /**
  * Run a $match query to only view one specific user's posts containing the word "idol" with
@@ -135,17 +128,13 @@ let pipeline = [{
     }
 }];
 
-assert.commandFailedWithCode(
-    usersTotalPostsViewWithMetrics.runCommand("aggregate", {pipeline, cursor: {}}),
-    ErrorCodes.QueryFeatureNotAllowed);
-
-// let results = usersTotalPostsViewWithMetrics
-//                   .aggregate([{
-//                       $match: {
-//                           username: "john_doe"  // Match a specific username
-//                       }
-//                   }])
-//                   .toArray();
-// assert.sameMembers(expectedResults, results);
+results = usersTotalPostsViewWithMetrics
+              .aggregate([{
+                  $match: {
+                      username: "john_doe"  // Match a specific username
+                  }
+              }])
+              .toArray();
+assert.sameMembers(expectedResults, results);
 
 dropSearchIndex(totalSocialMediaReactionsView, {name: "totalReactionsIndex"});

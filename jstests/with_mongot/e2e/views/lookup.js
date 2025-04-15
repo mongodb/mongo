@@ -7,12 +7,10 @@
  * 3. the outer collection is a view and the inner collection is a view.
  * 		a. includes explain() validation
  *
- * TODO SERVER-100355 Once sharded support is in, re-enable running subpipelines on mongot-indexed
- * views in both sharded and non-sharded environments
- *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkSbeFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
@@ -127,11 +125,7 @@ let lookupPipeline = [
  * because again, the view transforms will not be present.
  */
 
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: productColl.getName(), pipeline: lookupPipeline, cursor: {}}),
-    ErrorCodes.QueryFeatureNotAllowed);
-
-// let results = productColl.aggregate(lookupPipeline).toArray();
+let results = productColl.aggregate(lookupPipeline).toArray();
 let expectedResults = [
     {
         _id: 3,
@@ -164,7 +158,7 @@ let expectedResults = [
         }]
     }
 ];
-// assertArrayEq({actual: results, expected: expectedResults});
+assertArrayEq({actual: results, expected: expectedResults});
 
 // Second use case: outer coll is a view, inner coll is a regular collection.
 // ==========================================================================
@@ -207,11 +201,19 @@ if (isSbeEnabled) {
      * that will be streamed through the rest of the pipeline. But we don't need it to validate how
      * the view was applied.
      */
-    // explain.stages.shift();
-    // assertViewAppliedCorrectly(explain.stages, lookupPipeline, batteryTypeViewPipeline);
+    if (FixtureHelpers.isSharded(productColl)) {
+        explain.splitPipeline.shardsPart.shift();
+        assert(explain.splitPipeline.shardsPart.length == 1);
+        assert(Object.keys(explain.splitPipeline.shardsPart[0])[0], "$lookup");
+    } else {
+        explain.stages.shift();
+        explain.stages.shift();
+        assert(explain.stages.length == 1);
+        assert(Object.keys(explain.stages[0])[0], "$lookup");
+    }
 }
 
-let results = batteryTypeViewOnProductColl.aggregate(lookupPipeline).toArray();
+results = batteryTypeViewOnProductColl.aggregate(lookupPipeline).toArray();
 /**
  * There should be no [verified_review : 'unverified' ] field/values in these results, as that is
  * associated with the view on reviewColl. However, there should be battery_type field for every
@@ -299,21 +301,28 @@ lookupPipeline = [
  * collection. However, we are not able to validate via explain that the view pipeline was applied
  * by idLookup. See comment under first use case about $lookup serialize function to understand why.
  */
-// explain = assert.commandWorked(verifiedReviewView.explain().aggregate(lookupPipeline));
+explain = assert.commandWorked(verifiedReviewView.explain().aggregate(lookupPipeline));
 
-// if (isSbeEnabled) {
-//     assertViewAppliedCorrectly(
-//         explain.command.pipeline, lookupPipeline, verifiedReviewViewPipeline);
-// } else {
-//     /**
-//      *  The first stage is a $cursor, which represents the intermediate results of the outer coll
-//      * that will be streamed through the rest of the pipeline. But we don't need it to validate
-//      how
-//      * the view was applied.
-//      */
-//     explain.stages.shift();
-//     assertViewAppliedCorrectly(explain.stages, lookupPipeline, verifiedReviewViewPipeline);
-// }
+if (isSbeEnabled) {
+    assertViewAppliedCorrectly(
+        explain.command.pipeline, lookupPipeline, verifiedReviewViewPipeline);
+} else {
+    /**
+     * The first stage is a $cursor, which represents the intermediate results of the outer coll
+     * that will be streamed through the rest of the pipeline. But we don't need it to validate how
+     * the view was applied.
+     */
+    if (FixtureHelpers.isSharded(reviewColl)) {
+        explain.splitPipeline.mergerPart.shift();
+        assert(explain.splitPipeline.mergerPart.length == 2);
+        assert(Object.keys(explain.splitPipeline.mergerPart[0])[0], "$lookup");
+    } else {
+        explain.stages.shift();
+        explain.stages.shift();
+        assert(explain.stages.length == 2);
+        assert(Object.keys(explain.stages[0])[0], "$lookup");
+    }
+}
 
 /**
  * There should be a verified_review field (for the outer view) and battery_type field (for the
@@ -382,11 +391,9 @@ expectedResults = [
         }]
     }
 ];
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: verifiedReviewView.getName(), pipeline: lookupPipeline, cursor: {}}),
-    ErrorCodes.QueryFeatureNotAllowed);
-// results = verifiedReviewView.aggregate(lookupPipeline).toArray();
-// assertArrayEq({actual: results, expected: expectedResults});
+
+results = verifiedReviewView.aggregate(lookupPipeline).toArray();
+assertArrayEq({actual: results, expected: expectedResults});
 dropSearchIndex(reviewColl, {name: "default"});
 dropSearchIndex(verifiedReviewView, {name: "verifiedReviewSearchIndex"});
 dropSearchIndex(batteryTypeViewOnProductColl, {name: "default"});

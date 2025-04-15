@@ -345,9 +345,6 @@ runRequiresSearchMetaCursorTest({
     shouldRequireSearchMetaCursor: true,
 });
 
-// When $search is in a subpipeline it will always create a meta cursor, even when unnecessary.
-// TODO SERVER-87079 Configure queries where $search is in a subpipeline to not create unnecessary
-// meta cursor.
 runRequiresSearchMetaCursorTest({
     pipeline: [
         {$match: {b: {$gt: 3}}},
@@ -361,7 +358,7 @@ runRequiresSearchMetaCursorTest({
     ],
     coll: unshardedColl,
     expectedDocs: [{b: 5}, {x: "brown"}, {x: "brown"}, {x: "brown"}],
-    shouldRequireSearchMetaCursor: true,
+    shouldRequireSearchMetaCursor: false,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -378,7 +375,7 @@ runRequiresSearchMetaCursorTest({
     ],
     coll: unshardedColl,
     expectedDocs:  [{b: 5, out: [{x: "brown"}]}],
-    shouldRequireSearchMetaCursor: true,
+    shouldRequireSearchMetaCursor: false,
 });
 
 stWithMock.stop();
