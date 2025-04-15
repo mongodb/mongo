@@ -104,3 +104,11 @@ structs:
                 type: Decision
                 description: "Enumeration that defines whether the migration committed or aborted."
                 optional: true
+            transfersFirstCollectionChunkToRecipient:
+                type: bool
+                description:
+                    "A true value marks the fact that the migration will cause the recipient to
+                    start owning data for the parent collection once committed.
+                    This field (marked as optional for backwards compatibility) is used to compose
+                    the legacy 'migrateChunkToNewShard' op entry when the operation is successful."
+                optional: true

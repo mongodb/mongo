@@ -205,3 +205,13 @@ feature_flags:
         cpp_varname: feature_flags::gSnapshotFCVInDDLCoordinators
         default: false
         shouldBeFCVGated: true
+    # TODO (SERVER-103838): remove feature once 9.0 becomes LTS.
+    featureFlagPersistRecipientPlacementInfoInMigrationRecoveryDoc:
+        description:
+            "When enabled, the MigrationCoordinator will include in its recovery document metadata on
+            the placement status of the recipient shard (such information is used to ensure the
+            generation of the 'migrateChunkToNewShard' change stream events in case of donor step downs)."
+        cpp_varname: feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc
+        default: true
+        version: 8.2
+        shouldBeFCVGated: true

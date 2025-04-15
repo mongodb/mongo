@@ -85,6 +85,15 @@ public:
     void setShardKeyPattern(const boost::optional<KeyPattern>& shardKeyPattern);
 
     /**
+     * Persistently sets/gets whether this chunk migration will cause the recipent to start owning
+     * data for the parent collection. The value is expected to be set by MigrationSourceManager at
+     * the beginning of the clone phase and consumed upon commit to generate the related op entry
+     * for change stream readers.
+     */
+    void setTransfersFirstCollectionChunkToRecipient(OperationContext* opCtx, bool value);
+    bool getTransfersFirstCollectionChunkToRecipient();
+
+    /**
      * Initializes persistent state required to ensure that orphaned ranges are properly handled,
      * even after failover, by doing the following:
      *

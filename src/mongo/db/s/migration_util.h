@@ -126,12 +126,14 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
  * write concern.
  */
-void persistMigrationCoordinatorLocally(OperationContext* opCtx,
-                                        const MigrationCoordinatorDocument& migrationDoc);
+void insertMigrationCoordinatorDoc(OperationContext* opCtx,
+                                   const MigrationCoordinatorDocument& migrationDoc);
+void updateMigrationCoordinatorDoc(OperationContext* opCtx,
+                                   const MigrationCoordinatorDocument& migrationdoc);
 
 /**
- * Updates the migration coordinator document to set the decision field to "committed" and waits for
- * majority writeConcern.
+ * Updates the migration coordinator document to set the decision field to "committed" and waits
+ * for majority writeConcern.
  */
 void persistCommitDecision(OperationContext* opCtx,
                            const MigrationCoordinatorDocument& migrationDoc);

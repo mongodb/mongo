@@ -67,6 +67,18 @@ void notifyChangeStreamsOnReshardCollectionComplete(
     OperationContext* opCtx, const CollectionResharded& CollectionReshardedNotification);
 
 /**
+ * Writes a a series of no-op oplog entries to match the completion of a moveChunk/moveRange
+ * operation.
+ */
+void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
+                                        const NamespaceString& collName,
+                                        const boost::optional<UUID>& collUUID,
+                                        const ShardId& donor,
+                                        const ShardId& recipient,
+                                        bool noMoreCollectionChunksOnDonor,
+                                        bool firstCollectionChunkOnRecipient);
+
+/**
  * Writes a no-op oplog entry on the end of multi shard transaction.
  **/
 void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,

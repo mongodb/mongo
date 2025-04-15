@@ -55,6 +55,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -425,12 +426,6 @@ void MigrationSourceManager::startClone() {
         _state = kCloning;
     }
 
-    // Refreshing the collection routing information after starting the clone driver will give us a
-    // stable view on whether the recipient is owning other chunks of the collection (a condition
-    // that will be later evaluated).
-    uassertStatusOK(
-        Grid::get(_opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(_opCtx, nss()));
-
     {
         const repl::ReadConcernArgs readConcernArgs(replCoord->getMyLastAppliedOpTime(),
                                                     repl::ReadConcernLevel::kLocalReadConcern);
@@ -446,6 +441,20 @@ void MigrationSourceManager::startClone() {
                                              _coordinator->getMigrationId(),
                                              _coordinator->getLsid(),
                                              _coordinator->getTxnNumber()));
+
+    // Refresh the collection routing information after starting the clone driver to have a
+    // stable view on whether the recipient is already owning other chunks of the collection.
+    {
+        const auto cm = uassertStatusOK(
+            Grid::get(_opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(_opCtx,
+                                                                                     nss()));
+        // If the chunk migration will cause the collection placement to be extended to a new shard,
+        // persist the state so that it can be reported to change stream readers once the operation
+        // gets committed.
+        if (!cm.getVersion(_args.getToShard()).isSet()) {
+            _coordinator->setTransfersFirstCollectionChunkToRecipient(_opCtx, true);
+        }
+    }
 
     _moveTimingHelper.done(3);
     moveChunkHangAtStep3.pauseWhileSet();
@@ -477,22 +486,6 @@ void MigrationSourceManager::enterCriticalSection() {
     _cloneAndCommitTimer.reset();
 
     hangBeforeEnteringCriticalSection.pauseWhileSet();
-
-    const auto cri =
-        uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(_opCtx, nss()));
-
-    // Check that there are no chunks on the recepient shard. Write an oplog event for change
-    // streams if this is the first migration to the recipient.
-    if (!cri.getShardVersion(_args.getToShard()).placementVersion().isSet()) {
-        migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
-            _opCtx, nss(), _args.getFromShard(), _args.getToShard(), _collectionUUID);
-
-        // Wait for the above 'migrateChunkToNewShard' oplog message to be majority acknowledged.
-        WriteConcernResult ignoreResult;
-        auto latestOpTime = repl::ReplClientInfo::forClient(_opCtx->getClient()).getLastOp();
-        uassertStatusOK(waitForWriteConcern(
-            _opCtx, latestOpTime, defaultMajorityWriteConcern(), &ignoreResult));
-    }
 
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
@@ -666,13 +659,19 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     // Migration succeeded
 
     const auto refreshedMetadata = _getCurrentMetadataAndCheckForConflictingErrors();
-    // Check if there are no chunks left on donor shard. Write an oplog event for change streams if
-    // the last chunk migrated off the donor.
-    if (!refreshedMetadata.getChunkManager()->getVersion(_args.getFromShard()).isSet()) {
-        migrationutil::notifyChangeStreamsOnDonorLastChunk(
-            _opCtx, nss(), _args.getFromShard(), _collectionUUID);
+    {
+        // Emit an oplog entry about the completion of the migration
+        const bool noMoreCollectionChunksOnDonor =
+            !refreshedMetadata.getChunkManager()->getVersion(_args.getFromShard()).isSet();
+        notifyChangeStreamsOnChunkMigrated(
+            _opCtx,
+            nss(),
+            _collectionUUID,
+            _args.getFromShard(),
+            _args.getToShard(),
+            noMoreCollectionChunksOnDonor,
+            _coordinator->getTransfersFirstCollectionChunkToRecipient());
     }
-
 
     LOGV2(22018,
           "Migration succeeded and updated collection placement version",

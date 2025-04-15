@@ -52,6 +52,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -645,10 +646,16 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                 coordinator.setMigrationDecision(DecisionEnum::kAborted);
             } else {
                 coordinator.setMigrationDecision(DecisionEnum::kCommitted);
-                if (!currentMetadata.getChunkManager()->getVersion(doc.getDonorShardId()).isSet()) {
-                    migrationutil::notifyChangeStreamsOnDonorLastChunk(
-                        opCtx, doc.getNss(), doc.getDonorShardId(), doc.getCollectionUuid());
-                }
+                bool noMoreCollectionChunksOnDonor =
+                    !currentMetadata.getChunkManager()->getVersion(doc.getDonorShardId()).isSet();
+                notifyChangeStreamsOnChunkMigrated(
+                    opCtx,
+                    doc.getNss(),
+                    doc.getCollectionUuid(),
+                    doc.getDonorShardId(),
+                    doc.getRecipientShardId(),
+                    noMoreCollectionChunksOnDonor,
+                    doc.getTransfersFirstCollectionChunkToRecipient().value_or(false));
             }
 
             coordinator.setShardKeyPattern(KeyPattern(currentMetadata.getKeyPattern()));

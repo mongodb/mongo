@@ -320,8 +320,8 @@ bool deletionTaskUuidMatchesFilteringMetadataUuid(
         optCollDescr->uuidMatches(deletionTask.getCollectionUuid());
 }
 
-void persistMigrationCoordinatorLocally(OperationContext* opCtx,
-                                        const MigrationCoordinatorDocument& migrationDoc) {
+void insertMigrationCoordinatorDoc(OperationContext* opCtx,
+                                   const MigrationCoordinatorDocument& migrationDoc) {
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
     try {
@@ -336,75 +336,13 @@ void persistMigrationCoordinatorLocally(OperationContext* opCtx,
     }
 }
 
-void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
-                                              const NamespaceString& collNss,
-                                              const ShardId& fromShardId,
-                                              const ShardId& toShardId,
-                                              boost::optional<UUID> collUUID) {
-
-    const std::string dbgMessage = str::stream()
-        << "Migrating chunk from shard " << fromShardId << " to shard " << toShardId
-        << " with no chunks for this collection";
-
-    // The message expected by change streams
-    const auto o2Message =
-        BSON("migrateChunkToNewShard"
-             << NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault())
-             << "fromShardId" << fromShardId << "toShardId" << toShardId);
-
-    auto const serviceContext = opCtx->getClient()->getServiceContext();
-
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
-    writeConflictRetry(opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace, [&] {
-        WriteUnitOfWork uow(opCtx);
-        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                             collNss,
-                                                             *collUUID,
-                                                             BSON("msg" << dbgMessage),
-                                                             o2Message,
-                                                             boost::none,
-                                                             boost::none,
-                                                             boost::none,
-                                                             boost::none);
-        uow.commit();
-    });
-}
-
-void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
-                                         const NamespaceString& collNss,
-                                         const ShardId& donorShardId,
-                                         boost::optional<UUID> collUUID) {
-
-    const std::string oMessage = str::stream()
-        << "Migrate the last chunk for " << collNss.toStringForErrorMsg() << " off shard "
-        << donorShardId;
-
-    // The message expected by change streams
-    const auto o2Message =
-        BSON("migrateLastChunkFromShard"
-             << NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault())
-             << "shardId" << donorShardId);
-
-    auto const serviceContext = opCtx->getClient()->getServiceContext();
-
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
-    writeConflictRetry(opCtx, "migrateLastChunkFromShard", NamespaceString::kRsOplogNamespace, [&] {
-        WriteUnitOfWork uow(opCtx);
-        serviceContext->getOpObserver()->onInternalOpMessage(opCtx,
-                                                             collNss,
-                                                             *collUUID,
-                                                             BSON("msg" << oMessage),
-                                                             o2Message,
-                                                             boost::none,
-                                                             boost::none,
-                                                             boost::none,
-                                                             boost::none);
-        uow.commit();
-    });
+void updateMigrationCoordinatorDoc(OperationContext* opCtx,
+                                   const MigrationCoordinatorDocument& migrationDoc) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    store.update(opCtx,
+                 BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
+                 migrationDoc.toBSON());
 }
 
 void persistCommitDecision(OperationContext* opCtx,

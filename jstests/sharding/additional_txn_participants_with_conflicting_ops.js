@@ -78,9 +78,15 @@ const sessionDB = session.getDatabase(dbName);
     // Insert a doc in the foreign collection that we will later update
     assert.commandWorked(st.s.getDB(dbName).foreign.insert({_id: 1, x: 1}));
 
-    // Refresh the routing information for the foreign collection in shard0 after the moveChunk
-    // operation from previous test case.
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+    // Define the test case aggregation.
+    const aggCmd =
+        [{$lookup: {from: foreignColl, localField: "x", foreignField: "x", as: "result"}}];
+
+    // As a setup step, run the aggregation for a first time outside of the transaction: this will
+    // allow shard0 to recover up-to-date routing information about 'foreignColl' (which was stale
+    // after the last moveChunk operation completed) and avoid rising retryable errors that would
+    // disrupt the execution of this test case.
+    let _ = st.s.getDB(dbName)[localColl].aggregate(aggCmd, {cursor: {batchSize: 2}}).toArray();
 
     // Start a transaction on shard0
     session.startTransaction({readConcern: {level: "snapshot"}});
@@ -92,11 +98,8 @@ const sessionDB = session.getDatabase(dbName);
     session2.startTransaction();
     assert.commandWorked(sessionDB2.getCollection(foreignColl).update({x: 1}, {$set: {x: 2}}));
     assert.commandWorked(session2.commitTransaction_forTesting());
-
-    // Run a $lookup that will add shard1 as an additional participant in the first transaction
-    // and ensure it does not see the updated value, meaning that it returns a matching doc
-    let aggCmd = [{$lookup: {from: foreignColl, localField: "x", foreignField: "x", as: "result"}}];
-
+    // Run the $lookup on the first transaction, which is expected to add shard1 as an additional
+    // participant and not see the updated value (hence returning a matching doc).
     const expectedTxnAggRes = [{_id: 0, x: 1, result: [{_id: 1, x: 1}]}];
     let txnAggRes =
         sessionDB.getCollection(localColl).aggregate(aggCmd, {cursor: {batchSize: 2}}).toArray();

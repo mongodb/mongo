@@ -92,6 +92,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
@@ -849,6 +850,18 @@ private:
                     ShardingDDLCoordinatorService::getService(opCtx)
                         ->waitForCoordinatorsOfGivenTypeToComplete(
                             opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit);
+                }
+
+                // Drain ongoing chunk migrations to ensure that no backwards-incompatible metadata
+                // will be persisted in their recovery docs.
+                // TODO SERVER-103838 Remove this code block once 9.0 becomes LTS.
+                if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    static constexpr char kRegistryLockReason[] = "Performing FCV Downgrade";
+                    auto& activeMigrationRegistry = ActiveMigrationsRegistry::get(opCtx);
+                    activeMigrationRegistry.lock(opCtx, kRegistryLockReason);
+                    activeMigrationRegistry.unlock(kRegistryLockReason);
                 }
             }
         }
