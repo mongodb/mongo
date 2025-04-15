@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "restore_git_history_and_tags.sh":
+    approvers:
+      - 10gen/devprod-correctness
+  - "retry_git.sh":
+    approvers:
+      - 10gen/devprod-correctness
