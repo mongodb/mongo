@@ -155,6 +155,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "counters_sort",
+    srcs = [
+        "counters_sort.cpp",
+    ],
+    hdrs = [
+        "counters_sort.h",
+    ],
+    deps = [
+        "//src/mongo/db/commands:server_status_metric",
+    ],
+)
+
+mongo_cc_library(
     name = "counters",
     srcs = [
         "counters.cpp",
@@ -172,6 +185,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:sorted_data_interface.h",
     ],
     deps = [
+        ":counters_sort",
         "//src/mongo:base",
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/storage:index_entry_comparison",

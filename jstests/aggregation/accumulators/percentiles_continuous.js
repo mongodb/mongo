@@ -2,9 +2,7 @@
  * Tests for the continuous percentile accumulator semantics.
  * @tags: [
  *   requires_fcv_81,
- *   featureFlagAccuratePercentiles,
- *   # TODO SERVER-91581: Support spilling
- *   incompatible_aubsan,
+ *   featureFlagAccuratePercentiles
  * ]
  */
 import {
@@ -125,11 +123,10 @@ testWithMultipleGroups({
  * data distributions see C++ unit tests for continuous).
  */
 
-// The seed is arbitrary but the accuracy error has been empirically determined based on the
-// generated samples with _this_ seed.
-Random.setRandomSeed(20230328);
-// 'error' should be specified as zero since continuous should be accurate
-const accuracyError = 0;
+Random.setRandomFixtureSeed();
+// This error here is unused for the tests due to the use of continuous. Set it to -1 to be clear
+// that it is unused.
+const accuracyError = -1;
 
 let samples = [];
 for (let i = 0; i < 10000; i++) {

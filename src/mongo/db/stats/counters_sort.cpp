@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,37 +26,11 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/db/pipeline/percentile_algo_accurate.h"
+#include "mongo/db/stats/counters_sort.h"
 
 namespace mongo {
 
-/**
- *'ContinuousPercentile' algorithm for computing accurate continuous percentiles
- */
-class ContinuousPercentile : public AccuratePercentile {
-public:
-    ContinuousPercentile(ExpressionContext* expCtx);
+SortCounters sortCounters;
 
-    static double computeTrueRank(int n, double p) {
-        return p * (n - 1);
-    }
-
-    double linearInterpolate(
-        double rank, int rank_ceil, int rank_floor, double value_ceil, double value_floor);
-
-    boost::optional<double> computePercentile(double p) final;
-
-    void reset() final;
-
-private:
-    // Only used if we spilled to disk.
-    boost::optional<double> computeSpilledPercentile(double p) final;
-    std::pair<boost::optional<double>, boost::optional<double>> _previousValues = {boost::none,
-                                                                                   boost::none};
-};
-
-}  // namespace mongo
+}

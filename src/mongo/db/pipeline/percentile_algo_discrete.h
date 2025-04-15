@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
 #include <boost/optional/optional.hpp>
 
@@ -41,7 +42,7 @@ namespace mongo {
  */
 class DiscretePercentile : public AccuratePercentile {
 public:
-    DiscretePercentile() = default;  // no config required for this algorithm
+    DiscretePercentile(ExpressionContext* expCtx);
 
     // We define "percentile" as:
     //   Percentile P(p) where 'p' is from [0.0, 1.0] on dataset 'D' with 'n', possibly duplicated,
@@ -63,6 +64,13 @@ public:
     }
 
     boost::optional<double> computePercentile(double p) final;
+
+    void reset() final;
+
+private:
+    // Only used if we spilled to disk.
+    boost::optional<double> computeSpilledPercentile(double p) final;
+    boost::optional<double> _previousValue = boost::none;
 };
 
 }  // namespace mongo

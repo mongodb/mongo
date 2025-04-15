@@ -3,9 +3,7 @@
  * field 'p':[0.5].
  * @tags: [
  *   requires_fcv_81,
- *   featureFlagAccuratePercentiles,
- *   # TODO SERVER-91581: Support spilling
- *   incompatible_aubsan,
+ *   featureFlagAccuratePercentiles
  * ]
  */
 import {

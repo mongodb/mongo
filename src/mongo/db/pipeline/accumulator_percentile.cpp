@@ -29,9 +29,8 @@
 
 #include "mongo/db/pipeline/accumulator_percentile.h"
 
-#include "mongo/db/pipeline/percentile_algo.h"
-
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <type_traits>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
@@ -40,6 +39,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator_percentile_gen.h"
 #include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
+#include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/percentile_algo_accurate.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -79,7 +80,7 @@ Value evaluateAccumulatorQuantile(const ExpressionFromAccumulatorQuantile<TAccum
                     samples.push_back(item.coerceToDouble());
                 }
             }
-            DiscretePercentile dp;
+            DiscretePercentile dp(expr.getExpressionContext());
             dp.incorporate(samples);
             return TAccumulator::formatFinalValue(expr.getPs().size(),
                                                   dp.computePercentiles(expr.getPs()));
@@ -249,29 +250,18 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         assertMergingInputType(input, Array);
         dynamic_cast<PartialPercentile<Value>*>(_algo.get())->combine(input);
 
-        // TODO SERVER-92994: Both uasserts should be removed once spilling is supported while
-        // merging the accumulator state from $group spills
         _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream() << fmt::format("$percentile used too much memory and cannot spill to "
-                                             "disk. Used: {0} bytes. Memory limit: {1} bytes",
-                                             _memUsageTracker.currentMemoryBytes(),
-                                             _memUsageTracker.maxAllowedMemoryUsageBytes()),
-                _memUsageTracker.withinMemoryLimit());
+        if (!_memUsageTracker.withinMemoryLimit()) {
+            _algo->spill();
+            _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+        }
         return;
     }
-
     if (!input.numeric()) {
         return;
     }
     _algo->incorporate(input.coerceToDouble());
     _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << fmt::format("$percentile used too much memory and cannot spill to "
-                                         "disk. Used: {0} bytes. Memory limit: {1} bytes",
-                                         _memUsageTracker.currentMemoryBytes(),
-                                         _memUsageTracker.maxAllowedMemoryUsageBytes()),
-            _memUsageTracker.withinMemoryLimit());
 }
 
 Value AccumulatorPercentile::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
@@ -291,15 +281,15 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
                                                    _algo->computePercentiles(_percentiles));
 }
 
-namespace {
-std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethodEnum method) {
+std::unique_ptr<PercentileAlgorithm> AccumulatorPercentile::createPercentileAlgorithm(
+    PercentileMethodEnum method) {
     switch (method) {
         case PercentileMethodEnum::kApproximate:
             return createTDigestDistributedClassic();
         case PercentileMethodEnum::kDiscrete:
-            return createDiscretePercentile();
+            return createDiscretePercentile(this->getExpressionContext());
         case PercentileMethodEnum::kContinuous:
-            return createContinuousPercentile();
+            return createContinuousPercentile(this->getExpressionContext());
         default:
             uasserted(
                 7435800,
@@ -308,7 +298,6 @@ std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethodE
     }
     return nullptr;
 }
-}  // namespace
 
 AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
                                              const std::vector<double>& ps,
@@ -323,7 +312,13 @@ AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
 }
 
 void AccumulatorPercentile::reset() {
-    _algo = createPercentileAlgorithm(_method);
+    if (_method == PercentileMethodEnum::kApproximate) {
+        _algo = createPercentileAlgorithm(_method);
+    }
+    // Reset the algorithm's internal state, in case the algorithm has spilled to disk.
+    // Note that the approximate percentile case has a no-op reset, because it cannot spill to disk.
+    _algo->reset();
+
     _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
 }
 

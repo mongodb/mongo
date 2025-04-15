@@ -370,7 +370,6 @@ AggStageCounters aggStageCounters{"aggStageCounters."};
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
-SortCounters sortCounters;
 ValidatorCounters validatorCounters;
 GroupCounters groupCounters;
 SetWindowFieldsCounters setWindowFieldsCounters;

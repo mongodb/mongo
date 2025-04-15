@@ -99,6 +99,11 @@ public:
 
     long memUsageBytes() const final;
 
+    /* These are provided in order to provide a uniform interface to the PercentileAlgo class, but
+     * remain unimplemented since TDigest does not need to handle spilling to disk.*/
+    void spill() final;
+    void reset() final {}
+
     //----------------------------------------------------------------------------------------------
     // Implementation details of t-digest
     //

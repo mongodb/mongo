@@ -27,7 +27,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/commands:server_status_core",
     ],
 )
 
@@ -47,9 +46,8 @@ mongo_cc_library(
     ],
     deps = [
         ":sorter_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counters_sort",  # TODO(SERVER-93876): Remove.
     ] + select({
         "//bazel/config:use_wiredtiger_enabled": [
             "//src/third_party/wiredtiger:wiredtiger_checksum",

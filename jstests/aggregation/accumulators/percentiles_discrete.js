@@ -2,9 +2,7 @@
  * Tests for the discrete percentile accumulator semantics.
  * @tags: [
  *   requires_fcv_81,
- *   featureFlagAccuratePercentiles,
- *   # TODO SERVER-91581: Support spilling
- *   incompatible_aubsan,
+ *   featureFlagAccuratePercentiles
  * ]
  */
 import {
@@ -131,10 +129,7 @@ testWithMultipleGroups({
  * Random.rand() which produces a uniform distribution in [0.0, 1.0) (for testing with other
  * data distributions see C++ unit tests for discrete).
  */
-
-// The seed is arbitrary but the accuracy error has been empirically determined based on the
-// generated samples with _this_ seed.
-Random.setRandomSeed(20230328);
+Random.setRandomFixtureSeed();
 // 'error' should be specified as zero since discrete should be accurate
 const accuracyError = 0;
 

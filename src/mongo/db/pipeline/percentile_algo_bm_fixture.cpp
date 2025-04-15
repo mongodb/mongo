@@ -36,6 +36,7 @@
 
 #include <benchmark/benchmark.h>
 
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/percentile_algo_accurate.h"
 #include "mongo/db/pipeline/percentile_algo_bm_fixture.h"
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
@@ -83,7 +84,8 @@ void PercentileAlgoBenchmarkFixture::discrete_normalData(benchmark::State& state
                                                          const std::vector<double>& ps) {
     const vector<double> inputs = generateNormal(dataSize, presorted);
     for (auto keepRunning : state) {
-        auto d = createDiscretePercentile();
+        auto expCtx = ExpressionContextForTest();
+        auto d = createDiscretePercentile(&expCtx);
         d->incorporate(inputs);
         benchmark::DoNotOptimize(d->computePercentiles(ps));
         benchmark::ClobberMemory();

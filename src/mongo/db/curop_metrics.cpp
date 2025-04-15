@@ -35,6 +35,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/counters_sort.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {

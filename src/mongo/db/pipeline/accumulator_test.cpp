@@ -2040,10 +2040,11 @@ TEST(Accumulators, AccumulatorExpMovingAvg) {
 // Runs AccumulatorPercentile tests with the various different percentile algorithms.
 void accumulatorPercentileHelper(PercentileMethodEnum method,
                                  const std::vector<double>& percentiles,
-                                 const std::string& mergeFalseExpected) {
+                                 const std::string& mergeFalseExpected,
+                                 boost::optional<int> maxMemoryUsageBytes = 1024) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx =
         make_intrusive<ExpressionContextForTest>();
-    AccumulatorPercentile acc{expCtx.get(), percentiles, method, 1024 /* maxMemoryUsageBytes */};
+    AccumulatorPercentile acc{expCtx.get(), percentiles, method, maxMemoryUsageBytes};
 
     // Processing a non-numeric input when not merging does not accumulate anything, so the current
     // value should be an array of [null, null].
@@ -2091,24 +2092,25 @@ TEST(Accumulators, AccumulatorPercentileContinuous) {
         PercentileMethodEnum::kContinuous, std::vector<double>{0.5, 0.8}, "[0.55, 0.82]");
 }
 
-// Tests the AccumulatorPercentile class when it runs out of memory.
-TEST(Accumulators, AccumulatorPercentileOOM) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
-        make_intrusive<ExpressionContextForTest>();
-    const std::vector<double> percentiles{0.5, 0.8};
-    AccumulatorPercentile acc{
-        expCtx.get(), percentiles, PercentileMethodEnum::kApproximate, 1 /* maxMemoryUsageBytes */};
+// Tests the AccumulatorPercentile class when it runs out of memory using
+// PercentileMethodEnum::kApproximate
+TEST(Accumulators, AccumulatorPercentileOOMApproximate) {
+    accumulatorPercentileHelper(
+        PercentileMethodEnum::kApproximate, std::vector<double>{0.5, 0.8}, "[0.5, 0.8]", 1);
+}
 
-    ASSERT_THROWS_CODE(
-        [&]() -> void {
-            // Process some numbers the percentiles of which are easy to understand.
-            for (int i = 1; i <= 10; ++i) {
-                double val = 0.1 * i;
-                acc.processInternal(Value(val), false /* merging */);
-            }
-        }(),
-        DBException,
-        ErrorCodes::ExceededMemoryLimit);
+// Tests the AccumulatorPercentile class when it runs out of memory using
+// PercentileMethodEnum::kDiscrete
+TEST(Accumulators, AccumulatorPercentileOOMDiscrete) {
+    accumulatorPercentileHelper(
+        PercentileMethodEnum::kDiscrete, std::vector<double>{0.5, 0.8}, "[0.5, 0.8]", 1);
+}
+
+// Tests the AccumulatorPercentile class when it runs out of memory using
+// PercentileMethodEnum::kContinuous
+TEST(Accumulators, AccumulatorPercentileOOMContinuous) {
+    accumulatorPercentileHelper(
+        PercentileMethodEnum::kContinuous, std::vector<double>{0.5, 0.8}, "[0.55, 0.82]", 1);
 }
 
 /* ------------------------- Other accumulators ------------------------------------------------- */

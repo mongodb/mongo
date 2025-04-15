@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <cmath>
 #include <ctime>
@@ -37,9 +38,8 @@
 #include <ostream>
 #include <random>
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/percentile_algo_continuous.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
@@ -81,7 +81,8 @@ double computeTestPercentile(double p, vector<double> inputs, int n) {
  * Basics.
  */
 TEST(ContinuousPercentileTest, NoInputs) {
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     ASSERT(!cp.computePercentile(0.1));
     ASSERT(cp.computePercentiles({0.1, 0.5}).empty());
 }
@@ -89,7 +90,8 @@ TEST(ContinuousPercentileTest, NoInputs) {
 TEST(ContinuousPercentileTest, TinyInput1) {
     vector<double> inputs = {1.0};
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
@@ -100,7 +102,8 @@ TEST(ContinuousPercentileTest, TinyInput1) {
 TEST(ContinuousPercentileTest, TinyInput2) {
     vector<double> inputs = {1.0, 2.0};
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
@@ -111,7 +114,8 @@ TEST(ContinuousPercentileTest, TinyInput2) {
 TEST(ContinuousPercentileTest, TinyInput3) {
     vector<double> inputs = {1.0, 2.0, 3.0};
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
@@ -123,7 +127,8 @@ TEST(ContinuousPercentileTest, Basic) {
     vector<double> inputs(100);
     std::iota(inputs.begin(), inputs.end(), 1.0);  // {1, 2, ..., 100}
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
@@ -138,7 +143,8 @@ TEST(ContinuousPercentileTest, Basic) {
 TEST(ContinuousPercentileTest, ComputeMultiplePercentilesAtOnce) {
     const vector<double> inputs = generateNormal(100);
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     const vector<double> ps = cp.computePercentiles({0.5, 0.9, 0.1});
@@ -165,8 +171,8 @@ TEST(ContinuousPercentileTest, Incorporate_OnlyInfinities) {
     LOGV2(7514413, "Incorporate_OnlyInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
-    ContinuousPercentile cp;
-
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     for (double val : inputs) {
         cp.incorporate(val);
     }
@@ -203,8 +209,8 @@ TEST(ContinuousPercentileTest, Incorporate_WithInfinities) {
     LOGV2(7514414, "Incorporate_WithInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
-    ContinuousPercentile cp;
-
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     for (double val : inputs) {
         cp.incorporate(val);
     }
@@ -243,7 +249,8 @@ TEST(ContinuousPercentileTest, Incorporate_Nan_ShouldSkip) {
     // Add NaN value into the dataset.
     inputs.insert(inputs.begin() + 500, std::numeric_limits<double>::quiet_NaN());
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(std::numeric_limits<double>::quiet_NaN());
     cp.incorporate(inputs);
 
@@ -259,7 +266,8 @@ TEST(ContinuousPercentileTest, SmallDataset) {
     const int n = 10;
     vector<double> inputs = generateNormal(n);
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_LT(*cp.computePercentile(0.49), *cp.computePercentile(0.5));
@@ -277,7 +285,8 @@ TEST(ContinuousPercentileTest, LargerDataset) {
     const int n = 1000;
     vector<double> inputs = generateNormal(n);
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_LT(*cp.computePercentile(0.499), *cp.computePercentile(0.4999));
@@ -297,7 +306,8 @@ TEST(ContinuousPercentileTest, Presorted) {
     vector<double> inputs = generateNormal(n);
     std::sort(inputs.begin(), inputs.end());
 
-    ContinuousPercentile cp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(computeTestPercentile(0.1, inputs, n), *cp.computePercentile(0.1));

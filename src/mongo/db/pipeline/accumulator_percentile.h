@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/sorter/sorter.h"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 #include <utility>
@@ -136,6 +137,8 @@ public:
     PercentileMethodEnum getMethod() const {
         return _method;
     }
+
+    std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethodEnum method);
 
 protected:
     std::vector<double> _percentiles;

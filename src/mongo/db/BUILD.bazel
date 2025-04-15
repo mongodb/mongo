@@ -1465,8 +1465,9 @@ mongo_cc_library(
         "curop_metrics.h",
     ],
     deps = [
-        "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/db/stats:counters_sort",
     ],
 )
 

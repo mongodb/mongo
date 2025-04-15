@@ -33,6 +33,8 @@
 #include <cmath>
 #include <memory>
 
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/sorter/sorter.h"
 namespace mongo {
 
 /**
@@ -76,6 +78,16 @@ struct PercentileAlgorithm {
      * The owner might need a rough estimate of how much memory the algorithm is using.
      */
     virtual long memUsageBytes() const = 0;
+
+    /*
+     * Provides an interface if the percentile cannot be computed in memory and needs to access
+     * disk.
+     */
+    virtual void spill() = 0;
+
+    /* Provides an interface for resetting algorithm object to newly intialized state, for
+     * implementations that may need to do so without destroying the object.*/
+    virtual void reset() = 0;
 };
 
 /**
@@ -95,8 +107,7 @@ struct PartialPercentile {
 
 std::unique_ptr<PercentileAlgorithm> createTDigest();
 std::unique_ptr<PercentileAlgorithm> createTDigestDistributedClassic();
-
-std::unique_ptr<PercentileAlgorithm> createDiscretePercentile();
-std::unique_ptr<PercentileAlgorithm> createContinuousPercentile();
+std::unique_ptr<PercentileAlgorithm> createDiscretePercentile(ExpressionContext* expCtx);
+std::unique_ptr<PercentileAlgorithm> createContinuousPercentile(ExpressionContext* expCtx);
 
 }  // namespace mongo

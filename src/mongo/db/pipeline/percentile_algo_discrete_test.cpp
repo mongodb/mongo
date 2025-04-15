@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <cmath>
 #include <ctime>
@@ -37,9 +38,8 @@
 #include <ostream>
 #include <random>
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
@@ -69,7 +69,8 @@ vector<double> generateNormal(size_t n) {
  * Basics.
  */
 TEST(DiscretePercentileTest, NoInputs) {
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     ASSERT(!dp.computePercentile(0.1));
     ASSERT(dp.computePercentiles({0.1, 0.5}).empty());
 }
@@ -77,7 +78,8 @@ TEST(DiscretePercentileTest, NoInputs) {
 TEST(DiscretePercentileTest, TinyInput1) {
     vector<double> inputs = {1.0};
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *dp.computePercentile(0));
@@ -88,7 +90,8 @@ TEST(DiscretePercentileTest, TinyInput1) {
 TEST(DiscretePercentileTest, TinyInput2) {
     vector<double> inputs = {1.0, 2.0};
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *dp.computePercentile(0));
@@ -99,7 +102,8 @@ TEST(DiscretePercentileTest, TinyInput2) {
 TEST(DiscretePercentileTest, TinyInput3) {
     vector<double> inputs = {1.0, 2.0, 3.0};
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *dp.computePercentile(0));
@@ -111,7 +115,8 @@ TEST(DiscretePercentileTest, Basic) {
     vector<double> inputs(100);
     std::iota(inputs.begin(), inputs.end(), 1.0);  // {1, 2, ..., 100}
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *dp.computePercentile(0));
@@ -126,7 +131,8 @@ TEST(DiscretePercentileTest, Basic) {
 TEST(DiscretePercentileTest, ComputeMultiplePercentilesAtOnce) {
     const vector<double> inputs = generateNormal(100);
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     const vector<double> ps = dp.computePercentiles({0.5, 0.9, 0.1});
@@ -153,8 +159,8 @@ TEST(DiscretePercentileTest, Incorporate_OnlyInfinities) {
     LOGV2(7514412, "Incorporate_OnlyInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
-    DiscretePercentile dp;
-
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     for (double val : inputs) {
         dp.incorporate(val);
     }
@@ -191,8 +197,8 @@ TEST(DiscretePercentileTest, Incorporate_WithInfinities) {
     LOGV2(7514411, "Incorporate_WithInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
-    DiscretePercentile dp;
-
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     for (double val : inputs) {
         dp.incorporate(val);
     }
@@ -226,7 +232,8 @@ TEST(DiscretePercentileTest, Incorporate_Nan_ShouldSkip) {
     // Add NaN value into the dataset.
     inputs.insert(inputs.begin() + 500, std::numeric_limits<double>::quiet_NaN());
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(std::numeric_limits<double>::quiet_NaN());
     dp.incorporate(inputs);
 
@@ -242,7 +249,8 @@ TEST(DiscretePercentileTest, SmallDataset) {
     const int n = 10;
     vector<double> inputs = generateNormal(n);
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_EQ(*dp.computePercentile(0.49), *dp.computePercentile(0.5));
@@ -260,7 +268,8 @@ TEST(DiscretePercentileTest, LargerDataset) {
     const int n = 1000;
     vector<double> inputs = generateNormal(n);
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_LT(*dp.computePercentile(0.499), *dp.computePercentile(0.4999));
@@ -280,7 +289,8 @@ TEST(DiscretePercentileTest, Presorted) {
     vector<double> inputs = generateNormal(n);
     std::sort(inputs.begin(), inputs.end());
 
-    DiscretePercentile dp;
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    DiscretePercentile dp = DiscretePercentile(&expCtx);
     dp.incorporate(inputs);
 
     ASSERT_EQ(inputs[DiscretePercentile::computeTrueRank(n, 0.1)], *dp.computePercentile(0.1));

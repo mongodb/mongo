@@ -78,6 +78,10 @@ long TDigest::memUsageBytes() const {
         _centroids.capacity() * sizeof(Centroid);
 }
 
+void TDigest::spill() {
+    MONGO_UNREACHABLE_TASSERT(9299403);
+}
+
 void TDigest::incorporate(double input) {
     if (std::isnan(input)) {
         return;

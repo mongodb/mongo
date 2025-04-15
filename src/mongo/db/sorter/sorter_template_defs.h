@@ -60,6 +60,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -67,7 +68,7 @@
 #include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
-#include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/counters_sort.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"

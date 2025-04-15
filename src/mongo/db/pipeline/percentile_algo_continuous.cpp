@@ -40,9 +40,18 @@
 
 namespace mongo {
 
-double ContinuousPercentile::linearInterpolate(double rank, int rank_ceil, int rank_floor) {
-    return (rank_ceil - rank) * _accumulatedValues[rank_floor] +
-        (rank - rank_floor) * _accumulatedValues[rank_ceil];
+ContinuousPercentile::ContinuousPercentile(ExpressionContext* expCtx) {
+    _expCtx = expCtx;
+}
+
+void ContinuousPercentile::reset() {
+    AccuratePercentile::reset();
+    _previousValues = {boost::none, boost::none};
+}
+
+double ContinuousPercentile::linearInterpolate(
+    double rank, int rank_ceil, int rank_floor, double value_ceil, double value_floor) {
+    return (rank_ceil - rank) * value_floor + (rank - rank_floor) * value_ceil;
 }
 
 boost::optional<double> ContinuousPercentile::computePercentile(double p) {
@@ -76,19 +85,57 @@ boost::optional<double> ContinuousPercentile::computePercentile(double p) {
             auto floor_it = _accumulatedValues.begin() + rank_floor;
             std::nth_element(_accumulatedValues.begin(), ceil_it, _accumulatedValues.end());
             std::nth_element(_accumulatedValues.begin(), floor_it, _accumulatedValues.end());
-            return linearInterpolate(rank, rank_ceil, rank_floor);
+            return linearInterpolate(rank,
+                                     rank_ceil,
+                                     rank_floor,
+                                     _accumulatedValues[rank_ceil],
+                                     _accumulatedValues[rank_floor]);
         }
     }
 
     if (rank_ceil == rank && rank == rank_floor) {
         return _accumulatedValues[(int)rank];
     } else {
-        return linearInterpolate(rank, rank_ceil, rank_floor);
+        return linearInterpolate(rank,
+                                 rank_ceil,
+                                 rank_floor,
+                                 _accumulatedValues[*_previousValues.second],
+                                 _accumulatedValues[*_previousValues.first]);
     }
 }
 
-std::unique_ptr<PercentileAlgorithm> createContinuousPercentile() {
-    return std::make_unique<ContinuousPercentile>();
+boost::optional<double> ContinuousPercentile::computeSpilledPercentile(double p) {
+    double rank = computeTrueRank(_numTotalValuesSpilled + _posInfCount + _negInfCount, p);
+    if (_negInfCount > 0 && rank < _negInfCount) {
+        return -std::numeric_limits<double>::infinity();
+    } else if (_posInfCount > 0 && rank > _numTotalValuesSpilled + _negInfCount - 1) {
+        return std::numeric_limits<double>::infinity();
+    }
+    rank -= _negInfCount;
+
+    int rank_ceil = ceil(rank);
+    int rank_floor = floor(rank);
+
+    tassert(9299401,
+            "Successive calls to computeSpilledPercentile() must have nondecreasing values of p",
+            _indexNextSorted - rank < 2);
+
+    while (_indexNextSorted <= rank_ceil) {
+        _previousValues.first = _previousValues.second;
+        _previousValues.second = _sorterIterator->next().first.getDouble();
+        _indexNextSorted += 1;
+    }
+
+    if (rank_ceil == rank && rank == rank_floor) {
+        return _previousValues.second;
+    }
+
+    return linearInterpolate(
+        rank, rank_ceil, rank_floor, *_previousValues.second, *_previousValues.first);
+}
+
+std::unique_ptr<PercentileAlgorithm> createContinuousPercentile(ExpressionContext* expCtx) {
+    return std::make_unique<ContinuousPercentile>(expCtx);
 }
 
 }  // namespace mongo

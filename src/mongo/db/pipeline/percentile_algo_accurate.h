@@ -32,7 +32,9 @@
 #include <vector>
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
 
@@ -58,7 +60,19 @@ public:
 
     std::vector<double> computePercentiles(const std::vector<double>& ps) final;
 
+    /*
+     * Accurate percentile implementations may need to spill to disk if the amount of data involved
+     * exceeds AccumulatorPercentile's memory limit.
+     */
+    void spill() final;
+
 protected:
+    void reset() override;
+
+    void emptyMemory();
+
+    virtual boost::optional<double> computeSpilledPercentile(double p) = 0;
+
     std::vector<double> _accumulatedValues;
 
     // While infinities do compare and sort correctly, no arithmetics can be done on them so, to
@@ -68,6 +82,25 @@ protected:
     int _posInfCount = 0;
 
     bool _shouldSort = true;
+
+    // Only used if the accumulator needs to spill to disk after $group spills are merged together.
+    // File where spilled data will be written to disk.
+    std::unique_ptr<SorterFileStats> _spillStats;
+    std::shared_ptr<Sorter<Value, Value>::File> _spillFile;
+
+    // Vector of file iterators tracking each sorted segment that is written to disk when we spill.
+    std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _spilledSortedSegments;
+
+    // Sorter iterator used to merge sorted segments back together in sorted order.
+    std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
+
+    // Position of next value in sorted spill.
+    int _indexNextSorted = 0;
+
+    // Total number of values written to disk.
+    int _numTotalValuesSpilled = 0;
+
+    ExpressionContext* _expCtx;
 };
 
 }  // namespace mongo
