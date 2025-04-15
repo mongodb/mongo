@@ -46,7 +46,7 @@ void f(std::string s);
         self.fixes_dir = os.path.join(self.tempdir.name, "fixes")
         os.mkdir(self.fixes_dir)
 
-        toolchain = get_mongo_toolchain()
+        toolchain = get_mongo_toolchain(from_bazel=False)
         self.clang_tidy_binary = toolchain.get_tool_path("clang-tidy")
         clang_tidy_cfg = "Checks: 'performance-unnecessary-value-param'"
         self.clang_tidy_cfg = yaml.safe_load(clang_tidy_cfg)

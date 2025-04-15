@@ -9,12 +9,21 @@ import tempfile
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-TOOLCHAIN_URL_FORMAT = (
-    "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/"
-    "bazel_{version}_toolchain_builder_"
-    "{underscore_platform_name}_{patch_build_id}_{patch_build_date}"
-    ".tar.gz"
+PATCH_TOOLCHAIN_URL_FORMAT = (
+    "https://mciuploads.s3.amazonaws.com/toolchain-builder/"
+    "{platform_name}/79c9b62fe59b85252bd716333ebea111b4d03a12/{component}_builder_{underscore_platform_name}_{build_id}.tar.gz"
 )
+TOOLCHAIN_URL_FORMAT = "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/{component}-{platform_name}-{build_id}.tar.gz"
+COMPONENT_MAP = {
+    "compiler": "bazel_{version}_toolchain",
+    "gdb": "bazel_{version}_gdb",
+}
+
+COMPONENT_FILE_MAP = {
+    "compiler": "mongo_toolchain_version_{version}.bzl",
+    "gdb": "mongo_gdb_version_{version}.bzl",
+}
+
 PLATFORM_NAME_MAP = {
     "amazon_linux_2023_aarch64": "amazon2023-arm64",
     "amazon_linux_2023_x86_64": "amazon2023",
@@ -70,70 +79,99 @@ def sha256_file(filename: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("patch_build_id", help="Patch build id from toolchain-builder project.")
-    parser.add_argument(
-        "patch_build_date_string",
-        help="Patch build date string from toolchain-builder project, get this at the task URL, ex the date is 24_01_09_16_10_07 for https://spruce.mongodb.com/task/toolchain_builder_amazon2023_compile_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07/",
-    )
-    parser.add_argument("toolchain_version", help="Toolchain version e.g., v4")
+    toolchain_versions = ["v4", "v5"]
+    toolchain_components = ["compiler", "gdb"]
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "build_id",
+        help="The build id, this should be the toolchain revision (githash), or the evergreen task id (version and date) if it is a --patch toolchain.",
+    )
+    parser.add_argument(
+        "toolchain_version", choices=toolchain_versions + ["all"], help="Toolchain version"
+    )
+    parser.add_argument(
+        "toolchain_component", choices=toolchain_components + ["all"], help="Toolchain component"
+    )
+    parser.add_argument(
+        "--patch_toolchain",
+        action="store_true",
+        help="With the path URL should be used instead of the production URL.",
+    )
     args = parser.parse_args()
 
-    version_str = args.toolchain_version
-    mongo_toolchain_version = {}
-    version_file_path = os.path.join(
-        pathlib.Path(__file__).parent.resolve(), f"mongo_toolchain_version_{version_str}.bzl"
-    )
+    if args.toolchain_version == "all":
+        toolchain_versions_to_run = toolchain_versions
+    else:
+        toolchain_versions_to_run = [args.toolchain_version]
 
-    for toolchain_name, platform_name in PLATFORM_NAME_MAP.items():
-        underscore_platform_name = platform_name.replace("-", "_")
+    if args.toolchain_component == "all":
+        toolchain_components_to_run = toolchain_components
+    else:
+        toolchain_components_to_run = [args.toolchain_component]
 
-        toolchain_url = TOOLCHAIN_URL_FORMAT.format(
-            version=version_str,
-            platform_name=platform_name,
-            underscore_platform_name=underscore_platform_name,
-            patch_build_id=args.patch_build_id,
-            patch_build_date=args.patch_build_date_string,
-        )
+    for version_str in toolchain_versions_to_run:
+        for component in toolchain_components_to_run:
+            mongo_toolchain_version = {}
+            version_file_path = os.path.join(
+                pathlib.Path(__file__).parent.resolve(),
+                COMPONENT_FILE_MAP[component].format(version=version_str),
+            )
+            toolchain_found = False
+            for toolchain_name, platform_name in PLATFORM_NAME_MAP.items():
+                underscore_platform_name = platform_name.replace("-", "_")
+                if args.patch_toolchain:
+                    toolchain_url_format = PATCH_TOOLCHAIN_URL_FORMAT
+                else:
+                    toolchain_url_format = TOOLCHAIN_URL_FORMAT
 
-        temp_dir = tempfile.gettempdir()
-        local_tarball_path = os.path.join(
-            temp_dir,
-            f"bazel_{version_str}_toolchain_builder_{underscore_platform_name}_{args.patch_build_id}.tar.gz",
-        )
+                toolchain_url = toolchain_url_format.format(
+                    version=version_str,
+                    platform_name=platform_name,
+                    underscore_platform_name=underscore_platform_name,
+                    build_id=args.build_id,
+                    component=COMPONENT_MAP[component].format(version=version_str),
+                )
 
-        if not download_toolchain(toolchain_url, local_tarball_path):
-            print(f"Toolchain {toolchain_name} for {platform_name} not available, skipping")
-            continue
-        sha = sha256_file(local_tarball_path)
-        os.remove(local_tarball_path)
+                temp_dir = tempfile.gettempdir()
+                local_tarball_path = os.path.join(
+                    temp_dir,
+                    f"{COMPONENT_MAP[component].format(version=version_str)}_{underscore_platform_name}_{args.build_id}.tar.gz",
+                )
 
-        mongo_toolchain_version[toolchain_name] = {
-            "platform_name": platform_name,
-            "sha": sha,
-            "url": toolchain_url,
-        }
+                if not download_toolchain(toolchain_url, local_tarball_path):
+                    print(
+                        f"Toolchain {version_str}_{component} on {toolchain_name} for {platform_name} not available, skipping"
+                    )
+                    continue
+                toolchain_found = True
+                sha = sha256_file(local_tarball_path)
+                os.remove(local_tarball_path)
 
-    with open(version_file_path, "w") as f:
-        print(f"Writing toolchain map to {version_file_path}...")
-        print(
-            "# Use mongo/bazel/toolchains/mongo_toolchain_version_generator.py to generate this mapping for a given patch build.\n",
-            file=f,
-        )
-        print(f'TOOLCHAIN_PATCH_BUILD_ID = "{args.patch_build_id}"', file=f)
-        print(f'TOOLCHAIN_PATCH_BUILD_DATE = "{args.patch_build_date_string}"', file=f)
-        print(f"TOOLCHAIN_MAP_{version_str.upper()} = {{", file=f)
-        for key, value in sorted(mongo_toolchain_version.items(), key=lambda x: x[0]):
-            print(f'    "{key}": {{', file=f)
-            for subkey, subvalue in sorted(value.items(), key=lambda x: x[0]):
-                print(f'        "{subkey}": "{subvalue}",', file=f)
-            print("    },", file=f)
-        print("}", file=f)
+                mongo_toolchain_version[toolchain_name] = {
+                    "platform_name": platform_name,
+                    "sha": sha,
+                    "url": toolchain_url,
+                }
+            if toolchain_found:
+                with open(version_file_path, "w") as f:
+                    print(f"Writing toolchain map to {version_file_path}...")
+                    print(
+                        "# Use mongo/bazel/toolchains/mongo_toolchain_version_generator.py to generate this mapping for a given patch build.\n",
+                        file=f,
+                    )
+                    print(f'TOOLCHAIN_ID = "{args.build_id}"', file=f)
+                    print(f"TOOLCHAIN_MAP_{version_str.upper()} = {{", file=f)
+                    for key, value in sorted(mongo_toolchain_version.items(), key=lambda x: x[0]):
+                        print(f'    "{key}": {{', file=f)
+                        for subkey, subvalue in sorted(value.items(), key=lambda x: x[0]):
+                            print(f'        "{subkey}": "{subvalue}",', file=f)
+                        print("    },", file=f)
+                    print("}", file=f)
 
-    with open(version_file_path, "r") as f:
-        print(f"Finished writing to {version_file_path}:")
-        print(f.read())
+                with open(version_file_path, "r") as f:
+                    print(f"Finished writing to {version_file_path}:")
+                    print(f.read())
 
 
 if __name__ == "__main__":

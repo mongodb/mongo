@@ -1,82 +1,13 @@
-load("//bazel:utils.bzl", "get_host_distro_major_version", "retry_download_and_extract")
-load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP")
+load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 
-def _generate_noop_toolchain(ctx, substitutions):
-    # BUILD file is required for a no-op
-    ctx.file(
-        "BUILD.bazel",
-        "# {} toolchain not supported on this platform".format(ctx.attr.version),
-    )
-    ctx.template(
-        "mongo_toolchain_flags.bzl",
-        ctx.attr.flags_tpl,
-        substitutions = substitutions,
-    )
-
 def _toolchain_download(ctx):
-    if ctx.attr.os:
-        os = ctx.attr.os
-    else:
-        os = ctx.os.name
-
-    if ctx.attr.arch:
-        arch = ctx.attr.arch
-    else:
-        arch = ctx.os.arch
-
-    arch = ARCH_NORMALIZE_MAP[arch]
-
-    version = ctx.attr.version
-
-    if os != "linux":
-        substitutions = {
-            "{platforms_arch}": "arm64",
-            "{bazel_toolchain_cpu}": arch,
-            "{arch}": arch,
-            "{version}": version,
-        }
-        _generate_noop_toolchain(ctx, substitutions)
-        ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
-        return None
-
-    if arch == "aarch64":
-        substitutions = {
-            "{platforms_arch}": "arm64",
-            "{bazel_toolchain_cpu}": arch,
-            "{arch}": arch,
-            "{version}": version,
-        }
-    elif arch == "x86_64":
-        substitutions = {
-            "{platforms_arch}": "x86_64",
-            "{bazel_toolchain_cpu}": "x86_64",
-            "{arch}": arch,
-            "{version}": version,
-        }
-    elif arch == "ppc64le":
-        substitutions = {
-            "{platforms_arch}": "ppc64le",
-            "{bazel_toolchain_cpu}": "ppc",
-            "{arch}": arch,
-            "{version}": version,
-        }
-    elif arch == "s390x":
-        substitutions = {
-            "{platforms_arch}": "s390x",
-            "{bazel_toolchain_cpu}": arch,
-            "{arch}": arch,
-            "{version}": version,
-        }
-
-    distro = get_host_distro_major_version(ctx)
-    if distro == None:
-        fail("Failed to get mongo toolchain supported distribution for os {}".format(os))
+    distro, arch, substitutions = get_toolchain_subs(ctx)
 
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
 
-    if toolchain_key in TOOLCHAIN_MAP[version]:
-        toolchain_info = TOOLCHAIN_MAP[version][toolchain_key]
+    if toolchain_key in TOOLCHAIN_MAP[ctx.attr.version]:
+        toolchain_info = TOOLCHAIN_MAP[ctx.attr.version][toolchain_key]
         urls = toolchain_info["url"]
         sha = toolchain_info["sha"]
 
@@ -89,7 +20,7 @@ def _toolchain_download(ctx):
             sha256 = sha,
         )
 
-        ctx.report_progress("generating toolchain " + version + " build file")
+        ctx.report_progress("generating toolchain " + ctx.attr.version + " build file")
         ctx.template(
             "BUILD.bazel",
             ctx.attr.build_tpl,
@@ -102,8 +33,8 @@ def _toolchain_download(ctx):
         )
 
     else:
-        _generate_noop_toolchain(ctx, substitutions)
-        ctx.report_progress("Mongo toolchain " + version + " not supported on " + distro + " and " + arch + ". Toolchain key not found: " + toolchain_key)
+        generate_noop_toolchain(ctx, substitutions)
+        ctx.report_progress("Mongo toolchain " + ctx.attr.version + " not supported on this platform. Platform key not found: " + toolchain_key)
 
     return None
 
