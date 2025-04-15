@@ -57,15 +57,26 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
         username_input_box.send_keys(username)
         next_button.click()
 
-        # Wait for the password prompt and next button to load.
-        password_input_box = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@name='passwd'][@placeholder='Password']")
+        # Azure delivers two different HTML's so we try with both versions.
+        password_input_box = None
+        verify_button = None
+        try:
+            password_input_box = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.ID, "passwordEntry"))
             )
-        )
-        verify_button = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.ID, "idSIButton9"))
-        )
+        except:
+            password_input_box = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.ID, "i0118"))
+            )
+
+        try:
+            verify_button = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.XPATH, "//button[@data-testid='primaryButton']"))
+            )
+        except:
+            verify_button = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.ID, "idSIButton9"))
+            )
 
         # Enter password.
         password_input_box.send_keys(test_credentials[username])
@@ -90,6 +101,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
         print("Error: ", e)
         print("Traceback: ", traceback.format_exc())
         print("HTML Source: ", driver.page_source)
+        raise
     else:
         print("Success")
     finally:
@@ -120,7 +132,25 @@ def main():
         assert args.username in setup_information
         assert setup_information[args.username]
 
-        authenticate_azure(args.activationEndpoint, args.userCode, args.username, setup_information)
+        num_retries = 3
+        success = False
+
+        for i in range(num_retries):
+            try:
+                authenticate_azure(
+                    args.activationEndpoint, args.userCode, args.username, setup_information
+                )
+                success = True
+                break
+            except Exception as e:
+                print(f"Error authenticating (attempt {i+1}/{num_retries}): {e}")
+                if i < num_retries - 1:
+                    print("Retrying...")
+
+        if success:
+            print("Authentication with Azure was successful")
+        else:
+            print(f"Authentication with Azure failed after {num_retries} attempts")
 
 
 if __name__ == "__main__":
