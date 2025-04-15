@@ -67,6 +67,11 @@ inline void registerEncTextSearchExpressions() {
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
                                        kDoesNotRequireFeatureFlag);
+        Expression::registerExpression("$encStrContains",
+                                       ExpressionEncStrContains::parse,
+                                       AllowedWithApiStrict::kNeverInVersion1,
+                                       AllowedWithClientType::kAny,
+                                       kDoesNotRequireFeatureFlag);
     } catch (...) {
         // registering encTextSearch expressions will throw if a duplicate registration is
         // attempted. We catch and ignore this here. This is so that we can add
