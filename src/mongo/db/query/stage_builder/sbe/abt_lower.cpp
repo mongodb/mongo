@@ -359,6 +359,11 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     if (name == kParameterFunctionName) {
         uassert(8128700, "Invalid number of arguments to getParam()", fn.nodes().size() == 2);
         const auto* paramId = fn.nodes().at(0).cast<Constant>();
+
+        uassert(10367400,
+                "First argument to getParam() must be a 32-bit integer constant",
+                paramId != nullptr && paramId->isValueInt32());
+
         auto paramIdVal = paramId->getValueInt32();
 
         auto slotId = [&]() {
