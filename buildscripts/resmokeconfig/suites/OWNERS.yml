@@ -131,3 +131,9 @@ filters:
   - "write_concern*":
     approvers:
       - 10gen/server-rw-concerns
+  - "unified_write_executor.yml":
+    approvers:
+      - query-execution-router
+  - "sharding_unified_write_executor.yml":
+    approvers:
+      - query-execution-router

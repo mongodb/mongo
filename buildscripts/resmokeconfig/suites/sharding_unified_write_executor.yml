@@ -1,0 +1,49 @@
+# Tests the unified write executor. Currently, this includes tests that run bulkWrite commands directly.
+# Many of them are currently commented out and we will work to re-enable them as development continues.
+
+test_kind: js_test
+
+selector:
+  roots:
+    # Sharding tests.
+    - jstests/sharding/query/bulk_write_basic.js
+    # - jstests/sharding/analyze_shard_key/list_sampled_queries.js
+    # - jstests/sharding/analyze_shard_key/sample_rates_bulk_write_multi_namespaces.js
+    # - jstests/sharding/applyOps_multiple_namespaces.js
+    # - jstests/sharding/chunk_migration_with_bulk_write.js
+    # - jstests/sharding/database_versioning_all_commands.js
+    # - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
+    # - jstests/sharding/mongos_writes_wait_for_write_concern_sharded_addl_crud_ops.js
+    # - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
+    # - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
+    # - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    # - jstests/sharding/query/bulk_write_size_limit.js
+    # - jstests/sharding/query/let_rand.js
+    # - jstests/sharding/query/update/update_shard_key_bulk_write.js
+    # - jstests/sharding/query/update_delete_many_metrics.js
+    # - jstests/sharding/read_write_concern_defaults_application.js
+    # - jstests/sharding/timeseries/timeseries_writes_without_shard_key_single_shard_data_placement_change.js
+    # - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
+
+    # No passthrough tests.
+    # - jstests/noPassthrough/crud/bulk_write_currentop.js
+    # - jstests/noPassthrough/crud/bulk_write_metrics.js
+    # - jstests/noPassthrough/crud/bulk_write_metrics_single_shard.js
+    # - jstests/noPassthrough/query/command_diagnostics_sharded.js
+    # - jstests/noPassthrough/query/profile/profile_planning_time_stats.js
+    # - jstests/noPassthrough/server_parameters/cluster_commands_require_cluster_node.js
+    # - jstests/noPassthrough/timeseries/bulkwrite/bulkwrite_timeseries_insert_ordered_true.js
+    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_bulkwrite_metrics.js
+    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_log_omit_bulk_write.js
+    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_mirror_reads.js
+    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_update_shard_key.js
+    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle2_write_concern_errors_unsharded.js
+    # - src/mongo/db/modules/enterprise/jstests/no_passthrough/fle_tassert_log_omit.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          internalQueryUnifiedWriteExecutor: true
+      nodb: ""

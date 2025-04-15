@@ -1598,6 +1598,20 @@ tasks:
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
+  - <<: *task_template
+    name: unified_write_executor
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: sharding_unified_write_executor
+    tags: ["assigned_to_jira_team_server_query_execution", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
   ################################################
   #           Query Optimization tasks           #
   ################################################

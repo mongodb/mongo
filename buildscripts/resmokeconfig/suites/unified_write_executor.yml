@@ -1,0 +1,29 @@
+# Tests for the unified write executor. Currently, this includes tests that run bulkWrite commands directly.
+# Many of them are currently commented out and we will work to re-enable them as development continues.
+
+test_kind: js_test
+
+selector:
+  roots:
+    # - jstests/core/query/bulk/bulk_write.js
+    # - jstests/core/query/bulk/bulk_write_delete_cursor.js
+    # - jstests/core/query/bulk/bulk_write_non_auth.js
+    # - jstests/core/query/bulk/bulk_write_non_retryable_cursor.js
+    # - jstests/core/query/bulk/bulk_write_update_cursor.js
+    # - jstests/core/query/bulk/bulk_write_update_per_statement_constants.js
+    # - jstests/core/write/bulk/bulk_write_insert_cursor.js
+    # - jstests/core/write/bulk/bulk_write_non_transaction.js
+    # - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js
+    # - jstests/core/write/empty_ts/empty_ts_bulk_write.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          internalQueryUnifiedWriteExecutor: true
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

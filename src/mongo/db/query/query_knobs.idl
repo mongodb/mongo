@@ -1646,6 +1646,14 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+
+    internalQueryUnifiedWriteExecutor:
+        description: "Boolean flag to use the unified write executor."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryUnifiedWriteExecutor"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

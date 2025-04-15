@@ -130,6 +130,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/retryable_writes* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/rollback* @10gen/server-recovery @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/unified_write_executor.yml @query-execution-router @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/sharding_unified_write_executor.yml @query-execution-router @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness @svc-auto-approve-bot

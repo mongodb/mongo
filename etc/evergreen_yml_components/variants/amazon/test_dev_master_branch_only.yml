@@ -396,6 +396,36 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive
     tasks: *query-alias-task-list
 
+  - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
+    name: amazon_linux2023_arm64_static-unified-write-executor-query-patch-only
+    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Unified Write Executor)"
+    tags: ["experimental"]
+    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+    run_on:
+      - amazon2023-arm64-latest-small
+    expansions:
+      expansions:
+      <<: *amazon_linux2023_arm64_dynamic_expansions
+      has_packages: false
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --mongodSetParameters="{internalQueryUnifiedWriteExecutor: true}"
+        --mongosSetParameters="{internalQueryUnifiedWriteExecutor: true}"
+    # For now just unified write executor suites but tasks will be added as development continues.
+    tasks:
+      - name: unified_write_executor
+      - name: sharding_unified_write_executor
+      - name: burn_in_tests_gen
+        depends_on:
+          - name: version_burn_in_gen
+            variant: generate-tasks-for-version
+            omit_generated_tasks: true
+          - name: archive_dist_test
+            variant: *amazon_linux2023_arm64_static_compile_variant_name
+
   # TODO SERVER-94401: Reenable testing this variant.
   # # Run all-feature-flags along with recordIdsReplicated:true on all collections.
   # - &enterprise-amazon-linux2023-arm64-all-feature-flags-recordIdsReplicated

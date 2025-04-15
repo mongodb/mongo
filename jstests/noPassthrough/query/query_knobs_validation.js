@@ -70,7 +70,8 @@ const expectedParamDefaults = {
     internalQueryCollectOptimizerMetrics: false,
     internalQueryDisablePlanCache: false,
     internalQueryFindCommandBatchSize: 101,
-    internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "inDebug"
+    internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "inDebug",
+    internalQueryUnifiedWriteExecutor: false,
 };
 
 function assertDefaultParameterValues() {
@@ -320,5 +321,8 @@ assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpill
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "always");
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "inDebug");
 assertSetParameterFails("internalQuerySlotBasedExecutionHashAggIncreasedSpilling", "random");
+
+assertSetParameterSucceeds("internalQueryUnifiedWriteExecutor", true);
+assertSetParameterSucceeds("internalQueryUnifiedWriteExecutor", false);
 
 MongoRunner.stopMongod(conn);
