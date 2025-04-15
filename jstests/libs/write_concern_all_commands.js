@@ -54,7 +54,7 @@ let stopAdditionalSecondariesIfSharded = function(clusterType, cluster, secondar
     if (clusterType == "sharded") {
         const shards = cluster.getAllShards();
         for (let i = 0; i < shards.length; i++) {
-            shards[i].stop(secondariesRunning[i]);
+            secondariesRunning[i].getDB("admin").fsyncLock();
         }
     }
 };
@@ -62,7 +62,7 @@ let restartAdditionalSecondariesIfSharded = function(clusterType, cluster, secon
     if (clusterType == "sharded") {
         const shards = cluster.getAllShards();
         for (let i = 0; i < shards.length; i++) {
-            shards[i].restart(secondariesRunning[i]);
+            secondariesRunning[i].getDB("admin").fsyncUnlock();
         }
     }
 };
@@ -883,7 +883,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc:
@@ -891,7 +891,7 @@ const wcCommandsTests = {
                     if (clusterType == "sharded") {
                         assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                        cluster.configRS.restart(secondariesRunning[0]);
+                        secondariesRunning[0].getDB('admin').fsyncUnlock();
                     } else {
                         assert.commandWorkedIgnoringWriteConcernErrors(res);
                         assert.neq(coll.getDB().getRole("foo"), null);
@@ -909,7 +909,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -926,7 +926,7 @@ const wcCommandsTests = {
                     if (clusterType == "sharded") {
                         assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                        cluster.configRS.restart(secondariesRunning[0]);
+                        secondariesRunning[0].getDB('admin').fsyncUnlock();
                         coll.getDB().runCommand({dropUser: "fakeusr"});
                     } else {
                         assert.commandFailedWithCode(res, 51002);
@@ -948,7 +948,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc:
@@ -956,7 +956,7 @@ const wcCommandsTests = {
                     if (clusterType == "sharded") {
                         assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                        cluster.configRS.restart(secondariesRunning[0]);
+                        secondariesRunning[0].getDB('admin').fsyncUnlock();
                     } else {
                         assert.commandWorkedIgnoringWriteConcernErrors(res);
                         assert.neq(coll.getDB().getUser("foo"), null);
@@ -975,7 +975,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -992,7 +992,7 @@ const wcCommandsTests = {
                     if (clusterType == "sharded") {
                         assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                        cluster.configRS.restart(secondariesRunning[0]);
+                        secondariesRunning[0].getDB('admin').fsyncUnlock();
                         coll.getDB().runCommand({dropRole: "bar"});
                     } else {
                         assert.commandFailedWithCode(res, 51003);
@@ -1074,7 +1074,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -1086,7 +1086,7 @@ const wcCommandsTests = {
                 assert.eq(coll.getDB().getRoles({rolesInfo: 1}).length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 }
             },
         },
@@ -1099,14 +1099,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(coll.getDB().getRoles({rolesInfo: 1}).length, 0);
@@ -1124,7 +1124,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1145,7 +1145,7 @@ const wcCommandsTests = {
                 assert.eq(coll.getDB().getUsers().length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().runCommand({dropRole: "bar"});
                 }
             },
@@ -1159,14 +1159,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(coll.getDB().getUsers().length, 0);
@@ -1271,14 +1271,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(coll.getDB().getRoles().length, 0);
@@ -1293,7 +1293,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1309,7 +1309,7 @@ const wcCommandsTests = {
                 assert.commandFailedWithCode(res, ErrorCodes.RoleNotFound);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().runCommand({dropRole: "bar"});
                 }
                 assert.eq(coll.getDB().getRoles().length, 0);
@@ -1329,14 +1329,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(coll.getDB().getUsers().length, 0);
@@ -1351,7 +1351,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1368,7 +1368,7 @@ const wcCommandsTests = {
                 assert.eq(coll.getDB().getUsers({filter: {user: "foo"}}).length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().runCommand({dropRole: "bar"});
                 }
             },
@@ -1385,7 +1385,7 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding no
                 // longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
 
                 // `enableSharding` throws the WCE as top-level error when majority WC is not
                 // available
@@ -1405,7 +1405,7 @@ const wcCommandsTests = {
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
             },
             admin: true,
         },
@@ -1421,12 +1421,12 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding no
                 // longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
             },
             admin: true,
         },
@@ -1517,7 +1517,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1541,7 +1541,7 @@ const wcCommandsTests = {
                 assert.eq(role[0].privileges[0].actions, ["find"]);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropUser("fakeusr");
                 }
 
@@ -1565,14 +1565,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
 
@@ -1608,7 +1608,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1631,7 +1631,7 @@ const wcCommandsTests = {
                 assert.eq(role.inheritedRoles[0].role, "bar");
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropUser("fakeusr");
                 }
 
@@ -1656,14 +1656,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     let role = coll.getDB().getRole("foo");
@@ -1694,7 +1694,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1716,7 +1716,7 @@ const wcCommandsTests = {
                 assert.eq(user.roles.length, 1);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropRole("foo");
@@ -1737,14 +1737,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     let user = coll.getDB().getUser("foo");
@@ -1767,7 +1767,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -1789,7 +1789,7 @@ const wcCommandsTests = {
                 assert.eq(user.roles.length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropRole("foo");
@@ -1886,7 +1886,7 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once moveChunk no
                 // longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 let keyMoved = getShardKeyMinRanges(coll)[0]["min"];
@@ -1897,7 +1897,7 @@ const wcCommandsTests = {
                               .shard,
                           getShardNames(cluster)[1]);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
 
                 assert.commandWorked(coll.getDB().adminCommand(
                     {moveChunk: fullNs, find: keyMoved, to: optionalArgs.originalShard}));
@@ -1984,7 +1984,7 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once moveChunk no
                 // longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
@@ -1996,7 +1996,7 @@ const wcCommandsTests = {
                               .shard,
                           getShardNames(cluster)[0]);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
 
                 assert.commandWorked(coll.getDB().adminCommand(
                     {moveRange: fullNs, min: keyMoved, toShard: optionalArgs.originalShard}));
@@ -2035,7 +2035,7 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once moveChunk no
                 // longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
@@ -2047,7 +2047,7 @@ const wcCommandsTests = {
                               .shard,
                           getShardNames(cluster)[1]);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
 
                 assert.commandWorked(coll.getDB().adminCommand(
                     {moveRange: fullNs, min: keyMoved, toShard: optionalArgs.originalShard}));
@@ -2227,7 +2227,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -2250,7 +2250,7 @@ const wcCommandsTests = {
                 assert.eq(role[0].privileges.length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropUser("fakeusr");
                 }
 
@@ -2276,14 +2276,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     let role = coll.getDB().getRoles({rolesInfo: 1, showPrivileges: true});
@@ -2313,7 +2313,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -2335,7 +2335,7 @@ const wcCommandsTests = {
                 assert.eq(role.inheritedRoles.length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropUser("fakeusr");
                 }
 
@@ -2363,14 +2363,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     let role = coll.getDB().getRole("foo");
@@ -2398,7 +2398,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -2420,7 +2420,7 @@ const wcCommandsTests = {
                 assert.eq(user.roles.length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropRole("foo");
@@ -2443,14 +2443,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
 
@@ -2486,7 +2486,7 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -2496,7 +2496,7 @@ const wcCommandsTests = {
                               .permitMigrations,
                           false);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
             },
             admin: true,
         },
@@ -2514,7 +2514,7 @@ const wcCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -2524,7 +2524,7 @@ const wcCommandsTests = {
                               .itcount(),
                           0);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
             },
             admin: true,
         },
@@ -2545,7 +2545,7 @@ const wcCommandsTests = {
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2554,7 +2554,7 @@ const wcCommandsTests = {
                           {"w": 1, "wtimeout": 0});
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 }
 
                 // Reset to default of majority
@@ -2577,14 +2577,14 @@ const wcCommandsTests = {
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 }
                 // Reset to default of majority
                 assert.commandWorked(coll.getDB().adminCommand({
@@ -2604,7 +2604,7 @@ const wcCommandsTests = {
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2613,7 +2613,7 @@ const wcCommandsTests = {
                           {"w": 3, "wtimeout": 0});
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 }
                 // Reset to default of majority
                 assert.commandWorked(coll.getDB().adminCommand({
@@ -2647,7 +2647,7 @@ const wcCommandsTests = {
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2667,7 +2667,7 @@ const wcCommandsTests = {
                           optionalArgs.fcv);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 }
             },
             admin: true,
@@ -2693,7 +2693,7 @@ const wcCommandsTests = {
                 // TODO SERVER-97754 Do not stop the remaining secondary once setAllowMigrations
                 // no longer override user provided writeConcern
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
@@ -2706,7 +2706,7 @@ const wcCommandsTests = {
                                   .version,
                               lastLTSFCV);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     assert.eq(coll.getDB()
@@ -2946,7 +2946,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -2966,7 +2966,7 @@ const wcCommandsTests = {
                 }
                 assert.eq(coll.getDB().getRoles().length, 1);
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropUser("fakeusr");
                 }
                 coll.getDB().dropRole("foo");
@@ -2987,14 +2987,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
                     let role = coll.getDB().getRole("foo");
@@ -3016,7 +3016,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -3033,7 +3033,7 @@ const wcCommandsTests = {
                 assert.eq(coll.getDB().getRoles().length, 1);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropUser("fakeusr");
                 }
                 coll.getDB().dropRole("foo");
@@ -3057,7 +3057,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -3079,7 +3079,7 @@ const wcCommandsTests = {
                 assert.eq(user.roles.length, 1);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropRole("bar");
                 }
 
@@ -3101,14 +3101,14 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                 }
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 if (clusterType == "sharded") {
                     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                 } else {
                     assert.commandWorkedIgnoringWriteConcernErrors(res);
 
@@ -3129,7 +3129,7 @@ const wcCommandsTests = {
 
                 // UMCs enforce wc: majority, so shut down the other node
                 if (clusterType == "sharded") {
-                    cluster.configRS.stop(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncLock();
                     // Run this to advance the system optime on the config server, so that the
                     // subsequent failing request will also encounter a WriteConcernTimeout.
                     assert.commandFailedWithCode(coll.getDB().runCommand({
@@ -3146,7 +3146,7 @@ const wcCommandsTests = {
                 assert.eq(coll.getDB().getUser("foo").roles.length, 0);
 
                 if (clusterType == "sharded") {
-                    cluster.configRS.restart(secondariesRunning[0]);
+                    secondariesRunning[0].getDB('admin').fsyncUnlock();
                     coll.getDB().dropRole("bar");
                 }
                 coll.getDB().dropUser("foo");
@@ -3947,14 +3947,14 @@ const wcTimeseriesViewsCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding
                 // no longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorkedIgnoringWriteConcernErrors(res);
                 assert.eq(
                     coll.getDB().getSiblingDB("config").databases.find({_id: dbName}).itcount(), 1);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
             },
             admin: true,
         },
@@ -3968,12 +3968,12 @@ const wcTimeseriesViewsCommandsTests = {
 
                 // TODO SERVER-97754 Do not stop the remaining secondary once enableSharding
                 // no longer override user provided writeConcern
-                cluster.configRS.stop(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncLock();
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 
-                cluster.configRS.restart(secondariesRunning[0]);
+                secondariesRunning[0].getDB('admin').fsyncUnlock();
             },
             admin: true,
         },

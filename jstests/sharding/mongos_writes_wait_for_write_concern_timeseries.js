@@ -7,6 +7,7 @@
  * does_not_support_stepdowns,
  * multiversion_incompatible,
  * requires_timeseries,
+ * incompatible_aubsan,
  * tsan_incompatible,
  * requires_persistence,
  * ]
