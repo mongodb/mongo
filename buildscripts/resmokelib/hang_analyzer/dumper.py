@@ -158,8 +158,9 @@ class WindowsDumper(Dumper):
 
         for dbg_path in debugger_paths:
             self._root_logger.info("Checking for debugger in %s", dbg_path)
-            if os.path.exists(dbg_path):
-                return os.path.join(dbg_path, debugger)
+            cdb = os.path.join(dbg_path, debugger)
+            if os.path.exists(cdb):
+                return cdb
 
         return None
 
