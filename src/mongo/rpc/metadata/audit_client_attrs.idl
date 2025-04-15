@@ -28,18 +28,34 @@
 
 global:
     cpp_namespace: "mongo::rpc"
-    cpp_includes:
-        - "mongo/rpc/metadata/audit_client_attrs.h"
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/util/net/hostandport.idl"
 
 types:
     AuditClientAttrs:
         description: "Container type for all per-operation client information needed for auditing"
         bson_serialization_type: object
         cpp_type: AuditClientAttrs
-        serializer: "mongo::rpc::AuditClientAttrs::serialize"
-        deserializer: "mongo::rpc::AuditClientAttrs::parseFromBSON"
+        serializer: "mongo::rpc::AuditClientAttrs::toBSON"
+        deserializer: "mongo::rpc::AuditClientAttrs"
         # Deserializer uses getOwned.
         is_view: false
+structs:
+    AuditClientAttrsBase:
+        description: "Stores per-operation client information needed for auditing."
+        strict: false
+        fields:
+            local:
+                type: HostAndPort
+                description: The local address.
+                optional: false
+            remote:
+                type: HostAndPort
+                description: The remote address.
+                optional: false
+            proxies:
+                type: array<HostAndPort>
+                description: "The intermediate load balancers or mongos addresses that the request passed through between 'remote' and 'local'"
+                optional: false
