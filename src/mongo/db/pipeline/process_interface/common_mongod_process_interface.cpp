@@ -282,8 +282,7 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
     }
 
     const auto& collPtr = acquisition.getCollectionPtr();
-    const auto& indexStatsMap =
-        CollectionIndexUsageTrackerDecoration::get(collPtr.get()).getUsageStats();
+    const auto& indexStatsMap = CollectionIndexUsageTrackerDecoration::getUsageStats(collPtr.get());
     for (auto&& indexStatsMapIter : indexStatsMap) {
         auto indexName = indexStatsMapIter.first;
         auto stats = indexStatsMapIter.second;
@@ -501,7 +500,7 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
     if (!isQEColl(acquisition)) {
         const auto& collPtr = acquisition.getCollectionPtr();
         auto collectionScanStats =
-            CollectionIndexUsageTrackerDecoration::get(collPtr.get()).getCollectionScanStats();
+            CollectionIndexUsageTrackerDecoration::getCollectionScanStats(collPtr.get());
 
         dassert(collectionScanStats.collectionScans <=
                 static_cast<unsigned long long>(std::numeric_limits<long long>::max()));

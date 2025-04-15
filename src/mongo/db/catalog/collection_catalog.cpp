@@ -2354,19 +2354,27 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     _catalogIdTracker.create(nss, uuid, coll->getCatalogId(), commitTime, allowMixedModeWrites);
 
 
-    if (!nss.isOnInternalDb() && !nss.isSystem()) {
-        _stats.userCollections += 1;
-        if (coll->isCapped()) {
-            _stats.userCapped += 1;
+    if (!nss.isOnInternalDb()) {
+        if (!nss.isSystem()) {
+            _stats.userCollections += 1;
+            if (coll->isCapped()) {
+                _stats.userCapped += 1;
+            }
+            if (coll->isClustered()) {
+                _stats.userClustered += 1;
+            }
+            if (coll->getCollectionOptions().encryptedFieldConfig) {
+                _stats.queryableEncryption += 1;
+            }
+            if (isCSFLE1Validator(coll->getValidatorDoc())) {
+                _stats.csfle += 1;
+            }
+        } else {
+            _stats.internal += 1;
         }
-        if (coll->isClustered()) {
-            _stats.userClustered += 1;
-        }
-        if (coll->getCollectionOptions().encryptedFieldConfig) {
-            _stats.queryableEncryption += 1;
-        }
-        if (isCSFLE1Validator(coll->getValidatorDoc())) {
-            _stats.csfle += 1;
+
+        if (nss.isSystemDotProfile()) {
+            _stats.systemProfile += 1;
         }
     } else {
         _stats.internal += 1;
@@ -2415,19 +2423,27 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     _catalogIdTracker.drop(ns, uuid, commitTime);
 
-    if (!ns.isOnInternalDb() && !ns.isSystem()) {
-        _stats.userCollections -= 1;
-        if (coll->isCapped()) {
-            _stats.userCapped -= 1;
+    if (!ns.isOnInternalDb()) {
+        if (!ns.isSystem()) {
+            _stats.userCollections -= 1;
+            if (coll->isCapped()) {
+                _stats.userCapped -= 1;
+            }
+            if (coll->isClustered()) {
+                _stats.userClustered -= 1;
+            }
+            if (coll->getCollectionOptions().encryptedFieldConfig) {
+                _stats.queryableEncryption -= 1;
+            }
+            if (isCSFLE1Validator(coll->getValidatorDoc())) {
+                _stats.csfle -= 1;
+            }
+        } else {
+            _stats.internal -= 1;
         }
-        if (coll->isClustered()) {
-            _stats.userClustered -= 1;
-        }
-        if (coll->getCollectionOptions().encryptedFieldConfig) {
-            _stats.queryableEncryption -= 1;
-        }
-        if (isCSFLE1Validator(coll->getValidatorDoc())) {
-            _stats.csfle -= 1;
+
+        if (ns.isSystemDotProfile()) {
+            _stats.systemProfile -= 1;
         }
     } else {
         _stats.internal -= 1;

@@ -691,9 +691,11 @@ public:
         auto&& explainer = executor->getPlanExplainer();
         explainer.getSummaryStats(&stats);
         if (collection) {
-            CollectionIndexUsageTrackerDecoration::get(collection.get())
-                .recordCollectionIndexUsage(
-                    stats.collectionScans, stats.collectionScansNonTailable, stats.indexesUsed);
+            CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+                collection.get(),
+                stats.collectionScans,
+                stats.collectionScansNonTailable,
+                stats.indexesUsed);
         }
 
         curOp->debug().setPlanSummaryMetrics(std::move(stats));

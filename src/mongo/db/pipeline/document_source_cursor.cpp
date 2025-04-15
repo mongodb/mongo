@@ -443,18 +443,21 @@ DocumentSourceCursor::DocumentSourceCursor(
 
     if (collections.hasMainCollection()) {
         const auto& coll = collections.getMainCollection();
-        CollectionIndexUsageTrackerDecoration::get(coll.get())
-            .recordCollectionIndexUsage(_stats.planSummaryStats.collectionScans,
-                                        _stats.planSummaryStats.collectionScansNonTailable,
-                                        _stats.planSummaryStats.indexesUsed);
+        CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+            coll.get(),
+            _stats.planSummaryStats.collectionScans,
+            _stats.planSummaryStats.collectionScansNonTailable,
+            _stats.planSummaryStats.indexesUsed);
     }
     for (auto& [nss, coll] : collections.getSecondaryCollections()) {
         if (coll) {
             PlanSummaryStats stats;
             explainer.getSecondarySummaryStats(nss, &stats);
-            CollectionIndexUsageTrackerDecoration::get(coll.get())
-                .recordCollectionIndexUsage(
-                    stats.collectionScans, stats.collectionScansNonTailable, stats.indexesUsed);
+            CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+                coll.get(),
+                stats.collectionScans,
+                stats.collectionScansNonTailable,
+                stats.indexesUsed);
         }
     }
 

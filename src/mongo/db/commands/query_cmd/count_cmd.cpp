@@ -539,10 +539,11 @@ public:
             PlanSummaryStats summaryStats;
             exec.getPlanExplainer().getSummaryStats(&summaryStats);
             if (collection) {
-                CollectionIndexUsageTrackerDecoration::get(collection.get())
-                    .recordCollectionIndexUsage(summaryStats.collectionScans,
-                                                summaryStats.collectionScansNonTailable,
-                                                summaryStats.indexesUsed);
+                CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+                    collection.get(),
+                    summaryStats.collectionScans,
+                    summaryStats.collectionScansNonTailable,
+                    summaryStats.indexesUsed);
             }
             curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
             curOp->setEndOfOpMetrics(kNReturned);
