@@ -53,7 +53,6 @@ let testCases = {
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
     _configsvrAddShard: {skip: "primary only"},
-    _configsvrAddShardCoordinator: {skip: "primary only"},
     _configsvrAddShardToZone: {skip: "primary only"},
     _configsvrBalancerCollectionStatus: {skip: "primary only"},
     _configsvrBalancerStart: {skip: "primary only"},

@@ -6963,14 +6963,6 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrAddShardCoordinator",
-          command: {_configsvrAddShardCoordinator: "x"},
-          skipSharded: true,
-          testcases: [
-              {runOnDb: adminDbName, roles: {__system: 1}, expectFail: true},
-          ]
-        },
-        {
           testname: "addShardToZone",
           command: {addShardToZone: shard0name, zone: 'z'},
           skipUnlessSharded: true,
