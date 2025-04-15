@@ -324,23 +324,6 @@ tasks:
           display_name: Benchmarks
 
   - <<: *gen_task_template
-    name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
-    # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "experimental",
-        "incompatible_debug_mode",
-        "serverless",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-          suite: multitenancy_with_atlas_proxy_jscore_passthrough
-          resmoke_args: "--numClientsPerFixture=2 --useTenantClient --excludeWithAnyTags=multi_clients_incompatible"
-
-  - <<: *gen_task_template
     name: concurrency_embedded_router_causal_consistency_gen
     tags:
       [
