@@ -74,13 +74,22 @@ auto buildDelete(const NamespaceString& nss, BSONObj query, bool multi = false) 
 class ShardKeyPatternQueryUtilTest : public RouterCatalogCacheTestFixture {
 public:
     CollectionRoutingInfo prepare(BSONObj shardKeyPattern,
-                                  const std::vector<BSONObj>& splitPoints) {
-        return makeCollectionRoutingInfo(
-            kNss, ShardKeyPattern(shardKeyPattern), nullptr, false, splitPoints, {});
+                                  const std::vector<BSONObj>& splitPoints,
+                                  size_t chunksPerShard = 1) {
+        return makeCollectionRoutingInfo(kNss,
+                                         ShardKeyPattern(shardKeyPattern),
+                                         nullptr,
+                                         false,
+                                         splitPoints,
+                                         {},
+                                         boost::none,
+                                         boost::none,
+                                         chunksPerShard);
     }
 
 protected:
     void testGetShardIdsAndChunksUpdateWithRangePrefixHashedShardKey();
+    void testGetShardIdsAndChunksUpdateWithMultipleChunksPerShard();
     void testGetShardIdsAndChunksUpdateWithHashedPrefixHashedShardKey();
     void testGetShardIdsAndChunksDeleteWithExactId();
     void testGetShardIdsAndChunksDeleteWithHashedPrefixHashedShardKey();
@@ -275,6 +284,123 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     ASSERT_BSONOBJ_EQ(info.chunkRanges.cbegin()->getMin(), BSON("a.b" << 100 << "c.d" << MINKEY));
     ASSERT_BSONOBJ_EQ(info.chunkRanges.cbegin()->getMax(),
                       BSON("a.b" << MAXKEY << "c.d" << MAXKEY));
+    info.chunkRanges.clear();
+    shardIds.clear();
+}
+
+void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithMultipleChunksPerShard() {
+    std::set<ShardId> shardIds;
+    // Create 10 chunks and 5 shards such that shardId '0' has chunks [MinKey, -200) and [-200,
+    // -100), '1' has chunks [-100, -50) and [-50, -25), '2' has chunks [-25, 0) and [0, 25),
+    // '3' has chunks [25, 50) and [50, 100) and '4' has chunks [100, 200) and [200, MaxKey).
+    std::vector<BSONObj> splitPoints = {BSON("a.b" << -200LL),
+                                        BSON("a.b" << -100LL),
+                                        BSON("a.b" << -50LL),
+                                        BSON("a.b" << -25LL),
+                                        BSON("a.b" << 0LL),
+                                        BSON("a.b" << 25LL),
+                                        BSON("a.b" << 50LL),
+                                        BSON("a.b" << 100LL),
+                                        BSON("a.b" << 200LL)};
+    auto cri = prepare(BSON("a.b" << 1), splitPoints, 2);
+
+    shard_key_pattern_query_util::QueryTargetingInfo info;
+
+    // Two chunks from the last shard participate in the query.
+    auto requestAndSetLast =
+        buildUpdate(kNss,
+                    fromjson("{$and: [{'a.b': {$gte : 199}}, {'a.b': {$lt: 300}}]}"),
+                    fromjson("{$set: {p : 3}}"),
+                    false);
+
+    getShardIdsAndChunksForCanonicalQuery(
+        *makeCQUpdate(requestAndSetLast, fromjson("{}"), cri.getChunkManager()),
+        cri.getChunkManager(),
+        &shardIds,
+        &info,
+        false);
+
+    ASSERT_EQUALS(shardIds.size(), 1);
+    ASSERT_TRUE(shardIds.contains(ShardId("4")));
+    ASSERT_EQUALS(info.chunkRanges.size(), 2);
+    ASSERT_TRUE(info.chunkRanges.contains({BSON("a.b" << 100), BSON("a.b" << 200)}));
+    ASSERT_TRUE(info.chunkRanges.contains({BSON("a.b" << 200), BSON("a.b" << MAXKEY)}));
+    info.chunkRanges.clear();
+    shardIds.clear();
+
+    // All shards and their associated chunks participate in the query.
+    auto requestAndSetAll =
+        buildUpdate(kNss,
+                    fromjson("{$and: [{'a.b': {$gte : -250}}, {'a.b': {$lt: 300}}]}"),
+                    fromjson("{$set: {p : 2}}"),
+                    false);
+
+    getShardIdsAndChunksForCanonicalQuery(
+        *makeCQUpdate(requestAndSetAll, fromjson("{}"), cri.getChunkManager()),
+        cri.getChunkManager(),
+        &shardIds,
+        &info,
+        false);
+
+    ASSERT_EQUALS(shardIds.size(), 5);
+    for (int i = 0; i <= 4; ++i) {
+        ASSERT_TRUE(shardIds.contains(ShardId(std::to_string(i))));
+    }
+    ASSERT_EQUALS(info.chunkRanges.size(), 10);
+    for (std::vector<BSONObj>::size_type i = 1; i < splitPoints.size(); ++i) {
+        ASSERT_TRUE(info.chunkRanges.contains({splitPoints[i - 1], splitPoints[i]}));
+    }
+    ASSERT_TRUE(info.chunkRanges.contains({BSON("a.b" << MINKEY), BSON("a.b" << -200)}));
+    ASSERT_TRUE(info.chunkRanges.contains({BSON("a.b" << 200), BSON("a.b" << MAXKEY)}));
+    info.chunkRanges.clear();
+    shardIds.clear();
+
+    // With empty query all shards and their associated chunks participate.
+    auto requestAndSetAllEmpty =
+        buildUpdate(kNss, fromjson("{}"), fromjson("{$set: {p : 10}}"), false);
+
+    getShardIdsAndChunksForCanonicalQuery(
+        *makeCQUpdate(requestAndSetAllEmpty, fromjson("{}"), cri.getChunkManager()),
+        cri.getChunkManager(),
+        &shardIds,
+        &info,
+        false);
+
+    ASSERT_EQUALS(shardIds.size(), 5);
+    for (int i = 0; i <= 4; ++i) {
+        ASSERT_TRUE(shardIds.contains(ShardId(std::to_string(i))));
+    }
+    ASSERT_EQUALS(info.chunkRanges.size(), 10);
+    for (std::vector<BSONObj>::size_type i = 1; i < splitPoints.size(); ++i) {
+        ASSERT_TRUE(info.chunkRanges.contains({splitPoints[i - 1], splitPoints[i]}));
+    }
+    ASSERT_TRUE(info.chunkRanges.contains({BSON("a.b" << MINKEY), BSON("a.b" << -200)}));
+    ASSERT_TRUE(info.chunkRanges.contains({BSON("a.b" << 200), BSON("a.b" << MAXKEY)}));
+    info.chunkRanges.clear();
+    shardIds.clear();
+
+    // All shards are queried, but the first and last chunks are not used.
+    auto requestAndSet8 =
+        buildUpdate(kNss,
+                    fromjson("{$and: [{'a.b': {$gte : -150}}, {'a.b': {$lt: 150}}]}"),
+                    fromjson("{$set: {p : 3}}"),
+                    false);
+
+    getShardIdsAndChunksForCanonicalQuery(
+        *makeCQUpdate(requestAndSet8, fromjson("{}"), cri.getChunkManager()),
+        cri.getChunkManager(),
+        &shardIds,
+        &info,
+        false);
+
+    ASSERT_EQUALS(shardIds.size(), 5);
+    for (int i = 0; i <= 4; ++i) {
+        ASSERT_TRUE(shardIds.contains(ShardId(std::to_string(i))));
+    }
+    ASSERT_EQUALS(info.chunkRanges.size(), 8);
+    for (std::vector<BSONObj>::size_type i = 1; i < splitPoints.size(); ++i) {
+        ASSERT_TRUE(info.chunkRanges.contains({splitPoints[i - 1], splitPoints[i]}));
+    }
     info.chunkRanges.clear();
     shardIds.clear();
 }
@@ -531,6 +657,10 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksDeleteWithHashedPrefi
 
 TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksUpdateWithRangePrefixHashedShardKey) {
     testGetShardIdsAndChunksUpdateWithRangePrefixHashedShardKey();
+}
+
+TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksUpdateWithMultipleChunksPerShard) {
+    testGetShardIdsAndChunksUpdateWithMultipleChunksPerShard();
 }
 
 TEST_F(ShardKeyPatternQueryUtilTest, GetShardIdsAndChunksUpdateWithHashedPrefixHashedShardKey) {

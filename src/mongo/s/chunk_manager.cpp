@@ -835,8 +835,10 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
         // all shards. However, this optimization does not apply when we are reading from a snapshot
         // because _placementVersions contains shards with chunks and is built based on the last
         // refresh. Therefore, it is possible for _placementVersions to have fewer entries if a
-        // shard no longer owns chunks when it used to at _clusterTime.
-        if (!_clusterTime && shardIds->size() == _rt->optRt->getNShardsOwningChunks()) {
+        // shard no longer owns chunks when it used to at _clusterTime. Similarly, this optimization
+        // does not apply when it's necessary to fill chunkRanges, as the last chunks can be lost.
+        if (!_clusterTime && shardIds->size() == _rt->optRt->getNShardsOwningChunks() &&
+            !chunkRanges) {
             return false;
         }
 

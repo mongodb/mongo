@@ -154,7 +154,8 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     const std::vector<BSONObj>& splitPoints,
     boost::optional<ReshardingFields> reshardingFields,
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
-    boost::optional<bool> unsplittable) {
+    boost::optional<bool> unsplittable,
+    size_t chunksPerShard) {
     ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
     DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
@@ -194,13 +195,14 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     splitPointsIncludingEnds.push_back(shardKeyPattern.getKeyPattern().globalMax());
 
     for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
+        int shardIndex = (i - 1) / chunksPerShard;
         ChunkType chunk(
             uuid,
             {shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i - 1],
                                                               false),
              shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
             version,
-            ShardId{str::stream() << (i - 1)});
+            ShardId{str::stream() << shardIndex});
         chunk.setName(OID::gen());
 
         initialChunks.push_back(chunk.toConfigBSON());

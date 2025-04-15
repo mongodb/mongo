@@ -84,7 +84,8 @@ protected:
         const std::vector<BSONObj>& splitPoints,
         boost::optional<ReshardingFields> reshardingFields = boost::none,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none,
-        boost::optional<bool> unsplittable = boost::none);
+        boost::optional<bool> unsplittable = boost::none,
+        size_t chunksPerShard = 1);
 
     /**
      * Returns a chunk manager representing an unsharded collection tracked on the configsvr.

@@ -569,8 +569,10 @@ void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
         // However, this optimization does not apply when we are reading from a snapshot
         // because _shardPlacementVersions contains shards with chunks and is built based on the
         // last refresh. Therefore, it is possible for _shardPlacementVersions to have fewer entries
-        // if a shard no longer owns chunks when it used to at _clusterTime.
-        if (!cm.isAtPointInTime() && shardIds->size() == cm.getNShardsOwningChunks()) {
+        // if a shard no longer owns chunks when it used to at _clusterTime. Similarly, this
+        // optimization does not apply when it's necessary to fill chunkRanges, as the last chunks
+        // can be lost.
+        if (!cm.isAtPointInTime() && shardIds->size() == cm.getNShardsOwningChunks() && !info) {
             break;
         }
     }
