@@ -513,6 +513,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
     bool isConfigShard) {
+    static Lock::ResourceMutex _kAddShardLock("addShardLock");
+
+    auto addShardLock = Lock::ExclusiveLock(opCtx, _kAddShardLock);
+
     if (!shardConnectionString) {
         return {ErrorCodes::BadValue, "Invalid connection string"};
     }
