@@ -116,48 +116,6 @@ void finishWriteBatch(WriteBatch& batch) {
 }
 
 /**
- * Determines if 'measurement' will cause rollover to 'bucket'.
- * Returns the rollover reason and marks the bucket with rollover reason if it needs to be rolled
- * over.
- */
-RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
-                                                     Stripe& stripe,
-                                                     WithLock stripeLock,
-                                                     Bucket& bucket,
-                                                     const BSONObj& measurement,
-                                                     const Date_t& measurementTimestamp,
-                                                     const TimeseriesOptions& options,
-                                                     const StringDataComparator* comparator,
-                                                     uint64_t storageCacheSizeBytes,
-                                                     ExecutionStatsController& stats,
-                                                     bool& bucketOpenedDueToMetadata) {
-    Bucket::NewFieldNames newFieldNamesToBeInserted;
-    Sizes sizesToBeAdded;
-    calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                       bucket,
-                                       measurement,
-                                       options.getMetaField(),
-                                       newFieldNamesToBeInserted,
-                                       sizesToBeAdded);
-    auto rolloverReason = internal::determineRolloverReason(
-        measurement,
-        options,
-        bucket,
-        catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
-        sizesToBeAdded,
-        measurementTimestamp,
-        storageCacheSizeBytes,
-        comparator,
-        stats);
-
-    if (rolloverReason != RolloverReason::kNone) {
-        // Update the bucket's 'rolloverReason'.
-        bucket.rolloverReason = rolloverReason;
-    }
-    return rolloverReason;
-}
-
-/**
  * Disallows query-based reopening if the rollover reason is not time-backward.
  * Once 'allowQueryBasedReopening' is disabled, it cannot be re-enabled.
  */
@@ -212,16 +170,13 @@ Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
     for (const auto& potentialBucket : potentialBuckets) {
         // Check if the measurement can fit in the potential bucket.
         auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
-                                                                    stripe,
-                                                                    stripeLock,
-                                                                    *potentialBucket,
                                                                     measurement,
                                                                     measurementTimestamp,
                                                                     options,
                                                                     comparator,
                                                                     storageCacheSizeBytes,
-                                                                    stats,
-                                                                    bucketOpenedDueToMetadata);
+                                                                    *potentialBucket,
+                                                                    stats);
 
         if (rolloverReason == RolloverReason::kNone) {
             // The measurement can be inserted into the open bucket.
@@ -642,6 +597,40 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
     return {std::make_pair(std::move(insertContext), std::move(time))};
 }
 
+RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
+                                                     const BSONObj& measurement,
+                                                     const Date_t& measurementTimestamp,
+                                                     const TimeseriesOptions& options,
+                                                     const StringDataComparator* comparator,
+                                                     uint64_t storageCacheSizeBytes,
+                                                     Bucket& bucket,
+                                                     ExecutionStatsController& stats) {
+    Bucket::NewFieldNames newFieldNamesToBeInserted;
+    Sizes sizesToBeAdded;
+    calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
+                                       bucket,
+                                       measurement,
+                                       options.getMetaField(),
+                                       newFieldNamesToBeInserted,
+                                       sizesToBeAdded);
+    auto rolloverReason = internal::determineRolloverReason(
+        measurement,
+        options,
+        bucket,
+        catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
+        sizesToBeAdded,
+        measurementTimestamp,
+        storageCacheSizeBytes,
+        comparator,
+        stats);
+
+    if (rolloverReason != RolloverReason::kNone) {
+        // Update the bucket's 'rolloverReason'.
+        bucket.rolloverReason = rolloverReason;
+    }
+    return rolloverReason;
+}
+
 void sortOnNumMeasurements(absl::InlinedVector<Bucket*, 8>& vec) {
     std::sort(vec.begin(), vec.end(), [](const Bucket* lhs, const Bucket* rhs) {
         return lhs->numMeasurements < rhs->numMeasurements;
@@ -861,16 +850,13 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
         if (swReopenedBucket.isOK() && swReopenedBucket.getValue()) {
             auto& reopenedBucket = *swReopenedBucket.getValue();
             auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
-                                                                        stripe,
-                                                                        stripeLock,
-                                                                        reopenedBucket,
                                                                         measurement,
                                                                         measurementTimestamp,
                                                                         options,
                                                                         comparator,
                                                                         storageCacheSizeBytes,
-                                                                        stats,
-                                                                        bucketOpenedDueToMetadata);
+                                                                        reopenedBucket,
+                                                                        stats);
             if (rolloverReason == RolloverReason::kNone) {
                 // Use the reopened bucket if the measurement can fit there.
                 return reopenedBucket;

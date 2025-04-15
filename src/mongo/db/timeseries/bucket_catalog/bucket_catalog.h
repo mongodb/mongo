@@ -359,6 +359,20 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const BSONObj& measurementDoc);
 
 /**
+ * Determines if 'measurement' will cause rollover to 'bucket'.
+ * Returns the rollover reason and marks the bucket with rollover reason if it needs to be rolled
+ * over.
+ */
+RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
+                                                     const BSONObj& measurement,
+                                                     const Date_t& measurementTimestamp,
+                                                     const TimeseriesOptions& options,
+                                                     const StringDataComparator* comparator,
+                                                     uint64_t storageCacheSizeBytes,
+                                                     Bucket& bucket,
+                                                     ExecutionStatsController& stats);
+
+/**
  * Returns a vector of buckets based on the two conditions in order:
  *  1. Prioritizes returning candidate buckets that have the kSoftClose rollover reason, then the
  *     kArchive rollover reason, and finally a kNone rollover reason.
