@@ -1884,6 +1884,14 @@ functions:
         content_type: application/gzip
         display_name: npm logs - Execution ${execution}
 
+  "debug full disk":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/full_disk_debug.sh"
+
   "upload jstestfuzz minimized output":
     - command: s3.put
       params:

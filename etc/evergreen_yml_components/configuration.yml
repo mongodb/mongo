@@ -86,6 +86,7 @@ pre:
 post:
   - func: "f_expansions_write"
   - func: "cleanup external auth OIDC resources"
+  - func: "debug full disk"
   - func: "upload npm logs"
   - func: "attach local resmoke invocation"
   - func: "attach bazel invocation"
