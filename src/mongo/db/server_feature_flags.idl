@@ -167,3 +167,8 @@ feature_flags:
         cpp_varname: gFeatureFlagIntentRegistration
         default: false
         shouldBeFCVGated: false
+    featureFlagPQSBackfill:
+        description: "Enables PQS representative query backfilling"
+        cpp_varname: gFeatureFlagPQSBackfill
+        default: false
+        shouldBeFCVGated: true
