@@ -15,6 +15,9 @@ filters:
   - "move_primary_clone.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "proxy_protocol_connect.js":
+    approvers:
+      - 10gen/server-security
   - "*range*deleter*":
     approvers:
       - 10gen/server-cluster-scalability

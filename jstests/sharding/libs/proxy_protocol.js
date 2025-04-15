@@ -106,30 +106,50 @@ export class ProxyProtocolServer {
      * Get the proxy server port used to connect to the egress port provided.
      */
     getServerPort() {
-        let args = ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`];
-        clearRawMongoProgramOutput();
-        _startMongoProgram({args: args});
+        const regexPattern = `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`;
+        const commands = [
+            ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`],
+            ["netstat", "-nt"],
+        ];
 
-        sleep(1000);
+        let output = "";
+        let match = null;
 
-        let output = rawMongoProgramOutput(".*");
-
-        // Some variants like UBI 8 do not have ss installed
-        if (output.match("(?:not found|No such file or directory)")) {
-            args = ["netstat", "-nt"];
+        for (const args of commands) {
+            const cmd = args[0];
             clearRawMongoProgramOutput();
             _startMongoProgram({args: args});
 
-            sleep(1000);
+            try {
+                assert.soon(() => {
+                    output = rawMongoProgramOutput(".*");
 
-            output = rawMongoProgramOutput(".*");
+                    match = output.match(regexPattern);
+                    if (match) {
+                        return true;
+                    }
+
+                    if (output.match("(?:not found|No such file or directory)")) {
+                        return true;
+                    }
+
+                    print(`Did not receive output of ${cmd} command, retrying`);
+                    sleep(1000);
+                    return false;
+                }, `Timed out waiting for ${cmd} command output`, 30 * 1000);
+
+                if (match) {
+                    break;
+                }
+            } catch (e) {
+                print(`Command ${cmd} timed out: ${e}`);
+            }
         }
 
-        const regexMatch = `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`;
-        const match = output.match(regexMatch);
         if (!match) {
-            throw Error("Could not find connection to egress port");
+            throw Error(`Could not find connection to egress port: ${this.egress_port}`);
         }
+
         return parseInt(match[1]);
     }
 

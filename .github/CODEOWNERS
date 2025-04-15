@@ -1209,6 +1209,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/*chunk_migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*migration_coordinator* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/move_primary_clone.js @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/sharding/**/proxy_protocol_connect.js @10gen/server-security @svc-auto-approve-bot
 /jstests/sharding/**/*range*deleter* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*range*deletion* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*retryable_write* @10gen/server-cluster-scalability @svc-auto-approve-bot
