@@ -19,6 +19,10 @@ py_binary(
     ],
     deps = [
         dependency(
+            "regex",
+            group = "compile",
+        ),
+        dependency(
             "pyyaml",
             group = "core",
         ),

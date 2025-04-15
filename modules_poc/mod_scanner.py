@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 
+import dataclasses
+import functools
+import itertools
+import json
+import os
+import sys
+from dataclasses import dataclass
+from datetime import datetime
+from functools import cache, cached_property
+from glob import glob
+from pathlib import Path  # if you haven't already done so
+from typing import NoReturn
+
+import pyzstd
+import regex as re
 import yaml
+from codeowners import CodeOwners
 
 try:
     from yaml import CDumper as Dumper
@@ -8,21 +24,6 @@ try:
 except ImportError:
     raise RuntimeError("Why no cYaml?")
     # from yaml import Loader, Dumper
-
-import dataclasses
-import functools
-import json
-import os
-import re
-import sys
-from dataclasses import dataclass
-from datetime import datetime
-from glob import glob
-from pathlib import Path  # if you haven't already done so
-from typing import NoReturn
-
-import pyzstd
-from codeowners import CodeOwners
 
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
@@ -46,13 +47,10 @@ from cindex import File as ClangFile
 #     return node.has_attrs()
 
 
-# This papers over a difference between using clang-19 or clang-12
 def is_tu(c: Cursor | CursorKind):
     if isinstance(c, Cursor):
         c = c.kind
-
-    OLD_TRANSLATION_UNIT = 300  # clang-12
-    return c == CursorKind.TRANSLATION_UNIT or c.value == OLD_TRANSLATION_UNIT
+    return c == CursorKind.TRANSLATION_UNIT
 
 
 out_from_env = os.environ.get("MOD_SCANNER_OUTPUT", None)
@@ -90,13 +88,160 @@ def perr_exit(*values) -> NoReturn:
     sys.exit(1)
 
 
+class DecoratedCursor(Cursor):
+    # All USRs start with 'c:'. Local USRs then have a filename+'@' followed by
+    # an optional number+'@'. Global USRs just start with 'c:@'
+    _USR_GLOBALIZER_REGEX = re.compile(r"c:[\w\.\-]+@(\d+@)?")
+
+    # CursorKinds that represent types. For these we prefer definition locations.
+    # This was decided by manually examining the unique kinds from the output.
+    _TYPE_KINDS = {
+        CursorKind.ENUM_DECL,
+        CursorKind.STRUCT_DECL,
+        CursorKind.UNION_DECL,
+        CursorKind.CLASS_DECL,
+        CursorKind.CLASS_TEMPLATE,
+        CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION,
+        # Unsure about these:
+        # CursorKind.TYPE_ALIAS_DECL,
+        # CursorKind.TYPEDEF_DECL,
+        # CursorKind.TYPE_ALIAS_TEMPLATE_DECL,
+    }
+
+    def __init__(self, c: Cursor):
+        # Unfortunately, need to decompose and have Cursor constructor recompose.
+        super().__init__(c._kind_id, c.xdata, c.data)
+        self._tu = c._tu
+
+    @staticmethod
+    @cache
+    def normalize(c: Cursor):
+        assert c.kind != CursorKind.NAMESPACE  # Should not be called with this.
+
+        # unresolve implicit instantiations
+        while templ := c.specialized_template:
+            # Clang unfortunate behavior: The method to "unspecialize" a template
+            # will both go from implicit instantiation to the template *and* go from
+            # an explicit specialization to the primary template. Ideally, we
+            # would only do the first, but that isn't an option. So we try to fake
+            # it by only using the result if the locations are the same. However,
+            # in some cases (notably including template methods of a template class),
+            # clang will jump from the definition to the declaration, and neither
+            # orig.canonical or result.get_definition() works to get the same location.
+            # So we compromise: fully unspecialize non-type templates (variables and
+            # functions), but require the locs to match on types. This is important
+            # because class specializations can have different members than their
+            # primary template and we want to handle those correctly. We ignore all
+            # child declarations of functions, so that isn't a problem there.
+            # This still chokes on explicit and extern template instantiations, but
+            # it isn't clear how to fix that.
+            if c.kind in DecoratedCursor._TYPE_KINDS:
+                if templ.location != c.location and templ.extent != c.extent:
+                    templ_def = templ.get_definition()
+                    if not templ_def or templ_def.location != c.location:
+                        break
+            c = templ
+
+        usr = c.get_usr()
+        definition = c.get_definition()
+        # In clang terms, the "canonical" declaration is the first one seen in the TU.
+        canonical = c.canonical
+        assert canonical
+        if c.kind not in (
+            CursorKind.TYPEDEF_DECL,
+            CursorKind.TYPE_ALIAS_DECL,
+        ):  # Hit a clang bug :(
+            assert canonical.get_usr() == usr
+            if definition:
+                assert definition.get_usr() == usr
+
+        # For types, prefer the definition if it is in a header, otherwise use the canonical decl.
+        c = canonical
+        if c.kind in DecoratedCursor._TYPE_KINDS:
+            if definition and definition.location.file.name.endswith(".h"):
+                c = definition
+
+        return DecoratedCursor(c)
+
+    @cached_property
+    def raw_parent(self):
+        if is_tu(self.semantic_parent):
+            # We never want to treat TUs as parents.
+            return
+
+        assert self.semantic_parent
+        return DecoratedCursor(self.semantic_parent)
+
+    @cached_property
+    def normalized_parent(self):
+        if not self.raw_parent:
+            return None
+
+        if self.raw_parent.kind == CursorKind.NAMESPACE:
+            return self.raw_parent  # Note: returning same object to share cached properties.
+
+        return DecoratedCursor.normalize(self.raw_parent)
+
+    @property
+    def normalized_parents(self):
+        p = self.normalized_parent
+        while p and not is_tu(p):
+            yield p
+            p = p.normalized_parent
+
+    @cached_property
+    def raw_usr(self):
+        return self.get_usr()
+
+    @cached_property
+    def globalized_usr(self):
+        """
+        Removes the file and unique number clang adds to some USRs without external linkage.
+        This includes (among other cases) anything that has a lambda as part of its type,
+        and namspace-scope constant integers. This interferes with our normalizing of USRs
+        because it breaks the rule that everything's USR starts with its partent's USR.
+        Globalizing restores that property.
+
+        I have manually verified that this does not cause problematic collisions between USRs.
+        There were only 4 groups of declarations that ended up with the same USR after
+        globalizing. 3 were all function-local lambdas that get filtered out with other
+        function-local declarations, and the last was the decay operator for lambdas
+        used to build a hand-rolled VTable in a class's private section.
+        """
+        usr = DecoratedCursor._USR_GLOBALIZER_REGEX.sub("c:@", self.raw_usr)
+        return usr
+
+    @cached_property
+    def normalized_usr(self):
+        """
+        Like globalized_usr, but replaces the raw_parent's USR prefix with the normalized _parent's USR
+        """
+        usr = self.globalized_usr
+        if not usr or self.kind == CursorKind.NAMESPACE or not self.raw_parent:
+            # Namespaces don't undergo any normalization, so we can break the cycle here.
+            return usr
+
+        assert usr.startswith(self.raw_parent.globalized_usr)
+        return self.normalized_parent.normalized_usr + usr[len(self.raw_parent.globalized_usr) :]
+
+    @cached_property
+    def definition(self):
+        d = self.get_definition()
+        if not d:
+            return None
+        if d == self:
+            return self  # keep cache
+        return DecoratedCursor(self)
+
+    @property  # no need to cache
+    def has_definition(self):
+        return self.definition is not None
+
+
 DETAIL_REGEX = re.compile(r"(detail|internal)s?$")
 
 
-def get_visibility(c: Cursor, scanning_parent=False):
-    if is_tu(c):
-        return ("UNKNOWN", None)  # break recursion
-
+def get_visibility(c: DecoratedCursor, scanning_parent=False):
     if c.has_attrs():
         for child in c.get_children():
             if child.kind != CursorKind.ANNOTATE_ATTR:
@@ -151,7 +296,10 @@ def get_visibility(c: Cursor, scanning_parent=False):
         if c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling):
             return "private"
 
-    return get_visibility(c.semantic_parent, scanning_parent=True)
+    if not c.normalized_parent:
+        return ("UNKNOWN", None)  # break recursion
+
+    return get_visibility(c.normalized_parent, scanning_parent=True)
 
 
 def normpath_for_file(f: ClangFile | str | None) -> str | None:
@@ -217,6 +365,7 @@ def teams_for_file(f: ClangFile | str | None):
 class Decl:
     display_name: str
     usr: str
+    raw_usr: str
     # mangled_name: str
     loc: str
     kind: str
@@ -235,27 +384,40 @@ class Decl:
 
     @staticmethod
     def from_cursor(c: Cursor, mod=None):
+        if not isinstance(c, DecoratedCursor):
+            c = DecoratedCursor(c)
         vis, alt = get_visibility(c)
         return Decl(
             display_name=fully_qualified(c),
             spelling=c.spelling,
-            usr=c.get_usr(),
+            usr=c.normalized_usr,
+            raw_usr=c.raw_usr,
             # mangled_name=c.mangled_name,
             loc=pretty_location(c.location),
             linkage=c.linkage.name,
             kind=c.kind.name,
             mod=mod or mod_for_file(c.location.file),
-            defined=c.is_definition(),
+            defined=c.has_definition,
             visibility=vis,
             alt=alt,
-            sem_par=c.semantic_parent.get_usr(),
-            lex_par=c.lexical_parent.get_usr(),
+            sem_par=c.normalized_parent.normalized_usr if c.normalized_parent else None,
+            lex_par=(
+                DecoratedCursor(c.lexical_parent).normalized_usr
+                if not is_tu(c.lexical_parent)
+                else None
+            ),
         )
 
 
 def pretty_location(loc: clang.SourceLocation | clang.Cursor):
     if isinstance(loc, Cursor):
-        loc = loc.location
+        if loc.location.file:
+            loc = loc.location
+        else:
+            # Clang bug: For some reason, usages of conversion operators lack a
+            # location, but have an extent. Use the start of the extent instead.
+            extent_start = loc.extent.start  # type: clang.SourceLocation
+            loc = extent_start
     name = os.path.normpath(loc.file.name) if loc.file else "<unknown>"
     # return f"{name}({loc.line},{loc.column})"  # MSVC format
     return f"{name}:{loc.line}:{loc.column}"  # gcc format
@@ -264,9 +426,9 @@ def pretty_location(loc: clang.SourceLocation | clang.Cursor):
 decls = dict[str, Decl]()
 
 
-def fully_qualified(c: Cursor):
+def fully_qualified(c: DecoratedCursor):
     parts = []
-    while c is not None and not is_tu(c):
+    for c in itertools.chain((c,), c.normalized_parents):
         spelling = c.displayname
         if spelling:
             if c.is_const_method():
@@ -277,10 +439,9 @@ def fully_qualified(c: Cursor):
                 case RefQualifierKind.RVALUE:
                     spelling += " &&"
             parts.append(spelling)
-        c = c.semantic_parent
     if not parts:
         return ""
-    assert parts
+
     if parts[-1] == "mongo":
         parts.pop()
     else:
@@ -367,6 +528,30 @@ def find_decls(mod: str, c: Cursor):
         find_decls(mod, child)
 
 
+function_kinds = {
+    CursorKind.CONSTRUCTOR,
+    CursorKind.CONVERSION_FUNCTION,
+    CursorKind.CXX_METHOD,
+    CursorKind.DESTRUCTOR,
+    CursorKind.FUNCTION_DECL,
+    CursorKind.FUNCTION_TEMPLATE,
+}
+
+
+def is_local_decl(c: Cursor):
+    assert c.kind.is_declaration
+    # Checking linkage first avoids doing expensive check for things we know can't be local.
+    if c.linkage not in (LinkageKind.NO_LINKAGE, LinkageKind.INTERNAL):
+        return False
+
+    # Important: this skips over the input c itself, since we don't want to consider
+    # functions as local decls, unless they are inside of another function.
+    while (c := c.semantic_parent) and not is_tu(c):
+        if c.kind in function_kinds:
+            return True
+    return False
+
+
 def find_usages(mod: str, c: Cursor):
     ref = c.referenced
     # Handle children first. This makes it possible to use early returns below
@@ -391,7 +576,15 @@ def find_usages(mod: str, c: Cursor):
         CursorKind.TEMPLATE_TYPE_PARAMETER,
         CursorKind.TEMPLATE_NON_TYPE_PARAMETER,
         CursorKind.PARM_DECL,
+        CursorKind.NO_DECL_FOUND,
     ):
+        return
+
+    if ref.kind == CursorKind.OVERLOADED_DECL_REF:
+        # These come up when parsing a dependently-typed call. Unfortunately they
+        # are not very useful, so they are one of many cases where we can't get
+        # good info out of templates.
+        assert not ref.get_usr()
         return
 
     # NOTE: This is for templated variables and their specializations. Ideally these
@@ -404,14 +597,15 @@ def find_usages(mod: str, c: Cursor):
     if ref.kind == CursorKind.UNEXPOSED_DECL:
         return
 
-    # This is for local variables
-    if ref.linkage == LinkageKind.NO_LINKAGE and ref.kind in (
-        CursorKind.VAR_DECL,
-        CursorKind.UNEXPOSED_DECL,
-    ):
-        # double check that we aren't missing any cross-module usages.
-        # fails only on a mozjs .defs X-macro file.
-        # assert ref.location.file == c.location.file
+    if not ref.canonical.location.file:
+        # These are pre-declared in the compiler with no source location. In some cases,
+        # they are redeclared in the stdlib, but canonicalization points them back
+        # at the internal declaration. Make sure that this isn't causing us to skip
+        # any first-party declarations.
+        assert not ref.location.file or mod_for_file(ref.location.file) is None
+        return
+
+    if is_local_decl(ref):
         return
 
     # Unfortuntely libclang's c api doesn't handle implicitly declared methods
@@ -424,65 +618,22 @@ def find_usages(mod: str, c: Cursor):
         ref = ref.semantic_parent
 
     # assert not c.location.file or mod_for_file(c.location.file) == mod
+    ref = DecoratedCursor.normalize(ref)
 
-    # unresolve implicit instantiations
-    while templ := ref.specialized_template:
-        if templ.location != ref.location and templ.extent != ref.extent:
-            templ_def = templ.get_definition()
-            if not templ_def or templ_def.location != ref.location:
-                break
-        ref = templ
+    # Ignore any declarations not declared in a header.
+    # TODO what if a local type is passed to a template? For now doesn't matter because we
+    # don't look at usages from instantiations.
+    if ref.location.file.name.endswith(".cpp"):
+        return
 
-    # Everything after this is about finding the best location and shouldn't change the USR. Asserted later.
-    usr = ref.get_usr()
+    usr = ref.normalized_usr
     if not usr:
         return
 
     if usr in decls:
-        # We've already done the work to get th info for this decl.
+        # We've already done the work to get the info for this decl.
         d = decls[usr]
     else:
-        definition = ref.get_definition()
-        # In clang terms, the "canonical" declaration is the first one seen in the TU.
-        canonical = ref.canonical
-        assert canonical
-        if ref.kind not in (
-            CursorKind.TYPEDEF_DECL,
-            CursorKind.TYPE_ALIAS_DECL,
-        ):  # Hit a clang bug :(
-            assert canonical.get_usr() == usr
-            if definition:
-                assert definition.get_usr() == usr
-
-        # Ignore any declarations not declared in a header.
-        # TODO what if a local type is passed to a template? For now doesn't matter because we
-        # don't look at usages from instantiations.
-        if (not (file := canonical.location.file)) or file.name.endswith(".cpp"):
-            return
-
-        # This was decided by manually examining the unique kinds from the output.
-        type_kinds = (
-            CursorKind.ENUM_DECL,
-            CursorKind.STRUCT_DECL,
-            CursorKind.CLASS_DECL,
-            CursorKind.CLASS_TEMPLATE,
-            CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION,
-            # Unsure about these:
-            # CursorKind.TYPE_ALIAS_DECL,
-            # CursorKind.TYPEDEF_DECL,
-            # CursorKind.TYPE_ALIAS_TEMPLATE_DECL,
-        )
-
-        # For types, prefer the definition, otherwise use the canonical decl, but only if the definition is in a header.
-        ref = canonical
-        if ref.kind in type_kinds:
-            if definition and definition.location.file.name.endswith(".h"):
-                ref = definition
-
-        # ignore uses from the same file - this avoids recording local variables
-        # if ref.location.file == c.location.file:
-        #     return
-
         decl_mod = mod_for_file(ref.location.file)
         if not decl_mod or decl_mod in skip_mods:
             return
@@ -490,15 +641,13 @@ def find_usages(mod: str, c: Cursor):
         d = Decl.from_cursor(ref, decl_mod)
         decls[usr] = d
 
-        if definition and ref != definition:
-            def_mod = mod_for_file(definition.location.file)
+        if ref.definition and ref != ref.definition:
+            def_mod = mod_for_file(ref.definition.location.file)
             # Note def_mod is None means third_party, not __NONE__ module
             if def_mod != decl_mod and def_mod is not None:
-                print(f"WARNING: decl_mod '{decl_mod}' != def_mod '{def_mod}' for {d.display_name}")
-                print(f"decl: {pretty_location(ref)}")
-                print(f"defn: {pretty_location(definition)}")
-            else:
-                d.defined = True
+                print(f"WARNING: {d.display_name} is declared and defined in different modules")
+                print(f"  decl: {pretty_location(ref)} ({decl_mod})")
+                print(f"  defn: {pretty_location(ref.definition)} ({def_mod})")
 
     # ignore usages from the same module
     # if d.mod == mod or mod.startswith(d.mod):
@@ -539,6 +688,7 @@ def ast(node: Cursor):
             children.append(ast(c))
     return {
         "b_kind": node.kind.name,
+        "c_par_usr": str(node.semantic_parent.get_usr() if node.semantic_parent else None),
         "c_usr": str(usr),
         "d_display": str(node.displayname),
         "d_spelling": str(node.spelling),
@@ -711,11 +861,12 @@ def main():
         uncompressed_file_name = out_file_name
         open_func = open
 
-    with open_func(out_file_name, "wb") as f:
+    with open_func(out_file_name, "w") as f:
         out = [dict(d.__dict__) for d in decls.values() if d.mod not in skip_mods]
         for decl in out:
             # del decl["spelling"]
             del decl["linkage"]
+            del decl["raw_usr"]  # Can be helpful when debugging but not worth aggregating.
             # del decl["defined"]
             decl["used_from"] = {k: sorted(v) for k, v in decl["used_from"].items()}
 
