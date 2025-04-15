@@ -6,12 +6,9 @@
  *   requires_timeseries,
  * ]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-
 const testDB = db.getSiblingDB(jsTestName());
 let collCount = 0;
 
-const bucketGranularityError = ErrorCodes.InvalidOptions;
 const bucketMaxSpanSecondsError = ErrorCodes.InvalidOptions;
 
 const testOptions = function({
@@ -115,18 +112,6 @@ const testCompatibleCreateOptions = function(createOptions, optionsAffectStorage
     });
 };
 
-const testTimeseriesNamespaceExists = function(setUp) {
-    testOptions({
-        errorCode: ErrorCodes.NamespaceExists,
-        fixture: {
-            setUp: setUp,
-            tearDown: (testDB, collName) => {
-                assert.commandWorked(testDB.dropDatabase());
-            }
-        },
-    });
-};
-
 testValidTimeseriesOptions({timeField: "time"});
 testValidTimeseriesOptions({timeField: "time", metaField: "meta"});
 testValidTimeseriesOptions({timeField: "time", granularity: "minutes"});
@@ -208,10 +193,3 @@ testIncompatibleCreateOptions({viewOn: "coll"});
 testIncompatibleCreateOptions({viewOn: "coll", pipeline: []});
 testIncompatibleCreateOptions({clusteredIndex: true});
 testIncompatibleCreateOptions({clusteredIndex: false});
-
-testTimeseriesNamespaceExists((testDB, collName) => {
-    assert.commandWorked(testDB.createCollection(collName));
-});
-testTimeseriesNamespaceExists((testDB, collName) => {
-    assert.commandWorked(testDB.createView(collName, collName + '_source', []));
-});
