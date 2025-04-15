@@ -56,7 +56,7 @@ public:
     friend std::unique_ptr<UserRequestX509> std::make_unique<UserRequestX509>(
         mongo::UserName&& name,
         boost::optional<std::set<mongo::RoleName>>&& roles,
-        const mongo::SSLPeerInfo&& peerInfo);
+        std::shared_ptr<const mongo::SSLPeerInfo>&& peerInfo);
 
     /**
      * Makes a new UserRequestX509. Toggling for re-acquire to true enables
@@ -65,13 +65,13 @@ public:
     static StatusWith<std::unique_ptr<UserRequest>> makeUserRequestX509(
         UserName name,
         boost::optional<std::set<RoleName>> roles,
-        const SSLPeerInfo& peerInfo,
+        std::shared_ptr<const SSLPeerInfo> peerInfo,
         bool forReacquire = true);
 
     UserRequestType getType() const final {
         return UserRequestType::X509;
     }
-    const SSLPeerInfo& getPeerInfo() const {
+    std::shared_ptr<const SSLPeerInfo> getPeerInfo() const {
         return _peerInfo;
     }
     std::unique_ptr<UserRequest> clone() const final {
@@ -90,13 +90,13 @@ public:
 protected:
     UserRequestX509(UserName name,
                     boost::optional<std::set<RoleName>> roles,
-                    const SSLPeerInfo& peerInfo)
-        : UserRequestGeneral(std::move(name), std::move(roles)), _peerInfo(peerInfo) {}
+                    std::shared_ptr<const SSLPeerInfo> peerInfo)
+        : UserRequestGeneral(std::move(name), std::move(roles)), _peerInfo(std::move(peerInfo)) {}
 
 private:
     void _tryAcquireRoles();
 
-    const SSLPeerInfo& _peerInfo;
+    std::shared_ptr<const SSLPeerInfo> _peerInfo;
 };
 
 #endif  // MONGO_CONFIG_SSL

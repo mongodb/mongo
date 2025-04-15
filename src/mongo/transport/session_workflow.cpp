@@ -436,7 +436,8 @@ public:
 
     bool isTLS() const {
 #ifdef MONGO_CONFIG_SSL
-        return SSLPeerInfo::forSession(session()).isTLS();
+        auto sslPeerInfo = SSLPeerInfo::forSession(session());
+        return sslPeerInfo && sslPeerInfo->isTLS();
 #else
         return false;
 #endif

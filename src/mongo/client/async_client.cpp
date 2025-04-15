@@ -311,7 +311,8 @@ Future<void> AsyncDBClient::_call(Message request,
     request.header().setId(msgId);
     request.header().setResponseToMsgId(0);
 #ifdef MONGO_CONFIG_SSL
-    if (!SSLPeerInfo::forSession(_session).isTLS()) {
+    auto sslPeerInfo = SSLPeerInfo::forSession(_session);
+    if (!(sslPeerInfo && sslPeerInfo->isTLS())) {
         OpMsg::appendChecksum(&request);
     }
 #else

@@ -425,7 +425,7 @@ void AuthorizationRouterImpl::invalidateUserCache() {
     _updateCacheGeneration();
 }
 
-Status AuthorizationRouterImpl::refreshExternalUsers(OperationContext* opCtx) {
+Status AuthorizationRouterImpl::refreshExternalUsers(OperationContext* opCtx) try {
     LOGV2_DEBUG(5914801, 2, "Refreshing all users from the $external database");
     // First, get a snapshot of the UserHandles in the cache.
     auto cachedUsers = _userCache.peekLatestCachedIf(
@@ -485,6 +485,8 @@ Status AuthorizationRouterImpl::refreshExternalUsers(OperationContext* opCtx) {
     }
 
     return Status::OK();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 std::vector<AuthorizationRouter::CachedUserInfo> AuthorizationRouterImpl::getUserCacheInfo() const {

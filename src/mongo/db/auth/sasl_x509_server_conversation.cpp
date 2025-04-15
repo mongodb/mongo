@@ -76,9 +76,12 @@ std::string unpackName(StringData inputData) {
  * 1. Unpack the inputData field.
  * 2. Compare the user name to the subject DN from SSLPeerInfo.
  */
-std::string getUserName(Client* client, StringData inputData, const SSLPeerInfo& sslPeerInfo) {
-    const auto& clientName = sslPeerInfo.subjectName();
+std::string getUserName(Client* client,
+                        StringData inputData,
+                        std::shared_ptr<const SSLPeerInfo> sslPeerInfo) {
+    uassert(ErrorCodes::AuthenticationFailed, "No SSLPeerInfo available", sslPeerInfo);
 
+    const auto& clientName = sslPeerInfo->subjectName();
     uassert(ErrorCodes::AuthenticationFailed,
             "No verified subject name available from client",
             !clientName.empty());
@@ -120,13 +123,14 @@ StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserReques
         return std::move(request);
     }
 
-    const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
-    auto&& peerRoles = sslPeerInfo.roles();
-    if (peerRoles.empty() ||
-        (sslPeerInfo.subjectName().toString() != request->getUserName().getUser())) {
+    auto sslPeerInfo = SSLPeerInfo::forSession(session);
+
+    if (!sslPeerInfo || sslPeerInfo->roles().empty() ||
+        (sslPeerInfo->subjectName().toString() != request->getUserName().getUser())) {
         return std::move(request);
     }
 
+    const auto& peerRoles = sslPeerInfo->roles();
     std::set<RoleName> requestRoles;
     std::copy(
         peerRoles.begin(), peerRoles.end(), std::inserter(requestRoles, requestRoles.begin()));
@@ -156,9 +160,10 @@ bool SaslX509ServerMechanism::isClusterMember(Client* client) const {
         return false;
     }
 
-    const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+    auto sslPeerInfo = SSLPeerInfo::forSession(session);
+    auto clusterMembership = sslPeerInfo ? sslPeerInfo->getClusterMembership() : boost::none;
     if (!session->getSSLConfiguration()->isClusterMember(this->getPrincipalName(),
-                                                         sslPeerInfo.getClusterMembership())) {
+                                                         clusterMembership)) {
         return false;
     }
 
@@ -192,7 +197,7 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
 
     // We should get the correct UserName from SSLPeerInfo.
     auto client = opCtx->getClient();
-    const auto& sslPeerInfo = SSLPeerInfo::forSession(client->session());
+    auto sslPeerInfo = SSLPeerInfo::forSession(client->session());
     ServerMechanismBase::_principalName = getUserName(client, inputData, sslPeerInfo);
 
     uassert(ErrorCodes::BadValue,

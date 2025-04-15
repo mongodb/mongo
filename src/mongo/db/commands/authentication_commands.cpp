@@ -162,12 +162,13 @@ std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const U
         return std::make_unique<UserRequestGeneral>(username, boost::none);
     }
 
-    auto& sslPeerInfo = SSLPeerInfo::forSession(session);
-    auto&& peerRoles = sslPeerInfo.roles();
-    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != username.getUser())) {
+    auto sslPeerInfo = SSLPeerInfo::forSession(session);
+    if (!sslPeerInfo || sslPeerInfo->roles().empty() ||
+        (sslPeerInfo->subjectName().toString() != username.getUser())) {
         return std::make_unique<UserRequestGeneral>(username, boost::none);
     }
 
+    auto peerRoles = sslPeerInfo->roles();
     auto roles = std::set<RoleName>();
     std::copy(peerRoles.begin(), peerRoles.end(), std::inserter(roles, roles.begin()));
 
@@ -192,8 +193,9 @@ constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is dis
 void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) {
     auto client = opCtx->getClient();
 
-    auto& sslPeerInfo = SSLPeerInfo::forSession(client->session());
-    auto clientName = sslPeerInfo.subjectName();
+    auto sslPeerInfo = SSLPeerInfo::forSession(client->session());
+    uassert(ErrorCodes::AuthenticationFailed, "No SSLPeerInfo available", sslPeerInfo);
+    auto clientName = sslPeerInfo->subjectName();
     uassert(ErrorCodes::AuthenticationFailed,
             "No verified subject name available from client",
             !clientName.empty());
@@ -236,7 +238,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             authorizationSession->addAndAuthorizeUser(opCtx, std::move(request), boost::none));
     };
 
-    if (sslConfiguration->isClusterMember(clientName, sslPeerInfo.getClusterMembership())) {
+    if (sslConfiguration->isClusterMember(clientName, sslPeerInfo->getClusterMembership())) {
         // Handle internal cluster member auth, only applies to server-server connections
         if (!clusterAuthMode.allowsX509()) {
             uassert(ErrorCodes::AuthenticationFailed,
@@ -300,12 +302,10 @@ auth::SaslPayload generateSaslPayload(const boost::optional<StringData>& user,
 
 std::string getNameFromPeerInfo(Client* client) {
 #ifdef MONGO_CONFIG_SSL
-    auto& sslPeerInfo = SSLPeerInfo::forSession(client->session());
-    auto& clientName = sslPeerInfo.subjectName();
-
-    // If clientName is empty, that means that there is no certificate for
+    // If the client's subjectName is empty, that means that there is no certificate for
     // the user and they won't be able to use MONGODB-X509 anyways.
-    return clientName.toString();
+    auto sslPeerInfo = SSLPeerInfo::forSession(client->session());
+    return sslPeerInfo ? sslPeerInfo->subjectName().toString() : std::string();
 #else
     uasserted(ErrorCodes::BadValue, "MONGODB-X509 is unsupported on no-ssl builds");
 #endif

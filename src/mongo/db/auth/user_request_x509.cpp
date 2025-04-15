@@ -38,7 +38,7 @@ namespace mongo {
 StatusWith<std::unique_ptr<UserRequest>> UserRequestX509::makeUserRequestX509(
     UserName name,
     boost::optional<std::set<RoleName>> roles,
-    const SSLPeerInfo& peerInfo,
+    std::shared_ptr<const SSLPeerInfo> peerInfo,
     bool forReacquire) {
     auto request =
         std::make_unique<UserRequestX509>(std::move(name), std::move(roles), std::move(peerInfo));
@@ -52,13 +52,18 @@ StatusWith<std::unique_ptr<UserRequest>> UserRequestX509::makeUserRequestX509(
 }
 
 UserRequest::UserRequestCacheKey UserRequestX509::generateUserRequestCacheKey() const {
+    uassert(10355702, "SSLPeerInfo is not set when generating user cache key", _peerInfo);
     auto hashElements = getUserNameAndRolesVector(getUserName(), getRoles());
-    getPeerInfo().appendPeerInfoToVector(hashElements);
+    _peerInfo->appendPeerInfoToVector(hashElements);
     return UserRequestCacheKey(getUserName(), hashElements);
 }
 
 void UserRequestX509::_tryAcquireRoles() {
-    auto&& peerRoles = getPeerInfo().roles();
+    if (!_peerInfo) {
+        return;
+    }
+
+    const auto& peerRoles = _peerInfo->roles();
     if (peerRoles.empty()) {
         return;
     }

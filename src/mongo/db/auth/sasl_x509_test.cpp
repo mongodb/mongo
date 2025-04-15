@@ -99,7 +99,7 @@ SSLX509Name buildClusterX509Name() {
 
 void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeerInfo info) {
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
-    sslPeerInfo = info;
+    sslPeerInfo = std::make_shared<SSLPeerInfo>(info);
 }
 
 

@@ -483,7 +483,7 @@ void DBClientSession::say(Message& toSend, bool isRetry, string* actualServer) {
     toSend.header().setResponseToMsgId(0);
     if (!MONGO_unlikely(dbClientSessionDisableChecksum.shouldFail())) {
 #ifdef MONGO_CONFIG_SSL
-        if (!SSLPeerInfo::forSession(_session).isTLS()) {
+        if (!isTLS()) {
             OpMsg::appendChecksum(&toSend);
         }
 #else
@@ -519,7 +519,7 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
     toSend.header().setResponseToMsgId(0);
     if (!MONGO_unlikely(dbClientSessionDisableChecksum.shouldFail())) {
 #ifdef MONGO_CONFIG_SSL
-        if (!SSLPeerInfo::forSession(_session).isTLS()) {
+        if (!isTLS()) {
             OpMsg::appendChecksum(&toSend);
         }
 #else
@@ -573,6 +573,10 @@ bool DBClientSession::isUsingTransientSSLParams() const {
     return _transientSSLParams.has_value();
 }
 
+bool DBClientSession::isTLS() {
+    auto sslPeerInfo = SSLPeerInfo::forSession(_session);
+    return sslPeerInfo && sslPeerInfo->isTLS();
+}
 #endif
 
 }  // namespace mongo

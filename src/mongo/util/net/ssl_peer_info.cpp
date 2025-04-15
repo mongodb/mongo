@@ -33,15 +33,16 @@
 
 namespace mongo {
 namespace {
-const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
-    transport::Session::declareDecoration<SSLPeerInfo>();
+const auto peerInfoForSession =
+    transport::Session::declareDecoration<std::shared_ptr<const SSLPeerInfo>>();
 }
 
-SSLPeerInfo& SSLPeerInfo::forSession(const std::shared_ptr<transport::Session>& session) {
+std::shared_ptr<const SSLPeerInfo>& SSLPeerInfo::forSession(
+    const std::shared_ptr<transport::Session>& session) {
     return peerInfoForSession(session.get());
 }
 
-const SSLPeerInfo& SSLPeerInfo::forSession(
+std::shared_ptr<const SSLPeerInfo> SSLPeerInfo::forSession(
     const std::shared_ptr<const transport::Session>& session) {
     return peerInfoForSession(session.get());
 }
