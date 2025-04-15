@@ -3086,5 +3086,292 @@ TEST_F(BucketCatalogTest, BucketMetadataNormalization) {
     _testBucketMetadataFieldOrdering(BSON("nested" << BSON("b" << 1 << "a" << 1)),
                                      BSON("nested" << BSON("a" << 1 << "b" << 1)));
 }
+
+class CreateOrderedPotentialBucketsVectorTest : public BucketCatalogTest {
+public:
+    // We generate these measurements without a rollover reason to guarantee that the measurements
+    // we create will fit into one bucket, but we can mark the bucket generated with a rollover
+    // reason.
+    const std::vector<BSONObj> measurement1Vec = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .numMeasurements = 1});
+    const std::vector<BSONObj> measurement2Vec = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .numMeasurements = 2});
+    const std::vector<BSONObj> measurement3Vec = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .numMeasurements = 3});
+    const std::vector<BSONObj> measurement4Vec = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .numMeasurements = 4});
+    const std::vector<BSONObj> measurement5Vec = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .numMeasurements = 5});
+    const std::vector<BSONObj> measurementTimeseriesBucketMaxCountVec =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone});
+
+    const std::vector<std::vector<BSONObj>> unsorted1{measurement1Vec,
+                                                      measurement2Vec,
+                                                      measurement3Vec,
+                                                      measurementTimeseriesBucketMaxCountVec,
+                                                      measurement5Vec};
+    const std::vector<std::vector<BSONObj>> unsorted2{
+        measurementTimeseriesBucketMaxCountVec,
+        measurement4Vec,
+        measurement2Vec,
+        measurement3Vec,
+    };
+    const std::vector<std::vector<BSONObj>> unsorted3{measurement1Vec,
+                                                      measurement2Vec,
+                                                      measurement1Vec,
+                                                      measurement4Vec,
+                                                      measurement3Vec,
+                                                      measurement4Vec};
+    const std::vector<std::vector<BSONObj>> unsorted4{measurementTimeseriesBucketMaxCountVec,
+                                                      measurementTimeseriesBucketMaxCountVec,
+                                                      measurementTimeseriesBucketMaxCountVec,
+                                                      measurementTimeseriesBucketMaxCountVec,
+                                                      measurementTimeseriesBucketMaxCountVec,
+                                                      measurement1Vec};
+    const std::vector<std::vector<BSONObj>> unsortedLong1 =
+        _getFlattenedVector(std::vector<std::vector<std::vector<BSONObj>>>{unsorted1, unsorted2});
+    const std::vector<std::vector<BSONObj>> unsortedLong2 =
+        _getFlattenedVector(std::vector<std::vector<std::vector<BSONObj>>>{unsorted2, unsorted3});
+    const std::vector<std::vector<BSONObj>> unsortedLong3 =
+        _getFlattenedVector(std::vector<std::vector<std::vector<BSONObj>>>{unsorted3, unsorted4});
+    const std::vector<std::vector<BSONObj>> sorted1{measurement1Vec,
+                                                    measurement2Vec,
+                                                    measurement3Vec,
+                                                    measurement4Vec,
+                                                    measurement5Vec,
+                                                    measurementTimeseriesBucketMaxCountVec};
+    const std::vector<std::vector<BSONObj>> sorted2{measurement2Vec,
+                                                    measurement3Vec,
+                                                    measurement3Vec,
+                                                    measurement3Vec,
+                                                    measurementTimeseriesBucketMaxCountVec,
+                                                    measurementTimeseriesBucketMaxCountVec,
+                                                    measurementTimeseriesBucketMaxCountVec};
+    const std::vector<std::vector<BSONObj>> sorted3{
+        measurement1Vec, measurement1Vec, measurement2Vec, measurement2Vec, measurement4Vec};
+    const std::vector<std::vector<std::vector<BSONObj>>> allMeasurementVecs =
+        std::vector<std::vector<std::vector<BSONObj>>>{unsorted1,
+                                                       unsorted2,
+                                                       unsorted3,
+                                                       unsorted4,
+                                                       unsortedLong1,
+                                                       unsortedLong2,
+                                                       unsortedLong3,
+                                                       sorted1,
+                                                       sorted2,
+                                                       sorted3};
+
+protected:
+    std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> _getPairsVector(
+        const std::vector<std::vector<BSONObj>>& measurements,
+        const bucket_catalog::RolloverReason& reason) const {
+        std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> result;
+        result.reserve(measurements.size());
+        std::transform(measurements.begin(),
+                       measurements.end(),
+                       std::back_inserter(result),
+                       [&reason](const std::vector<BSONObj>& element) {
+                           return std::make_pair(element, reason);
+                       });
+        return result;
+    }
+
+    void _testCreateOrderedPotentialBucketsVector(
+        PotentialBucketOptions& potentialBucketOptions) const {
+        auto& kSoftClosedBuckets = potentialBucketOptions.kSoftClosedBuckets;
+        auto& kArchivedBuckets = potentialBucketOptions.kArchivedBuckets;
+        auto& kNoneBucket = potentialBucketOptions.kNoneBucket;
+        bool kNoneBucketExists = (kNoneBucket != nullptr);
+        auto potentialBuckets = createOrderedPotentialBucketsVector(potentialBucketOptions);
+        ASSERT_EQ(potentialBuckets.size(),
+                  (kSoftClosedBuckets.size() + kArchivedBuckets.size() + kNoneBucketExists));
+
+        // Check that all the buckets are correctly ordered by their action priority:
+        // kSoftClose -> kArchived -> kNone
+        // and check that all buckets have numMeasurements in increasing order.
+        for (size_t i = 0; i < kSoftClosedBuckets.size(); i++) {
+            ASSERT(getRolloverAction(potentialBuckets[i]->rolloverReason) ==
+                   RolloverAction::kSoftClose);
+            if (i != kSoftClosedBuckets.size() - 1) {
+                ASSERT(potentialBuckets[i]->numMeasurements <=
+                       potentialBuckets[i + 1]->numMeasurements);
+            }
+        }
+        for (size_t i = kSoftClosedBuckets.size();
+             i < (kSoftClosedBuckets.size() + kArchivedBuckets.size());
+             i++) {
+            ASSERT(getRolloverAction(potentialBuckets[i]->rolloverReason) ==
+                   RolloverAction::kArchive);
+            if (i != (kSoftClosedBuckets.size() + kArchivedBuckets.size()) - 1) {
+                ASSERT(potentialBuckets[i]->numMeasurements <=
+                       potentialBuckets[i + 1]->numMeasurements);
+            }
+        }
+        if (kNoneBucketExists) {
+            ASSERT(
+                getRolloverAction(potentialBuckets[potentialBuckets.size() - 1]->rolloverReason) ==
+                RolloverAction::kNone);
+        }
+    }
+};
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithoutAnyBuckets) {
+    PotentialBucketOptions bucketOptions;
+    _testCreateOrderedPotentialBucketsVector(bucketOptions);
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithOneSoftClosedBucketSimple) {
+    PotentialBucketOptions bucketOptions;
+    std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>
+        softClosedSimpleVec;
+    softClosedSimpleVec.push_back(
+        std::make_pair(measurement1Vec, bucket_catalog::RolloverReason::kTimeForward));
+    absl::InlinedVector<Bucket*, 8> softClosedSimpleBucket =
+        _generateBucketsWithMeasurements(_ns1, _uuid1, softClosedSimpleVec);
+    bucketOptions.kSoftClosedBuckets = softClosedSimpleBucket;
+    _testCreateOrderedPotentialBucketsVector(bucketOptions);
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithOneArchivedBucketSimple) {
+    PotentialBucketOptions bucketOptions;
+    std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> archiveSimpleVec;
+    archiveSimpleVec.push_back(
+        std::make_pair(measurement1Vec, bucket_catalog::RolloverReason::kTimeBackward));
+    absl::InlinedVector<Bucket*, 8> archiveSimpleBucket =
+        _generateBucketsWithMeasurements(_ns1, _uuid1, archiveSimpleVec);
+    bucketOptions.kArchivedBuckets = archiveSimpleBucket;
+    _testCreateOrderedPotentialBucketsVector(bucketOptions);
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithoutkNoneBucketSimple) {
+    PotentialBucketOptions bucketOptions;
+    std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>
+        softClosedSimpleVec;
+    softClosedSimpleVec.push_back(
+        std::make_pair(measurement1Vec, bucket_catalog::RolloverReason::kTimeForward));
+    absl::InlinedVector<Bucket*, 8> softClosedSimpleBucket =
+        _generateBucketsWithMeasurements(_ns1, _uuid1, softClosedSimpleVec);
+    bucketOptions.kSoftClosedBuckets = softClosedSimpleBucket;
+
+    std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> archiveSimpleVec;
+    archiveSimpleVec.push_back(
+        std::make_pair(measurement1Vec, bucket_catalog::RolloverReason::kTimeBackward));
+    absl::InlinedVector<Bucket*, 8> archiveSimpleBucket =
+        _generateBucketsWithMeasurements(_ns1, _uuid1, archiveSimpleVec);
+    bucketOptions.kSoftClosedBuckets = softClosedSimpleBucket;
+    bucketOptions.kArchivedBuckets = archiveSimpleBucket;
+    _testCreateOrderedPotentialBucketsVector(bucketOptions);
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithOnlykSoftClosedBuckets) {
+    // Test with only setting kSoftClosedBucket.
+    for (size_t i = 0; i < allMeasurementVecs.size(); i++) {
+        PotentialBucketOptions bucketOptionsWithEmptyArchive;
+        std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> softClosedVec =
+            _getPairsVector(allMeasurementVecs[i], bucket_catalog::RolloverReason::kTimeForward);
+        absl::InlinedVector<Bucket*, 8> softClosedBucket =
+            _generateBucketsWithMeasurements(_ns1, _uuid1, softClosedVec);
+        bucketOptionsWithEmptyArchive.kSoftClosedBuckets = softClosedBucket;
+        _testCreateOrderedPotentialBucketsVector(bucketOptionsWithEmptyArchive);
+    }
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithOnlykArchivedBuckets) {
+    // Test with only setting kArchivedBuckets.
+    for (size_t i = 0; i < allMeasurementVecs.size(); i++) {
+        PotentialBucketOptions bucketOptionsWithEmptySoftClosed;
+        std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> archivedVec =
+            _getPairsVector(allMeasurementVecs[i], bucket_catalog::RolloverReason::kTimeBackward);
+        absl::InlinedVector<Bucket*, 8> archivedBucket =
+            _generateBucketsWithMeasurements(_ns1, _uuid1, archivedVec);
+        bucketOptionsWithEmptySoftClosed.kArchivedBuckets = archivedBucket;
+        _testCreateOrderedPotentialBucketsVector(bucketOptionsWithEmptySoftClosed);
+    }
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithoutkNoneBucket) {
+    for (size_t i = 0; i < allMeasurementVecs.size(); i++) {
+        PotentialBucketOptions bucketOptions;
+        // Create soft-closed buckets.
+        std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> softClosedVec =
+            _getPairsVector(allMeasurementVecs[i], bucket_catalog::RolloverReason::kTimeForward);
+        absl::InlinedVector<Bucket*, 8> softClosedBucket =
+            _generateBucketsWithMeasurements(_ns1, _uuid1, softClosedVec);
+        bucketOptions.kSoftClosedBuckets = softClosedBucket;
+
+        for (size_t j = 0; j < allMeasurementVecs.size(); j++) {
+            // Create archived buckets.
+            std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>
+                archivedVec = _getPairsVector(allMeasurementVecs[j],
+                                              bucket_catalog::RolloverReason::kTimeBackward);
+            absl::InlinedVector<Bucket*, 8> archivedBucket =
+                _generateBucketsWithMeasurements(_ns1, _uuid1, archivedVec);
+            bucketOptions.kArchivedBuckets = archivedBucket;
+            _testCreateOrderedPotentialBucketsVector(bucketOptions);
+        }
+    }
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithOnlykNoneBucket) {
+    // The sorted1 vec contains all the potential sizes of measurement vectors [1, 2, 3, 4, 5,
+    // kBucketMaxCount] we created in the fixture.
+    for (size_t i = 0; i < sorted1.size(); i++) {
+        PotentialBucketOptions bucketOptions;
+        std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> kNoneVec;
+        kNoneVec.push_back(std::make_pair(sorted1[i], bucket_catalog::RolloverReason::kNone));
+        absl::InlinedVector<Bucket*, 8> kNoneBucket =
+            _generateBucketsWithMeasurements(_ns1, _uuid1, kNoneVec);
+        bucketOptions.kNoneBucket = kNoneBucket[0];
+        _testCreateOrderedPotentialBucketsVector(bucketOptions);
+
+        // We will invariant if we have > 1 uncleared, kNone bucket. So we have to set the
+        // RolloverReason for the next kNone open bucket we create.
+        kNoneBucket[0]->rolloverReason = bucket_catalog::RolloverReason::kTimeForward;
+    }
+}
+
+TEST_F(CreateOrderedPotentialBucketsVectorTest,
+       CreateOrderedPotentialBucketsVectorWithkNoneBucket) {
+    for (size_t i = 0; i < allMeasurementVecs.size(); i++) {
+        PotentialBucketOptions bucketOptions;
+        // Create soft-closed buckets.
+        std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>> softClosedVec =
+            _getPairsVector(allMeasurementVecs[i], bucket_catalog::RolloverReason::kTimeForward);
+        absl::InlinedVector<Bucket*, 8> softClosedBucket =
+            _generateBucketsWithMeasurements(_ns1, _uuid1, softClosedVec);
+        bucketOptions.kSoftClosedBuckets = softClosedBucket;
+        for (size_t j = 0; j < allMeasurementVecs.size(); j++) {
+            // Create archived buckets.
+            std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>
+                archivedVec = _getPairsVector(allMeasurementVecs[j],
+                                              bucket_catalog::RolloverReason::kTimeBackward);
+            absl::InlinedVector<Bucket*, 8> archivedBucket =
+                _generateBucketsWithMeasurements(_ns1, _uuid1, archivedVec);
+            bucketOptions.kArchivedBuckets = archivedBucket;
+            for (size_t i = 0; i < sorted1.size(); i++) {
+                std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>
+                    kNoneVec;
+                kNoneVec.push_back(
+                    std::make_pair(sorted1[i], bucket_catalog::RolloverReason::kNone));
+                absl::InlinedVector<Bucket*, 8> kNoneBucket =
+                    _generateBucketsWithMeasurements(_ns1, _uuid1, kNoneVec);
+                bucketOptions.kNoneBucket = kNoneBucket[0];
+                _testCreateOrderedPotentialBucketsVector(bucketOptions);
+
+                // We will invariant if we have > 1 uncleared, kNone bucket. So we have to set the
+                // RolloverReason for the next kNone open bucket we create.
+                kNoneBucket[0]->rolloverReason = bucket_catalog::RolloverReason::kTimeForward;
+            }
+        }
+    }
+}
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

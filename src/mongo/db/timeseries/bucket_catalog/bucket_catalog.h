@@ -179,6 +179,13 @@ struct Stripe {
     Stripe(TrackingContexts& trackingContextOpenId);
 };
 
+struct PotentialBucketOptions {
+    absl::InlinedVector<Bucket*, 8> kArchivedBuckets;
+    absl::InlinedVector<Bucket*, 8> kSoftClosedBuckets;
+    // Only one uncleared open bucket is allowed for each key.
+    Bucket* kNoneBucket = nullptr;
+};
+
 /**
  * This class holds all the data used to coordinate time series inserts amongst threads.
  */
@@ -350,6 +357,15 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const UUID& collectionUUID,
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& measurementDoc);
+
+/**
+ * Returns a vector of buckets based on the two conditions in order:
+ *  1. Prioritizes returning candidate buckets that have the kSoftClose rollover reason, then the
+ *     kArchive rollover reason, and finally a kNone rollover reason.
+ *  2. Prioritizes returning buckets with less measurements in them.
+ */
+std::vector<Bucket*> createOrderedPotentialBucketsVector(
+    PotentialBucketOptions& potentialBucketOptions);
 
 /**
  * Finds all buckets with 'bucketKey' by criteria in the following order:

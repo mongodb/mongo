@@ -381,7 +381,8 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
 
     // We need to ensure that the idxWithDiffMeasurement isn't the first element. Otherwise, we may
     // not create a vector that causes the input RolloverReason.
-    invariant(idxWithDiffMeasurement >= 1 && idxWithDiffMeasurement <= numMeasurements);
+    invariant(numMeasurements == 1 ||
+              (idxWithDiffMeasurement >= 1 && idxWithDiffMeasurement <= numMeasurements));
 
     // We should not be setting the metaValueType if the measurements don't have a metaValue.
     invariant(metaValue != boost::none || metaValueType == String);
@@ -635,6 +636,7 @@ TimeseriesTestFixture::_generateBucketsWithMeasurements(
         }
         buckets.push_back(std::move(curBucket));
     }
+    ASSERT_EQ(measurementsAndRolloverReasons.size(), buckets.size());
     return buckets;
 }
 

@@ -642,6 +642,41 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
     return {std::make_pair(std::move(insertContext), std::move(time))};
 }
 
+void sortOnNumMeasurements(absl::InlinedVector<Bucket*, 8>& vec) {
+    std::sort(vec.begin(), vec.end(), [](const Bucket* lhs, const Bucket* rhs) {
+        return lhs->numMeasurements < rhs->numMeasurements;
+    });
+}
+
+std::vector<Bucket*> createOrderedPotentialBucketsVector(
+    PotentialBucketOptions& potentialBucketOptions) {
+    auto& kSoftClosedBuckets = potentialBucketOptions.kSoftClosedBuckets;
+    auto& kArchivedBuckets = potentialBucketOptions.kArchivedBuckets;
+    bool kNoneBucketExists = (potentialBucketOptions.kNoneBucket != nullptr);
+
+    // Sort in increasing order of the the number of measurements in the buckets.
+    // We prioritize buckets with less data in them to improve fill ratios.
+    sortOnNumMeasurements(kSoftClosedBuckets);
+    sortOnNumMeasurements(kArchivedBuckets);
+
+    // Create the potentialBuckets vector.
+    size_t totalSize = kSoftClosedBuckets.size() + kArchivedBuckets.size() + kNoneBucketExists;
+    std::vector<Bucket*> potentialBuckets;
+    potentialBuckets.reserve(totalSize);
+
+    // We can prioritize kSoftClose candidates over kArchive, since we can easily reopen the
+    // kArchive ones whereas we're about to rollover kSoftClose buckets (ignoring query-based
+    // reopening).
+    potentialBuckets.insert(
+        potentialBuckets.end(), kSoftClosedBuckets.begin(), kSoftClosedBuckets.end());
+    potentialBuckets.insert(
+        potentialBuckets.end(), kArchivedBuckets.begin(), kArchivedBuckets.end());
+    if (kNoneBucketExists) {
+        potentialBuckets.push_back(potentialBucketOptions.kNoneBucket);
+    }
+    return potentialBuckets;
+}
+
 std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 Stripe& stripe,
                                                 WithLock stripeLock,
@@ -650,9 +685,8 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 const Seconds& bucketMaxSpanSeconds,
                                                 AllowQueryBasedReopening& allowQueryBasedReopening,
                                                 bool& bucketOpenedDueToMetadata) {
-    std::vector<Bucket*> potentialBuckets;
+    PotentialBucketOptions potentialBucketOptions;
     auto openBuckets = internal::findOpenBuckets(stripe, stripeLock, bucketKey);
-    Bucket* bucketWithoutRolloverAction = nullptr;
     for (const auto& openBucket : openBuckets) {
         // We found at least one bucket with the same metadata.
         bucketOpenedDueToMetadata = false;
@@ -665,10 +699,10 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                 if (bucketState == internal::BucketStateForInsertAndCleanup::kEligibleForInsert) {
                     internal::markBucketNotIdle(stripe, stripeLock, *openBucket);
                     // Only one uncleared open bucket is allowed for each key.
-                    invariant(bucketWithoutRolloverAction == nullptr);
+                    invariant(potentialBucketOptions.kNoneBucket == nullptr);
                     // Save the bucket with 'RolloverAction::kNone' to add it to the end of
                     // 'potentialBuckets'.
-                    bucketWithoutRolloverAction = openBucket;
+                    potentialBucketOptions.kNoneBucket = openBucket;
                 }
                 break;
             }
@@ -691,7 +725,11 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                 if (time >= bucketMinTime && time - bucketMinTime < bucketMaxSpanSeconds &&
                     bucketState == internal::BucketStateForInsertAndCleanup::kEligibleForInsert) {
                     // The time range and the state of the bucket are eligible.
-                    potentialBuckets.push_back(openBucket);
+                    if (action == RolloverAction::kArchive) {
+                        potentialBucketOptions.kArchivedBuckets.push_back(openBucket);
+                    } else {
+                        potentialBucketOptions.kSoftClosedBuckets.push_back(openBucket);
+                    }
                 } else {
                     // We only want to rollover these buckets when we don't have an insertion
                     // conflict; otherwise, we will attempt to remove the bucket twice.
@@ -702,10 +740,8 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
             }
         }
     }
-    if (bucketWithoutRolloverAction) {
-        potentialBuckets.push_back(bucketWithoutRolloverAction);
-    }
-    return potentialBuckets;
+    // Create vector with all potential buckets.
+    return createOrderedPotentialBucketsVector(potentialBucketOptions);
 }
 
 StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
