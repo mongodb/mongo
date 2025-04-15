@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
+#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 

@@ -30,7 +30,6 @@
 #include "mongo/db/exec/queued_data_stage.h"
 
 #include <memory>
-#include <vector>
 
 namespace mongo {
 

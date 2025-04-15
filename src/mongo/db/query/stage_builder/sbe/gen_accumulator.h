@@ -34,14 +34,8 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo::stage_builder {
 const StringData kAccumulatorCountName = "$count"_sd;

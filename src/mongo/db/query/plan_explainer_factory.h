@@ -41,7 +41,6 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
-#include "mongo/util/duration.h"
 
 namespace mongo::plan_explainer_factory {
 

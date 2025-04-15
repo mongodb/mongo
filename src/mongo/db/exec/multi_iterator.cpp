@@ -34,7 +34,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/exec/multi_iterator.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"

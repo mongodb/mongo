@@ -29,7 +29,6 @@
 
 
 #include <cstdint>
-#include <exception>
 #include <string>
 #include <utility>
 #include <vector>
@@ -64,11 +63,9 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

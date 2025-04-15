@@ -28,7 +28,6 @@
  */
 
 #include <algorithm>
-#include <cstdint>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -38,7 +37,6 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_knob_configuration.h"
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo::trial_period {
 size_t getTrialPeriodMaxWorks(OperationContext* opCtx,

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo::stage_builder {

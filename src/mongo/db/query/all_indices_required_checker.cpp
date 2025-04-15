@@ -29,10 +29,7 @@
 
 #include "mongo/db/query/all_indices_required_checker.h"
 
-#include <memory>
-#include <type_traits>
 #include <utility>
-#include <vector>
 
 #include <absl/container/flat_hash_map.h>
 

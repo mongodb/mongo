@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"

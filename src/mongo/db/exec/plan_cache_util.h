@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/none.hpp>
-#include <functional>
 #include <memory>
 #include <utility>
 #include <vector>

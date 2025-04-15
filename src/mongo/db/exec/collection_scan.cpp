@@ -32,7 +32,6 @@
 #include <boost/none.hpp>
 #include <memory>
 #include <utility>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -50,7 +49,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -59,8 +57,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/str.h"

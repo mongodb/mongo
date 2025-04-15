@@ -41,6 +41,7 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/idl/server_parameter_test_util.h"

@@ -36,22 +36,16 @@
 #include <deque>
 #include <functional>
 #include <memory>
-#include <queue>
 #include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/container_size_helper.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

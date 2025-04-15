@@ -39,10 +39,8 @@
 #include <memory>
 #include <set>
 #include <utility>
-#include <variant>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"

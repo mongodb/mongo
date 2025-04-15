@@ -36,7 +36,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <variant>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -46,36 +45,29 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/timeseries_modify.h"
-#include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

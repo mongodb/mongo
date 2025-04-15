@@ -33,7 +33,6 @@
 #include <vector>
 
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/shard_filterer.h"

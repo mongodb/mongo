@@ -35,18 +35,14 @@
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
-#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
-#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

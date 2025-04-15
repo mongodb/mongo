@@ -29,7 +29,9 @@
 
 #include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
+#include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/count.h"
+#include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/spool.h"
 #include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/timeseries_upsert.h"

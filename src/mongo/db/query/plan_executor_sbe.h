@@ -33,7 +33,6 @@
 #include <boost/optional/optional.hpp>
 #include <deque>
 #include <memory>
-#include <queue>
 #include <utility>
 #include <vector>
 
@@ -53,7 +52,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/restore_context.h"

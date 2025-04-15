@@ -32,7 +32,8 @@
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 
 namespace mongo::stage_builder {
 sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variableId) {

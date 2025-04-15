@@ -33,9 +33,6 @@
 #include <queue>
 #include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/exec/working_set.h"

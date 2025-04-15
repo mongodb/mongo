@@ -38,7 +38,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/geo/shapes.h"

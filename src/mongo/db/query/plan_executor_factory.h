@@ -32,7 +32,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <memory>
-#include <queue>
 #include <utility>
 
 #include "mongo/base/status_with.h"
@@ -52,9 +51,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
-#include "mongo/db/shard_role.h"
-#include "mongo/util/duration.h"
 
 namespace mongo::plan_executor_factory {
 

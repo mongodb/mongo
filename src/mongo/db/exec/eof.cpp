@@ -28,7 +28,6 @@
  */
 
 #include <memory>
-#include <vector>
 
 #include "mongo/db/exec/eof.h"
 

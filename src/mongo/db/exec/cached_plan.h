@@ -46,7 +46,6 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 

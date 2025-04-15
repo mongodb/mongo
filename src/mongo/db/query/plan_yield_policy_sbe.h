@@ -30,7 +30,6 @@
 #pragma once
 
 #include <memory>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -38,9 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/yield_policy_callbacks_impl.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 

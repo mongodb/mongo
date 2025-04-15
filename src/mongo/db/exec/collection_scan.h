@@ -33,7 +33,6 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -42,14 +41,11 @@
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/transaction_resources.h"
-#include "mongo/s/resharding/resume_token_gen.h"
 
 namespace mongo {
 

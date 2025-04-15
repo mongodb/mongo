@@ -28,10 +28,8 @@
  */
 
 #include <memory>
-#include <string>
 
 
-#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"

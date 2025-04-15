@@ -39,7 +39,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 

@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 

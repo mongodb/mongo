@@ -32,22 +32,17 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
 #include <memory>
-#include <set>
-#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_executor.h"
-#include "mongo/db/exec/sort_key_comparator.h"
-#include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/db/record_id.h"
 
 namespace mongo {
 

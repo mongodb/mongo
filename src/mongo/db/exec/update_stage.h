@@ -37,7 +37,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/plan_stage.h"

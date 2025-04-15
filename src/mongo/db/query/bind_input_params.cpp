@@ -68,7 +68,6 @@
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/tree_walker.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::input_params {

@@ -34,11 +34,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <array>
-#include <bitset>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -48,28 +45,15 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/match_path.h"
-#include "mongo/db/exec/sbe/stages/filter.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
-#include "mongo/db/exec/sbe/stages/makeobj.h"
-#include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
@@ -79,7 +63,6 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/field_set.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo::projection_ast {

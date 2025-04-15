@@ -29,7 +29,6 @@
 
 
 #include <cstddef>
-#include <set>
 #include <tuple>
 
 #include <absl/container/inlined_vector.h>
@@ -42,16 +41,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/filter.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
-#include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/namespace_string.h"
@@ -62,7 +53,6 @@
 #include "mongo/db/query/stage_builder/sbe/gen_coll_scan.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"

@@ -31,11 +31,12 @@
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <cstddef>
-#include <string>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/util/assert_util.h"

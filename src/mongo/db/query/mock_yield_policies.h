@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 
 namespace mongo {
 

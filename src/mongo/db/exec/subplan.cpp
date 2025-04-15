@@ -31,7 +31,6 @@
 #include <boost/move/utility_core.hpp>
 #include <functional>
 #include <memory>
-#include <ostream>
 #include <utility>
 #include <vector>
 

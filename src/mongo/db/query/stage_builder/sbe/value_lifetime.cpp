@@ -32,8 +32,6 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
-#include <string>
 
 namespace mongo::stage_builder {
 using namespace std::string_literals;

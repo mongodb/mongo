@@ -30,9 +30,6 @@
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

@@ -29,8 +29,6 @@
 
 
 #include <boost/optional.hpp>
-#include <map>
-#include <type_traits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -41,7 +39,6 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
@@ -50,7 +47,6 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
@@ -58,10 +54,8 @@
 #include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

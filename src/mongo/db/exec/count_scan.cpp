@@ -35,7 +35,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <memory>
-#include <vector>
 
 
 #include "mongo/bson/bsonelement.h"

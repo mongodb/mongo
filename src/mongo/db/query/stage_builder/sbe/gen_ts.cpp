@@ -33,9 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/exec/sbe/stages/block_to_row.h"
-#include "mongo/db/exec/sbe/stages/makeobj.h"
-#include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -47,7 +44,6 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

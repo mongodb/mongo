@@ -47,7 +47,6 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"

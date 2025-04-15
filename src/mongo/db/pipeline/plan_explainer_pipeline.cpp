@@ -28,12 +28,9 @@
  */
 
 #include <algorithm>
-#include <list>
-#include <memory>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"

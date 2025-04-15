@@ -31,7 +31,6 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"

@@ -30,19 +30,13 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <string>
-#include <tuple>
 #include <utility>
-#include <vector>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 
 namespace mongo::stage_builder {

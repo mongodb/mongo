@@ -29,7 +29,6 @@
 
 
 #include <memory>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -56,7 +55,6 @@
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

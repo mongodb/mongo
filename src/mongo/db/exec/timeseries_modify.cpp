@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/timeseries_modify.h"
 
-#include <exception>
 #include <fmt/format.h>
 #include <string>
 #include <tuple>
@@ -51,7 +50,6 @@
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
@@ -71,13 +69,9 @@
 #include "mongo/db/update/update_util.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/future.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

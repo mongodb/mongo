@@ -29,21 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/subplan.h"
-#include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_interface.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"

@@ -71,7 +71,6 @@
 #include "mongo/db/query/expression_geo_index_knobs_gen.h"
 #include "mongo/db/query/expression_geo_index_mapping.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/interval.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/atomic_word.h"

@@ -34,7 +34,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <deque>
 #include <memory>
-#include <queue>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -57,9 +56,9 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/restore_context.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/yieldable.h"

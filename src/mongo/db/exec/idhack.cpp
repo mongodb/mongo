@@ -30,11 +30,9 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
