@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes_gen.h"
+#include "mongo/db/query/search/search_query_view_spec_gen.h"
 
 namespace mongo {
 class DocumentSourceListSearchIndexesSpec;
@@ -129,13 +130,9 @@ private:
     // Cache the underlying source collection name, which is necessary for supporting running
     // search queries on views, to avoid retrieving on each getNext.
     boost::optional<NamespaceString> _resolvedNamespace;
-    // For other mongot aggregations, the document source can retrieve the viewName off of the
-    // expression context. However, $listSearchIndexes is unique mongos sends the request
-    // directly to its mongot without resolving the view on the primary shard. Given this
-    // information is not otherwise accessible for sharded views, we cache the viewName to avoid
-    // retrieving on each getNext.
-    boost::optional<NamespaceString> _viewName;
-    boost::optional<std::vector<BSONObj>> _viewPipeline;
+
+    // Cache the view for search queries on views.
+    boost::optional<SearchQueryViewSpec> _view;
 };
 
 }  // namespace mongo

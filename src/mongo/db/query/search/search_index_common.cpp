@@ -49,8 +49,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     const NamespaceString& nss,
     const UUID& uuid,
     const BSONObj& userCmd,
-    boost::optional<NamespaceString> viewName = boost::none,
-    boost::optional<std::vector<BSONObj>> viewPipeline = boost::none) {
+    boost::optional<SearchQueryViewSpec> view) {
     // Fetch the search index management host and port.
     invariant(!globalSearchIndexParams.host.empty());
     auto swHostAndPort = HostAndPort::parse(globalSearchIndexParams.host);
@@ -62,20 +61,12 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     manageSearchIndexRequest.setManageSearchIndex(nss.coll());
     manageSearchIndexRequest.setCollectionUUID(uuid);
     manageSearchIndexRequest.setUserCommand(userCmd);
-    if (viewName) {
-        SearchIndexRequestView view;
 
-        // Always append the view name.
-        view.setName(viewName->coll());
-
-        // Only append the view pipeline if it exists.
-        // TODO SERVER-100553: replace this conditional with a tassert that viewPipeline exists.
-        if (viewPipeline) {
-            view.setEffectivePipeline(viewPipeline.value());
-        }
-
-        manageSearchIndexRequest.setView(view);
+    if (view) {
+        manageSearchIndexRequest.setView(boost::make_optional(
+            MongotQueryViewSpec(view->getNss().coll().toString(), view->getEffectivePipeline())));
     }
+
     // Create a RemoteCommandRequest with the request and host-and-port.
     executor::RemoteCommandRequest remoteManageSearchIndexRequest(executor::RemoteCommandRequest(
         swHostAndPort.getValue(), nss.dbName(), manageSearchIndexRequest.toBSON(), opCtx));
@@ -84,52 +75,65 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
 }
 }  // namespace
 
-std::tuple<const UUID,
-           const NamespaceString,
-           boost::optional<NamespaceString>,
-           boost::optional<std::vector<BSONObj>>>
-retrieveCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                            const NamespaceString& currentOperationNss) {
-    // If the index management command is being run on a view, this call will return the
-    // underlying source collection UUID and ResolvedView. If not, it will just return a UUID.
+StatusWith<std::tuple<UUID, const NamespaceString, boost::optional<SearchQueryViewSpec>>>
+retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
+                                     const NamespaceString& currentOperationNss) {
+    // TLDR: on mongod, pass the viewName saved to expCtx. On mongos, pass the NSS saved to
+    // expCtx.
+    // On mongod, pExpCtx->getNamespaceString() represents the resolved namespace (the
+    // underlying namespace). To correctly identify if the
+    // query is being run on a view, we need to pass the nss the user is running their original
+    // query against. However, on mongod, pExpCtx->getNamespaceString() already represents the
+    // resolved nss (eg the underlying source collection nss). Thus if we are on mongod, we
+    // should pass the view NS saved to the expression context. On mongos, $listSearchIndexes
+    // queries are never resolved thus there is no view NS on the expression context. Luckily,
+    // because these queries are never resolved, pExpCtx->getNamespaceString() still represents
+    // the view nss.
     auto collUUIDResolvedViewPair =
-        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
+        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
             opCtx, currentOperationNss);
+
+    // The caller of the function decides whether to escalate the error returned or not.
+    if (!collUUIDResolvedViewPair.first) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection '" << currentOperationNss.toStringForErrorMsg()
+                              << "' does not exist."};
+    }
+
+    auto collUUID = *collUUIDResolvedViewPair.first;
+
     // If the query is on a normal collection, the source collection will be the same as
     // the current NS.
     auto sourceCollectionNss = currentOperationNss;
-    boost::optional<NamespaceString> viewNss;
-    auto collUUID = collUUIDResolvedViewPair.first;
-    boost::optional<std::vector<BSONObj>> viewPipeline;
+
+    boost::optional<SearchQueryViewSpec> view;
     if (auto resolvedView = collUUIDResolvedViewPair.second) {
         uassert(
             ErrorCodes::QueryFeatureNotAllowed,
             "search index commands on views are not allowed in the current configuration. "
             "You may need to enable the "
-            "correponding feature flag",
+            "corrsponding feature flag",
             feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         // The request is on a view! Therefore, currentOperationNss refers to the view
         // NS and the namespace on resolvedView refers to the underlying source collection.
         sourceCollectionNss = resolvedView.value().getNamespace();
-        viewNss.emplace(currentOperationNss);
 
-        viewPipeline.emplace(resolvedView.value().getPipeline());
+        // Construct a SearchQueryViewSpec object.
+        view.emplace(currentOperationNss, resolvedView.value().getPipeline());
     }
-
-    return std::make_tuple(collUUID, sourceCollectionNss, viewNss, viewPipeline);
+    return std::make_tuple(collUUID, sourceCollectionNss, view);
 }
+
 
 BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& uuid,
                                       const BSONObj& userCmd,
-                                      boost::optional<NamespaceString> viewName,
-                                      boost::optional<std::vector<BSONObj>> viewPipeline) {
+                                      boost::optional<SearchQueryViewSpec> view) {
     // Create the RemoteCommandRequest.
-    auto request = createManageSearchIndexRemoteCommandRequest(
-        opCtx, nss, uuid, userCmd, viewName, viewPipeline);
+    auto request = createManageSearchIndexRemoteCommandRequest(opCtx, nss, uuid, userCmd, view);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));
@@ -187,12 +191,13 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& cmdObj,
                               const UUID& collUUID,
-                              boost::optional<NamespaceString> viewNss) {
+                              boost::optional<SearchQueryViewSpec> view) {
     throwIfNotRunningWithRemoteSearchIndexManagement();
 
     BSONObj manageSearchIndexResponse =
-        getSearchIndexManagerResponse(opCtx, nss, collUUID, cmdObj, viewNss);
+        getSearchIndexManagerResponse(opCtx, nss, collUUID, cmdObj, view);
 
     return manageSearchIndexResponse;
 }
+
 }  // namespace mongo

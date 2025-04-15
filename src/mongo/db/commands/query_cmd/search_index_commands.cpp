@@ -48,12 +48,13 @@ namespace {
 template <typename CommandType>
 BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, CommandType& cmd) {
     const auto& currentOperationNss = cmd.getNamespace();
-    const auto [collUUID, resolvedNss, viewName, viewPipeline] =
-        retrieveCollectionUUIDAndResolveViewOrThrow(opCtx, currentOperationNss);
+    const auto [collUUID, resolvedNss, view] =
+        uassertStatusOKWithContext(retrieveCollectionUUIDAndResolveView(opCtx, currentOperationNss),
+                                   "Error retrieving collection UUID and view info");
 
     // Run the search index command against the remote search index management server.
-    auto searchIndexManagerResponse = getSearchIndexManagerResponse(
-        opCtx, resolvedNss, collUUID, cmd.toBSON(), viewName, viewPipeline);
+    auto searchIndexManagerResponse =
+        getSearchIndexManagerResponse(opCtx, resolvedNss, collUUID, cmd.toBSON(), view);
 
     return searchIndexManagerResponse;
 }

@@ -88,7 +88,7 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
     InternalSearchMongotRemoteSpec spec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
-    boost::optional<MongotQueryViewInfo> view)
+    boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
       _mergingPipeline(spec.getMergingPipeline().has_value()
                            ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
@@ -177,12 +177,12 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
         : mongot_cursor::getOptimizationFlagsForSearch();
 
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
-        return mongot_cursor::getSearchExplainResponse(
-            pExpCtx.get(),
-            _spec.getMongotQuery(),
-            _taskExecutor.get(),
-            optFlags,
-            _view ? boost::make_optional(_view->getViewNss()) : boost::none);
+        return mongot_cursor::getSearchExplainResponse(pExpCtx.get(),
+                                                       _spec.getMongotQuery(),
+                                                       _taskExecutor.get(),
+                                                       optFlags,
+                                                       _view ? boost::make_optional(_view->getNss())
+                                                             : boost::none);
     });
 
     MutableDocument mDoc;
@@ -357,7 +357,7 @@ DocumentSourceInternalSearchMongotRemote::establishCursor() {
         boost::none,
         nullptr,
         getSearchIdLookupMetrics(),
-        _view ? boost::make_optional(_view->getViewNss()) : boost::none);
+        _view ? boost::make_optional(_view->getNss()) : boost::none);
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);

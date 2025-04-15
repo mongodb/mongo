@@ -32,26 +32,9 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/pipeline/visitors/docs_needed_bounds.idl"
+    - "mongo/db/query/search/search_query_view_spec.idl"
 
 structs:
-    MongotQueryViewInfo:
-        description: >-
-            If the query is on a sharded view, mongos will use this struct to serialize the view information before sending the requests to the shards. The document sources specific to mongot stages also hold this struct to retain the view information necessary to perform mongot-indexed view logic during query execution.
-        strict: true
-        fields:
-            viewNss:
-                description: >-
-                    Atlas requires just the name of the view. However, when mongos serializes the view information, 
-                    we need to include the entire NSS in order to add the corresponding view pipeline to the 
-                    resolvedNamespaces dict on the expression context.
-                type: namespacestring
-                optional: false
-            effectivePipeline:
-                description: >-
-                    An array of agg stages gathered from the current and associated views. This field is only required for 
-                    createSearchIndexes commands, though it is being added to all search index command requests for easier debugability.
-                type: array<object>
-                optional: false
     InternalSearchMongotRemoteSpec:
         description: Specification for a $_internalSearchMongotRemote stage given in the full, explicit format.
         # Because the specification is internal only, we permit extra fields. This avoids some upgrade/downngrade
@@ -102,4 +85,4 @@ structs:
                     For requests on views over sharded collections, mongos must serialize the view NSS, the view name and pipeline as part of
                     the mongot stage.
                 optional: true
-                type: MongotQueryViewInfo
+                type: SearchQueryViewSpec

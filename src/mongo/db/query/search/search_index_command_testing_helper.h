@@ -265,24 +265,17 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
 }
 
 
-inline BSONObj wrapCmdInShardSvrRunSearchIndexCmd(
-    const NamespaceString& nss,
-    const BSONObj& userCmd,
-    boost::optional<NamespaceString> viewName,
-    boost::optional<std::vector<BSONObj>> viewPipeline) {
+inline BSONObj wrapCmdInShardSvrRunSearchIndexCmd(const NamespaceString& nss,
+                                                  const BSONObj& userCmd,
+                                                  boost::optional<SearchQueryViewSpec> view) {
     BSONObjBuilder bob;
     bob.append("_shardsvrRunSearchIndexCommand", 1);
     bob.append("resolvedNss",
                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     bob.append("userCmd", userCmd);
 
-    if (viewName) {
-        BSONObjBuilder subObj(bob.subobjStart("view"));
-        subObj.append(
-            "viewNss",
-            NamespaceStringUtil::serialize(*viewName, SerializationContext::stateDefault()));
-        subObj.append("effectivePipeline", *viewPipeline);
-        subObj.done();
+    if (view) {
+        bob.append("view", view->toBSON());
     }
     /*
      * Fetch the search index management host and port to forward the mongotAlreadyInformed
@@ -296,11 +289,9 @@ inline BSONObj wrapCmdInShardSvrRunSearchIndexCmd(
     return bob.obj();
 }
 
-inline BSONObj createWrappedListSearchIndexesCmd(
-    const NamespaceString& nss,
-    const BSONObj& cmd,
-    boost::optional<NamespaceString> viewName,
-    boost::optional<std::vector<BSONObj>> viewPipeline) {
+inline BSONObj createWrappedListSearchIndexesCmd(const NamespaceString& nss,
+                                                 const BSONObj& cmd,
+                                                 boost::optional<SearchQueryViewSpec> view) {
     auto idxCmdType = std::string(cmd.firstElement().fieldName());
     // In order to use the IDL commands for retrieving the index name, we have to add $db field.
     auto newCmdObj = cmd.addField(BSON("$db" << DatabaseNameUtil::serialize(
@@ -331,14 +322,14 @@ inline BSONObj createWrappedListSearchIndexesCmd(
         }
     }
 
-    return wrapCmdInShardSvrRunSearchIndexCmd(nss, listSearchIndexes, viewName, viewPipeline);
+    return wrapCmdInShardSvrRunSearchIndexCmd(nss, listSearchIndexes, view);
 }
 
 inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext* opCtx,
                                                                const NamespaceString& nss,
                                                                const BSONObj& userCmd) {
-    const auto [collUUID, resolvedNss, viewName, viewPipeline] =
-        retrieveCollectionUUIDAndResolveViewOrThrow(opCtx, nss);
+    const auto [collUUID, resolvedNss, view] = uassertStatusOKWithContext(
+        retrieveCollectionUUIDAndResolveView(opCtx, nss), "Error retrieving collection UUID");
 
     // This helper can only be called by routers for server testing with a real mongot (eg not tests
     // that use mongotmock).
@@ -352,16 +343,13 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext*
     BSONObj listSearchIndexesCmd;
     boost::optional<BSONObj> searchIdxLatestDefinition;
     if (idxCmdType.compare(kListCommand.toString()) == 0) {
-        listSearchIndexesCmd =
-            wrapCmdInShardSvrRunSearchIndexCmd(resolvedNss, userCmd, viewName, viewPipeline);
+        listSearchIndexesCmd = wrapCmdInShardSvrRunSearchIndexCmd(resolvedNss, userCmd, view);
     } else {
-        auto cmdObj =
-            wrapCmdInShardSvrRunSearchIndexCmd(resolvedNss, userCmd, viewName, viewPipeline);
+        auto cmdObj = wrapCmdInShardSvrRunSearchIndexCmd(resolvedNss, userCmd, view);
         multiCastShardsvrRunSearchIndexCommandOnAllMongods(opCtx, allClusterHosts, dbName, cmdObj);
         if (idxCmdType.compare(kCreateCommand.toString()) == 0 ||
             idxCmdType.compare(kUpdateCommand.toString()) == 0) {
-            listSearchIndexesCmd =
-                createWrappedListSearchIndexesCmd(resolvedNss, userCmd, viewName, viewPipeline);
+            listSearchIndexesCmd = createWrappedListSearchIndexesCmd(resolvedNss, userCmd, view);
             if (idxCmdType.compare(kUpdateCommand.toString()) == 0) {
                 if (userCmd.hasField("definition") && userCmd["definition"].type() == Object) {
                     searchIdxLatestDefinition = boost::make_optional(userCmd["definition"].Obj());

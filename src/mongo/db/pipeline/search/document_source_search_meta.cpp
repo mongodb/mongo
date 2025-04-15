@@ -100,7 +100,7 @@ std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establis
         getTaskExecutor(),
         getIntermediateResultsProtocolVersion(),
         nullptr,
-        _view ? boost::make_optional(_view->getViewNss()) : boost::none);
+        _view ? boost::make_optional(_view->getNss()) : boost::none);
 
     // TODO SERVER-91594: Since mongot will no longer only return explain, remove this block.
     // Mongot can return only an explain object or an explain with a cursor. If mongot returned

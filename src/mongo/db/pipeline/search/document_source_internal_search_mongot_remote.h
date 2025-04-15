@@ -71,7 +71,7 @@ public:
         InternalSearchMongotRemoteSpec spec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::shared_ptr<executor::TaskExecutor> taskExecutor,
-        boost::optional<MongotQueryViewInfo> view = boost::none);
+        boost::optional<SearchQueryViewSpec> view = boost::none);
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return getSearchDefaultConstraints();
@@ -227,7 +227,7 @@ protected:
      * view's nss. However, DocumentSourceSearchMeta derives from this class and needs both the
      * view name and the view pipeline. As such, we keep track of the entire view struct.
      */
-    boost::optional<MongotQueryViewInfo> _view;
+    boost::optional<SearchQueryViewSpec> _view;
 
 private:
     /**

@@ -200,7 +200,7 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
     const ExpressionContext* expCtx,
     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline);
 
-boost::optional<MongotQueryViewInfo> getViewFromBSONObj(
+boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec);
 /**
  * Create the initial search pipeline which can be used for both $search and $searchMeta. The
@@ -241,7 +241,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
  * Assert that the mongot stage is allowed to run on the view pipeline (i.e. the pipeline doesn't
  * involve other namespaces).
  */
-void validateViewPipeline(MongotQueryViewInfo view);
+void validateViewPipeline(SearchQueryViewSpec view);
 
 }  // namespace search_helpers
 }  // namespace mongo

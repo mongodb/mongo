@@ -23,6 +23,7 @@ idl_generator(
     name = "internal_search_mongot_remote_spec_gen",
     src = "internal_search_mongot_remote_spec.idl",
     deps = [
+        ":search_query_view_spec_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/pipeline/visitors:docs_needed_bounds_gen",
     ],
@@ -41,6 +42,14 @@ idl_generator(
 idl_generator(
     name = "manage_search_index_request_gen",
     src = "manage_search_index_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "search_query_view_spec_gen",
+    src = "search_query_view_spec.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
@@ -69,6 +78,7 @@ mongo_cc_library(
         "mongot_cursor_getmore_strategy.cpp",
         ":internal_search_cluster_parameters_gen",
         ":internal_search_mongot_remote_spec_gen",
+        ":search_query_view_spec_gen",
         "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
@@ -155,6 +165,7 @@ mongo_cc_library(
         "search_index_options",
         "search_index_process_interface",
         "search_task_executors",
+        ":mongot_cursor",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/rpc:command_status",

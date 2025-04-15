@@ -51,7 +51,7 @@ public:
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
                                BSONObj originalSpec,
-                               boost::optional<MongotQueryViewInfo> view = boost::none);
+                               boost::optional<SearchQueryViewSpec> view = boost::none);
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -176,6 +176,6 @@ private:
     BSONObj _originalSpec;
 
     // If applicable, hold the view information.
-    boost::optional<MongotQueryViewInfo> _view;
+    boost::optional<SearchQueryViewSpec> _view;
 };
 }  // namespace mongo

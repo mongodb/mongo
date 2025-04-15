@@ -27,46 +27,53 @@
 #
 
 global:
-    cpp_namespace: "mongo"
-
+    cpp_namespace: mongo
 imports:
-    - "mongo/db/basic_types.idl"
-
+    - mongo/db/basic_types.idl
 structs:
-    SearchIndexRequestView:
-        description: "If the index command is on a view, the request to mongot will include this struct that contains the name of the view and the effective pipeline"
+    MongotQueryViewSpec:
+        description: >-
+            If the search query is on a view, this struct defines the view information
+            required to be serialized into the RemoteCommandRequest before sending it
+            to mongot. 
+            NOTE: this struct is similar to SearchQueryViewSpec except for
+            that it holds only the view's *name*, not the *NSS*. When working with
+            commands on views, mongot requires just the name of the view while  the
+            server-side code needs the NSS in order to add the corresponding view
+            pipeline to the resolvedNamespaces dict on the expression context.
         strict: true
         fields:
             name:
-                description: "The name of the view"
+                description: Mongot requires just the name of the view.
                 type: string
                 optional: false
             effectivePipeline:
                 description: >-
-                    An array of agg stages gathered from the current and associated views. 
-                    This field is only required for createSearchIndexes commands, though 
-                    it is being added to all search index command requests for easier debugability.
+                    An array of agg stages gathered from the current and associated views.
+                    This field is only required for  createSearchIndexes commands, though
+                    it is being added to all search index command requests for easier
+                    debugability.
                 type: array<object>
-                optional: true
+                optional: false
     ManageSearchIndexRequest:
-        description: "Command request for search index management host"
-        # Not being strict because this is used to parse a command object that
-        # contains other fields, like 'lsid'.
+        description: Command request for search index management host
         strict: false
         fields:
             manageSearchIndex:
-                description: "Command name field that holds the collection name value"
+                description: Command name field that holds the collection name value
                 type: string
                 optional: false
             collectionUUID:
-                description: "The collection UUID"
+                description: The collection UUID
                 type: uuid
                 optional: false
             userCommand:
-                description: "The original user search index command request"
+                description: The original user search index command request
                 type: object
                 optional: false
             view:
-                description: "If the command is being run on a view namespace, this field must be set to SearchIndexRequestView"
-                type: SearchIndexRequestView
+                description: >-
+                    If the command is being run on a view namespace, this field must be
+                    set to MongotQueryViewSpec
+                type: MongotQueryViewSpec
                 optional: true

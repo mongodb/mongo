@@ -71,7 +71,7 @@ public:
 
     DocumentSourceSearch(const boost::intrusive_ptr<ExpressionContext> expCtx,
                          InternalSearchMongotRemoteSpec spec,
-                         boost::optional<MongotQueryViewInfo> view = boost::none)
+                         boost::optional<SearchQueryViewSpec> view = boost::none)
         : DocumentSource(kStageName, expCtx), _spec(std::move(spec)), _view(view) {}
 
     const char* getSourceName() const override;
@@ -200,7 +200,7 @@ private:
     boost::optional<BSONObj> _remoteCursorVars;
 
     // If applicable, hold the view information.
-    boost::optional<MongotQueryViewInfo> _view;
+    boost::optional<SearchQueryViewSpec> _view;
 };
 
 }  // namespace mongo

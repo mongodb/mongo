@@ -106,22 +106,13 @@ public:
 
             auto catalog = CollectionCatalog::get(opCtx);
             auto resolvedNamespace = cmd.getResolvedNss();
-            boost::optional<NamespaceString> viewNss = boost::none;
-            boost::optional<std::vector<BSONObj>> viewPipeline = boost::none;
-
-            if (cmd.getView()) {
-                viewNss = boost::make_optional(cmd.getView()->getViewNss());
-                viewPipeline = boost::make_optional(cmd.getView()->getEffectivePipeline());
-            }
-
 
             BSONObj manageSearchIndexResponse =
                 getSearchIndexManagerResponse(opCtx,
                                               resolvedNamespace,
                                               *catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
                                               cmd.getUserCmd(),
-                                              viewNss,
-                                              viewPipeline);
+                                              cmd.getView());
 
             auto searchIdxResp = SearchIndexManagerResponse::parse(
                 IDLParserContext("_shardsvrRunSearchIndexCommand"), manageSearchIndexResponse);

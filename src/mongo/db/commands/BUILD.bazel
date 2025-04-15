@@ -107,6 +107,7 @@ idl_generator(
     src = "shardsvr_run_search_index_command.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/search:search_query_view_spec_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
@@ -122,6 +123,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/query/search:search_index_common",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/idl:idl_parser",
     ],

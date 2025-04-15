@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/search/search_query_view_spec_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -38,13 +39,11 @@ namespace mongo {
  * Passes the remote command response data back to the caller if the status is OK, otherwise throws
  * if the command failed.
  */
-BSONObj getSearchIndexManagerResponse(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    const BSONObj& userCmd,
-    boost::optional<NamespaceString> viewName = boost::none,
-    boost::optional<std::vector<BSONObj>> viewPipeline = boost::none);
+BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const UUID& uuid,
+                                      const BSONObj& userCmd,
+                                      boost::optional<SearchQueryViewSpec> view = boost::none);
 
 /**
  * Runs the given command against the remote search index management server, if the remote host
@@ -54,18 +53,14 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& cmdObj,
                               const UUID& collUUID,
-                              boost::optional<NamespaceString> viewNss = boost::none);
+                              boost::optional<SearchQueryViewSpec> view = boost::none);
 /**
  * Helper function to throw if search index management is not properly configured.
  */
 void throwIfNotRunningWithRemoteSearchIndexManagement();
 
-std::tuple<const UUID,
-           const NamespaceString,
-           boost::optional<NamespaceString>,
-           boost::optional<std::vector<BSONObj>>>
-retrieveCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                            const NamespaceString& currentOperationNss);
-
+StatusWith<std::tuple<UUID, const NamespaceString, boost::optional<SearchQueryViewSpec>>>
+retrieveCollectionUUIDAndResolveView(OperationContext* opCtx,
+                                     const NamespaceString& currentOperationNss);
 
 }  // namespace mongo

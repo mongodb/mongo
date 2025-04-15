@@ -59,7 +59,7 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     BSONObj originalSpec,
-    boost::optional<MongotQueryViewInfo> view)
+    boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
       _taskExecutor(taskExecutor),
       _originalSpec(originalSpec.getOwned()),

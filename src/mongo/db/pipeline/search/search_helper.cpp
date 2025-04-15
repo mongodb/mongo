@@ -648,12 +648,12 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
 }
 
 
-void validateViewPipeline(MongotQueryViewInfo view) {
+void validateViewPipeline(SearchQueryViewSpec view) {
     // mongot stages cannot run on a view involving other namespaces. This can occur when the
     // view's pipeline contains $lookup, $unionWith, another mongot stage, etc. For safety, this
     // error will throw even when these stages involve the same collection that the mongot stage
     // is running on.
-    LiteParsedPipeline lpp(view.getViewNss(), view.getEffectivePipeline());
+    LiteParsedPipeline lpp(view.getNss(), view.getEffectivePipeline());
 
     if (!lpp.getInvolvedNamespaces().empty()) {
         if (lpp.hasSearchStage()) {
@@ -674,19 +674,19 @@ void validateViewPipeline(MongotQueryViewInfo view) {
     }
 }
 
-boost::optional<MongotQueryViewInfo> getViewFromBSONObj(
+boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec) {
     // First, check if the view is held on the spec object (sharded scenarios).
-    boost::optional<MongotQueryViewInfo> view;
+    boost::optional<SearchQueryViewSpec> view;
     if (spec.hasField("view") && spec["view"].type() == BSONType::Object) {
-        view = MongotQueryViewInfo::parse(IDLParserContext("unpack MongotQueryViewInfo"),
+        view = SearchQueryViewSpec::parse(IDLParserContext("unpack SearchQueryViewSpec"),
                                           spec["view"].embeddedObject());
     }
 
     // If the view struct is not found on the spec document, check the expression context to see
     // if the command is being executed on a view (non-sharded scenarios).
     if (!view && expCtx->getViewNSForMongotIndexedView()) {
-        view = boost::make_optional(MongotQueryViewInfo(
+        view = boost::make_optional(SearchQueryViewSpec(
             *expCtx->getViewNSForMongotIndexedView(),
             expCtx->getResolvedNamespace(*expCtx->getViewNSForMongotIndexedView()).pipeline));
     }
