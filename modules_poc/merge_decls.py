@@ -3,7 +3,9 @@ import glob
 import json
 import multiprocessing
 import os
+import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed, wait
+from copy import deepcopy
 from datetime import datetime
 from typing import Any, TypedDict
 
@@ -93,11 +95,8 @@ def merge_decl(decl: Decl):
     # assert decl["loc"] == old["loc"]
     assert (
         decl["kind"] == old["kind"]
-        # These are weird special cases where it sometimes ends up on
-        # CLASS_DECL rather than the CLASS_TEMPLATE. Not sure why?
-        or decl["display_name"].startswith("StackBufBuilderBase")
-        or decl["display_name"].startswith("Sorter")
-        or decl["display_name"].startswith("SortIteratorInterface")
+        or (decl["kind"] == "CLASS_DECL" and old["kind"] == "CLASS_TEMPLATE")
+        or (decl["kind"] == "CLASS_TEMPLATE" and old["kind"] == "CLASS_DECL")
     )
     # assert decl["display_name"] == old["display_name"]  # TODO ugh sometimes mongo:: screws it up
 
@@ -165,12 +164,14 @@ def main(
                 merge_decls(json.loads(f.read()))
         timer.mark("processed input")
 
-    if not intra_module:
-        for decl in all_decls.values():
-            if decl["mod"] in decl["used_from"]:
-                del decl["used_from"][decl["mod"]]
+    no_self_decls = deepcopy(all_decls)
+    for decl in no_self_decls.values():
+        if decl["mod"] in decl["used_from"]:
+            del decl["used_from"][decl["mod"]]
 
-    out: Any = [d for d in all_decls.values() if d["used_from"]]
+    out: Any = deepcopy(
+        [d for d in (no_self_decls if not intra_module else all_decls).values() if d["used_from"]]
+    )
     for decl in out:
         # go from {$MOD: $LOCS} map to [{mod: $MOD, locs: $LOCS}] list of
         # objects which is easier to work with in mongo aggregations
@@ -195,19 +196,17 @@ def main(
             yaml.dump(out, f, Dumper=Dumper, width=1000000)
         timer.mark("dumped yaml")
 
-    out = list(
-        {k: v for k, v in d.items() if not k == "used_from"}
-        for d in all_decls.values()
-        if d["mod"] == "__NONE__"
-        # These are parts of other things (classes and enums) that should already be included.
-        and d["kind"] not in ("CXX_METHOD", "CONSTRUCTOR", "ENUM_CONSTANT_DECL", "FIELD_DECL")
-    )
-    out.sort(key=lambda d: d["display_name"])
-    timer.mark("massaged output for unowned.yaml")
-
-    with open("unowned.yaml", "w") as f:
-        yaml.dump(out, f, Dumper=Dumper, width=1000000)
-    timer.mark("dumped unowned.yaml")
+    out: Any = [
+        d for d in no_self_decls.values() if d["used_from"] and d["visibility"] == "private"
+    ]
+    for decl in out:
+        print(f"Illegal use of {decl['display_name']} outside of module {decl['mod']}:")
+        for locs in decl["used_from"].values():
+            for loc in locs:
+                print(f"  {loc}")
+    timer.mark("checked for privacy violations")
+    if out:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

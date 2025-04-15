@@ -53,6 +53,11 @@ python modules_poc/merge_decls.py
 and declarations that are only used from within their module. Typically, you don't so it defaults to
 omitting them.
 
+Running `merge_decls.py` also validates that private APIs aren't being used
+outside their own module. If any are, the script will fail, though
+`merged_decls.json` will still be generated, and the
+invalid uses will be printed to stdout.
+
 If you only wish to include the files linked in to a given executable, replace the `bazel build` command with the following commands:
 
 ```bash
