@@ -102,8 +102,8 @@ public:
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
             auto setAllowMigrationsCoordinator =
-                checked_pointer_cast<SetAllowMigrationsCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                checked_pointer_cast<SetAllowMigrationsCoordinator>(service->getOrCreateInstance(
+                    opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
             setAllowMigrationsCoordinator->getCompletionFuture().get(opCtx);
         }
 

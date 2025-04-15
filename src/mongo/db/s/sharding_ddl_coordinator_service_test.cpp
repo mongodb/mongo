@@ -354,9 +354,10 @@ TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondari
 
     stepDown();
 
-    ASSERT_THROWS_CODE(ddlService()->getOrCreateInstance(opCtx.get(), BSONObj()),
-                       DBException,
-                       ErrorCodes::NotWritablePrimary);
+    ASSERT_THROWS_CODE(
+        ddlService()->getOrCreateInstance(opCtx.get(), BSONObj(), FixedFCVRegion{opCtx.get()}),
+        DBException,
+        ErrorCodes::NotWritablePrimary);
 
     ASSERT_THROWS_CODE(
         ddlService()->waitForRecovery(opCtx.get()), DBException, ErrorCodes::NotWritablePrimary);

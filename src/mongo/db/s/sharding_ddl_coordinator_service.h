@@ -36,6 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -103,6 +104,7 @@ public:
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx,
                                                   BSONObj initialState,
+                                                  const FixedFCVRegion& fcvRegion,
                                                   bool checkOptions = true);
 
     std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;

@@ -113,7 +113,7 @@ public:
                           DDLCoordinatorTypeEnum::kAddShard}});
 
                     return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-                        opCtx, coordinatorDoc.toBSON());
+                        opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx});
                 }));
 
             const auto finalName = addShardCoordinator->getResult(opCtx);

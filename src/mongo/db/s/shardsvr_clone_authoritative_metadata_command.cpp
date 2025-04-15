@@ -88,7 +88,8 @@ public:
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
             auto coordinator = checked_pointer_cast<CloneAuthoritativeMetadataCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                service->getOrCreateInstance(
+                    opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
             coordinator->getCompletionFuture().get(opCtx);
         }
 

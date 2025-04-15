@@ -131,7 +131,7 @@ public:
             {{cmd.getNamespace(), DDLCoordinatorTypeEnum::kCollMod}});
         auto service = ShardingDDLCoordinatorService::getService(opCtx);
         auto collModCoordinator = checked_pointer_cast<CollModCoordinator>(
-            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
 
         result.appendElements(collModCoordinator->getResult(opCtx));
         return true;

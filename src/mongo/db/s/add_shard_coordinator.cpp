@@ -329,7 +329,7 @@ bool AddShardCoordinator::canAlwaysStartWhenUserWritesAreDisabled() const {
 
 std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
     OperationContext* opCtx,
-    const FixedFCVRegion&,
+    const FixedFCVRegion& fcvRegion,
     const mongo::ConnectionString& target,
     boost::optional<std::string> name,
     bool isConfigShard) {
@@ -354,7 +354,7 @@ std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
 
     return checked_pointer_cast<AddShardCoordinator>(
         ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-            opCtx, coordinatorDoc.toBSON()));
+            opCtx, coordinatorDoc.toBSON(), fcvRegion));
 }
 
 bool AddShardCoordinator::_mustAlwaysMakeProgress() {

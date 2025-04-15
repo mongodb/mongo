@@ -172,7 +172,7 @@ public:
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(
                             ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-                                opCtx, coordinatorDoc.toBSON()));
+                                opCtx, coordinatorDoc.toBSON(), *fixedFcvRegion));
 
                     fixedFcvRegion.reset();
                     ddlLock.reset();

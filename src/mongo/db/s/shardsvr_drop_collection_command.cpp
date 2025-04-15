@@ -123,8 +123,9 @@ public:
             coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto dropCollCoordinator = checked_pointer_cast<DropCollectionCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            auto dropCollCoordinator =
+                checked_pointer_cast<DropCollectionCoordinator>(service->getOrCreateInstance(
+                    opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
 
             dropCollCoordinator->getCompletionFuture().get(opCtx);
         }

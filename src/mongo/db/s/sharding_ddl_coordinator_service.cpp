@@ -374,6 +374,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
                                                    BSONObj coorDoc,
+                                                   const FixedFCVRegion& fcvRegion,
                                                    bool checkOptions) {
     // Wait for all coordinators to be recovered before to allow the creation of new ones.
     waitForRecovery(opCtx);
@@ -395,7 +396,6 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
         coorMetadata.setDatabaseVersion(clientDbVersion);
     }
 
-    FixedFCVRegion fixedFcvRegion(opCtx);
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     ForwardableOperationMetadata forwardableOpMetadata(opCtx);
     // We currently only propagate the Operation FCV for DDL operations.

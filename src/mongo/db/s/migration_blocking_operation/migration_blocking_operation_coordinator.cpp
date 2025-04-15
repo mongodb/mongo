@@ -76,7 +76,7 @@ MigrationBlockingOperationCoordinator::getOrCreate(OperationContext* opCtx,
 
     auto service = ShardingDDLCoordinatorService::getService(opCtx);
     return checked_pointer_cast<MigrationBlockingOperationCoordinator>(
-        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
+        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc), FixedFCVRegion{opCtx}));
 }
 
 boost::optional<std::shared_ptr<MigrationBlockingOperationCoordinator>>

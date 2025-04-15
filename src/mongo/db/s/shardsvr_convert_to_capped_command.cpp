@@ -85,8 +85,9 @@ public:
                 {{nss, DDLCoordinatorTypeEnum::kConvertToCapped}});
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto coordinator = checked_pointer_cast<ConvertToCappedCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            auto coordinator =
+                checked_pointer_cast<ConvertToCappedCoordinator>(service->getOrCreateInstance(
+                    opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
             coordinator->getCompletionFuture().get(opCtx);
         }
 

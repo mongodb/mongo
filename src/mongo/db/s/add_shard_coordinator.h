@@ -56,7 +56,7 @@ public:
     bool canAlwaysStartWhenUserWritesAreDisabled() const override;
 
     static std::shared_ptr<AddShardCoordinator> create(OperationContext* opCtx,
-                                                       const FixedFCVRegion&,
+                                                       const FixedFCVRegion& fcvRegion,
                                                        const mongo::ConnectionString& target,
                                                        boost::optional<std::string> name,
                                                        bool isConfigShard);

@@ -310,8 +310,10 @@ public:
                 const auto coordinator = [&] {
                     auto service = ShardingDDLCoordinatorService::getService(opCtx);
                     return checked_pointer_cast<CreateCollectionCoordinator>(
-                        service->getOrCreateInstance(
-                            opCtx, coordinatorDoc.copy(), false /*checkOptions*/));
+                        service->getOrCreateInstance(opCtx,
+                                                     coordinatorDoc.copy(),
+                                                     *optFixedFcvRegion,
+                                                     false /*checkOptions*/));
                 }();
                 try {
                     coordinator->checkIfOptionsConflict(coordinatorDoc);

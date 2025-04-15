@@ -138,7 +138,7 @@ public:
                 const auto coordinator = [&] {
                     auto service = ShardingDDLCoordinatorService::getService(opCtx);
                     return checked_pointer_cast<MovePrimaryCoordinator>(
-                        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
+                        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc), fcvRegion));
                 }();
 
                 return coordinator->getCompletionFuture();

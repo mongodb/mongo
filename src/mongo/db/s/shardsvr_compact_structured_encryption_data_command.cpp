@@ -112,10 +112,9 @@ public:
             auto compactCoordinator =
                 [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
-
                 auto compact = makeRequest(opCtx);
                 return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-                    opCtx, compact.toBSON());
+                    opCtx, compact.toBSON(), fixedFcvRegion);
             }();
 
             return checked_pointer_cast<CompactStructuredEncryptionDataCoordinator>(

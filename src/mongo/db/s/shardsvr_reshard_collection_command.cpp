@@ -180,8 +180,8 @@ public:
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
                 auto reshardCollectionCoordinator =
-                    checked_pointer_cast<ReshardCollectionCoordinator>(
-                        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                    checked_pointer_cast<ReshardCollectionCoordinator>(service->getOrCreateInstance(
+                        opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
                 return reshardCollectionCoordinator->getCompletionFuture();
             }();
 

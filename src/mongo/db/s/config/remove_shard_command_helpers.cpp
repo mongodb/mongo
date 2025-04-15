@@ -70,7 +70,7 @@ RemoveShardProgress runCoordinatorRemoveShard(
               DDLCoordinatorTypeEnum::kRemoveShardCommit}});
         auto service = ShardingDDLCoordinatorService::getService(opCtx);
         auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
-            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), *fcvRegion));
         return coordinator;
     }();
     fcvRegion.reset();

@@ -88,7 +88,8 @@ public:
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
                 return checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                    service->getOrCreateInstance(
+                        opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
             }();
 
             refineCoordinator->getCompletionFuture().get(opCtx);

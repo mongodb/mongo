@@ -111,10 +111,9 @@ public:
             auto cleanupCoordinator =
                 [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
-
                 auto cleanup = makeRequest(opCtx);
                 return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-                    opCtx, cleanup.toBSON());
+                    opCtx, cleanup.toBSON(), fixedFcvRegion);
             }();
 
             return checked_pointer_cast<CleanupStructuredEncryptionDataCoordinator>(

@@ -125,7 +125,8 @@ public:
                             authoritativeMetadataAccessLevel);
 
                         dropDatabaseCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
-                            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                            service->getOrCreateInstance(
+                                opCtx, coordinatorDoc.toBSON(), fcvRegion));
                     }
 
                     invariant(dropDatabaseCoordinator);
