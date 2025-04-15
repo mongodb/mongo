@@ -67,8 +67,6 @@ assertExplain(getTimeseriesCollForRawOps(coll).explain().update(
 
 // Additionally run explains that issue a cluster write without a shard key in a sharded environment
 // to test that path.
-// TODO SERVER-102697: Cluster write without shard key for findAndModify (if not put into its own
-// test).
 assertExplain(getTimeseriesCollForRawOps(coll).explain().remove(
                   {"control.count": 2}, {...kRawOperationSpec, justOne: true}),
               "delete");
