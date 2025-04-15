@@ -54,7 +54,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
-#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -278,9 +277,6 @@ int dbtestsMain(int argc, char** argv) {
 
     AuthorizationManager::get(service->getService())->setAuthEnabled(false);
     ScriptEngine::setup(ExecutionEnvironment::Server);
-
-    query_settings::initializeForTest(service);
-
     return mongo::dbtests::runDbTests(argc, argv);
 }
 

@@ -264,11 +264,11 @@ public:
                                benchmark::Counter::OneK::kIs1024);
 
         // Update the qurey shape configurations present in the system.
-        QuerySettingsService::get(opCtx.get())
-            .setAllQueryShapeConfigurations(
-                QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigs),
-                                                      LogicalTime(Timestamp(1))},
-                tenantId);
+        query_settings::setAllQueryShapeConfigurations(
+            opCtx.get(),
+            QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigs),
+                                                  LogicalTime(Timestamp(1))},
+            tenantId);
         benchmark::ClobberMemory();
     }
 
@@ -311,12 +311,11 @@ public:
                 auto&& queryShapeConfigurations =
                     queryShapeConfigurationsWithTimestamp.queryShapeConfigurations;
                 queryShapeConfigurations.push_back(hitQueryShapeConfiguration);
-
-                QuerySettingsService::get(opCtx.get())
-                    .setAllQueryShapeConfigurations(
-                        QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigurations),
-                                                              LogicalTime(Timestamp(2))},
-                        tid);
+                query_settings::setAllQueryShapeConfigurations(
+                    opCtx.get(),
+                    QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigurations),
+                                                          LogicalTime(Timestamp(2))},
+                    tid);
             }
 
             return parsedFindRequest;
