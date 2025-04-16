@@ -659,6 +659,19 @@ void stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(
 
     stasher->stashTransactionResources(std::move(stashedResources));
 }
+
+logv2::DynamicAttributes getCurOpLogAttrs(OperationContext* opCtx) {
+    logv2::DynamicAttributes attr;
+    const auto curop = CurOp::get(opCtx);
+    curop->debug().report(opCtx,
+                          nullptr,
+                          nullptr,
+                          curop->getOperationStorageMetrics(),
+                          curop->getPrepareReadConflicts(),
+                          &attr);
+    return attr;
+}
+
 }  // namespace
 
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -1600,9 +1613,18 @@ void restoreTransactionResourcesToOperationContext(
                      prerequisites.readConcern.getLevel() !=
                          repl::ReadConcernLevel::kAvailableReadConcern) &&
                     !acquiredCollection.ownershipFilter->isRangePreserverStillValid()) {
+                    static constexpr char errMsg[] =
+                        "Read has been terminated due to orphan range cleanup";
+                    if (enableQueryKilledByRangeDeletionLog.load()) {
+                        LOGV2(10016300,
+                              errMsg,
+                              logv2::DynamicAttributes{
+                                  getCurOpLogAttrs(opCtx),
+                                  "orphanCleanupDelaySecs"_attr = orphanCleanupDelaySecs.load(),
+                              });
+                    }
                     killedDueToRangeDeletionCounter.increment();
-                    uasserted(ErrorCodes::QueryPlanKilled,
-                              "Read has been terminated due to orphan range cleanup.");
+                    uasserted(ErrorCodes::QueryPlanKilled, errMsg);
                 }
             };
 

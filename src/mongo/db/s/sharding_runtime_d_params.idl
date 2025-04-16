@@ -185,3 +185,12 @@ server_parameters:
         cpp_varname: terminateSecondaryReadsOnOrphanCleanup
         default: true
         redact: false
+
+    enableQueryKilledByRangeDeletionLog:
+        description: >-
+            Enables the log printed when a query gets killed due to a range deletion.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableQueryKilledByRangeDeletionLog
+        default: true
+        redact: false

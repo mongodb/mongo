@@ -457,6 +457,7 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("queues", queueingStats.toBson());
 
     // workingMillis should always be present for any operation
+    // TODO (SERVER-103038) add `workingMillis` field only if it's value has been set.
     pAttrs->add("workingMillis", workingTimeMillis.count());
 
     // Measures the time from when the operation was killed to when it completed.
