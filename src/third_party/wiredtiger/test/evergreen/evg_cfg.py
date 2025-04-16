@@ -261,16 +261,8 @@ def evg_cfg(action, test_type):
     """
 
     # Make sure the program is run under a checkout of wiredtiger repository
-    # We could get different string outputs when running 'git config remote.origin.url':
-    #   - 'git@github.com:wiredtiger/wiredtiger.git' (if run locally)
-    #   - 'ssh://git@github.com/wiredtiger/wiredtiger.git' (if run through SSH)
-    #   - 'git://github.com/wiredtiger/wiredtiger' (if cloned anonymously)
-    output = run('git config remote.origin.url')
-    if not 'github.com' in output or not 'wiredtiger/wiredtiger' in output:
-        sys.exit(("ERROR [{prog}]: need to run this script inside a wiredtiger repo\n" +
-        "\t`git config remote.origin.url` returned \"{output}\""
-        ).format(prog=prog, output=output))
-
+    # We move to the location of this file, then move to the repo top level
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     # Change directory to repo top level
     os.chdir(run('git rev-parse --show-toplevel'))
 

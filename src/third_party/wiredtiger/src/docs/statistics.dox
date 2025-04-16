@@ -97,7 +97,7 @@ that will not be needed:
 WiredTiger will optionally log database statistics into files when the
 the ::wiredtiger_open \c statistics_log configuration is set.
 
-The log files are named \c WiredTiger.%%d.%%H, where \c %%d is replaced
+The log files are named \c WiredTigerStat.%%d.%%H, where \c %%d is replaced
 with the day of the month as a decimal number (01-31), and \c %%H
 is replaced by the hour (24-hour clock) as a decimal number (00-23).
 Each log file contains the statistics for the hour specified in its name.

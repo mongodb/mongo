@@ -1,0 +1,1461 @@
+#!/usr/bin/perl
+use v5.26;
+use strict;
+use warnings;
+no warnings 'uninitialized';    # allow 0+undef
+
+# Alternatives:
+# https://github.com/Vermeille/clang-callgraph
+# https://stackoverflow.com/questions/5373714/how-to-generate-a-call-graph-for-c-code
+
+# Good examples of use:
+# $ callgraph -t __evict_walk_tree -d 10 -r
+# $ callgraph -t __wt_free_ref -d 5 -r -no-l -depth | less -S
+# $ callgraph -t __wt_ref_out -d 4 -r -no-l | sort | less -S
+# $ callgraph -t __wt_root_ref_init -d 5 -r -no-l | sort | less -S
+# $ callgraph -t ///'WT_REF_SET_STATE.*WT_REF_MEM' -d 5 -no-l -r | sort | less -S
+# $ callgraph -grep '/->page = (?!NULL)'
+# $ callgraph -t ///'->page = (?!NULL)' -d 5 -r -no-l -tag LOCK=WT_PAGE_LOCK | sort | less -S
+# $ callgraph --tag SET=WTREF_SET_STATE --tag CAS='/\bWT_REF_CAS_STATE\b.*WT_REF_LOCKED' --tag LOCK=WT_REF_LOCK --tag PAGELOCK='__split_internal_lock|__split_insert_lock|__split_multi_lock|__split_insert_lock|__split_multi_lock|__split_ref_prepare' -t '///->page = ' -d 5 --continue -no-l -r | sort | less -S -p 'CAS|SET|LOCK'
+# $ callgraph -grep WT_PAGE_LOCK
+# $ callgraph -grep evict_lock
+# $ callgraph -t //__wt_spin_lock -f //__wt_spin_lock -tag LOCK=__wt_spin_lock -tagre '/__wt_spin_(?:try)?lock\({ARG},({ARG})/$1' -tag UNLOCK=__wt_spin_unlock -tagre '/__wt_spin_unlock\({ARG},({ARG})/${1}' -continue -d 5 | less -S -p LOCK
+# $ callgraph -t '///__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)' -f '///__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)' -tagre '/__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)\({ARG},\s++({ARG})/$1($2)' -continue -d 5 | less -S -p ' (lock|trylock|unlock|locked|owned|unlock_if_owned)'
+# $ callgraph -f __wt_evict_thread_run -t '///__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)' -tagre '/__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)\({ARG},\s++({ARG})/$1($2)' -continue -d 17 -depth | less -S -p ' (lock|trylock|unlock|locked|owned|unlock_if_owned)'
+# $ callgraph -f __evict_server -t '///\b(evict_lock|evict_walk_lock|evict_pass_lock|WT_WITH_PASS_LOCK|cache_pool_lock)\b' -tag PASS_LOCK=WT_WITH_PASS_LOCK -tagre '/__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)\({ARG},\s++({ARG})/$1($2)' -continue -d 20 -depth -x /urgent -x /prefetch -x __wt_verbose_dump_cache -x /_hs_ -x /_session_ -x __evict_clear_walk -x __evict_lru_pages -table | less -S -p ' (lock|trylock|unlock|locked|owned|unlock_if_owned|PASS_LOCK)'
+# $ callgraph -f __evict_server -t '///\b(evict_lock|evict_walk_lock|evict_pass_lock|WT_WITH_PASS_LOCK|cache_pool_lock)\b' -tag PASS_LOCK=WT_WITH_PASS_LOCK -tagrex '/__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)\({ARG},\s++({ARG})/uc($1)."($2)"' -continue -d 20 -depth -x /urgent -x /prefetch -x __wt_verbose_dump_cache -x /_hs_ -x /_session_ -x __evict_clear_walk -x __evict_lru_pages | less -S
+# $ callgraph -f __wt_evict_thread_run -t '///\b(evict_lock|evict_walk_lock|evict_pass_lock|WT_WITH_PASS_LOCK|cache_pool_lock)\b' -tag PASS_LOCK=WT_WITH_PASS_LOCK -tagre '/__wt_spin_(lock|trylock|unlock|locked|owned|unlock_if_owned)\({ARG},\s++({ARG})/$1($2)' -continue -d 20 -depth -x /urgent -x /prefetch -x __wt_verbose_dump_cache -x /_hs_ -x /_session_ -x __evict_clear_walk -x __evict_lru_pages -svg-html > q.html && open q.html
+# $ callgraph -g "*$(callgraph -t __wt_cache_eviction_worker -d 6 -list)" -svg-html > ~/tmp/q.html && open ~/tmp/q.html
+# ... -tagre '/^(.*_lock(\b|_).*)$/$1'
+# $ callgraph -t __wt_cache_eviction_worker -f '///schema_lock(\b|_)' -tagre '/^(.*_lock(\b|_).*)$/$1' -tagre '/^(.*schema_lock(\b|_).*)$/--color=red' -d 8 -svg-html > ~/tmp/q.html && open ~/tmp/q.html
+# $ callgraph -g "*$(callgraph -t __wt_cache_eviction_worker -f '///schema_lock(\b|_)' -d 8 -list)" -tagre '/^(.*_lock(\b|_).*)$/$1' -tagre '/^(.*schema_lock(\b|_).*)$/--color=red' -svg-html > ~/tmp/q.html && open ~/tmp/q.html
+# $ callgraph -merge <(callgraph -f __evict_server -t __evict_walk -d 10 -dot) <(callgraph -f __evict_walk -t /hazard -d 5 -dot) <(callgraph -f __evict_walk -t /page_in_func -d 8 -dot) -svg-html > ~/tmp/q.html && open ~/tmp/q.html
+
+# Examine the structure of functions in a directory or file:
+# FUNCS="$(callgraph '@/checkpoint/' -list)"; [[ -n "$FUNCS" ]] && { FUNCRE="\\b(${FUNCS// /|})\\b"; callgraph --svg-html -g "$FUNCRE -> $FUNCRE" "*$FUNCS" --init-code '$splines=q{spline}; @ARGV=();' --after-parse-code 'map {push @{$funcmarks{$_}}, "--fontcolor=".(/^(__wt_|wiredtiger_)/ ? "darkred" : /^__wti_/ ? "darkblue" : "darkgreen")} '"qw/$FUNCS/;" > ~/tmp/qq.html && open ~/tmp/qq.html; }
+# FUNCS="$(callgraph '@/checkpoint_txn.c' -list)"; [[ -n "$FUNCS" ]] && { FUNCRE="\\b(${FUNCS// /|})\\b"; callgraph --svg-html -g " -> $FUNCRE" "*$FUNCS" --init-code '$splines=q{spline}; @ARGV=();' --after-parse-code 'map {push @{$funcmarks{$_}}, "--fontcolor=".(/^(__wt_|wiredtiger_)/ ? "darkred" : /^__wti_/ ? "darkblue" : "darkgreen")} '"qw/$FUNCS/;" > ~/tmp/qq.html && open ~/tmp/qq.html; }
+
+# Highlight "from" and "to" functions:
+# --after-parse-code 'map {push @{$funcmarks{$_}}, "--fontcolor=darkgreen"} grep { ($pathTo && /$pathTo/) || ($pathFrom && /$pathFrom/) } keys %func2file;'
+
+use Getopt::Long;
+use IO::File;
+
+our $VERSION="1.4.4";
+
+our (@codeInit, @codeParse, @codeAfterParse, @codeFilterNode, @codeFilterEdge, @codeEnd);
+our ($outputFilter, $OUT);
+sub EXIT(@) {
+  for my $code (@codeEnd) {
+    eval $code;
+    if ($@) { say STDERR "Error in custom end code: $@\n$code" }
+  }
+  $outputFilter && $OUT and close $OUT;
+  exit @_;
+}
+sub fatal(@) { say STDERR @_; EXIT 1; }
+sub readfile($) { local $/=undef; IO::File->new(shift, "r")->getline(); }
+sub writefile($@) { IO::File->new(shift, "w")->print(@_); }
+sub re_escape($) { $_[0] =~ s{([\\^.\$|\(\)\[\]*+?{}\-\#])}{\\$1}gr }  # use quotemeta?
+sub re_escape_word_list($) {
+  my @list = grep {$_ ne ""} split /[\s,;]+/, $_[0];
+  return @list == 0 ? "" :
+         @list == 1 ? "\\b".re_escape($list[0])."\\b" :
+         "\\b(?:".join("|", map {re_escape $_} @list).")\\b";
+}
+sub dot_escape_in_str($) { $_[0] =~ s{([\\"])}{\\$1}gr =~ s{\n}{\\n}gr }
+sub dot_escape_node($) { $_[0] =~ /^[\w]+$/ ? $_[0] : '"'.(dot_escape_in_str $_[0]).'"' }
+sub dot_escape_in_html($) {
+  $_[0] =~ /^[\w]+$/ ?
+  $_[0] :
+  $_[0] =~ s{(&)|(<)|(>)|(\n)}{$1 ? "&amp;" : $2 ? "&lt;" : $3 ? "&gt;" : $4 ? "<BR/>" : ""}gre
+}
+sub make_re(@) {
+  return undef if !@_ || !defined $_[0];
+  join "|", map {
+    my $x = $_;
+    $x =~ s{/}{}g or $x = re_escape_word_list($x);
+    $x ne "" ? "(?:$x)" : ()
+  } @_
+}
+sub make_re_tagged(@) {
+  return undef if !@_ || !defined $_[0];
+  join "|", map {
+    my $x = $_;
+    my $s = ($x =~ s/^(\w++)[:=](.*)$/$2/s) ? "<m$1>" : ":";
+    $x =~ s{/}{}g or $x = re_escape_word_list($x);
+    $x ne "" ? "(?$s$x)" : ()
+  } @_
+}
+sub re_or_number($) {
+  return undef if !@_ || !defined $_[0];
+  $_[0] =~ /^\d+$/ ? $_[0] : make_re $_[0];
+}
+sub in_list(\@@) {
+  my $a = shift;
+  for my $e (@_) {
+    for my $x (@$a) { $x eq $e and return 1; }
+  }
+  return undef;
+}
+sub path_looped_back(\@) {
+  my $a = $_[0];
+  return undef if @$a < 2;
+  my $e = $a->[-1];
+  for (my $i = 0; $i < @$a-1; ++$i) { $a->[$i] eq $e and return 1; }
+  return undef;
+}
+sub cd_root() {
+  if (! -d "src") {
+    my $root = `git rev-parse --show-toplevel`;
+    $? and exit 1;
+    chdir $root or fatal "Cant chdir to $root";
+  }
+}
+
+# sub files_list() {
+#   return split /\n/, `LC_ALL=C find src build -name '*.[ch]' | LC_ALL=C sort`;
+# }
+
+sub read_all() {
+  my $ret = `
+    die() { echo "\$@"; exit 1; }
+    if ! test -d src; then
+      ROOT="\$(git rev-parse --show-toplevel)" || die "Can't find the repo top level"
+      cd "\$ROOT" || die "Can't chdir to \$ROOT"
+    fi
+    for f in \`find src build -name '*.[ch]' | LC_ALL=C sort\`; do
+      echo
+      echo "#line" \$f
+      cat \$f
+    done`;
+  EXIT 1 if $?;
+  return $ret;
+}
+
+sub usage() {
+  return << "_E";
+Build WT call graph.
+Version: $VERSION
+Usage:
+\$ callgraph --graph [edge-regex ...] [*additional-nodes ...] [!exclude-nodes ...]    - Output a call graph filtered by edges.
+\$ callgraph --path-1 {from-nodes} {to-nodes} [exclude-nodes]    - Find the shortest call path.
+\$ callgraph --path-all {from-nodes} {to-nodes} [exclude-nodes]  - Find all call paths from .. to.
+\$ callgraph --path-all {from-nodes} [depth] [exclude-nodes]     - Find all call paths of depth.
+\$ callgraph --path-all {depth} {to-nodes} [exclude-nodes]       - Find all reverse call paths of depth.
+\$ callgraph --crosslink-stats | column -t                       - Print crosslink stats.
+
+  * Options for switching the run mode:
+--graph, -g          - Full call graph filter by edges.
+--path-1, -1         - Find shortest call path.
+--path-all, -a       - Find all call paths (default).
+--crosslink-stats    - Print crosslink stats.
+--ret                - Print all possible return values for a function.
+--retl               - Print all possible return values for a function and list all sub-calls returning immediate value.
+--retll              - Print all possible return values for a function and list all sub-calls that can return the value, recursively.
+--merge              - Merge multiple DOT files into one.
+
+  * Options:
+--from, -f                - Source function names or regex.
+--to, -t                  - Destination function names or regex.
+--exclude, -x             - Exclude function names or regex.
+--prune                   - When scanning, display these functions but don't scan further. Can specify N=... to stop after N calls.
+--max-depth, -d           - Maximum depth to scan.
+--grow                    - When scanning, extend the depth after meeting these functions. Can specify N=... to grow by N calls.
+--[no-]reverse, -[no-]r   - Output call path backwards.
+--[no-]length, -[no-]l    - Output call path length.
+
+  * Tagging functions:
+--ntag {TAG:... ...}      - Tag functions by name
+--tag {TAG=WORD}          - Tag functions having this word in its body
+--tag {TAG=/REGEX}        - Tag functions having this regexp in its body
+--tagline {WORD}          - Tag functions having this word in its body, quoting the entire line
+--tagline {/REGEX}        - Tag functions having this regexp in its body, quoting the entire line
+--tagre {/REGEX/SUBST}    - Tag functions having this regexp with a substitution
+--tagrex {/REGEX/SUBST}   - Tag functions having this regexp with a eval-substitution
+  For --tagre and --tagrex:
+      {ARG} matches a function's argument
+    (BLOCK) matches a () block
+    [BLOCK] matches a [] block
+    {BLOCK} matches a {} block
+  For graphical output, tags can use node attributes in format: --{ATTR]={VAL}
+  (Graphviz node attributes reference: https://graphviz.org/docs/nodes/)
+--hlends                  - Highlight the start and end functions in the path.
+
+  * Finding things:
+--grep WORD               - Grep functions contents.
+--grep /REGEX             - Grep functions contents.
+
+  * Graph walk options:
+--breadth                 - Walk by breadth (also leads to the output sorted by depth) (default).
+--depth                   - Depth first (also leads to alphabetically sored output).
+--continue                - Continue the search when a target is hit (for more matches).
+--refs                    - Try to make sense of assigned function pointers.
+
+  * Output format:
+--text                    - Plain text (default for text).
+--table                   - Tabular plain text - process plain text through "column -t".
+--list                    - Just list the functions.
+--indent                  - Python-like indented plain text.
+    --indentstr           - Indent string (default: "" -> use the call arrow).
+    --indents              - Combines --indent and --indentstr "    " (four spaces)
+--dot                     - Graphviz DOT format (default for graph).
+--dotdot                  - DOT format with layout information.
+--png                     - PNG format.
+--svg                     - SVG format.
+--svg-html                - HTML format for SVG browsing.
+
+  * Graphviz options:
+--dir                     - Graph direction: LR, RL, TB, BT.
+--minmaxrank              - Group top and bottom rank nodes at the begginning and end.
+
+  * Misc options:
+--help, -h           - Print this usage help and exit.
+--version, -v        - Print version and exit.
+
+  * Advanced-advanced options (do not use unless you know what you are doing):
+--init-code          - Custom code to run before parsing.
+--parse-code         - Custom code to run during parsing.
+--after-parse-code   - Custom code to run after parsing.
+--filter-edge-code   - Custom code to filter edges.
+--filter-node-code   - Custom code to filter nodes.
+--end-code           - Custom code to run at the end.
+
+        * 3 types of arrows are used in text output:
+    ->   call from/to within the same file
+    -->  call from/to another file in the same directory
+    ---> call from/to another directory.
+
+        * Building SVG call graph example:
+    \$ callgraph --graph --svg-html -- \x27^__evict_walk -> (?!WT_)\x27 \x27^__evict_walk_tree  -> (?!WT_)\x27 \x27-> __wt_hazard_set\$\x27 \x27-> __wt_page_in(_func)?\$\x27 \x27-> __wt_page_swap(_func)?\$\x27 \x27*hazard\x27 \x27!^(__wt_session_gen|__wt_readunlock)\$\x27 > callgraph-evict_walk-hazard.html
+
+        * -to and -from function spec:
+      NAME : function name
+      /NAME : function regexp
+      //TEXT : function content regexp as word
+      ///TEXT : function content regexp
+      \@PATH_WORD : file path WORD fragment
+      \@/PATH_REGEX : file path regexp
+
+        * Finding the shortest call path from a set of functions(regex) to another(regex):
+    \$ callgraph --path-1 --from __evict_walk --to /hazard_set
+    \$ callgraph --path-1 --from __evict_walk --to /hazard_set --exclude __wt_random_descent
+
+        * Finding the all call paths from a set of functions(regex) to another(regex):
+    \$ callgraph --path-all --from /__evict_walk --to /hazard_set --exclude \x27__wt_page_release|__wt_delete_page|__wt_random_descent\x27
+    \$ callgraph --path-all /__evict_walk /hazard_set \x27__wt_page_release|__wt_delete_page|__wt_random_descent\x27
+    \$ callgraph --path-all /__statlog_server WT_WITH_DHANDLE -d 15 -x __wt_session_release_dhandle -x /close -svg-html > q.html; open q.html
+
+        * Finding the all call paths from a set of functions(regex) up to a length:
+    \$ callgraph --path-all --from /__evict_walk --max-depth 2
+    \$ callgraph --path-all /__evict_walk 2
+
+        * Finding the all call paths to a set of functions(regex) up to a length:
+    \$ callgraph --path-all --max-depth 3 --to /__evict_walk
+    \$ callgraph --path-all 3 /__evict_walk
+    \$ callgraph --path-all 3 /__evict_walk -r
+
+        * Shortcuts for path search:
+    \$ callgraph --path-all {from} [to] [exclude]
+        - If {from} is a number, then it\x27s the depth.
+        - If {to} is a number, then it\x27s the depth.
+        - If {to} is missing, then just find all functions by regex.
+
+        * List all function with "_hs_" in their name:
+    \$ callgraph --path-all /_hs_
+       * List all call stacks originating from __wt_page_alloc up to 10 calls deep:
+    \$ callgraph --path-all __wt_page_alloc 10 | less -S
+       * List all call stacks originating from __wt_page_alloc up to 10 calls deep, exluding __wt_page_release:
+    \$ callgraph --path-all 10 __wt_page_alloc __wt_page_release | less -S
+    \$ callgraph --path-all -t /page_alloc -d 5 -r -no-l --depth | less -S
+
+       * Building cross calls stats:
+    \$ callgraph --crosslink-stats | column -t
+
+_E
+}
+
+if (!@ARGV) {
+  print STDERR usage();
+  exit 0;
+}
+
+our $ret_arg0 = "__wt_illegal_value|__wt_errno";
+our $ret_arg1 = "WT_ERR|WT_ERR_ERROR_OK|WT_ERR_NOTFOUND_OK|WT_RET|WT_RET_TRACK|WT_RET_ERROR_OK|WT_RET_BUSY_OK|WT_RET_NOTFOUND_OK|WT_TRET|WT_TRET_ERROR_OK|WT_TRET_NOTFOUND_OK|__err_cell_corrupt|__err_cell_corrupt_or_eof";
+our $ret_arg2 = "WT_ERR_MSG|WT_ERR_TEST|WT_RET_TEST|WT_ERR_PANIC|WT_RET_VRFY_RETVAL|WT_RET_MSG|WT_PREFETCH_ASSERT|API_END_RET|__wt_set_return|__blkcache_read_corrupt|__wt_err_func|__wt_panic|__wt_panic_func|__wt_panic_func";
+our $ret_arg3 = "__config_err";
+our $ret_arg4 = "WT_RET_ASSERT|WT_RET_PANIC_ASSERT";
+our ($pathFrom, $pathTo, $exclude, $prune, $grow, $printBackwards, $maxDepthToScan, $searchPath, $printLen, $rankdir, $minmaxrank, $fmt, $mode, $walkByBreadth, $continue, $refs, $grep, $indentStr, $hlends);
+$refs = $printLen = $walkByBreadth = 1;
+$searchPath = 2; $mode = 2;
+our (@pathFrom, @pathTo, @exclude, @prune, @grow, $grepFrom, @grepFrom, $grepTo, @grepTo, $fileFrom, @fileFrom, $fileTo, @fileTo, @grep);
+our (@tags, @ntags, $ntags, %ntags, %func2ret);
+our (%nodesPrint, @edges);
+our ($reverseSearch, @srcs, @dsts, $start, $src, $dst, $maxdepth, $nPaths, $nFound);
+our $splines = "line"; # none / line / polyline / curved / ortho / spline : https://graphviz.org/docs/attrs/splines/
+
+our ($a, $b, $filterMode);
+our $path;
+
+our $re_arg = "".qr/(?(DEFINE)(?<TOKEN>
+  \s++ |
+  [;]++ |
+  (?>,) |           ########### Add : and ? here?
+  (?> (?:\#|\/\/) (?:[^\\\n]|\\.)*+ \n) |
+  (?> \/\* (?:[^*]|\*[^\/])*+ \*\/ ) |
+  (?> " (?>[^\\"]|\\.)* " ) |
+  (?> ' (?>[^\\']|\\.)* ' ) |
+  (?> \{ (?&TOKEN)* \} ) |
+  (?> \( (?&TOKEN)* \) ) |
+  (?> \[ (?&TOKEN)* \] ) |
+  (?>(?:[^\[\](){};,\#\s"'\/]|\/[^\/\*])++)
+))/nxs;
+
+our %re_patterns = (
+  '{ARG}'   => { subst => "(?&TOKEN)+?(?=[,\\)]|\$)" },
+  '(BLOCK)' => { subst => "\\(\\s*+(?&TOKEN)*+\\)" },
+  '[BLOCK]' => { subst => "\\[\\s*+(?&TOKEN)*+\\]" },
+  '{BLOCK}' => { subst => "\\{\\s*+(?&TOKEN)*+\\}" },
+);
+
+GetOptions(
+  "help|h" => sub { print STDERR usage(); exit; },
+  "version|v" => sub { print STDERR "callgraph version: $VERSION\n"; exit; },
+
+  "graph|g" => sub { $mode = 1; },
+  "path-1|1" => sub { $searchPath = 1; $mode = 2; },
+  "path-all|a" => sub { $searchPath = 2; $mode = 2; },
+  "crosslink-stats" => sub { $mode = 3; },
+  "ret" => sub { $mode = 4; $printLen = 0; },
+  "retl" => sub { $mode = 4; $printLen = 1; },
+  "retll" => sub { $mode = 4; $printLen = 2; },
+  "merge" => sub { $mode = 5; },
+
+  "from|f=s" => \@pathFrom,
+  "to|t=s" => \@pathTo,
+  "exclude|x=s" => \@exclude,
+  "prune=s" => \@prune,
+  "grow=s" => \@grow,
+  "max-depth|d=i" => \$maxDepthToScan,
+  "reverse|r!" => \$printBackwards,
+  "length|l!" => \$printLen,
+  "grep=s" => \@grep,
+  "ntag=s" => sub {
+    my @tag = split /:/, $_[1], 2;
+    @tag == 2 or fatal "Invalid name tag: '$_[1]' (must be TAG:TEXT or TAG:/REGEXP)";
+    my $t = scalar keys %ntags;
+    $ntags{"m$t"} = $tag[0];
+    push @ntags, make_re_tagged "$t:$tag[1]";
+  },
+  "tag=s" => sub {
+    my @tag = split /=/, $_[1], 2;
+    @tag == 2 or fatal "Invalid tag: '$_[1]' (must be TAG=TEXT or TAG=/REGEXP)";
+    push @tags, [1, $tag[0], make_re $tag[1]];
+  },
+  "tagre=s" => sub {
+    my $splitChar = substr $_[1], 0, 1;
+    my @tag = split /\Q$splitChar/, (substr $_[1], 1), 2;
+    @tag == 2 or fatal "Invalid tag: '$_[1]' (must be /TAG/TEXT)";
+    # ($tag[0] =~ s/\{ARG\}/(?&TOKEN)+?(?=[,\\)]|\$)/gns) and $tag[0] .= $re_arg;
+    my $re = join "|", map {re_escape $_} keys %re_patterns;
+    ($tag[0] =~ s/($re)/$re_patterns{$1}->{subst}/egs) and $tag[0] .= $re_arg;
+#say "TAGRE: $tag[0] -> $tag[1]";
+    push @tags, [2, $tag[0], $tag[1]];
+  },
+  "tagrex=s" => sub {
+    my $splitChar = substr $_[1], 0, 1;
+    my @tag = split /\Q$splitChar/, (substr $_[1], 1), 2;
+    @tag == 2 or fatal "Invalid tag: '$_[1]' (must be /TAG/CODE)";
+    # ($tag[0] =~ s/\{ARG\}/(?&TOKEN)+?(?=[,\\)]|\$)/gns) and $tag[0] .= $re_arg;
+    my $re = join "|", map {re_escape $_} keys %re_patterns;
+    ($tag[0] =~ s/($re)/$re_patterns{$1}->{subst}/egs) and $tag[0] .= $re_arg;
+#say "TAGRE: $tag[0] -> $tag[1]";
+    push @tags, [3, $tag[0], $tag[1]];
+  },
+  "tagline=s" => sub {
+    my $re = (substr($_[1], 0, 1) eq '/') ? substr($_[1], 1) : re_escape($_[1]);
+    push @tags, [2, qr{^(.*(?:$re).*)$}, '$1'];
+  },
+  "hlends!" => \$hlends,
+  "init-code=s" => \@codeInit,
+  "parse-code=s" => \@codeParse,
+  "after-parse-code=s" => \@codeAfterParse,
+  "filter-edge-code=s" => \@codeFilterEdge,
+  "filter-node-code=s" => \@codeFilterNode,
+  "end-code=s" => \@codeEnd,
+
+  "breadth" => sub { $walkByBreadth = 1; },
+  "depth" => sub { $walkByBreadth = 0; },
+  "continue" => \$continue,
+  "refs" => \$refs,
+
+  "dir=s" => sub {
+    $rankdir =
+      $_[1] =~ /^L/i ? "LR" :
+      $_[1] =~ /^R/i ? "RL" :
+      $_[1] =~ /^[TU]/i ? "TB" :
+      $_[1] =~ /^[BD]/i ? "BT" :
+      fatal "Invalid rankdir: $_[1], should be one of: LR, RL, TB, BT";
+  },
+  "minmaxrank" => \$minmaxrank,
+
+  "text" => sub { $fmt = "text"; $outputFilter = undef; },
+  "table" => sub { $fmt = "table"; $outputFilter = "column -t -s '\t'"; },
+  "list" => sub { $fmt = "list"; $outputFilter = undef; $printLen = 0; },
+  "indent" => sub { $fmt = "indent"; $outputFilter = undef; },
+  "indentstr=s" => \$indentStr,
+  "indents" => sub { $fmt = "indent"; $indentStr = "    "; $outputFilter = undef; },
+  "dot" => sub { $fmt = "dot"; $printLen = 0; $outputFilter = undef; },
+  "dotdot" => sub { $fmt = "dot"; $printLen = 0; $outputFilter = "dot -Tdot /dev/stdin"; },
+  "png" => sub { $fmt = "png"; $printLen = 0; $outputFilter = "dot -Tpng /dev/stdin"; },
+  "svg" => sub { $fmt = "svg"; $printLen = 0; $outputFilter = "dot -Tsvg /dev/stdin"; },
+  "svg-html" => sub { $fmt = "svg-html"; $printLen = 0; $outputFilter = "dot -Tsvg /dev/stdin"; },
+) || exit 1;
+
+sub is_graphical_output() { $fmt =~ /^(dot|png|svg|svg-html)$/ }
+
+defined $hlends or $hlends = is_graphical_output();
+
+$rankdir //= ($mode == 1 ? "LR" : "TB");
+
+if ($mode == 5) {
+  # Merge mode
+  $OUT = *STDOUT;
+  if ($outputFilter) {
+    $OUT = IO::File->new("|$outputFilter") or fatal "Can't open output filter program: $outputFilter";
+  }
+  $fmt =~ /^(svg-html)$/ and do { print "<!DOCTYPE html><html><head></head><body>\n"; flush STDOUT; };
+  say $OUT "strict digraph root { rankdir=$rankdir;";
+  while (do {local $/=undef; $_=<>;}) { say $OUT s/strict digraph/subgraph/gr; }
+  say $OUT "}";
+  close $OUT; $OUT = undef;
+  $fmt =~ /^(svg-html)$/ and say "<script defer>".pan_js()."</script></body></html>\n";
+  EXIT;
+}
+
+our ($filter, $addNodes);
+
+@exclude = grep {$_ ne ""} map {split /[\s,;]+/} @exclude if @exclude;
+
+@ntags and $ntags = join "|", @ntags;
+
+if ($mode == 1) {
+  # Build DOT graph mode
+  $filter = join "|", map {"(?:$_)"} grep !/^[*!]/, @ARGV;
+  $addNodes = make_re map { my $x = $_; $x =~ s/^[*]// ? $x : () } @ARGV;
+  $exclude = make_re @exclude, map { my $x = $_; $x =~ s/^[!]// ? $x : () } @ARGV;
+} elsif ($mode == 2) {
+  # Search path mode
+  @ARGV && !defined $pathFrom and @pathFrom = shift @ARGV;
+  @ARGV && !defined $pathTo and @pathTo = shift @ARGV;
+  @ARGV && !defined $exclude and @exclude = shift @ARGV;
+
+  @pathFrom = map { s{^//}{} ? do { push @grepFrom, $_; () } : s{^[@]}{} ? do { push @fileFrom, $_; () } : $_ } @pathFrom;
+  $pathFrom =
+    (@pathFrom == 0 && @grepFrom == 0) ? undef :
+    (@pathFrom == 1 && @grepFrom == 0) ? re_or_number $pathFrom[0] :
+    make_re @pathFrom;
+  $grepFrom = make_re @grepFrom;
+  $fileFrom = !@fileFrom ? undef : join "|", map {re_escape_word_list $_} @fileFrom;
+
+  @pathTo   = map { s{^//}{} ? do { push   @grepTo, $_; () } : s{^[@]}{} ? do { push   @fileTo, $_; () } : $_ } @pathTo;
+  $pathTo =
+    (@pathTo == 0 && @grepTo == 0) ? undef :
+    (@pathTo == 1 && @grepTo == 0) ? re_or_number $pathTo[0] :
+    make_re @pathTo;
+  $grepTo = make_re @grepTo;
+  $fileTo = !@fileTo ? undef : join "|", map {re_escape_word_list $_} @fileTo;
+
+  $exclude = @exclude == 0 ? undef : make_re @exclude;
+
+  @prune = grep {$_ ne ""} map {split /[\s,;]+/} @prune if @prune;
+  $prune = @prune == 0 ? undef : make_re_tagged @prune;
+
+  @grow = grep {$_ ne ""} map {split /[\s,;]+/} @grow if @grow;
+  $grow = @grow == 0 ? undef : make_re_tagged @grow;
+} elsif ($mode == 3) {
+  # Crosslink stats mode
+} elsif ($mode == 4) {
+  # Returns mode
+  $addNodes = make_re @ARGV;
+  $exclude = make_re @exclude, "/$ret_arg0|$ret_arg1|$ret_arg2|$ret_arg3|$ret_arg4";
+  # Add some POSIX functions
+  %func2ret = (
+    "posix_memalign" => ["0", "EINVAL", "ENOMEM"],
+  );
+} else {
+  print STDERR "Must specify exactly one of: --graph, --path-1, --path-all\n";
+  exit 1;
+}
+
+$grep = @grep == 0 ? undef : make_re @grep;
+
+$fmt //= ($mode == 1 ? "dot" : "text");
+is_graphical_output() and $printBackwards = 0;
+
+sub status(;$$);
+if (-t STDERR) {
+  eval { use Time::HiRes "time"; };  # try do get it but ok to fail
+  my $lastStatusUpdate = 0;
+  *status = sub (;$$) {
+    my $t = time();
+    ($t - $lastStatusUpdate < 0.1 && $_[1]) and return;
+    $lastStatusUpdate = $t;
+    print STDERR "\e[K$_[0]\r"; flush STDERR;
+  };
+} else {
+  *status = sub (;$$) {};
+}
+
+$OUT = *STDOUT;
+if ($outputFilter) {
+  $OUT = IO::File->new("|$outputFilter") or fatal "Can't open output filter program: $outputFilter";
+}
+
+status "Reading source...";
+$_ = read_all();
+
+status "Pre-processing...";
+
+our (%funcs, %func2file, %file2func, %edges, %calls, %rcalls, %files, %callstats, %rcallstats, %funcmarks);
+our ($f, $callee, $edge, $func);
+our (%grepFuncsFrom, %grepFuncsTo);
+our %fn_refs;
+
+if ($refs) {
+  for my $txt (/(WT_CURSOR_STATIC_INIT\([^)]++\);[^\n]++\n)/sg) {
+    while ($txt =~ m{ (\w++)(?:,|\);)\s++\/\*\s++([\w-]++)}g) {
+      ($callee, $func) = ($1, $2);
+      $func =~ tr/-/_/;
+      $func = "cursor->$func";
+      ++$fn_refs{$func};
+# say "(2) $func -> $callee";
+      $edge = dot_escape_node($func) . " -> " . dot_escape_node($callee);
+      $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
+      $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
+      $func2file{$func} = "";
+    }
+  }
+}
+
+# Strip comments
+s{\/\*([^*]|\*[^/])*\*/}{}msg;
+
+# Join long lines
+s{\\\n\s*}{ }msg;
+s{\(\n\s*}{(}msg;
+s{([,?:|!~%^])\n\s*}{$1 }msg;
+s{(\&\&)\n\s*}{$1 }msg;
+
+# Collect all function names from func definitions and count them
+our %fn;
+for my $name (/^([a-z_]\w++)\(/mg) { ++$fn{$name}; }
+
+# Collect fn-like defines
+for my $name (/^#define ([_]*wt_\w++)\(/img) { $fn{$name} = 1 if !exists $fn{$name}; }
+
+our %fn_all = map {($_, 1)} keys %fn;
+our %fn_good = map {($_, 1)} grep {$fn{$_}==1} keys %fn;
+our %fn_bad = map {($_, 1)} grep {$fn{$_}>1} keys %fn;
+
+our $re_all = "\\b(".(join "|", sort keys %fn_all).")\\b";
+our $re_bad = "^(".(join "|", sort keys %fn_bad).")\$";
+
+if ($mode == 4) {
+  # Find all unique assigned function pointers
+  my %fnrets;
+  while (/^\s*+((?:\w+(?:->|\.))+\w+)\s*+=\s*+(\w+);/mg) {
+    $fnrets{"$1"}->{"$2"} = 1;
+  }
+  for my $fn (keys %fnrets) {
+    my @rets = keys %{$fnrets{$fn}};
+    # if (@rets == 1 && $fn_all{$rets[0]}) {
+    #   push @{$func2ret{$fn}}, "$rets[0](...)";
+    #   # say "*** $fn => $rets[0]";
+    # }
+    for (@rets) {
+      push @{$func2ret{$fn}}, "$_(...)"; # if exists $fn_all{$rets[0]};
+      # say "*** $fn => $_";
+    }
+  }
+}
+
+for my $code (@codeInit) {
+  eval $code;
+  if ($@) { fatal "Error in custom init code: $@\n$code"; }
+}
+
+# Parse source
+status "Parsing...";
+
+if ($refs) {
+  while (/^\s*+((?:\w+(?:->|\.))+\w+)\s*+=\s*+($re_all);/mg) {
+    ($func, $callee) = ($1, $2);
+    ++$fn_refs{$func};
+# say "(1) $func -> $callee";
+    $edge = dot_escape_node($func) . " -> " . dot_escape_node($callee);
+    $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
+    $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
+    $func2file{$func} = "";
+  }
+  $re_all = "\\b(".(join "|", map {re_escape($_)} sort ((keys %fn_all), (keys %fn_refs))).")\\b" if %fn_refs;
+}
+
+$func = "";
+sub parse_retvals {
+  return if $mode != 4;
+  local $_ = $_[0] // $_;
+
+  # function-like defines
+  while (/^#define\s+(?:\w++)\((?&TOKEN)+?\)\s+(\w++)\($re_arg/sg) {
+    push @{$func2ret{$func}}, "$1(...)";
+  }
+  # no args
+  # if (/WT_RET_VRFY/) { push @{$func2ret{$func}}, "0"; }
+  if (/__wt_illegal_value/) { push @{$func2ret{$func}}, "EINVAL"; }
+  if (/__wt_errno/) { push @{$func2ret{$func}}, "errno"; }
+  if (/calloc|free|malloc|realloc|reallocf|valloc|aligned_alloc/) { push @{$func2ret{$_}}, "EINVAL"; }
+
+  # return-like statements without parentheses
+  while (/(?:\breturn\b|\bret\b\s*=)\s++((?&TOKEN)+?)(?=[,;\\)]|\$)$re_arg/sg) {
+    push @{$func2ret{$func}}, $1;
+  }
+  # 1 arg
+  while (/\b(?:$ret_arg1)\b\s*+\(\s*+((?&TOKEN)+?)(?=[,\\)]|\$)$re_arg/sg) {
+    push @{$func2ret{$func}}, $1;
+  }
+  # 2 args
+  while (/\b(?:$ret_arg2)\b\s*+\((?&TOKEN)\s*+,\s*+((?&TOKEN)+?)(?=[,\\)]|\$)$re_arg/sg) {
+    push @{$func2ret{$func}}, $1;
+  }
+  # 3 args
+  while (/\b(?:$ret_arg3)\b\s*+\((?&TOKEN)\s*+,(?&TOKEN)\s*+,\s*+((?&TOKEN)+?)(?=[,\\)]|\$)$re_arg/sg) {
+    push @{$func2ret{$func}}, $1;
+  }
+  # 4 args
+  while (/\b(?:$ret_arg4)\b\s*+\((?&TOKEN)\s*+,(?&TOKEN)\s*+,(?&TOKEN)\s*+,\s*+((?&TOKEN)+?)(?=[,\\)]|\$)$re_arg/sg) {
+    push @{$func2ret{$func}}, $1;
+  }
+}
+for (split /\n/) {
+  if (/^#define ([_]*wt_\w++)\(/i) {
+    local $func = $1;  # make a local one
+    $funcs{$func} = 1;
+
+    if (@ntags && $ntags && $func =~ /$ntags/) {
+      my @n;
+      @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
+    }
+
+    if ($func !~ /$re_bad/) {
+      $func2file{$func}=$f;
+      push @{$file2func{$f}}, $func;
+    }
+    parse_retvals($_);
+    next;
+  }
+  if (/^([a-z_]\w+)\(/) {
+    $func = $1;
+    $funcs{$func} = 1;
+
+    if (@ntags && $ntags && $func =~ /$ntags/) {
+      my @n;
+      @n = sort keys %+ and push @{$funcmarks{$func}}, $ntags{$n[0]};
+    }
+
+# $f =~ /scratch\.c/ and say "----: $f $func: $_";
+    if ($func =~ /$re_bad/) {
+      $func = ""; next;
+    }
+    $func2file{$func}=$f;
+    push @{$file2func{$f}}, $func;
+    $f && (defined $fileFrom) && $f =~ /$fileFrom/ and $grepFuncsFrom{$func} = 1;
+    $f && (defined $fileTo  ) && $f =~ /$fileTo/   and $grepFuncsTo{$func}   = 1;
+    next;
+  }
+  if (/^}/) { $func = ""; next; }
+  if (/#line (.*)/) {
+    $f = $1;
+    $func = "";
+    next;
+  }
+  if (!$func) { next; }
+  # Search for function calls
+  # while (m{$re_all\(}g) {
+  while (m{$re_all[(,)]}g) {
+    $callee = $1;
+    $edge = "$func -> $callee";
+    $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
+    $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
+  }
+  parse_retvals($_);
+  (defined $grepFrom) && /$grepFrom/ and $grepFuncsFrom{$func} = 1;
+  (defined $grepTo  ) && /$grepTo/   and $grepFuncsTo{$func}   = 1;
+  defined($grep) && /$grep/ and print "$func: $_\n";
+  for my $tag (@tags) {
+    if ($tag->[0] == 1) {
+      my ($name, $re) = ($tag->[1], $tag->[2]);
+      /$re/ and push @{$funcmarks{$func}}, $name;
+    } elsif ($tag->[0] == 2) {
+      my ($re, $subst) = ($tag->[1], $tag->[2]);
+      while (/($re)/gs) {
+        my @a = @{^CAPTURE};
+#say "$func: ".join(" | ", @a)," -> $subst = ".($subst =~ s/\$(\d++)/$a[$1]/ersg =~ s/\$\{(\d++)\}/$a[$1]/ersg);
+        my $str = $subst =~ s/\$(\{)?(\d++)(?(1)\})/$a[$2]/ersg =~ s/(^\s++)|(\s++$)//grs;
+        $str ne "" and push @{$funcmarks{$func}}, $str;
+      }
+    } elsif ($tag->[0] == 3) {
+      my ($re, $subst) = ($tag->[1], $tag->[2]);
+      while (/$re/gs) {
+#say "$func: ".join(" | ", @a)," -> $subst = ".($subst =~ s/\$(\d++)/$a[$1]/ersg =~ s/\$\{(\d++)\}/$a[$1]/ersg);
+        my $str = eval "$subst";
+        if (defined $str) {
+          $str =~ s/(^\s++)|(\s++$)//gs;
+          $str ne "" and push @{$funcmarks{$func}}, $str;
+        }
+      }
+    }
+  }
+} continue {
+  for my $code (@codeParse) {
+    eval $code;
+    if ($@) { fatal "Error in custom parse code: $@\n$code"; }
+  }
+}
+
+#sub printPath(@);
+#!$printBackwards ?
+#  ($printLen ? (*printPath = sub (@) { say $OUT "[".@_."] ".join " -> ", @_; }) :
+#              (*printPath = sub (@) { say $OUT join " -> ", @_; })
+#  ) :
+#  ($printLen ? (*printPath = sub (@) { say $OUT "[".@_."] ".join " <- ", reverse @_; }) :
+#              (*printPath = sub (@) { say $OUT join " <- ", reverse @_; })
+#  );
+
+if ($fmt eq "indent") {
+  $walkByBreadth = 0;
+}
+our $pathJoiner = $printBackwards ? " <- " : " -> ";
+$fmt eq "table" and $pathJoiner =~ s/ /\t/g;
+our ($pathJoiner2, $pathJoiner3) = ($pathJoiner =~ s/-/--/r, $pathJoiner =~ s/-/---/r);
+our $inPathJoiner = is_graphical_output() ? "\n" : " ";
+sub is_same_file($$) { return $func2file{$_[0]} eq $func2file{$_[1]}; }
+sub is_same_directory($$) { return ($func2file{$_[0]} =~ s{/[^/]++$}{}r) eq ($func2file{$_[1]} =~ s{/[^/]++$}{}r); }
+sub path_joiner($$) {
+  is_same_file($_[0], $_[1]) ? $pathJoiner :
+  is_same_directory($_[0], $_[1]) ? $pathJoiner2 : $pathJoiner3;
+}
+our @prevPath;
+sub joinPathIndent(@) {
+  if (@_ == 1) { @prevPath = @_; return "$_[0]\t\t($func2file{$_[0]})"; }
+  my $useIndentStr = defined($indentStr) && $indentStr ne "";
+  my $curIndentStr = ""; # "     ·";
+  my $ret = "";
+  if ($_[0] ne $prevPath[0]) {
+    $ret = "$_[0]\t\t($func2file{$_[0]})";
+    @prevPath = ();
+  }
+  for (my $i = 1; $i <= $#_; ++$i) {
+    $useIndentStr ? ($curIndentStr .= $indentStr) : ($curIndentStr .= path_joiner($_[$i-1], $_[$i]) . "\t");
+    if ($_[$i] ne $prevPath[$i]) {
+      $ret .= "".(@prevPath ? "" : "\n") . $curIndentStr .
+          ($useIndentStr ? path_joiner($_[$i-1], $_[$i]) : "") .
+          "$_[$i]      ($func2file{$_[$i]})";
+      $printLen and $ret .= " [".($i+1)."]";
+      @prevPath = ();
+    }
+  }
+  @prevPath = @_;
+  return $ret;
+}
+sub joinPath(@) {
+  if (is_graphical_output()) { return join " -> ", @_; }
+  if ($fmt eq "indent") { return joinPathIndent @_; }
+  if (@_ == 1) { return "$_[0]      ($func2file{$_[0]})"; }
+  my $ret = $_[0];
+  for (my $i = 1; $i <= $#_; ++$i) {
+    $ret .= path_joiner($_[$i-1], $_[$i]) . $_[$i];
+  }
+  return $ret;
+}
+my %listedNodes;
+sub listPath(@) {
+  for my $node (@_) {
+    if (!$listedNodes{$node}) {
+      say $OUT "$node";
+      $listedNodes{$node} = 1;
+    }
+  }
+}
+sub printPathText(@) {
+  $fmt eq "list" and return listPath @_;
+  my @path = $printBackwards ? reverse @_ : @_;
+  say $OUT "".(($printLen && $fmt ne "indent") ? "[".@_."]$inPathJoiner" : "").joinPath map {
+    $funcmarks{$_} ? "$_$inPathJoiner@{[join $inPathJoiner, @{$funcmarks{$_}}]}" : $_;
+  } @path;
+}
+sub formatNodeDot($) {
+  my $node = shift;
+  my $node_dot = dot_escape_node $node;
+  # if (!%funcmarks) { return "$node_dot;"; }
+  my $funcnameLabel = "<B>".(dot_escape_in_html $node)."</B>";
+  my $attributes = !$funcmarks{$node} ? "" : " ".(join " ", map {/^--(\w+)=(.++)$/s ? "$1=$2" : ()} @{$funcmarks{$node}})." ";
+  my @funcmarks = !$funcmarks{$node} ? () : grep {!/^--\w+=/} @{$funcmarks{$node}};
+  if (!@funcmarks) {
+    return "$node_dot [label=<$funcnameLabel>$attributes];";
+  } else {
+    my $label = join "", map { '<FONT color="#666">'.dot_escape_in_html($_).'</FONT><BR align="left"/>' } @funcmarks;
+    return "$node_dot [label=<$funcnameLabel<BR/><BR/>$label>$attributes];";
+  }
+}
+my %dot_nodes_defined;
+sub printPathDot(@) {
+  my @path = $printBackwards ? reverse @_ : @_;
+  for my $node (@path) {
+    if (!$dot_nodes_defined{$node}) {
+      say $OUT formatNodeDot $node;
+      $dot_nodes_defined{$node} = 1;
+    }
+  }
+  if (@path < 2) { return; }
+  say $OUT join " -> ", map { dot_escape_node $_ } @path;
+}
+sub printPath(@) {
+  is_graphical_output() ? &printPathDot : &printPathText;
+}
+
+sub FILTER_NEXT() { 0x0000 }
+sub FILTER_DONE() { 0x1000 }
+sub FILTER_SET() { 0 }
+sub FILTER_AND() { 1 }
+sub FILTER_OR() { 2 }
+sub filterEdge($$) {
+  local ($a, $b) = @_;
+  local $filterMode = FILTER_OR;
+  my $ret = undef;
+  for my $code (@codeFilterEdge) {
+    my $ret1 = eval $code;
+    if ($@) { fatal "Error in custom edge filter code: $@\n$code"; }
+    my $filterOp = $filterMode & 0x0FFF;
+    $ret =
+      !defined($ret) ? $ret1 :
+      $filterOp == FILTER_SET  ? $ret1 :
+      $filterOp == FILTER_AND  ? $ret && $ret1 :
+      $filterOp == FILTER_OR   ? $ret || $ret1 :
+      fatal "Wrong \$filterMode set by custom edge filter code: $filterOp\n$code";
+    last if $filterMode & FILTER_DONE;
+  }
+  return $ret;
+}
+sub filterNode(;$) { # uses $_ or arg
+  local $_ = $_[0] // $_;
+  local $filterMode = FILTER_OR;
+  my $ret = undef;
+  for my $code (@codeFilterNode) {
+    my $ret1 = eval $code;
+    if ($@) { fatal "Error in custom node filter code: $@\n$code"; }
+    my $filterOp = $filterMode & 0x0FFF;
+    $ret =
+      !defined($ret) ? $ret1 :
+      $filterOp == FILTER_SET  ? $ret1 :
+      $filterOp == FILTER_AND  ? $ret && $ret1 :
+      $filterOp == FILTER_OR   ? $ret || $ret1 :
+      fatal "Wrong \$filterMode set by custom node filter code: $filterOp\n$code";
+    last if $filterMode & FILTER_DONE;
+  }
+  return $ret;
+}
+
+%grepFuncsFrom and
+  $pathFrom = (defined $pathFrom) ? "$pathFrom|(?:".(make_re sort keys %grepFuncsFrom).")" : make_re sort keys %grepFuncsFrom;
+%grepFuncsTo   and
+  $pathTo   = (defined $pathTo)   ?   "$pathTo|(?:".(make_re sort keys %grepFuncsTo).")"   : make_re sort keys %grepFuncsTo  ;
+
+# Add artificial links
+for (keys %funcs) {
+  if (/^(.*)_func$/) {
+    if (exists $funcs{$1}) {
+      $func = $1;
+      $callee = "${func}_func";
+      $edge = "$func -> $callee";
+      $edges{$edge} = [$edge, $func, $callee] if !exists $edges{$edge};
+      $rcalls{$callee}->{$func} = $calls{$func}->{$callee} = 1;
+      if ($mode == 4) {
+        push @{$func2ret{$func}}, "$callee(...)";
+      }
+    }
+  }
+}
+if ($mode == 4) {
+  # push @{$func2ret{WT_HANDLE_METHOD_REQ}}, "EINVAL";
+  push @{$func2ret{__wt_realloc_def}}, "__wt_realloc(...)";
+}
+
+for my $code (@codeAfterParse) {
+  eval $code;
+  if ($@) { fatal "Error in custom after-parse code: $@\n$code"; }
+}
+
+if ($mode == 4) {
+  my @funcs = sort grep {/$addNodes/} keys %func2ret;
+  if (!@funcs) {
+    say $OUT "No functions match filter: $addNodes";
+    EXIT;
+  }
+  for my $func (@funcs) {
+    my %seen_rets = qw/ret 1 __wt_set_return 1 __wt_set_return_func 1 __wt_illegal_value 1/;
+    my (%retvals, @funcstack);
+    my ($ret_of, $ret_expr, $reg_funcall);
+    $reg_funcall = sub($) {
+      my $funcname = $_[0];
+      return 1 if $seen_rets{$funcname};
+      return 1 if $exclude && $funcname =~ /$exclude/;   # if return 0 then the call will be included verbatim.
+      return 0 if defined($maxDepthToScan) && @funcstack >= $maxDepthToScan;
+      if ($func2ret{$funcname}) {
+        $seen_rets{$funcname} = 1;
+        $ret_of->($funcname);
+        return 1;
+      }
+      return 0;
+    };
+    my $reg_retval = sub($$) {
+      my ($func, $retval) = @_;
+      $retvals{$retval}->{$_} = 1 for ($func, $printLen > 1 ? @funcstack : ());
+    };
+    $ret_expr = sub($$) {
+        my ($func, $ret) = @_;
+# print "$func >>> <$ret>";
+        while ($ret =~ s/^\(((?&TOKEN)*)\)$re_arg$/$1/s) {}   # Remove outermost parentheses
+        $ret =~ s/^\s*+\w++\s*+=\s*+(?![=])//s;               # Remove simple assignment
+# say "... <$ret>";
+        # return if $seen_rets{$ret};
+        # $seen_rets{$ret} = 1;
+
+        # plain function call
+        if ($ret =~ /^([\w\-\>\.]++)\((?&TOKEN)*\)$re_arg$/) {
+          my $funcname = $1;
+          # $reg_funcall->($funcname) or $retvals{"$funcname(...)"}->{$func} = 1;  # No matching function - add the call verbatim.
+          $reg_funcall->($funcname) or $reg_retval->($func, "$funcname(...)");  # No matching function - add the call verbatim.
+          return;
+        }
+
+        # Unwind a ternary operator
+        if ($ret =~ /^\s*+(?&TOKEN)*?\s*+\?\s*+((?&TOKEN)*?)\s*+:\s*+((?&TOKEN)*?)\s*+$re_arg$/s) {
+          $_ ne "" && $ret_expr->($func, $_) for (my @a=($1, $2));
+          return;
+        }
+
+        # Add verbatim return value.
+        # $retvals{$ret}->{$func} = 1;
+        $reg_retval->($func, $ret);
+
+        # Search for any function calls
+# say "funcsearch";
+        $reg_funcall->($1) while ($ret =~ /(\w++)\(/sg);
+    };
+    $ret_of = sub($) {
+      my ($func) = @_;
+      push @funcstack, $func;
+# say "$func: {";
+      for (@{$func2ret{$func}}) {
+        $ret_expr->($func, $_);
+      }
+# say "}";
+      pop @funcstack;
+    };
+    $ret_of->($func);
+
+    say $OUT "$func:";
+    for (sort {
+            my @word = map {!!/^[\w\-\>\.]++$/} $a,$b;
+            my @call = map {!!/^[\w\-\>\.]++\((?&TOKEN)*\)$re_arg$/} $a,$b;
+            ($word[0] == $word[1] && $call[0] == $call[1]) ? $a cmp $b :
+            $word[1] <=> $word[0] || $call[1] <=> $call[0];
+        } keys %retvals) {
+      next if /^ret$/;
+      print $OUT "  $_";
+      if ($printLen) {
+        print $OUT ":";
+        for (sort keys %{$retvals{$_}}) {
+          print $OUT "  $_";
+        }
+      }
+      say "";
+    }
+    say "";
+  }
+  EXIT;
+}
+
+if ($mode == 3) {
+  for my $f1 (keys %func2file) {
+    my @path1 = split /\//, $func2file{$f1};
+    for $func (keys %{$calls{$f1}}) {
+      my $f2 = $func2file{$func};
+      if ($f2) {
+        my @path2 = split /\//, $f2;
+        for my $i (0 .. ($#path1 < $#path2 ? $#path1 : $#path2)) {
+          my $pathPart = join "/", @path1[0..$i];
+          ++$callstats{$pathPart}->[0+($path1[$i] eq $path2[$i])];
+        }
+      }
+    }
+    for $func (keys %{$rcalls{$f1}}) {
+      my $f2 = $func2file{$func};
+      if ($f2) {
+        my @path2 = split /\//, $f2;
+        for my $i (0 .. ($#path1 < $#path2 ? $#path1 : $#path2)) {
+          my $pathPart = join "/", @path1[0..$i];
+          ++$rcallstats{$pathPart}->[0+($path1[$i] eq $path2[$i])];
+        }
+      }
+    }
+  }
+  print $OUT "Module\tInternal%\tExternal%\tTotal\tOutgoing_Internal%\tOutgoing_External%\tOutgoing_Total\tIncoming_Internal%\tIncoming_External%\tIncoming_Total\n";
+  my %paths = map { ($_, 1) } keys %callstats, keys %rcallstats;
+  for (sort keys %paths) {
+    my $v = $callstats{$_};
+    my $rv = $rcallstats{$_};
+    my $total = $v->[0] + $v->[1];
+    my $external = $total ? 100.0 * $v->[0] / $total : 0;
+    my $internal = $total ? 100.0 * $v->[1] / $total : 0;
+    my $rtotal = $rv->[0] + $rv->[1];
+    my $rexternal = $rtotal ? 100.0 * $rv->[0] / $rtotal : 0;
+    my $rinternal = $rtotal ? 100.0 * $rv->[1] / $rtotal : 0;
+    my $atotal = $rtotal + $total;
+    my $aexternal = $atotal ? 100.0 * ($v->[0] + $rv->[0]) / $atotal : 0;
+    my $ainternal = $atotal ? 100.0 * ($v->[1] + $rv->[1]) / $atotal : 0;
+    printf $OUT "%s\t%.3f\t%.3f\t%d\t%.3f\t%.3f\t%d\t%.3f\t%.3f\t%d\n", $_, $ainternal, $aexternal, $atotal, $internal, $external, $total, $rinternal, $rexternal, $rtotal;
+  }
+  EXIT;
+}
+
+if ($fmt =~ /^(svg-html)$/) {
+  print STDOUT "<!DOCTYPE html><html><head></head><body>\n";
+  flush STDOUT;
+}
+
+if ($mode == 2) {
+  status "Searching...";
+
+  if ($searchPath == 1 || (defined $pathFrom && $pathFrom !~ /^\d+$/)) {
+    @srcs = sort grep { /$pathFrom/ } keys %func2file;
+    !@srcs and fatal "No functions match source filter: $pathFrom";
+  } elsif (defined $pathFrom && $pathFrom =~ /^\d+$/) {
+    !defined $maxDepthToScan and $maxDepthToScan = 0+$pathFrom;
+    $reverseSearch = 1;
+  } elsif (defined $maxDepthToScan && defined $pathTo) {
+    $reverseSearch = 1;
+  }
+
+  if ($searchPath == 1 || (defined $pathTo && $pathTo !~ /^\d+$/)) {
+    @dsts = sort grep { /$pathTo/ } keys %func2file;
+    !@dsts and fatal "No functions match destination filter: $pathTo";
+  } elsif (defined $pathTo && $pathTo =~ /^\d+$/) {
+    !defined $maxDepthToScan and $maxDepthToScan = 0+$pathTo;
+    $reverseSearch = undef;
+  } elsif (defined $maxDepthToScan && defined $pathFrom) {
+    $reverseSearch = undef;
+  }
+
+  if ($hlends) {
+    for (@srcs, @dsts) {
+      push @{$funcmarks{$_}}, "--fontcolor=darkgreen";
+    }
+  }
+
+  my $depthScan = !@srcs || !@dsts;
+  $depthScan and !$maxDepthToScan and $maxDepthToScan = 1;
+
+  @srcs ? $start = \@srcs :
+  @dsts ? $start = \@dsts :
+  defined($grep) ? exit :
+  fatal "Must specify either source or destination for search";
+
+  $exclude and $start = [grep { !/$exclude/ } @$start];
+  @$start or fatal "No functions match source filter\n";
+
+  my @exclude = $exclude ? grep { /$exclude/ } keys %func2file : ();
+
+  my %acalls;
+  if (!$reverseSearch) {
+    for $src (keys %calls) { $acalls{$src} = [sort keys %{$calls{$src}}]; }
+  } else {
+    for $src (keys %rcalls) { $acalls{$src} = [sort keys %{$rcalls{$src}}]; }
+  }
+
+  if ($maxDepthToScan > 1) {
+    say STDERR "Search for: ".
+      (@srcs ?  "(".(join " | ", @srcs).")" : "*").
+      ($maxDepthToScan ? " ...[$maxDepthToScan]... " : " ... ").
+      (@dsts ?  "(".(join " | ", @dsts).")" : "*");
+    say STDERR "Exclude: ".join " | ", @exclude if @exclude;
+    say STDERR "";
+  }
+
+  is_graphical_output() and print $OUT (<< "_E");
+strict digraph calls {
+rankdir=$rankdir;
+_E
+
+  if ($depthScan && $maxDepthToScan == 1) {
+    for (@$start) { printPath $_ if !$exclude || !/$exclude/; }
+    EXIT;
+  }
+
+  if ($searchPath == 1) {
+    $maxdepth = 0;
+    for (@srcs) {
+      my @queue = [$_];
+      my %visited = ($_, 1, map { ($_, 1) } @exclude );
+      while (local $path = shift @queue) {
+        ++$nPaths;
+        $maxdepth = 0+@$path if $maxdepth < @$path;
+        status "[$maxdepth] $_", 1;
+        $src = $path->[-1];
+        if ($pathTo && $src =~ /$pathTo/) {
+          ++$nFound;
+          printPath @$path;
+          last;
+        }
+        $visited{$src} = 1;
+        next if @prune && $prune && $src =~ /$prune/;
+        for $dst (@{$acalls{$src}}) {
+          next if $visited{$dst};
+          next if @codeFilterNode && !filterNode($dst);
+          push @queue, [@$path, $dst] if !@codeFilterEdge || filterEdge $src, $dst;
+        }
+      }
+    }
+  } elsif ($searchPath == 2) {
+    #{
+      my @queue = map { [$maxDepthToScan, [$_]] } @$start;
+      my %ignore = ($_, 1, map { ($_, 1) } @exclude);
+      my (%node_outs, %node_ins);   # this is for supporting min rank and max rank on graph
+      our $curMaxDepth = $maxDepthToScan;
+      while (my $next_item = ($walkByBreadth ? shift @queue : pop @queue)) {
+        local ($curMaxDepth, $path) = @$next_item;
+
+        ++$nPaths;
+        $src = $path->[-1];
+
+        my $hit_dst = (@dsts && $pathTo && ($src =~ /$pathTo/));
+
+        if ($hit_dst || $depthScan) {
+          ++$nFound;
+          printPath $reverseSearch ? reverse(@$path) : (@$path);
+          $minmaxrank && is_graphical_output() and do {for (my $i = 0; $i < @$path; ++$i) {
+            ($i > 0)        && $path->[$i-1] ne $path->[$i] ?  ++$node_ins{$path->[$i]} :  ($node_ins{$path->[$i]} = 0 +  $node_ins{$path->[$i]});
+            ($i < @$path-1) && $path->[$i+1] ne $path->[$i] ? ++$node_outs{$path->[$i]} : ($node_outs{$path->[$i]} = 0 + $node_outs{$path->[$i]});
+          }}
+        }
+
+        next if path_looped_back @$path;
+
+        # next if @prune && $src =~ /$prune/;
+        if (@prune && $prune && $src =~ /$prune/) {
+          my @n = sort keys %+ or next;
+          ($curMaxDepth = @$path + substr($n[0], 1)) > 0 or next;
+        } elsif ($curMaxDepth && @grow && $grow && $src =~ /$grow/) {
+          my @n = sort keys %+;
+          $curMaxDepth += @n ? 0+substr($n[0], 1) : 1;
+        }
+
+        if ($depthScan || !@dsts || ($hit_dst && !$continue)) {
+          next if !$curMaxDepth || @$path >= $curMaxDepth;
+        } else {
+          next if $curMaxDepth && @$path >= $curMaxDepth;
+        }
+
+        $maxdepth = 0+@$path if $maxdepth < @$path;
+        status "[".($maxdepth+1)."] ($nPaths)", 1;
+        for $dst (@{$acalls{$src}}) {
+          next if $ignore{$dst}; # || in_list @$path, $dst; ### Allow to print a recursive call once
+          next if @codeFilterNode && !filterNode($dst);
+          push @queue, [$curMaxDepth, [@$path, $dst]] if !@codeFilterEdge || filterEdge $src, $dst;
+        }
+      }
+      if ($minmaxrank && is_graphical_output()) {
+        # Do min and max rank thing
+        my @min_rank = sort grep { $node_ins{$_} == 0 } keys %node_ins;
+        if (@min_rank) {
+          my $minr = !$reverseSearch ? "min" : "max";
+          my $nodes = join "", map { (dot_escape_node $_).";\n" } @min_rank;
+          say $OUT "{ rank=$minr;\n$nodes}";
+        }
+        my @max_rank = sort grep { $node_outs{$_} == 0 && $node_ins{$_} != 0 } keys %node_outs;
+        if (@max_rank) {
+          my $maxr = !$reverseSearch ? "max" : "min";
+          my $nodes = join "", map { (dot_escape_node $_).";\n" } @max_rank;
+          say $OUT "{ rank=$maxr;\n$nodes}";
+        }
+      }
+    #}
+  }
+  is_graphical_output() and print $OUT "}\n";
+  close $OUT; $OUT = undef;
+  wait;
+  if ($fmt =~ /^(svg-html)$/) {
+    print STDOUT "<script defer>".pan_js()."</script></body></html>\n";
+    flush STDOUT;
+  }
+  status;
+  print STDERR "\nStats: Walk depth: ".($maxdepth+1)."; $nPaths paths walked; $nFound paths found.\n";
+  EXIT;
+}
+
+if ($mode == 1) {
+  status "Generating graph...";
+
+  # Print graph
+  is_graphical_output() and print $OUT (<< "_E");
+strict digraph calls {
+label="Call Graph\\n@{[join "", map {q{\n}.s/(["\\])/\\$1/gr} @ARGV]}";
+labelloc=t;
+rankdir=$rankdir;
+splines=$splines;
+node [shape=oval; style="filled"; labeljust=c; color="#00000080"; fillcolor="#0000000C"; fontcolor="#000000"; margin="0,0";]
+edge [color="#00000040"; fillcolor="#00000010"; penwidth=2; ]
+_E
+
+  # Find relevant nodes
+  if (!$filter && !@codeFilterEdge && !$addNodes && !@codeFilterNode) {
+    %nodesPrint = %funcs;
+  } else {
+    if ($filter && @codeFilterEdge) { fatal "Can't specify both cmdline arg filters and custom filter code"; }
+    %nodesPrint = map { ($_, 1) } grep { $addNodes && /$addNodes/ or @codeFilterNode && filterNode() } keys %funcs;
+    for (values %edges) {
+      if ($filter) {
+        $_->[0] =~ /$filter/ and $nodesPrint{$_->[1]} = $nodesPrint{$_->[2]} = 1;
+      } else {
+        filterEdge $_->[1], $_->[2] and $nodesPrint{$_->[1]} = $nodesPrint{$_->[2]} = 1;
+      }
+    }
+  }
+  if ($exclude) {
+    for (keys %nodesPrint) {
+      /$exclude/ and delete $nodesPrint{$_};
+    }
+  }
+
+  if (is_graphical_output()) {
+    # Print out nodes inside of corresponding files
+    for (keys %nodesPrint) { $files{$func2file{$_}} = 1; }
+    my $f0 = "";
+    my @f0;
+    for $f (sort keys %files) {
+      if ($f0 ne $f) {
+        @f0 = split /\//, $f0;
+        my @f = split /\//, $f;
+        my $n = $#f0 < $#f ? $#f0 : $#f;
+        my $common = -1;
+        for my $i (0 .. $n) {
+          ($f0[$i] eq $f[$i]) ? $common = $i : last;
+        }
+        say $OUT "}"x($#f0 - $common);
+        for my $i ($common+1 ... $#f) {
+          my $id1 = my $f1 = join "/", @f[0..$i];
+          $id1 =~ s{\W}{_}g;
+          say $OUT qq/subgraph "cluster: $f1" { cluster=true; style="filled,dashed"; label="$f1"; labeljust=l; color="#00000040"; fillcolor="#00000008"; fontcolor="#0000FF60";/;
+        }
+
+        $f0 = $f;
+        @f0 = @f;
+      }
+
+      print $OUT sort map {
+        exists $nodesPrint{$_} ? formatNodeDot($_)."\n" : ()
+      } @{$file2func{$f}};
+    }
+    say $OUT "}"x(@f0);
+  }
+
+  # Print edges
+  @edges = sort map {
+    (exists $nodesPrint{$_->[1]} && exists $nodesPrint{$_->[2]}) ?
+    (
+      $_->[0].(
+        is_graphical_output() ?
+          sprintf qq{ [color="#%02X%02X%02X60"];}, (rand(128)+64), (rand(128)+64), (rand(128)+64) :
+          ""
+      )."\n"
+    ) :
+    ()
+  } values %edges;
+  print $OUT join "", @edges;
+
+  is_graphical_output() and say $OUT "}";
+
+  close $OUT; $OUT = undef;
+  wait;
+  $fmt =~ /^(svg-html)$/ and print STDOUT "<script defer>setTimeout(()=>{".pan_js()."}, 10)</script></body></html>\n";
+
+  status;
+
+  print STDERR "".(keys %nodesPrint)." nodes, ".@edges." edges\n";
+
+  EXIT;
+}
+
+#  Pan-and-Zoom of SVG in browser:
+
+sub pan_js {
+  return << "_E";
+var zoom = 1.0;
+var mainElement = document.querySelector("svg") || document.querySelector("body") || document.scrollingElement;
+//var w = mainElement.scrollWidth;
+//var h = mainElement.scrollHeight;
+// var scrollX = window.scrollX;  // window.scrollX : original dimensions  // document.firstElementChild.scrollLeft : zoomed dimensions
+// var scrollY = window.scrollY;  // window.scrollY : original dimensions  // document.firstElementChild.scrollTop  : zoomed dimensions
+var mouseX = 100;
+var mouseY = 100;
+// mainElement.style.width = `\${w*10}px`;
+// mainElement.style.height = `\${h*10}px`;
+
+addStyle();
+mainElement.classList.add("mainElement");
+// mainElement.style.margin = `\${Math.max(window.screen.availHeight, mainElement.scrollHeight)}px \${Math.max(window.screen.availWidth, mainElement.scrollWidth)}px`;
+// mainElement.style.border = "5px solid #eee";
+// mainElement.style.padding = "0.3in";
+
+document.scrollingElement.scrollTo(document.scrollingElement.scrollWidth/2 - window.screen.availWidth/2, document.scrollingElement.scrollHeight/2 - window.screen.availHeight/2);
+
+//document.addEventListener("scroll", ev => {}, {passive: true})
+document.addEventListener("mousemove", ev => [mouseX, mouseY] = [ev.clientX, ev.clientY], {passive: true})
+
+function zoomBy(ratio) {
+    if (ratio == 1) return;
+    let [posX, posY] = [document.scrollingElement.scrollLeft + mouseX, document.scrollingElement.scrollTop + mouseY];
+
+    let zz = zoom;
+    zoom *= ratio;
+    zoom = Math.min(Math.max(zoom, 0.1), 10.);
+    if (zz == zoom) return;
+    zz = zoom / zz;
+    document.scrollingElement.scrollBy(posX*zz - posX, posY*zz - posY);
+    document.scrollingElement.style.zoom = zoom;
+    // document.scrollingElement.scrollBy(posX*zz - posX, posY*zz - posY);
+    // mainElement.style.zoom = zoom;
+
+    let e = document.querySelector('#search-box');
+    if (e) { e.style.zoom = 1/zoom; }
+}
+
+var searchBox;
+
+function startSearch(str = "") {
+    if (searchBox) { searchBox.focus(); return; }
+    document.body.insertAdjacentHTML('beforeEnd', `<input id=search-box placeholder="Regex Search" style="position: fixed; bottom: 0; left: 50%;"></input>`);
+    searchBox = document.querySelector('#search-box');
+    searchBox.style.zoom = 1/zoom;
+    let onInput = () => {
+        let re;
+        try {
+            re = searchBox.value == "" ? null : new RegExp(searchBox.value, "i");
+            searchBox.style.backgroundColor = "";
+        } catch {
+            searchBox.style.backgroundColor = "#FCC";
+        }
+        for (let e of document.querySelectorAll('text')) {
+            if (re && re.test(e.textContent)) {
+                e.style = "fill: #80F; font-weight: bold;";
+            } else {
+                e.style = "";
+            }
+        }
+        history.replaceState(null, 0, searchBox.value != "" ?
+            "#" + encodeURIComponent(searchBox.value) :
+            location.href.replace(/#.*/, ""));
+    };
+    if ((searchBox.value = str) != "") onInput();
+    searchBox.addEventListener("input", onInput);
+    searchBox.addEventListener("keydown", ev=>{ if (ev.key === "Escape") { endSearch(); } });
+    searchBox.focus();
+}
+
+function endSearch() {
+    if (!searchBox) return;
+    for (let e of document.querySelectorAll('text')) { e.style &&= ""; }
+    searchBox.remove();
+    searchBox = null;
+    history.replaceState(null, 0, location.href.replace(/#.*/, ""));
+}
+
+document.addEventListener("wheel", ev => {
+    if (!ev.shiftKey || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    ev.preventDefault();
+    ev.cancelBubble = true;
+    let delta = ev.wheelDeltaY ? -ev.wheelDeltaY : ev.wheelDeltaX ? -ev.wheelDeltaX : 0;
+    if (delta == 0) return;
+    zoomBy(Math.pow(1.0005, delta));
+}, {passive: false});
+
+document.addEventListener("keypress", ev => {
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    if (document.activeElement.tagName === "INPUT") return;
+    ev.preventDefault();
+    ev.cancelBubble = true;
+
+    switch (ev.key) {
+        case '=': case '+':
+            zoomBy(1.225);
+            break;
+        case '-': case '_':
+            zoomBy(1/1.225);
+            break;
+        case '0': case ')':
+            zoomBy(1/zoom);
+            document.scrollingElement.scrollTo(document.scrollingElement.scrollWidth/2 - window.screen.availWidth/2, document.scrollingElement.scrollHeight/2 - window.screen.availHeight/2);
+            break;
+        case 'f': case 'F': case '/':
+            startSearch();
+            break;
+    }
+}, {passive: false});
+
+// Shift|Alt|Ctrl + drag
+var moving = false;
+document.addEventListener("mousedown", ev => (ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) && (moving = true), {passive: true});
+document.addEventListener("mouseup", ev => moving = false, {passive: true});
+document.addEventListener("mousemove", ev => moving && document.scrollingElement.scrollBy(-ev.movementX, -ev.movementY), {passive: true});
+
+document.addEventListener("click", ev => {
+    let e = ev.target.closest("g.edge,g.node");
+    if (!e) return;
+    e.classList.toggle("hi");
+}, {passive: false});
+
+function addStyle() {
+    document.firstElementChild.insertAdjacentHTML("afterBegin", `<style>
+\@media screen {
+    .mainElement {
+margin: \${Math.max(window.screen.availHeight, document.scrollingElement.scrollHeight)}px \${Math.max(window.screen.availWidth, document.scrollingElement.scrollWidth)}px;
+border: 0.2in solid #ddd;
+padding: 0.3in;
+    }
+}
+g.edge:hover,
+g.edge:hover path,
+g.edge:hover polygon {
+    stroke: #0000FFFF !important;
+    stroke-opacity: 1;
+}
+g.edge.hi,
+g.edge.hi path,
+g.edge.hi polygon {
+    stroke: #FF0000FF;
+    stroke-opacity: 1;
+}
+g.hi text {
+    fill: #FF0000FF;
+    fill-opacity: 1;
+}
+</style>`);
+}
+
+try {
+  let hash = location.hash.replace(/^#/,"");
+  if (hash != "") { startSearch(decodeURIComponent(hash)); }
+} catch {}
+_E
+}
