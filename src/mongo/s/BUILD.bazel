@@ -261,7 +261,7 @@ mongo_cc_library(
         ":mongos_server_parameters",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/repl:hello_command",
+        "//src/mongo/db/repl/hello:hello_command",
     ],
 )
 

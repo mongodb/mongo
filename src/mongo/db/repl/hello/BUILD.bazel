@@ -1,0 +1,98 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+idl_generator(
+    name = "hello_gen",
+    src = "hello.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/rpc:topology_version_gen",
+        "//src/mongo/rpc/metadata:client_metadata_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "hello_command",
+    srcs = [
+        "hello_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/rpc:metadata",
+    ],
+)
+
+mongo_cc_library(
+    name = "hello_response",
+    srcs = [
+        "hello_response.cpp",
+        "//src/mongo/db/repl:optime_with.h",
+    ],
+    hdrs = [
+        "hello_response.h",
+    ],
+    deps = [
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/rpc:metadata",
+    ],
+)
+
+mongo_cc_library(
+    name = "hello_auth",
+    srcs = [
+        "hello_auth.cpp",
+    ],
+    hdrs = [
+        "hello_auth.h",
+    ],
+    deps = [
+        ":hello_command",
+        "//src/mongo:base",
+        "//src/mongo/db/auth:authentication_session",
+        "//src/mongo/db/auth:sasl_commands",
+        "//src/mongo/db/auth:saslauth",
+        "//src/mongo/db/commands:authentication_commands",
+    ],
+)
+
+mongo_cc_library(
+    name = "topology_version_observer",
+    srcs = [
+        "topology_version_observer.cpp",
+    ],
+    hdrs = [
+        "topology_version_observer.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/repl:replica_set_messages",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "topology_version_observer_test",
+    srcs = [
+        "topology_version_observer_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":topology_version_observer",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db/repl:repl_coordinator_impl",
+        "//src/mongo/db/repl:repl_coordinator_test_fixture",
+        "//src/mongo/util:clock_sources",
+    ],
+)

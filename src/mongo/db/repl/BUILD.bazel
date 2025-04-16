@@ -202,33 +202,6 @@ mongo_cc_library(
 )
 
 idl_generator(
-    name = "hello_gen",
-    src = "hello.idl",
-    deps = [
-        "replication_types_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db:write_concern_options_gen",
-        "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/rpc:topology_version_gen",
-        "//src/mongo/rpc/metadata:client_metadata_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "hello_command",
-    srcs = [
-        "hello_gen",
-    ],
-    deps = [
-        ":optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/auth",
-        "//src/mongo/db/auth:authprivilege",
-        "//src/mongo/rpc:metadata",
-    ],
-)
-
-idl_generator(
     name = "replication_metrics_gen",
     src = "replication_metrics.idl",
     deps = [
@@ -397,7 +370,6 @@ idl_generator(
 mongo_cc_library(
     name = "replica_set_messages",
     srcs = [
-        "hello_response.cpp",
         "last_vote.cpp",
         "member_config.cpp",
         "repl_set_config.cpp",
@@ -413,7 +385,6 @@ mongo_cc_library(
         ":repl_set_config_params_gen",
     ],
     hdrs = [
-        "hello_response.h",
         "last_vote.h",
         "member_config.h",
         "repl_set_config.h",
@@ -434,28 +405,11 @@ mongo_cc_library(
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl/hello:hello_response",
         "//src/mongo/db/repl/split_horizon",
         "//src/mongo/rpc:command_status",
-        "//src/mongo/rpc:metadata",
         "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "topology_version_observer",
-    srcs = [
-        "topology_version_observer.cpp",
-    ],
-    hdrs = [
-        "topology_version_observer.h",
-    ],
-    deps = [
-        ":repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-        ":replica_set_messages",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -1148,24 +1102,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "hello_auth",
-    srcs = [
-        "hello_auth.cpp",
-    ],
-    hdrs = [
-        "hello_auth.h",
-    ],
-    deps = [
-        ":hello_command",
-        "//src/mongo:base",
-        "//src/mongo/db/auth:authentication_session",
-        "//src/mongo/db/auth:sasl_commands",
-        "//src/mongo/db/auth:saslauth",
-        "//src/mongo/db/commands:authentication_commands",
-    ],
-)
-
-mongo_cc_library(
     name = "isself",
     srcs = [
         "isself.cpp",
@@ -1288,8 +1224,6 @@ mongo_cc_library(
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
-        ":hello_auth",
-        ":hello_command",
         ":oplog",
         ":primary_only_service",
         ":repl_coordinator_interface",
@@ -1304,6 +1238,8 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:saslauth",
         "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/repl/hello:hello_auth",
+        "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/repl/split_horizon",
         "//src/mongo/db/stats:counters",
         "//src/mongo/transport:message_compressor",
@@ -2403,21 +2339,6 @@ mongo_cc_unit_test(
         ":storage_interface",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/transport:transport_layer_mock",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "topology_version_observer_test",
-    srcs = [
-        "topology_version_observer_test.cpp",
-    ],
-    tags = ["mongo_unittest_fifth_group"],
-    deps = [
-        ":repl_coordinator_impl",
-        ":repl_coordinator_test_fixture",
-        ":topology_version_observer",
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/util:clock_sources",
     ],
 )
 

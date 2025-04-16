@@ -648,8 +648,8 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/commands:standalone",
-        "//src/mongo/db/repl:hello_command",
         "//src/mongo/db/repl:task_executor_mock",
+        "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/util:clock_source_mock",
     ],
 )

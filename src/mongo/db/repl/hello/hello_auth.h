@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/hello_gen.h"
+#include "mongo/db/repl/hello/hello_gen.h"
 
 namespace mongo {
 

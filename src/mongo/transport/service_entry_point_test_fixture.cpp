@@ -36,7 +36,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
-#include "mongo/db/repl/hello_gen.h"
+#include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine_mock.h"

@@ -35,7 +35,7 @@
 #include <new>
 #include <vector>
 
-#include "mongo/db/repl/hello_response.h"
+#include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/static_immortal.h"

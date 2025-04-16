@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/repl/topology_version_observer.h"
+#include "mongo/db/repl/hello/topology_version_observer.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

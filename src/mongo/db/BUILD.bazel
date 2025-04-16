@@ -2710,7 +2710,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/repl:replica_set_messages",
-        "//src/mongo/db/repl:topology_version_observer",
+        "//src/mongo/db/repl/hello:topology_version_observer",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/executor:thread_pool_task_executor",

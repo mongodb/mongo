@@ -37,7 +37,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/hello_gen.h"
+#include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_retry_policy.h"

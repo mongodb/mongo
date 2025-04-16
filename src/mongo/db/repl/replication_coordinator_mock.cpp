@@ -42,7 +42,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/hello_response.h"
+#include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replica_set_aware_service.h"

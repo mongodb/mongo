@@ -47,7 +47,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/repl/hello_response.h"
+#include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_data.h"

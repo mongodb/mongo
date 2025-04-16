@@ -30,7 +30,7 @@
 #include <memory>
 
 #include "mongo/bson/oid.h"
-#include "mongo/db/repl/hello_gen.h"
+#include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_retry_policy.h"

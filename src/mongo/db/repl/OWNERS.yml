@@ -18,12 +18,6 @@ filters:
   - "*sync_source*":
     approvers:
       - 10gen/server-oplog
-  - "*hello*":
-    approvers:
-      - 10gen/server-hello
-  - "*topology_version*":
-    approvers:
-      - 10gen/server-hello
   - "*read_concern*":
     approvers:
       - 10gen/server-rw-concerns

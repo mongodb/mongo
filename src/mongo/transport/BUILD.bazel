@@ -329,8 +329,8 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/repl:hello_command",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",

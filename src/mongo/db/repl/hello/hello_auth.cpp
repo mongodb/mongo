@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/hello_auth.h"
+#include "mongo/db/repl/hello/hello_auth.h"
 
 #include <boost/optional.hpp>
 
