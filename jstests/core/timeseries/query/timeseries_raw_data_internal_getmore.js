@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   featureFlagRawDataCrudOperations,
+ *   requires_fcv_82,
  *   does_not_support_transactions,
  *   # Refusing to run a test that issues commands that may return different values after a failover
  *   does_not_support_stepdowns,

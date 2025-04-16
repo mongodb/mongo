@@ -160,7 +160,7 @@ feature_flags:
     featureFlagRawDataCrudOperations:
         description: "Feature flag for rawData CRUD operations"
         cpp_varname: gFeatureFlagRawDataCrudOperations
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagIntentRegistration:
         description: "Enables intent registration in place of RSTL acquisitions"

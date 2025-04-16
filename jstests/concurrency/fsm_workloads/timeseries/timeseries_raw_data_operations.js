@@ -4,7 +4,7 @@
  *
  * @tags: [
  *  requires_timeseries,
- *  featureFlagRawDataCrudOperations,
+ *  requires_fcv_82,
  *  # Time-series collections cannot be written to in a transaction.
  *  does_not_support_transactions,
  *  # Time-series findAndModify does not support retryable writes.

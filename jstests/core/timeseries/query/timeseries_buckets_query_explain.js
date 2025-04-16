@@ -5,7 +5,7 @@
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
- *   featureFlagRawDataCrudOperations,
+ *   requires_fcv_82,
  *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  *   requires_timeseries,
  * ]

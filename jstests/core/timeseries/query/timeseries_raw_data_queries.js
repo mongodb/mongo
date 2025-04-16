@@ -3,7 +3,7 @@
  * namespace using rawData.
  * @tags: [
  *   requires_timeseries,
- *   featureFlagRawDataCrudOperations,
+ *   requires_fcv_82,
  *   does_not_support_transactions,
  *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]

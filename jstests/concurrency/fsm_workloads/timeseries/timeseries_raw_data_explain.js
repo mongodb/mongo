@@ -3,7 +3,7 @@
  *
  * @tags: [
  *  requires_timeseries,
- *  featureFlagRawDataCrudOperations,
+ *  requires_fcv_82,
  *  # Aggregation with explain may return incomplete results if interrupted by a stepdown.
  *  does_not_support_stepdowns,
  *  requires_getmore,

@@ -35,10 +35,9 @@ for (let i = 0; i < nMeasurements; i++) {
 
 // Test that a changeStream cannot be opened on a time-series collection because it's a view, both
 // with and without rawData.
-// TODO (SERVER-96883): Remove InvalidNamespace as an accepted error code.
 assert.throwsWithCode(() => getTimeseriesCollForRawOps(testDB, tsColl)
                                 .aggregate([{$changeStream: {}}], getRawOperationSpec(testDB)),
-                      [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.InvalidNamespace]);
+                      ErrorCodes.CommandNotSupportedOnView);
 assert.commandFailedWithCode(
     testDB.runCommand({aggregate: tsColl.getName(), pipeline: [{$changeStream: {}}], cursor: {}}),
     ErrorCodes.CommandNotSupportedOnView);

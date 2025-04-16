@@ -2,7 +2,7 @@
  * Tests explaining write operations on a time-series buckets collection.
  *
  * @tags: [
- *   featureFlagRawDataCrudOperations,
+ *   requires_fcv_82,
  *   requires_timeseries,
  *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]

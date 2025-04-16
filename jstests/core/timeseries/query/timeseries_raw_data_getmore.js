@@ -2,7 +2,7 @@
  * Tests getMore on cursors opened by reads that used rawData.
  *
  * @tags: [
- *   featureFlagRawDataCrudOperations,
+ *   requires_fcv_82,
  *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  *   requires_timeseries,
  *   requires_getmore,
