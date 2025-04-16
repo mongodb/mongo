@@ -60,6 +60,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
@@ -69,7 +70,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -82,8 +82,6 @@
 namespace mongo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(skipShardCatalogRecovery);
-
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
 const auto kViewsPermittedDontSkipRSTL =
     AutoGetCollection::Options{}
@@ -524,7 +522,43 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                 "writeConcern"_attr = writeConcern);
 }
 
-void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContext* opCtx) {
+void ShardingRecoveryService::onReplicationRollback(
+    OperationContext* opCtx, const std::set<NamespaceString>& rollbackNamespaces) {
+    // TODO (SERVER-91926): Move these recovery services to onConsistentDataAvailable interface once
+    // it offers a way to know which nss were impacted by the rollback event.
+
+    if (rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
+        rollbackNamespaces.end()) {
+        _recoverRecoverableCriticalSections(opCtx);
+    }
+
+    if (rollbackNamespaces.find(NamespaceString::kConfigShardCatalogDatabasesNamespace) !=
+        rollbackNamespaces.end()) {
+        _recoverDatabaseShardingState(opCtx);
+    }
+
+    // If writes to config.cache.* have been rolled back, interrupt the SSCCL to ensure secondary
+    // waits for replication do not use incorrect opTimes.
+    if (std::any_of(rollbackNamespaces.begin(),
+                    rollbackNamespaces.end(),
+                    [](const NamespaceString& nss) { return nss.isConfigDotCacheDotChunks(); })) {
+        FilteringMetadataCache::get(opCtx)->onReplicationRollback();
+    }
+}
+
+void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
+                                                        bool isMajority,
+                                                        bool isRollback) {
+    // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
+    if (isRollback) {
+        return;
+    }
+
+    _recoverRecoverableCriticalSections(opCtx);
+    _recoverDatabaseShardingState(opCtx);
+}
+
+void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationContext* opCtx) {
     LOGV2_DEBUG(5604000, 2, "Recovering all recoverable critical sections");
 
     // Release all in-memory critical sections
@@ -549,49 +583,44 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
         NamespaceString::kCollectionCriticalSectionsNamespace);
     store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
         const auto& nss = doc.getNss();
-        {
-            if (nss.isDbOnly()) {
-                AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
-                auto scopedDss =
-                    DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
-                scopedDss->enterCriticalSectionCatchUpPhase(opCtx, doc.getReason());
-                if (doc.getBlockReads()) {
-                    scopedDss->enterCriticalSectionCommitPhase(opCtx, doc.getReason());
-                }
-            } else {
-                AutoGetCollection collLock(opCtx,
-                                           nss,
-                                           MODE_X,
-                                           AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted));
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                         nss);
-                scopedCsr->enterCriticalSectionCatchUpPhase(doc.getReason());
-                if (doc.getBlockReads()) {
-                    scopedCsr->enterCriticalSectionCommitPhase(doc.getReason());
-                }
+        if (nss.isDbOnly()) {
+            AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
+            auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
+            scopedDss->enterCriticalSectionCatchUpPhase(opCtx, doc.getReason());
+            if (doc.getBlockReads()) {
+                scopedDss->enterCriticalSectionCommitPhase(opCtx, doc.getReason());
             }
-
-            return true;
+        } else {
+            AutoGetCollection collLock(opCtx,
+                                       nss,
+                                       MODE_X,
+                                       AutoGetCollection::Options{}.viewMode(
+                                           auto_get_collection::ViewMode::kViewsPermitted));
+            auto scopedCsr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+            scopedCsr->enterCriticalSectionCatchUpPhase(doc.getReason());
+            if (doc.getBlockReads()) {
+                scopedCsr->enterCriticalSectionCommitPhase(doc.getReason());
+            }
         }
+
+        return true;
     });
 
     LOGV2_DEBUG(5604001, 2, "Recovered all recoverable critical sections");
 }
 
-void ShardingRecoveryService::recoverStates(OperationContext* opCtx,
-                                            const std::set<NamespaceString>& rollbackNamespaces) {
-
-    if (rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
-        rollbackNamespaces.end()) {
-        ShardingRecoveryService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);
+void ShardingRecoveryService::_recoverDatabaseShardingState(OperationContext* opCtx) {
+    if (!feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
     }
-}
 
-void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
+    LOGV2_DEBUG(9813601, 2, "Recovering DatabaseShardingState from the shard catalog");
+
     Lock::GlobalWrite globalLock{opCtx};
-    LOGV2(9813601, "Recovering DatabaseShardingState from the shard catalog");
 
     const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
     for (const auto& dbName : allDatabases) {
@@ -601,32 +630,14 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
 
     PersistentTaskStore<DatabaseType> store(NamespaceString::kConfigShardCatalogDatabasesNamespace);
     store.forEach(opCtx, BSONObj{}, [&opCtx](const DatabaseType& dbMetadata) {
-        AutoGetDb dbLock(opCtx, dbMetadata.getDbName(), MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbMetadata.getDbName());
         scopedDss->setDbInfo(opCtx, dbMetadata);
 
         return true;
     });
-}
 
-void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
-                                                        bool isMajority,
-                                                        bool isRollback) {
-
-    if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        MONGO_likely(!skipShardCatalogRecovery.shouldFail())) {
-        // Has to be called on rollback too. Takes the global lock.
-        _reloadShardingState(opCtx);
-    }
-
-    // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
-    if (isRollback) {
-        return;
-    }
-    recoverRecoverableCriticalSections(opCtx);
+    LOGV2_DEBUG(9813602, 2, "Recovered the DatabaseShardingState from the shard catalog");
 }
 
 }  // namespace mongo

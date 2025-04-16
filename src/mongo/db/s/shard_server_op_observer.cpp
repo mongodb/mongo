@@ -916,18 +916,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
 
 void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
                                                   const RollbackObserverInfo& rbInfo) {
-    ShardingRecoveryService::get(opCtx)->recoverStates(opCtx, rbInfo.rollbackNamespaces);
-
-    // If writes to config.cache.collections or config.cache.* have been rolled back, interrupt the
-    // SSCCL to ensure secondary waits for replication do not use incorrect opTimes.
-    if (std::any_of(rbInfo.rollbackNamespaces.begin(),
-                    rbInfo.rollbackNamespaces.end(),
-                    [](const NamespaceString& nss) {
-                        return nss == NamespaceString::kShardConfigCollectionsNamespace ||
-                            nss.isConfigDotCacheDotChunks();
-                    })) {
-        FilteringMetadataCache::get(opCtx)->onReplicationRollback();
-    }
+    ShardingRecoveryService::get(opCtx)->onReplicationRollback(opCtx, rbInfo.rollbackNamespaces);
 }
 
 void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,

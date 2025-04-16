@@ -151,13 +151,13 @@ public:
                                            bool throwIfReasonDiffers = true);
 
     /**
-     * Recovers all sharding related in memory states from disk.
+     * Recovers the in-memory sharding state from disk in case of rollback.
      */
-    void recoverStates(OperationContext* opCtx,
-                       const std::set<NamespaceString>& rollbackNamespaces);
+    void onReplicationRollback(OperationContext* opCtx,
+                               const std::set<NamespaceString>& rollbackNamespaces);
 
     /**
-     * Recovers critical sections and indexes from disk when either initial sync or startup recovery
+     * Recovers the in-memory sharding state from disk when either initial sync or startup recovery
      * have completed.
      */
     void onConsistentDataAvailable(OperationContext* opCtx, bool isMajority, bool isRollback) final;
@@ -167,13 +167,13 @@ private:
      * This method is called when we have to mirror the state on disk of the recoverable critical
      * section to memory (on startup or on rollback).
      */
-    void recoverRecoverableCriticalSections(OperationContext* opCtx);
+    void _recoverRecoverableCriticalSections(OperationContext* opCtx);
 
     /**
-     * Called from onConsistentDataAvailable to recover the in-memory metadata information from the
-     * on-disk shard catalog. Runs on startup and on rollback.
+     * This method is called when we have to mirror the state on disk of the database sharding state
+     * to memory (on startup or on rollback).
      */
-    void _reloadShardingState(OperationContext* opCtx);
+    void _recoverDatabaseShardingState(OperationContext* opCtx);
 
     void onStartup(OperationContext* opCtx) final {}
     void onSetCurrentConfig(OperationContext* opCtx) final {}

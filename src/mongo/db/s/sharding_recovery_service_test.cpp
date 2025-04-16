@@ -981,8 +981,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->recoverStates(operationContext(),
-                        {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(operationContext(),
+                                {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -999,8 +999,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->recoverStates(operationContext(),
-                        {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(operationContext(),
+                                {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(dbName);
@@ -1017,8 +1017,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
     ShardingRecoveryService::get(operationContext())
-        ->recoverStates(operationContext(),
-                        {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(operationContext(),
+                                {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(dbName);
@@ -1037,8 +1037,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->recoverStates(operationContext(),
-                        {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(operationContext(),
+                                {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -1055,8 +1055,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(operationContext())
-        ->recoverStates(operationContext(),
-                        {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(operationContext(),
+                                {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCommitEnteredInMemory(collNss);
@@ -1073,8 +1073,8 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
     ShardingRecoveryService::get(operationContext())
-        ->recoverStates(operationContext(),
-                        {NamespaceString::kCollectionCriticalSectionsNamespace});
+        ->onReplicationRollback(operationContext(),
+                                {NamespaceString::kCollectionCriticalSectionsNamespace});
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionLeftInMemory(collNss);
