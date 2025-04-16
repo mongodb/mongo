@@ -309,9 +309,7 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextTransformIdentifiers) {
     ASSERT_EQ(filters.size(), 2);
 }
 
-DEATH_TEST_REGEX_F(DocumentSourceQueryStatsTest,
-                   GetNextKeyFailsToReParse,
-                   "Tripwire assertion.*7349401") {
+TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
     // Manually construct a match expression that will successfully be constructed and serialized,
     // but be unable to re-parse the serialized representative value.
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(
@@ -346,8 +344,8 @@ DEATH_TEST_REGEX_F(DocumentSourceQueryStatsTest,
 
     const auto source =
         DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
-    // This should hit our tripwire assertion.
-    ASSERT_THROWS(source->getNext(), DBException);
+    // This should raise an user assertion.
+    ASSERT_THROWS_CODE(source->getNext(), DBException, ErrorCodes::QueryStatsFailedToRecord);
 }
 
 TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {

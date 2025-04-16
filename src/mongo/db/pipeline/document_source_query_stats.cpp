@@ -46,10 +46,12 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/buildinfo.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -58,6 +60,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
 namespace mongo {
+
+// Fail point to mimic re-parsing errors during execution.
+MONGO_FAIL_POINT_DEFINE(queryStatsFailToReparseQueryShape);
 namespace {
 auto& queryStatsHmacApplicationErrors =
     *MetricBuilder<Counter64>{"queryStats.numHmacApplicationErrors"};
@@ -246,6 +251,12 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
         auto queryShapeHash = key->getQueryShapeHash(pExpCtx->getOperationContext(),
                                                      SerializationContext::stateDefault())
                                   .toHexString();
+
+        if (MONGO_unlikely(queryStatsFailToReparseQueryShape.shouldFail())) {
+            uasserted(ErrorCodes::FailPointEnabled,
+                      "queryStatsFailToReparseQueryShape fail point is enabled");
+        }
+
         return Document{
             {"key", std::move(queryStatsKey)},
             {"keyHash", keyHash},
@@ -271,11 +282,12 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
 
         if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
             auto keyString = std::to_string(hash);
-            tasserted(7349401,
-                      str::stream() << "Was not able to re-parse queryStats key when "
-                                       "reading queryStats.Status "
-                                    << ex.toString() << " Hash: " << keyString
-                                    << " Query Shape: " << queryShape.toString());
+            BSONObj cmdObj = serialize().getDocument().toBson();
+            uasserted(Status{QueryStatsFailedToRecordInfo(
+                                 cmdObj, ex.toStatus(), getBuildInfoVersionOnly().getVersion()),
+                             str::stream()
+                                 << "Failed to re-parse query stats store key when reading. Hash: "
+                                 << keyString << ", Query Shape: " << queryShape.toString()});
         }
     }
     return {};

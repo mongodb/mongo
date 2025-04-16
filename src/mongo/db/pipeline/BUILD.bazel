@@ -1509,6 +1509,7 @@ mongo_cc_unit_test(
         "//src/mongo/s/query/exec:router_exec_stage",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
+        "//src/mongo/util:version_impl",
     ],
 )
 

@@ -75,6 +75,8 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
     QueryStatsStoreManager::getRateLimiter =
         ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
 
+// Fail point to mimic the operation fails during 'registerRequest()'.
+MONGO_FAIL_POINT_DEFINE(queryStatsFailToSerializeKey);
 
 namespace {
 
@@ -346,6 +348,10 @@ void registerRequest(OperationContext* opCtx,
     try {
         opDebug.queryStatsInfo.key = makeKey();
         opDebug.queryStatsInfo.keyHash = absl::HashOf(*opDebug.queryStatsInfo.key);
+        if (MONGO_unlikely(queryStatsFailToSerializeKey.shouldFail())) {
+            uasserted(ErrorCodes::FailPointEnabled,
+                      "queryStatsFailToSerializeKey fail point is enabled");
+        }
     } catch (const DBException& ex) {
         queryStatsStoreWriteErrorsMetric.increment();
 
