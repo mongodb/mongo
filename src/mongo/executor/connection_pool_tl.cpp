@@ -129,8 +129,16 @@ void TLTypeFactory::shutdown() {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    LOGV2(22582, "Killing all outstanding egress activity.");
-    for (auto collar : _collars) {
+    std::unordered_map<std::string, int> counts;
+    for (const Type* collar : _collars) {
+        ++counts[demangleName(typeid(collar))];
+    }
+
+    LOGV2(22582,
+          "Killing all outstanding egress activity",
+          "instanceName"_attr = _instanceName,
+          "numKilledByType"_attr = counts);
+    for (Type* collar : _collars) {
         collar->kill();
     }
 }
@@ -165,7 +173,10 @@ void TLTimer::setTimeout(Milliseconds timeoutVal, TimeoutCallback cb) {
     // We will not wait on a timeout if we are in shutdown.
     // The clients will be canceled as an inevitable consequence of pools shutting down.
     if (inShutdown()) {
-        LOGV2_DEBUG(22583, 2, "Skipping timeout due to impending shutdown.");
+        LOGV2_DEBUG(22583,
+                    2,
+                    "Skipping timeout due to impending shutdown.",
+                    "instanceName"_attr = instanceName());
         return;
     }
 
@@ -498,7 +509,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
                 handler->promise.setError(status);
             }
         });
-    LOGV2_DEBUG(22585, 2, "Finished connection setup.");
+    LOGV2_DEBUG(22585, 2, "Finished connection setup", "hostAndPort"_attr = _peer);
 }
 
 void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {

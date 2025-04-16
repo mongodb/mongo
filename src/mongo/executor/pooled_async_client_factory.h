@@ -72,7 +72,7 @@ public:
         }
 #endif
         auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-            reactor, tl, std::move(_onConnectHook), _poolOpts, transientSSLContext);
+            reactor, tl, std::move(_onConnectHook), _poolOpts, transientSSLContext, _name);
         _pool = std::make_shared<ConnectionPool>(std::move(typeFactory), _name, _poolOpts);
     }
 
