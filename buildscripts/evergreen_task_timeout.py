@@ -17,6 +17,7 @@ import structlog
 import yaml
 from pydantic import BaseModel
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, parse_evergreen_file
 from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.timeouts.timeout_service import TimeoutParams, TimeoutService
@@ -46,6 +47,10 @@ HISTORY_LOOKBACK = timedelta(weeks=2)
 COMMIT_QUEUE_TIMEOUT = timedelta(minutes=30)
 DEFAULT_REQUIRED_BUILD_TIMEOUT = timedelta(hours=1, minutes=20)
 DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
+
+# An idle timeout will expire in the presence of an exceptionally long running test in a resmoke task.
+# This helps prevent the introduction of new long-running tests in required build variants.
+DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT = timedelta(minutes=40)
 
 
 class TimeoutOverride(BaseModel):
@@ -291,6 +296,15 @@ class TaskTimeoutOrchestrator:
             LOGGER.info("Overriding configured timeout", idle_timeout_secs=override.total_seconds())
             determined_timeout = override
 
+        elif self._is_required_build_variant(variant) and (
+            determined_timeout is None or determined_timeout > DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT
+        ):
+            LOGGER.info(
+                "Overriding required-builder idle timeout",
+                idle_timeout_secs=DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT.total_seconds(),
+            )
+            determined_timeout = DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT
+
         return determined_timeout
 
     def determine_historic_timeout(
@@ -401,7 +415,16 @@ class TaskTimeoutOrchestrator:
 
 
 def main():
-    """Determine the timeout value a task should use in evergreen."""
+    """
+    Determine the timeout value a task should use in evergreen.
+
+    The timeouts are set based on (in order or precedence):
+    1. The timeouts listed in the --timeout-overrides file, (default etc/evergreen_timeouts.yml)
+    2. Restricted to a hard-coded maximum execution timeout if the task is part of a commit queue patch.
+    3. Restricted to a hard-coded maximum timeout if the task is run on a default build variant.
+    4. An estimate from historic runtime information of the tests in the task, if task history exists.
+    5. A hard-coded default timeout.
+    """
     parser = argparse.ArgumentParser(description=main.__doc__)
 
     parser.add_argument(

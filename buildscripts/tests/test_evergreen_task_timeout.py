@@ -322,7 +322,13 @@ class TestDetermineExecTimeout(unittest.TestCase):
 
 class TestDetermineIdleTimeout(unittest.TestCase):
     def _validate_idle_timeout(
-        self, idle_timeout, historic_timeout, build_variant, timeout_override, expected_timeout
+        self,
+        idle_timeout,
+        historic_timeout,
+        build_variant,
+        display_name,
+        timeout_override,
+        expected_timeout,
     ):
         task_name = "task_name"
         overrides = {}
@@ -334,7 +340,10 @@ class TestDetermineIdleTimeout(unittest.TestCase):
         orchestrator = under_test.TaskTimeoutOrchestrator(
             timeout_service=MagicMock(spec_set=TimeoutService),
             timeout_overrides=mock_timeout_overrides,
-            evg_project_config=MagicMock(spec_set=EvergreenProjectConfig),
+            evg_project_config=MagicMock(
+                spec_set=EvergreenProjectConfig,
+                get_variant=MagicMock(return_value=MagicMock(display_name=display_name)),
+            ),
         )
 
         actual_timeout = orchestrator.determine_idle_timeout(
@@ -348,6 +357,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             idle_timeout=timedelta(seconds=42),
             historic_timeout=None,
             build_variant="variant",
+            display_name="not required",
             timeout_override=None,
             expected_timeout=timedelta(seconds=42),
         )
@@ -357,6 +367,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             idle_timeout=None,
             historic_timeout=None,
             build_variant="variant",
+            display_name="not required",
             timeout_override=None,
             expected_timeout=None,
         )
@@ -366,6 +377,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             idle_timeout=None,
             historic_timeout=None,
             build_variant="variant",
+            display_name="not required",
             timeout_override=60,
             expected_timeout=timedelta(minutes=60),
         )
@@ -375,6 +387,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             idle_timeout=None,
             historic_timeout=timedelta(minutes=15),
             build_variant="variant",
+            display_name="not required",
             timeout_override=None,
             expected_timeout=timedelta(minutes=15),
         )
@@ -384,6 +397,37 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             idle_timeout=None,
             historic_timeout=timedelta(minutes=15),
             build_variant="variant",
+            display_name="not required",
             timeout_override=30,
             expected_timeout=timedelta(minutes=30),
+        )
+
+    def test_default_required_returned_on_required_variants(self):
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=None,
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=None,
+            expected_timeout=under_test.DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT,
+        )
+
+    def test_prefer_shorter_that_default_on_required_variants(self):
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=timedelta(minutes=2),
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=None,
+            expected_timeout=timedelta(minutes=2),
+        )
+
+    def test_override_on_required_should_use_override(self):
+        self._validate_idle_timeout(
+            idle_timeout=None,
+            historic_timeout=None,
+            build_variant="variant-required",
+            display_name="! required",
+            timeout_override=3,
+            expected_timeout=timedelta(minutes=3),
         )
