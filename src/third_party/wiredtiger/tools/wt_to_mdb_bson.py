@@ -26,7 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import bson, codecs, pprint, subprocess, sys, re
+import argparse, bson, codecs, pprint, subprocess, sys, re
+from bson.json_util import dumps, CANONICAL_JSON_OPTIONS
 from enum import Enum
 
 # This script is intended to parse the output of three wt util commands and convert MongoDB bson
@@ -45,11 +46,23 @@ from enum import Enum
 # location and the filename and the script will execute the required wt util command. When running
 # with -f the script must be executed in the same directory as the database.
 #
+# Note that this script can also output valid JSON if given the -j/--json flag. This will return properly
+# formatted JSON using the Canonical Extended JSON format.
+#
+# Particularly for the dump command this will change the output from:
+#     Key: <key>
+#     Value: <value>
+# To:
+#     { "key": <key>, "value": <value> }
+#
+# Other commands will have the BSON output replaced with JSON without any modifications to the structure.
+#
 # Some example usages are:
 #    - ./wt -r dump -x file:foo.wt | ./wt_to_mdb_bson -m dump
 #    - ./wt -r verify -d dump_pages file:bar.wt | ./wt_to_mdb_bson -m verify
 #    - ./wt_to_mdb_bson -m dump -f ./wt file:foo.wt
 #    - ./wt_to_mdb_bson -m printlog -f ./wt
+#    - ./wt_to_mdb_bson -m dump -j -f ./wt file:_mdb_catalog.wt | jq .value.md.ns  # Returns all namespaces on a MongoDB data directory
 
 # A basic enum to determine which mode we are operating in.
 class Mode(Enum):
@@ -57,16 +70,12 @@ class Mode(Enum):
     VERIFY = 2
     PRINTLOG = 3
 
-# Decodes a MongoDB file into a readable format.
-def util_usage():
-    print("Usage: wt_to_mdb_bson -m {dump|verify|printlog} [-f] [path_to_wt] [uri]")
-    print('\t-m the intended mode that the wt util operated in or will be executed using.')
-    print('\t-f the location of the wt util.')
-    sys.exit(1)
-
 # BSON printer helper.
-def print_bson(bson):
-    return pprint.pformat(bson, indent=1).replace('\n', '\n\t  ')
+def print_bson(bson, as_json):
+    if as_json:
+        return dumps(bson, json_options=CANONICAL_JSON_OPTIONS)
+    else:
+        return pprint.pformat(bson, indent=1).replace('\n', '\n\t  ')
 
 # A utility function for converting verify byte output into parsible hex.
 def convert_byte(inp):
@@ -90,18 +99,18 @@ def convert_byte(inp):
     return codecs.escape_decode(ret)[0]
 
 # Converts the output of ./verify -d dump_pages to bson.
-def wt_verify_to_bson(wt_output):
+def wt_verify_to_bson(wt_output, as_json):
     pattern = re.compile(r'V {(.*?)}$')
     for line in wt_output:
         print(line, end='')
         matches = pattern.findall(line.strip())
         if matches:
             obj = bson.decode_all(convert_byte(matches[0]))[0]
-            print('\t  %s' % (print_bson(obj),))
+            print('\t  %s' % (print_bson(obj, as_json),))
 
 # Converts the output of ./wt printlog -x -u.
 # Doesn't convert hex keys as I don't think they're bson.
-def wt_printlog_to_bson(wt_output):
+def wt_printlog_to_bson(wt_output, as_json):
     pattern_value = re.compile(r'value-hex\": \"(.*)\"')
     for line in wt_output:
         value_match = pattern_value.search(line)
@@ -110,7 +119,7 @@ def wt_printlog_to_bson(wt_output):
             value_bytes = bytes.fromhex(value_hex_str)
             try:
                 bson_obj = bson.decode_all(value_bytes)
-                print('\t\"value-bson\":%s' % (print_bson(bson_obj),))
+                print('\t\"value-bson\":%s' % (print_bson(bson_obj, as_json),))
             except Exception as e:
                 # If bsons don't appear to be printing uncomment this line for the error reason.
                 #logging.error('Error at %s', 'division', exc_info=e)
@@ -129,7 +138,7 @@ def find_data_section(mdb_file_contents):
     return -1
 
 # Decode the keys and values from hex format to a readable BSON format for ./wt dump.
-def decode_data_section(mdb_file_contents, data_index):
+def decode_data_section(mdb_file_contents, data_index, as_json):
     # Loop through the data section and increment by 2, since we parse the K/V pairs.
     for i in range(data_index, len(mdb_file_contents), 2):
         key = mdb_file_contents[i].strip()
@@ -138,16 +147,19 @@ def decode_data_section(mdb_file_contents, data_index):
         byt = codecs.decode(value, 'hex')
         obj = bson.decode_all(byt)[0]
 
-        print('Key:\t%s' % key)
-        print('Value:\n\t%s' % (print_bson(obj),))
+        if as_json:
+            print(print_bson({"key": key, "value": obj}, as_json))
+        else:
+            print('Key:\t%s' % key)
+            print('Value:\t%s' % (print_bson(obj, as_json),))
 
 # Convert the output of ./wt -r dump -x to bson.
-def wt_dump_to_bson(wt_output):
+def wt_dump_to_bson(wt_output, as_json):
     # Dump the MongoDB file into hex format.
     mdb_file_contents = wt_output
     data_index = find_data_section(mdb_file_contents)
     if data_index > 0:
-        decode_data_section(mdb_file_contents, data_index)
+        decode_data_section(mdb_file_contents, data_index, as_json)
     else:
         print("Error: No data section was found in the file.")
         exit()
@@ -165,42 +177,55 @@ def execute_wt(mode, wtpath, uri):
             [wtpath, "-r", "-C", "log=(compressor=snappy,path=journal/)", "printlog", "-u", "-x"], universal_newlines=True).splitlines()
 
 def main():
-    if len(sys.argv) < 3:
-        util_usage()
-        exit()
+    parser = argparse.ArgumentParser(
+        prog='wt_to_mdb_bson',
+        description="A tool to convert WT contents to MognoDB's BSON representation"
+    )
+    parser.add_argument("-m", "--mode",
+       required=True,
+       help="The intended mode that the wt util operated in or will be executed using",
+       choices=["dump", "verify", "printlog"]
+    )
+    parser.add_argument("-j", "--json",
+        action="store_true",
+        help="Outputs the BSON as proper JSON using the canonical JSON format"
+    )
+    parser.add_argument("-f", "--wt-path",
+        help="The location of the wt util"
+    )
+    parser.add_argument("uri",
+       nargs='?',
+       default=None
+    )
 
-    if sys.argv[1] != '-m':
-        print('A mode must be specified with -m.')
-        util_usage()
+    args = parser.parse_args()
 
-    mode_str = sys.argv[2]
+    mode_str = args.mode
     if mode_str == 'dump':
         mode = Mode.DUMP
     elif mode_str == 'verify':
         mode = Mode.VERIFY
-    elif mode_str == 'printlog':
-        mode = Mode.PRINTLOG
     else:
-        print('Invalid mode specified.')
-        util_usage()
+        mode = Mode.PRINTLOG
 
     # Does the user plan on passing wt's location and a file?
-    if len(sys.argv) > 3:
-        if sys.argv[3] != '-f':
-            print('Invalid option specified.')
-            util_usage()
-        uri = None if mode == Mode.PRINTLOG else sys.argv[5]
-        wt_output = execute_wt(mode, sys.argv[4], uri)
+    if args.uri or args.wt_path:
+        if not args.wt_path:
+            parser.error("WiredTiger binary path must be specified when using a URI")
+        if not args.uri:
+            parser.error("URI must be specified when using the WiredTiger binary")
+        uri = None if mode == Mode.PRINTLOG else args.uri
+        wt_output = execute_wt(mode, args.wt_path, uri)
     else:
         # Read in stdout to a string then pass it like the wt_output.
         wt_output = sys.stdin.readlines()
 
     if mode == Mode.DUMP:
-        wt_dump_to_bson(wt_output)
+        wt_dump_to_bson(wt_output, args.json)
     elif mode == Mode.VERIFY:
-        wt_verify_to_bson(wt_output)
+        wt_verify_to_bson(wt_output, args.json)
     else:
-        wt_printlog_to_bson(wt_output)
+        wt_printlog_to_bson(wt_output, args.json)
 
 if __name__ == "__main__":
     main()
