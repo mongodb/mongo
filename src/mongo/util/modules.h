@@ -34,13 +34,28 @@
 /** Marks a declaration and everything inside as public to other modules */
 #define MONGO_MOD_PUB MONGO_MOD_ATTR_(public)
 
-/** Marks a declaration and everything inside as unfortunately public to other modules */
+/**
+ * Marks a declaration which the module owner would prefer to be
+ * private, but for which there is currently no good alternative
+ * for out-of-module usage. Allows external usage like MONGO_MOD_PUB,
+ * but gives a warning to the module owner.
+ */
 #define MONGO_MOD_NEEDS_REPLACEMENT MONGO_MOD_ATTR_(needs_replacement)
+/**
+ * Marks a declaration which the module owner would prefer to be
+ * private, but for which there are historical uses outside the
+ * module which haven't been cleaned up yet. Allows external usage
+ * like MONGO_MOD_PUB, but gives a warning to each caller for usage
+ * outside the module.
+ */
 #define MONGO_MOD_USE_REPLACEMENT(replacement) MONGO_MOD_ATTR_(use_replacement::replacement)
 
 /**
  * Marks a declaration and everything inside it public. Should only be used for things that should
  * be private, but can't be marked so due to limitations with the scanner.
+ * For example, declarations that should only be used via public macros
+ * currently need to be public, even if they aren't directly used externally.
+ * In almost all cases, MONGO_MOD_NEEDS_REPLACEMENT should be used instead.
  */
 #define MONGO_MOD_PUB_FOR_TECHNICAL_REASONS MONGO_MOD_ATTR_(public)
 

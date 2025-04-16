@@ -1,14 +1,24 @@
 # Modules POC
 
-This folder contains a POC implementation of a module metrics tracker and enforcement. The following
-commands will run the scanner across the entire first-party codebase, and merge the results. All
+This folder contains a POC implementation of a module metrics tracker and enforcement. This documentation includes
+commands which will run the scanner across the entire first-party codebase, and merge the results. All
 commands are assumed to run at the root of the checkout, inside of a correctly activated python
 virtual env.
 
-## Showing assigned and unassigned files
+## Assigning files to modules
+
+The file `modules_poc/modules.yaml` contains a list of modules, each containing
+a list of files. Each file must be contained in only one module. Note that
+module assignment is not required to map neatly to team ownership.
+
+In cases where multiple globs match a file, the current rule is that the
+longest glob wins. This is used as a simpler-to-implement version of
+most-specific glob wins, which we may switch to in the future.
+
+### Showing assigned and unassigned files
 
 Run `modules_poc/mod_scanner.py --dump-modules` to produce a `modules.yaml` file
-in current directory. This file is a multi-level map from
+in the current directory. This file is a multi-level map from
 module name to team name to directory path to list of file names.
 For unassigned files it uses `__NONE__` as the module name, and for unowned
 files it uses `__NO_OWNER__` as the team, both of which conveniently sort first.
@@ -38,9 +48,45 @@ yq '.[].__NO_OWNER__ | values | to_entries | map("\(.key)/\(.value[])") | .[] ' 
 yq '[.[].__NO_OWNER__ | to_entries? | .[]] | group_by(.key) | map({key: .[0].key, value: ([.[].value] | add | sort)}) | from_entries' modules.yaml
 ```
 
-## Running the scanner
+## Specifying public and private module APIs
 
-This will build the `merged_decls.json` files in the current directory:
+To make an API or class available for use by other modules, add a
+tag to its header declaration.
+
+```
+class MONGO_MOD_PUB Foo {
+
+};
+
+MONGO_MOD_PUB int foo();
+```
+
+Availability specification can also be done at the namespace level.
+
+```
+namespace MONGO_MOD_PRIVATE my_details {
+
+} // namespace MONGO_MOD_PRIVATE my details
+```
+
+Elements inside a class or namespace default to the visibility of the
+enclosing scope. Note that the canonical version of "inside" can be
+subtle, with, e.g., member functions being "inside" the class definition,
+not the location the member function is defined. All forward
+declarations of the same function or class should have the same visibility
+tags, and forward declarations across module boundaries should be avoided.
+
+If visibility is not specified at any containing scope,
+it defaults to `MONGO_MOD_PRIVATE` (except in cases where the
+header doesn't include `mongo/util/modules.h`, where the default is `UNKNOWN`
+to facilitate incrementally tagging APIs).
+
+Documentation for individual `MONGO_MOD_*` tags is present in
+[`mongo/util/modules.h`](../src/mongo/util/modules.h).
+
+### Running the scanner
+
+This will build the `merged_decls.json` file in the current directory:
 
 ```bash
 buildscripts/poetry_sync.sh # make sure the python env has the right packages installed
@@ -64,6 +110,17 @@ If you only wish to include the files linked in to a given executable, replace t
 TARGET="//src/mongo/db:mongod"
 bazel cquery --config=mod-scanner "filter(//src/mongo, kind(cc_*, deps($TARGET)))"  | awk '{print $1}' > targets.file
 bazel build --config=mod-scanner --target_pattern_file=targets.file
+```
+
+### Note for implementers
+
+You can also scan a single file which is useful when iterating on this. You can
+either pass it the same flags used to compile, or pass it just a cpp file and it
+will figure out the flags from your `compile_commands.json`. It will create a file
+called `decls.yaml` to the current directory when run this way.
+
+```bash
+modules_poc/mod_scanner.py src/mongo/bson/bsonobj.cpp
 ```
 
 ## Browsing
@@ -106,17 +163,6 @@ python modules_poc/upload.py $MONGO_URI # fill this in
 If the upload fails with an error connecting and you need to update the IP
 whitelist for your virtual workstation, `curl -4 wtfismyip.com/text` is a good
 way to see your public IP address
-
-## Note for implementers
-
-You can also scan a single file which is useful when iterating on this. You can
-either pass it the same flags used to compile, or pass it just a cpp file and it
-will figure out the flags from your compile_commands.json. It will create a file
-called `decls.yaml` to the current directory when run this way.
-
-```bash
-python modules_poc/mod_scanner.py src/mongo/bson/bsonobj.cpp
-```
 
 ## Future Work
 
