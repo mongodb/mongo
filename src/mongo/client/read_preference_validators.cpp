@@ -39,7 +39,8 @@ namespace mongo {
 
 constexpr char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
 
-Status validateMaxStalenessSecondsExternal(const std::int64_t maxStalenessSeconds) {
+Status validateMaxStalenessSecondsExternal(const std::int64_t maxStalenessSeconds,
+                                           const boost::optional<TenantId>&) {
     if (!maxStalenessSeconds) {
         return Status::OK();
     }

@@ -30,6 +30,8 @@
 
 global:
     cpp_namespace: "mongo::resharding"
+    cpp_includes:
+        - "mongo/client/read_preference_validators.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -66,6 +68,22 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+        redact: false
+
+    reshardingCollectionClonerMaxStalenessSeconds:
+        description: >-
+            The maximum replication lag on a donor shard's secondary node for it to be eligible
+            for being targeted by the ReshardingCollectionCloner. This is used to avoid fetching
+            from a secondary that has fallen overly behind in replication and might transition to
+            the "RECOVERING" state.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingCollectionClonerMaxStalenessSeconds
+        default:
+            expr: 5 * 60
+        validator:
+            callback: validateMaxStalenessSecondsExternal
+            gt: 0
         redact: false
 
     reshardingCollectionClonerBatchSizeCount:

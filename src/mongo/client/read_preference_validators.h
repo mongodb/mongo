@@ -34,6 +34,7 @@
 
 namespace mongo {
 
-Status validateMaxStalenessSecondsExternal(std::int64_t maxStalenessSeconds);
+Status validateMaxStalenessSecondsExternal(std::int64_t maxStalenessSeconds,
+                                           const boost::optional<TenantId>& tenantId = boost::none);
 
 }  // namespace mongo

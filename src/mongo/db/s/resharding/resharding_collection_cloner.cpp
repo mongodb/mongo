@@ -516,9 +516,11 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
     readConcern.setWaitLastStableRecoveryTimestamp(true);
     request.setReadConcern(readConcern);
 
+    auto readPref = ReadPreferenceSetting{
+        ReadPreference::Nearest,
+        Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
     // The read preference on the request is merely informational (e.g. for profiler entries) -- the
     // pipeline's opCtx setting is actually used when sending the request.
-    auto readPref = ReadPreferenceSetting{ReadPreference::Nearest};
     request.setUnwrappedReadPref(readPref.toContainingBSON());
     ReadPreferenceSetting::get(opCtx) = readPref;
 

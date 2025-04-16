@@ -73,6 +73,31 @@ assert.commandWorked(inputCollection.insert([
 st.shard0.rs.awaitLastOpCommitted();
 st.shard1.rs.awaitLastOpCommitted();
 
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
+const reshardingCollectionClonerMaxStalenessSeconds = 100;
+
+if (!isMultiversion) {
+    // Verify that the ReshardingCollectionCloner's maxStalenessSeconds can be set at runtime.
+    const shard0Primary = st.rs0.getPrimary();
+    const shard1Primary = st.rs1.getPrimary();
+
+    assert.commandWorked(shard0Primary.adminCommand(
+        {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds}));
+    assert.commandWorked(shard1Primary.adminCommand(
+        {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds}));
+
+    // Verify that setting the ReshardingCollectionCloner's maxStalenessSeconds to 0 or lower
+    // than the minimum is disallowed.
+    assert.commandFailedWithCode(
+        shard0Primary.adminCommand(
+            {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds: 0}),
+        ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        shard0Primary.adminCommand(
+            {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds: 1}),
+        ErrorCodes.MaxStalenessOutOfRange);
+}
+
 function testReshardCloneCollection(shard, expectedDocs) {
     const dbName = inputCollection.getDB().getName();
     const allNodes = [...st.shard0.rs.nodes, ...st.shard1.rs.nodes];
@@ -125,6 +150,21 @@ function testReshardCloneCollection(shard, expectedDocs) {
             assert(entry.command.hasOwnProperty("lsid"),
                    "expected profiler entry for collection cloning aggregation to have a logical" +
                        ` session ID: ${tojson(entry)}`);
+
+            if (!isMultiversion) {
+                // Verify that the aggregation requests have readPreference "nearest" with the
+                // configured maxStalenessSeconds.
+                assert(
+                    entry.command.hasOwnProperty("$queryOptions") &&
+                        entry.command["$queryOptions"].hasOwnProperty("$readPreference"),
+                    "expected profiler entry for collection cloning aggregation to have a readPreference" +
+                        `: ${tojson(entry)}`);
+                const readPreference = entry.command["$queryOptions"]["$readPreference"];
+                assert.eq(readPreference.mode, "nearest", entry);
+                assert.eq(readPreference.maxStalenessSeconds,
+                          reshardingCollectionClonerMaxStalenessSeconds,
+                          entry);
+            }
         }
     }
 }
