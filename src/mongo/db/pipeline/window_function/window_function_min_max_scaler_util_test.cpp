@@ -354,11 +354,22 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxResetAndUpdateTest) {
     ASSERT_VALUE_EQ(minAndMax.max(), Value(initial));
 }
 
+// Tests that MinAndMax can be initialized with min and max as the same value.
+TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxEqualTest) {
+    // min == max
+    int min = getRandomBetweenBounds(0, 1000);
+    int max = min;
+
+    const auto minAndMax = min_max_scaler::MinAndMax(Value(min), Value(max));
+
+    ASSERT_VALUE_EQ(minAndMax.min(), minAndMax.max());
+}
+
 // Test that trying to construct a MinAndMax with a min greater than max throws.
 DEATH_TEST_F(WindowFunctionMinMaxScalerUtilTest, MinAndMaxConstructMinGTMaxThrowsTest, "") {
     // max < min
     int max = getRandomBetweenBounds(1, 1000);
-    int min = max + getRandomBetweenBounds(0, 1000);
+    int min = max + getRandomBetweenBounds(1, 1000);
 
     // Hits tassert 9522900.
     const auto minAndMax = min_max_scaler::MinAndMax(Value(min), Value(max));
