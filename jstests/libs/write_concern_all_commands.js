@@ -864,7 +864,7 @@ const wcCommandsTests = {
                 assert.commandWorked(coll.insert({b: 1}));
                 assert.commandWorkedIgnoringWriteConcernErrors(coll.getDB().runCommand({
                     createIndexes: collName,
-                    indexes: [{key: {b: 1}, name: "b_1"}],
+                    indexes: [{key: {b: -1}, name: "b_1"}],
                     commitQuorum: "majority"
                 }));
             },
@@ -3764,7 +3764,7 @@ const wcTimeseriesViewsCommandsTests = {
                 assert.commandWorked(coll.insert({meta: 1, time: timeValue}));
                 assert.commandWorkedIgnoringWriteConcernErrors(coll.getDB().runCommand({
                     createIndexes: collName,
-                    indexes: [{key: {b: 1}, name: "b_1"}],
+                    indexes: [{key: {b: -1}, name: "b_1"}],
                     commitQuorum: "majority"
                 }));
             },
@@ -5955,17 +5955,14 @@ function shouldSkipTestCase(
 
     if (testCase == "failure") {
         // TODO SERVER-100942 setDefaultRWConcern does not return WCE
-
-        // TODO SERVER-100938 createIndexes does not return WCE
         if (clusterType == "sharded" &&
             (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-             command == "createIndexes" || command == "setDefaultRWConcern")) {
+             command == "setDefaultRWConcern")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
 
-        if (clusterType == "rs" &&
-            (command == "setDefaultRWConcern" || command == "createIndexes")) {
+        if (clusterType == "rs" && command == "setDefaultRWConcern") {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
