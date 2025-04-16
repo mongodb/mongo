@@ -1,7 +1,4 @@
 // SERVER-2662 - drop client cursor in a context where query will yield frequently
-// @tags: [
-//   requires_fcv_82,
-// ]
 
 let t = db.jstests_slowNightly_explain1;
 t.drop();
