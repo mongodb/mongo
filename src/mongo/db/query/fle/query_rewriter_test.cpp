@@ -310,10 +310,23 @@ protected:
             auto expCtx = encStrContainsExpr->getExpressionContext();
             auto textExpr = make_intrusive<ExpressionConstant>(expCtx, Value(kRewrittenText));
 
-            // Return a new ExpressionEncStrContainsExpr with the same input, and rewritten suffix
-            // string.
+            // Return a new ExpressionEncStrContainsExpr with the same input, and rewritten
+            // substring string.
             return std::make_unique<ExpressionEncStrContains>(
                 expCtx, std::move(encStrContainsExpr->getChildren()[0]), std::move(textExpr));
+        } else if (auto encStrNormalizedEqExpr = dynamic_cast<ExpressionEncStrNormalizedEq*>(expr);
+                   encStrNormalizedEqExpr) {
+            if (!isPayload(encStrNormalizedEqExpr->getText().getValue())) {
+                return nullptr;
+            }
+
+            auto expCtx = encStrNormalizedEqExpr->getExpressionContext();
+            auto textExpr = make_intrusive<ExpressionConstant>(expCtx, Value(kRewrittenText));
+
+            // Return a new ExpressionEncStrNormalizedEqExpr with the same input, and rewritten
+            // target string.
+            return std::make_unique<ExpressionEncStrNormalizedEq>(
+                expCtx, std::move(encStrNormalizedEqExpr->getChildren()[0]), std::move(textExpr));
         }
         MONGO_UNREACHABLE_TASSERT(10184102);
     }
@@ -356,6 +369,9 @@ static const fle::ExpressionToRewriteMap aggRewriteMap{
          return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
      }}},
     {typeid(ExpressionEncStrContains), {[](auto* rewriter, auto* expr) {
+         return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
+     }}},
+    {typeid(ExpressionEncStrNormalizedEq), {[](auto* rewriter, auto* expr) {
          return EncTextSearchPredicateRewriter{rewriter}.rewrite(expr);
      }}}};
 
@@ -600,27 +616,61 @@ TEST_FLE_REWRITE_MATCH(
     "{$and: [{$expr: {$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}, "
     "{$expr: {$encStrContains: {input: '$otherSsn', substring: {$const: 'other'}}}}]}")
 
-// TODO SERVER-102565 Add $encStrNormalizedEq to the combined test
+TEST_FLE_REWRITE_AGG(Basic_FleEncStrNormalizedEq,
+                     "{$encStrNormalizedEq: {input: '$ssn', string: 'original'}}",
+                     "{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}")
+
+TEST_FLE_REWRITE_AGG(
+    Nested_FleEncStrNormalizedEq_FullyRewrite,
+    "{$or: [{$encStrNormalizedEq: {input: '$ssn', string: 'original'}}, {$encStrNormalizedEq: "
+    "{input: "
+    "'$otherSsn', string: 'original'}}]}",
+    "{$or: [{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}, "
+    "{$encStrNormalizedEq: {input: '$otherSsn', string: {$const: 'rewritten'}}}]}")
+
+TEST_FLE_REWRITE_AGG(
+    Nested_FleEncStrNormalizedEq_PartiallyRewrite,
+    "{$and: [{$encStrNormalizedEq: {input: '$ssn', string: 'original'}}, {$encStrNormalizedEq: "
+    "{input: "
+    "'$otherSsn', string: 'other'}}]}",
+    "{$and: [{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}, "
+    "{$encStrNormalizedEq: {input: '$otherSsn', string: {$const: 'other'}}}]}")
+
+TEST_FLE_REWRITE_MATCH(
+    Match_FleEncStrNormalizedEq_Expr,
+    "{$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}",
+    "{$expr: {$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}}");
+
+TEST_FLE_REWRITE_MATCH(
+    Match_Nested_FleEncStrNormalizedEq_Expr,
+    "{$and: [{$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}, {$expr: "
+    "{$encStrNormalizedEq: {input: "
+    "'$otherSsn', string: 'other'}}}]}",
+    "{$and: [{$expr: {$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}}, "
+    "{$expr: {$encStrNormalizedEq: {input: '$otherSsn', string: {$const: 'other'}}}}]}")
+
 TEST_FLE_REWRITE_MATCH(
     Match_FleEncStrCombined_Exprs_FullyRewrite,
     "{$or: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}, {$expr: "
     "{$encStrEndsWith: {input: "
     "'$otherSsn', suffix: 'original'}}}, {$expr: {$encStrContains: {input: '$ssn', substring: "
-    "'original'}}}]}",
+    "'original'}}}, {$expr: {$encStrNormalizedEq: {input: '$ssn', string: 'original'}}}]}",
     "{$or: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
     "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'rewritten'}}}}, {$expr: "
-    "{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}]}")
+    "{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}, {$expr: "
+    "{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'rewritten'}}}}]}")
 
-// TODO SERVER-102565 Add $encStrNormalizedEq to the combined test
 TEST_FLE_REWRITE_MATCH(
     Match_FleEncStrCombined_Exprs_PartiallyRewrite,
     "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: 'original'}}}, {$expr: "
     "{$encStrEndsWith: {input: "
     "'$otherSsn', suffix: 'other'}}}, {$expr: {$encStrContains: {input: '$ssn', substring: "
-    "'original'}}}]}",
+    "'original'}}}, {$expr: {$encStrNormalizedEq: {input: '$ssn', string: "
+    "'other'}}}]}",
     "{$and: [{$expr: {$encStrStartsWith: {input: '$ssn', prefix: {$const: 'rewritten'}}}}, "
     "{$expr: {$encStrEndsWith: {input: '$otherSsn', suffix: {$const: 'other'}}}}, {$expr: "
-    "{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}]}")
+    "{$encStrContains: {input: '$ssn', substring: {$const: 'rewritten'}}}}, {$expr: "
+    "{$encStrNormalizedEq: {input: '$ssn', string: {$const: 'other'}}}}]}")
 
 // Test that the rewriter will work from any rewrite registered to an expression. The test rewriter
 // has two rewrites registered on $eq.
