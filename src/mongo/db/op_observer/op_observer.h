@@ -51,7 +51,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -675,14 +674,12 @@ public:
     /**
      * Called when the authoritative DSS needs to be updated with a createDatabase operation.
      */
-    virtual void onCreateDatabaseMetadata(OperationContext* opCtx,
-                                          const CreateDatabaseMetadataOplogEntry& entry) = 0;
+    virtual void onCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
 
     /**
      * Called when the authoritative DSS needs to be updated with a dropDatabase operation.
      */
-    virtual void onDropDatabaseMetadata(OperationContext* opCtx,
-                                        const DropDatabaseMetadataOplogEntry& entry) = 0;
+    virtual void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
 
     struct Times;
 

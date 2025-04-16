@@ -170,11 +170,6 @@ private:
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
     /**
-     * Recovers the index versions from disk into the CSR.
-     */
-    void recoverIndexesCatalog(OperationContext* opCtx);
-
-    /**
      * Called from onConsistentDataAvailable to recover the in-memory metadata information from the
      * on-disk shard catalog. Runs on startup and on rollback.
      */

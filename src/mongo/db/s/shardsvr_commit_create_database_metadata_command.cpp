@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/shardsvr_commit_create_database_metadata_command.h"
+
 #include <fmt/format.h>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -44,6 +49,64 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+void commitCreateDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseType& dbMetadata) {
+    auto dbName = dbMetadata.getDbName();
+    auto dbNameStr = DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+
+    LOGV2_DEBUG(10105906,
+                1,
+                "Updating database sharding in-memory state onCreateDatabaseMetadata",
+                "dbName"_attr = dbName);
+
+    // Write to `config.shard.catalog.databases` to insert database metadata.
+    {
+        write_ops::UpdateCommandRequest updateOp(
+            NamespaceString::kConfigShardCatalogDatabasesNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(dbMetadata.toBSON()));
+            entry.setUpsert(true);
+            entry.setMulti(false);
+            return entry;
+        }()});
+        updateOp.setWriteConcern(defaultMajorityWriteConcern());
+
+        DBDirectClient client(opCtx);
+        const auto result = client.update(std::move(updateOp));
+        write_ops::checkWriteErrors(result);
+    }
+
+    // Write an oplog 'c' entry to inform secondaries on how to populate the DSS.
+    {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
+        oplogEntry.setObject(CreateDatabaseMetadataOplogEntry{dbNameStr, dbMetadata}.toBSON());
+        oplogEntry.setOpTime(OplogSlot());
+        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
+        writeConflictRetry(
+            opCtx, "createDatabaseMetadata", NamespaceString::kRsOplogNamespace, [&] {
+                AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+                WriteUnitOfWork wuow(opCtx);
+                repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
+                uassert(9980400,
+                        str::stream()
+                            << "Failed to create new oplog entry for createDatabaseMetadata "
+                            << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
+                            << redact(oplogEntry.toBSON()),
+                        !opTime.isNull());
+                wuow.commit();
+            });
+    }
+
+    // Update DSS in primary node.
+    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
+    scopedDss->setDbInfo(opCtx, dbMetadata);
+}
+
 namespace {
 
 class ShardsvrCommitCreateDatabaseMetadataCommand final
@@ -121,12 +184,7 @@ public:
                 const auto thisShardId = ShardingState::get(opCtx)->shardId();
                 DatabaseType db{dbName, thisShardId, dbVersion};
 
-                const auto dbNameStr = DatabaseNameUtil::serialize(
-                    db.getDbName(), SerializationContext::stateDefault());
-
-                auto newOpCtxPtr = newOpCtx.get();
-                newOpCtxPtr->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(
-                    newOpCtxPtr, {dbNameStr, db});
+                commitCreateDatabaseMetadataLocally(newOpCtx.get(), db);
             }
 
             LOGV2(10105905,

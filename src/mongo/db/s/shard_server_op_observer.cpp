@@ -42,15 +42,11 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
-#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -59,7 +55,6 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/db/s/shard_catalog_operations.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -67,9 +62,6 @@
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/s/type_shard_collection.h"
-#include "mongo/db/s/type_shard_collection_gen.h"
-#include "mongo/db/s/type_shard_database.h"
-#include "mongo/db/s/type_shard_database_gen.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
@@ -84,8 +76,6 @@
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -191,31 +181,6 @@ void abortOngoingMigrationIfNeeded(OperationContext* opCtx, const NamespaceStrin
         // Only interrupt the migration, but don't actually join
         (void)msm->abort();
     }
-}
-
-template <typename OplogEntry>
-void logDatabaseMetadataUpdateOplogEntry(OperationContext* opCtx,
-                                         const DatabaseName& dbName,
-                                         const OplogEntry& entry,
-                                         const std::string& operation) {
-    repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
-    oplogEntry.setObject(entry.toBSON());
-    oplogEntry.setOpTime(OplogSlot());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
-
-    writeConflictRetry(opCtx, operation, NamespaceString::kRsOplogNamespace, [&] {
-        AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
-        WriteUnitOfWork wuow(opCtx);
-        repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
-        uassert(9980400,
-                str::stream() << "Failed to create new oplog entry for " << operation
-                              << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
-                              << redact(oplogEntry.toBSON()),
-                !opTime.isNull());
-        wuow.commit();
-    });
 }
 
 }  // namespace
@@ -965,51 +930,27 @@ void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
     }
 }
 
-void ShardServerOpObserver::onCreateDatabaseMetadata(
-    OperationContext* opCtx, const CreateDatabaseMetadataOplogEntry& entry) {
+void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
+                                                     const repl::OplogEntry& op) {
+    auto entry = CreateDatabaseMetadataOplogEntry::parse(
+        IDLParserContext("OplogCreateDatabaseMetadataOplogEntryContext"), op.getObject());
+
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
 
-    LOGV2_DEBUG(10105906,
-                1,
-                "Updating database sharding in-memory state onCreateDatabaseMetadata",
-                "dbName"_attr = dbName);
-
-    // Step 1: Write to `config.shard.catalog.databases` to insert database metadata.
-    shard_catalog_operations::insertDatabaseMetadata(opCtx, dbMetadata);
-
-    // Step 2: Update DSS in primary node.
-    {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->setDbInfo(opCtx, dbMetadata);
-    }
-
-    // Step 3: Write an oplog 'c' entry to inform secondaries.
-    logDatabaseMetadataUpdateOplogEntry(opCtx, dbName, entry, "createDatabaseMetadata");
+    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
+    scopedDss->setDbInfo(opCtx, dbMetadata);
 }
 
 void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
-                                                   const DropDatabaseMetadataOplogEntry& entry) {
+                                                   const repl::OplogEntry& op) {
+    auto entry = DropDatabaseMetadataOplogEntry::parse(
+        IDLParserContext("OplogDropDatabaseMetadataOplogEntryContext"), op.getObject());
+
     auto dbName = entry.getDbName();
 
-    LOGV2_DEBUG(10105907,
-                1,
-                "Updating database sharding in-memory state onDropDatabaseMetadata",
-                "dbName"_attr = dbName);
-
-    // Step 1: Remove database metadata from `config.shard.catalog.databases`.
-    shard_catalog_operations::deleteDatabaseMetadata(opCtx, dbName);
-
-    // Step 2: Update DSS in primary node.
-    {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearDbInfo(opCtx);
-    }
-
-    // Step 3: Write an oplog 'c' entry to inform secondaries.
-    logDatabaseMetadataUpdateOplogEntry(opCtx, dbName, entry, "dropDatabaseMetadata");
+    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
+    scopedDss->clearDbInfo(opCtx);
 }
 
 }  // namespace mongo

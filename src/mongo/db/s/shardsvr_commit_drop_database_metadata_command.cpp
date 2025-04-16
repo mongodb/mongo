@@ -33,9 +33,13 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -44,7 +48,60 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
 namespace {
+
+void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseName& dbName) {
+    auto dbNameStr = DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+
+    LOGV2_DEBUG(10105907,
+                1,
+                "Updating database sharding in-memory state onDropDatabaseMetadata",
+                "dbName"_attr = dbName);
+
+    // Remove database metadata from `config.shard.catalog.databases`.
+    {
+        write_ops::DeleteCommandRequest deleteOp(
+            NamespaceString::kConfigShardCatalogDatabasesNamespace);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(BSON(DatabaseType::kDbNameFieldName << dbNameStr));
+            entry.setMulti(false);
+            return entry;
+        }()});
+        deleteOp.setWriteConcern(defaultMajorityWriteConcern());
+
+        DBDirectClient client(opCtx);
+        const auto result = client.remove(std::move(deleteOp));
+        write_ops::checkWriteErrors(result);
+    }
+
+    // Write an oplog 'c' entry to inform secondaries on how to populate the DSS.
+    {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
+        oplogEntry.setObject(DropDatabaseMetadataOplogEntry{dbNameStr, dbName}.toBSON());
+        oplogEntry.setOpTime(OplogSlot());
+        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
+        writeConflictRetry(opCtx, "dropDatabaseMetadata", NamespaceString::kRsOplogNamespace, [&] {
+            AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+            WriteUnitOfWork wuow(opCtx);
+            repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
+            uassert(9980401,
+                    str::stream() << "Failed to create new oplog entry for dropDatabaseMetadata"
+                                  << " with opTime: " << oplogEntry.getOpTime().toString() << ": "
+                                  << redact(oplogEntry.toBSON()),
+                    !opTime.isNull());
+            wuow.commit();
+        });
+    }
+
+    // Update DSS in primary node.
+    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
+    scopedDss->clearDbInfo(opCtx);
+}
 
 class ShardsvrCommitDropDatabaseMetadataCommand final
     : public TypedCommand<ShardsvrCommitDropDatabaseMetadataCommand> {
@@ -120,8 +177,8 @@ public:
                     DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
                 auto newOpCtxPtr = newOpCtx.get();
-                newOpCtxPtr->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(
-                    newOpCtxPtr, {dbNameStr, dbName});
+
+                commitDropDatabaseMetadataLocally(newOpCtxPtr, dbName);
             }
 
             LOGV2(10105903,

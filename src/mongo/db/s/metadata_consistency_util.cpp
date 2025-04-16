@@ -59,7 +59,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/shard_catalog_operations.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
@@ -444,7 +443,17 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     const ShardId& primaryShard) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
-    auto cursor = shard_catalog_operations::readDatabaseMetadata(opCtx, dbName);
+    DBDirectClient client(opCtx);
+    FindCommandRequest findOp{NamespaceString::kConfigShardCatalogDatabasesNamespace};
+    findOp.setFilter(BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(
+                              dbName, SerializationContext::stateDefault())));
+    auto cursor = client.find(std::move(findOp));
+
+    tassert(
+        10078300,
+        str::stream() << "Failed to retrieve cursor while reading database metadata for database: "
+                      << dbName.toStringForErrorMsg(),
+        cursor);
 
     if (!cursor->more()) {
         inconsistencies.emplace_back(

@@ -38,8 +38,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/collection.h"
@@ -56,12 +54,10 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
-#include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
@@ -254,48 +250,6 @@ Status createIndexOnCollection(OperationContext* opCtx,
         }
     } catch (const DBException& e) {
         return e.toStatus();
-    }
-
-    return Status::OK();
-}
-
-Status createShardingIndexCatalogIndexes(OperationContext* opCtx,
-                                         const NamespaceString& indexCatalogNamespace) {
-    bool unique = true;
-    auto result = createIndexOnCollection(opCtx,
-                                          indexCatalogNamespace,
-                                          BSON(IndexCatalogType::kCollectionUUIDFieldName
-                                               << 1 << IndexCatalogType::kLastmodFieldName << 1),
-                                          !unique);
-    if (!result.isOK()) {
-        return result.withContext(str::stream()
-                                  << "couldn't create collectionUUID_1_lastmod_1 index on "
-                                  << indexCatalogNamespace.toStringForErrorMsg());
-    }
-    result = createIndexOnCollection(opCtx,
-                                     indexCatalogNamespace,
-                                     BSON(IndexCatalogType::kCollectionUUIDFieldName
-                                          << 1 << IndexCatalogType::kNameFieldName << 1),
-                                     unique);
-    if (!result.isOK()) {
-        return result.withContext(str::stream()
-                                  << "couldn't create collectionUUID_1_name_1 index on "
-                                  << indexCatalogNamespace.toStringForErrorMsg());
-    }
-    return Status::OK();
-}
-
-Status createShardCollectionCatalogIndexes(OperationContext* opCtx) {
-    bool unique = true;
-    auto result =
-        createIndexOnCollection(opCtx,
-                                NamespaceString::kShardCollectionCatalogNamespace,
-                                BSON(ShardAuthoritativeCollectionType::kUuidFieldName << 1),
-                                !unique);
-    if (!result.isOK()) {
-        return result.withContext(str::stream() << "couldn't create uuid_1 index on "
-                                                << NamespaceString::kShardCollectionCatalogNamespace
-                                                       .toStringForErrorMsg());
     }
 
     return Status::OK();

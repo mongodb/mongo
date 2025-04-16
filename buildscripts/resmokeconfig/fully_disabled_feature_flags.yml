@@ -27,3 +27,5 @@
 - featureFlagCreateViewlessTimeseriesCollections
 # TODO SERVER-102993: uncomment 'featureFlagSbeFull' once test tagging is changed.
 # - featureFlagSbeFull
+# TODO (SERVER-103771): Delete featureFlagGlobalIndexesShardingCatalog.
+- featureFlagGlobalIndexesShardingCatalog

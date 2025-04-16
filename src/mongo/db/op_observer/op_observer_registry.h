@@ -555,16 +555,14 @@ public:
             o->onMajorityCommitPointUpdate(service, newCommitPoint);
     }
 
-    void onCreateDatabaseMetadata(OperationContext* opCtx,
-                                  const CreateDatabaseMetadataOplogEntry& entry) override {
+    void onCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {
         for (auto& o : _observers)
-            o->onCreateDatabaseMetadata(opCtx, entry);
+            o->onCreateDatabaseMetadata(opCtx, op);
     }
 
-    void onDropDatabaseMetadata(OperationContext* opCtx,
-                                const DropDatabaseMetadataOplogEntry& entry) override {
+    void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {
         for (auto& o : _observers)
-            o->onDropDatabaseMetadata(opCtx, entry);
+            o->onDropDatabaseMetadata(opCtx, op);
     }
 
 private:

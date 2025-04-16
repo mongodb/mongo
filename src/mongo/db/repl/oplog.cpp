@@ -44,7 +44,6 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -90,7 +89,6 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
-#include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -105,7 +103,6 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -115,9 +112,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
-#include "mongo/db/s/database_metadata_oplog_application.h"
-#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
-#include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -137,9 +131,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/catalog/type_index_catalog.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
@@ -1087,90 +1078,22 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           -> Status {
          return applyAbortTransaction(opCtx, op, mode);
      }}},
-    {kShardingIndexCatalogOplogEntryName,
+    {"modifyCollectionShardingIndexCatalog",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         const auto& entry = *op;
-         auto indexCatalogOplog = ShardingIndexCatalogOplogEntry::parse(
-             IDLParserContext("OplogModifyCollectionShardingIndexCatalogCtx"), entry.getObject());
-         try {
-             switch (indexCatalogOplog.getOp()) {
-                 case ShardingIndexCatalogOpEnum::insert: {
-                     auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
-                         IDLParserContext("OplogModifyCollectionShardingIndexCatalogCtx"),
-                         entry.getObject());
-                     addShardingIndexCatalogEntryToCollection(
-                         opCtx,
-                         entry.getNss(),
-                         indexEntry.getI().getName().toString(),
-                         indexEntry.getI().getKeyPattern(),
-                         indexEntry.getI().getOptions(),
-                         indexEntry.getI().getCollectionUUID(),
-                         indexEntry.getI().getLastmod(),
-                         indexEntry.getI().getIndexCollectionUUID());
-                     break;
-                 }
-                 case ShardingIndexCatalogOpEnum::remove: {
-                     auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
-                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     removeShardingIndexCatalogEntryFromCollection(opCtx,
-                                                                   entry.getNss(),
-                                                                   removeEntry.getUuid(),
-                                                                   removeEntry.getName(),
-                                                                   removeEntry.getLastmod());
-                     break;
-                 }
-                 case ShardingIndexCatalogOpEnum::replace: {
-                     auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
-                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     replaceCollectionShardingIndexCatalog(opCtx,
-                                                           entry.getNss(),
-                                                           replaceEntry.getUuid(),
-                                                           replaceEntry.getLastmod(),
-                                                           replaceEntry.getI());
-                     break;
-                 }
-                 case ShardingIndexCatalogOpEnum::clear: {
-                     auto clearEntry = ShardingIndexCatalogClearEntry::parse(
-                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     clearCollectionShardingIndexCatalog(
-                         opCtx, entry.getNss(), clearEntry.getUuid());
-                     break;
-                 }
-                 case ShardingIndexCatalogOpEnum::drop:
-                     dropCollectionShardingIndexCatalog(opCtx, entry.getNss());
-                     break;
-                 case ShardingIndexCatalogOpEnum::rename: {
-                     auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
-                         IDLParserContext("OplogModifyCatalogEntryContext"), entry.getObject());
-                     renameCollectionShardingIndexCatalog(opCtx,
-                                                          renameEntry.getFromNss(),
-                                                          renameEntry.getToNss(),
-                                                          renameEntry.getLastmod());
-                     break;
-                 }
-                 default:
-                     MONGO_UNREACHABLE;
-             }
-         } catch (const DBException& ex) {
-             LOGV2_ERROR(6712302,
-                         "Failed to apply modifyCollectionShardingIndexCatalog with entry obj",
-                         "entry"_attr = redact(entry.getObject()),
-                         "error"_attr = redact(ex));
-             return ex.toStatus();
-         }
+         // TODO (SERVER-103771): Remove `modifyCollectionShardingIndexCatalog` oplog c entry.
          return Status::OK();
      }}},
     {"createDatabaseMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         applyCreateDatabaseMetadata(opCtx, *op);
+         opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
     {"dropDatabaseMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         applyDropDatabaseMetadata(opCtx, *op);
+         opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
 };

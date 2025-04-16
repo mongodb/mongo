@@ -30,13 +30,10 @@
 
 #include "mongo/db/s/clone_authoritative_metadata_coordinator.h"
 
-#include "mongo/db/generic_argument_util.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/s/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -103,8 +100,6 @@ void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
 
 void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     OperationContext* opCtx, const DatabaseName& dbName) {
-    const auto dbNameStr =
-        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto dbMetadata =
         catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
@@ -136,8 +131,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     DDLLockManager::ScopedDatabaseDDLLock dbLock(
         opCtx, dbName, "cloneAuthoritativeMetadata"_sd, MODE_IX);
 
-    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(opCtx,
-                                                                          {dbNameStr, dbMetadata});
+    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
 }
 
 void CloneAuthoritativeMetadataCoordinator::_removeDbFromCloningList(OperationContext* opCtx,

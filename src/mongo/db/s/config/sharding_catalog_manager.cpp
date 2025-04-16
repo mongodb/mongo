@@ -46,7 +46,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
@@ -59,7 +58,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/json.h"
 #include "mongo/db/logical_time.h"
@@ -86,7 +84,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/placement_history_cleaner.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -109,7 +106,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/service_entry_point.h"
@@ -796,16 +792,6 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_tag_1 index on config db");
-    }
-
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        result = sharding_util::createShardingIndexCatalogIndexes(
-            opCtx, NamespaceString::kConfigsvrIndexCatalogNamespace);
-        if (!result.isOK()) {
-            return result;
-        }
     }
 
     result = createIndexOnConfigCollection(

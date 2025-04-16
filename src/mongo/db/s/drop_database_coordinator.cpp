@@ -50,7 +50,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -60,6 +59,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/s/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
@@ -75,7 +75,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
@@ -87,7 +86,6 @@
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
@@ -144,9 +142,7 @@ void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseN
                         thisShardId.toString()),
             thisShardId == dbMetadata.getPrimary());
 
-    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(
-        opCtx,
-        {DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()), dbMetadata});
+    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
 }
 
 void removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(

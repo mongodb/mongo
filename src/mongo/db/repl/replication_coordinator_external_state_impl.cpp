@@ -43,7 +43,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/admission/execution_admission_context.h"
@@ -102,7 +101,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -136,11 +134,9 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/session.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -1163,50 +1159,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 64285,
                 indexStatus.withContext("Failed to create index on config.rangeDeletions on "
                                         "shard's first transition to primary"));
-        }
-
-        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        if (mongo::feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-            // Create indexes in config.shard.indexes if needed.
-            indexStatus = sharding_util::createShardingIndexCatalogIndexes(
-                opCtx, NamespaceString::kShardIndexCatalogNamespace);
-            if (!indexStatus.isOK()) {
-                // If the node is shutting down or it lost quorum just as it was becoming primary,
-                // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
-                // methods is already idempotent, so the machinery will remain in the stepped down
-                // state.
-                if (ErrorCodes::isShutdownError(indexStatus.code()) ||
-                    ErrorCodes::isNotPrimaryError(indexStatus.code())) {
-                    return;
-                }
-                fassertFailedWithStatus(
-                    6280501,
-                    indexStatus.withContext(
-                        str::stream()
-                        << "Failed to create index on "
-                        << NamespaceString::kShardIndexCatalogNamespace.toStringForErrorMsg()
-                        << " on shard's first transition to primary"));
-            }
-
-            // Create indexes in config.shard.collections if needed.
-            indexStatus = sharding_util::createShardCollectionCatalogIndexes(opCtx);
-            if (!indexStatus.isOK()) {
-                // If the node is shutting down or it lost quorum just as it was becoming primary,
-                // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
-                // methods is already idempotent, so the machinery will remain in the stepped down
-                // state.
-                if (ErrorCodes::isShutdownError(indexStatus.code()) ||
-                    ErrorCodes::isNotPrimaryError(indexStatus.code())) {
-                    return;
-                }
-                fassertFailedWithStatus(
-                    6711907,
-                    indexStatus.withContext(
-                        str::stream()
-                        << "Failed to create index on "
-                        << NamespaceString::kShardCollectionCatalogNamespace.toStringForErrorMsg()
-                        << " on shard's first transition to primary"));
-            }
         }
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {  // unsharded

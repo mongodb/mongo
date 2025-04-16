@@ -1044,7 +1044,6 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/db/query/write_ops",
-        "//src/mongo/db/s:sharding_catalog",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",

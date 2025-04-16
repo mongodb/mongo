@@ -30,18 +30,11 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
-/**
- * Applies the oplog 'c' entry to insert database metadata into the local catalog cache.
- */
-void applyCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op);
-
-/**
- * Applies the oplog 'c' entry to delete database metadata from the local catalog cache.
- */
-void applyDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op);
+// TODO (SERVER-98118): add this function to the unnamed namespace once 9.0 becomes last LTS.
+void commitCreateDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseType& dbMetadata);
 
 }  // namespace mongo

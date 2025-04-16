@@ -242,11 +242,9 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
-    void onCreateDatabaseMetadata(OperationContext* opCtx,
-                                  const CreateDatabaseMetadataOplogEntry& entry) final {}
+    void onCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {}
 
-    void onDropDatabaseMetadata(OperationContext* opCtx,
-                                const DropDatabaseMetadataOplogEntry& entry) final {}
+    void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {}
 
 private:
     std::unique_ptr<OperationLogger> _operationLogger;

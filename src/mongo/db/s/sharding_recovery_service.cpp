@@ -39,38 +39,27 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/shard_authoritative_catalog_gen.h"
-#include "mongo/db/s/shard_catalog_operations.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
@@ -81,17 +70,12 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -100,71 +84,12 @@ namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(skipShardCatalogRecovery);
 
-const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
 const auto kViewsPermittedDontSkipRSTL =
     AutoGetCollection::Options{}
         .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
         .globalLockSkipOptions({{.skipRSTLLock = false}});  // Make sure we don't skip the RSTL
 
-AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
-    ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace] = {
-        NamespaceString::kShardCollectionCatalogNamespace, std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace] = {
-        NamespaceString::kShardIndexCatalogNamespace, std::vector<BSONObj>()};
-
-    auto expCtx = ExpressionContextBuilder{}
-                      .opCtx(opCtx)
-                      .ns(NamespaceString::kShardCollectionCatalogNamespace)
-                      .resolvedNamespace(std::move(resolvedNamespaces))
-                      .build();
-
-    using Doc = Document;
-    using Arr = std::vector<Value>;
-
-    Pipeline::SourceContainer stages;
-
-    // 1. Match all entries in config.shard.collections with indexVersion.
-    // {
-    //      $match: {
-    //          indexVersion: {
-    //              $exists: true
-    //          }
-    //      }
-    // }
-    stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{ShardAuthoritativeCollectionType::kIndexVersionFieldName, Doc{{"$exists", true}}}}
-            .toBson(),
-        expCtx));
-
-    // 2. Retrieve config.shard.indexes entries with the same uuid as the one from the
-    // config.shard.collections document.
-    //
-    // The $lookup stage gets the config.shard.indexes documents and puts them in a field called
-    // "indexes" in the document produced during stage 1.
-    //
-    // {
-    //      $lookup: {
-    //          from: "shard.indexes",
-    //          as: "indexes",
-    //          localField: "uuid",
-    //          foreignField: "collectionUUID"
-    //      }
-    // }
-    const Doc lookupPipeline{{"from", NamespaceString::kShardIndexCatalogNamespace.coll()},
-                             {"as", kShardingIndexCatalogEntriesFieldName},
-                             {"localField", ShardAuthoritativeCollectionType::kUuidFieldName},
-                             {"foreignField", IndexCatalogType::kCollectionUUIDFieldName}};
-
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(
-        Doc{{"$lookup", lookupPipeline}}.toBson().firstElement(), expCtx));
-
-    auto pipeline = Pipeline::create(std::move(stages), expCtx);
-    auto serializedPipeline = pipeline->serializeToBson();
-    return AggregateCommandRequest(NamespaceString::kShardCollectionCatalogNamespace,
-                                   std::move(serializedPipeline));
-}
 }  // namespace
 
 ShardingRecoveryService::FilteringMetadataClearer::FilteringMetadataClearer(
@@ -662,12 +587,6 @@ void ShardingRecoveryService::recoverStates(OperationContext* opCtx,
         rollbackNamespaces.end()) {
         ShardingRecoveryService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);
     }
-
-    if (rollbackNamespaces.find(NamespaceString::kShardCollectionCatalogNamespace) !=
-            rollbackNamespaces.end() ||
-        rollbackNamespaces.find(CollectionType::ConfigNS) != rollbackNamespaces.end()) {
-        ShardingRecoveryService::get(opCtx)->recoverIndexesCatalog(opCtx);
-    }
 }
 
 void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
@@ -680,14 +599,15 @@ void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
         scopedDss->clearDbInfo(opCtx);
     }
 
-    const auto dssMetadataCursor = shard_catalog_operations::readAllDatabaseMetadata(opCtx);
-    while (dssMetadataCursor->more()) {
-        const auto dbInfo =
-            DatabaseType::parse(IDLParserContext("DatabaseType"), dssMetadataCursor->next());
+    PersistentTaskStore<DatabaseType> store(NamespaceString::kConfigShardCatalogDatabasesNamespace);
+    store.forEach(opCtx, BSONObj{}, [&opCtx](const DatabaseType& dbMetadata) {
+        AutoGetDb dbLock(opCtx, dbMetadata.getDbName(), MODE_X);
         auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbInfo.getDbName());
-        scopedDss->setDbInfo(opCtx, dbInfo);
-    }
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbMetadata.getDbName());
+        scopedDss->setDbInfo(opCtx, dbMetadata);
+
+        return true;
+    });
 }
 
 void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
@@ -707,53 +627,6 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
         return;
     }
     recoverRecoverableCriticalSections(opCtx);
-    recoverIndexesCatalog(opCtx);
-}
-
-void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
-    LOGV2_DEBUG(6686500, 2, "Recovering all sharding index catalog");
-
-    // Reset all in-memory index versions.
-    const auto collectionNames = CollectionShardingState::getCollectionNames(opCtx);
-    for (const auto& collName : collectionNames) {
-        try {
-            AutoGetCollection collLock(opCtx, collName, MODE_X);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, collName)
-                ->clearIndexes(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-            LOGV2_DEBUG(6686501,
-                        2,
-                        "Skipping attempting to clear indexes for a view in "
-                        "recoverIndexCatalogs",
-                        logAttrs(collName));
-        }
-    }
-    DBDirectClient client(opCtx);
-    auto aggRequest = makeCollectionsAndIndexesAggregation(opCtx);
-
-    auto cursor = uassertStatusOKWithContext(
-        DBClientCursor::fromAggregationRequest(
-            &client, aggRequest, true /* secondaryOk */, true /* useExhaust */),
-        "Failed to establish a cursor for aggregation");
-
-
-    while (cursor->more()) {
-        auto doc = cursor->nextSafe();
-        const auto nss =
-            NamespaceStringUtil::deserialize(boost::none,
-                                             doc[CollectionType::kNssFieldName].String(),
-                                             SerializationContext::stateDefault());
-        auto indexVersion = doc[CollectionType::kIndexVersionFieldName].timestamp();
-        for (const auto& idx : doc[kShardingIndexCatalogEntriesFieldName].Array()) {
-            auto indexEntry = IndexCatalogType::parse(
-                IDLParserContext("recoverIndexesCatalogContext"), idx.Obj());
-            AutoGetCollection collLock(opCtx, nss, MODE_X);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                 collLock->ns())
-                ->addIndex(opCtx, indexEntry, {indexEntry.getCollectionUUID(), indexVersion});
-        }
-    }
-    LOGV2_DEBUG(6686502, 2, "Recovered all index versions");
 }
 
 }  // namespace mongo

@@ -35,15 +35,12 @@
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
 #include <iterator>
-#include <list>
-#include <tuple>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
@@ -56,20 +53,18 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/s/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
@@ -787,9 +782,7 @@ void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext
                         thisShardId.toString()),
             thisShardId == dbMetadata.getPrimary());
 
-    opCtx->getServiceContext()->getOpObserver()->onCreateDatabaseMetadata(
-        opCtx,
-        {DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()), dbMetadata});
+    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata);
 }
 
 void MovePrimaryCoordinator::blockWritesLegacy(OperationContext* opCtx) const {

@@ -238,11 +238,9 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {}
 
-    void onCreateDatabaseMetadata(OperationContext* opCtx,
-                                  const CreateDatabaseMetadataOplogEntry& entry) override {}
+    void onCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {}
 
-    void onDropDatabaseMetadata(OperationContext* opCtx,
-                                const DropDatabaseMetadataOplogEntry& entry) override {}
+    void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override {}
 };
 
 }  // namespace mongo

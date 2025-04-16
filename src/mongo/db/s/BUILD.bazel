@@ -568,32 +568,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "sharding_catalog",
-    srcs = [
-        "database_metadata_oplog_application.cpp",
-        "shard_catalog_operations.cpp",
-        "sharding_index_catalog_ddl_util.cpp",
-        ":shard_authoritative_catalog_gen",
-        ":type_oplog_catalog_metadata_gen",
-    ],
-    hdrs = [
-        "database_metadata_oplog_application.h",
-        "shard_catalog_operations.h",
-        "sharding_index_catalog_ddl_util.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:dbhelpers",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/collection_crud",
-        "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/query/write_ops",
-        "//src/mongo/s:common_s",
-    ],
-)
-
-mongo_cc_library(
     name = "transaction_coordinator",
     srcs = [
         "server_transaction_coordinators_metrics.cpp",
@@ -940,7 +914,6 @@ mongo_cc_library(
         ":forwardable_operation_metadata",
         ":query_analysis_writer",
         ":resharding_server_parameters_idl",
-        ":sharding_catalog",
         ":sharding_catalog_manager",
         ":sharding_logging",
         ":sharding_runtime_d_params_idl",
@@ -1052,6 +1025,7 @@ mongo_cc_library(
         "shard_metadata_util.cpp",
         "shard_server_catalog_cache_loader_impl.cpp",
         "shard_server_op_observer.cpp",
+        "sharding_index_catalog_ddl_util.cpp",
         "sharding_initialization_mongod.cpp",
         "sharding_initialization_waiter.cpp",
         "sharding_ready.cpp",
@@ -1063,6 +1037,8 @@ mongo_cc_library(
         "type_shard_database.cpp",
         ":collection_critical_section_document_gen",
         ":commit_chunk_migration_gen",
+        ":shard_authoritative_catalog_gen",
+        ":type_oplog_catalog_metadata_gen",
         ":type_shard_collection_gen",
         ":type_shard_database_gen",
         "//src/mongo/db/s/metrics:phase_duration.cpp",
@@ -1155,6 +1131,7 @@ mongo_cc_library(
         "shard_server_catalog_cache_loader.h",
         "shard_server_catalog_cache_loader_impl.h",
         "shard_server_op_observer.h",
+        "sharding_index_catalog_ddl_util.h",
         "sharding_initialization_mongod.h",
         "sharding_initialization_waiter.h",
         "sharding_ready.h",
@@ -1235,7 +1212,6 @@ mongo_cc_library(
         ":forwardable_operation_metadata",
         ":query_analysis_writer",
         ":resharding_server_parameters_idl",
-        ":sharding_catalog",
         ":sharding_catalog_manager",
         ":sharding_coord_d",
         ":sharding_logging",
@@ -1560,6 +1536,7 @@ mongo_cc_library(
         "sharding_ddl_coordinator.h",
         "sharding_ddl_coordinator_external_state.h",
         "sharding_ddl_coordinator_service.h",
+        "shardsvr_commit_create_database_metadata_command.h",
         "untrack_unsplittable_collection_coordinator.h",
         "//src/mongo/db/query/query_stats:count_key.h",
         "//src/mongo/db/s/config:configsvr_coordinator.h",
@@ -1585,7 +1562,6 @@ mongo_cc_library(
         ":analyze_shard_key_util",
         ":balancer_stats_registry",
         ":forwardable_operation_metadata",
-        ":sharding_catalog",
         ":sharding_logging",
         ":sharding_runtime_d",
         ":user_writes_recoverable_critical_section",
@@ -1760,7 +1736,6 @@ mongo_cc_unit_test(
         ":analyze_shard_key_util",
         ":query_analysis_writer",
         ":shard_server_test_fixture",
-        ":sharding_catalog",
         ":sharding_commands_d",
         ":sharding_logging",
         ":transaction_coordinator",

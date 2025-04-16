@@ -44,7 +44,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -59,20 +58,17 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/drop_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
@@ -82,12 +78,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -100,11 +94,8 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
-#include "mongo/db/s/shard_authoritative_catalog_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
@@ -117,8 +108,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
@@ -798,15 +787,6 @@ private:
                             return ofcv == originalVersion;
                         });
             } else {
-                // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
-                if (feature_flags::gGlobalIndexesShardingCatalog
-                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                      originalVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
-                }
-
                 // TODO SERVER-77915: Remove once v8.0 branches out
                 if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection
                         .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
@@ -892,9 +872,6 @@ private:
                                                        [&](auto&& type) { return opType == type; });
                         });
             }
-
-            _createShardingIndexCatalogIndexes(
-                opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
         }
     }
 
@@ -1027,22 +1004,6 @@ private:
         }
     }
 
-    void _createShardingIndexCatalogIndexes(OperationContext* opCtx,
-                                            const FCV requestedVersion,
-                                            const NamespaceString& indexCatalogNss) {
-        // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
-        const auto actualVersion =
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-        if (feature_flags::gGlobalIndexesShardingCatalog
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            uassertStatusOK(
-                sharding_util::createShardingIndexCatalogIndexes(opCtx, indexCatalogNss));
-            if (indexCatalogNss == NamespaceString::kShardIndexCatalogNamespace) {
-                uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
-            }
-        }
-    }
-
     // _prepareToUpgrade performs all actions and checks that need to be done before proceeding to
     // make any metadata changes as part of FCV upgrade. Any new feature specific upgrade code
     // should be placed in the _prepareToUpgrade helper functions:
@@ -1110,9 +1071,6 @@ private:
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         if (role && role->has(ClusterRole::ConfigServer)) {
-            _createShardingIndexCatalogIndexes(
-                opCtx, requestedVersion, NamespaceString::kConfigsvrIndexCatalogNamespace);
-
             // Tell the shards to complete setFCV (transition to fully upgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
@@ -1172,42 +1130,6 @@ private:
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         invariant(fcvSnapshot.isUpgradingOrDowngrading());
         const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
-
-        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
-        // roles aren't mutually exclusive.
-        if (role && role->has(ClusterRole::ConfigServer)) {
-            if (feature_flags::gGlobalIndexesShardingCatalog
-                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                bool hasShardingIndexCatalogEntries;
-                BSONObj indexDoc, collDoc;
-                {
-                    AutoGetCollection indexesColl(
-                        opCtx, NamespaceString::kConfigsvrIndexCatalogNamespace, MODE_IS);
-                    hasShardingIndexCatalogEntries =
-                        Helpers::findOne(opCtx, indexesColl.getCollection(), BSONObj(), indexDoc);
-                }
-                if (hasShardingIndexCatalogEntries) {
-                    auto uuid = uassertStatusOK(
-                        UUID::parse(indexDoc[IndexCatalogType::kCollectionUUIDFieldName]));
-                    AutoGetCollection collsColl(
-                        opCtx, NamespaceString::kConfigsvrCollectionsNamespace, MODE_IS);
-                    Helpers::findOne(opCtx,
-                                     collsColl.getCollection(),
-                                     BSON(CollectionType::kUuidFieldName << uuid),
-                                     collDoc);
-                }
-                uassert(ErrorCodes::CannotDowngrade,
-                        str::stream()
-                            << "Cannot downgrade the cluster when there are global indexes "
-                               "present. Drop all global indexes before downgrading. First "
-                               "detected global index name: '"
-                            << indexDoc[IndexCatalogType::kNameFieldName].String()
-                            << "' on collection '"
-                            << collDoc[CollectionType::kNssFieldName].String() << "'",
-                        !hasShardingIndexCatalogEntries);
-            }
-        }
 
         if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion) &&
@@ -1395,103 +1317,11 @@ private:
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (role && role->has(ClusterRole::ConfigServer)) {
-            _dropInternalShardingIndexCatalogCollection(
-                opCtx,
-                requestedVersion,
-                originalVersion,
-                NamespaceString::kConfigsvrIndexCatalogNamespace);
             _dropSessionsCollectionLocally(opCtx, requestedVersion, originalVersion);
         }
 
         if (role && role->has(ClusterRole::ShardServer)) {
-            _dropInternalShardingIndexCatalogCollection(
-                opCtx,
-                requestedVersion,
-                originalVersion,
-                NamespaceString::kShardIndexCatalogNamespace);
-
             abortAllMultiUpdateCoordinators(opCtx, requestedVersion, originalVersion);
-        }
-    }
-
-    void _dropInternalShardingIndexCatalogCollection(OperationContext* opCtx,
-                                                     const FCV requestedVersion,
-                                                     const FCV originalVersion,
-                                                     const NamespaceString& indexCatalogNss) {
-        auto role = ShardingState::get(opCtx)->pollClusterRole();
-        // TODO SERVER-67392: Remove when 7.0 branches-out.
-        // Coordinators that commits indexes to the csrs must be drained before this point. Older
-        // FCV's must not find cluster-wide indexes.
-        DropReply dropReply;
-        if (feature_flags::gGlobalIndexesShardingCatalog
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            // Note the config server is also considered a shard, so the ConfigServer and
-            // ShardServer roles aren't mutually exclusive.
-            if (role && role->has(ClusterRole::ShardServer)) {
-                // There cannot be any global indexes at this point, but calling
-                // clearCollectionShardingIndexCatalog removes the index version from
-                // config.shard.collections and the csr transactionally.
-                LOGV2(7013200, "Clearing global indexes for all collections");
-                DBDirectClient client(opCtx);
-                FindCommandRequest findCmd{NamespaceString::kShardCollectionCatalogNamespace};
-                findCmd.setFilter(BSON(ShardAuthoritativeCollectionType::kIndexVersionFieldName
-                                       << BSON("$exists" << true)));
-                auto cursor = client.find(std::move(findCmd));
-                while (cursor->more()) {
-                    const auto collectionDoc = cursor->next();
-                    auto collection = ShardAuthoritativeCollectionType::parse(
-                        IDLParserContext("FCVDropIndexCatalogCtx"), collectionDoc);
-                    clearCollectionShardingIndexCatalog(
-                        opCtx, collection.getNss(), collection.getUuid());
-                }
-
-                LOGV2(6711905,
-                      "Droping collection catalog collection",
-                      "nss"_attr = NamespaceString::kShardCollectionCatalogNamespace);
-                const auto dropStatus =
-                    dropCollection(opCtx,
-                                   NamespaceString::kShardCollectionCatalogNamespace,
-                                   &dropReply,
-                                   DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-                uassert(dropStatus.code(),
-                        str::stream() << "Failed to drop "
-                                      << NamespaceString::kShardCollectionCatalogNamespace
-                                             .toStringForErrorMsg()
-                                      << causedBy(dropStatus.reason()),
-                        dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
-            }
-
-            if (role && role->has(ClusterRole::ConfigServer)) {
-                LOGV2(6711906,
-                      "Unset index version field in config.collections",
-                      "nss"_attr = CollectionType::ConfigNS);
-                DBDirectClient client(opCtx);
-                write_ops::UpdateCommandRequest update(CollectionType::ConfigNS);
-                update.setUpdates({[&]() {
-                    write_ops::UpdateOpEntry entry;
-                    entry.setQ(BSON(ShardAuthoritativeCollectionType::kIndexVersionFieldName
-                                    << BSON("$exists" << true)));
-                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
-                        "$unset" << BSON(ShardAuthoritativeCollectionType::kIndexVersionFieldName
-                                         << true))));
-                    entry.setMulti(true);
-                    return entry;
-                }()});
-                update.getWriteCommandRequestBase().setOrdered(false);
-                client.update(update);
-            }
-
-            LOGV2(6280502, "Dropping global indexes collection", "nss"_attr = indexCatalogNss);
-            const auto deletionStatus =
-                dropCollection(opCtx,
-                               indexCatalogNss,
-                               &dropReply,
-                               DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-            uassert(deletionStatus.code(),
-                    str::stream() << "Failed to drop " << indexCatalogNss.toStringForErrorMsg()
-                                  << causedBy(deletionStatus.reason()),
-                    deletionStatus.isOK() ||
-                        deletionStatus.code() == ErrorCodes::NamespaceNotFound);
         }
     }
 
