@@ -26,10 +26,31 @@ def _gdb_download(ctx):
             """
 sh_binary(
     name = "gdb",
-    srcs = ["%s/bin/gdb"],
+    srcs = ["working_dir.sh"],
+    data = ["%s/bin/gdb"],
     env = {"PYTHONPATH": "%s/lib/python3.10", "PYTHONHOME": "%s"},
 )
 """ % (ctx.attr.version, pythonhome, pythonhome),
+        )
+
+        ctx.file(
+            "working_dir.sh",
+            """
+#!/bin/bash
+
+set -e
+
+RUNFILES_WORKING_DIRECTORY="$(pwd)"
+
+if [ -z $BUILD_WORKING_DIRECTORY ]; then
+  echo "ERROR: BUILD_WORKING_DIRECTORY was not set, was this run from bazel?"
+  exit 1
+fi
+
+cd $BUILD_WORKING_DIRECTORY
+
+${RUNFILES_WORKING_DIRECTORY}/external/gdb/%s/bin/gdb "${@:1}"
+""" % ctx.attr.version,
         )
 
     else:
