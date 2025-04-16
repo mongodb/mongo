@@ -149,12 +149,12 @@ public:
         recoveryOplogApplierSection.numBatches.fetchAndAdd(1);
         LOGV2_FOR_RECOVERY(24098,
                            kRecoveryBatchLogLevel.toInt(),
-                           "Applying operations in batch",
+                           "About to apply operations in batch",
                            "numBatches"_attr = _numBatches,
-                           "batchSize"_attr = batch.size(),
+                           "numOpsInBatch"_attr = batch.size(),
                            "firstOpTime"_attr = batch.front().getOpTime(),
                            "lastOpTime"_attr = batch.back().getOpTime(),
-                           "numOpsApplied"_attr = _numOpsApplied);
+                           "numOpsAppliedBeforeThisBatch"_attr = _numOpsApplied);
 
         _numOpsApplied += batch.size();
         recoveryOplogApplierSection.numOpsApplied.fetchAndAdd(batch.size());
