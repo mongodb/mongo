@@ -4,10 +4,8 @@
  * Uses getMore to pin an open cursor.
  * @tags: [
  *   requires_getmore,
- *   requires_fcv_81,
- *   uses_parallel_shell,
- *   # TODO (SERVER-102377): Re-enable this test.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_82,
+ *   uses_parallel_shell
  * ]
  */
 

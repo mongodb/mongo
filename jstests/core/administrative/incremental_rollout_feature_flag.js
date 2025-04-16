@@ -13,9 +13,7 @@
  *
  *   # Earlier versions of the server do not define the "featureFlagInDevelopmentForTest" server
  *   # parameter.
- *   requires_fcv_82,
- *   # TODO (SERVER-102377): Re-enable this test.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_82
  * ]
  */
 
