@@ -76,6 +76,21 @@ structs:
                 type: bool
                 default: false
 
+    OnlyTargetDataOwningShardsForMultiWritesParam:
+        description: >-
+            Cluster parameter determining if multi-write operations should target only shards owning
+            data instead of broadcasting to all shards.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            enabled:
+                description: >-
+                    If true, multi-write operations will only target shards that own the data,
+                    honoring the sharding protocol, instead of broadcasting to all shards.
+                type: bool
+                default: false
+
 server_parameters:
     shardedClusterCardinalityForDirectConns:
         description: >-
@@ -110,3 +125,15 @@ server_parameters:
         redact: false
         condition:
             min_fcv: 8.0
+
+    onlyTargetDataOwningShardsForMultiWrites:
+        description: >-
+            Cluster parameter determining if multi-write operations should target only shards owning
+            data instead of broadcasting to all shards.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: OnlyTargetDataOwningShardsForMultiWritesParam
+        cpp_varname: onlyTargetDataOwningShardsForMultiWrites
+        redact: false
+        condition:
+            min_fcv: 8.2

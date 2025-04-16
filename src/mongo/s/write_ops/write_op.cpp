@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -207,14 +208,28 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         }
         MONGO_UNREACHABLE;
     }();
-
-    // Unless executing as part of a transaction, if we're targeting more than one endpoint with an
-    // update/delete, we have to target everywhere since we cannot currently retry partial results.
-    //
-    // NOTE: Index inserts are currently specially targeted only at the current collection to avoid
-    // creating collections everywhere.
+    // For update/delete operations targeting multiple endpoints:
+    // - If not part of a transaction, we must target all endpoints since partial results cannot be
+    // retried
+    // - Exception: data shards can be specifically targeted if the user enables
+    // 'onlyTargetDataOwningShardsForMultiWrites'
+    // - Note that StaleConfig errors with partially applied writes will fail with non-retryable
+    // QueryPlanKilled
+    // - Users must determine if their operation is idempotent and can be safely retried
+    // - NOTE: Index inserts are currently specially targeted only at the current collection to
+    // avoid creating collections everywhere.
     const bool inTransaction = bool(TransactionRouter::get(opCtx));
-    if (endpoints.size() > 1u && !inTransaction) {
+    const bool targetAllShards = [&]() {
+        if (endpoints.size() > 1u && !inTransaction) {
+            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+            auto* clusterCardinalityParam = clusterParameters->get<
+                ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
+                "onlyTargetDataOwningShardsForMultiWrites");
+            return !clusterCardinalityParam->getValue(boost::none).getEnabled();
+        }
+        return false;
+    }();
+    if (targetAllShards) {
         endpoints = targeter.targetAllShards(opCtx);
     }
 
@@ -230,9 +245,7 @@ void WriteOp::targetWrites(OperationContext* opCtx,
 
         WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
 
-        // Outside of a transaction, multiple endpoints currently imply no versioning, since we
-        // can't retry half a regular multi-write.
-        if (endpoints.size() > 1u && !inTransaction) {
+        if (targetAllShards) {
             // Do not ignore shard version if this is WriteType::WithoutShardKeyWithId
             // TODO: PM-3673 for non-retryable writes.
             if ((isNonTargetedWriteWithoutShardKeyWithExactId &&
