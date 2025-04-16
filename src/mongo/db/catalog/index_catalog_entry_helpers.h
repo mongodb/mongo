@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/update_index_data.h"

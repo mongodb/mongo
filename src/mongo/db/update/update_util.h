@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/exec/mutable_bson/document.h"

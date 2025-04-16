@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/plan_executor.h"

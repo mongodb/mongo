@@ -26,6 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#pragma once
+
 #include "mongo/db/exec/plan_cache_callbacks_impl.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"

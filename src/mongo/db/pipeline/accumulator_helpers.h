@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/variables.h"
 

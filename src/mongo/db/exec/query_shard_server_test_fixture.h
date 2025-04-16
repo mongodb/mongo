@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <memory>
 
 #include "mongo/client/index_spec.h"

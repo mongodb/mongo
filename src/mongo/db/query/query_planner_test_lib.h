@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 /**
  * This file contains tests for mongo/db/query/query_planner.cpp
  */

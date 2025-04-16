@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <boost/container_hash/hash.hpp>
 #include <filesystem>
 #include <limits>

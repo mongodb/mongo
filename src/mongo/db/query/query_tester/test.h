@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <filesystem>
 #include <fstream>
 #include <string>

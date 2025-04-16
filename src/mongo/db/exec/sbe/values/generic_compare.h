@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <boost/cstdint.hpp>
 #include <boost/optional/optional.hpp>
 #include <cmath>

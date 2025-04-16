@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <functional>

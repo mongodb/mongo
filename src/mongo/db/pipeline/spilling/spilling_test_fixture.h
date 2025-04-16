@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 

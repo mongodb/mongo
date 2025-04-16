@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {

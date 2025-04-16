@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 namespace mongo::sbe {

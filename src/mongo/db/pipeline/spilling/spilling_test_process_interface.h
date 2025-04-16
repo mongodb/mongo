@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 
 namespace mongo {

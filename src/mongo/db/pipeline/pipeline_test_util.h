@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/pipeline.h"
 

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"

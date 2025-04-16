@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/query/search/search_index_process_interface.h"
 
 namespace mongo {
