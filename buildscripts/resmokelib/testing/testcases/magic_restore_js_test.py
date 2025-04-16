@@ -16,7 +16,7 @@ class MagicRestoreTestCase(jsrunnerfile.JSRunnerFileTestCase):
             logger,
             "MagicRestore Test",
             js_filenames[0],
-            test_runner_file="jstests/libs/magic_restore_passthrough_runner.js",
+            test_runner_file="src/mongo/db/modules/enterprise/jstests/hot_backups/libs/magic_restore_passthrough_runner.js",
             shell_executable=shell_executable,
             shell_options=shell_options,
         )

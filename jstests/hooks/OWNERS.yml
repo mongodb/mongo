@@ -24,9 +24,6 @@ filters:
   - "lag_secondary_application.js":
     approvers:
       - 10gen/server-jstest-infra
-  - "magic_restore*":
-    approvers:
-      - 10gen/server-recovery
   - "run_check_repl_oplogs.js":
     approvers:
       - 10gen/server-jstest-infra

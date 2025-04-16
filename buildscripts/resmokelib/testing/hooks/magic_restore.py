@@ -79,7 +79,9 @@ class MagicRestoreEveryN(interface.Hook):
 class BackupCursorTestCase(jsfile.DynamicJSTestCase):
     """BackupCursorTestCase class."""
 
-    JS_FILENAME = os.path.join("jstests", "hooks", "magic_restore_backup.js")
+    JS_FILENAME = os.path.join(
+        "src", "mongo", "db", "modules", "enterprise", "jstests", "hooks", "magic_restore_backup.js"
+    )
 
     def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize BackupCursorTestCase."""
@@ -97,7 +99,9 @@ class BackupCursorTestCase(jsfile.DynamicJSTestCase):
 class MagicRestoreTestCase(jsfile.DynamicJSTestCase):
     """MagicRestoreTestCase class."""
 
-    JS_FILENAME = os.path.join("jstests", "hooks", "magic_restore.js")
+    JS_FILENAME = os.path.join(
+        "src", "mongo", "db", "modules", "enterprise", "jstests", "hooks", "magic_restore.js"
+    )
 
     def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize MagicRestoreTestCase."""

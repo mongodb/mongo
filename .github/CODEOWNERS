@@ -673,7 +673,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/hooks/**/run_inject_hello_failures.js @10gen/server-hello @svc-auto-approve-bot
 /jstests/hooks/**/run_reconfig_background.js @10gen/server-jstest-infra @svc-auto-approve-bot
 /jstests/hooks/**/lag_secondary_application.js @10gen/server-jstest-infra @svc-auto-approve-bot
-/jstests/hooks/**/magic_restore* @10gen/server-recovery @svc-auto-approve-bot
 /jstests/hooks/**/run_check_repl_oplogs.js @10gen/server-jstest-infra @svc-auto-approve-bot
 /jstests/hooks/**/run_cleanup_hello_failures.js @10gen/server-hello @svc-auto-approve-bot
 
@@ -1769,6 +1768,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fle2_query_analysis/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/fle2_query_analysis/**/* @10gen/query-integration-extensions @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hooks/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/hooks/**/magic_restore* @10gen/server-recovery @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-backup-restore @svc-auto-approve-bot
