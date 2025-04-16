@@ -17,11 +17,9 @@ declare class DB {
     [collectionIndex: string]: DBCollection
 
     rotateCertificates(message)
-    getMongo()
-    getSiblingDB(name)
-    getName()
+    getSiblingDB(name): DB
     stats(opt)
-    getCollection(name)
+    getCollection(name): DBCollection
     commandHelp(name)
     runReadCommand()
     runCommand(obj, extra, queryOptions)

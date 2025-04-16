@@ -12,8 +12,8 @@ declare class DBCollection {
     getName()
     help()
     getFullName()
-    getMongo()
-    getDB()
+    getMongo(): Mongo
+    getDB(): DB
     find(filter, projection, limit, skip, batchSize, options)
     insert(obj, options)
     remove(t, justOne)

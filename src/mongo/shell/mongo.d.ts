@@ -2,11 +2,7 @@
 
 declare class Mongo {
     constructor(uri?: string, encryptedDBClientCallback?, options?: object)
-    
-    getDB(name): DB
-
     startSession(opts?): DriverSession
-
     find(ns, query, fields, limit, skip, batchSize, options)
     insert(ns, obj)
     remove(ns, pattern)
@@ -15,7 +11,7 @@ declare class Mongo {
     getSlaveOk()
     setSecondaryOk(value = true)
     getSecondaryOk()
-    getDB(name)
+    getDB(name: string): DB
     getDBs(driverSession)
     adminCommand(cmd)
     runCommand(dbname, cmd, options)

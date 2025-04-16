@@ -1,4 +1,4 @@
 // type declarations for utils_sh.js
 
-declare var db
+declare var db: DB
 declare function printShardingStatus()
