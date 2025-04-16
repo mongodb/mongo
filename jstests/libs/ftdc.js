@@ -98,7 +98,7 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
         FeatureFlagUtil.isPresentAndEnabled(adminDb, "MultiServiceLogAndFTDCFormat") && !isMongos) {
         assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 400);
     } else {
-        assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 200);
+        assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 250);
     }
 
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
