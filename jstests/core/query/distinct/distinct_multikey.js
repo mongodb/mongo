@@ -20,7 +20,6 @@ assert.eq([1, 2, 3, 4, 5, 6, 7], result.sort());
 let explain = coll.explain("queryPlanner").distinct("a");
 let winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
 // Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 }
@@ -61,7 +60,6 @@ assert.eq([2, 3], result.sort());
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gte: 2}});
 winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
 // Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 }
@@ -80,7 +78,6 @@ assert.eq([7, 8], result.sort());
 explain = coll.explain("queryPlanner").distinct("a", {a: {$gte: 2}});
 winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
 // Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 }
@@ -106,7 +103,6 @@ assert.eq([1, 7, 8], result.sort());
 explain = coll.explain("queryPlanner").distinct("b", {a: 3});
 winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
 // Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 }
@@ -124,7 +120,6 @@ assert.eq([1, 7, 8], result.sort());
 explain = coll.explain("queryPlanner").distinct("b.c", {a: 3});
 winningPlan = getWinningPlanFromExplain(explain.queryPlanner);
 // Sharded suites use '_id' as the shard key, so fetching is required to apply shard filtering.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, winningPlan, "PROJECTION_DEFAULT"));
 }

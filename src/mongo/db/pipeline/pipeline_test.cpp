@@ -2000,10 +2000,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnID) {
         " {$match: {_id : 4}}]";
     std::string outputPipe =
         "[{$match: {a:{$eq : 4}}}, "
-        " {$group:{_id:'$a'}}]";
+        " {$group:{_id:'$a', $willBeMerged: false}}]";
     std::string serializedPipe =
         "[{$match: {a:{$eq :4}}}, "
-        " {$group:{_id:'$a'}}]";
+        " {$group:{_id:'$a', $willBeMerged: false}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
@@ -2014,10 +2014,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchOnExprIfFilteringOnID) 
         " {$match: {$expr: {$eq: ['$_id', 4]}}}]";
     std::string outputPipe =
         "[{$match: {$and: [{$expr: {$eq: ['$a', {$const: 4}]}}, {a: {$_internalExprEq: 4}}]}},"
-        " {$group: {_id: '$a'}}]";
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
     std::string serializedPipe =
         "[{$match: {$expr: {$eq: ['$a', {$const: 4}]}}}, "
-        " {$group: {_id: '$a'}}]";
+        " {$group: {_id: '$a', $willBeMerged: false}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
@@ -2027,10 +2027,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchOnExprIfNotFiltering
         "[{$group : {_id:'$a'}}, "
         " {$match: {$expr: {$eq: ['$b', 4]}}}]";
     std::string outputPipe =
-        "[{$group : {_id:'$a'}}, "
+        "[{$group : {_id:'$a', $willBeMerged: false}}, "
         " {$match: {$and: [{$expr: {$eq: ['$b', {$const: 4}]}}, {b: {$_internalExprEq: 4}}]}}]";
     std::string serializedPipe =
-        "[{$group : {_id:'$a'}}, "
+        "[{$group : {_id:'$a', $willBeMerged: false}}, "
         " {$match: {$expr: {$eq: ['$b', 4]}}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2041,10 +2041,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfNotFilteringOnID) 
         "[{$group : {_id:'$a'}}, "
         " {$match: {b : 4}}]";
     std::string outputPipe =
-        "[{$group : {_id:'$a'}}, "
+        "[{$group : {_id:'$a', $willBeMerged: false}}, "
         " {$match: {b : {$eq: 4}}}]";
     std::string serializedPipe =
-        "[{$group : {_id:'$a'}}, "
+        "[{$group : {_id:'$a', $willBeMerged: false}}, "
         " {$match: {b : 4}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2055,10 +2055,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfExistsPredicateOnI
         "[{$group : {_id:'$x'}}, "
         " {$match: {_id : {$exists: true}}}]";
     std::string outputPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {_id : {$exists: true}}}]";
     std::string serializedPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {_id : {$exists: true}}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2069,10 +2069,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfTypePredicateOnID)
         "[{$group : {_id:'$x'}}, "
         " {$match: {_id : {$type: [1]}}}]";
     std::string outputPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {_id : {$type: [1]}}}]";
     std::string serializedPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {_id : {$type: [1]}}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2083,10 +2083,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfExistsPred
         "[{$group : {_id:'$x'}}, "
         " {$match: {$or : [ {_id : {$exists: true}}, {_id : {$gt : 70}}]}}]";
     std::string outputPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {$or : [ {_id : {$gt : 70}}, {_id : {$exists: true}}]}}]";
     std::string serializedPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {$or : [ {_id : {$exists: true}}, {_id : {$gt : 70}}]}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2097,10 +2097,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfTypePredic
         "[{$group : {_id:'$x'}}, "
         " {$match: {$or : [ {_id : {$type: [18]}}, {_id : {$gt : 70}}]}}]";
     std::string outputPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {$or : [ {_id : {$gt : 70}}, {_id : {$type: [18]}}]}}]";
     std::string serializedPipe =
-        "[{$group : {_id:'$x'}}, "
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {$or : [ {_id : {$type: [18]}}, {_id : {$gt : 70}}]}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2112,10 +2112,10 @@ TEST_F(PipelineOptimizationTest, GroupShouldSwapWithCompoundMatchIfFilteringOnID
         " {$match: {$or : [ {_id : {$lte : 50}}, {_id : {$gt : 70}}]}}]";
     std::string outputPipe =
         "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
-        "{$group : {_id:'$x'}}]";
+        "{$group : {_id:'$x', $willBeMerged: false}}]";
     std::string serializedPipe =
         "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
-        "{$group : {_id:'$x'}}]";
+        "{$group : {_id:'$x', $willBeMerged: false}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
@@ -2705,7 +2705,7 @@ TEST_F(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnGrouping) {
         "{$match: { m: {$eq: 2} } }]";
     std::string outputPipeline =
         "[{$match: { d: {$eq: 2} } },"
-        "{$group: { _id: { c: '$d' }, c: { $sum: {$const: 1} } } },"
+        "{$group: { _id: { c: '$d' }, c: { $sum: {$const: 1} }, $willBeMerged: false } },"
         "{$project: { _id: true, m: '$_id.c' } }]";
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline);
 }
@@ -2716,11 +2716,11 @@ TEST_F(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnGroupingMixedPr
         "{$project: { m: '$_id.c' } },"
         "{$match: { $and: [ {m: {$eq: 2} }, {_id: {$eq: 3} } ] } }]";
     std::string outputPipeline =
-        "[{$group: { _id: { c: '$d' }, c: { $sum: { $const: 1} } } },"
+        "[{$group: { _id: { c: '$d' }, c: { $sum: { $const: 1} }, $willBeMerged: false } },"
         "{$match: { $and: [{_id: {$eq: 3} }, {'_id.c': {$eq: 2} } ] } },"
         "{$project: { _id: true, m: '$_id.c' } } ]";
     std::string serializedPipe =
-        "[{$group: { _id: { c: '$d' }, c: { $sum: { $const: 1} } } },"
+        "[{$group: { _id: { c: '$d' }, c: { $sum: { $const: 1} }, $willBeMerged: false } },"
         "{$match: { $and: [ {'_id.c': {$eq: 2} }, {_id: {$eq: 3} } ] } },"
         "{$project: { _id: true, m: '$_id.c' } } ]";
 
@@ -2733,7 +2733,7 @@ TEST_F(PipelineOptimizationTest, AvoidPushingMatchOverGroupWithLongDottedRename)
         "{$project: {renamed: '$_id.a.b'}},"
         "{$match: {renamed: {$eq: 5}}}]";
     std::string outputPipeline =
-        "[{$group: {_id: {a: {b: '$a'}}}},"
+        "[{$group: {_id: {a: {b: '$a'}}, $willBeMerged: false}},"
         "{$project: {_id: true, renamed: '$_id.a.b'}},"
         "{$match: {renamed: {$eq: 5 }}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline);
@@ -2741,12 +2741,12 @@ TEST_F(PipelineOptimizationTest, AvoidPushingMatchOverGroupWithLongDottedRename)
 
 TEST_F(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnNestedGrouping) {
     std::string inputPipeline =
-        "[{$group: { _id: { c: '$d', s: '$k' }, c: { $sum: {$const: 1} } } },"
+        "[{$group: { _id: { c: '$d', s: '$k' }, c: { $sum: {$const: 1} }} },"
         "{$project: { m: '$_id.c' } },"
         "{$match: { m: {$eq: 2} } }]";
     std::string outputPipeline =
         "[{$match: { d: {$eq: 2} } },"
-        "{$group: { _id: { c: '$d', s: '$k' }, c: { $sum: {$const: 1} } } },"
+        "{$group: { _id: { c: '$d', s: '$k' }, c: { $sum: {$const: 1} }, $willBeMerged: false } },"
         "{$project: { _id: true, m: '$_id.c' } }]";
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline);
 }
@@ -2759,7 +2759,7 @@ TEST_F(PipelineOptimizationTest, MatchLeavingSecondAfterPushingOverProjection) {
 
     std::string outputPipeline =
         "[{$match: { d: {$eq: 2} } },"
-        "{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} } } },"
+        "{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} }, $willBeMerged: false } },"
         "{$project: { _id: true, m1: '$_id.c' } },"
         "{$match: { k: {$eq: 5} } }]";
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline);
@@ -2774,7 +2774,7 @@ TEST_F(PipelineOptimizationTest, PushingOverProjectionWithTail) {
 
     std::string outputPipeline =
         "[{$match: { d: {$eq: 2} } },"
-        "{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} } } },"
+        "{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} }, $willBeMerged: false } },"
         "{$project: { _id: true, m1: '$_id.c' } },"
         "{$match: { k: {$eq: 5} } },"
         "{$project: { _id: true, m2: '$_id' } }]";
@@ -2783,12 +2783,12 @@ TEST_F(PipelineOptimizationTest, PushingOverProjectionWithTail) {
 
 TEST_F(PipelineOptimizationTest, PushingDottedMatchOverGrouping) {
     std::string inputPipeline =
-        "[{$group: {_id: {a: '$l', b: '$b'}}},"
+        "[{$group: {_id: {a: '$l', b: '$b'}, $willBeMerged: false}},"
         "{$match: {'_id.a': 5}}]";
 
     std::string outputPipeline =
         "[{ $match: { l: { $eq: 5 } } },"
-        "{ $group: { _id: { a: '$l', b: '$b' } } }]";
+        "{ $group: { _id: { a: '$l', b: '$b' }, $willBeMerged: false } }]";
     assertPipelineOptimizesAndSerializesTo(inputPipeline, outputPipeline);
 }
 
@@ -3804,14 +3804,14 @@ TEST_F(PipelineOptimizationTest, LimDoesNotCoalesceWithSortInSortProjGroupLim) {
     std::string outputPipe =
         "[{$sort: {sortKey: {a: 1}}}"
         ",{$project: {_id: true, a: true}}"
-        ",{$group: {_id: '$a'}}"
+        ",{$group: {_id: '$a', $willBeMerged: false}}"
         ",{$limit: 5}"
         "]";
 
     std::string serializedPipe =
         "[{$sort: {a: 1}}"
         ",{$project : {_id: true, a: true}}"
-        ",{$group: {_id: '$a'}}"
+        ",{$group: {_id: '$a', $willBeMerged: false}}"
         ",{$limit: 5}"
         "]";
 
@@ -4842,9 +4842,10 @@ TEST_F(PipelineOptimizations, MatchWithSkipAddFieldsAndLimit) {
  * shard before it can apply the $limit.
  */
 TEST_F(PipelineOptimizations, MatchWithSkipGroupAndLimit) {
-    doTest("[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]" /*inputPipeJson*/,
-           "[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]" /*shardPipeJson*/,
-           "[{$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]" /*mergePipeJson*/);
+    doTest(
+        "[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]" /*inputPipeJson*/,
+        "[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]" /*shardPipeJson*/,
+        "[{$skip: 10}, {$group: {_id: '$y', $willBeMerged: false}}, {$limit: 5}]" /*mergePipeJson*/);
 };
 
 /**
@@ -4872,13 +4873,13 @@ TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNeedWholeDoc) {
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerJustNeedsId) {
     doTest("[{$limit:1}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
            "[{$limit:1}, {$project: {_id:true}}]" /*shardPipeJson*/,
-           "[{$limit:1}, {$group: {_id: '$_id'}}]" /*mergePipeJson*/);
+           "[{$limit:1}, {$group: {_id: '$_id', $willBeMerged: false}}]" /*mergePipeJson*/);
 };
 
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerJustNeedsNonId) {
     doTest("[{$limit:1}, {$group: {_id: '$a.b'}}]" /*inputPipeJson*/,
            "[{$limit:1}, {$project: {a: {b: true}, _id: false}}]" /*shardPipeJson*/,
-           "[{$limit:1}, {$group: {_id: '$a.b'}}]" /*mergePipeJson*/);
+           "[{$limit:1}, {$group: {_id: '$a.b', $willBeMerged: false}}]" /*mergePipeJson*/);
 };
 
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNothingNeeded) {
@@ -4887,7 +4888,8 @@ TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNothingNeeded) {
         "{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}]";
     doTest(kInputPipeJson,
            "[{$limit:1}, {$project: {_id: true}}]" /*shardPipeJson*/,
-           kInputPipeJson /*mergePipeJson*/);
+           "[{$limit:1}, {$group: {_id: {$const: null}, count: {$sum: {$const: 1}}, $willBeMerged: "
+           "false}}]" /*mergePipeJson*/);
 };
 
 // No new project should be added. This test reflects current behavior where the
@@ -4946,7 +4948,8 @@ TEST_F(PipelineOptimizations,
     doTest(
         "[{$sort:{a: 1}},{$group:{_id:{a:'$a'}}},{$project:{a: 1}},{$limit:5}]" /*inputPipeJson*/,
         "[{$sort: {sortKey: {a: 1}}},{$project : {a: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$group: {_id:{a: '$a'}}},{$project:{_id: true, a: true}},{$limit: 5}]" /*mergePipeJson*/);
+        "[{$group: {_id:{a: '$a'}, $willBeMerged: false}},{$project:{_id: true, a: true}},{$limit: "
+        "5}]" /*mergePipeJson*/);
 };
 
 TEST_F(PipelineOptimizations,
@@ -5005,14 +5008,14 @@ namespace pushDownGroupPrecededBySort {
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupWithoutShardKey) {
     doTest("[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
            "[{$sort: {sortKey: {a: 1}}}, {$project: {_id: true}}]" /*shardPipeJson*/,
-           "[{$group: {_id: '$_id'}}]" /*mergePipeJson*/);
+           "[{$group: {_id: '$_id', $willBeMerged: false}}]" /*mergePipeJson*/);
 };
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfNotOnShardKey) {
     const OrderedPathSet shardKey = {"a", "c"};
     doTest("[{$sort: {a: 1}}, {$group: {_id: '$c'}}]" /*inputPipeJson*/,
            "[{$sort: {sortKey: {a: 1}}}, {$project: {c: true, _id: false}}]" /*shardPipeJson*/,
-           "[{$group: {_id: '$c'}}]" /*mergePipeJson*/,
+           "[{$group: {_id: '$c', $willBeMerged: false}}]" /*mergePipeJson*/,
            shardKey);
 };
 
@@ -5023,7 +5026,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfProjectDoesNotPreserveShar
         ,
         "[{$project: {_id: true, shardKey: '$other'}}, {$sort: {sortKey: {shardKey: 1}}}]" /*shardPipeJson*/
         ,
-        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        "[{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*mergePipeJson*/,
         shardKey);
 };
 
@@ -5035,7 +5038,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfShardKeyIsUnset) {
         "[{$project: {shardKey: false, _id: true}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
         ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        "[{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*mergePipeJson*/,
         shardKey);
 };
 
@@ -5047,7 +5050,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfAddFieldsOverwritesShardKe
         "[{$addFields: {shardKey: '$other'}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
         ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        "[{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*mergePipeJson*/,
         shardKey);
 };
 
@@ -5177,7 +5180,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfComputesValue) {
     doTest(
         "[{$sort: {shardKey: 1}}, {$group: {_id: {'$add':[{$const: 1}, '$shardKey']}}}]", /*inputPipeJson*/
         "[{$sort: {sortKey: {shardKey: 1}}} ,{$project: {shardKey: true, _id: false}}]", /*shardPipeJson*/
-        "[{$group: {_id: {'$add':[{$const: 1}, '$shardKey']}}}]" /*mergePipeJson*/,
+        "[{$group: {_id: {'$add':[{$const: 1}, '$shardKey']}, $willBeMerged: false}}]", /*mergePipeJson*/
         shardKey);
 };
 

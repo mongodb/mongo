@@ -92,7 +92,9 @@ public:
 TEST_F(SortByCountReturnsGroupAndSort, ExpressionFieldPathSpec) {
     BSONObj spec = BSON("$sortByCount" << "$x");
     Value expectedGroupExplain =
-        Value{Document{{"_id", "$x"_sd}, {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+        Value{Document{{"_id", "$x"_sd},
+                       {"count", Document{{"$sum", Document{{"$const", 1}}}}},
+                       {"$willBeMerged", false}}};
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 
@@ -100,13 +102,15 @@ TEST_F(SortByCountReturnsGroupAndSort, ExpressionInObjectSpec) {
     BSONObj spec = BSON("$sortByCount" << BSON("$floor" << "$x"));
     Value expectedGroupExplain =
         Value{Document{{"_id", Document{{"$floor", Value{BSON_ARRAY("$x")}}}},
-                       {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+                       {"count", Document{{"$sum", Document{{"$const", 1}}}}},
+                       {"$willBeMerged", false}}};
     testCreateFromBsonResult(spec, expectedGroupExplain);
 
     spec = BSON("$sortByCount" << BSON("$eq" << BSON_ARRAY("$x" << 15)));
     expectedGroupExplain =
         Value{Document{{"_id", Document{{"$eq", Value{BSON_ARRAY("$x" << BSON("$const" << 15))}}}},
-                       {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+                       {"count", Document{{"$sum", Document{{"$const", 1}}}}},
+                       {"$willBeMerged", false}}};
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 

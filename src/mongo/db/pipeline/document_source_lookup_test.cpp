@@ -1379,7 +1379,7 @@ TEST_F(DocumentSourceLookUpTest,
                                   "   {$internalFacetTeeConsumer: {}},"
                                   "   {$match: {$and: [{_id: {$_internalExprEq: 5}},"
                                   "                    {$expr: {$eq: ['$_id', {$const: 5}]}}]}},"
-                                  "   {$group: {_id: '$_id'}}]}}]");
+                                  "   {$group: {_id: '$_id', $willBeMerged: false}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }

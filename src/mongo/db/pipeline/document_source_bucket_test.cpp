@@ -105,7 +105,8 @@ TEST_F(BucketReturnsGroupAndSort,
     const auto spec = fromjson(
         "{$bucket : {groupBy : {$const : 6}, boundaries : [ 1, 5, 8 ], default : 'other'}}");
 
-    auto expectedGroupWithOpt = Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}}"));
+    auto expectedGroupWithOpt =
+        Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
 }
@@ -115,8 +116,8 @@ TEST_F(BucketReturnsGroupAndSort,
     const auto spec = fromjson(
         "{$bucket : {groupBy : {$const : 9}, boundaries : [ 1, 5, 8 ], default : 'other'}}");
 
-    auto expectedGroupWithOpt =
-        Value(fromjson("{_id: {$const: 'other'}, count: {$sum: {$const: 1}}}"));
+    auto expectedGroupWithOpt = Value(
+        fromjson("{_id: {$const: 'other'}, count: {$sum: {$const: 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
 }
@@ -148,7 +149,8 @@ TEST_F(BucketReturnsGroupAndSort, BucketWithAllConstantsIsCorrectlyOptimizedAfte
     const auto spec = fromjson(
         "{$bucket : {groupBy : {$add: [2, 4]}, boundaries : [ 1, 5, 8 ], default : 'other'}}");
 
-    auto expectedGroupWithOpt = Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}}"));
+    auto expectedGroupWithOpt =
+        Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
 }
@@ -157,7 +159,8 @@ TEST_F(BucketReturnsGroupAndSort,
        BucketWithAllConstantsAndNoDefaultIsCorrectlyOptimizedAfterSwitch) {
     const auto spec = fromjson("{$bucket : {groupBy : {$add: [2, 4]}, boundaries : [ 1, 5, 8 ]}}");
 
-    auto expectedGroupWithOpt = Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}}"));
+    auto expectedGroupWithOpt =
+        Value(fromjson("{_id: {$const: 5}, count: {$sum: {$const: 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupWithOpt, true);
 }
@@ -165,10 +168,10 @@ TEST_F(BucketReturnsGroupAndSort,
 TEST_F(BucketReturnsGroupAndSort, BucketUsesDefaultOutputWhenNoOutputSpecified) {
     const auto spec =
         fromjson("{$bucket : {groupBy :'$x', boundaries : [ 0, 2 ], default : 'other'}}");
-    auto expectedGroupExplain =
-        Value(fromjson("{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : "
-                       "0}]}, {$lt : ['$x', {$const : 2}]}]}, then : {$const : 0}}], default : "
-                       "{$const : 'other'}}}, count : {$sum : {$const : 1}}}"));
+    auto expectedGroupExplain = Value(
+        fromjson("{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : "
+                 "0}]}, {$lt : ['$x', {$const : 2}]}]}, then : {$const : 0}}], default : "
+                 "{$const : 'other'}}}, count : {$sum : {$const : 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
@@ -178,7 +181,8 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenOutputSpecified) {
         "{$bucket : {groupBy : '$x', boundaries : [0, 2], output : { number : {$sum : 1}}}}");
     auto expectedGroupExplain = Value(fromjson(
         "{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : 0}]}, {$lt : "
-        "['$x', {$const : 2}]}]}, then : {$const : 0}}]}}, number : {$sum : {$const : 1}}}"));
+        "['$x', {$const : 2}]}]}, then : {$const : 0}}]}}, number : {$sum : {$const : 1}}, "
+        "$willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
@@ -187,7 +191,8 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenNoDefaultSpecified) {
     const auto spec = fromjson("{$bucket : { groupBy : '$x', boundaries : [0, 2]}}");
     auto expectedGroupExplain = Value(fromjson(
         "{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : 0}]}, {$lt : "
-        "['$x', {$const : 2}]}]}, then : {$const : 0}}]}}, count : {$sum : {$const : 1}}}"));
+        "['$x', {$const : 2}]}]}, then : {$const : 0}}]}}, count : {$sum : {$const : 1}}, "
+        "$willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
@@ -196,7 +201,8 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenBoundariesAreSameCanonicalTy
     const auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [0, 1.5]}}");
     auto expectedGroupExplain = Value(fromjson(
         "{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : 0}]}, {$lt : "
-        "['$x', {$const : 1.5}]}]}, then : {$const : 0}}]}},count : {$sum : {$const : 1}}}"));
+        "['$x', {$const : 1.5}]}]}, then : {$const : 0}}]}},count : {$sum : {$const : 1}}, "
+        "$willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
@@ -205,7 +211,8 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenBoundariesAreConstantExpress
     const auto spec = fromjson("{$bucket : {groupBy : '$x', boundaries : [0, {$add : [4, 5]}]}}");
     auto expectedGroupExplain = Value(fromjson(
         "{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : 0}]}, {$lt : "
-        "['$x', {$const : 9}]}]}, then : {$const : 0}}]}}, count : {$sum : {$const : 1}}}"));
+        "['$x', {$const : 9}]}]}, then : {$const : 0}}]}}, count : {$sum : {$const : 1}}, "
+        "$willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
@@ -216,7 +223,7 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWhenDefaultIsConstantExpression)
     auto expectedGroupExplain =
         Value(fromjson("{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const :"
                        "0}]}, {$lt : ['$x', {$const : 1}]}]}, then : {$const : 0}}], default : "
-                       "{$const : 9}}}, count : {$sum : {$const : 1}}}"));
+                       "{$const : 9}}}, count : {$sum : {$const : 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
@@ -227,7 +234,7 @@ TEST_F(BucketReturnsGroupAndSort, BucketSucceedsWithMultipleBoundaryValues) {
         Value(fromjson("{_id : {$switch : {branches : [{case : {$and : [{$gte : ['$x', {$const : "
                        "0}]}, {$lt : ['$x', {$const : 1}]}]}, then : {$const : 0}}, {case : {$and "
                        ": [{$gte : ['$x', {$const : 1}]}, {$lt : ['$x', {$const : 2}]}]}, then : "
-                       "{$const : 1}}]}}, count : {$sum : {$const : 1}}}"));
+                       "{$const : 1}}]}}, count : {$sum : {$const : 1}}, $willBeMerged: false}"));
 
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }

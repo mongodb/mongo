@@ -75,7 +75,8 @@ const auto expectedOptimizedGroupForMatchOnly = fromjson(R"(
     $group: {
         _id: {hour: {$dateTrunc: {date: '$time', unit: {$const: 'hour'}}}, symbol: '$tag.symbol'},
         open: {$top: {output: '$price', sortBy: {time: 1}}},
-        close: {$bottom: {output: '$price', sortBy: {time: 1}}}
+        close: {$bottom: {output: '$price', sortBy: {time: 1}}},
+        $willBeMerged: false
     }
 }
 )");
@@ -178,7 +179,8 @@ const auto expectedOptimizedGroupForMatchAndProject = fromjson(R"(
     $group: {
         _id: {hour: {$dateTrunc: {date: '$time', unit: {$const: 'hour'}}}, symbol: '$s'},
         open: {$top: {output: '$price', sortBy: {s: 1}}},
-        totalVol: {$sum: '$vol'}
+        totalVol: {$sum: '$vol'},
+        $willBeMerged: false
     }
 }
 )");

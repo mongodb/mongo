@@ -214,7 +214,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -587,7 +588,8 @@ TEST_F(DocumentSourceRankFusionTest,
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -917,7 +919,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -1197,7 +1200,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -1820,7 +1824,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2044,7 +2049,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2450,7 +2456,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2637,7 +2644,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                         },
                         "agatha_scoreDetails": {
                             "$mergeObjects": "$agatha_scoreDetails"
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2823,7 +2831,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
                         },
                         "agatha_scoreDetails": {
                             "$mergeObjects": "$agatha_scoreDetails"
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -3108,7 +3117,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                         },
                         "searchPipe_scoreDetails": {
                             "$mergeObjects": "$searchPipe_scoreDetails"
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -3837,7 +3847,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -4057,7 +4068,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        $willBeMerged: false
                     }
                 },
                 {

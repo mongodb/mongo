@@ -231,7 +231,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNone) 
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -365,7 +366,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationSigmoi
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -660,7 +662,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -901,7 +904,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -1013,7 +1017,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -1252,7 +1257,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -1579,7 +1585,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -1990,7 +1997,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2325,7 +2333,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2530,7 +2539,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedAvgMethod) {
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -2701,93 +2711,94 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMe
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-        "expectedStages": [
-            {
-                "$vectorSearch": {
-                    "queryVector": [
-                        1,
-                        2,
-                        3
-                    ],
-                    "path": "plot_embedding",
-                    "numCandidates": 300,
-                    "index": "vector_index",
-                    "limit": 10
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": {
-                        "docs": "$$ROOT"
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
                     }
-                }
-            },
-            {
-                "$addFields": {
-                    "name1_score": {
-                        "$multiply": [
-                            {
-                                "$meta": "score"
-                            },
-                            {
-                                "$const": 1
-                            }
-                        ]
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
                     }
-                }
-            },
-            {
-                "$group": {
-                    "_id": "$docs._id",
-                    "docs": {
-                        "$first": "$docs"
-                    },
-                    "name1_score": {
-                        "$max": {
-                            "$ifNull": [
-                                "$name1_score",
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
                                 {
-                                    "$const": 0
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
                                 }
                             ]
                         }
                     }
-                }
-            },
-            {
-                "$setMetadata": {
-                    "score": {
-                        "$let": {
-                            "vars": {
-                                "name1": "$name1_score"
-                            },
-                            "in": {
-                                "$sum": [
-                                    "$$name1",
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
                                     {
-                                        "$const": 5
+                                        "$const": 0
                                     }
                                 ]
                             }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$name1_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
+                                        {
+                                            "$const": 5
+                                        }
+                                    ]
+                                }
+                            }
                         }
                     }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
                 }
-            },
-            {
-                "$sort": {
-                    "$computed0": {
-                        "$meta": "score"
-                    },
-                    "_id": 1
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": "$docs"
-                }
-            }
-        ]
-    })",
+            ]
+        })",
         asOneObj);
 }
 
@@ -2826,88 +2837,89 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-        "expectedStages": [
-            {
-                "$vectorSearch": {
-                    "queryVector": [
-                        1,
-                        2,
-                        3
-                    ],
-                    "path": "plot_embedding",
-                    "numCandidates": 300,
-                    "index": "vector_index",
-                    "limit": 10
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": {
-                        "docs": "$$ROOT"
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
                     }
-                }
-            },
-            {
-                "$addFields": {
-                    "name1_score": {
-                        "$multiply": [
-                            {
-                                "$meta": "score"
-                            },
-                            {
-                                "$const": 1
-                            }
-                        ]
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
                     }
-                }
-            },
-            {
-                "$group": {
-                    "_id": "$docs._id",
-                    "docs": {
-                        "$first": "$docs"
-                    },
-                    "name1_score": {
-                        "$max": {
-                            "$ifNull": [
-                                "$name1_score",
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
                                 {
-                                    "$const": 0
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
                                 }
                             ]
                         }
                     }
-                }
-            },
-            {
-                "$setMetadata": {
-                    "score": {
-                        "$let": {
-                            "vars": {
-                                "name1": "$name1_score"
-                            },
-                            "in": {
-                                "$const": 1
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$name1_score"
+                                },
+                                "in": {
+                                    "$const": 1
+                                }
                             }
                         }
                     }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
                 }
-            },
-            {
-                "$sort": {
-                    "$computed0": {
-                        "$meta": "score"
-                    },
-                    "_id": 1
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": "$docs"
-                }
-            }
-        ]
-    })",
+            ]
+        })",
         asOneObj);
 }
 
@@ -2960,142 +2972,143 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-        "expectedStages": [
-            {
-                "$search": {
-                    "index": "search_index",
-                    "text": {
-                        "query": "mystery",
-                        "path": "genres"
+            "expectedStages": [
+                {
+                    "$search": {
+                        "index": "search_index",
+                        "text": {
+                            "query": "mystery",
+                            "path": "genres"
+                        }
                     }
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": {
-                        "docs": "$$ROOT"
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
                     }
-                }
-            },
-            {
-                "$addFields": {
-                    "name1_score": {
-                        "$multiply": [
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
                             {
-                                "$meta": "score"
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
                             },
                             {
-                                "$const": 1
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "name2_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    }
+                                }
                             }
                         ]
                     }
-                }
-            },
-            {
-                "$unionWith": {
-                    "coll": "pipeline_test",
-                    "pipeline": [
-                        {
-                            "$vectorSearch": {
-                                "queryVector": [
-                                    1,
-                                    2,
-                                    3
-                                ],
-                                "path": "plot_embedding",
-                                "numCandidates": 300,
-                                "index": "vector_index",
-                                "limit": 10
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
                             }
                         },
-                        {
-                            "$replaceRoot": {
-                                "newRoot": {
-                                    "docs": "$$ROOT"
-                                }
+                        "name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
                             }
                         },
-                        {
-                            "$addFields": {
-                                "name2_score": {
-                                    "$multiply": [
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$name1_score",
+                                    "name2": "$name2_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
+                                        "$$name2",
                                         {
-                                            "$meta": "score"
-                                        },
-                                        {
-                                            "$const": 1
+                                            "$const": 5
                                         }
                                     ]
                                 }
                             }
                         }
-                    ]
-                }
-            },
-            {
-                "$group": {
-                    "_id": "$docs._id",
-                    "docs": {
-                        "$first": "$docs"
-                    },
-                    "name1_score": {
-                        "$max": {
-                            "$ifNull": [
-                                "$name1_score",
-                                {
-                                    "$const": 0
-                                }
-                            ]
-                        }
-                    },
-                    "name2_score": {
-                        "$max": {
-                            "$ifNull": [
-                                "$name2_score",
-                                {
-                                    "$const": 0
-                                }
-                            ]
-                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 }
-            },
-            {
-                "$setMetadata": {
-                    "score": {
-                        "$let": {
-                            "vars": {
-                                "name1": "$name1_score",
-                                "name2": "$name2_score"
-                            },
-                            "in": {
-                                "$sum": [
-                                    "$$name1",
-                                    "$$name2",
-                                    {
-                                        "$const": 5
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                "$sort": {
-                    "$computed0": {
-                        "$meta": "score"
-                    },
-                    "_id": 1
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": "$docs"
-                }
-            }
-        ]
-    })",
+            ]
+        })",
         asOneObj);
 }
 
@@ -3148,141 +3161,142 @@ TEST_F(DocumentSourceScoreFusionTest,
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-        "expectedStages": [
-            {
-                "$search": {
-                    "index": "search_index",
-                    "text": {
-                        "query": "mystery",
-                        "path": "genres"
+            "expectedStages": [
+                {
+                    "$search": {
+                        "index": "search_index",
+                        "text": {
+                            "query": "mystery",
+                            "path": "genres"
+                        }
                     }
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": {
-                        "docs": "$$ROOT"
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
                     }
-                }
-            },
-            {
-                "$addFields": {
-                    "name1_score": {
-                        "$multiply": [
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
                             {
-                                "$meta": "score"
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
                             },
                             {
-                                "$const": 1
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "name2_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    }
+                                }
                             }
                         ]
                     }
-                }
-            },
-            {
-                "$unionWith": {
-                    "coll": "pipeline_test",
-                    "pipeline": [
-                        {
-                            "$vectorSearch": {
-                                "queryVector": [
-                                    1,
-                                    2,
-                                    3
-                                ],
-                                "path": "plot_embedding",
-                                "numCandidates": 300,
-                                "index": "vector_index",
-                                "limit": 10
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
                             }
                         },
-                        {
-                            "$replaceRoot": {
-                                "newRoot": {
-                                    "docs": "$$ROOT"
-                                }
+                        "name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
                             }
                         },
-                        {
-                            "$addFields": {
-                                "name2_score": {
-                                    "$multiply": [
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$let": {
+                                "vars": {
+                                    "name1": "$name1_score",
+                                    "name2": "$name2_score"
+                                },
+                                "in": {
+                                    "$sum": [
+                                        "$$name1",
                                         {
-                                            "$meta": "score"
-                                        },
-                                        {
-                                            "$const": 1
+                                            "$const": 5
                                         }
                                     ]
                                 }
                             }
                         }
-                    ]
-                }
-            },
-            {
-                "$group": {
-                    "_id": "$docs._id",
-                    "docs": {
-                        "$first": "$docs"
-                    },
-                    "name1_score": {
-                        "$max": {
-                            "$ifNull": [
-                                "$name1_score",
-                                {
-                                    "$const": 0
-                                }
-                            ]
-                        }
-                    },
-                    "name2_score": {
-                        "$max": {
-                            "$ifNull": [
-                                "$name2_score",
-                                {
-                                    "$const": 0
-                                }
-                            ]
-                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
                     }
                 }
-            },
-            {
-                "$setMetadata": {
-                    "score": {
-                        "$let": {
-                            "vars": {
-                                "name1": "$name1_score",
-                                "name2": "$name2_score"
-                            },
-                            "in": {
-                                "$sum": [
-                                    "$$name1",
-                                    {
-                                        "$const": 5
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                "$sort": {
-                    "$computed0": {
-                        "$meta": "score"
-                    },
-                    "_id": 1
-                }
-            },
-            {
-                "$replaceRoot": {
-                    "newRoot": "$docs"
-                }
-            }
-        ]
-    })",
+            ]
+        })",
         asOneObj);
 }
 
@@ -3424,7 +3438,8 @@ TEST_F(DocumentSourceScoreFusionTest,
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "$willBeMerged": false
                     }
                 },
                 {
@@ -3555,7 +3570,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNoneMe
                                     }
                                 ]
                             }
-                        }
+                        },
+                        $willBeMerged: false
                     }
                 },
                 {

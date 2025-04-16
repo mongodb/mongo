@@ -3,7 +3,8 @@
  * use a distinct scan. Reproduces BF-35249.
  *
  * @tags: [
- *   featureFlagShardFilteringDistinctScan
+ *   featureFlagShardFilteringDistinctScan,
+ *   requires_fcv_82
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

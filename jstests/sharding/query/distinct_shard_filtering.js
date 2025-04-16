@@ -5,6 +5,7 @@
  *   featureFlagShardFilteringDistinctScan,
  *   do_not_wrap_aggregations_in_facets,
  *   not_allowed_with_signed_security_token,
+ *   requires_fcv_82
  * ]
  */
 

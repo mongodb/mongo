@@ -13,7 +13,7 @@
  *   # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
  *   assumes_balancer_off,
  *   assumes_unsharded_collection,
- *   requires_fcv_81,
+ *   requires_fcv_82,
  *   featureFlagShardFilteringDistinctScan,
  *   requires_getmore,
  *   # The test examines the SBE plan cache, which initial sync may change the contents of.

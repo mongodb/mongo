@@ -489,7 +489,8 @@ TEST_F(DocumentSourceGroupTest, CanOutputExectionStatsExplainWithoutProcessingDo
                            R"({
                             $group: {
                                 _id: {$const: null},
-                                count: {$sum: {$const: 1}}},
+                                count: {$sum: {$const: 1}},
+                                $willBeMerged: false},
                                 maxAccumulatorMemoryUsageBytes: {count: 0},
                                 totalOutputDataSizeBytes: 0,
                                 usedDisk: false,
@@ -530,7 +531,7 @@ TEST_F(DocumentSourceGroupTest, CorrectlyReportsTriviallyReferencedExprsFromID) 
 
 
 TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfWithoutShardKey) {
-    auto spec = fromjson(R"({$group: {_id: "$x.y"}})");
+    auto spec = fromjson(R"({$group: {_id: "$x.y", $willBeMerged: true}})");
     auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
     auto distributedPlanLogic = group->distributedPlanLogic();
     ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1UL);
@@ -539,7 +540,7 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfWithoutShardKey) 
 }
 
 TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfIdNotSupersetOfShardKey) {
-    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
+    auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}, $willBeMerged: true}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
     auto distributedPlanLogic =
@@ -717,7 +718,17 @@ protected:
     }
 
     void createGroup(const BSONObj& spec, bool inShard = false, bool inRouter = false) {
-        BSONObj namedSpec = BSON(getStageName() << spec);
+        BSONObjBuilder bob;
+        for (auto&& elem : spec) {
+            bob << elem;
+        }
+        if (!inShard) {
+            bob << "$willBeMerged" << false;
+        } else {
+            bob << "$willBeMerged" << true;
+        }
+
+        BSONObj namedSpec = BSON(getStageName() << bob.obj());
         BSONElement specElement = namedSpec.firstElement();
 
         boost::intrusive_ptr<ExpressionContextForTest> expressionContext =

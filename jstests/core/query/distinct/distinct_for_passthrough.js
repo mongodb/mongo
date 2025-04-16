@@ -6,7 +6,7 @@
  *
  * @tags: [
  *  featureFlagShardFilteringDistinctScan,
- *  requires_fcv_81,
+ *  requires_fcv_82,
  *  simulate_atlas_proxy_incompatible,
  *  simulate_mongoq_incompatible,
  *  not_allowed_with_signed_security_token

@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
+ *   requires_fcv_82
  * ]
  */
 import {section, subSection} from "jstests/libs/pretty_md.js";

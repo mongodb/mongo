@@ -79,7 +79,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopsWithSameSortKeyOptimizedIntoOn
                 output: {tm: {$ifNull: ["$m", {$const: null}]}, ti: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");
@@ -129,7 +130,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeySameNOptimi
                 output: {bnm: {$ifNull: ["$m", {$const: null}]}, bni: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");
@@ -167,7 +169,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleTopNsWithSameSortKeyOptimizedIntoO
                 output: {tm: {$ifNull: ["$m", {$const: null}]}, ti: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");
@@ -204,7 +207,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomsWithSameSortKeyOptimizedInt
                 output: {bm: {$ifNull: ["$m", {$const: null}]}, bi: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");
@@ -241,7 +245,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultipleBottomNsWithSameSortKeyOptimizedIn
                 output: {bm: {$ifNull: ["$m", {$const: null}]}, bi: {$ifNull: ["$i", {$const: null}]}},
                 sortBy: {time: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");
@@ -288,7 +293,8 @@ TEST_F(CommonSortKeyOptimizationTest,
                 output: {b_a: {$ifNull: ["$a", {$const: null}]}, b_b: {$ifNull: ["$b", {$const: null}]}},
                 sortBy: {time: 1, g: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");
@@ -324,7 +330,8 @@ TEST_F(CommonSortKeyOptimizationTest, MultiTopBottomsWithDifferentSortPatternNot
     $group: {
         _id: {$const: null},
         t_a: {$top: {output: "$a", sortBy: {time: 1, g: -1}}},
-        t_b: {$top: {output: "$b", sortBy: {time: 1, g: 1}}}
+        t_b: {$top: {output: "$b", sortBy: {time: 1, g: 1}}},
+        $willBeMerged: false
     }
 }
     )");
@@ -347,7 +354,8 @@ TEST_F(CommonSortKeyOptimizationTest, DifferentAccumulatorsWithSameSortPatternNo
     $group: {
         _id: {$const: null},
         t_a: {$top: {output: "$a", sortBy: {time: 1}}},
-        b_b: {$bottom: {output: "$b", sortBy: {time: 1}}}
+        b_b: {$bottom: {output: "$b", sortBy: {time: 1}}},
+        $willBeMerged: false
     }
 }
     )");
@@ -372,7 +380,8 @@ TEST_F(CommonSortKeyOptimizationTest, OneTopAndOneTopNWithSameSortPatternNotOpti
     $group: {
         _id: {$const: null},
         t_a: {$top: {output: "$a", sortBy: {time: 1}}},
-        t_b: {$topN: {n: {$const: 3}, output: "$b", sortBy: {time: 1}}}
+        t_b: {$topN: {n: {$const: 3}, output: "$b", sortBy: {time: 1}}},
+        $willBeMerged: false
     }
 }
     )");
@@ -399,7 +408,8 @@ TEST_F(CommonSortKeyOptimizationTest, OneTopAndOneTopNWithSameSortPatternOptimiz
         ts_0: {$top: {
             output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}},
             sortBy: {time: 1}
-        }}
+        }},
+        $willBeMerged: false
     }
 }
     )");
@@ -438,7 +448,8 @@ TEST_F(CommonSortKeyOptimizationTest, DifferentNsForBottomNsWithSameSortPatternN
     $group: {
         _id: {$const: null},
         b_a: {$bottomN: {n: {$const: 2}, output: "$a", sortBy: {time: 1}}},
-        b_b: {$bottomN: {n: {$const: 3}, output: "$b", sortBy: {time: 1}}}
+        b_b: {$bottomN: {n: {$const: 3}, output: "$b", sortBy: {time: 1}}},
+        $willBeMerged: false
     }
 }
     )");
@@ -470,7 +481,8 @@ TEST_F(CommonSortKeyOptimizationTest, OptimizableTopNsMixedWithIneligibleAccumul
             }
         },
         fc: {$first: "$c"},
-        ld: {$last: "$d"}
+        ld: {$last: "$d"},
+        $willBeMerged: false
     }
 }
     )");
@@ -518,7 +530,8 @@ TEST_F(CommonSortKeyOptimizationTest,
             }
         },
         fc: {$first: "$c"},
-        ld: {$last: "$d"}
+        ld: {$last: "$d"},
+        $willBeMerged: false
     }
 }
     )");
@@ -600,7 +613,8 @@ TEST_F(CommonSortKeyOptimizationTest,
                 },
                 sortBy: {a: 1}
             }
-        }
+        },
+        $willBeMerged: false
     }
 }
     )");

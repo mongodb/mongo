@@ -52,8 +52,9 @@ auto unpackSpecObj = fromjson(R"({
                 fixedBuckets: true
             }
   })");
-auto groupSpecObj =
-    fromjson("{$group: {_id: '$meta1.a.b', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}");
+auto groupSpecObj = fromjson(
+    "{$group: {_id: '$meta1.a.b', accmin: {$min: '$b'}, accmax: {$max: '$c'}, $willBeMerged: "
+    "false}}");
 auto limitSpecObj = fromjson("{$limit: 2}");
 
 TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewrite) {
@@ -77,7 +78,7 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewrite) {
         ASSERT_TRUE(serialized[0].hasField("$match"));
         auto groupOptimized = fromjson(
             "{$group: {_id: '$meta.a.b', accmin: {$min: '$control.min.b'}, accmax: {$max: "
-            "'$control.max.c'}}}");
+            "'$control.max.c'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(groupOptimized, serialized[1]);
     }
 

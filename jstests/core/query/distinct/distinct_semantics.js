@@ -252,7 +252,6 @@ const coll = db.distinct_semantics;
 
             // Shard filtering might require fetching, so we may get the correct result even with
             // the index.
-            // TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
             assertEitherArrayEq({
                 expected1: testCase.resultWithIndex ? testCase.resultWithIndex : testCase.result,
                 expected2: testCase.result,

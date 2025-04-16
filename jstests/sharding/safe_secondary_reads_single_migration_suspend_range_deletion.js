@@ -26,8 +26,6 @@
  *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *    requires_scripting,
- *    # TODO SERVER-72748: Update test to incorporate $willBeMerged in $group.
- *    featureFlagShardFilteringDistinctScan_incompatible
  * ]
  */
 import {
@@ -332,33 +330,69 @@ let testCases = {
         },
         filter: {
             aggregate: coll,
-            "pipeline": [
-                {
-                    "$project": {
-                        "emits": {
-                            "$_internalJsEmit": {
-                                "eval":
-                                    "function() {\n                emit(this.x, 1);\n            }",
-                                "this": "$$ROOT"
+            "pipeline": {
+                $in: [
+                    // There are two possible versions of this pipeline; the only difference is the
+                    // presence/absence of the $willBeMerged field, which depends on whether or not
+                    // the pipeline needs to be merged on the router. We can't predict which case we
+                    // will get on upgrade/downgrade suites, so we allow either.
+                    [
+                        {
+                            "$project": {
+                                "emits": {
+                                    "$_internalJsEmit": {
+                                        "eval":
+                                            "function() {\n                emit(this.x, 1);\n            }",
+                                        "this": "$$ROOT"
+                                    }
+                                },
+                                "_id": false
                             }
                         },
-                        "_id": false
-                    }
-                },
-                {"$unwind": {"path": "$emits"}},
-                {
-                    "$group": {
-                        "_id": "$emits.k",
-                        "value": {
-                            "$_internalJsReduce": {
-                                "data": "$emits",
-                                "eval":
-                                    "function(key, values) {\n                return Array.sum(values);\n            }"
+                        {"$unwind": {"path": "$emits"}},
+                        {
+                            "$group": {
+                                "_id": "$emits.k",
+                                "value": {
+                                    "$_internalJsReduce": {
+                                        "data": "$emits",
+                                        "eval":
+                                            "function(key, values) {\n                return Array.sum(values);\n            }"
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            ],
+                    ],
+                    [
+                        {
+                            "$project": {
+                                "emits": {
+                                    "$_internalJsEmit": {
+                                        "eval":
+                                            "function() {\n                emit(this.x, 1);\n            }",
+                                        "this": "$$ROOT"
+                                    }
+                                },
+                                "_id": false
+                            }
+                        },
+                        {"$unwind": {"path": "$emits"}},
+                        {
+                            "$group": {
+                                "_id": "$emits.k",
+                                "value": {
+                                    "$_internalJsReduce": {
+                                        "data": "$emits",
+                                        "eval":
+                                            "function(key, values) {\n                return Array.sum(values);\n            }"
+                                    }
+                                },
+                                "$willBeMerged": false,
+                            }
+                        }
+                    ],
+                ]
+            },
         },
         checkResults: function(res) {
             assert.commandWorked(res);

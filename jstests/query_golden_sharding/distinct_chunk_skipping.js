@@ -3,6 +3,7 @@
  * work of embedded chunk skipping is evaluated during plan enumeration.
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
+ *   requires_fcv_82
  * ]
  */
 

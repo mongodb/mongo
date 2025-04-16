@@ -10,7 +10,8 @@
  *   does_not_support_stepdowns,
  *   # Explain cannot run within a multi-document transaction.
  *   does_not_support_transactions,
- *   featureFlagShardFilteringDistinctScan
+ *   featureFlagShardFilteringDistinctScan,
+ *   requires_fcv_82
  * ]
  */
 import {

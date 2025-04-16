@@ -112,7 +112,7 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountAggStage) {
     auto groupOptimized = fromjson(
         "{ $group : { _id : {$const: null }, foo : { $sum : { $cond: [{$gte : [ "
         "'$control.version', {$const : 2} ]}, '$control.count', {$size : [ {$objectToArray : "
-        "['$data.t']} ] } ] } } } }");
+        "['$data.t']} ] } ] } }, $willBeMerged: false } }");
     ASSERT_BSONOBJ_EQ(groupOptimized, serialized[0]);
 }
 
@@ -126,7 +126,7 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountInGroup) {
     auto groupOptimized = fromjson(
         "{ $group : { _id : '$meta.a.b', acccount : { $sum : { $cond: [{$gte : [ "
         "'$control.version', {$const : 2} ]}, '$control.count', {$size : [ {$objectToArray : "
-        "['$data.t']} ] } ] } } } }");
+        "['$data.t']} ] } ] } }, $willBeMerged: false } }");
     ASSERT_BSONOBJ_EQ(groupOptimized, serialized[0]);
 }
 
@@ -162,7 +162,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
 
     auto optimized = fromjson(
         "{$group: {_id: '$meta.a.b', accmin: {$min: '$control.min.b'}, accmax: {$max: "
-        "'$control.max.c'}}}");
+        "'$control.max.c'}, $willBeMerged: false}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
@@ -170,7 +170,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxComplexGroupOnMetadata) {
     auto groupSpecObj = fromjson(
         "{$group: {_id: '$meta1.a.b', accmin: {$min: {$add: ['$b', {$const: 0}]}}, accmax: {$max: "
-        "{$add: [{$const: 0}, '$c']}}}}");
+        "{$add: [{$const: 0}, '$c']}}, $willBeMerged: false }}");
 
     auto serialized = makeAndOptimizePipeline(
         getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
@@ -187,7 +187,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetafield) {
         getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(1, serialized.size());
 
-    auto optimized = fromjson("{$group: {_id: '$meta.a.b', accmin: {$min: '$meta.f1'}}}");
+    auto optimized =
+        fromjson("{$group: {_id: '$meta.a.b', accmin: {$min: '$meta.f1'}, $willBeMerged: false }}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
@@ -199,7 +200,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetafieldIdObj) {
         getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(1, serialized.size());
 
-    auto optimized = fromjson("{$group: {_id: {d: '$meta.a.b'}, accmin: {$min: '$meta.f1'}}}");
+    auto optimized = fromjson(
+        "{$group: {_id: {d: '$meta.a.b'}, accmin: {$min: '$meta.f1'}, $willBeMerged: false }}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
@@ -213,14 +215,14 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeField) {
 
     auto optimized = fromjson(
         "{$group: {_id: {time: {$dateTrunc: {date: '$control.min.t', unit: {$const: 'day'}}}}, "
-        "accmin: {$min: '$control.min.a'} }}");
+        "accmin: {$min: '$control.min.a'}, $willBeMerged: false}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldOverwrittenDoesNotOptimize) {
     auto groupSpecObj = fromjson(
         "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: {$const: 'day'}}}}, accmin: {$min: "
-        "'$a'}}}");
+        "'$a'}, $willBeMerged: false }}");
 
     auto serialized = makeAndOptimizePipeline(getExpCtx(),
                                               {fromjson("{$project: {t: '$meta1'}}"), groupSpecObj},
@@ -251,7 +253,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
             getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
         ASSERT_EQ(1, serialized.size());
 
-        auto optimized = fromjson("{$group: {_id: { $const: null }, accmin: {$min: '$meta.f1'}}}");
+        auto optimized = fromjson(
+            "{$group: {_id: { $const: null }, accmin: {$min: '$meta.f1'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
     }
     // Test with an int group key.
@@ -262,7 +265,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
             getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
         ASSERT_EQ(1, serialized.size());
 
-        auto optimized = fromjson("{$group: {_id:  {$const: 0}, accmin: {$min: '$meta.f1'}}}");
+        auto optimized = fromjson(
+            "{$group: {_id:  {$const: 0}, accmin: {$min: '$meta.f1'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
     }
     // Test with an expression that is optimized to a constant.
@@ -274,7 +278,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
             getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
         ASSERT_EQ(1, serialized.size());
 
-        auto optimized = fromjson("{$group: {_id:  {$const: 5}, accmin: {$min: '$meta.f1'}}}");
+        auto optimized = fromjson(
+            "{$group: {_id:  {$const: 5}, accmin: {$min: '$meta.f1'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
     }
     // Test with an int group key and no metaField.
@@ -287,8 +292,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(1, serialized.size());
 
-        auto optimized =
-            fromjson("{$group: {_id:  {$const: 0}, accmin: {$min: '$control.min.meta1.f1'}}}");
+        auto optimized = fromjson(
+            "{$group: {_id:  {$const: 0}, accmin: {$min: '$control.min.meta1.f1'}, $willBeMerged: "
+            "false}}");
         ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
     }
 }
@@ -304,7 +310,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFields) {
 
     auto optimized = fromjson(
         "{$group: {_id: {m1: '$meta.m1', m2: '$meta.m2', m3: '$meta' }, accmin: {$min: "
-        "'$meta.f1'}}}");
+        "'$meta.f1'}, $willBeMerged: false}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
@@ -319,7 +325,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsAndConst
 
     auto optimized = fromjson(
         "{$group: {_id: {m1: {$const: 'hello'}, m2: '$meta.m1', m3: '$meta' }, accmin: {$min: "
-        "'$meta.f1'}}}");
+        "'$meta.f1'}, $willBeMerged: false}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
@@ -334,7 +340,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetaFieldsExpression) {
 
         auto optimized = fromjson(
             "{$group: {_id: {m1: {$toUpper: [ '$meta.m1' ] }}, accmin: {$min: "
-            "'$control.min.val'}}}");
+            "'$control.min.val'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
     }
     {
@@ -347,7 +353,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetaFieldsExpression) {
         auto optimized = fromjson(
             "{$group: {_id: {m1: {$concat: [{$trim: {input: {$toUpper: [ '$meta.m1' ]}}}, "
             "{$const: '-'}, {$trim: {input: {$toUpper: [ '$meta.m2' ]}}}]}}, accmin: {$min: "
-            "'$control.min.val'}}}");
+            "'$control.min.val'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
     }
 }
@@ -372,9 +378,10 @@ TEST_F(InternalUnpackBucketGroupReorder, MaxGroupRewriteTimeField) {
         {.inRouter = true, .extendedRange = true, .shouldRewrite = false},
     };
 
-    auto groupSpecObj = fromjson("{$group: {_id:'$meta1.m1', accmax: {$max: '$t'}}}");
-    auto rewrittenGroupStage =
-        fromjson("{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}}}");
+    auto groupSpecObj =
+        fromjson("{$group: {_id:'$meta1.m1', accmax: {$max: '$t'}, $willBeMerged: false}}");
+    auto rewrittenGroupStage = fromjson(
+        "{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}, $willBeMerged: false}}");
     auto expectedUnpackStageNoExtendedRange = fromjson(
         "{ $_internalUnpackBucket: { include: [ 't', 'meta1' ], timeField: 't', metaField: "
         "'meta1', bucketMaxSpanSeconds: 3600 } }");
@@ -439,8 +446,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MaxGroupRewriteTimeField) {
 // met.
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative) {
     // This rewrite does not apply because the $group stage uses the $sum accumulator.
-    auto groupSpecObj =
-        fromjson("{$group: {_id: '$meta1', accmin: {$min: '$b'}, s: {$sum: '$c'}}}");
+    auto groupSpecObj = fromjson(
+        "{$group: {_id: '$meta1', accmin: {$min: '$b'}, s: {$sum: '$c'}, $willBeMerged: false}}");
 
     auto serialized = makeAndOptimizePipeline(
         getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
@@ -459,7 +466,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative) {
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative1) {
     // This rewrite does not apply because the $min accumulator is on a nested field referencing the
     // timeField.
-    auto groupSpecObj = fromjson("{$group: {_id: '$meta1', accmin: {$min: '$t.a'}}}");
+    auto groupSpecObj =
+        fromjson("{$group: {_id: '$meta1', accmin: {$min: '$t.a'}, $willBeMerged: false}}");
 
     auto serialized = makeAndOptimizePipeline(
         getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
@@ -478,8 +486,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative1) {
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative) {
     // This rewrite does not apply because we are grouping on an expression that references a field.
     {
-        auto groupSpecObj =
-            fromjson("{$group: {_id: {m1: {$toUpper: [ '$val.a' ]}}, accmin: {$min: '$val.b'}}}");
+        auto groupSpecObj = fromjson(
+            "{$group: {_id: {m1: {$toUpper: [ '$val.a' ]}}, accmin: {$min: '$val.b'}, "
+            "$willBeMerged: false}}");
         auto serialized = makeAndOptimizePipeline(getExpCtx(), {groupSpecObj}, 3600, false);
         ASSERT_EQ(2, serialized.size());
 
@@ -504,7 +513,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             "    {$toUpper: [ '$meta1.m2' ]}}}]},"
             // m2 is not allowed and so inhibits the optimization.
             "  m2: {$trim: {input: {$toUpper: [ '$val.a']}}}"
-            "}, accmin: {$min: '$val'}}}");
+            "}, accmin: {$min: '$val'}, $willBeMerged: false}}");
         auto serialized = makeAndOptimizePipeline(getExpCtx(), {groupSpecObj}, 3600, false);
         ASSERT_EQ(2, serialized.size());
 
@@ -522,8 +531,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
         auto unpackSpecObj = fromjson(
             "{$_internalUnpackBucket: { include: ['a', 'meta1', 'x'], timeField: 't', "
             "bucketMaxSpanSeconds: 3600}}");
-        auto groupSpecObj =
-            fromjson("{$group: {_id: {g0: {$toUpper: [ '$x' ] }}, accmin: {$min: '$meta1.f1'}}}");
+        auto groupSpecObj = fromjson(
+            "{$group: {_id: {g0: {$toUpper: [ '$x' ] }}, accmin: {$min: '$meta1.f1'}, "
+            "$willBeMerged: false}}");
         auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
         pipeline->optimizePipeline();
         auto serialized = pipeline->serializeToBson();
@@ -553,8 +563,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
 
         // The $$CURRENT.x field path will be simplified to $x before it reaches the group
         // optimization.
-        auto wantGroupSpecObj =
-            fromjson("{$group: {_id: {g0: {$toUpper: [ '$x' ] }}, accmin: {$min: '$meta1.f1'}}}");
+        auto wantGroupSpecObj = fromjson(
+            "{$group: {_id: {g0: {$toUpper: [ '$x' ] }}, accmin: {$min: '$meta1.f1'}, "
+            "$willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(wantGroupSpecObj, serialized[1]);
 
@@ -568,7 +579,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             "{$_internalUnpackBucket: { exclude: [], timeField: 't', "
             "bucketMaxSpanSeconds: 3600}}");
         auto groupSpecObj = fromjson(
-            "{$group: {_id: {g0: {$toUpper: [ '$$ROOT.x' ] }}, accmin: {$min: '$meta1.f1'}}}");
+            "{$group: {_id: {g0: {$toUpper: [ '$$ROOT.x' ] }}, accmin: {$min: '$meta1.f1'}, "
+            "$willBeMerged: false}}");
 
         auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
         pipeline->optimizePipeline();
@@ -600,7 +612,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
 
         auto serializedGroup = fromjson(
             "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: {$const: 'day'}}}}, accmin: "
-            "{$min: '$a'}}}");
+            "{$min: '$a'}, $willBeMerged: false}}");
         auto unpackSpecObj = fromjson(
             "{$_internalUnpackBucket: { include: ['a', 't'], timeField: 't', metaField: "
             "'meta1', bucketMaxSpanSeconds: 3600}}");
@@ -628,7 +640,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
             "'meta1', bucketMaxSpanSeconds: 604800, fixedBuckets: true}}");
         auto serializedGroupObj = fromjson(
             "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: {$const: 'day'}}}}, accmin: "
-            "{$min: '$a'}}}");
+            "{$min: '$a'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(serializedGroupObj, serialized[1]);
 
@@ -653,7 +665,7 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
             "'meta1', bucketMaxSpanSeconds: 3600, fixedBuckets: true}}");
         auto serializedGroupObj = fromjson(
             "{$group: {_id: {time: {$dateTrunc: {date: '$c', unit: {$const: 'day'}}}}, accmin: "
-            "{$min: '$a'}}}");
+            "{$min: '$a'}, $willBeMerged: false}}");
         ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
         ASSERT_BSONOBJ_EQ(serializedGroupObj, serialized[1]);
 
@@ -665,8 +677,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsNegative) {
     // The rewrite does not apply, because some fields in the group key are not referencing the
     // metaField.
-    auto groupSpecObj =
-        fromjson("{$group: {_id: {m1: '$meta1.m1', m2: '$val' }, accmin: {$min: '$meta1.f1'}}}");
+    auto groupSpecObj = fromjson(
+        "{$group: {_id: {m1: '$meta1.m1', m2: '$val' }, accmin: {$min: '$meta1.f1'}, "
+        "$willBeMerged: false}}");
 
     auto serialized = makeAndOptimizePipeline(
         getExpCtx(), {groupSpecObj}, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
@@ -684,7 +697,8 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsNegative
 
 TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNegative) {
     auto projectSpec = fromjson("{$project: {'meta1': 1}}");
-    auto groupSpecObj = fromjson("{$group: {_id: {m1: '$meta1.m1'}, accmin: {$min: '$v'}}}");
+    auto groupSpecObj =
+        fromjson("{$group: {_id: {m1: '$meta1.m1'}, accmin: {$min: '$v'}, $willBeMerged: false}}");
 
     auto serialized = makeAndOptimizePipeline(getExpCtx(),
                                               {projectSpec, groupSpecObj},
@@ -704,7 +718,7 @@ TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNegative) {
 
 TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNotMetaNegative) {
     auto projectSpec = fromjson("{$project: {'_id' : 0, 'meta1': 1}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$x'}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$x', $willBeMerged: false}}");
 
     auto serialized = makeAndOptimizePipeline(getExpCtx(),
                                               {projectSpec, groupSpecObj},
@@ -724,7 +738,8 @@ TEST_F(InternalUnpackBucketGroupReorder, InclusionProjectBeforeGroupNotMetaNegat
 
 TEST_F(InternalUnpackBucketGroupReorder, ProjectBeforeGroupAccessSubFieldPositive) {
     auto projectSpec = fromjson("{$project: {'meta1': 1}}");
-    auto groupSpecObj = fromjson("{$group: {_id: {m1: '$meta1.m1'}, accmin: {$min: '$v'}}}");
+    auto groupSpecObj =
+        fromjson("{$group: {_id: {m1: '$meta1.m1'}, accmin: {$min: '$v'}, $willBeMerged: false}}");
 
     auto serialized = makeAndOptimizePipeline(getExpCtx(),
                                               {projectSpec, groupSpecObj},
@@ -757,8 +772,9 @@ TEST_F(InternalUnpackBucketGroupReorder, ExclusionProjectBeforeGroupPositive) {
 
     // Since the $project does not change the availability of any fields other than 'meta1', and the
     // 'meta1' just a rename of 'meta' field this rewrite is still allowed.
-    auto expectedGroupStage =
-        fromjson("{$group: {_id: {m1: '$meta.m1'}, accmin: {$min: '$control.min.v'}}}");
+    auto expectedGroupStage = fromjson(
+        "{$group: {_id: {m1: '$meta.m1'}, accmin: {$min: '$control.min.v'}, $willBeMerged: "
+        "false}}");
     ASSERT_BSONOBJ_EQ(expectedGroupStage, serialized[1]);
 
     // Remake the pipeline and optimize again to ensure no rewrites are expected.

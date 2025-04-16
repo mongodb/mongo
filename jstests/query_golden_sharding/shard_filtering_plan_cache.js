@@ -3,7 +3,8 @@
  * shard contains multiple (orphaned) chunks.
  *
  * @tags: [
- *   featureFlagShardFilteringDistinctScan
+ *   featureFlagShardFilteringDistinctScan,
+ *   requires_fcv_82
  * ]
  */
 

@@ -9,6 +9,7 @@
  *   expects_explicit_underscore_id_index,
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
+ *   requires_fcv_82
  * ]
  */
 

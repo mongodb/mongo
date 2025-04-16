@@ -153,7 +153,8 @@ feature_flags:
     featureFlagShardFilteringDistinctScan:
         description: "Feature flag to support shard filtering in distinct scan optimization"
         cpp_varname: gFeatureFlagShardFilteringDistinctScan
-        default: false
+        default: true
+        version: 8.2
         shouldBeFCVGated: true
 
     featureFlagArrayAccumulators:

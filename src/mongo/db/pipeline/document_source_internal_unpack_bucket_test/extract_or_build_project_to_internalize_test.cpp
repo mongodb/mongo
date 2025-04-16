@@ -56,7 +56,7 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectForGroupDependencies) {
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
-    auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
+    auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}, $willBeMerged: false}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
@@ -106,7 +106,7 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
+    auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}, $willBeMerged: false}}");
     auto pipeline = Pipeline::parse(makeVector(matchSpec, unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
     ASSERT_EQ(3u, container.size());
@@ -131,7 +131,7 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectWhenGroupDependenciesAreDotted) {
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
-    auto groupSpec = fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}}}");
+    auto groupSpec = fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}, $willBeMerged: false}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
@@ -179,7 +179,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        DoesNotBuildProjectWhenThereAreNoDependencies) {
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
-    auto groupSpec = fromjson("{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}}}");
+    auto groupSpec = fromjson(
+        "{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}, $willBeMerged: false}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
@@ -313,7 +314,7 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
     auto sortSpec = fromjson("{$sort: {y: 1}}");
-    auto groupSpec = fromjson("{$group: {_id: '$y', f: {$first: '$z'}}}");
+    auto groupSpec = fromjson("{$group: {_id: '$y', f: {$first: '$z'}, $willBeMerged: false}}");
     auto pipeline =
         Pipeline::parse(makeVector(unpackSpec, projectSpec, sortSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();

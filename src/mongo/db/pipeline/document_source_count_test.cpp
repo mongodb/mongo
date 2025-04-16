@@ -83,7 +83,8 @@ public:
         StringData countName = countSpec.firstElement().valueStringData();
         Value expectedGroupExplain =
             Value{Document{{"_id", Document{{"$const", BSONNULL}}},
-                           {countName, Document{{"$sum", Document{{"$const", 1}}}}}}};
+                           {countName, Document{{"$sum", Document{{"$const", 1}}}}},
+                           {"$willBeMerged", false}}};
         auto groupExplain = explainedStages[0];
         ASSERT_VALUE_EQ(groupExplain["$group"], expectedGroupExplain);
 

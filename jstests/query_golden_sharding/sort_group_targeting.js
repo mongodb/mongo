@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
+ *   requires_fcv_82
  * ]
  */
 

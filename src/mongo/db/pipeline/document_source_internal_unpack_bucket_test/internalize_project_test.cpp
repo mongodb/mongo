@@ -214,7 +214,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest, OptimizeCorrectlyInternalizes
 TEST_F(InternalUnpackBucketInternalizeProjectTest, OptimizeCorrectlyInternalizesDependencyProject) {
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
     auto sortSpec = fromjson("{$sort: {y: 1}}");
-    auto groupSpec = fromjson("{$group: {_id: '$y', f: {$first: '$z'}}}");
+    auto groupSpec = fromjson("{$group: {_id: '$y', f: {$first: '$z'}, $willBeMerged: false}}");
     auto pipeline =
         Pipeline::parse(makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: "
                                             "'foo', bucketMaxSpanSeconds: 3600}}"),

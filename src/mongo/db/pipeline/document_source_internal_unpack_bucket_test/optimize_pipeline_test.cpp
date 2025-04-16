@@ -250,10 +250,11 @@ TEST_F(OptimizePipeline, MetaMatchThenCountPushedDown) {
     // The $group is rewritten to make use of '$control.count' and the $unpack stage is removed.
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$eq: 'abc'}}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$group: {_id: {$const: null}, foo: { $sum: { $cond: [ { $gte: [ "
-                               "'$control.version', { $const: 2 } ] }, '$control.count', { $size: "
-                               "[ { $objectToArray: ['$data.time']} ] } ] } } } }"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$group: {_id: {$const: null}, foo: { $sum: { $cond: [ { $gte: [ "
+                 "'$control.version', { $const: 2 } ] }, '$control.count', { $size: "
+                 "[ { $objectToArray: ['$data.time']} ] } ] } }, $willBeMerged: false } }"),
+        serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$project: {foo: true, _id: false}}"), serialized[2]);
 }
 
@@ -1170,8 +1171,8 @@ TEST_F(OptimizePipeline, StreamingGroupIsEnabledWhenPossible) {
 
     auto streamingGroupSpecObj = fromjson(
         "{$_internalStreamingGroup: {_id: {hour: {$dateTrunc: {date: '$time', unit: {$const: "
-        "'hour'}}}, symbol: '$myMeta.symbol'}, 'sum': {$sum: '$tradeAmount'}, "
-        "'$monotonicIdFields': ['hour']}}");
+        "'hour'}}}, symbol: '$myMeta.symbol'}, 'sum': {$sum: '$tradeAmount'}, '$willBeMerged': "
+        "false, '$monotonicIdFields': ['hour']}}");
     ASSERT_BSONOBJ_EQ(streamingGroupSpecObj, serialized.back());
     makePipelineOptimizeAssertNoRewrites(getExpCtx(), serialized);
 }
@@ -1182,7 +1183,7 @@ TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
         "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}");
     auto groupSpecObj = fromjson(
         "{$group: {_id: {hour: '$time', symbol: '$myMeta.symbol'}, 'sum': {$sum: "
-        "'$tradeAmount'}}}");
+        "'$tradeAmount'}, $willBeMerged: false}}");
     auto pipeline = Pipeline::parse(
         makeVector(unpackSpecObj,
                    fromjson("{$addFields: {'time': {$dateTrunc: {date: '$time', unit: 'hour'}}}}"),

@@ -60,7 +60,6 @@ explain = getDistinctExplainWithExecutionStats("a", {a: {$gt: 5}});
 assert.eq(4, explain.executionStats.nReturned);
 assert.eq(4, explain.executionStats.totalKeysExamined);
 // Shard filtering might require fetching even when the query could otherwise be covered.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert.eq(0, explain.executionStats.totalDocsExamined);
 }
@@ -77,7 +76,6 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 explain = getDistinctExplainWithExecutionStats("b", {a: {$gt: 5}, b: {$gt: 5}});
 assert.lte(explain.executionStats.nReturned, 171);
 // Shard filtering might require fetching even when the query could otherwise be covered.
-// TODO SERVER-72748: Assert that we always fetch if the collection is sharded.
 if (!FixtureHelpers.isSharded(coll)) {
     assert.eq(0, explain.executionStats.totalDocsExamined);
 }
