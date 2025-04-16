@@ -50,6 +50,14 @@ namespace mongo {
 namespace {
 using std::vector;
 
+ContinuousPercentile createContinuousPercentileForTest(ExpressionContextForTest* expCtx) {
+    // Setup the test to allow for spilled data.
+    expCtx->setAllowDiskUse(true);
+    expCtx->setTempDir("tmp/percentile_algo_continuous_test");
+
+    return ContinuousPercentile(expCtx);
+}
+
 vector<double> generateNormal(size_t n) {
     auto seed = time(nullptr);
     LOGV2(7514415, "generateNormal", "seed"_attr = seed);
@@ -82,7 +90,7 @@ double computeTestPercentile(double p, vector<double> inputs, int n) {
  */
 TEST(ContinuousPercentileTest, NoInputs) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     ASSERT(!cp.computePercentile(0.1));
     ASSERT(cp.computePercentiles({0.1, 0.5}).empty());
 }
@@ -91,36 +99,62 @@ TEST(ContinuousPercentileTest, TinyInput1) {
     vector<double> inputs = {1.0};
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
-    ASSERT_EQ(1.0, *cp.computePercentile(0.5));
     ASSERT_EQ(1.0, *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0, 0.5, 1});
+
+    ASSERT_EQ(1.0, pctls[0]);
+    ASSERT_EQ(1.0, pctls[1]);
+    ASSERT_EQ(1.0, pctls[2]);
 }
 
 TEST(ContinuousPercentileTest, TinyInput2) {
     vector<double> inputs = {1.0, 2.0};
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
     ASSERT_EQ(1.5, *cp.computePercentile(0.5));
     ASSERT_EQ(2.0, *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0, 0.5, 1});
+
+    ASSERT_EQ(1.0, pctls[0]);
+    ASSERT_EQ(1.5, pctls[1]);
+    ASSERT_EQ(2.0, pctls[2]);
 }
 
 TEST(ContinuousPercentileTest, TinyInput3) {
     vector<double> inputs = {1.0, 2.0, 3.0};
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
     ASSERT_EQ(2.0, *cp.computePercentile(0.5));
     ASSERT_EQ(3.0, *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0, 0.5, 1});
+
+    ASSERT_EQ(1.0, pctls[0]);
+    ASSERT_EQ(2.0, pctls[1]);
+    ASSERT_EQ(3.0, pctls[2]);
 }
 
 TEST(ContinuousPercentileTest, Basic) {
@@ -128,7 +162,7 @@ TEST(ContinuousPercentileTest, Basic) {
     std::iota(inputs.begin(), inputs.end(), 1.0);  // {1, 2, ..., 100}
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(1.0, *cp.computePercentile(0));
@@ -138,19 +172,41 @@ TEST(ContinuousPercentileTest, Basic) {
     ASSERT_EQ(95.05, *cp.computePercentile(0.95));
     ASSERT_EQ(99.01, *cp.computePercentile(0.99));
     ASSERT_EQ(100.0, *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0, 0.01, 0.1, 0.5, 0.95, 0.99, 1});
+
+    ASSERT_EQ(1.0, pctls[0]);
+    ASSERT_EQ(1.99, pctls[1]);
+    ASSERT_EQ(10.9, pctls[2]);
+    ASSERT_EQ(50.5, pctls[3]);
+    ASSERT_EQ(95.05, pctls[4]);
+    ASSERT_EQ(99.01, pctls[5]);
+    ASSERT_EQ(100.0, pctls[6]);
 }
 
 TEST(ContinuousPercentileTest, ComputeMultiplePercentilesAtOnce) {
     const vector<double> inputs = generateNormal(100);
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
-    const vector<double> ps = cp.computePercentiles({0.5, 0.9, 0.1});
-    ASSERT_EQ(*cp.computePercentile(0.5), ps[0]);
-    ASSERT_EQ(*cp.computePercentile(0.9), ps[1]);
-    ASSERT_EQ(*cp.computePercentile(0.1), ps[2]);
+    const vector<double> pctls = cp.computePercentiles({0.5, 0.9, 0.1});
+    ASSERT_EQ(*cp.computePercentile(0.5), pctls[0]);
+    ASSERT_EQ(*cp.computePercentile(0.9), pctls[1]);
+    ASSERT_EQ(*cp.computePercentile(0.1), pctls[2]);
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto spilledPctls = cp.computePercentiles({0.5, 0.9, 0.1});
+
+    ASSERT_EQ(pctls[0], spilledPctls[0]);
+    ASSERT_EQ(pctls[1], spilledPctls[1]);
+    ASSERT_EQ(pctls[2], spilledPctls[2]);
 }
 
 /**
@@ -172,7 +228,7 @@ TEST(ContinuousPercentileTest, Incorporate_OnlyInfinities) {
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     for (double val : inputs) {
         cp.incorporate(val);
     }
@@ -188,6 +244,21 @@ TEST(ContinuousPercentileTest, Incorporate_OnlyInfinities) {
     ASSERT_EQ(inf, *cp.computePercentile(0.9));
     ASSERT_EQ(inf, *cp.computePercentile(0.999));
     ASSERT_EQ(inf, *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0, 0.001, 0.1, 0.7, 0.71, 0.9, 0.999, 1});
+
+    ASSERT_EQ(-inf, pctls[0]);
+    ASSERT_EQ(-inf, pctls[1]);
+    ASSERT_EQ(-inf, pctls[2]);
+    ASSERT_EQ(-inf, pctls[3]);
+
+    ASSERT_EQ(inf, pctls[4]);
+    ASSERT_EQ(inf, pctls[5]);
+    ASSERT_EQ(inf, pctls[6]);
+    ASSERT_EQ(inf, pctls[7]);
 }
 
 TEST(ContinuousPercentileTest, Incorporate_WithInfinities) {
@@ -210,7 +281,7 @@ TEST(ContinuousPercentileTest, Incorporate_WithInfinities) {
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     for (double val : inputs) {
         cp.incorporate(val);
     }
@@ -239,6 +310,30 @@ TEST(ContinuousPercentileTest, Incorporate_WithInfinities) {
     ASSERT_EQ(inf, *cp.computePercentile(0.9));
     ASSERT_EQ(inf, *cp.computePercentile(0.999));
     ASSERT_EQ(inf, *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles(
+        {0, 0.001, 0.1, pInfEnd, pFirstNonInf, 0.5, 0.8, 0.867, 0.2, pInfStart, 0.9, 0.999, 1});
+
+    ASSERT_EQ(-inf, pctls[0]);
+    ASSERT_EQ(-inf, pctls[1]);
+    ASSERT_EQ(-inf, pctls[2]);
+    ASSERT_EQ(-inf, pctls[3]);
+
+    ASSERT_NE(-inf, pctls[4]);
+
+    ASSERT_EQ(450.5, pctls[5]);
+    ASSERT_EQ(900.2, pctls[6]);
+
+    ASSERT_EQ(inf, pctls[7]);
+    ASSERT_EQ(-inf, pctls[8]);
+
+    ASSERT_EQ(inf, pctls[9]);
+    ASSERT_EQ(inf, pctls[10]);
+    ASSERT_EQ(inf, pctls[11]);
+    ASSERT_EQ(inf, pctls[12]);
 }
 
 TEST(ContinuousPercentileTest, Incorporate_Nan_ShouldSkip) {
@@ -250,13 +345,22 @@ TEST(ContinuousPercentileTest, Incorporate_Nan_ShouldSkip) {
     inputs.insert(inputs.begin() + 500, std::numeric_limits<double>::quiet_NaN());
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(std::numeric_limits<double>::quiet_NaN());
     cp.incorporate(inputs);
 
     ASSERT_EQ(100.9, *cp.computePercentile(0.1));
     ASSERT_EQ(500.5, *cp.computePercentile(0.5));
     ASSERT_EQ(900.1, *cp.computePercentile(0.9));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0.1, 0.5, 0.9});
+
+    ASSERT_EQ(100.9, pctls[0]);
+    ASSERT_EQ(500.5, pctls[1]);
+    ASSERT_EQ(900.1, pctls[2]);
 }
 
 /**
@@ -267,7 +371,7 @@ TEST(ContinuousPercentileTest, SmallDataset) {
     vector<double> inputs = generateNormal(n);
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_LT(*cp.computePercentile(0.49), *cp.computePercentile(0.5));
@@ -279,6 +383,20 @@ TEST(ContinuousPercentileTest, SmallDataset) {
     ASSERT_EQ(computeTestPercentile(0.5, inputs, n), *cp.computePercentile(0.5));
     ASSERT_EQ(computeTestPercentile(0.9, inputs, n), *cp.computePercentile(0.9));
     ASSERT_EQ(inputs.back(), *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0.49, 0.5, 0.4, 0, 0.1, 0.5, 0.9, 1});
+
+    ASSERT_LT(pctls[0], pctls[1]);
+    ASSERT_LT(pctls[2], pctls[1]);
+
+    ASSERT_EQ(inputs.front(), pctls[3]);
+    ASSERT_EQ(computeTestPercentile(0.1, inputs, n), pctls[4]);
+    ASSERT_EQ(computeTestPercentile(0.5, inputs, n), pctls[5]);
+    ASSERT_EQ(computeTestPercentile(0.9, inputs, n), pctls[6]);
+    ASSERT_EQ(inputs.back(), pctls[7]);
 }
 
 TEST(ContinuousPercentileTest, LargerDataset) {
@@ -286,7 +404,7 @@ TEST(ContinuousPercentileTest, LargerDataset) {
     vector<double> inputs = generateNormal(n);
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_LT(*cp.computePercentile(0.499), *cp.computePercentile(0.4999));
@@ -299,6 +417,21 @@ TEST(ContinuousPercentileTest, LargerDataset) {
     ASSERT_EQ(computeTestPercentile(0.5, inputs, n), *cp.computePercentile(0.5));
     ASSERT_EQ(computeTestPercentile(0.995, inputs, n), *cp.computePercentile(0.995));
     ASSERT_EQ(inputs.back(), *cp.computePercentile(1));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0.499, 0.4999, 0.5, 0.5001, 0, 0.005, 0.995, 1});
+
+    ASSERT_LT(pctls[0], pctls[1]);
+    ASSERT_LT(pctls[1], pctls[2]);
+    ASSERT_LT(pctls[2], pctls[3]);
+
+    ASSERT_EQ(inputs.front(), pctls[4]);
+    ASSERT_EQ(computeTestPercentile(0.005, inputs, n), pctls[5]);
+    ASSERT_EQ(computeTestPercentile(0.5, inputs, n), pctls[2]);
+    ASSERT_EQ(computeTestPercentile(0.995, inputs, n), pctls[6]);
+    ASSERT_EQ(inputs.back(), pctls[7]);
 }
 
 TEST(ContinuousPercentileTest, Presorted) {
@@ -307,12 +440,63 @@ TEST(ContinuousPercentileTest, Presorted) {
     std::sort(inputs.begin(), inputs.end());
 
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    ContinuousPercentile cp = ContinuousPercentile(&expCtx);
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
     cp.incorporate(inputs);
 
     ASSERT_EQ(computeTestPercentile(0.1, inputs, n), *cp.computePercentile(0.1));
     ASSERT_EQ(computeTestPercentile(0.5, inputs, n), *cp.computePercentile(0.5));
     ASSERT_EQ(computeTestPercentile(0.99, inputs, n), *cp.computePercentile(0.99));
+
+    // Spill the previously incorporated data to disk and check that we still get the correct
+    // results.
+    cp.spill();
+    auto pctls = cp.computePercentiles({0.1, 0.5, 0.99});
+
+    ASSERT_EQ(computeTestPercentile(0.1, inputs, n), pctls[0]);
+    ASSERT_EQ(computeTestPercentile(0.5, inputs, n), pctls[1]);
+    ASSERT_EQ(computeTestPercentile(0.99, inputs, n), pctls[2]);
+}
+
+/**
+ * Tests that computePercentiles() won't leave any unspilled data out of computation once spilling
+ * has occurred at least once and that reset will clear the algorithm to have no data stored.
+ */
+TEST(ContinuousPercentileTest, SpillingSpecific) {
+    const double inf = std::numeric_limits<double>::infinity();
+
+    vector<double> inputs(101);
+    std::iota(inputs.begin(), inputs.end(), 0);
+
+    auto seed = time(nullptr);
+    LOGV2(9233000, "SpillingSpecific", "seed"_attr = seed);
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
+
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+    ContinuousPercentile cp = createContinuousPercentileForTest(&expCtx);
+    cp.incorporate(inputs);
+
+    cp.spill();
+    auto pctls = cp.computePercentiles({0.1, 0.5, 0.99, 1});
+
+    ASSERT_EQ(10, pctls[0]);
+    ASSERT_EQ(50, pctls[1]);
+    ASSERT_EQ(99, pctls[2]);
+    ASSERT_EQ(100, pctls[3]);
+
+    // Incorporate more data but don't explicitly spill it (computePercentiles should handle this
+    // automatically).
+    cp.incorporate(inf);
+
+    pctls = cp.computePercentiles({1});
+
+    ASSERT_EQ(inf, pctls[0]);
+
+    // Reset algorithm object to empty.
+    cp.reset();
+
+    ASSERT(!cp.computePercentile(0.1));
+    ASSERT(!cp.computePercentile(1));
+    ASSERT(cp.computePercentiles({0, 0.1, 0.5, 0.99, 1}).empty());
 }
 
 }  // namespace
