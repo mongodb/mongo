@@ -14,7 +14,7 @@ RETRIES=5
 DELAY=2
 COUNT=0
 while [ $COUNT -lt $RETRIES ]; do
-  $REALGIT "$@"
+  "$REALGIT" "$@"
   CODE=$?
   if [ $CODE -eq 0 ]; then
     RETRIES=0
