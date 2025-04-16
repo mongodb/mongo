@@ -69,31 +69,26 @@ Value evaluateAccumulatorQuantile(const ExpressionFromAccumulatorQuantile<TAccum
     }
 
     if (input.isArray() && input.getArrayLength() > 0) {
+        std::vector<double> samples;
+        samples.reserve(input.getArrayLength());
+        for (const auto& item : input.getArray()) {
+            if (item.numeric()) {
+                samples.push_back(item.coerceToDouble());
+            }
+        }
         if (expr.getMethod() != PercentileMethodEnum::kContinuous) {
             // On small datasets, which are likely to be the inputs for the expression, creating
             // t-digests is inefficient, so instead we use DiscretePercentile algo directly for
             // both "discrete" and "approximate" methods.
-            std::vector<double> samples;
-            samples.reserve(input.getArrayLength());
-            for (const auto& item : input.getArray()) {
-                if (item.numeric()) {
-                    samples.push_back(item.coerceToDouble());
-                }
-            }
             DiscretePercentile dp(expr.getExpressionContext());
             dp.incorporate(samples);
             return TAccumulator::formatFinalValue(expr.getPs().size(),
                                                   dp.computePercentiles(expr.getPs()));
         } else {
-            // Delegate to the accumulator. Note: it would be more efficient to use the
-            // percentile algorithms directly rather than an accumulator, as it would reduce
-            // heap alloc, virtual calls and avoid unnecessary for expressions memory tracking.
-            // This path currently cannot be executed as we only support discrete percentiles.
-            TAccumulator accum(expr.getExpressionContext(), expr.getPs(), expr.getMethod());
-            for (const auto& item : input.getArray()) {
-                accum.process(item, false /* merging */);
-            }
-            return accum.getValue(false /* toBeMerged */);
+            ContinuousPercentile cp(expr.getExpressionContext());
+            cp.incorporate(samples);
+            return TAccumulator::formatFinalValue(expr.getPs().size(),
+                                                  cp.computePercentiles(expr.getPs()));
         }
     }
 
@@ -133,9 +128,10 @@ PercentileMethodEnum methodNameToEnum(const VersionContext& vCtx, StringData met
         return PercentileMethodEnum::kContinuous;
     }
 
+    // The idl should have validated the input string (see 'validatePercentileMethod()').
     uasserted(
-        ErrorCodes::BadValue,
-        "Only 'approximate', 'discrete', and 'continuous' can be used as percentile 'method'.");
+        9157900,
+        "Currently only 'approximate', 'discrete', and 'continuous' percentiles are supported");
 }
 
 StringData percentileMethodEnumToString(PercentileMethodEnum method) {

@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/percentile_algo_continuous.h"
 #include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
