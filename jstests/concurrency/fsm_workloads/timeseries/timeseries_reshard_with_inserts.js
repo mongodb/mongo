@@ -19,6 +19,7 @@
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 export const $config = (function() {
     // This test manually shards the collection.
@@ -134,7 +135,9 @@ export const $config = (function() {
         let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(numInitialDocs, res.nInserted);
-        assert.eq(100, db[bucketNss].countDocuments({}));
+        assert.eq(100,
+                  getTimeseriesCollForRawOps(db, db[collName])
+                      .countDocuments({}, getRawOperationSpec(db)));
     }
 
     return {

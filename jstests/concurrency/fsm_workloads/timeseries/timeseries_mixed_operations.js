@@ -9,6 +9,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 export const $config = (function() {
     const initData = {
@@ -18,10 +19,6 @@ export const $config = (function() {
 
         getCollection: function(db, collName) {
             return db.getCollection(this.getCollectionName(collName));
-        },
-
-        getBucketCollection: function(db, collName) {
-            return db.getCollection("system.buckets." + this.getCollectionName(collName));
         },
     };
 
@@ -39,6 +36,12 @@ export const $config = (function() {
             });
             TimeseriesTest.assertInsertWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
+
+            // Cache the collection name and command options to use for rawData in order to prevent
+            // the workload threads from having to re-determine them during their execution.
+            this.collNameForRawOps =
+                getTimeseriesCollForRawOps(db, this.getCollectionName(collName));
+            this.rawOperationSpec = getRawOperationSpec(db);
         },
 
         insertManyOrdered: function insertManyOrdered(db, collName) {
@@ -72,7 +75,7 @@ export const $config = (function() {
         },
 
         deleteAllBuckets: function deleteAllBuckets(db, collName) {
-            assert.commandWorked(this.getBucketCollection(db, collName).remove({}));
+            assert.commandWorked(db[this.collNameForRawOps].remove({}, this.rawOperationSpec));
         },
     };
 
