@@ -66,11 +66,15 @@ protected:
 
     virtual void validateCollectionsHelper(const std::set<NamespaceString>& collections);
 
+    // Ensure that the input collection has a meta field and that at least one measurement has a
+    // meta field value.
     void _assertCollWithMetaField(const NamespaceString& ns,
                                   std::vector<BSONObj> batchOfMeasurements) const;
 
     void _assertCollWithoutMetaField(const NamespaceString& ns) const;
 
+    // Ensure that the input collection is configured with a meta field. Ensure that no measurements
+    // in the collection have meta field values.
     void _assertNoMetaFieldsInCollWithMetaField(const NamespaceString& ns,
                                                 std::vector<BSONObj> batchOfMeasurements) const;
 
@@ -78,45 +82,53 @@ protected:
 
     const CollatorInterface* _getCollator(const NamespaceString& ns) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue = Date_t::now()) const;
+    //_generateMeasurementWithMetaFieldType enables us to generate a simple measurement with
+    // metaValue and timeValue.
+    //
+    // There are  simplifications with the Array, Object, RegEx, DBRef, and CodeWScope
+    // BSONTypes (we use the metaValue in a String component of the BSONElement rather than
+    // configuring the entire BSONType output).
+    //
+    // Set timeValue to boost::none to generate a malformed measurement.
+    BSONObj _generateMeasurementWithMetaFieldType(
+        BSONType type, boost::optional<Date_t> timeValue = Date_t::now()) const;
 
     // We don't supply defaults for these type-specific function declarations because we provide the
     // defaults in the generic _generateMeasurementWithMetaFieldType above.
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   Timestamp metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   int metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   long long metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   Decimal128 metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   double metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   OID metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   bool metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   BSONBinData metaValue) const;
 
     BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  Date_t timeValue,
+                                                  boost::optional<Date_t> timeValue,
                                                   StringData metaValue) const;
 
     bucket_catalog::Bucket* _generateBucketWithBatch(const NamespaceString& ns,
@@ -165,6 +177,27 @@ protected:
         Date_t timeValue = Date_t::now();
     };
 
+    // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that
+    // have the input RolloverReason. Input conditions: numMeasurements is the number of
+    // measurements that should be returned in the measurement vector.
+    // Default: gTimeseriesBucketMaxCount
+    // 1 <= numMeasurements <= gTimeseriesBucketMaxCount    if kNone
+    // 2 <= numMeasurements <= gTimeseriesBucketMaxCount    if kSchemaChange,
+    //                                                      kTimeForward,
+    //                                                      kTimeBackward
+    // cannot set numMeasurements                           otherwise
+    //
+    // idxWithDiffMeasurement is the index where we change the record in a measurement vector to
+    // simulate a specific rollover reason. This is only used for kSchemaChange, kTimeForward,
+    // kTimeBackward.
+    // Default: numMeasurements - 1
+    // 1 <= idxWithDiffMeasurement <= numMeasurements       if kSchemaChange,
+    //                                                         kTimeForward,
+    //                                                         kTimeBackward
+    // cannot set idxWithDiffMeasurement                    otherwise
+    //
+    // metaValue and timeValue are what we set as the meta value and time value for a measurement,
+    // and have the defaults _metaValue and Date_t::now() respectively.
     std::vector<BSONObj> _generateMeasurementsWithRolloverReason(
         const MeasurementsWithRolloverReasonOptions& options) const;
 

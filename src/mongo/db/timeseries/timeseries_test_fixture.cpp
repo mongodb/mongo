@@ -113,8 +113,6 @@ void TimeseriesTestFixture::_assertCollWithoutMetaField(const NamespaceString& n
     ASSERT(!metaField);
 }
 
-// Ensure that the input collection is configured with a meta field. Ensure that no measurements in
-// the collection have meta field values.
 void TimeseriesTestFixture::_assertNoMetaFieldsInCollWithMetaField(
     const NamespaceString& ns, std::vector<BSONObj> measurements) const {
     // Ensure that the input collection has a meta field.
@@ -196,30 +194,30 @@ const CollatorInterface* TimeseriesTestFixture::_getCollator(const NamespaceStri
     return autoColl->getDefaultCollator();
 }
 
-//_generateMeasurementWithMetaFieldType enables us to generate a simple measurement with
-// metaValue and timeValue.
-//
-// There are  simplifications with the Array, Object, RegEx, DBRef, and CodeWScope
-// BSONTypes (we use the metaValue in a String component of the BSONElement rather than
-// configuring the entire BSONType output).
-BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONType type,
-                                                                     const Date_t timeValue) const {
+BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
+    const BSONType type, const boost::optional<Date_t> timeValue) const {
     switch (type) {
         case (Undefined):
-            return BSON(_timeField << timeValue << _metaField << BSONUndefined);
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << BSONUndefined)
+                               : BSON(_metaField << BSONUndefined);
         case (Date): {
             StatusWith<Date_t> date = dateFromISOString("2022-06-06T15:34:00.000Z");
             ASSERT(date.isOK());
-            return BSON(_timeField << timeValue << _metaField << date.getValue());
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << date.getValue())
+                               : BSON(_metaField << date.getValue());
         }
         case (MinKey):
-            return BSON(_timeField << timeValue << _metaField << MINKEY);
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << MINKEY)
+                               : BSON(_metaField << MINKEY);
         case (MaxKey):
-            return BSON(_timeField << timeValue << _metaField << MAXKEY);
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << MAXKEY)
+                               : BSON(_metaField << MAXKEY);
         case (jstNULL):
-            return BSON(_timeField << timeValue << _metaField << BSONNULL);
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << BSONNULL)
+                               : BSON(_metaField << BSONNULL);
         case (EOO):
-            return BSON(_timeField << timeValue << _metaField << BSONObj());
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << BSONObj())
+                               : BSON(_metaField << BSONObj());
         case (bsonTimestamp):
             return _generateMeasurementWithMetaFieldType(type, timeValue, Timestamp(1, 2));
         case (NumberInt):
@@ -246,105 +244,106 @@ BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONT
 }
 
 BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
-    const BSONType type, const Date_t timeValue, const Timestamp metaValue) const {
+    const BSONType type, const boost::optional<Date_t> timeValue, const Timestamp metaValue) const {
     invariant(type == bsonTimestamp);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
-BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONType type,
-                                                                     const Date_t timeValue,
-                                                                     const int metaValue) const {
+BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
+    const BSONType type, const boost::optional<Date_t> timeValue, const int metaValue) const {
     invariant(type == NumberInt);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
 BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
-    const BSONType type, const Date_t timeValue, const long long metaValue) const {
+    const BSONType type, const boost::optional<Date_t> timeValue, const long long metaValue) const {
     invariant(type == NumberLong);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
 BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
-    const BSONType type, const Date_t timeValue, const Decimal128 metaValue) const {
+    const BSONType type,
+    const boost::optional<Date_t> timeValue,
+    const Decimal128 metaValue) const {
     invariant(type == NumberDecimal);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
-BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONType type,
-                                                                     const Date_t timeValue,
-                                                                     const double metaValue) const {
+BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
+    const BSONType type, const boost::optional<Date_t> timeValue, const double metaValue) const {
     invariant(type == NumberDouble);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
-BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONType type,
-                                                                     const Date_t timeValue,
-                                                                     const OID metaValue) const {
+BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
+    const BSONType type, const boost::optional<Date_t> timeValue, const OID metaValue) const {
     invariant(type == jstOID);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
-BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(const BSONType type,
-                                                                     const Date_t timeValue,
-                                                                     const bool metaValue) const {
+BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
+    const BSONType type, const boost::optional<Date_t> timeValue, const bool metaValue) const {
     invariant(type == Bool);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
 BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
-    const BSONType type, const Date_t timeValue, const BSONBinData metaValue) const {
+    const BSONType type,
+    const boost::optional<Date_t> timeValue,
+    const BSONBinData metaValue) const {
     invariant(type == BinData);
-    return BSON(_timeField << timeValue << _metaField << metaValue);
+    return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                       : BSON(_metaField << metaValue);
 }
 
 BSONObj TimeseriesTestFixture::_generateMeasurementWithMetaFieldType(
-    const BSONType type, const Date_t timeValue, const StringData metaValue) const {
+    const BSONType type,
+    const boost::optional<Date_t> timeValue,
+    const StringData metaValue) const {
     switch (type) {
         // Cases where the metaValue will be a part of the returned measurement.
         case (Object):
-            return BSON(_timeField << timeValue << _metaField << BSON("obj" << metaValue));
+            return (timeValue)
+                ? BSON(_timeField << *timeValue << _metaField << BSON("obj" << metaValue))
+                : BSON(_metaField << BSON("obj" << metaValue));
         case (Array):
-            return BSON(_timeField << timeValue << _metaField << BSONArray(BSON("0" << metaValue)));
+            return (timeValue)
+                ? BSON(_timeField << *timeValue << _metaField << BSONArray(BSON("0" << metaValue)))
+                : BSON(_metaField << BSONArray(BSON("0" << metaValue)));
         case (RegEx):
-            return BSON(_timeField << timeValue << _metaField << BSONRegEx(metaValue, metaValue));
+            return (timeValue)
+                ? BSON(_timeField << *timeValue << _metaField << BSONRegEx(metaValue, metaValue))
+                : BSON(_metaField << BSONRegEx(metaValue, metaValue));
         case (DBRef):
-            return BSON(_timeField << timeValue << _metaField
-                                   << BSONDBRef(metaValue, OID("dbdbdbdbdbdbdbdbdbdbdbdb")));
+            return (timeValue)
+                ? BSON(_timeField << *timeValue << _metaField
+                                  << BSONDBRef(metaValue, OID("dbdbdbdbdbdbdbdbdbdbdbdb")))
+                : BSON(_metaField << BSONDBRef(metaValue, OID("dbdbdbdbdbdbdbdbdbdbdbdb")));
         case (Code):
-            return BSON(_timeField << timeValue << _metaField << BSONCode(metaValue));
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << BSONCode(metaValue))
+                               : BSON(_metaField << BSONCode(metaValue));
         case (Symbol):
-            return BSON(_timeField << timeValue << _metaField << BSONSymbol(metaValue));
+            return (timeValue)
+                ? BSON(_timeField << *timeValue << _metaField << BSONSymbol(metaValue))
+                : BSON(_metaField << BSONSymbol(metaValue));
         case (CodeWScope):
-            return BSON(_timeField << timeValue << _metaField
-                                   << BSONCodeWScope(metaValue, BSON("x" << 1)));
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField
+                                                 << BSONCodeWScope(metaValue, BSON("x" << 1)))
+                               : BSON(_metaField << BSONCodeWScope(metaValue, BSON("x" << 1)));
         default:
-            return BSON(_timeField << timeValue << _metaField << metaValue);
+            return (timeValue) ? BSON(_timeField << *timeValue << _metaField << metaValue)
+                               : BSON(_metaField << metaValue);
     }
     MONGO_UNREACHABLE;
 }
 
-// _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that have
-// the input RolloverReason.
-// Input conditions:
-// numMeasurements is the number of measurements that should be returned in the measurement vector.
-// Default: gTimeseriesBucketMaxCount
-// 1 <= numMeasurements <= gTimeseriesBucketMaxCount    if kNone
-// 2 <= numMeasurements <= gTimeseriesBucketMaxCount    if kSchemaChange,
-//                                                         kTimeForward,
-//                                                         kTimeBackward
-// cannot set numMeasurements                           otherwise
-//
-// idxWithDiffMeasurement is the index where we change the record in a measurement vector to
-// simulate a specific rollover reason. This is only used for kSchemaChange, kTimeForward,
-// kTimeBackward.
-// Default: numMeasurements - 1
-// 1 <= idxWithDiffMeasurement <= numMeasurements       if kSchemaChange,
-//                                                         kTimeForward,
-//                                                         kTimeBackward
-// cannot set idxWithDiffMeasurement                    otherwise
-//
-// metaValue and timeValue are what we set as the meta value and time value for a measurement, and
-// have the defaults _metaValue and Date_t::now() respectively.
 std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverReason(
     const MeasurementsWithRolloverReasonOptions& options) const {
     std::vector<BSONObj> measurements;

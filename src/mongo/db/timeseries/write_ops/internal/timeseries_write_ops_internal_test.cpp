@@ -97,6 +97,10 @@ protected:
         const std::vector<BSONObj>& batchOfMeasurements,
         const std::vector<size_t>& numWriteBatches) const;
 
+    template <typename T>
+    void _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        BSONType type, std::vector<T> metaValues) const;
+
     void _testStageInsertBatchWithoutMetaFieldInCollWithMetaField(
         const NamespaceString& ns,
         const UUID& collectionUUID,
@@ -336,6 +340,57 @@ void TimeseriesWriteOpsInternalTest::
     _assertCollWithoutMetaField(ns);
     _testBuildBatchedInsertContextWithoutMetaField(
         ns, userMeasurementsBatch, correctIndexOrder, expectedIndicesWithErrors);
+}
+
+// _testBuildBatchedInsertContextWithMalformedMeasurements will accept a BSONType and an optional
+// std::vector<T> with only two elements that should store the values of meta values if we have a
+// non-constant BSONType.
+// We assert if the BSONType is non-constant and we don't have a metaValues vector.
+// We assert if metaValues.size() != 2.
+template <typename T>
+void TimeseriesWriteOpsInternalTest::
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        const BSONType type, std::vector<T> metaValues) const {
+    auto isConstantBSONType =
+        (std::find(_constantBSONTypes.begin(), _constantBSONTypes.end(), type) !=
+         _constantBSONTypes.end());
+    // We case on how we generate based on if we have the metaValues vector or not.
+    // We assert if there is no metaValues vector and a non-constant BSONType.
+    ASSERT(isConstantBSONType || metaValues.size() == 2);
+    auto measurement1 = (isConstantBSONType)
+        ? _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(105))
+        : _generateMeasurementWithMetaFieldType(
+              type, Date_t::fromMillisSinceEpoch(105), metaValues[0]);
+    auto measurement2 = (isConstantBSONType)
+        ? _generateMeasurementWithMetaFieldType(type, boost::none)
+        : _generateMeasurementWithMetaFieldType(type, boost::none, metaValues[0]);
+    auto measurement3 = (isConstantBSONType)
+        ? _generateMeasurementWithMetaFieldType(type, boost::none)
+        : _generateMeasurementWithMetaFieldType(type, boost::none, metaValues[0]);
+    auto measurement4 = (isConstantBSONType)
+        ? _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(103))
+        : _generateMeasurementWithMetaFieldType(
+              type, Date_t::fromMillisSinceEpoch(103), metaValues[1]);
+    auto measurement5 = (isConstantBSONType)
+        ? _generateMeasurementWithMetaFieldType(type, Date_t::fromMillisSinceEpoch(101))
+        : _generateMeasurementWithMetaFieldType(
+              type, Date_t::fromMillisSinceEpoch(101), metaValues[0]);
+    std::vector<BSONObj> userMeasurementsBatch{
+        measurement1, measurement2, measurement3, measurement4, measurement5};
+    stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
+        metaFieldMetadataToCorrectIndexOrderMap;
+    if (isConstantBSONType) {
+        metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+            *(getBucketMetadata(userMeasurementsBatch[0])), std::initializer_list<size_t>{4, 3, 0});
+    } else {
+        metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+            *(getBucketMetadata(userMeasurementsBatch[0])), std::initializer_list<size_t>{4, 0});
+        metaFieldMetadataToCorrectIndexOrderMap.try_emplace(
+            *(getBucketMetadata(userMeasurementsBatch[3])), std::initializer_list<size_t>{3});
+    }
+    stdx::unordered_set<size_t> expectedIndicesWithErrors{1, 2};
+    _testBuildBatchedInsertContextWithMetaField(
+        userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
 }
 
 // numWriteBatches is the size of the writeBatches that should be generated from the
@@ -841,6 +896,45 @@ TEST_F(TimeseriesWriteOpsInternalTest,
     stdx::unordered_set<size_t> expectedIndicesWithErrors{1, 2};
     _testBuildBatchedInsertContextWithMetaField(
         userMeasurementsBatch, metaFieldMetadataToCorrectIndexOrderMap, expectedIndicesWithErrors);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       BuildBatchedInsertContextsWithConstantBSONTypeMetaReportsMalformedMeasurements) {
+    for (BSONType type : _constantBSONTypes) {
+        std::vector<StringData> emptyMetaValues{};
+        _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(type, emptyMetaValues);
+    }
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       BuildBatchedInsertContextsWithNonConstantBSONTypeMetaReportsMalformedMeasurements) {
+    // For non-string component meta field types, we directly have to declare two meta values.
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        bsonTimestamp, std::vector<Timestamp>{Timestamp(1, 2), Timestamp(2, 3)});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(NumberInt,
+                                                                         std::vector<int>{1, 2});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        NumberLong, std::vector<long long>{0x0123456789abcdefll, 0x0123456789abcdeell});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        NumberDecimal, std::vector<Decimal128>{Decimal128("1.45"), Decimal128("0.987")});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        NumberDouble, std::vector<double>{1.4, 8.6});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        jstOID, std::vector<OID>{OID("649f0704230f18da067519c4"), OID("64a33d9cdf56a62781061048")});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        Bool, std::vector<bool>{true, false});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        BinData,
+        std::vector<BSONBinData>{BSONBinData("", 0, BinDataGeneral),
+                                 BSONBinData("\x69\xb7", 2, BinDataGeneral)});
+
+    // For string component meta field types, we can don't need to directly declare the values; we
+    // can just use two different strings.
+    for (BSONType type : _stringComponentBSONTypes) {
+        std::vector<StringData> stringMetaValues{_metaValue, _metaValue2};
+        _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(type,
+                                                                             stringMetaValues);
+    }
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, BuildBatchedInsertContextsAllMeasurementsErrorNoMeta) {
