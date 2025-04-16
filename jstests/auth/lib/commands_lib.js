@@ -3182,39 +3182,6 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: "_shardsvrCommitCreateDatabaseMetadata",
-          command: {
-            _shardsvrCommitCreateDatabaseMetadata: 1,
-            dbVersion: {uuid: new UUID(), timestamp: new Timestamp(1, 0), lastMod: NumberInt(1)}
-          },
-          skipSharded: true,
-          testcases: [
-            {
-              runOnDb: adminDbName,
-              roles: {__system: 1},
-              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-              expectFail: true
-            },
-            {runOnDb: firstDbName, roles: {}},
-            {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "_shardsvrCommitDropDatabaseMetadata",
-          command: {_shardsvrCommitDropDatabaseMetadata: 1},
-          skipSharded: true,
-          testcases: [
-            {
-              runOnDb: adminDbName,
-              roles: {__system: 1},
-              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-              expectFail: true
-            },
-            {runOnDb: firstDbName, roles: {}},
-            {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
           testname: "commitTxn",
           command: {commitTransaction: 1},
           skipSharded: true,
