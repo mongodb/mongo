@@ -22,6 +22,7 @@
  *   cannot_run_during_upgrade_downgrade,
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -189,8 +190,7 @@ const insensitive = {
 
     // Let's check our understanding of what happens with the bucketing as otherwise the tests below
     // won't be testing what we think they are.
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, buckets.length, "All docs should be placed into the same bucket");
     assert.eq("10", buckets[0].control.max.val, "Computed max control for 'val' measurement");
 

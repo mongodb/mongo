@@ -11,9 +11,13 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -27,7 +31,7 @@ TimeseriesTest.run((insert) => {
 
     const coll = db[jsTestName()];
     const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    coll.drop();  // implicitly drops bucketsColl.
+    coll.drop();
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
@@ -81,7 +85,10 @@ TimeseriesTest.run((insert) => {
 
     // Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
     // $indexStats on the buckets collection.
-    const bucketIndexStatsDocs = bucketsColl.aggregate([{$indexStats: {}}]).toArray();
+    // TODO (SERVER-103876): Remove the rawData from $indexStats.
+    const bucketIndexStatsDocs = getTimeseriesCollForRawOps(coll)
+                                     .aggregate([{$indexStats: {}}], kRawOperationSpec)
+                                     .toArray();
     assert.eq(Object.keys(indexKeys).length + 1,
               bucketIndexStatsDocs.length,
               tojson(bucketIndexStatsDocs));

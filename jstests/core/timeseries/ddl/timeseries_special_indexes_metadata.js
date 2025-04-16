@@ -11,9 +11,14 @@
  *   requires_pipeline_optimization,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -22,7 +27,6 @@ import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyz
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB(jsTestName());
     const timeseriescoll = testdb.getCollection(jsTestName() + "_coll");
-    const bucketscoll = testdb.getCollection('system.buckets.' + timeseriescoll.getName());
 
     const timeFieldName = 'tm';
     const metaFieldName = 'mm';
@@ -32,7 +36,7 @@ TimeseriesTest.run((insert) => {
      * and 'metaFieldName'. Checks that the buckets collection is created, as well.
      */
     function resetCollections() {
-        timeseriescoll.drop();  // implicitly drops bucketscoll.
+        timeseriescoll.drop();
 
         assert.commandWorked(testdb.createCollection(
             timeseriescoll.getName(),
@@ -56,7 +60,13 @@ TimeseriesTest.run((insert) => {
         // Check that the index is usable.
         assert.gt(
             timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length, 0);
-        assert.gt(bucketscoll.find(bucketsFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
+        assert.gt(getTimeseriesCollForRawOps(timeseriescoll)
+                      .find(bucketsFindQuery)
+                      .rawData()
+                      .hint(bucketsIndexSpec)
+                      .toArray()
+                      .length,
+                  0);
 
         // Check that listIndexes returns expected results.
         listIndexesHasIndex(timeseriesIndexSpec);
@@ -67,9 +77,12 @@ TimeseriesTest.run((insert) => {
         assert.commandFailedWithCode(
             assert.throws(() => timeseriescoll.find().hint(timeseriesIndexSpec).toArray()),
                          ErrorCodes.BadValue);
-        assert.commandFailedWithCode(
-            assert.throws(() => bucketscoll.find().hint(bucketsIndexSpec).toArray()),
-                         ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(timeseriescoll)
+                                                             .find()
+                                                             .rawData()
+                                                             .hint(bucketsIndexSpec)
+                                                             .toArray()),
+                                                  ErrorCodes.BadValue);
 
         // Check that the index can still be found via listIndexes even if hidden.
         listIndexesHasIndex(timeseriesIndexSpec);
@@ -78,7 +91,13 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(timeseriescoll.unhideIndex(timeseriesIndexSpec));
         assert.gt(
             timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length, 0);
-        assert.gt(bucketscoll.find(bucketsFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
+        assert.gt(getTimeseriesCollForRawOps(timeseriescoll)
+                      .find(bucketsFindQuery)
+                      .rawData()
+                      .hint(bucketsIndexSpec)
+                      .toArray()
+                      .length,
+                  0);
     }
 
     /**
@@ -141,7 +160,12 @@ TimeseriesTest.run((insert) => {
               timeseriescoll.find().hint(sparseTimeseriesIndexSpec).toArray().length,
               "Failed to use index: " + tojson(sparseTimeseriesIndexSpec));
     assert.eq(1,
-              bucketscoll.find().hint(sparseBucketsIndexSpec).toArray().length,
+              getTimeseriesCollForRawOps(timeseriescoll)
+                  .find()
+                  .rawData()
+                  .hint(sparseBucketsIndexSpec)
+                  .toArray()
+                  .length,
               "Failed to use index: " + tojson(sparseBucketsIndexSpec));
     assert.eq(2, timeseriescoll.find().toArray().length, "Failed to see all time-series documents");
 
@@ -169,8 +193,11 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(timeseriescoll, multikeyDoc),
                          'Failed to insert multikeyDoc: ' + tojson(multikeyDoc));
 
-    const bucketsFindExplain =
-        assert.commandWorked(bucketscoll.find().hint(multikeyBucketsIndexSpec).explain());
+    const bucketsFindExplain = assert.commandWorked(getTimeseriesCollForRawOps(timeseriescoll)
+                                                        .find()
+                                                        .rawData()
+                                                        .hint(multikeyBucketsIndexSpec)
+                                                        .explain());
     const planStage = getPlanStage(getWinningPlanFromExplain(bucketsFindExplain), "IXSCAN");
     assert.eq(true,
               planStage.isMultiKey,
@@ -200,15 +227,21 @@ TimeseriesTest.run((insert) => {
                          'Failed to insert twoDDoc: ' + tojson(twoDDoc));
 
     assert.eq(1,
-              bucketscoll.find({'meta': {$near: [0, 0]}}).toArray().length,
+              getTimeseriesCollForRawOps(timeseriescoll)
+                  .find({'meta': {$near: [0, 0]}})
+                  .rawData()
+                  .toArray()
+                  .length,
               "Failed to use index: " + tojson(twoDBucketsIndexSpec));
 
     assert.eq(1,
-              bucketscoll
-                  .aggregate([
-                      {$geoNear: {near: [40.4, -70.4], distanceField: "dist", spherical: true}},
-                      {$limit: 1}
-                  ])
+              getTimeseriesCollForRawOps(timeseriescoll)
+                  .aggregate(
+                      [
+                          {$geoNear: {near: [40.4, -70.4], distanceField: "dist", spherical: true}},
+                          {$limit: 1}
+                      ],
+                      kRawOperationSpec)
                   .toArray()
                   .length,
               "Failed to use 2d index: " + tojson(twoDBucketsIndexSpec));
@@ -256,17 +289,19 @@ TimeseriesTest.run((insert) => {
                          'Failed to insert twoDSphereDoc: ' + tojson(twoDSphereDoc));
 
     assert.eq(1,
-              bucketscoll
-                  .aggregate([
-                      {
-                          $geoNear: {
-                              near: {type: "Point", coordinates: [40.4, -70.4]},
-                              distanceField: "dist",
-                              spherical: true
-                          }
-                      },
-                      {$limit: 1}
-                  ])
+              getTimeseriesCollForRawOps(timeseriescoll)
+                  .aggregate(
+                      [
+                          {
+                              $geoNear: {
+                                  near: {type: "Point", coordinates: [40.4, -70.4]},
+                                  distanceField: "dist",
+                                  spherical: true
+                              }
+                          },
+                          {$limit: 1}
+                      ],
+                      kRawOperationSpec)
                   .toArray()
                   .length,
               "Failed to use 2dsphere index: " + tojson(twoDSphereBucketsIndexSpec));
@@ -324,8 +359,11 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(timeseriescoll, wildcard3Doc));
 
     // Queries on 'metaFieldName' subfields should be able to use the wildcard index hint.
-    const wildcardBucketsResults =
-        bucketscoll.find({'meta.c.d': 1}).hint(wildcardBucketsIndexSpec).toArray();
+    const wildcardBucketsResults = getTimeseriesCollForRawOps(timeseriescoll)
+                                       .find({'meta.c.d': 1})
+                                       .rawData()
+                                       .hint(wildcardBucketsIndexSpec)
+                                       .toArray();
     assert.eq(2, wildcardBucketsResults.length, "Query results: " + tojson(wildcardBucketsResults));
     const wildcardTimeseriesResults = timeseriescoll.find({[metaFieldName + '.c.d']: 1})
                                           .hint(wildcardTimeseriesIndexSpec)
@@ -357,8 +395,11 @@ TimeseriesTest.run((insert) => {
 
     assert.eq(
         1, timeseriescoll.find({'mm.d.zip': '01234'}).hint(wildcardTimeseriesIndexSpec).itcount());
-    const wildcardFindExplain = assert.commandWorked(
-        bucketscoll.find({'meta.d.zip': '01234'}).hint(wildcardBucketsIndexSpec).explain());
+    const wildcardFindExplain = assert.commandWorked(getTimeseriesCollForRawOps(timeseriescoll)
+                                                         .find({'meta.d.zip': '01234'})
+                                                         .rawData()
+                                                         .hint(wildcardBucketsIndexSpec)
+                                                         .explain());
     const planWildcardStage =
         getPlanStage(getWinningPlanFromExplain(wildcardFindExplain), "IXSCAN");
     assert(planWildcardStage.isMultiKey,

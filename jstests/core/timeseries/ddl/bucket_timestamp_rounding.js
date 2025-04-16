@@ -7,8 +7,11 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 
 (function testSeconds() {
     let coll = db[jsTestName() + '_granularitySeconds'];
@@ -28,8 +31,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:09:59.999Z")}));
 
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:10:00.000Z"));
     // The timestamp component of the bucketId should equal the min time field.
@@ -37,7 +39,7 @@
 
     // Exceeding the bucket boundary should create a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:10:00.000Z")}));
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(2, buckets.length);
 })();
 
@@ -59,8 +61,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T19:59:59.999Z")}));
 
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:00:00.000Z"));
     // The timestamp component of the bucketId should equal the min time field.
@@ -68,7 +69,7 @@
 
     // Exceeding the bucket boundary should create a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(2, buckets.length);
 })();
 
@@ -90,8 +91,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-05-21T23:59:59.999Z")}));
 
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     jsTestLog(tojson(buckets));
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T00:00:00.000Z"));
@@ -100,7 +100,7 @@
 
     // Exceeding the bucket boundary should create a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-05-23T00:00:00.000Z")}));
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(2, buckets.length);
 })();
 
@@ -122,8 +122,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:09:59.999Z")}));
 
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:10:00.000Z"));
     // The timestamp component of the bucketId should equal the min time field.
@@ -142,7 +141,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-25T19:59:59.999Z")}));
 
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(2, buckets.length);
     assert.eq(buckets[1].control.min.t, ISODate("2021-04-24T20:00:00.000Z"));
     // The timestamp component of the bucketId should equal the min time field.
@@ -150,7 +149,7 @@
 
     // Exceeding the bucket boundary should create a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-26T00:00:00.000Z")}));
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(3, buckets.length);
 })();
 
@@ -172,8 +171,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:09:59.999Z")}));
 
-    let bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(1, buckets.length);
     assert.eq(buckets[0].control.min.t, ISODate("2021-04-22T20:00:00.000Z"));
     // The timestamp component of the bucketId should equal the min time field.
@@ -191,7 +189,7 @@
     // doesn't open a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-07-23T23:59:59.999Z")}));
 
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(2, buckets.length);
     assert.eq(buckets[1].control.min.t, ISODate("2021-06-24T00:00:00.000Z"));
     // The timestamp component of the bucketId should equal the min time field.
@@ -199,6 +197,6 @@
 
     // Exceeding the bucket boundary should create a new bucket.
     assert.commandWorked(coll.insert({t: ISODate("2021-07-25T00:00:00.000Z")}));
-    buckets = bucketsColl.find().toArray();
+    buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(3, buckets.length);
 })();

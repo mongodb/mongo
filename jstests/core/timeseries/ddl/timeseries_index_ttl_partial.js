@@ -13,7 +13,6 @@
 const collName = jsTestName();
 const indexName = "partialTTLIndex";
 const coll = db.getCollection(collName);
-const bucketsColl = db.getCollection("system.buckets." + collName);
 
 const timeFieldName = "tm";
 const metaFieldName = "mm";

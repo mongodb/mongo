@@ -32,7 +32,6 @@ const generateTest = (useHint) => {
         const timeFieldName = 'ts';
         const metaFieldName = 'mm';
         const coll = testDB.getCollection('t');
-        const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
         /**
          * Sets up an empty time-series collection with options 'collOpts' on namespace 't' using
@@ -40,7 +39,7 @@ const generateTest = (useHint) => {
          * well.
          */
         function resetCollections(collOpts = {}) {
-            coll.drop();  // implicitly drops bucketsColl.
+            coll.drop();
 
             assert.commandWorked(testDB.createCollection(
                 coll.getName(),

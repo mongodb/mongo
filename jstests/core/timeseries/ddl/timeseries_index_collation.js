@@ -7,8 +7,10 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -18,7 +20,6 @@ TimeseriesTest.run((insert) => {
     const metadata = ['8', '16', '64', '128'];
 
     const coll = db[jsTestName()];
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();  // implicitly drops bucketsColl.
 
@@ -38,7 +39,7 @@ TimeseriesTest.run((insert) => {
 
     // Check bucket collection. We are using all unique metadata values so each measurement should
     // be in its own bucket.
-    const bucketDocs = bucketsColl.find().toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(metadata.length, bucketDocs.length, bucketDocs);
 
     // Create an index that should use the default collation, which is {numericOrdering: true}.

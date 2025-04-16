@@ -12,6 +12,10 @@
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -95,7 +99,7 @@ assert.commandWorked(coll.insert([
     {[timeField]: ISODate('2000-01-01T00:00:04Z'), [metaField]: {bucket: 'C'}, a: 14, b: 0},
 ]));
 assert.eq(15, coll.count());
-assert.eq(3, buckets.count());
+assert.eq(3, getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec));
 
 // Expected partialFilterExpression to be an object.
 assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 123}), [10065]);

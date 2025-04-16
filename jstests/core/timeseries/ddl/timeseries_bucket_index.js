@@ -7,8 +7,13 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
     getWinningPlanFromExplain,
@@ -33,23 +38,28 @@ TimeseriesTest.run((insert) => {
 
     assert.commandWorked(bucketsColl.createIndex({"control.max.time": 1}));
 
-    let buckets = bucketsColl.find().toArray();
+    let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));
     const bucketId = buckets[0]._id;
     const minTime = buckets[0].control.min.time;
     const maxTime = buckets[0].control.max.time;
 
-    assert.docEq(buckets, bucketsColl.find({_id: bucketId}).toArray());
-    let explain = bucketsColl.find({_id: bucketId}).explain();
+    assert.docEq(buckets,
+                 getTimeseriesCollForRawOps(coll).find({_id: bucketId}).rawData().toArray());
+    let explain = getTimeseriesCollForRawOps(coll).find({_id: bucketId}).rawData().explain();
     assert(isIdhackOrExpress(db, getWinningPlanFromExplain(explain)), explain);
 
-    assert.docEq(buckets, bucketsColl.find({"control.max.time": maxTime}).toArray());
-    explain = bucketsColl.find({"control.max.time": minTime}).explain();
+    assert.docEq(
+        buckets,
+        getTimeseriesCollForRawOps(coll).find({"control.max.time": maxTime}).rawData().toArray());
+    explain =
+        getTimeseriesCollForRawOps(coll).find({"control.max.time": minTime}).rawData().explain();
     assert(planHasStage(db, getWinningPlanFromExplain(explain), "IXSCAN"), explain);
 
-    let res = assert.commandWorked(bucketsColl.validate());
+    let res = assert.commandWorked(coll.validate());
     assert(res.valid, res);
 
-    assert.commandWorked(bucketsColl.remove({_id: bucketId}));
-    assert.docEq([], bucketsColl.find().toArray());
+    assert.commandWorked(
+        getTimeseriesCollForRawOps(coll).remove({_id: bucketId}, kRawOperationSpec));
+    assert.docEq([], getTimeseriesCollForRawOps(coll).find().rawData().toArray());
 });

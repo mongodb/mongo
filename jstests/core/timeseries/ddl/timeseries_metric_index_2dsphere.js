@@ -16,13 +16,16 @@
  * ]
  */
 
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB(jsTestName() + '_db');
     const timeseriescoll = testdb.getCollection(jsTestName() + '_coll');
-    const bucketscoll = testdb.getCollection('system.buckets.' + timeseriescoll.getName());
 
     const timeFieldName = 'tm';
     const metaFieldName = 'mm';
@@ -32,7 +35,7 @@ TimeseriesTest.run((insert) => {
      * and 'metaFieldName'. Checks that the buckets collection is created, as well.
      */
     function resetCollections() {
-        timeseriescoll.drop();  // implicitly drops bucketscoll.
+        timeseriescoll.drop();
 
         assert.commandWorked(testdb.createCollection(
             timeseriescoll.getName(),
@@ -107,8 +110,8 @@ TimeseriesTest.run((insert) => {
     ];
     assert.commandWorked(insert(timeseriescoll, twoDSphereDocs),
                          'Failed to insert twoDSphereDocs: ' + tojson(twoDSphereDocs));
-    assert.eq(bucketscoll.count(), 4);
-    printjson(bucketscoll.find({}).toArray());
+    assert.eq(getTimeseriesCollForRawOps(timeseriescoll).count({}, kRawOperationSpec), 4);
+    printjson(getTimeseriesCollForRawOps(timeseriescoll).find({}).rawData().toArray());
 
     // Test invalid documents
     const docWithInvalidCoordinates = {

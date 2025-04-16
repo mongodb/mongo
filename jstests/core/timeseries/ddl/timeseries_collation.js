@@ -10,14 +10,15 @@
  *   # This test uses a non-default collation which can cause bucket reopening to be sub-optimal
  *   # when moveCollection is running in the background.
  *   assumes_balancer_off,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
+import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     const timeFieldName = 'time';
     const metaFieldName = 'meta';
@@ -77,7 +78,8 @@ TimeseriesTest.run((insert) => {
 
     // Now let's check that min and max appropriately ignore collation for field names, but not
     // values.
-    const buckets = bucketsColl.find().sort({'control.min._id': 1}).toArray();
+    const buckets =
+        getTimeseriesCollForRawOps(coll).find().rawData().sort({'control.min._id': 1}).toArray();
     jsTestLog('Checking buckets: ' + tojson(buckets));
     assert.eq(buckets.length, 3);
     assert.eq(buckets[0].control.min.x, '10');
