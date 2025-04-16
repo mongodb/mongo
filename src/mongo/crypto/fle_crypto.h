@@ -900,6 +900,7 @@ public:
     std::vector<FLE2TagAndEncryptedMetadataBlockView> getSubstringMetadataBlocks() const;
     std::vector<FLE2TagAndEncryptedMetadataBlockView> getSuffixMetadataBlocks() const;
     std::vector<FLE2TagAndEncryptedMetadataBlockView> getPrefixMetadataBlocks() const;
+    std::vector<FLE2TagAndEncryptedMetadataBlockView> getAllMetadataBlocks() const;
 
 private:
     FLE2IndexedTextEncryptedValue();

@@ -555,16 +555,17 @@ export function isFLE2AlwaysUseCollScanModeEnabled(db) {
 }
 
 /**
- * Assert a field is an indexed encrypted field. That includes both
- * equality and range
+ * Assert a field is an indexed encrypted field. That includes
+ * equality, range, and text
  *
  * @param {BinData} value bindata value
  */
 export function assertIsIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("0e") || value.hex().startsWith("0f"),
-           "Expected subtype 14 or 15 but found the wrong type: " + value.hex());
+    assert(value.hex().startsWith("0e") || value.hex().startsWith("0f") ||
+               value.hex().startsWith("11"),
+           "Expected subtype 14, 15, or 17 but found the wrong type: " + value.hex());
 }
 
 /**

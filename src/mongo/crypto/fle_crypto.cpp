@@ -1438,7 +1438,8 @@ void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
 
     if (encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValueV2 ||
-        encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValueV2) {
+        encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValueV2 ||
+        encryptedTypeBinding == EncryptedBinDataType::kFLE2TextIndexedValue) {
         pFields->push_back({cdr, fieldPath.toString()});
     }
 }
@@ -3659,6 +3660,17 @@ FLE2IndexedTextEncryptedValue::getPrefixMetadataBlocks() const {
     return res;
 }
 
+std::vector<FLE2TagAndEncryptedMetadataBlockView>
+FLE2IndexedTextEncryptedValue::getAllMetadataBlocks() const {
+    std::vector<FLE2TagAndEncryptedMetadataBlockView> res;
+    for (size_t i = 0; i < getTagCount(); i++) {
+        res.push_back({MongoCryptBuffer::borrow(&_value->metadata[i].encryptedCount).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].tag).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].encryptedZeros).toCDR()});
+    }
+    return res;
+}
+
 ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToken(
     ConstDataRange cdr) {
     return ESCDerivedFromDataTokenAndContentionFactorToken::parse(cdr);
@@ -4006,6 +4018,18 @@ std::vector<PrfBlock> EDCServerCollection::getRemovedTags(
             uassertStatusOK(swTags.getStatus());
             auto& rangeTags = swTags.getValue();
             staleTags.insert(staleTags.end(), rangeTags.begin(), rangeTags.end());
+        } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2TextIndexedValue) {
+            FLE2IndexedTextEncryptedValue iev(field.value);
+            auto textMetadata = iev.getAllMetadataBlocks();
+            std::transform(
+                textMetadata.begin(),
+                textMetadata.end(),
+                std::back_inserter(staleTags),
+                [](const auto& block) {
+                    PrfBlock prf;
+                    std::copy(block.tag.data(), block.tag.data() + block.tag.length(), prf.data());
+                    return prf;
+                });
         } else {
             auto typeValue = EncryptedBinDataType_serializer(encryptedTypeBinding);
             uasserted(7293204,
