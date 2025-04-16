@@ -12,7 +12,7 @@ var md = MongoRunner.runMongod({
 });
 
 var mongo = runMongoProgram(
-    "mongo", "--port", md.port, "--tls", "--tlsAllowInvalidCertificates", "--eval", ";");
+    "mongo", "--port", md.port, "--tls", "--tlsCAFile", "jstests/libs/ca.pem", "--eval", ";");
 
 // 0 is the exit code for success
 assert(mongo == 0);
@@ -22,7 +22,8 @@ mongo = runMongoProgram("mongo",
                         "--port",
                         md.port,
                         "--tls",
-                        "--tlsAllowInvalidCertificates",
+                        "--tlsCAFile",
+                        "jstests/libs/ca.pem",
                         "--tlsCertificateKeyFile",
                         "jstests/libs/client.pem",
                         "--eval",
@@ -40,7 +41,7 @@ var md2 = MongoRunner.runMongod({
 });
 
 mongo = runMongoProgram(
-    "mongo", "--port", md2.port, "--tls", "--tlsAllowInvalidCertificates", "--eval", ";");
+    "mongo", "--port", md2.port, "--tls", "--tlsCAFile", "jstests/libs/ca.pem", "--eval", ";");
 
 // 1 is the exit code for failure
 assert(mongo == 1);

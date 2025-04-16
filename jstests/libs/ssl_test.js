@@ -49,7 +49,7 @@ export function TLSTest(serverOpts, clientOpts) {
 TLSTest.prototype.defaultTLSClientOptions = {
     "tls": "",
     "tlsCertificateKeyFile": "jstests/libs/client.pem",
-    "tlsAllowInvalidCertificates": "",
+    "tlsCAFile": "jstests/libs/ca.pem",
     "eval": ";"  // prevent the shell from entering interactive mode
 };
 
