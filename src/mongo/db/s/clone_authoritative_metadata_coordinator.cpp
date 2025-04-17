@@ -77,12 +77,13 @@ void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
             auto extraInfo = ex.extraInfo<StaleDbRoutingVersion>();
             tassert(10050303, "StaleDbVersion must have extraInfo", extraInfo);
 
-            if (extraInfo->getVersionWanted()) {
-                // If there is a wanted version, it indicates that the routing information is stale.
-                // The database has either been moved or dropped and recreated. In such cases,
-                // another DDL operation was responsible for cloning, so we do not need to clone it
-                // anymore. This is because any concurrent DDLs is already supposed to be
-                // authoritative at this stage.
+            auto wantedVersion = extraInfo->getVersionWanted();
+            if (wantedVersion && *wantedVersion > extraInfo->getVersionReceived()) {
+                // If there is a wanted version and this is newer than the received one, it
+                // indicates that the routing information is stale. The database has either been
+                // moved or dropped and recreated. In such cases, another DDL operation was
+                // responsible for cloning, so we do not need to clone it anymore. This is because
+                // any concurrent DDLs is already supposed to be authoritative at this stage.
                 _removeDbFromCloningList(opCtx, dbName);
             } else {
                 // If the shard is unaware of the database, perform a metadata refresh and retry.
