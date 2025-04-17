@@ -198,7 +198,7 @@ filters:
       - 10gen/server-storage-engine-integration
   - "field_ref*":
     approvers:
-      - 10gen/query
+      - 10gen/query-optimization
   - "read_concern*":
     approvers:
       - 10gen/server-rw-concerns

@@ -11,15 +11,6 @@ filters:
   - "doc_validation*":
     approvers:
       - 10gen/query-execution
-  - "expression_optimize*":
-    approvers:
-      - 10gen/query-optimization
-  - "expression_parameterization*":
-    approvers:
-      - 10gen/query-optimization
-  - "match_expression_dependencies*":
-    approvers:
-      - 10gen/query-optimization
   - "expression_*geo*":
     approvers:
       - 10gen/query-integration-extensions
@@ -30,20 +21,34 @@ filters:
   - "expression_where*":
     approvers:
       - 10gen/query-integration-extensions
-  - "in_list_data*":
-    approvers:
-      - 10gen/query-optimization
   # 'ExtensionsCallbackReal' is tied to $text and $where parsing, and is therefore owned by QI.
-  - "extensions_callback_real*":
+  - "extensions_callback*":
     approvers:
       - 10gen/query-integration-search
-  # These files are related to boolean simplification and thus owned by QO.
-  - "expression_bitset_tree_converter*":
+  - "expression_internal_bucket_geo*":
     approvers:
-      - 10gen/query-optimization
-  - "expression_restorer*":
+      - 10gen/query-integration-geo
+  - "match_expression_util*":
     approvers:
-      - 10gen/query-optimization
-  - "expression_simplifier*":
+      - 10gen/query-execution
+  - "matchable*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "matcher.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "matcher.h":
+    approvers:
+      - 10gen/query-execution
+  - "path_internal*":
+    approvers:
+      - 10gen/query-execution
+  - "path.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "path.h":
+    approvers:
+      - 10gen/query-execution
+  - "path_test.cpp":
+    approvers:
+      - 10gen/query-execution
