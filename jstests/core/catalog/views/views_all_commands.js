@@ -181,6 +181,7 @@ let viewsCommandTests = {
     _shardsvrDropDatabase: {skip: isAnInternalCommand},
     _shardsvrDropDatabaseParticipant: {skip: isAnInternalCommand},
     _shardsvrGetStatsForBalancing: {skip: isAnInternalCommand},
+    _shardsvrCheckCanConnectToConfigServer: {skip: isAnInternalCommand},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
     _shardsvrMergeAllChunksOnShard: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isAnInternalCommand},

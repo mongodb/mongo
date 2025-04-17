@@ -320,3 +320,6 @@ filters:
   - "*topology_change*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "*check_can_connect_to*":
+    approvers:
+      - 10gen/server-catalog-and-routing

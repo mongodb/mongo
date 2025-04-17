@@ -107,6 +107,7 @@ const allCommands = {
     _shardsvrDropIndexes: {skip: isAnInternalCommand},
     _shardsvrCreateCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrGetStatsForBalancing: {skip: isPrimaryOnly},
+    _shardsvrCheckCanConnectToConfigServer: {skip: isPrimaryOnly},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
     _shardsvrJoinDDLCoordinators: {skip: isPrimaryOnly},
     _shardsvrMergeAllChunksOnShard: {skip: isPrimaryOnly},

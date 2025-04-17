@@ -1387,6 +1387,7 @@ mongo_cc_library(
         "shardsvr_abort_reshard_collection_command.cpp",
         "shardsvr_add_shard_cmd.cpp",
         "shardsvr_change_primary_command.cpp",
+        "shardsvr_check_can_connect_to_config_server_cmd.cpp",
         "shardsvr_check_metadata_consistency_command.cpp",
         "shardsvr_check_metadata_consistency_participant_command.cpp",
         "shardsvr_cleanup_reshard_collection_command.cpp",

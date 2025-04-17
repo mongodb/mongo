@@ -114,6 +114,7 @@ const allCommands = {
     _shardsvrCoordinateMultiUpdate: {skip: isAnInternalCommand},
     _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrGetStatsForBalancing: {skip: isAnInternalCommand},
+    _shardsvrCheckCanConnectToConfigServer: {skip: isAnInternalCommand},
     _shardsvrJoinDDLCoordinators: {skip: isAnInternalCommand},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
     _shardsvrMergeAllChunksOnShard: {skip: isAnInternalCommand},

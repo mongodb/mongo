@@ -178,6 +178,7 @@ let testCases = {
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},
     _shardsvrEndMigrationBlockingOperation: {skip: "internal command"},
     _shardsvrGetStatsForBalancing: {skip: "internal command"},
+    _shardsvrCheckCanConnectToConfigServer: {skip: "internal command"},
     _shardsvrJoinDDLCoordinators: {skip: "internal command"},
     _shardsvrJoinMigrations: {skip: "internal command"},
     _shardsvrMergeAllChunksOnShard: {skip: "internal command"},

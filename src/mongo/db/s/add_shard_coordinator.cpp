@@ -36,6 +36,7 @@
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/util/assert_util.h"
 #include "src/mongo/db/list_collections_gen.h"
 
@@ -87,9 +88,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                         executor,
                         token);
                 } catch (const DBException&) {
-                    // if we are not able to validate the host as a shard after
-                    // multiple try, we don't want to continue, so we remove
-                    // the replicaset monitor and give up.
+                    // If we are not able to validate the host as a shard after multiple tries, we
+                    // don't want to continue, so we remove the replicaset monitor and give up.
                     topology_change_helpers::removeReplicaSetMonitor(opCtx,
                                                                      _doc.getConnectionString());
                     _completeOnError = true;
@@ -111,6 +111,44 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     _checkExistingDataOnShard(opCtx, targeter, **executor);
                 }
 
+                // (Generic FCV reference): These FCV checks should exist across LTS binary
+                // versions.
+                const auto currentFCV =
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+                invariant(currentFCV == multiversion::GenericFCV::kLatest ||
+                          currentFCV == multiversion::GenericFCV::kLastContinuous ||
+                          currentFCV == multiversion::GenericFCV::kLastLTS);
+
+                _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
+
+                const auto host = uassertStatusOK(
+                    Grid::get(opCtx)->shardRegistry()->getConfigShard()->getTargeter()->findHost(
+                        opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+
+                try {
+                    _runWithRetries(
+                        [&]() {
+                            ShardsvrCheckCanConnectToConfigServer cmd(host);
+                            cmd.setDbName(DatabaseName::kAdmin);
+                            uassertStatusOK(
+                                topology_change_helpers::runCommandForAddShard(opCtx,
+                                                                               _getTargeter(opCtx),
+                                                                               DatabaseName::kAdmin,
+                                                                               cmd.toBSON(),
+                                                                               **executor)
+                                    .commandStatus);
+                        },
+                        executor,
+                        token);
+                } catch (const DBException&) {
+                    // If the replica set is not able to contact us after multiple tries, we don't
+                    // want to continue, so we remove the replicaset monitor and give up.
+                    topology_change_helpers::removeReplicaSetMonitor(opCtx,
+                                                                     _doc.getConnectionString());
+                    _completeOnError = true;
+                    throw;
+                }
+
                 std::string shardName =
                     topology_change_helpers::createShardName(opCtx,
                                                              _getTargeter(opCtx),
@@ -125,16 +163,6 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             [this, _ = shared_from_this()] { return !_doc.getIsConfigShard(); },
             [this, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
-
-                // (Generic FCV reference): These FCV checks should exist across LTS binary
-                // versions.
-                const auto currentFCV =
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
-                invariant(currentFCV == multiversion::GenericFCV::kLatest ||
-                          currentFCV == multiversion::GenericFCV::kLastContinuous ||
-                          currentFCV == multiversion::GenericFCV::kLastLTS);
-
-                _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
 
                 _dropSessionsCollection(opCtx, **executor);
 
@@ -414,6 +442,9 @@ void AddShardCoordinator::_runWithRetries(std::function<void()>&& function,
     })
         .until([&](const Status& status) {
             if (status.isOK()) {
+                return true;
+            }
+            if (!_isRetriableErrorForDDLCoordinator(status)) {
                 return true;
             }
             failCounter++;

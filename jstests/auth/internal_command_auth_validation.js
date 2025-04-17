@@ -613,6 +613,10 @@ const internalCommandsMap = {
         testname: "_shardsvrGetStatsForBalancing",
         command: {_shardsvrGetStatsForBalancing: "ns", collections: [], scaleFactor: 1},
     },
+    _shardsvrCheckCanConnectToConfigServer: {
+        testname: "_shardsvrCheckCanConnectToConfigServer",
+        command: {_shardsvrCheckCanConnectToConfigServer: "host:20022"},
+    },
     _shardsvrJoinMigrations: {
         testname: "_shardsvrJoinMigrations",
         command: {_shardsvrJoinMigrations: 1},

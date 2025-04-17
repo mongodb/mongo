@@ -32,6 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/type_shard_identity.idl"
+    - "mongo/util/net/hostandport.idl"
 
 structs:
     AddShardRequestBase:
@@ -88,3 +89,14 @@ commands:
             shardIdentity:
                 description: "Identity metadata for the new shard"
                 type: ShardIdentity
+
+    # Internal command where the config server expects the shard to send a hello command to the
+    # config server. This is used to find out if the contact could be done both ways (without
+    # network or security issue)
+    _shardsvrCheckCanConnectToConfigServer:
+        command_name: _shardsvrCheckCanConnectToConfigServer
+        cpp_name: ShardsvrCheckCanConnectToConfigServer
+        description: "Internal command where the config server expects the shard to send a hello command to the config server. This is used to find out if the contact could be done both ways (without network or security issue)"
+        namespace: type
+        type: HostAndPort
+        api_version: ""
