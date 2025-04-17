@@ -8,6 +8,10 @@
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
  *  featureFlagTimeseriesUpdatesSupport,
+ *  # Some config fuzzer permutations can slow the server enough to make commands exhaust their
+ *  # TemporarilyUnavailable retries, especially if temporarilyUnavailableMaxRetries is set to a low
+ *  # value.
+ *  does_not_support_config_fuzzer,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
