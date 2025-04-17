@@ -35,6 +35,7 @@
 #include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -110,6 +111,9 @@ protected:
         }
     }
 
+    SharedPromise<void>* refreshPromise() {
+        return _refresher->getRefreshPromise_forTest();
+    }
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ClusterServerParameterRefresher> _refresher;
@@ -118,9 +122,9 @@ protected:
     stdx::unordered_map<std::string, BSONObj> _clusterParameterDocs;
 };
 
-TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
+TEST_F(ClusterServerParameterRefresherTest, RefresherConcurrency) {
     auto runRefreshTestIteration = [&](StringData blockingFPName, Status expectedStatus) {
-        ASSERT_EQ(_refresher->_refreshPromise, nullptr);
+        ASSERT_EQ(refreshPromise(), nullptr);
         // Set up failpoints and get their initial times entered.
         auto blockFp = globalFailPointRegistry().find(blockingFPName);
         auto waiterCountFp =
@@ -139,7 +143,7 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
         // blocking failpoint, we increment "timesEntered" by 2, because we first check for
         // shouldFail and then call pauseWhileSet.
         blockFp->waitForTimesEntered(initBlockFpTE + 2);
-        ASSERT(_refresher->_refreshPromise && !_refresher->_refreshPromise->getFuture().isReady());
+        ASSERT(refreshPromise() && !refreshPromise()->getFuture().isReady());
 
         // Toggle the countPromiseWaiters failpoint to get the times entered. This count should not
         // have changed from the initial count as we have no futures waiting on the promise yet.
@@ -170,7 +174,7 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
         // The first thread should now finish, setting the job to ready and notifying threads 2 and
         // 3, which should finish.
         firstRun.join();
-        ASSERT_EQ(_refresher->_refreshPromise, nullptr);
+        ASSERT_EQ(refreshPromise(), nullptr);
 
         secondRun.join();
         thirdRun.join();
@@ -195,8 +199,8 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrency) {
 // Verifies that an invocation of 'refreshParameters()' with 'ensureReadYourWritesConsistency'
 // parameter set to 'true' while another cluster-wide parameters refresh request is in progress
 // waits for completion of that request and then initiates a new request.
-TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrencyReadYourWritesConsistency) {
-    ASSERT_EQ(_refresher->_refreshPromise, nullptr);
+TEST_F(ClusterServerParameterRefresherTest, RefresherConcurrencyReadYourWritesConsistency) {
+    ASSERT_EQ(refreshPromise(), nullptr);
 
     // Lookup fail-points.
     auto blockAndSucceedClusterParameterRefreshFailPoint =
@@ -260,8 +264,7 @@ TEST_F(ClusterServerParameterRefresherTest, testRefresherConcurrencyReadYourWrit
     concurrentRequestThread.join();
 }
 
-TEST_F(ClusterServerParameterRefresherTest,
-       testGetFCVAndClusterParamsFunctionRetriesOnSnapshotError) {
+TEST_F(ClusterServerParameterRefresherTest, GetFCVAndClusterParamsFunctionRetriesOnSnapshotError) {
     // gMultitenancySupport is set to false so that the function to get FCV and cluster parameters
     // skips making a request to get the list of tenants.
     gMultitenancySupport = false;

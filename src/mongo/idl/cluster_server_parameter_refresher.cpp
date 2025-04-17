@@ -413,7 +413,7 @@ void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, Operatio
 
     PeriodicRunner::PeriodicJob job(
         "ClusterServerParameterRefresher",
-        [serviceCtx](Client* client) { getClusterServerParameterRefresher(serviceCtx)->run(); },
+        [serviceCtx](Client* client) { getClusterServerParameterRefresher(serviceCtx)->_run(); },
         loadInterval(),
         // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
         false /*isKillableByStepdown*/);
@@ -425,7 +425,7 @@ void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, Operatio
     getClusterServerParameterRefresher(serviceCtx)->_job->start();
 }
 
-void ClusterServerParameterRefresher::run() {
+void ClusterServerParameterRefresher::_run() {
     if (MONGO_unlikely(skipClusterParameterRefresh.shouldFail())) {
         return;
     }

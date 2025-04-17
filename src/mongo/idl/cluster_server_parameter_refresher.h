@@ -50,8 +50,6 @@ namespace mongo {
  */
 class ClusterServerParameterRefresher {
 public:
-    ClusterServerParameterRefresher() = default;
-
     static ClusterServerParameterRefresher* get(OperationContext* opCtx);
     static ClusterServerParameterRefresher* get(ServiceContext* serviceCtx);
 
@@ -77,24 +75,27 @@ public:
      */
     Status refreshParameters(OperationContext* opCtx, bool ensureReadYourWritesConsistency = false);
 
-    // What the actual refresh job runs to do a refresh.
-    Status _refreshParameters(OperationContext* opCtx);
-
     /**
      * Set the period of the background job. This should only be used internally (by the
      * setParameter).
      */
     void setPeriod(Milliseconds period);
 
-    // Public for testing.
-    std::unique_ptr<SharedPromise<void>> _refreshPromise;
+    SharedPromise<void>* getRefreshPromise_forTest() {
+        return _refreshPromise.get();
+    }
 
 private:
-    void run();
+    void _run();
+
+    /** What the actual refresh job runs to do a refresh. */
+    Status _refreshParameters(OperationContext* opCtx);
 
     std::unique_ptr<PeriodicJobAnchor> _job;
     multiversion::FeatureCompatibilityVersion _lastFcv;
     stdx::mutex _mutex;
+
+    std::unique_ptr<SharedPromise<void>> _refreshPromise;
 };
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);
