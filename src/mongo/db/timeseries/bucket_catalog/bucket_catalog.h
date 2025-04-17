@@ -399,6 +399,25 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
                                                 AllowQueryBasedReopening& allowQueryBasedReopening,
                                                 bool& bucketOpenedDueToMetadata);
 
+/**
+ * Returns an open bucket from 'stripe' that can fit 'measurement'. If none available, returns
+ * nullptr.
+ * Makes the decision to skip query-based reopening if 'measurementTimestamp' is later than
+ * the bucket's time range.
+ */
+Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
+                                     Stripe& stripe,
+                                     WithLock stripeLock,
+                                     const BSONObj& measurement,
+                                     const BucketKey& bucketKey,
+                                     const Date_t& measurementTimestamp,
+                                     const TimeseriesOptions& options,
+                                     const StringDataComparator* comparator,
+                                     uint64_t storageCacheSizeBytes,
+                                     AllowQueryBasedReopening& allowQueryBasedReopening,
+                                     ExecutionStatsController& stats,
+                                     bool& bucketOpenedDueToMetadata);
+
 using CompressAndWriteBucketFunc = std::function<void(
     OperationContext*, const bucket_catalog::BucketId&, const NamespaceString&, StringData)>;
 
