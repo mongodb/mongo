@@ -134,6 +134,60 @@ void decideQueryBasedReopening(const RolloverReason& rolloverReason,
     }
     MONGO_UNREACHABLE;
 }
+
+/**
+ * Returns an open bucket from stripe that can fit 'measurement'. If none available, returns
+ * nullptr.
+ * Makes the decision to skip query-based reopening if 'measurementTimestamp' is later than
+ * the bucket's time range.
+ */
+Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
+                                     Stripe& stripe,
+                                     WithLock stripeLock,
+                                     const BSONObj& measurement,
+                                     const BucketKey& bucketKey,
+                                     const Date_t& measurementTimestamp,
+                                     const TimeseriesOptions& options,
+                                     const StringDataComparator* comparator,
+                                     uint64_t storageCacheSizeBytes,
+                                     AllowQueryBasedReopening& allowQueryBasedReopening,
+                                     ExecutionStatsController& stats,
+                                     bool& bucketOpenedDueToMetadata) {
+    // Gets a vector of potential buckets, starting with kSoftClose/kArchived buckets, followed by
+    // at most one kNone bucket.
+    auto potentialBuckets = findAndRolloverOpenBuckets(catalog,
+                                                       stripe,
+                                                       stripeLock,
+                                                       bucketKey,
+                                                       measurementTimestamp,
+                                                       Seconds(*options.getBucketMaxSpanSeconds()),
+                                                       allowQueryBasedReopening,
+                                                       bucketOpenedDueToMetadata);
+    if (potentialBuckets.empty()) {
+        return nullptr;
+    }
+
+    for (const auto& potentialBucket : potentialBuckets) {
+        // Check if the measurement can fit in the potential bucket.
+        auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
+                                                                    measurement,
+                                                                    measurementTimestamp,
+                                                                    options,
+                                                                    comparator,
+                                                                    storageCacheSizeBytes,
+                                                                    *potentialBucket,
+                                                                    stats);
+
+        if (rolloverReason == RolloverReason::kNone) {
+            // The measurement can be inserted into the open bucket.
+            return potentialBucket;
+        }
+
+        decideQueryBasedReopening(rolloverReason, allowQueryBasedReopening);
+    }
+
+    return nullptr;
+}
 }  // namespace
 
 SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b) : batch{std::move(b)} {}
@@ -677,54 +731,6 @@ std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
     }
     // Create vector with all potential buckets.
     return createOrderedPotentialBucketsVector(potentialBucketOptions);
-}
-
-Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
-                                     Stripe& stripe,
-                                     WithLock stripeLock,
-                                     const BSONObj& measurement,
-                                     const BucketKey& bucketKey,
-                                     const Date_t& measurementTimestamp,
-                                     const TimeseriesOptions& options,
-                                     const StringDataComparator* comparator,
-                                     uint64_t storageCacheSizeBytes,
-                                     AllowQueryBasedReopening& allowQueryBasedReopening,
-                                     ExecutionStatsController& stats,
-                                     bool& bucketOpenedDueToMetadata) {
-    // Gets a vector of potential buckets, starting with kSoftClose/kArchived buckets, followed by
-    // at most one kNone bucket.
-    auto potentialBuckets = findAndRolloverOpenBuckets(catalog,
-                                                       stripe,
-                                                       stripeLock,
-                                                       bucketKey,
-                                                       measurementTimestamp,
-                                                       Seconds(*options.getBucketMaxSpanSeconds()),
-                                                       allowQueryBasedReopening,
-                                                       bucketOpenedDueToMetadata);
-    if (potentialBuckets.empty()) {
-        return nullptr;
-    }
-
-    for (const auto& potentialBucket : potentialBuckets) {
-        // Check if the measurement can fit in the potential bucket.
-        auto rolloverReason = determineBucketRolloverForMeasurement(catalog,
-                                                                    measurement,
-                                                                    measurementTimestamp,
-                                                                    options,
-                                                                    comparator,
-                                                                    storageCacheSizeBytes,
-                                                                    *potentialBucket,
-                                                                    stats);
-
-        if (rolloverReason == RolloverReason::kNone) {
-            // The measurement can be inserted into the open bucket.
-            return potentialBucket;
-        }
-
-        decideQueryBasedReopening(rolloverReason, allowQueryBasedReopening);
-    }
-
-    return nullptr;
 }
 
 StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
