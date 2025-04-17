@@ -1,0 +1,57 @@
+# Coverity analysis options that are passed to cov-analyze command line
+analyze:
+  checkers:
+    all: true # Enables all checkers except a few which need to be explicitly enabled. See: https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title11
+    rule: true # Enables "rule" checkers. See: https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#refsection_dgq_pf2_4qb__list-checkers
+    checker-config:
+      # Explicitly disabled checkers
+      # Add any checker that needs to be disabled below
+      STACK_USE:
+        enabled: false
+      COPY_INSTEAD_OF_MOVE:
+        enabled: false
+      RULE_OF_ZERO_THREE_FIVE:
+        enabled: false
+      MISSING_RETURN:
+        enabled: false
+      SLEEP:
+        enabled: false
+      PASS_BY_VALUE:
+        enabled: false
+      GLOBAL_INIT_ORDER:
+        enabled: false
+      # Explicitly enabled checkers
+      # Add any checker that needs to be explicitly enabled below
+      REVERSE_OVERRUN:
+        enabled: true
+      # Checkers with customized options
+      CHECKED_RETURN:
+        enabled: true
+        options:
+          stat_threshold: 80
+      DEADCODE:
+        enabled: true
+        options:
+          no_dead_default: true
+          report_redundant_tests: true
+      NULL_RETURNS:
+        enabled: true
+        options:
+          stat_threshold: 50
+  # Enables additional filtering of potential defects by using an additional false-path pruner (FPP). More details here https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title5
+  constraint-fpp: true
+  # Enables function pointer models if the analysis fails to analyze certain function pointers calls. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title9
+  c-cpp-fnptr: true
+  # Enables full, virtual-call resolution. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title9
+  c-cpp-virtual: true
+  # Enables call graph matrics. The callgraph-metrics files store information about which functions are analyzed. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title20
+  callgraph-metrics: true
+  cov-analyze-args:
+    # Specifies the name for the configuration file, which allows you to change the parse warnings that pass through a warning filter. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title9
+    - --parse-warnings-config
+    - etc/coverity_parse_warnings.conf
+
+commit:
+  connect:
+    stream: mongo.master
+    project: "MongoDB master"

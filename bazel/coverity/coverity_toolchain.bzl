@@ -1,12 +1,15 @@
 def _coverity_toolchain(ctx):
-    result = ctx.execute([
-        "ls",
-        "/data/cov-sa/bin/cov-build",
-    ])
+    retCode = 1
+    if "COVERITY_INSTALL_ROOT" in ctx.os.environ:
+        result = ctx.execute([
+            "ls",
+            ctx.getenv("COVERITY_INSTALL_ROOT") + "/bin/cov-build",
+        ])
+        retCode = result.return_code
 
-    if result.return_code == 0:
+    if retCode == 0:
         ctx.report_progress("extracting coverity rules...")
-        result = ctx.download_and_extract("file:///data/cov-sa/bazel/rules_coverity.tar.gz")
+        result = ctx.download_and_extract("file://" + ctx.getenv("COVERITY_INSTALL_ROOT") + "/bazel/rules_coverity.tar.gz")
     else:
         ctx.template(
             "coverity/BUILD.bazel",

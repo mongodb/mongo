@@ -1,0 +1,90 @@
+buildvariants:
+  - name: bv_coverity_analysis
+    display_name: Coverity Analysis
+    # Don't run Coverity analysis as part of patch builds
+    patchable: false
+    allow_for_git_tag: false
+    # Run at 4 am UTC everyday
+    cron: "0 4 * * *"
+    run_on: ubuntu2404-xlarge
+    modules:
+      - devprod_coverity
+    tasks:
+      - name: run_coverity
+
+functions:
+  f_generate_evergreen_bazelrc:
+    command: subprocess.exec
+    display_name: "generate evergreen bazelrc"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/generate_evergreen_bazelrc.sh"
+
+  f_setup_python:
+    command: subprocess.exec
+    display_name: "set up venv"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/functions/venv_setup.sh"
+
+  f_coverity_build:
+    command: subprocess.exec
+    display_name: "Coverity build"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/coverity_build.sh"
+      env:
+        COVERITY_INSTALL_ROOT: ${workdir}/coverity
+      add_expansions_to_env: true
+
+tasks:
+  - name: run_coverity
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "coverity",
+      ]
+    exec_timeout_secs: 28800 # Max scan time of 8 hours
+    commands:
+      - func: f_clone_source
+        vars:
+          module_prefix: ${workdir}/devprodCoveritySrc
+          module_name: devprod_coverity
+      # Functions to prepare for Coverity build
+      - func: f_expansions_write
+      - func: f_setup_python
+      - func: f_expansions_write
+      - func: f_generate_evergreen_bazelrc
+      - func: f_download_and_extract_coverity
+        vars:
+          module_prefix: ${workdir}/devprodCoveritySrc
+          module_name: devprod_coverity
+      - func: f_coverity_build
+        timeout_secs: 10800 # Idle timeout of 3 hours
+      - func: f_analyze
+        vars:
+          module_prefix: ${workdir}/devprodCoveritySrc
+          module_name: devprod_coverity
+        timeout_secs: 10800 # Idle timeout of 3 hours
+      - func: f_commit
+        vars:
+          module_prefix: ${workdir}/devprodCoveritySrc
+          module_name: devprod_coverity
+
+#######################################
+#               Modules               #
+#######################################
+# for some reason this has can't be included from the included configuration file above
+# it may be because one of the includes needs this module, could be an evergreen bug
+modules:
+  - name: devprod_coverity
+    owner: mongodb-devprod-infrastructure
+    repo: coverity
+    prefix: "${workdir}/devprodCoveritySrc"
+    branch: main
+    auto_update: true
