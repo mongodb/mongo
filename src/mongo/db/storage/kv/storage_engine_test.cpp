@@ -64,6 +64,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/startup_recovery.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
@@ -1011,6 +1012,10 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     const auto oldPath = storageGlobalParams.dbpath;
     const auto newPath = boost::filesystem::path(oldPath).append(".alternate").string();
     boost::filesystem::create_directory(newPath);
+    StorageControl::stopStorageControls(
+        opCtx->getServiceContext(),
+        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
+        /*forRestart=*/false);
     CollectionCatalog::write(getServiceContext(), [this](CollectionCatalog& catalog) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
@@ -1037,6 +1042,10 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     ASSERT_TRUE(collectionExists(opCtx.get(), coll2Ns));
 
     LOGV2(5781104, "Starting up storage engine in original location");
+    StorageControl::stopStorageControls(
+        opCtx->getServiceContext(),
+        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
+        /*forRestart=*/false);
     CollectionCatalog::write(getServiceContext(), [this](CollectionCatalog& catalog) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(getServiceContext());

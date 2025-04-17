@@ -220,31 +220,15 @@ StorageEngine::LastShutdownState initializeStorageEngine(
     }
 }
 
-namespace {
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service,
-                                        Status errorToReport,
-                                        bool forRestart) {
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
-    // We always use 'forRestart' = false here because 'forRestart' = true is only appropriate if
-    // we're going to restart controls on the same storage engine, which we are not here because we
-    // are shutting the storage engine down. Additionally, we need to terminate any background
-    // threads as they may be holding onto an OperationContext, as opposed to pausing them.
-    StorageControl::stopStorageControls(service, errorToReport, /*forRestart=*/false);
     storageEngine->cleanShutdown(service);
     auto& lockFile = StorageEngineLockFile::get(service);
     if (lockFile) {
         lockFile->clearPidAndUnlock();
         lockFile = boost::none;
     }
-}
-} /* namespace */
-
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
-    shutdownGlobalStorageEngineCleanly(
-        service,
-        {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."},
-        /*forRestart=*/false);
 }
 
 StorageEngine::LastShutdownState reinitializeStorageEngine(
@@ -253,10 +237,7 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     std::function<void()> changeConfigurationCallback) {
     auto service = opCtx->getServiceContext();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-    shutdownGlobalStorageEngineCleanly(
-        service,
-        {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."},
-        /*forRestart=*/true);
+    shutdownGlobalStorageEngineCleanly(service);
     shard_role_details::setRecoveryUnit(opCtx,
                                         std::make_unique<RecoveryUnitNoop>(),
                                         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

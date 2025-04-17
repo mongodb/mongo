@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -384,6 +385,11 @@ Status dropCollectionsWithPrefix(OperationContext* opCtx,
 }
 
 void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* service) {
+    // SERVER-103812 Shut down JournalFlusher before closing CollectionCatalog
+    StorageControl::stopStorageControls(
+        service,
+        {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."},
+        /*forRestart=*/false);
     CollectionCatalog::write(service, [service](CollectionCatalog& catalog) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(service);
