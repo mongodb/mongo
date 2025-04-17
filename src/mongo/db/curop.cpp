@@ -359,7 +359,7 @@ void CurOp::setGenericOpRequestDetails(
     _nss = std::move(nss);
 }
 
-void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, AdmissionContext::Priority priority) {
+void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline) {
     auto opCtx = this->opCtx();
     // Do not fetch operation statistics again if we have already got them (for
     // instance, as a part of stashing the transaction). Take a lock before calling into
@@ -371,7 +371,8 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, AdmissionContext::Pri
     if (_debug.storageStats == nullptr &&
         shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
         opCtx->getServiceContext()->getStorageEngine()) {
-        ScopedAdmissionPriority<ExecutionAdmissionContext> admissionControl(opCtx, priority);
+        ScopedAdmissionPriority<ExecutionAdmissionContext> admissionControl(
+            opCtx, AdmissionContext::Priority::kExempt);
         Lock::GlobalLock lk(opCtx,
                             MODE_IS,
                             deadline,
@@ -413,8 +414,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
             // If we choose a fixed priority other than kExempt (e.g., kNormal), it may
             // be lower than the operation's current priority, which would cause an exception to be
             // thrown.
-            const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
-            _fetchStorageStatsIfNecessary(Date_t::max(), admCtx.getPriority());
+            _fetchStorageStatsIfNecessary(Date_t::max());
         } catch (DBException& ex) {
             LOGV2(8457400,
                   "Failed to gather storage statistics for query stats",
@@ -673,8 +673,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
             // acquisition. Slow queries can happen for various reasons; however, if queries
             // are slower due to ticket exhaustion, queueing in order to log can compound
             // the issue. Hence we pass the kExempt priority to _fetchStorageStatsIfNecessary.
-            _fetchStorageStatsIfNecessary(Date_t::now() + Milliseconds(500),
-                                          AdmissionContext::Priority::kExempt);
+            _fetchStorageStatsIfNecessary(Date_t::now() + Milliseconds(500));
         } catch (const DBException& ex) {
             LOGV2_OPTIONS(20526,
                           logOptions,

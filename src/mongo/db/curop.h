@@ -783,7 +783,7 @@ private:
      * Fetches storage stats and stores them in the OpDebug if they're not already present.
      * Can throw if interrupted while waiting for the global lock.
      */
-    void _fetchStorageStatsIfNecessary(Date_t deadline, AdmissionContext::Priority priority);
+    void _fetchStorageStatsIfNecessary(Date_t deadline);
 
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
