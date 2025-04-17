@@ -63,13 +63,27 @@ BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) {
         return nameHashPair.first;
     };
-    return BSON("docs" << std::vector<BSONObj>(measurements.begin(), measurements.end())
-                       << "bucketMin" << min << "bucketMax" << max << "numCommittedMeasurements"
-                       << int(numPreviouslyCommittedMeasurements) << "newFieldNamesToBeInserted"
-                       << std::set<std::string>(boost::make_transform_iterator(
-                                                    newFieldNamesToBeInserted.begin(), toFieldName),
-                                                boost::make_transform_iterator(
-                                                    newFieldNamesToBeInserted.end(), toFieldName)));
+
+    return BSONObjBuilder{}
+        .append("isReopened", isReopened)
+        .append("bucketIsSortedByTime", bucketIsSortedByTime)
+        .append("openedDueToMetadata", openedDueToMetadata)
+        .append("opId", int(opId))
+        .append("numCommittedMeasurements", int(numPreviouslyCommittedMeasurements))
+        .append("timeField", timeField)
+        .append("bucketMin", min)
+        .append("bucketMax", max)
+        .append("userBatchIndices",
+                std::vector<int>(userBatchIndices.begin(), userBatchIndices.end()))
+        .append("stmtIds", std::vector<int>(stmtIds.begin(), stmtIds.end()))
+        .append("newFieldNamesToBeInserted",
+                std::set<std::string>(
+                    boost::make_transform_iterator(newFieldNamesToBeInserted.begin(), toFieldName),
+                    boost::make_transform_iterator(newFieldNamesToBeInserted.end(), toFieldName)))
+        .append("measurements", std::vector<BSONObj>(measurements.begin(), measurements.end()))
+        .append("bucketOID", bucketId.oid)
+        .append("bucketMetaData", bucketKey.metadata.toBSON())
+        .obj();
 }
 
 Status getWriteBatchStatus(WriteBatch& batch) {

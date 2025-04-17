@@ -92,9 +92,8 @@ struct WriteBatch {
                ExecutionStatsController& stats,
                StringData timeField);
 
+    // Only used in testing.
     BSONObj toBSON() const;
-
-    bool generateCompressedDiff = false;
 
     // True if the bucket already exists and was reopened.
     bool isReopened = false;
@@ -113,9 +112,6 @@ struct WriteBatch {
     const OperationId opId;
 
     uint32_t numPreviouslyCommittedMeasurements = 0;
-
-    // Will add the compressed measurement sizes while committing.
-    int32_t size = 0;
 
     TrackingContexts& trackingContexts;
 

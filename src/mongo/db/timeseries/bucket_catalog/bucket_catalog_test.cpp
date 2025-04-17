@@ -188,8 +188,9 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
                                 uint16_t numPreviouslyCommittedMeasurements,
                                 size_t expectedBatchSize) {
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(ns)));
-    ASSERT_EQ(batch->measurements.size(), expectedBatchSize);
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, numPreviouslyCommittedMeasurements);
+    ASSERT_EQ(batch->measurements.size(), expectedBatchSize) << batch->toBSON();
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, numPreviouslyCommittedMeasurements)
+        << batch->toBSON();
     TimeseriesStmtIds stmtIds;
     std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
     std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
@@ -676,7 +677,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     auto result2 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2).batch;
-    ASSERT_EQ(batch1, batch2);
+    ASSERT_EQ(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     // The batch hasn't actually been committed yet.
     ASSERT(!isWriteBatchFinished(*batch1));
@@ -688,8 +689,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
 
     // The batch should contain both documents since they belong in the same bucket and happened
     // in the same commit epoch. Nothing else has been committed in this bucket yet.
-    ASSERT_EQ(batch1->measurements.size(), 2);
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch1->measurements.size(), 2) << batch1->toBSON();
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Once the commit has occurred, the waiter should be notified.
     finish(*_bucketCatalog, batch1);
@@ -755,18 +756,18 @@ TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
 
     // Inserts should be into different buckets (and therefore batches) because they went through
     // different bucket catalogs.
-    ASSERT_NE(batch1, batch2);
+    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1);
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
     finish(*_bucketCatalog, batch1);
 
     ASSERT_OK(prepareCommit(temporaryBucketCatalog, batch2, _getCollator(_ns2)));
-    ASSERT_EQ(batch2->measurements.size(), 1);
-    ASSERT_EQ(batch2->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch2->measurements.size(), 1) << batch2->toBSON();
+    ASSERT_EQ(batch2->numPreviouslyCommittedMeasurements, 0) << batch2->toBSON();
     finish(temporaryBucketCatalog, batch2);
 }
 
@@ -898,14 +899,14 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1);
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before finish so there's a second batch live at the same time.
     auto result2 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2).batch;
-    ASSERT_NE(batch1, batch2);
+    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     (void)write_ops_utils::makeTimeseriesInsertOp(batch1,
                                                   _ns1.makeTimeseriesBucketsNamespace(),
@@ -983,7 +984,7 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
                          _uuidNoMeta,
                          BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
     auto& batch2 = get<SuccessfulInsertion>(result2).batch;
-    ASSERT_NE(oldId, batch2->bucketId);
+    ASSERT_NE(oldId, batch2->bucketId) << batch2->toBSON();
     _commit(_nsNoMeta, batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted.size()) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted.count(_timeField)) << batch2->toBSON();
@@ -995,14 +996,14 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1);
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before finish so there's a second batch live at the same time.
     auto result2 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2).batch;
-    ASSERT_NE(batch1, batch2);
+    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     abort(*_bucketCatalog, batch2, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch2));
@@ -1028,8 +1029,8 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1);
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
 
     clear(*_bucketCatalog, _uuid1);
 
@@ -1049,8 +1050,8 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1);
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
 
     ASSERT_THROWS(directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId),
                   WriteConflictException);
@@ -1065,15 +1066,15 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch1 = get<SuccessfulInsertion>(result1).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1);
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before clear so there's a second batch live at the same time.
     auto result2 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch2 = get<SuccessfulInsertion>(result2).batch;
-    ASSERT_NE(batch1, batch2);
-    ASSERT_EQ(batch1->bucketId, batch2->bucketId);
+    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
+    ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
     clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketId);
@@ -1091,9 +1092,9 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     auto result3 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch3 = get<SuccessfulInsertion>(result3).batch;
-    ASSERT_NE(batch1, batch3);
-    ASSERT_NE(batch2, batch3);
-    ASSERT_NE(batch1->bucketId, batch3->bucketId);
+    ASSERT_NE(batch1, batch3) << batch1->toBSON() << batch3->toBSON();
+    ASSERT_NE(batch2, batch3) << batch2->toBSON() << batch3->toBSON();
+    ASSERT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
     // Clean up this batch
     abort(*_bucketCatalog, batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
 
@@ -1166,8 +1167,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                                     BSON(_timeField << Date_t::now()));
     auto batch3 = get<SuccessfulInsertion>(result3).batch;
 
-    ASSERT_EQ(batch1->bucketId, batch2->bucketId);
-    ASSERT_EQ(batch1->bucketId, batch3->bucketId);
+    ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
+    ASSERT_EQ(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
 
     // Batch 2 will not be able to commit until batch 1 has finished.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
@@ -1196,7 +1197,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     auto result4 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch4 = get<SuccessfulInsertion>(result4).batch;
-    ASSERT_NE(batch2->bucketId, batch4->bucketId);
+    ASSERT_NE(batch2->bucketId, batch4->bucketId) << batch2->toBSON() << batch4->toBSON();
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
@@ -1212,7 +1213,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
     auto batch2 = get<SuccessfulInsertion>(result2).batch;
 
     // Batch 1 and 2 use the same bucket.
-    ASSERT_EQ(batch1->bucketId, batch2->bucketId);
+    ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
 
     // Batch 1 will be in a prepared state now. Abort the second batch so that bucket 1 will be
@@ -1227,7 +1228,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
     auto result3 =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto batch3 = get<SuccessfulInsertion>(result3).batch;
-    ASSERT_NE(batch1->bucketId, batch3->bucketId);
+    ASSERT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
@@ -1244,8 +1245,8 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
 
     // Batch 2 is the first batch to commit the time field.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
-    ASSERT_EQ(batch2->newFieldNamesToBeInserted.size(), 1);
-    ASSERT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField);
+    ASSERT_EQ(batch2->newFieldNamesToBeInserted.size(), 1) << batch2->toBSON();
+    ASSERT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField) << batch2->toBSON();
     (void)write_ops_utils::makeTimeseriesInsertOp(batch2,
                                                   _ns1.makeTimeseriesBucketsNamespace(),
                                                   getMetadata(*_bucketCatalog, batch2->bucketId));
@@ -1254,7 +1255,7 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
     // committed by batch 2.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT(batch1->newFieldNamesToBeInserted.empty());
+    ASSERT(batch1->newFieldNamesToBeInserted.empty()) << batch1->toBSON();
     finish(*_bucketCatalog, batch1);
 }
 
@@ -1542,10 +1543,10 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
 
     auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1);
+    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
 
     // The reopened bucket already contains three committed measurements.
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 3);
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 3) << batch->toBSON();
 
     // Verify that the min and max is updated correctly when inserting new measurements.
     ASSERT_BSONOBJ_BINARY_EQ(batch->min, BSON("u" << BSON("a" << -100)));
@@ -1589,10 +1590,10 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
 
     auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1);
+    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
 
     // Since the reopened bucket was incompatible, we opened a new one.
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
 
     finish(*_bucketCatalog, batch);
 }
@@ -2045,7 +2046,7 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     result = _insertOneHelper(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "B"));
     auto batch2 = get<SuccessfulInsertion>(result).batch;
-    ASSERT_NE(nextBucketId, batch2->bucketId);
+    ASSERT_NE(nextBucketId, batch2->bucketId) << batch2->toBSON();
     // We should check that the bucketID that we failed to create is not stored in the stripe.
     ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
 }
