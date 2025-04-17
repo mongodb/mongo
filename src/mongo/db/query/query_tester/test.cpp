@@ -48,34 +48,6 @@ bool isTestLine(const std::string& line) {
     return line.starts_with(":");
 }
 
-BSONObj makeExplainCommand(const BSONObj& initialCommand) {
-    auto explainCommandBuilder = BSONObjBuilder{};
-    // Extract 'apiVersion' and 'apiStrict' properties and remove 'writeConcern' from the inner
-    // command object.
-    BSONObjBuilder innerCommandBuilder{explainCommandBuilder.subobjStart("explain")};
-    for (const auto& element : initialCommand) {
-        const auto propName = element.fieldNameStringData();
-        if (propName == "writeConcern") {
-            continue;
-        }
-        if (propName == "apiVersion" || propName == "apiStrict") {
-            //  'apiVersion' and 'apiStrict' only make sense on the root of the command.
-            explainCommandBuilder.append(element);
-        } else {
-            // Add the rest of the fields to the inner command body.
-            innerCommandBuilder.append(element);
-        }
-    }
-    // Append cursor object in case of aggregation.
-    if (initialCommand.firstElementFieldNameStringData() == "aggregate" &&
-        !initialCommand.hasField("cursor")) {
-        innerCommandBuilder.append("cursor", BSONObj());
-    }
-    // Run the explain with the 'queryPlanner' verbosity.
-    explainCommandBuilder.append("verbosity", "queryPlanner");
-    return explainCommandBuilder.obj();
-}
-
 BSONObj toBSONObj(const std::vector<BSONObj>& objs) {
     auto bob = BSONObjBuilder{};
     bob.append("res", objs.begin(), objs.end());
@@ -84,10 +56,6 @@ BSONObj toBSONObj(const std::vector<BSONObj>& objs) {
 }  // namespace
 
 std::vector<BSONObj> Test::getAllResults(DBClientConnection* const conn, const BSONObj& result) {
-    // Early exit in case of explain result.
-    if (result.hasField("explainVersion")) {
-        return {result};
-    }
     const auto actualResult = getResultsFromCommandResponse(result, _testNum);
     const auto id = result.getField("cursor").embeddedObject()["id"].Long();
 
@@ -208,8 +176,7 @@ NormalizationOptsSet Test::parseResultType(const std::string& type) {
         {":normalizeNumerics", NormalizationOpts::kNormalizeNumerics},
         {":normalizeNulls", NormalizationOpts::kConflateNullAndMissing},
         {":sortResults", NormalizationOpts::kSortResults},
-        {":results", NormalizationOpts::kResults},
-        {":queryShapeHash", NormalizationOpts::kExplain | NormalizationOpts::kQueryShapeHash}};
+        {":results", NormalizationOpts::kResults}};
 
     if (auto it = kTypeMap.find(type); it != kTypeMap.end()) {
         return it->second;
@@ -383,14 +350,11 @@ void Test::parseTestQueryLine() {
 
 void Test::runTestAndRecord(DBClientConnection* const conn, const ModeOption mode) {
     try {
-        const auto command = shell_utils::isSet(_testType, shell_utils::NormalizationOpts::kExplain)
-            ? makeExplainCommand(_query)
-            : _query;
         // Populate _normalizedResult so that git diff operates on normalized result sets.
         _normalizedResult = normalize(mode == ModeOption::Normalize
                                           ? _expectedResult
                                           // Run test
-                                          : getAllResults(conn, runCommand(conn, _db, command)),
+                                          : getAllResults(conn, runCommand(conn, _db, _query)),
                                       _testType);
     } catch (AssertionException& ex) {
         _errorMessage = ex.reason();
