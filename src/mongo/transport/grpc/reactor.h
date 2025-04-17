@@ -53,7 +53,8 @@ class GRPCReactor;
 
 class GRPCReactorTimer : public ReactorTimer {
 public:
-    GRPCReactorTimer(std::weak_ptr<GRPCReactor> reactor) : _reactor(reactor) {}
+    GRPCReactorTimer(std::shared_ptr<Reactor> reactor)
+        : _reactor(dynamic_pointer_cast<GRPCReactor>(reactor)) {}
 
     ~GRPCReactorTimer() override {
         cancel();
@@ -84,7 +85,7 @@ private:
  * completion queue on construction and notifies CompletionQueueEntry tags that are provided in
  * calls to startCall/read/write/finish.
  */
-class GRPCReactor : public Reactor, public std::enable_shared_from_this<GRPCReactor> {
+class GRPCReactor : public Reactor {
 public:
     // The following classes are friends because they must be allowed to request notification for
     // the completion of async work via the completion queue. However, this functionality is not
@@ -137,7 +138,7 @@ public:
     void schedule(Task task) override;
 
     std::unique_ptr<ReactorTimer> makeTimer() override {
-        return std::make_unique<GRPCReactorTimer>(weak_from_this());
+        return std::make_unique<GRPCReactorTimer>(shared_from_this());
     }
 
     Date_t now() override {
@@ -145,9 +146,6 @@ public:
     }
 
     void appendStats(BSONObjBuilder& bob) const override;
-
-    // sleepFor is implemented so that the gRPC reactor is compatible with the AsyncTry API.
-    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancellationToken& token);
 
 private:
     ::grpc::CompletionQueue* _getCompletionQueue() {

@@ -56,6 +56,15 @@ void writeToSocketAndPollForResponse(Stream& writeSocket, Stream& readSocket, St
 }
 
 template <typename Stream>
+void peekEmptySocket(Stream& readSocket) {
+    const auto bufferSize = 10;
+    auto inBuffer = std::make_unique<char[]>(bufferSize);
+    const auto bytesRead =
+        peekASIOStream(readSocket, asio::mutable_buffer(inBuffer.get(), bufferSize));
+    ASSERT_EQ(bytesRead, 0);
+}
+
+template <typename Stream>
 void peekAllSubstrings(Stream& writeSocket, Stream& readSocket, StringData data) {
     writeToSocketAndPollForResponse(writeSocket, readSocket, data);
 
@@ -84,31 +93,59 @@ void peekPastBuffer(Stream& writeSocket, Stream& readSocket, StringData data) {
 }
 
 #ifdef ASIO_HAS_LOCAL_SOCKETS
-auto prepareUnixSocketPair(asio::io_context& io_context) {
+auto prepareUnixSocketPair(asio::io_context& io_context, bool blocking) {
     asio::local::stream_protocol::socket writeSocket(io_context);
     asio::local::stream_protocol::socket readSocket(io_context);
     asio::local::connect_pair(writeSocket, readSocket);
-    readSocket.non_blocking(true);
+    readSocket.non_blocking(blocking);
 
     return std::pair(std::move(writeSocket), std::move(readSocket));
 }
 
-TEST(ASIOUtils, PeekAvailableBytes) {
+TEST(ASIOUtils, PeekEmptySocketBlocking) {
     asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context);
+    auto [_, readSocket] = prepareUnixSocketPair(io_context, false);
+
+    peekEmptySocket(readSocket);
+}
+
+TEST(ASIOUtils, PeekEmptySocketNonBlocking) {
+    asio::io_context io_context;
+    auto [_, readSocket] = prepareUnixSocketPair(io_context, true);
+
+    peekEmptySocket(readSocket);
+}
+
+TEST(ASIOUtils, PeekAvailableBytesBlocking) {
+    asio::io_context io_context;
+    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, false);
 
     peekAllSubstrings(writeSocket, readSocket, "example"_sd);
 }
 
-TEST(ASIOUtils, PeekPastAvailableBytes) {
+TEST(ASIOUtils, PeekAvailableBytesNonBlocking) {
     asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context);
+    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, true);
+
+    peekAllSubstrings(writeSocket, readSocket, "example"_sd);
+}
+
+TEST(ASIOUtils, PeekPastAvailableBytesBlocking) {
+    asio::io_context io_context;
+    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, false);
+
+    peekPastBuffer(writeSocket, readSocket, "example"_sd);
+}
+
+TEST(ASIOUtils, PeekPastAvailableBytesNonBlocking) {
+    asio::io_context io_context;
+    auto [writeSocket, readSocket] = prepareUnixSocketPair(io_context, true);
 
     peekPastBuffer(writeSocket, readSocket, "example"_sd);
 }
 #endif  // ASIO_HAS_LOCAL_SOCKETS
 
-auto prepareTCPSocketPair(asio::io_context& io_context) {
+auto prepareTCPSocketPair(asio::io_context& io_context, bool blocking) {
     // Make a local loopback connection on an arbitrary ephemeral port.
     asio::ip::tcp::endpoint ep(asio::ip::make_address("127.0.0.1"), 0);
     asio::ip::tcp::acceptor acceptor(io_context, ep.protocol());
@@ -126,21 +163,49 @@ auto prepareTCPSocketPair(asio::io_context& io_context) {
     writeSocket.non_blocking(false);
     // Set no_delay so that our output doesn't get buffered in a kernel buffer.
     writeSocket.set_option(asio::ip::tcp::no_delay(true));
-    readSocket.non_blocking(true);
+    readSocket.non_blocking(blocking);
 
     return std::pair(std::move(writeSocket), std::move(readSocket));
 }
 
-TEST(ASIOUtils, PeekAvailableBytesTCP) {
+TEST(ASIOUtils, PeekEmptySocketTCPBlocking) {
     asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context);
+    auto [_, readSocket] = prepareTCPSocketPair(io_context, false);
+
+    peekEmptySocket(readSocket);
+}
+
+TEST(ASIOUtils, PeekEmptySocketTCPNonBlocking) {
+    asio::io_context io_context;
+    auto [_, readSocket] = prepareTCPSocketPair(io_context, true);
+
+    peekEmptySocket(readSocket);
+}
+
+TEST(ASIOUtils, PeekAvailableBytesTCPBlocking) {
+    asio::io_context io_context;
+    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, false);
 
     peekAllSubstrings(writeSocket, readSocket, "example"_sd);
 }
 
-TEST(ASIOUtils, PeekPastAvailableBytesTCP) {
+TEST(ASIOUtils, PeekAvailableBytesTCPNonBlocking) {
     asio::io_context io_context;
-    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context);
+    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, true);
+
+    peekAllSubstrings(writeSocket, readSocket, "example"_sd);
+}
+
+TEST(ASIOUtils, PeekPastAvailableBytesTCPBlocking) {
+    asio::io_context io_context;
+    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, false);
+
+    peekPastBuffer(writeSocket, readSocket, "example"_sd);
+}
+
+TEST(ASIOUtils, PeekPastAvailableBytesTCPNonBlocking) {
+    asio::io_context io_context;
+    auto [writeSocket, readSocket] = prepareTCPSocketPair(io_context, true);
 
     peekPastBuffer(writeSocket, readSocket, "example"_sd);
 }
