@@ -30,27 +30,6 @@ LINUX_OPT_COPTS = select({
     "//conditions:default": [],
 })
 
-LINUX_PTHREAD_LINKFLAG = select({
-    "@platforms//os:linux": [
-        # Adds support for multithreading with the pthreads library. This option
-        # sets flags for both the preprocessor and linker.
-        "-pthread",
-    ],
-    "//conditions:default": [],
-})
-
-RDYNAMIC_LINKFLAG = select({
-    # Use rdynamic for backtraces with glibc unless we have libunwind.
-    "@platforms//os:linux": [
-        # Pass the flag -export-dynamic to the ELF linker, on targets that
-        # support it. This instructs the linker to add all symbols, not only
-        # used ones, to the dynamic symbol table. This option is needed for some
-        # uses of dlopen or to allow obtaining backtraces from within a program.
-        "-rdynamic",
-    ],
-    "//conditions:default": [],
-})
-
 # SERVER-9761: Ensure early detection of missing symbols in dependent libraries
 # at program startup. For non-release dynamic builds we disable this behavior in
 # the interest of improved mongod startup times. Xcode15 removed bind_at_load
@@ -259,15 +238,6 @@ LIBGCC_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
-LINUX_EXTRA_GLOBAL_LIBS_LINKFLAGS = select({
-    "@platforms//os:linux": [
-        "-lm",
-        "-lresolv",
-        "-latomic",
-    ],
-    "//conditions:default": [],
-})
-
 DEBUG_TYPES_SECTION_FLAGS = select({
     "//bazel/config:linux_clang_linkstatic": [
         "-fdebug-types-section",
@@ -276,28 +246,6 @@ DEBUG_TYPES_SECTION_FLAGS = select({
     # the size of the debug information under the 4GB limit.
     "//bazel/config:suse15_gcc_linkstatic": [
         "-fdebug-types-section",
-    ],
-    "//conditions:default": [],
-})
-
-GCC_OR_CLANG_LINKFLAGS = select({
-    "//bazel/config:linux_gcc_or_clang": [
-        # Explicitly enable GNU build id's if the linker supports it.
-        "-Wl,--build-id",
-
-        # Explicitly use the new gnu hash section if the linker offers it.
-        "-Wl,--hash-style=gnu",
-
-        # Disallow an executable stack. Also, issue a warning if any files are
-        # found that would cause the stack to become executable if the
-        # noexecstack flag was not in play, so that we can find them and fix
-        # them. We do this here after we check for ld.gold because the
-        # --warn-execstack is currently only offered with gold.
-        "-Wl,-z,noexecstack",
-        "-Wl,--warn-execstack",
-
-        # If possible with the current linker, mark relocations as read-only.
-        "-Wl,-z,relro",
     ],
     "//conditions:default": [],
 })
@@ -311,15 +259,6 @@ COMPRESS_DEBUG_COPTS = select({
     # by default still compresses on x86/x86_64 - nocompress is only a flag in gcc not clang
     "//bazel/config:compress_debug_compile_disabled_linux_gcc": [
         "-Wa,--nocompress-debug-sections",
-    ],
-    "//conditions:default": [],
-})
-
-COMPRESS_DEBUG_LINKFLAGS = select({
-    # Disable debug compression in both the assembler and linker
-    # by default.
-    "@platforms//os:linux": [
-        "-Wl,--compress-debug-sections=none",
     ],
     "//conditions:default": [],
 })
@@ -459,12 +398,8 @@ MONGO_LINUX_CC_LINKFLAGS = (
     LIBCXX_LINKFLAGS +
     DETECT_ODR_VIOLATIONS_LINKFLAGS +
     BIND_AT_LOAD_LINKFLAGS +
-    RDYNAMIC_LINKFLAG +
-    LINUX_PTHREAD_LINKFLAG +
     ANY_SANITIZER_AVAILABLE_LINKFLAGS +
     ANY_SANITIZER_GCC_LINKFLAGS +
-    GCC_OR_CLANG_LINKFLAGS +
-    COMPRESS_DEBUG_LINKFLAGS +
     DEBUG_TYPES_SECTION_FLAGS +
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
     THIN_LTO_FLAGS +
@@ -473,6 +408,5 @@ MONGO_LINUX_CC_LINKFLAGS = (
     PGO_PROFILE_FLAGS +
     SANITIZE_WITHOUT_TSAN_LINKFLAGS +
     SHARED_ARCHIVE_LINKFLAGS +
-    LIBGCC_LINKFLAGS +
-    LINUX_EXTRA_GLOBAL_LIBS_LINKFLAGS
+    LIBGCC_LINKFLAGS
 )

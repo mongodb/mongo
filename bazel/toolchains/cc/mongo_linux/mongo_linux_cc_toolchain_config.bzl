@@ -462,7 +462,7 @@ def _impl(ctx):
 
     per_object_debug_info_feature = feature(
         name = "per_object_debug_info",
-        enabled = True,
+        enabled = not ctx.attr.disable_debug_symbols,
         flag_sets = [
             flag_set(
                 actions = [
@@ -519,7 +519,7 @@ def _impl(ctx):
 
     dbg_level_0_feature = feature(
         name = "g0",
-        enabled = False,
+        enabled = ctx.attr.debug_level == 0,
         flag_sets = [
             flag_set(
                 actions = all_non_assembly_compile_actions,
@@ -536,7 +536,7 @@ def _impl(ctx):
 
     dbg_level_1_feature = feature(
         name = "g1",
-        enabled = False,
+        enabled = ctx.attr.debug_level == 1 and not ctx.attr.disable_debug_symbols,
         flag_sets = [
             flag_set(
                 actions = all_non_assembly_compile_actions,
@@ -553,7 +553,7 @@ def _impl(ctx):
 
     dbg_level_2_feature = feature(
         name = "g2",
-        enabled = True,
+        enabled = ctx.attr.debug_level == 2 and not ctx.attr.disable_debug_symbols,
         flag_sets = [
             flag_set(
                 actions = all_non_assembly_compile_actions,
@@ -575,7 +575,7 @@ def _impl(ctx):
 
     dbg_level_3_feature = feature(
         name = "g3",
-        enabled = False,
+        enabled = ctx.attr.debug_level == 3 and not ctx.attr.disable_debug_symbols,
         flag_sets = [
             flag_set(
                 actions = all_non_assembly_compile_actions,
@@ -592,7 +592,8 @@ def _impl(ctx):
 
     dwarf4_feature = feature(
         name = "dwarf-4",
-        enabled = False,
+        enabled = ctx.attr.dwarf_version == 4,
+        implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
@@ -606,7 +607,8 @@ def _impl(ctx):
 
     dwarf5_feature = feature(
         name = "dwarf-5",
-        enabled = False,
+        enabled = ctx.attr.dwarf_version == 5,
+        implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
@@ -620,7 +622,9 @@ def _impl(ctx):
 
     dwarf32_feature = feature(
         name = "dwarf32",
-        enabled = False,
+        # SUSE15 builds system libraries with dwarf32, use dwarf32 to be keep consistent
+        enabled = ctx.attr.compiler == COMPILERS.CLANG or ctx.attr.fission or ctx.attr.distro == "suse15",
+        implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
@@ -637,9 +641,11 @@ def _impl(ctx):
         ],
     )
 
+    # gdb crashes with -gsplit-dwarf and -gdwarf64
     dwarf64_feature = feature(
         name = "dwarf64",
-        enabled = False,
+        enabled = ctx.attr.compiler == COMPILERS.GCC and not ctx.attr.fission and not ctx.attr.distro == "suse15",
+        implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
                 actions = all_non_assembly_compile_actions,
@@ -656,15 +662,34 @@ def _impl(ctx):
 
     disable_debug_symbols_feature = feature(
         name = "disable_debug_symbols",
-        enabled = False,
+        enabled = ctx.attr.disable_debug_symbols,
+        implies = ["g0"],
         flag_sets = [
             flag_set(
                 actions = all_compile_actions,
-                flag_groups = [flag_group(flags = ["-g0"])],
+                with_features = [
+                    with_feature_set(
+                        not_features = [
+                            "per_object_debug_info",
+                            "g1",
+                            "g2",
+                            "g3",
+                        ],
+                    ),
+                ],
             ),
             flag_set(
                 actions = all_link_actions,
-                flag_groups = [flag_group(flags = ["-g0"])],
+                with_features = [
+                    with_feature_set(
+                        not_features = [
+                            "per_object_debug_info",
+                            "g1",
+                            "g2",
+                            "g3",
+                        ],
+                    ),
+                ],
             ),
         ],
     )
@@ -717,7 +742,7 @@ def _impl(ctx):
     # Warn when hiding a virtual function.
     overloaded_virtual_warning_feature = feature(
         name = "overloaded_virtual_warning",
-        enabled = False,
+        enabled = True,
         flag_sets = [
             flag_set(
                 actions = all_cpp_compile_actions,
@@ -1035,6 +1060,95 @@ def _impl(ctx):
         ],
     )
 
+    general_linkflags_feature = feature(
+        name = "general_linkflags",
+        enabled = ctx.attr.compiler == COMPILERS.CLANG or ctx.attr.compiler == COMPILERS.GCC,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = [
+                    # Explicitly enable GNU build id's if the linker supports it.
+                    "-Wl,--build-id",
+
+                    # Explicitly use the new gnu hash section if the linker offers it.
+                    "-Wl,--hash-style=gnu",
+
+                    # Disallow an executable stack. Also, issue a warning if any files are
+                    # found that would cause the stack to become executable if the
+                    # noexecstack flag was not in play, so that we can find them and fix
+                    # them. We do this here after we check for ld.gold because the
+                    # --warn-execstack is currently only offered with gold.
+                    "-Wl,-z,noexecstack",
+                    "-Wl,--warn-execstack",
+
+                    # If possible with the current linker, mark relocations as read-only.
+                    "-Wl,-z,relro",
+                ])],
+            ),
+        ],
+    )
+
+    global_libs_feature = feature(
+        name = "global_libs",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = [
+                    "-lm",
+                    "-lresolv",
+                    "-latomic",
+                ])],
+            ),
+        ],
+    )
+
+    pthread_feature = feature(
+        name = "pthread",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = [
+                    # Adds support for multithreading with the pthreads library. This option
+                    # sets flags for both the preprocessor and linker.
+                    "-pthread",
+                ])],
+            ),
+        ],
+    )
+
+    compress_debug_sections_feature = feature(
+        name = "compress_debug_sections",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wl,--compress-debug-sections=none",
+                ])],
+            ),
+        ],
+    )
+
+    # Define rdynamic for backtraces with glibc unless we have libunwind.
+    rdynamic_feature = feature(
+        name = "rdynamic",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = [
+                    # Pass the flag -export-dynamic to the ELF linker, on targets that
+                    # support it. This instructs the linker to add all symbols, not only
+                    # used ones, to the dynamic symbol table. This option is needed for some
+                    # uses of dlopen or to allow obtaining backtraces from within a program.
+                    "-rdynamic",
+                ])],
+            ),
+        ],
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1091,6 +1205,11 @@ def _impl(ctx):
         general_gcc_warnings_feature,
         general_gcc_or_clang_options_feature,
         clang_fno_limit_debug_info_feature,
+        general_linkflags_feature,
+        pthread_feature,
+        compress_debug_sections_feature,
+        rdynamic_feature,
+        global_libs_feature,
     ]
 
     return [
@@ -1125,6 +1244,7 @@ mongo_linux_cc_toolchain_config = rule(
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "cpu": attr.string(mandatory = True),
         "compiler": attr.string(mandatory = True),
+        "distro": attr.string(mandatory = False),
         "extra_cflags": attr.string_list(mandatory = False),
         "extra_cxxflags": attr.string_list(mandatory = False),
         "extra_ldflags": attr.string_list(mandatory = False),
@@ -1135,6 +1255,10 @@ mongo_linux_cc_toolchain_config = rule(
         "verbose": attr.bool(mandatory = False),
         "linkstatic": attr.bool(mandatory = True),
         "shared_archive": attr.bool(mandatory = True),
+        "dwarf_version": attr.int(mandatory = False),
+        "fission": attr.bool(mandatory = False),
+        "debug_level": attr.int(mandatory = False),
+        "disable_debug_symbols": attr.bool(mandatory = False),
     },
     provides = [CcToolchainConfigInfo],
 )

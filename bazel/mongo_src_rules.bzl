@@ -33,34 +33,6 @@ load(
 )
 load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
 
-# These are added to both copts and linker flags.
-DWARF_VERSION_FEATURES = select({
-    "//bazel/config:dwarf_version_4_linux": [
-        "dwarf-4",
-    ],
-    "//bazel/config:dwarf_version_5_linux": [
-        "dwarf-5",
-    ],
-    "//conditions:default": [],
-})
-
-# Set the debug level for copts and linker
-DEBUG_LEVEL_FEATURES = select({
-    "//bazel/config:gcc_or_clang_dbg_level_0": [
-        "g0",
-    ],
-    "//bazel/config:gcc_or_clang_dbg_level_1": [
-        "g1",
-    ],
-    "//bazel/config:gcc_or_clang_dbg_level_2": [
-        "g2",
-    ],
-    "//bazel/config:gcc_or_clang_dbg_level_3": [
-        "g3",
-    ],
-    "//conditions:default": [],
-})
-
 # These will throw an error if the following condition is not met:
 # (libunwind == on && os == linux) || libunwind == off || libunwind == auto
 LIBUNWIND_DEPS = select({
@@ -243,28 +215,6 @@ TCMALLOC_DEPS = select({
     ],
 }, no_match_error = TCMALLOC_ERROR_MESSAGE)
 
-# These are added as both copts and linker flags.
-GDWARF_FEATURES = select({
-    "//bazel/config:linux_clang": ["dwarf32"],
-    "//bazel/config:linux_gcc_fission": ["dwarf32"],  # gdb crashes with -gsplit-dwarf and -gdwarf64
-    "//bazel/config:linux_gcc": ["dwarf64"],
-    # SUSE15 builds system libraries with dwarf32, use dwarf32 to be keep consistent
-    "//bazel/config:suse15_gcc": ["dwarf32"],
-    "//conditions:default": [],
-})
-
-# These are added as both copts and linker flags. This should also be added after any debugging flags on the command
-# line to ensure debugging is disabled.
-DISABLE_DEBUGGING_SYMBOLS_FEATURE = select({
-    "//bazel/config:not_windows_debug_symbols_disabled": ["disable_debug_symbols", "-per_object_debug_info"],
-    "//conditions:default": [],
-})
-
-OVERLOADED_VIRTUAL_FEATURES = select({
-    "@platforms//os:linux": ["overloaded_virtual_warning"],
-    "//conditions:default": [],
-})
-
 SYMBOL_ORDER_FILES = [
     "//:symbols.orderfile",
 ]
@@ -297,8 +247,6 @@ MONGO_GLOBAL_SRC_DEPS = [
 ]
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
-
-MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES + DEBUG_LEVEL_FEATURES + OVERLOADED_VIRTUAL_FEATURES + DISABLE_DEBUGGING_SYMBOLS_FEATURE
 
 def force_includes_hdr(package_name, name):
     if package_name.startswith("src/mongo"):
@@ -593,7 +541,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + features,
+        features = features,
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
@@ -624,7 +572,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + features,
+        features = SKIP_ARCHIVE_FEATURE + features,
         target_compatible_with = target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
@@ -871,7 +819,7 @@ def _mongo_cc_binary_and_test(
         "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
         "defines": defines,
         "includes": includes,
-        "features": MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + ["-pic", "pie"] + features + select({
+        "features": SKIP_ARCHIVE_FEATURE + ["-pic", "pie"] + features + select({
             "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
             "//conditions:default": [],
         }),
@@ -1329,7 +1277,7 @@ def mongo_proto_library(
         name = name,
         srcs = srcs,
         tags = tags + ["gen_source"],
-        features = features + MONGO_GLOBAL_FEATURES,
+        features = features,
         **kwargs
     )
 

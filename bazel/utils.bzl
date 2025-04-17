@@ -47,12 +47,15 @@ def get_toolchain_subs(ctx):
 
     version = ctx.attr.version
 
+    distro = get_host_distro_major_version(ctx)
+
     if os != "linux":
         substitutions = {
             "{platforms_arch}": "arm64",
             "{bazel_toolchain_cpu}": arch,
             "{arch}": arch,
             "{version}": version,
+            "{distro}": distro,
         }
         generate_noop_toolchain(ctx, substitutions)
         ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
@@ -63,6 +66,7 @@ def get_toolchain_subs(ctx):
             "{bazel_toolchain_cpu}": arch,
             "{arch}": arch,
             "{version}": version,
+            "{distro}": distro,
         }
     elif arch == "x86_64":
         substitutions = {
@@ -70,6 +74,7 @@ def get_toolchain_subs(ctx):
             "{bazel_toolchain_cpu}": "x86_64",
             "{arch}": arch,
             "{version}": version,
+            "{distro}": distro,
         }
     elif arch == "ppc64le":
         substitutions = {
@@ -77,6 +82,7 @@ def get_toolchain_subs(ctx):
             "{bazel_toolchain_cpu}": "ppc",
             "{arch}": arch,
             "{version}": version,
+            "{distro}": distro,
         }
     elif arch == "s390x":
         substitutions = {
@@ -84,6 +90,7 @@ def get_toolchain_subs(ctx):
             "{bazel_toolchain_cpu}": arch,
             "{arch}": arch,
             "{version}": version,
+            "{distro}": distro,
         }
     else:
         substitutions = {
@@ -91,11 +98,10 @@ def get_toolchain_subs(ctx):
             "{bazel_toolchain_cpu}": arch,
             "{arch}": arch,
             "{version}": version,
+            "{distro}": distro,
         }
         generate_noop_toolchain(ctx, substitutions)
         ctx.report_progress("mongo toolchain not supported on " + os + " and " + arch)
-
-    distro = get_host_distro_major_version(ctx)
 
     return distro, arch, substitutions
 
