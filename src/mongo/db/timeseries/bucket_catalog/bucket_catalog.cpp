@@ -812,7 +812,7 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                           bool& bucketOpenedDueToMetadata) {
     Status reopeningStatus = Status::OK();
     auto numReopeningsAttempted = 0;
-    auto reopeningLimit = 3;
+    auto reopeningLimit = gTimeseriesMaxRetriesForWriteConflictsOnReopening.load();
     do {
         auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
         // 1. Try to find an eligible open bucket for the next measurement.

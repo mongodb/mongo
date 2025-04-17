@@ -155,6 +155,19 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
+    "timeseriesMaxRetriesForWriteConflictsOnReopening":
+        description:
+            "When re-opening a bucket from archival or query-based reopening,
+            the bucket catalog will retry re-opening a bucket due to WriteConflicts for a limited number of times.
+            This value represents the maximum number of retries the bucket catalog would perform before attempting
+            to find an existing open bucket, and if unsuccessful, then allocating a new bucket."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: "gTimeseriesMaxRetriesForWriteConflictsOnReopening"
+        default: 16
+        validator: {gte: 1}
+        redact: false
+
 enums:
     BucketGranularity:
         description:
