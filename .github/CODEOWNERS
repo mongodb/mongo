@@ -107,7 +107,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/core_wildcard_indexes.yml @10gen/query-execution-write-exec @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/fle* @10gen/query-integration-extensions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/json_schema.yml @10gen/query-execution @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/mql_model* @10gen/query-execution @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_tester_self_test.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/search* @10gen/query-integration-search @svc-auto-approve-bot

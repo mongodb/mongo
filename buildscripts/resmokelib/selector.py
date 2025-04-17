@@ -844,7 +844,7 @@ class _DbTestSelector(_Selector):
 
 
 class _FileBasedSelectorConfig(_SelectorConfig):
-    """_SelectorConfig subclass for json_schema_test and mql_model_mongod_test tests."""
+    """_SelectorConfig subclass for json_schema_test tests."""
 
     def __init__(self, roots, include_files=None, exclude_files=None):
         """Initialize _FileBasedSelectorConfig."""
@@ -897,8 +897,6 @@ _SELECTOR_REGISTRY = {
     "json_schema_test": (_FileBasedSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
     "all_versions_js_test": (_JSTestSelectorConfig, _JSTestSelector),
-    "mql_model_haskell_test": (_FileBasedSelectorConfig, _Selector),
-    "mql_model_mongod_test": (_FileBasedSelectorConfig, _Selector),
     "multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),
     "py_test": (_PyTestCaseSelectorConfig, _Selector),
     "sleep_test": (_SleepTestCaseSelectorConfig, _SleepTestCaseSelector),

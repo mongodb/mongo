@@ -62,9 +62,6 @@ filters:
   - "json_schema.yml":
     approvers:
       - 10gen/query-execution
-  - "mql_model*":
-    approvers:
-      - 10gen/query-execution
   - "query_stats*":
     approvers:
       - 10gen/query-integration-observability
