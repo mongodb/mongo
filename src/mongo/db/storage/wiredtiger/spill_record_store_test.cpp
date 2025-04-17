@@ -34,7 +34,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/spill_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/unittest.h"
@@ -54,13 +54,15 @@ protected:
             std::string{kWiredTigerEngineName}, _dbpath.path(), &_clockSource, std::move(wtConfig));
 
         _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
+        ASSERT_TRUE(_kvEngine->hasIdent(_recordStore->getRecoveryUnit(nullptr), "a.b"));
     }
 
-    std::unique_ptr<RecordStore> makeTemporaryRecordStore(const std::string& ns,
-                                                          KeyFormat keyFormat) {
+    std::unique_ptr<SpillRecordStore> makeTemporaryRecordStore(const std::string& ns,
+                                                               KeyFormat keyFormat) {
         StringData ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        return _kvEngine->makeTemporaryRecordStore(_opCtx.get(), ident, keyFormat);
+        auto rs = _kvEngine->makeTemporaryRecordStore(_opCtx.get(), ident, keyFormat);
+        return std::unique_ptr<SpillRecordStore>(dynamic_cast<SpillRecordStore*>(rs.release()));
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() {
@@ -70,7 +72,7 @@ protected:
     unittest::TempDir _dbpath;
     ClockSourceMock _clockSource;
     std::unique_ptr<SpillKVEngine> _kvEngine;
-    std::unique_ptr<RecordStore> _recordStore;
+    std::unique_ptr<SpillRecordStore> _recordStore;
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
@@ -347,6 +349,43 @@ TEST_F(SpillRecordStoreTest, RecordCursor) {
         record = cursor->next();
     }
     ASSERT_FALSE(cursor->next());
+}
+
+// Test that tables get created and deleted as expected.
+TEST_F(SpillRecordStoreTest, TableCreation) {
+    SpillRecoveryUnit wtRu(&_kvEngine->getConnection());
+
+    std::vector<std::unique_ptr<SpillRecordStore>> recordStores;
+    for (int i = 0; i < 3; ++i) {
+        auto ident = "a." + std::to_string(i + 1);
+        auto recordStore = makeTemporaryRecordStore(ident, KeyFormat::Long);
+        ASSERT_TRUE(_kvEngine->hasIdent(wtRu, ident));
+        recordStores.push_back(std::move(recordStore));
+    }
+
+    auto allIdents = _kvEngine->getAllIdents(wtRu);
+    std::unordered_set<std::string> allIdentsSet(allIdents.begin(), allIdents.end());
+    ASSERT_EQ(allIdentsSet.size(), 4);
+    ASSERT_TRUE(allIdentsSet.contains("a.b"));
+    for (int i = 0; i < 3; ++i) {
+        auto ident = "a." + std::to_string(i + 1);
+        ASSERT_TRUE(allIdentsSet.contains(ident));
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_OK(recordStores[i]->truncate(_opCtx.get()));
+        recordStores[i].reset();
+
+        auto ident = "a." + std::to_string(i + 1);
+        ASSERT_OK(_kvEngine->dropIdent(&wtRu, ident, false));
+        ASSERT_FALSE(_kvEngine->hasIdent(wtRu, ident));
+    }
+
+    allIdents = _kvEngine->getAllIdents(wtRu);
+    allIdentsSet.clear();
+    allIdentsSet.insert(allIdents.begin(), allIdents.end());
+    ASSERT_EQ(allIdentsSet.size(), 1);
+    ASSERT_TRUE(allIdentsSet.contains("a.b"));
 }
 
 }  // namespace

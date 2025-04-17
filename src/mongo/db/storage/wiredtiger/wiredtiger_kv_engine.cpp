@@ -507,6 +507,55 @@ Status WiredTigerKVEngineBase::reconfigureLogging() {
     return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr);
 }
 
+bool WiredTigerKVEngineBase::_wtHasUri(WiredTigerSession& session, const std::string& uri) const {
+    // can't use WiredTigerCursor since this is called from constructor.
+    WT_CURSOR* c = nullptr;
+    // No need for a metadata:create cursor, since it gathers extra information and is slower.
+    int ret = session.open_cursor("metadata:", nullptr, nullptr, &c);
+    if (ret == ENOENT)
+        return false;
+    invariantWTOK(ret, session);
+    ON_BLOCK_EXIT([&] { c->close(c); });
+
+    c->set_key(c, uri.c_str());
+    return c->search(c) == 0;
+}
+
+std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(
+    WiredTigerRecoveryUnitBase& wtRu) const {
+    std::vector<std::string> all;
+    int ret;
+    // No need for a metadata:create cursor, since it gathers extra information and is slower.
+
+    auto cursorParams = getWiredTigerCursorParams(wtRu, WiredTigerUtil::kMetadataTableId);
+    WiredTigerCursor cursor(std::move(cursorParams), "metadata:", *wtRu.getSession());
+    WT_CURSOR* c = cursor.get();
+    if (!c)
+        return all;
+
+    while ((ret = c->next(c)) == 0) {
+        const char* raw;
+        c->get_key(c, &raw);
+        StringData key(raw);
+        size_t idx = key.find(':');
+        if (idx == string::npos)
+            continue;
+        StringData type = key.substr(0, idx);
+        if (type != "table")
+            continue;
+
+        StringData ident = key.substr(idx + 1);
+        if (ident == "sizeStorer")
+            continue;
+
+        all.push_back(ident.toString());
+    }
+
+    fassert(50663, ret == WT_NOTFOUND);
+
+    return all;
+}
+
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& path,
                                        ClockSource* clockSource,
@@ -627,7 +676,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     _sizeStorerUri = WiredTigerUtil::buildTableUri("sizeStorer");
     WiredTigerSession session(_connection.get());
-    if (repair && _hasUri(session, _sizeStorerUri)) {
+    if (repair && _wtHasUri(session, _sizeStorerUri)) {
         LOGV2(22316, "Repairing size cache");
 
         auto status = _salvageIfNeeded(_sizeStorerUri.c_str());
@@ -2116,57 +2165,13 @@ void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
 }
 
 bool WiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
-    return _hasUri(*WiredTigerRecoveryUnit::get(ru).getSession(),
-                   WiredTigerUtil::buildTableUri(ident));
-}
-
-bool WiredTigerKVEngine::_hasUri(WiredTigerSession& session, const std::string& uri) const {
-    // can't use WiredTigerCursor since this is called from constructor.
-    WT_CURSOR* c = nullptr;
-    // No need for a metadata:create cursor, since it gathers extra information and is slower.
-    int ret = session.open_cursor("metadata:", nullptr, nullptr, &c);
-    if (ret == ENOENT)
-        return false;
-    invariantWTOK(ret, session);
-    ON_BLOCK_EXIT([&] { c->close(c); });
-
-    c->set_key(c, uri.c_str());
-    return c->search(c) == 0;
+    return _wtHasUri(*WiredTigerRecoveryUnit::get(ru).getSession(),
+                     WiredTigerUtil::buildTableUri(ident));
 }
 
 std::vector<std::string> WiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) const {
-    std::vector<std::string> all;
-    int ret;
-    // No need for a metadata:create cursor, since it gathers extra information and is slower.
-
-    auto wtRu = WiredTigerRecoveryUnit::get(&ru);
-    auto cursorParams = getWiredTigerCursorParams(*wtRu, WiredTigerUtil::kMetadataTableId);
-    WiredTigerCursor cursor(std::move(cursorParams), "metadata:", *wtRu->getSession());
-    WT_CURSOR* c = cursor.get();
-    if (!c)
-        return all;
-
-    while ((ret = c->next(c)) == 0) {
-        const char* raw;
-        c->get_key(c, &raw);
-        StringData key(raw);
-        size_t idx = key.find(':');
-        if (idx == string::npos)
-            continue;
-        StringData type = key.substr(0, idx);
-        if (type != "table")
-            continue;
-
-        StringData ident = key.substr(idx + 1);
-        if (ident == "sizeStorer")
-            continue;
-
-        all.push_back(ident.toString());
-    }
-
-    fassert(50663, ret == WT_NOTFOUND);
-
-    return all;
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    return _wtGetAllIdents(wtRu);
 }
 
 boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForIdent(

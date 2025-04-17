@@ -62,7 +62,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
+        MONGO_UNREACHABLE;
+    }
 
     bool supportsDirectoryPerDB() const override {
         return false;
@@ -73,23 +75,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool hasIdent(RecoveryUnit&, StringData ident) const override {
-        // TODO(SERVER-103258): Implement hasIdent().
-        MONGO_UNREACHABLE;
-    }
+    bool hasIdent(RecoveryUnit&, StringData ident) const override;
 
-    std::vector<std::string> getAllIdents(RecoveryUnit&) const override {
-        // TODO(SERVER-103258): Implement getAllIdents().
-        MONGO_UNREACHABLE;
-    }
+    std::vector<std::string> getAllIdents(RecoveryUnit&) const override;
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop = nullptr) override {
-        // TODO(SERVER-103272): Implement dropIdent().
-        MONGO_UNREACHABLE;
-    }
+                     const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,

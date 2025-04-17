@@ -56,10 +56,6 @@ public:
 
     ~SpillRecordStore() override;
 
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
-                                                    bool forward = true) const override;
-
-private:
     long long dataSize() const override;
 
     long long numRecords() const override;
@@ -68,11 +64,15 @@ private:
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
 
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                    bool forward = true) const override;
+
     /**
      * The 'opCtx' param is not used and is allowed to be nullptr.
      */
     RecoveryUnit& getRecoveryUnit(OperationContext* opCtx) const override;
 
+private:
     void _deleteRecord(OperationContext* opCtx, const RecordId&) override;
 
     // TODO(SERVER-103259): Remove the timestamp param.

@@ -140,8 +140,36 @@ std::unique_ptr<RecordStore> SpillKVEngine::makeTemporaryRecordStore(OperationCo
     return getTemporaryRecordStore(opCtx, ident, keyFormat);
 }
 
-std::unique_ptr<RecoveryUnit> SpillKVEngine::newRecoveryUnit() {
-    return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
+bool SpillKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
+    return _wtHasUri(*SpillRecoveryUnit::get(ru).getSession(),
+                     WiredTigerUtil::buildTableUri(ident));
+}
+
+std::vector<std::string> SpillKVEngine::getAllIdents(RecoveryUnit& ru) const {
+    auto& wtRu = SpillRecoveryUnit::get(ru);
+    return _wtGetAllIdents(wtRu);
+}
+
+Status SpillKVEngine::dropIdent(RecoveryUnit* ru,
+                                StringData ident,
+                                bool identHasSizeInfo,
+                                const StorageEngine::DropIdentCallback& onDrop) {
+    std::string uri = WiredTigerUtil::buildTableUri(ident);
+
+    auto& wtRu = SpillRecoveryUnit::get(*ru);
+    wtRu.getSessionNoTxn()->closeAllCursors(uri);
+
+    WiredTigerSession session(_connection.get());
+
+    int ret = session.drop(uri.c_str(), "checkpoint_wait=false");
+    Status status = Status::OK();
+    if (ret == 0 || ret == ENOENT) {
+        // If ident doesn't exist, it is effectively dropped.
+    } else {
+        status = wtRCToStatus(ret, session);
+    }
+    LOGV2_DEBUG(10327200, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
+    return status;
 }
 
 void SpillKVEngine::cleanShutdown() {

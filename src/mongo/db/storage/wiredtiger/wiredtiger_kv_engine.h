@@ -265,6 +265,16 @@ public:
     virtual void sizeStorerPeriodicFlush() {}
 
 protected:
+    /**
+     * Returns true if the given table uri exists in this WiredTiger instance.
+     */
+    bool _wtHasUri(WiredTigerSession& session, const std::string& uri) const;
+
+    /**
+     * Returns all the idents known to this WiredTiger instance.
+     */
+    std::vector<std::string> _wtGetAllIdents(WiredTigerRecoveryUnitBase& wtRu) const;
+
     // Configuration parameters to configure the WiredTiger instance.
     WiredTigerConfig _wtConfig;
     std::string _canonicalName;
