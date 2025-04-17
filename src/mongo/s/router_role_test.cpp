@@ -40,6 +40,9 @@
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -291,7 +294,7 @@ TEST_F(RouterRoleTest, MultiCollectionRouterRetriesOnStaleConfigForNonSubRouter)
 }
 
 // TODO SERVER-102931: Integrate RouterAcquisitionSnapshot into the tests below.
-TEST_F(RouterRoleTest, RoutingContextCreation) {
+TEST_F(RouterRoleTest, RoutingContextCreationAndDestruction) {
     auto opCtx = operationContext();
 
     const auto expectedCri =
@@ -304,6 +307,62 @@ TEST_F(RouterRoleTest, RoutingContextCreation) {
     ASSERT_TRUE(actualCri.hasRoutingTable());
     ASSERT_TRUE(actualCri.isSharded());
     ASSERT_EQ(actualCri.getCollectionVersion(), expectedCri.getCollectionVersion());
+
+    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+}
+
+TEST_F(RouterRoleTest, InvalidRoutingContextDestruction) {
+    const auto opCtx = operationContext();
+    startCapturingLogMessages();
+    {
+        // Create RoutingContext in scope without explicitly validating nss before destruction.
+        RoutingContext routingCtx(opCtx, std::vector{_nss});
+    }
+    stopCapturingLogMessages();
+    ASSERT_EQ(countTextFormatLogLinesContaining(
+                  "RoutingContext failed to validate routing table for all namespaces."),
+              1);
+}
+
+DEATH_TEST_F(RouterRoleTest,
+             CannotDeclareDuplicateNssOnRoutingContext,
+             "declared multiple times in RoutingContext") {
+    const auto opCtx = operationContext();
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            RoutingContext routingCtx(opCtx, std::vector{_nss, _nss});
+        }(),
+        AssertionException,
+        10292300);
+}
+
+TEST_F(RouterRoleTest, CannotAccessUndeclaredNssOnRoutingContext) {
+    const auto opCtx = operationContext();
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            RoutingContext routingCtx(opCtx, std::vector{_nss});
+            const auto cri = routingCtx.getCollectionRoutingInfo(
+                NamespaceString::createNamespaceString_forTest("test.nonexistent_nss"));
+        }(),
+        DBException,
+        10292301);
+}
+
+DEATH_TEST_F(RouterRoleTest,
+             DuplicateNssValidationErrorsOnRoutingContext,
+             "Duplicate validation recorded for namespace") {
+    const auto opCtx = operationContext();
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            RoutingContext routingCtx(opCtx, std::vector{_nss});
+            routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+            routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+        }(),
+        AssertionException,
+        10292800);
 }
 
 TEST_F(RouterRoleTest, RoutingContextPropagatesCatalogCacheErrors) {
@@ -344,6 +403,8 @@ TEST_F(RouterRoleTest, RoutingContextRoutingTablesAreImmutable) {
     ASSERT_NE(versionA, versionB);
     ASSERT_EQ(routingCtx.getCollectionRoutingInfo(_nss).getCollectionVersion().placementVersion(),
               versionA);
+
+    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
 }
 }  // namespace
 }  // namespace mongo

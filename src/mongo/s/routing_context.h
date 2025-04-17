@@ -56,11 +56,25 @@ public:
     RoutingContext(const RoutingContext&) = delete;
     RoutingContext& operator=(const RoutingContext&) = delete;
 
+    ~RoutingContext();
+
     /**
      * Returns the routing table mapped to a namespace. This is initialized at construction time and
      * remains the same throughout the routing operation.
      */
     const CollectionRoutingInfo& getCollectionRoutingInfo(const NamespaceString& nss) const;
+
+    /**
+     * Record that a versioned request for a namespace was accepted by a shard. The namespace is
+     * considered validated.
+     */
+    void onResponseReceivedForNss(const NamespaceString& nss, const Status& status);
+
+    /**
+     * Utility to trigger CatalogCache refreshes for staleness errors directly from the
+     * RoutingContext.
+     */
+    bool onStaleError(const NamespaceString& nss, const Status& status);
 
 private:
     /**
@@ -73,8 +87,9 @@ private:
                                                                 bool allowLocks) const;
 
     CatalogCache* _catalogCache;
-
-    // Immutable map from _nss -> CollectionRoutingInfo
-    const stdx::unordered_map<NamespaceString, CollectionRoutingInfo> _nssToCriMap;
+    // Map from _nss -> CollectionRoutingInfo
+    stdx::unordered_map<NamespaceString,
+                        std::pair<const CollectionRoutingInfo, boost::optional<Status>>>
+        _nssToCriMap;
 };
 }  // namespace mongo
