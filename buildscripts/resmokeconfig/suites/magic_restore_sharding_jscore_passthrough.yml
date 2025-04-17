@@ -35,11 +35,6 @@ selector:
     - jstests/core/views/views_aggregation.js
     - jstests/core/query/bson_size_limit.js
 
-    # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
-    - jstests/core/query/type/type_array.js
-    - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
-    - jstests/core/query/json_schema/unique_items.js
-
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
     - jstests/core/query/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
@@ -74,8 +69,6 @@ selector:
     # no-op override, threads remain unjoined. Causes mongo shell to throw an exception
     # on shutdown.
     - jstests/core_sharding/resharding/resharding_perform_verification.js
-
-    - jstests/core/query/update/update_bit_examples.js
 
     # These tests run many aggregations, and the override slows them down enough to hit the
     # evergreen timeout. Since they do not provide valuable coverage in this passthrough we
