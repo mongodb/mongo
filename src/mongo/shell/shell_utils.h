@@ -126,6 +126,10 @@ enum class NormalizationOpts : uint32_t {
     kConflateNullAndMissing = 1 << 4,
     // Set this bit to round floating points to 15 digits of precision.
     kRoundFloatingPointNumerics = 1 << 5,
+    // Set this bit to run explain of the original query instead.
+    kExplain = 1 << 6,
+    // Set this bit to compare only the 'queryShapeHash' results.
+    kQueryShapeHash = 1 << 7,
 };
 using NormalizationOptsSet = NormalizationOpts;
 

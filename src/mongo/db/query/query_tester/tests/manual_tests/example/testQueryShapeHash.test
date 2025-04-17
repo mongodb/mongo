@@ -1,0 +1,5 @@
+testQueryShapeHash
+test
+basic.coll as fuzzer_coll
+
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
