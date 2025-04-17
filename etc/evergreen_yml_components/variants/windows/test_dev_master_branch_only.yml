@@ -82,6 +82,7 @@ buildvariants:
       content_type: application/zip
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=windows
+      skip_archive_dist_test_debug_activate: True
       python: "/cygdrive/c/python/python310/python.exe"
       ext: zip
       multiversion_platform: windows

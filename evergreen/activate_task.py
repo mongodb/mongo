@@ -9,13 +9,17 @@ from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.read_config import read_config_file
 
 
-def main(task_name: str, skip_for_patch_author: Annotated[Optional[str], typer.Argument()] = None):
+def main(
+    task_name: str,
+    skip_for_patch_author: Annotated[Optional[str], typer.Argument()] = None,
+    skip_activate_task: Annotated[Optional[bool], typer.Argument()] = False,
+):
     expansions_file = "../expansions.yml"
     expansions = read_config_file(expansions_file)
     evg_api = evergreen_conn.get_evergreen_api()
 
     # Skip activation if the patch author is the excluded user
-    if expansions.get("author") == skip_for_patch_author:
+    if expansions.get("author") == skip_for_patch_author or skip_activate_task:
         return
 
     variant_id = expansions.get("build_id")

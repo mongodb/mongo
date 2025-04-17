@@ -117,6 +117,7 @@ tasks:
         vars:
           task_to_activate: ${archive_dist_test_debug_task_name|archive_dist_test_debug}
           skip_for_patch_author: sys-perf-user
+          skip_activate_task: ${skip_archive_dist_test_debug_activate|False}
       - func: "bazel compile"
         vars:
           targets: >-

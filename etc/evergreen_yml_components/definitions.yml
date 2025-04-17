@@ -2837,6 +2837,7 @@ functions:
           - "evergreen/activate_task.py"
           - "${task_to_activate}"
           - "${skip_for_patch_author}"
+          - "${skip_activate_task}"
 
   "gen supplementary data":
     command: subprocess.exec
