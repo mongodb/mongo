@@ -146,6 +146,13 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
         MONGO_UNREACHABLE;
     }
 }
+
+/**
+ * Return the length of the array. Throws an error if the value is not one of the possible types of
+ * array.
+ */
+size_t getArraySize(TypeTags tag, Value value);
+
 }  // namespace value
 }  // namespace sbe
 }  // namespace mongo

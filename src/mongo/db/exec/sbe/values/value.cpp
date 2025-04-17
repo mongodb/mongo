@@ -38,32 +38,23 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/string_data_comparator.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/exec/js_function.h"
-#include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/index/btree_key_generator.h"
-#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/errno_util.h"
-#include "mongo/util/pcre_util.h"
 
 namespace mongo {
 namespace sbe {
@@ -831,6 +822,28 @@ bool ArraySet::push_back(TypeTags tag, Value val) {
     }
 
     return false;
+}
+
+bool ArraySet::push_back_clone(TypeTags tag, Value val) {
+    if (tag != TypeTags::Nothing) {
+        return _values.insert_lazy({tag, val}, [&]() { return value::copyValue(tag, val); }).second;
+    }
+
+    return false;
+}
+
+std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
+                                           Value value,
+                                           const CollatorInterface* collator) {
+    auto [resTag, resVal] = makeNewArraySet(collator);
+    ValueGuard guard(resTag, resVal);
+    ArraySet* setValues = getArraySetView(resVal);
+    setValues->reserve(getArraySize(tag, value));
+    arrayForEach(tag, value, [&](TypeTags elemTag, Value elemVal) {
+        setValues->push_back_clone(elemTag, elemVal);
+    });
+    guard.reset();
+    return {resTag, reinterpret_cast<Value>(setValues)};
 }
 
 std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {

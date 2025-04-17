@@ -593,12 +593,31 @@ void ExpressionConstEval::transport(abt::ABT& n,
             swapAndUpdate(n, abt::make<abt::Constant>(tag, val));
         }
     }
-    if (op.name() == "isInList") {
+    if (op.name() == "isInList"s) {
         // If the child node is a Constant, check if the type is inList, then directly set to
         // true/false.
         if (args.size() == 1 && args[0].is<abt::Constant>()) {
             const auto tag = args[0].cast<abt::Constant>()->get().first;
             swapAndUpdate(n, abt::Constant::boolean(tag == sbe::value::TypeTags::inList));
+        }
+    }
+    if (op.name() == "setIsSubset"s || op.name() == "setDifference"s || op.name() == "setEquals"s) {
+        // Convert any argument of type Array to an ArraySet.
+        for (size_t idx = 0; idx < args.size(); idx++) {
+            if (args[idx].is<abt::Constant>()) {
+                auto [tag, val] = args[idx].cast<abt::Constant>()->get();
+                switch (tag) {
+                    case sbe::value::TypeTags::Array:
+                    case sbe::value::TypeTags::ArrayMultiSet:
+                    case sbe::value::TypeTags::bsonArray: {
+                        auto [setTag, setVal] = sbe::value::makeNewArraySet(tag, val, nullptr);
+                        swapAndUpdate(args[idx], abt::make<abt::Constant>(setTag, setVal));
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
         }
     }
 }

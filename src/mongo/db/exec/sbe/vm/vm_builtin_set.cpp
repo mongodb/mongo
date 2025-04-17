@@ -201,8 +201,7 @@ FastTuple<bool, value::TypeTags, value::Value> setUnion(
         auto argVal = argVals[idx];
 
         value::arrayForEach(argTag, argVal, [&](value::TypeTags elTag, value::Value elVal) {
-            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-            resView->push_back(copyTag, copyVal);
+            resView->push_back_clone(elTag, elVal);
         });
     }
     resGuard.reset();
@@ -247,8 +246,7 @@ FastTuple<bool, value::TypeTags, value::Value> setIntersection(
     for (auto&& [item, counter] : intersectionMap) {
         if (counter == argVals.size()) {
             auto [elTag, elVal] = item;
-            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-            resView->push_back(copyTag, copyVal);
+            resView->push_back_clone(elTag, elVal);
         }
     }
 
@@ -256,10 +254,15 @@ FastTuple<bool, value::TypeTags, value::Value> setIntersection(
     return {true, resTag, resVal};
 }
 
-value::ValueSetType valueToSetHelper(value::TypeTags tag,
-                                     value::Value value,
-                                     const CollatorInterface* collator) {
+/**
+ * Helper function that creates a set useful to quickly search through a dataset and then it is
+ * destroyed.
+ */
+value::ValueSetType valueToShallowSetHelper(value::TypeTags tag,
+                                            value::Value value,
+                                            const CollatorInterface* collator) {
     value::ValueSetType setValues(0, value::ValueHash(collator), value::ValueEq(collator));
+    setValues.reserve(getArraySize(tag, value));
     value::arrayForEach(tag, value, [&](value::TypeTags elemTag, value::Value elemVal) {
         setValues.insert({elemTag, elemVal});
     });
@@ -276,14 +279,20 @@ FastTuple<bool, value::TypeTags, value::Value> setDifference(
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
 
-    auto setValuesSecondArg = valueToSetHelper(rhsTag, rhsVal, collator);
-
-    value::arrayForEach(lhsTag, lhsVal, [&](value::TypeTags elTag, value::Value elVal) {
-        if (setValuesSecondArg.count({elTag, elVal}) == 0) {
-            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-            resView->push_back(copyTag, copyVal);
-        }
-    });
+    auto process =
+        [&resView](value::TypeTags lhsTag, value::Value lhsVal, const value::ValueSetType& rhsSet) {
+            value::arrayForEach(lhsTag, lhsVal, [&](value::TypeTags elTag, value::Value elVal) {
+                if (rhsSet.count({elTag, elVal}) == 0) {
+                    resView->push_back_clone(elTag, elVal);
+                }
+            });
+        };
+    if (rhsTag == value::TypeTags::ArraySet &&
+        value::getArraySetView(rhsVal)->values().hash_function().getCollator() == collator) {
+        process(lhsTag, lhsVal, value::getArraySetView(rhsVal)->values());
+    } else {
+        process(lhsTag, lhsVal, valueToShallowSetHelper(rhsTag, rhsVal, collator));
+    }
 
     resGuard.reset();
     return {true, resTag, resVal};
@@ -293,11 +302,20 @@ FastTuple<bool, value::TypeTags, value::Value> setEquals(
     const std::vector<value::TypeTags>& argTags,
     const std::vector<value::Value>& argVals,
     const CollatorInterface* collator = nullptr) {
-    auto setValuesFirstArg = valueToSetHelper(argTags[0], argVals[0], collator);
+    auto setValuesFirstArg = valueToShallowSetHelper(argTags[0], argVals[0], collator);
 
     for (size_t idx = 1; idx < argVals.size(); ++idx) {
-        auto setValuesOtherArg = valueToSetHelper(argTags[idx], argVals[idx], collator);
-        if (setValuesFirstArg != setValuesOtherArg) {
+        bool matches = false;
+        if (argTags[idx] == value::TypeTags::ArraySet &&
+            value::getArraySetView(argVals[idx])->values().hash_function().getCollator() ==
+                collator) {
+            matches = setValuesFirstArg == value::getArraySetView(argVals[idx])->values();
+        } else {
+            matches =
+                setValuesFirstArg == valueToShallowSetHelper(argTags[idx], argVals[idx], collator);
+        }
+
+        if (!matches) {
             return {false, value::TypeTags::Boolean, false};
         }
     }
@@ -316,13 +334,22 @@ FastTuple<bool, value::TypeTags, value::Value> setIsSubset(
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto setValuesSecondArg = valueToSetHelper(rhsTag, rhsVal, collator);
-
     bool isSubset = true;
-    value::arrayAny(lhsTag, lhsVal, [&](value::TypeTags elTag, value::Value elVal) {
-        isSubset = (setValuesSecondArg.count({elTag, elVal}) > 0);
-        return !isSubset;
-    });
+    auto process = [&isSubset](value::TypeTags lhsTag,
+                               value::Value lhsVal,
+                               const value::ValueSetType& rhsSet) {
+        value::arrayAny(lhsTag, lhsVal, [&](value::TypeTags elTag, value::Value elVal) {
+            isSubset = (rhsSet.count({elTag, elVal}) > 0);
+            return !isSubset;
+        });
+    };
+
+    if (rhsTag == value::TypeTags::ArraySet &&
+        value::getArraySetView(rhsVal)->values().hash_function().getCollator() == collator) {
+        process(lhsTag, lhsVal, value::getArraySetView(rhsVal)->values());
+    } else {
+        process(lhsTag, lhsVal, valueToShallowSetHelper(rhsTag, rhsVal, collator));
+    }
 
     return {false, value::TypeTags::Boolean, isSubset};
 }

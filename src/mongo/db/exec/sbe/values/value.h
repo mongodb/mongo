@@ -677,6 +677,21 @@ public:
         return _values.insert(value);
     }
 
+    /**
+     * Specialized insert operation that can seek the value and, if it is not present in the set,
+     * invoke the keyConstructor function to provide the actual data to be inserted. It assumes that
+     * the data to be inserted is identical to the key that has been searched.
+     * The main purpose is to allow a copy-on-insert operation.
+     */
+    std::pair<iterator, bool> insert_lazy(const T& value, std::function<T()> keyConstructor) {
+        bool inserted = false;
+        auto it = _values.lazy_emplace(value, [&](const SetType::constructor& ctor) {
+            inserted = true;
+            ctor(keyConstructor());
+        });
+        return {it, inserted};
+    }
+
     bool contains(const T& key) const {
         return _values.contains(key);
     }
@@ -1110,6 +1125,14 @@ public:
     bool push_back(std::pair<TypeTags, Value> val) {
         return push_back(val.first, val.second);
     }
+
+    /**
+     * If the value cannot be found in the set, insert a copy.
+     *
+     * Returns true if the value was newly inserted, otherwise returns false to indicate that
+     * an equal value was already present in the set.
+     */
+    bool push_back_clone(TypeTags tag, Value val);
 
     auto& values() const noexcept {
         return _values;
@@ -1589,6 +1612,14 @@ inline std::pair<TypeTags, Value> makeNewArraySet(const CollatorInterface* colla
     auto a = new ArraySet(collator);
     return {TypeTags::ArraySet, reinterpret_cast<Value>(a)};
 }
+
+/**
+ * Variant of makeNewArraySet that initializes the set using the data in the provided value. Throws
+ * an error if the value is not a type of array.
+ */
+std::pair<TypeTags, Value> makeNewArraySet(TypeTags tag,
+                                           Value value,
+                                           const CollatorInterface* collator = nullptr);
 
 inline std::pair<TypeTags, Value> makeNewArrayMultiSet(
     const CollatorInterface* collator = nullptr) {

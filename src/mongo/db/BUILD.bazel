@@ -2370,6 +2370,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/values:row.cpp",
         "//src/mongo/db/exec/sbe/values:slot_printer.cpp",
         "//src/mongo/db/exec/sbe/values:ts_block.cpp",
+        "//src/mongo/db/exec/sbe/values:util.cpp",
         "//src/mongo/db/exec/sbe/values:value.cpp",
         "//src/mongo/db/exec/sbe/values:value_printer.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_types.h",

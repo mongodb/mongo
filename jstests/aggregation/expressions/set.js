@@ -52,6 +52,35 @@ runTest(
     ],
 );
 
+// Exercise the optimization of constant arguments.
+var unionConstantArray = [3, 900, 3];
+runTest(
+    [{$project: {union: {$setUnion: ["$arr1", unionConstantArray]}}}],
+    [
+        {_id: 0, union: [1, 2, 3, 900]},
+        {_id: 1, union: [1, 2, 3, 900]},
+        {_id: 2, union: [1, 2, 3, 900]},
+        {_id: 3, union: [3, 900]},
+        {_id: 4, union: [1, 2, 3, 900]},
+        {_id: 5, union: [2, 3, 900]},
+        {_id: 6, union: [1, 2, 3, 900]},
+        {_id: 7, union: [1, 2, 3, 900]},
+    ],
+);
+runTest(
+    [{$project: {union: {$setUnion: [unionConstantArray, "$arr2"]}}}],
+    [
+        {_id: 0, union: [2, 3, 4, 900]},
+        {_id: 1, union: [3, 4, 5, 6, 900]},
+        {_id: 2, union: [3, 900]},
+        {_id: 3, union: [3, 4, 5, 6, 900]},
+        {_id: 4, union: [2, 3, 900]},
+        {_id: 5, union: [2, 3, 4, 900]},
+        {_id: 6, union: [1, 2, 3, 900]},
+        {_id: 7, union: [1, 2, 3, 900]},
+    ],
+);
+
 runTest(
     [{$project: {intersection: {$setIntersection: ["$arr1", "$arr2"]}}}],
     [
@@ -63,6 +92,35 @@ runTest(
         {_id: 5, intersection: [2, 3]},
         {_id: 6, intersection: [1, 2, 3]},
         {_id: 7, intersection: [1, 2, 3]},
+    ],
+);
+
+// Exercise the optimization of constant arguments.
+var intersectionConstantArray = [1, 2, 1, 890, "long constant string"];
+runTest(
+    [{$project: {intersection: {$setIntersection: ["$arr1", intersectionConstantArray]}}}],
+    [
+        {_id: 0, intersection: [1, 2]},
+        {_id: 1, intersection: [1, 2]},
+        {_id: 2, intersection: [1, 2]},
+        {_id: 3, intersection: []},
+        {_id: 4, intersection: [1, 2]},
+        {_id: 5, intersection: [2]},
+        {_id: 6, intersection: [1, 2]},
+        {_id: 7, intersection: [1, 2]},
+    ],
+);
+runTest(
+    [{$project: {intersection: {$setIntersection: [intersectionConstantArray, "$arr2"]}}}],
+    [
+        {_id: 0, intersection: [2]},
+        {_id: 1, intersection: []},
+        {_id: 2, intersection: []},
+        {_id: 3, intersection: []},
+        {_id: 4, intersection: [2]},
+        {_id: 5, intersection: [2]},
+        {_id: 6, intersection: [1, 2]},
+        {_id: 7, intersection: [1, 2]},
     ],
 );
 
@@ -94,8 +152,66 @@ runTest(
     ],
 );
 
+// Exercise the optimization of constant arguments.
+var differenceConstantArray = [3, 780];
+runTest(
+    [{$project: {difference: {$setDifference: ["$arr1", differenceConstantArray]}}}],
+    [
+        {_id: 0, difference: [1, 2]},
+        {_id: 1, difference: [1, 2]},
+        {_id: 2, difference: [1, 2]},
+        {_id: 3, difference: []},
+        {_id: 4, difference: [1, 2]},
+        {_id: 5, difference: [2]},
+        {_id: 6, difference: [1, 2]},
+        {_id: 7, difference: [1, 2]},
+    ],
+);
+runTest(
+    [{$project: {difference: {$setDifference: [differenceConstantArray, "$arr2"]}}}],
+    [
+        {_id: 0, difference: [780]},
+        {_id: 1, difference: [3, 780]},
+        {_id: 2, difference: [3, 780]},
+        {_id: 3, difference: [3, 780]},
+        {_id: 4, difference: [780]},
+        {_id: 5, difference: [780]},
+        {_id: 6, difference: [780]},
+        {_id: 7, difference: [780]},
+    ],
+);
+
 runTest(
     [{$project: {equals: {$setEquals: ["$arr1", "$arr2"]}}}],
+    [
+        {_id: 0, equals: false},
+        {_id: 1, equals: false},
+        {_id: 2, equals: false},
+        {_id: 3, equals: false},
+        {_id: 4, equals: false},
+        {_id: 5, equals: false},
+        {_id: 6, equals: true},
+        {_id: 7, equals: true},
+    ],
+);
+
+// Exercise the optimization of constant arguments.
+var equalConstantArray = [1, 2, 3, 2, 1];
+runTest(
+    [{$project: {equals: {$setEquals: ["$arr1", equalConstantArray]}}}],
+    [
+        {_id: 0, equals: true},
+        {_id: 1, equals: true},
+        {_id: 2, equals: true},
+        {_id: 3, equals: false},
+        {_id: 4, equals: true},
+        {_id: 5, equals: false},
+        {_id: 6, equals: true},
+        {_id: 7, equals: true},
+    ],
+);
+runTest(
+    [{$project: {equals: {$setEquals: [equalConstantArray, "$arr2"]}}}],
     [
         {_id: 0, equals: false},
         {_id: 1, equals: false},
@@ -117,6 +233,36 @@ runTest(
         {_id: 3, isSubset: true},
         {_id: 4, isSubset: false},
         {_id: 5, isSubset: true},
+        {_id: 6, isSubset: true},
+        {_id: 7, isSubset: true},
+    ],
+);
+
+// Exercise the optimization of constant arguments.
+runTest(
+    [{$project: {isSubset: {$setIsSubset: ["$arr1", [2, 3, 4, "long constant string"]]}}}],
+    [
+        {_id: 0, isSubset: false},
+        {_id: 1, isSubset: false},
+        {_id: 2, isSubset: false},
+        {_id: 3, isSubset: true},
+        {_id: 4, isSubset: false},
+        {_id: 5, isSubset: true},
+        {_id: 6, isSubset: false},
+        {_id: 7, isSubset: false},
+    ],
+);
+
+// Exercise the optimization of constant arguments.
+runTest(
+    [{$project: {isSubset: {$setIsSubset: [[1, 3], "$arr2"]}}}],
+    [
+        {_id: 0, isSubset: false},
+        {_id: 1, isSubset: false},
+        {_id: 2, isSubset: false},
+        {_id: 3, isSubset: false},
+        {_id: 4, isSubset: false},
+        {_id: 5, isSubset: false},
         {_id: 6, isSubset: true},
         {_id: 7, isSubset: true},
     ],

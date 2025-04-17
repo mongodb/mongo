@@ -117,8 +117,7 @@ public:
         auto [tag, value] = value::makeNewArraySet(collator);
         auto* arraySet = value::getArraySetView(value);
         for (const auto& [tag, value] : values) {
-            auto [tagCopy, valueCopy] = value::copyValue(tag, value);
-            arraySet->push_back(tagCopy, valueCopy);
+            arraySet->push_back_clone(tag, value);
         }
         return {tag, value};
     }
