@@ -1278,6 +1278,11 @@ export var ReshardingTest = class {
         });
     }
 
+    updatePrimaryShard(primaryShardName) {
+        jsTest.log(`ReshardingTestFixture updating primary shard to ${primaryShardName}`);
+        this._primaryShardName = primaryShardName;
+    }
+
     /**
      * @returns the timestamp chosen by the resharding operation for cloning.
      *
