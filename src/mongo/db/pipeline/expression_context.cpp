@@ -324,9 +324,9 @@ ExpressionContextBuilder& ExpressionContextBuilder::serverSideJsConfig(
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::viewNS(
-    boost::optional<NamespaceString> viewNS) {
-    params.viewNS = std::move(viewNS);
+ExpressionContextBuilder& ExpressionContextBuilder::view(
+    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view) {
+    params.view = std::move(view);
     return *this;
 }
 
@@ -567,7 +567,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     }();
 
     // Some of the properties of expression context are not cloned (e.g runtimeConstants,
-    // letParameters). In case new fields need to be cloned, they will need to be added in the
+    // letParameters, view). In case new fields need to be cloned, they will need to be added in the
     // builder and the proper setter called here.
     auto expCtx = ExpressionContextBuilder()
                       .opCtx(_params.opCtx)
@@ -597,7 +597,6 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                       .maxFeatureCompatibilityVersion(_params.maxFeatureCompatibilityVersion)
                       .subPipelineDepth(_params.subPipelineDepth)
                       .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
-                      .viewNS(_params.viewNS)
                       .build();
 
     if (_collator.getIgnore()) {

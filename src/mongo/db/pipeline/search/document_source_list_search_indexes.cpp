@@ -104,9 +104,8 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     // We cannot use 'pExpCtx->getUUID()' like other aggregation stages, because this stage can run
     // directly on mongos. 'pExpCtx->getUUID()' will always be null on mongos.
     if (!_collectionUUID) {
-        auto retrieveCollectionUUIDAndResolveViewStatus = retrieveCollectionUUIDAndResolveView(
-            opCtx,
-            pExpCtx->getViewNSForMongotIndexedView().value_or(pExpCtx->getNamespaceString()));
+        auto retrieveCollectionUUIDAndResolveViewStatus =
+            retrieveCollectionUUIDAndResolveView(opCtx, pExpCtx->getUserNss());
 
         // Ignore any error sent by retrieveCollectionUUIDAndResolveView. This issue will be handled
         // below by returning EOF.

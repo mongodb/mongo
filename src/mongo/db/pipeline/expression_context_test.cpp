@@ -41,6 +41,7 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+#include <utility>
 
 namespace mongo {
 namespace {
@@ -159,6 +160,69 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kNowId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kClusterTimeId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kUserRolesId));
+}
+
+TEST_F(ExpressionContextTest, CanBuildWithoutView) {
+    auto opCtx = makeOperationContext();
+
+    auto expCtxWithoutView =
+        mongo::ExpressionContextBuilder{}
+            .opCtx(opCtx.get())
+            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd))
+            .build();
+
+    ASSERT_FALSE(expCtxWithoutView->getView().has_value());
+}
+
+TEST_F(ExpressionContextTest, CanBuildWithView) {
+    auto opCtx = makeOperationContext();
+
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
+    std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
+
+    auto view = boost::make_optional(std::make_pair(viewNss, viewPipeline));
+    auto expCtxWithView =
+        mongo::ExpressionContextBuilder{}
+            .opCtx(opCtx.get())
+            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd))
+            .view(view)
+            .build();
+
+    // expCtx namespace isn't affected by the view namespace.
+    ASSERT_EQUALS(expCtxWithView->getNamespaceString(),
+                  NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd));
+
+    ASSERT_TRUE(expCtxWithView->getView().has_value());
+    ASSERT_EQUALS(expCtxWithView->getView()->first, viewNss);
+    ASSERT_EQUALS(expCtxWithView->getView()->second.size(), viewPipeline.size());
+    ASSERT_BSONOBJ_EQ(expCtxWithView->getView()->second[0], viewPipeline[0]);
+}
+
+TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeView) {
+    auto opCtx = makeOperationContext();
+
+    auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
+    std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
+
+    auto view = boost::make_optional(std::make_pair(viewNss, viewPipeline));
+    auto expCtxOriginal =
+        mongo::ExpressionContextBuilder{}
+            .opCtx(opCtx.get())
+            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd))
+            .view(view)
+            .build();
+
+    auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
+    auto expCtxCopy = expCtxOriginal->copyWith(namespaceCopy);
+
+    // expCtxCopy doesn't have a view initialized.
+    ASSERT_FALSE(expCtxCopy->getView().has_value());
+
+    // expCtxOriginal isn't affected by the copy.
+    ASSERT_TRUE(expCtxOriginal->getView().has_value());
+    ASSERT_EQUALS(expCtxOriginal->getView()->first, viewNss);
+    ASSERT_EQUALS(expCtxOriginal->getView()->second.size(), viewPipeline.size());
+    ASSERT_BSONOBJ_EQ(expCtxOriginal->getView()->second[0], viewPipeline[0]);
 }
 
 }  // namespace

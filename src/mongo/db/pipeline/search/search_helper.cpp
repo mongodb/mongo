@@ -260,21 +260,14 @@ bool isSearchMetaPipeline(const Pipeline* pipeline) {
 
 void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
-                                   boost::intrusive_ptr<ExpressionContext> expCtx,
-                                   boost::optional<UUID> uuid) {
-    expCtx->addResolvedNamespace(origNss,
-                                 ResolvedNamespace(resolvedView.getNamespace(),
-                                                   resolvedView.getPipeline(),
-                                                   uuid,
-                                                   true /*involvedNamespaceIsAView*/));
-    expCtx->setViewNSForMongotIndexedView(boost::make_optional(origNss));
+                                   boost::intrusive_ptr<ExpressionContext> expCtx) {
+    expCtx->setView(boost::make_optional(std::make_pair(origNss, resolvedView.getPipeline())));
 }
 
 void checkAndAddResolvedNamespaceForSearch(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            const std::vector<mongo::BSONObj> pipelineObj,
                                            ResolvedView resolvedView,
-                                           const NamespaceString& viewName,
-                                           boost::optional<UUID> uuid) {
+                                           const NamespaceString& viewName) {
     auto lpp = LiteParsedPipeline(viewName, pipelineObj);
 
     // Search queries on views behave differently than non-search aggregations on views.
@@ -292,7 +285,7 @@ void checkAndAddResolvedNamespaceForSearch(boost::intrusive_ptr<ExpressionContex
     // view pipeline after idLookup.
     if (expCtx->isFeatureFlagMongotIndexedViewsEnabled() && lpp.hasSearchStage() &&
         !search_helper_bson_obj::isStoredSource(pipelineObj)) {
-        search_helpers::addResolvedNamespaceForSearch(viewName, resolvedView, expCtx, uuid);
+        search_helpers::addResolvedNamespaceForSearch(viewName, resolvedView, expCtx);
     }
 }
 
@@ -685,10 +678,9 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
 
     // If the view struct is not found on the spec document, check the expression context to see
     // if the command is being executed on a view (non-sharded scenarios).
-    if (!view && expCtx->getViewNSForMongotIndexedView()) {
-        view = boost::make_optional(SearchQueryViewSpec(
-            *expCtx->getViewNSForMongotIndexedView(),
-            expCtx->getResolvedNamespace(*expCtx->getViewNSForMongotIndexedView()).pipeline));
+    if (!view && expCtx->getView()) {
+        auto expCtxView = *expCtx->getView();
+        view = boost::make_optional(SearchQueryViewSpec(expCtxView.first, expCtxView.second));
     }
 
     return view;

@@ -535,6 +535,10 @@ public:
         return _params.ns;
     }
 
+    const NamespaceString& getUserNss() const {
+        return _params.view ? _params.view->first : getNamespaceString();
+    }
+
     void setNamespaceString(NamespaceString ns) {
         _params.ns = std::move(ns);
     }
@@ -847,18 +851,17 @@ public:
         _params.tailableMode = tailableMode;
     }
 
-    boost::optional<NamespaceString> getViewNSForMongotIndexedView() const {
-        return _featureFlagGuardedMongotIndexedViewNs.get();
+    const boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>& getView() const {
+        return _params.view;
     }
 
     bool isFeatureFlagMongotIndexedViewsEnabled() const {
-        return feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(getOperationContext()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        return _featureFlagMongotIndexedViews.get(
+            VersionContext::getDecoration(getOperationContext()));
     }
 
-    void setViewNSForMongotIndexedView(boost::optional<NamespaceString> viewNS) {
-        _params.viewNS = std::move(viewNS);
+    void setView(boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view) {
+        _params.view = std::move(view);
     }
 
     // Returns true if we've received a TemporarilyUnavailableException.
@@ -969,7 +972,9 @@ protected:
         // libraries from having large numbers of dependencies. This pointer is always non-null.
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface = nullptr;
         NamespaceString ns;
-        // A map from namespace to the resolved namespace, in case any views are involved.
+        // A map from the user namespace to the resolved namespace (underlying nss and resolved view
+        // pipeline), in case any views are involved. This map is only for *secondary* namespaces.
+        // See `view` below for information on the resolved *primary* namespace.
         ResolvedNamespaceMap resolvedNamespaces;
         SerializationContext serializationContext;
         // If known, the UUID of the execution namespace for this aggregation command.
@@ -979,7 +984,11 @@ protected:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none;
         boost::optional<LegacyRuntimeConstants> runtimeConstants = boost::none;
         boost::optional<BSONObj> letParameters = boost::none;
-        boost::optional<NamespaceString> viewNS = boost::none;
+
+        // The *view's* namespace with the view's effective pipeline. Note that this is different
+        // than ResolvedNamespace as that holds the *underlying collections's* namespace with the
+        // view's effective pipeline.
+        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none;
         // Defaults to empty to prevent external sorting in mongos.
         std::string tmpDir;
         // Tracks whether the collator to use for the aggregation matches the default collation of
@@ -1217,17 +1226,16 @@ private:
                     vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         }};
 
+    Deferred<bool (*)(const VersionContext&)> _featureFlagMongotIndexedViews{
+        [](const VersionContext& vCtx) {
+            return feature_flags::gFeatureFlagMongotIndexedViews
+                .isEnabledUseLatestFCVWhenUninitialized(
+                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        }};
+
     // Initialized in constructor to avoid including server_feature_flags_gen.h
     // in this header file.
     Deferred<bool (*)(const VersionContext&)> _featureFlagStreams;
-
-    DeferredFn<boost::optional<NamespaceString>> _featureFlagGuardedMongotIndexedViewNs{
-        [this]() -> boost::optional<NamespaceString> {
-            if (isFeatureFlagMongotIndexedViewsEnabled()) {
-                return _params.viewNS;
-            }
-            return boost::none;
-        }};
 };
 
 class ExpressionContextBuilder {
@@ -1283,7 +1291,8 @@ public:
     ExpressionContextBuilder& subPipelineDepth(long long);
     ExpressionContextBuilder& initialPostBatchResumeToken(BSONObj);
     ExpressionContextBuilder& tailableMode(TailableModeEnum);
-    ExpressionContextBuilder& viewNS(boost::optional<NamespaceString>);
+    ExpressionContextBuilder& view(
+        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace

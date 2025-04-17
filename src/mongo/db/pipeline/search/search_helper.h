@@ -84,8 +84,7 @@ bool isSearchMetaPipeline(const Pipeline* pipeline);
 /* This function is only called if the mongot pipeline is on a view. */
 void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
-                                   boost::intrusive_ptr<ExpressionContext> expCtx,
-                                   boost::optional<UUID> uuid = boost::none);
+                                   boost::intrusive_ptr<ExpressionContext> expCtx);
 
 /**
  * A wrapper around addResolvedNamespaceForSearch that additionally checks that the pipeline
@@ -94,8 +93,7 @@ void addResolvedNamespaceForSearch(const NamespaceString& origNss,
 void checkAndAddResolvedNamespaceForSearch(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::vector<mongo::BSONObj> pipelineObj,
                                            ResolvedView resolvedView,
-                                           const NamespaceString& viewName,
-                                           boost::optional<UUID> uuid = boost::none);
+                                           const NamespaceString& viewName);
 
 /**
  * Check if this is a stored source $search or $_internalSearchMongot pipeline.

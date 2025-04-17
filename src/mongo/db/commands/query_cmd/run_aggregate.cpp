@@ -930,8 +930,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             expCtx,
             aggExState.getOriginalRequest().getPipeline(),
             *aggExState.getResolvedView(),
-            aggExState.getOriginalNss(),
-            aggCatalogState.getUUID());
+            aggExState.getOriginalNss());
     }
 
     // If we're operating over a view, we first parse just the original user-given request
