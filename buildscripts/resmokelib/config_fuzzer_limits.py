@@ -228,6 +228,13 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
+        # Default value 16; can help us identify flaky tests that rely on having/not having WriteConflicts during bucket re-opening.
+        "timeseriesMaxRetriesForWriteConflictsOnReopening": {
+            "min": 1,
+            "max": 32,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         # Default value 104857600 (100 MB); Enables more bucket re-opening by decreasing the side bucket catalog memory threshold so we can more aggressively expire buckets.
         # Increasing bucket expiry was the most helpful way to increase re-opening because these buckets are still eligible for archived-based reopening, without side effects from doing more hard closes.
         "timeseriesSideBucketCatalogMemoryUsageThreshold": {
