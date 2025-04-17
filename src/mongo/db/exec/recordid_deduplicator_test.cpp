@@ -168,7 +168,6 @@ TEST_F(RecordIdDeduplicatorTest, basicBitmapSpillTest) {
     ASSERT_FALSE(recordIdDeduplicator.insert(nullRecordId));
 
     // Shuffle the recordIds.
-    std::random_device rd;
     const unsigned int seed(12346);
     std::mt19937 g(seed);
 
