@@ -69,7 +69,7 @@ public:
     /**
      * Increments the time taken to respond to an interrupt.
      */
-    void incrementInterruptResponseNs(CounterType n) {
+    void incrementInterruptResponseNs(int64_t n) {
         counter_ops::add(interruptResponseNs, n);
     }
 
@@ -82,7 +82,7 @@ public:
     /**
      * Increments writeConflicts by n.
      */
-    void incrementWriteConflicts(CounterType n) {
+    void incrementWriteConflicts(int64_t n) {
         counter_ops::add(writeConflicts, n);
     }
 
@@ -94,7 +94,7 @@ public:
     /**
      * Increments temporarilyUnavailableErrors by n.
      */
-    void incrementTemporarilyUnavailableErrors(CounterType n) {
+    void incrementTemporarilyUnavailableErrors(int64_t n) {
         counter_ops::add(temporarilyUnavailableErrors, n);
     }
 
