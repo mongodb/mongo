@@ -117,7 +117,9 @@ private:
         Updated,
         Stopped,
     };
-    VisibilityUpdateResult _updateVisibility(const KVEngine&, const RecordStore::Capped& oplog);
+    VisibilityUpdateResult _updateVisibility(stdx::unique_lock<stdx::mutex>&,
+                                             const KVEngine&,
+                                             const RecordStore::Capped& oplog);
 
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 

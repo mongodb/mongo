@@ -98,8 +98,9 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                       &oplog] {
             Client::initThread("OplogVisibilityThread", service);
 
+            stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
             while (true) {
-                switch (_updateVisibility(engine, *oplog.capped())) {
+                switch (_updateVisibility(lk, engine, *oplog.capped())) {
                     case VisibilityUpdateResult::NotUpdated:
                         continue;
                     case VisibilityUpdateResult::Updated:
@@ -205,8 +206,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
 }
 
 WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVisibility(
-    const KVEngine& engine, const RecordStore::Capped& oplog) {
-    stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    stdx::unique_lock<stdx::mutex>& lk, const KVEngine& engine, const RecordStore::Capped& oplog) {
     {
         MONGO_IDLE_THREAD_BLOCK;
         _oplogVisibilityThreadCV.wait(
