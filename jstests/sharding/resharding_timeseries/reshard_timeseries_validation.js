@@ -56,16 +56,20 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     mongos.adminCommand({reshardCollection: ns, key: {[timeFieldName]: 'hashed'}}), [880031]);
 
-function reshardAndVerifyShardKeyAndIndexes(
-    newKey, indexIdx, expectedViewIndexKey, expectedBucketIndexKey, expectedBucketShardKey) {
+function reshardAndVerifyShardKeyAndIndexes(newKey,
+                                            indexIdx,
+                                            expectedViewIndexKey,
+                                            expectedBucketIndexKey,
+                                            expectedBucketShardKey,
+                                            isShardKeyHashedPrefix) {
     jsTestLog("Resharding to new key:");
     printjson(newKey);
 
-    assert.commandWorked(mongos.adminCommand({
-        reshardCollection: ns,
-        key: newKey,
-        numInitialChunks: 1,
-    }));
+    let cmdObj = {reshardCollection: ns, key: newKey};
+    if (!isShardKeyHashedPrefix) {
+        cmdObj.numInitialChunks = 1;
+    }
+    assert.commandWorked(mongos.adminCommand(cmdObj));
 
     const viewIndexes =
         assert.commandWorked(sDB.getCollection(kCollName).runCommand({listIndexes: kCollName}));
@@ -84,18 +88,25 @@ reshardAndVerifyShardKeyAndIndexes({[timeFieldName]: 1},
                                    1,
                                    {[timeFieldName]: 1},
                                    {"control.min.time": 1, "control.max.time": 1},
-                                   {"control.min.time": 1});
-reshardAndVerifyShardKeyAndIndexes(
-    {'hostId.x': "hashed"}, 2, {"hostId.x": "hashed"}, {"meta.x": "hashed"}, {"meta.x": "hashed"});
+                                   {"control.min.time": 1},
+                                   false /* isShardKeyHashedPrefix */);
+reshardAndVerifyShardKeyAndIndexes({'hostId.x': "hashed"},
+                                   2,
+                                   {"hostId.x": "hashed"},
+                                   {"meta.x": "hashed"},
+                                   {"meta.x": "hashed"},
+                                   true /* isShardKeyHashedPrefix */);
 reshardAndVerifyShardKeyAndIndexes({[metaFieldName]: 1},
                                    0,
                                    {[metaFieldName]: 1, [timeFieldName]: 1},
                                    {"meta": 1, "control.min.time": 1, "control.max.time": 1},
-                                   {"meta": 1});
+                                   {"meta": 1},
+                                   false /* isShardKeyHashedPrefix */);
 reshardAndVerifyShardKeyAndIndexes({'hostId.y': 1, [timeFieldName]: 1},
                                    3,
                                    {"hostId.y": 1, [timeFieldName]: 1},
                                    {"meta.y": 1, "control.min.time": 1, "control.max.time": 1},
-                                   {"meta.y": 1, "control.min.time": 1});
+                                   {"meta.y": 1, "control.min.time": 1},
+                                   false /* isShardKeyHashedPrefix */);
 
 st.stop();

@@ -116,31 +116,45 @@ int getNumberOfChunksOnShard(const std::vector<ChunkType>& chunks, const ShardId
     });
 }
 
-/**
- * Calls calculateHashedSplitPoints according to the given arguments
- * and asserts that calculated split points match with the expected split points.
- */
-void checkCalculatedHashedSplitPoints(const std::vector<BSONObj>& expectedSplitPoints,
-                                      const ShardKeyPattern& shardKeyPattern,
-                                      size_t numShards) {
-    SplitPointsBasedSplitPolicy policy(shardKeyPattern, numShards);
-    assertBSONObjVectorsAreEqual(expectedSplitPoints, policy.getSplitPoints());
-}
+class CalculateHashedSplitPointsTest : public ConfigServerTestFixture {
+public:
+    /**
+     * Calls calculateHashedSplitPoints according to the given arguments
+     * and asserts that calculated split points match with the expected split points.
+     */
+    void checkCalculatedHashedSplitPoints(const std::vector<BSONObj>& expectedSplitPoints,
+                                          const ShardKeyPattern& shardKeyPattern,
+                                          const std::vector<ShardId>& availableShardIds) {
+        SplitPointsBasedSplitPolicy policy(availableShardIds);
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixEvenNumberShards) {
+        const SplitPolicyParams splitParams{UUID::gen(), availableShardIds.front()};
+        policy.createFirstChunks(operationContext(), shardKeyPattern, splitParams);
+
+        assertBSONObjVectorsAreEqual(expectedSplitPoints, policy.getSplitPoints());
+    }
+};
+
+TEST_F(CalculateHashedSplitPointsTest, HashedPrefixEvenNumberShards) {
+    const std::vector<ShardId> availableShardIds{
+        ShardId("shard0"), ShardId("shard1"), ShardId("shard2"), ShardId("shard3")};
     const std::vector<BSONObj> expectedSplitPoints = {
         BSON("x" << -4611686018427387902LL), BSON("x" << 0), BSON("x" << 4611686018427387902LL)};
     checkCalculatedHashedSplitPoints(
-        expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), 4);
+        expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), availableShardIds);
 }
 
-TEST(CalculateHashedSplitPointsTest, HashedPrefixUnevenNumberShards) {
+TEST_F(CalculateHashedSplitPointsTest, HashedPrefixUnevenNumberShards) {
+    const std::vector<ShardId> availableShardIds{ShardId("shard0"),
+                                                 ShardId("shard1"),
+                                                 ShardId("shard2"),
+                                                 ShardId("shard3"),
+                                                 ShardId("shard4")};
     const std::vector<BSONObj> expectedSplitPoints = {BSON("x" << -5534023222112865483LL),
                                                       BSON("x" << -1844674407370955161LL),
                                                       BSON("x" << 1844674407370955161LL),
                                                       BSON("x" << 5534023222112865483LL)};
     checkCalculatedHashedSplitPoints(
-        expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), 5);
+        expectedSplitPoints, ShardKeyPattern(BSON("x" << "hashed")), availableShardIds);
 }
 
 TEST(CalculateHashedSplitPointsTest, HashedSuffix) {

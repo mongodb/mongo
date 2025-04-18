@@ -434,28 +434,22 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnShardSplitPolicy::createF
 }
 
 SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(
-    const ShardKeyPattern& shardKeyPattern,
-    size_t numShards,
     boost::optional<std::vector<ShardId>> availableShardIds)
-    : _availableShardIds(std::move(availableShardIds)) {
-
-    // Calculate split points such that a single chunk is allocated to every shard,
-    // with 'numShards' chunks created in total.
-    _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numShards);
-}
+    : _availableShardIds(std::move(availableShardIds)) {}
 
 InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
     const SplitPolicyParams& params) {
+    auto availableShardIds =
+        _availableShardIds ? *_availableShardIds : getAllNonDrainingShardIdsShuffled(opCtx);
+    // Calculate split points such that a single chunk is allocated to every shard.
+    _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), availableShardIds.size());
+
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     return generateShardCollectionInitialChunks(
-        params,
-        shardKeyPattern,
-        validAfter,
-        _splitPoints,
-        _availableShardIds ? *_availableShardIds : getAllNonDrainingShardIdsShuffled(opCtx));
+        params, shardKeyPattern, validAfter, _splitPoints, availableShardIds);
 }
 
 AbstractTagsBasedSplitPolicy::AbstractTagsBasedSplitPolicy(

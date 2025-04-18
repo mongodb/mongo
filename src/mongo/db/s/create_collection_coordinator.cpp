@@ -199,8 +199,7 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
         if (tags.empty() && shardKeyPattern.hasHashedPrefix()) {
             // Evenly distribute chunks across shards (in combination with hashed shard keys, this
             // should increase the probability of establishing an already balanced collection).
-            return std::make_unique<SplitPointsBasedSplitPolicy>(
-                shardKeyPattern, numShards, std::move(availableShardIds));
+            return std::make_unique<SplitPointsBasedSplitPolicy>(std::move(availableShardIds));
         }
         if (!tags.empty()) {
             // Enforce zone constraints.

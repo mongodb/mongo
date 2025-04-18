@@ -185,15 +185,22 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
         InitialSplitPolicy::ShardCollectionConfig splitResult;
 
-        // If shardDistribution is specified with min/max, use ShardDistributionSplitPolicy.
-        if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
+        // Note: The resharding initial split policy doesn't care about what is the real
+        // primary shard, so just pass in a random shard.
+        const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
+                                            *donorShardIds.begin()};
+
+        if (shardKey.hasHashedPrefix()) {
+            auto initialSplitter = SplitPointsBasedSplitPolicy(boost::none /* availableShardIds */);
+            splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+        } else if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
             uassert(ErrorCodes::InvalidOptions,
                     "ShardDistribution should not be empty if provided",
                     shardDistribution->size() > 0);
-            const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
-                                                *donorShardIds.begin()};
-            // If shardDistribution is specified with min/max, create chunks based on the shard
-            // min/max. If not, do sampling based split on limited shards.
+
+            // If shardDistribution is specified with min/max, use shardDistributionSplitPolicy to
+            // create chunks based on the shard min/max. If not, do sampling based split on limited
+            // shards.
             if ((*shardDistribution)[0].getMin()) {
                 auto initialSplitter = ShardDistributionSplitPolicy::make(
                     opCtx, shardKey, *shardDistribution, std::move(parsedZones));
@@ -213,17 +220,14 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
                 splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
             }
         } else {
-            auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
-                                                                  coordinatorDoc.getSourceNss(),
-                                                                  shardKey,
-                                                                  numInitialChunks,
-                                                                  std::move(parsedZones),
-                                                                  boost::none /*availableShardIds*/,
-                                                                  numSamplesPerChunk);
-            // Note: The resharding initial split policy doesn't care about what is the real
-            // primary shard, so just pass in a random shard.
-            const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),
-                                                *donorShardIds.begin()};
+            auto initialSplitter =
+                SamplingBasedSplitPolicy::make(opCtx,
+                                               coordinatorDoc.getSourceNss(),
+                                               shardKey,
+                                               numInitialChunks,
+                                               std::move(parsedZones),
+                                               boost::none /* availableShardIds */,
+                                               numSamplesPerChunk);
             splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         }
 

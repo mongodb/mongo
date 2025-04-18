@@ -10,6 +10,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
@@ -91,7 +92,6 @@ jsTest.log("Fail if zone provided is invalid for storage.");
 assert.commandFailedWithCode(db.adminCommand({
     reshardCollection: ns,
     key: {"_id": "hashed"},
-    numInitialChunks: 1,
     zones: [{min: {"_id": {"$minKey": 1}}, max: {"_id": {"$maxKey": 1}}, zone: "Namezone"}]
 }),
                              ErrorCodes.BadValue);
@@ -99,8 +99,6 @@ assert.commandFailedWithCode(db.adminCommand({
 jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
 assert.commandFailedWithCode(
     db.adminCommand({reshardCollection: ns, key: {b: 1}, numInitialChunks: 2}), 4952606);
-assert.commandFailedWithCode(
-    db.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 2}), 4952606);
 
 jsTest.log(
     "Fail if authoritative tags exist in config.tags collection and zones are not provided.");
@@ -264,11 +262,19 @@ reshardCmdTest.assertReshardCollOk({
 },
                                    3);
 
-jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
-assert.commandWorked(
-    db.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
+jsTestLog("Succeed if hashed shard key without hashed prefix and numInitialChunks is respected.");
+reshardCmdTest.assertReshardCollOk(
+    {reshardCollection: ns, key: {oldKey: 1, newKey: "hashed"}, numInitialChunks: 5}, 5);
+
+jsTest.log("Succeed reshard to hashed shard key with one chunk per shard.");
+assert.commandWorked(db.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
 assert.commandWorked(db.getCollection(collName).insert(
     Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))));
-assert.commandWorked(
-    db.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
+assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {b: "hashed"}}));
+
+var configDB = db.getSiblingDB('config');
+shardNames.forEach(shardName => {
+    let chunks = findChunksUtil.findChunksByNs(configDB, ns, {shard: shardName});
+    assert.eq(chunks.itcount(), 1);
+});
 db.getCollection(collName).drop();
