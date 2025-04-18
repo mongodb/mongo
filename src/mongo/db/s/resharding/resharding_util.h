@@ -478,5 +478,11 @@ ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
 SemiFuture<void> waitForMajority(const CancellationToken& token,
                                  const CancelableOperationContextFactory& factory);
 
+/**
+ * To be called on a primary only. Returns the amount of time between the last applied optime on the
+ * primary and the last majority committed optime.
+ */
+Milliseconds getMajorityReplicationLag(OperationContext* opCtx);
+
 }  // namespace resharding
 }  // namespace mongo

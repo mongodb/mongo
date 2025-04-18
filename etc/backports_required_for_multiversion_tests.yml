@@ -428,6 +428,8 @@ last-continuous:
       ticket: SERVER-100264
     - test_file: jstests/core/index/express_pbt.js
       ticket: SERVER-102693
+    - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
+      ticket: SERVER-103932
   suites: null
 last-lts:
   all:
@@ -911,4 +913,6 @@ last-lts:
       ticket: SERVER-100264
     - test_file: jstests/core/index/express_pbt.js
       ticket: SERVER-102693
+    - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
+      ticket: SERVER-103932
   suites: null

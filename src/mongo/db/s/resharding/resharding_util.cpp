@@ -639,5 +639,16 @@ SemiFuture<void> waitForMajority(const CancellationToken& token,
         .waitUntilMajorityForWrite(opTime, token);
 }
 
+Milliseconds getMajorityReplicationLag(OperationContext* opCtx) {
+    const auto& replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const auto lastAppliedWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime().wallTime;
+    const auto lastCommittedWallTime = replCoord->getLastCommittedOpTimeAndWallTime().wallTime;
+
+    if (!lastAppliedWallTime.isFormattable() || !lastCommittedWallTime.isFormattable()) {
+        return Milliseconds(0);
+    }
+    return lastAppliedWallTime - lastCommittedWallTime;
+}
+
 }  // namespace resharding
 }  // namespace mongo

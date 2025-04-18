@@ -95,17 +95,6 @@ auto makeRequests(const BSONObj& cmdObj, const std::vector<ShardId>& recipientSh
     return requests;
 }
 
-static constexpr auto kRemainingOperationTimeFieldName = "remainingMillis"_sd;
-
-boost::optional<Milliseconds> extractOperationRemainingTime(const BSONObj& obj) {
-    if (const auto field = obj.getField(kRemainingOperationTimeFieldName); field.ok()) {
-        const auto remainingTimeMillis =
-            uassertStatusOK(field.parseIntegerElementToNonNegativeLong());
-        return Milliseconds(remainingTimeMillis);
-    }
-    return boost::none;
-}
-
 }  // namespace
 
 CoordinatorCommitMonitor::CoordinatorCommitMonitor(
@@ -190,7 +179,9 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
         auto status = getStatusFromCommandResult(shardResponse.data);
         uassertStatusOKWithContext(status, errorContext);
 
-        const auto remainingTime = extractOperationRemainingTime(shardResponse.data);
+        auto parsedShardResponse = ShardsvrReshardingOperationTimeResponse::parse(
+            IDLParserContext("CoordinatorCommitMonitor"), shardResponse.data);
+        auto remainingTime = parsedShardResponse.getRemainingMillis();
 
         // If any recipient omits the "remainingMillis" field of the response then
         // we cannot conclude that it is safe to begin the critical section.
@@ -201,6 +192,17 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
             maxRemainingTime = Milliseconds::max();
             continue;
         }
+
+        if (resharding::gReshardingRemainingTimeEstimateAccountsForReplicationLag.load()) {
+            // The remaining time estimate should account for the replication lag since
+            // transitioning to the "strict-consistency" state (or any state) requires waiting for
+            // the write to the recipient state doc to be majority committed. If the replication lag
+            // info is not available which is expected in a mixed version cluster, assume that it is
+            // zero.
+            remainingTime = *remainingTime +
+                parsedShardResponse.getMajorityReplicationLagMillis().value_or(Milliseconds(0));
+        }
+
         if (remainingTime.value() < minRemainingTime) {
             minRemainingTime = remainingTime.value();
         }

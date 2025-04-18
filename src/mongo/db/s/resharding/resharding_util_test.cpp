@@ -419,6 +419,25 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocPerformVerification) {
     }
 }
 
+TEST_F(ReshardingUtilTest, GetMajorityReplicationLag) {
+    repl::ReplicationCoordinator::set(
+        getServiceContext(),
+        std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+
+    auto expectedReplicationLag = Milliseconds(1500);
+    auto lastCommittedOpTimeAndWallTime = replCoord->getLastCommittedOpTimeAndWallTime();
+    auto lastAppliedOpTime = repl::OpTime(lastCommittedOpTimeAndWallTime.opTime.getTimestamp() + 10,
+                                          lastCommittedOpTimeAndWallTime.opTime.getTerm() + 1);
+    auto lastAppliedWallTime = lastCommittedOpTimeAndWallTime.wallTime + expectedReplicationLag;
+    replCoord->setMyLastAppliedOpTimeAndWallTimeForward({lastAppliedOpTime, lastAppliedWallTime});
+
+    auto actualReplicationLag = getMajorityReplicationLag(operationContext());
+    ASSERT_EQ(expectedReplicationLag, actualReplicationLag);
+}
+
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {
 
 protected:

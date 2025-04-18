@@ -65,11 +65,13 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/request_types/resharding_operation_time_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -123,10 +125,17 @@ protected:
     void tearDown() override;
 
     void mockCommandForRecipients(Milliseconds remainingOperationTime);
+
     void mockOmitRemainingMillisForRecipients();
+
     void mockOmitRemainingMillisForOneRecipient();
+
     void mockRemaingOperationTimesCommandForRecipients(
         CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes);
+
+    void mockRemaingOperationTimesCommandForRecipients(
+        std::vector<Milliseconds> remainingOperationTimes,
+        std::vector<boost::optional<Milliseconds>> replicationLags);
 
 private:
     const NamespaceString _ns = NamespaceString::createNamespaceString_forTest("test.test");
@@ -222,7 +231,9 @@ void CoordinatorCommitMonitorTest::mockCommandForRecipients(Milliseconds remaini
             _runOnMockingNextResponse = boost::none;
         }
 
-        return BSON("remainingMillis" << durationCount<Milliseconds>(remainingOperationTime));
+        ShardsvrReshardingOperationTimeResponse response;
+        response.setRemainingMillis(remainingOperationTime);
+        return response.toBSON();
     };
 
     std::for_each(
@@ -247,9 +258,10 @@ void CoordinatorCommitMonitorTest::mockOmitRemainingMillisForOneRecipient() {
                 // Return an empty BSON object.
                 return BSONObj();
             }
+            ShardsvrReshardingOperationTimeResponse response;
             auto threshold = Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load());
-            return BSON("remainingMillis"
-                        << durationCount<Milliseconds>(threshold - Milliseconds(1)));
+            response.setRemainingMillis(threshold - Milliseconds(1));
+            return response.toBSON();
         });
     }
 }
@@ -265,37 +277,127 @@ void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients
             _runOnMockingNextResponse = boost::none;
         }
 
+        ShardsvrReshardingOperationTimeResponse response;
         if (useMin) {
             useMin = false;
-            return BSON("remainingMillis"
-                        << durationCount<Milliseconds>(remainingOperationTimes.min));
+            response.setRemainingMillis(remainingOperationTimes.min);
         } else {
-            return BSON("remainingMillis"
-                        << durationCount<Milliseconds>(remainingOperationTimes.max));
+            response.setRemainingMillis(remainingOperationTimes.max);
         }
+        return response.toBSON();
     };
 
     std::for_each(
         _recipientShards.begin(), _recipientShards.end(), [&](const ShardId&) { onCommand(func); });
 }
 
-TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimes) {
-    auto future = launchAsync([this] {
-        ThreadClient tc(getServiceContext()->getService());
-        return getCommitMonitor()->queryRemainingOperationTimeForRecipients();
-    });
+void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients(
+    std::vector<Milliseconds> remainingOperationTimes,
+    std::vector<boost::optional<Milliseconds>> replicationLags) {
+    ASSERT_EQ(_recipientShards.size(), remainingOperationTimes.size());
+    ASSERT_EQ(_recipientShards.size(), replicationLags.size());
 
+    for (size_t i = 0; i < _recipientShards.size(); i++) {
+        onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+            LOGV2(10393201, "Mocking command response", "command"_attr = request.cmdObj);
+
+            if (_runOnMockingNextResponse) {
+                (*_runOnMockingNextResponse)();
+                _runOnMockingNextResponse = boost::none;
+            }
+
+            ShardsvrReshardingOperationTimeResponse response;
+            response.setRemainingMillis(remainingOperationTimes[i]);
+            response.setMajorityReplicationLagMillis(replicationLags[i]);
+            return response.toBSON();
+        });
+    }
+}
+
+
+TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimesReplicationLagNotAvailable) {
     auto minTimeMillis = 1;
     auto maxTimeMillis = 8;
 
     CoordinatorCommitMonitor::RemainingOperationTimes remainingOpTimes = {
         Milliseconds(minTimeMillis), Milliseconds(maxTimeMillis)};
 
-    mockRemaingOperationTimesCommandForRecipients(remainingOpTimes);
+    for (bool accountForReplLag : {true, false}) {
+        LOGV2(10393202,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "accountForReplLag"_attr = accountForReplLag);
 
-    auto newRemainingOpTimes = future.default_timed_get();
-    ASSERT_EQUALS(newRemainingOpTimes.min, remainingOpTimes.min);
-    ASSERT_EQUALS(newRemainingOpTimes.max, remainingOpTimes.max);
+        RAIIServerParameterControllerForTest batchSize{
+            "reshardingRemainingTimeEstimateAccountsForReplicationLag", accountForReplLag};
+
+        auto future = launchAsync([this] {
+            ThreadClient tc(getServiceContext()->getService());
+            return getCommitMonitor()->queryRemainingOperationTimeForRecipients();
+        });
+
+        mockRemaingOperationTimesCommandForRecipients(remainingOpTimes);
+
+        auto newRemainingOpTimes = future.default_timed_get();
+        ASSERT_EQUALS(newRemainingOpTimes.min, remainingOpTimes.min);
+        ASSERT_EQUALS(newRemainingOpTimes.max, remainingOpTimes.max);
+    }
+}
+
+TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimesReplicationLagFullyAvailable) {
+    std::vector<Milliseconds> remainingOpTimes{Milliseconds{1}, Milliseconds{2}};
+    std::vector<boost::optional<Milliseconds>> replicationLags{Milliseconds{100}, Milliseconds{10}};
+
+    for (bool accountForReplLag : {true, false}) {
+        LOGV2(10393203,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "accountForReplLag"_attr = accountForReplLag);
+
+        RAIIServerParameterControllerForTest batchSize{
+            "reshardingRemainingTimeEstimateAccountsForReplicationLag", accountForReplLag};
+
+        auto future = launchAsync([this] {
+            ThreadClient tc(getServiceContext()->getService());
+            return getCommitMonitor()->queryRemainingOperationTimeForRecipients();
+        });
+
+        mockRemaingOperationTimesCommandForRecipients(remainingOpTimes, replicationLags);
+
+        auto newRemainingOpTimes = future.default_timed_get();
+        ASSERT_EQUALS(newRemainingOpTimes.min,
+                      accountForReplLag ? Milliseconds{12} : Milliseconds{1});
+        ASSERT_EQUALS(newRemainingOpTimes.max,
+                      accountForReplLag ? Milliseconds{101} : Milliseconds{2});
+    }
+}
+
+TEST_F(CoordinatorCommitMonitorTest,
+       ComputesMinAndMaxRemainingTimesReplicationLagPartiallyAvailable) {
+    std::vector<Milliseconds> remainingOpTimes{Milliseconds{1}, Milliseconds{2}};
+    std::vector<boost::optional<Milliseconds>> replicationLags{boost::none, Milliseconds{10}};
+
+    for (bool accountForReplLag : {true, false}) {
+        LOGV2(10393204,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "accountForReplLag"_attr = accountForReplLag);
+
+        RAIIServerParameterControllerForTest batchSize{
+            "reshardingRemainingTimeEstimateAccountsForReplicationLag", accountForReplLag};
+
+        auto future = launchAsync([this] {
+            ThreadClient tc(getServiceContext()->getService());
+            return getCommitMonitor()->queryRemainingOperationTimeForRecipients();
+        });
+
+        mockRemaingOperationTimesCommandForRecipients(remainingOpTimes, replicationLags);
+
+        auto newRemainingOpTimes = future.default_timed_get();
+        ASSERT_EQUALS(newRemainingOpTimes.min, Milliseconds{1});
+        ASSERT_EQUALS(newRemainingOpTimes.max,
+                      accountForReplLag ? Milliseconds{12} : Milliseconds{2});
+    }
 }
 
 TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenRecipientsWithinCommitThreshold) {
@@ -349,6 +451,51 @@ TEST_F(CoordinatorCommitMonitorTest, BlocksWhenRemainingMillisIsOmitted) {
     ASSERT(!future.isReady());
 
     respondWithReadyToCommit();
+    future.get();
+}
+
+TEST_F(CoordinatorCommitMonitorTest,
+       BlocksWhenRemainingMillisPlusReplicationLagNotWithinCommitThreshold) {
+    // Not set the reshardingRemainingTimeEstimateAccountsForReplicationLag to test that the
+    // default is true.
+    auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
+    auto threshold = gRemainingReshardingOperationTimeThresholdMillis.load();
+
+    // replicationLag > threshold.
+    std::vector<Milliseconds> remainingOpTimes0{
+        Milliseconds{0},
+        Milliseconds{0},
+    };
+    std::vector<boost::optional<Milliseconds>> replicationLags0{
+        Milliseconds{0},
+        Milliseconds{threshold + 1},
+    };
+    mockRemaingOperationTimesCommandForRecipients(remainingOpTimes0, replicationLags0);
+    ASSERT(!future.isReady());
+
+    // remainingTime + replicationLag > threshold.
+    std::vector<Milliseconds> remainingOpTimes1{
+        Milliseconds{1},
+        Milliseconds{0},
+    };
+    std::vector<boost::optional<Milliseconds>> replicationLags1{
+        Milliseconds{threshold},
+        Milliseconds{0},
+    };
+    mockRemaingOperationTimesCommandForRecipients(remainingOpTimes1, replicationLags1);
+    ASSERT(!future.isReady());
+
+    // remainingTime + replicationLag < threshold.
+    std::vector<Milliseconds> remainingOpTimes2{
+        Milliseconds{0},
+        Milliseconds{0},
+    };
+    std::vector<boost::optional<Milliseconds>> replicationLags2{
+        Milliseconds{0},
+        Milliseconds{threshold - 1},
+    };
+    mockRemaingOperationTimesCommandForRecipients(remainingOpTimes2, replicationLags2);
+
     future.get();
 }
 

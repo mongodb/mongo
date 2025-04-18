@@ -275,6 +275,17 @@ server_parameters:
             gte: 0
         redact: false
 
+    reshardingRemainingTimeEstimateAccountsForReplicationLag:
+        description: >-
+            Controls whether the remaining time estimate on the resharding coordinator, when trying
+            to engage the critical section and block incoming writes, should account for the
+            replication lag on the recipients.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRemainingTimeEstimateAccountsForReplicationLag
+        default: true
+        redact: false
+
     reshardingCoordinatorQuiescePeriodMillis:
         description: >-
             Controls the amount of time a resharding operation will remain in a quiesced state on
