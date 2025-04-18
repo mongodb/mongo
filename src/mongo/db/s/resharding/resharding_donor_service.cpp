@@ -404,7 +404,6 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
 
     return resharding::WithAutomaticRetry([this, executor] {
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-               _metrics->fillDonorCtxOnCompletion(_donorCtx);
                return _updateCoordinator(opCtx.get(), executor);
            })
         .onTransientError([](const Status& status) {
@@ -1233,6 +1232,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
         .then([this] {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             auto shardId = _externalState->myShardId(opCtx->getServiceContext());
+            _metrics->updateDonorCtx(_donorCtx);
 
             BSONObjBuilder updateBuilder;
             {

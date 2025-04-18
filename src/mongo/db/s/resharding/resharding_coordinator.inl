@@ -1852,6 +1852,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     BSONObjBuilder builder;
     BSONObjBuilder statsBuilder;
     BSONObjBuilder totalsBuilder;
+    BSONObjBuilder criticalSectionBuilder;
     builder.append("uuid", _coordinatorDoc.getReshardingUUID().toBSON());
     if (const auto& userUuid = _coordinatorDoc.getUserReshardingUUID()) {
         builder.append("userSuppliedUUID", userUuid->toBSON());
@@ -1886,7 +1887,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     } else {
         statsBuilder.append("endTime", resharding::getCurrentTime());
     }
-    _metrics->reportPhaseDurationsOnCompletion(&totalsBuilder);
+    _metrics->reportPhaseDurations(&totalsBuilder);
 
     auto numDestinationShards = 0;
     if (const auto& shardDistribution = _coordinatorDoc.getShardDistribution()) {
@@ -1912,22 +1913,24 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
         shardBuilder.append("shardName", donor.getId());
         auto bytes = state.getBytesToClone().value_or(0);
         auto docs = state.getDocumentsToClone().value_or(0);
-        auto writes = state.getWritesDuringCriticalSection().value_or(0);
         shardBuilder.append("bytesToClone", bytes);
         shardBuilder.append("documentsToClone", docs);
-        shardBuilder.append("writesDuringCriticalSection", writes);
         totalBytes += bytes;
         totalDocuments += docs;
-        totalWritesDuringCriticalSection += writes;
         if (const auto& phaseDurations = state.getPhaseDurations()) {
             shardBuilder.append("phaseDurations", *phaseDurations);
         }
+        if (const auto& interval = state.getCriticalSectionInterval()) {
+            shardBuilder.append("criticalSectionInterval", interval->toBSON());
+        }
+        auto writes = state.getWritesDuringCriticalSection().value_or(0);
+        totalWritesDuringCriticalSection += writes;
+        shardBuilder.append("writesDuringCriticalSection", writes);
         donors.append(shardBuilder.obj());
     }
     statsBuilder.append("donors", donors.obj());
     totalsBuilder.append("totalBytesToClone", totalBytes);
     totalsBuilder.append("totalDocumentsToClone", totalDocuments);
-    totalsBuilder.append("totalWritesDuringCriticalSection", totalWritesDuringCriticalSection);
     totalsBuilder.append("averageDocSize", totalDocuments > 0 ? (totalBytes / totalDocuments) : 0);
 
     int64_t maxIndexes = 0;
@@ -1966,8 +1969,22 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     totalsBuilder.append("totalOplogsFetched", totalOplogsFetched);
     totalsBuilder.append("totalOplogsApplied", totalOplogsApplied);
     totalsBuilder.append("maxRecipientIndexes", maxIndexes);
-
     statsBuilder.append("totals", totalsBuilder.obj());
+
+    bool hadCriticalSection = false;
+    if (auto criticalSectionInterval = _metrics->getIntervalFor(resharding_metrics::TimedPhase::kCriticalSection)) {
+        criticalSectionBuilder.append("interval", criticalSectionInterval->toBSON());
+        hadCriticalSection = true;
+    }
+    if (auto expiration = _coordinatorDoc.getCriticalSectionExpiresAt()) {
+        criticalSectionBuilder.append("expiration", *expiration);
+        hadCriticalSection = true;
+    }
+    if (hadCriticalSection) {
+        criticalSectionBuilder.append("totalWritesDuringCriticalSection", totalWritesDuringCriticalSection);
+        statsBuilder.append("criticalSection", criticalSectionBuilder.obj());
+    }
+
     builder.append("statistics", statsBuilder.obj());
     LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
 }

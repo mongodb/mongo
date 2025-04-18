@@ -328,7 +328,7 @@ void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipien
     }
 }
 
-void ReshardingMetrics::reportPhaseDurationsOnCompletion(BSONObjBuilder* builder) {
+void ReshardingMetrics::reportPhaseDurations(BSONObjBuilder* builder) {
     invariant(builder);
     const auto fieldNames = ReshardingMetrics::TimedPhaseNameMap{
         {TimedPhase::kCloning, "copyDurationMs"},
@@ -339,21 +339,22 @@ void ReshardingMetrics::reportPhaseDurationsOnCompletion(BSONObjBuilder* builder
     reportDurationsForAllPhases<Milliseconds>(fieldNames, getClockSource(), builder);
 }
 
-void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {
+void ReshardingMetrics::updateDonorCtx(DonorShardContext& donorCtx) {
     donorCtx.setWritesDuringCriticalSection(getWritesDuringCriticalSection());
     BSONObjBuilder bob;
-    reportPhaseDurationsOnCompletion(&bob);
+    reportPhaseDurations(&bob);
     donorCtx.setPhaseDurations(bob.obj());
+    donorCtx.setCriticalSectionInterval(getIntervalFor(TimedPhase::kCriticalSection));
 }
 
-void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx) {
+void ReshardingMetrics::updateRecipientCtx(RecipientShardContext& recipientCtx) {
     if (!recipientCtx.getBytesCopied()) {
         recipientCtx.setBytesCopied(getBytesWrittenCount());
     }
     recipientCtx.setOplogFetched(getOplogEntriesFetched());
     recipientCtx.setOplogApplied(getOplogEntriesApplied());
     BSONObjBuilder bob;
-    reportPhaseDurationsOnCompletion(&bob);
+    reportPhaseDurations(&bob);
     recipientCtx.setPhaseDurations(bob.obj());
 }
 

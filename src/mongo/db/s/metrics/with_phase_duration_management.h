@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/s/metrics/phase_duration.h"
+#include "mongo/s/resharding/common_types_gen.h"
 
 namespace mongo {
 
@@ -40,6 +41,18 @@ public:
 
     template <typename... Args>
     WithPhaseDurationManagement(Args&&... args) : Base{std::forward<Args>(args)...} {}
+
+    boost::optional<ReshardingMetricsTimeInterval> getIntervalFor(PhaseEnum phase) const {
+        auto start = getStartFor(phase);
+        auto end = getEndFor(phase);
+        if (!start && !end) {
+            return boost::none;
+        }
+        ReshardingMetricsTimeInterval interval;
+        interval.setStart(start);
+        interval.setStop(end);
+        return interval;
+    }
 
     boost::optional<Date_t> getStartFor(PhaseEnum phase) const {
         return _durations[toIndex(phase)].getStart();

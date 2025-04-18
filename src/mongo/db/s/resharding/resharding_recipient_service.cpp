@@ -1871,7 +1871,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
         _recipientCtx.setNumOfIndexes(indexCount);
     }
 
-    _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
+    _metrics->updateRecipientCtx(_recipientCtx);
 }
 
 CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(

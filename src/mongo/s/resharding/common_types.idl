@@ -152,6 +152,19 @@ structs:
                     coordinator itself."
                 optional: true
 
+    ReshardingMetricsTimeInterval:
+        description: "Contains the start and stop time of a resharding operation phase."
+        strict: false
+        fields:
+            start:
+                type: date
+                description: "The start timestamp."
+                optional: true
+            stop:
+                type: date
+                description: "The stop timestamp."
+                optional: true
+
     DonorShardContext:
         description:
             "Mutable state for a donor shard tracked both locally by a donor shard and
@@ -193,6 +206,10 @@ structs:
             phaseDurations:
                 type: object_owned
                 description: "Time spent in each phase so far."
+                optional: true
+            criticalSectionInterval:
+                type: ReshardingMetricsTimeInterval
+                description: Start and end times for the critical section.
                 optional: true
 
     DonorShardFetchTimestamp:
@@ -311,19 +328,6 @@ structs:
             max:
                 type: object_owned
                 description: "The max key of the chunk range."
-
-    ReshardingMetricsTimeInterval:
-        description: "Contains the start and stop time of a resharding operation phase."
-        strict: false
-        fields:
-            start:
-                type: date
-                description: "The start timestamp."
-                optional: true
-            stop:
-                type: date
-                description: "The stop timestamp."
-                optional: true
 
     DocumentSourceReshardingOwnershipMatchSpec:
         description:

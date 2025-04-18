@@ -138,6 +138,7 @@ function verifyCompletionLogs(collName, logs, expectedStatus) {
     verifyDonorMetrics(stats, success);
     verifyRecipientMetrics(stats, success);
     verifyTotals(stats, success);
+    verifyCriticalSection(stats, success);
 }
 
 function verifyDonorMetrics(stats, success) {
@@ -153,6 +154,10 @@ function verifyDonorMetrics(stats, success) {
             assert(donor.hasOwnProperty("phaseDurations"), "Missing donor phaseDurations");
             assert.gte(
                 donor.phaseDurations.criticalSectionDurationMs, 0, "criticalSectionDurationMs");
+            assert(donor.hasOwnProperty("criticalSectionInterval"));
+            const interval = donor.criticalSectionInterval;
+            assert(interval.hasOwnProperty("start"), "Missing criticalSectionInterval start");
+            assert(interval.hasOwnProperty("stop"), "Missing criticalSectionInterval stop");
         }
     }
 }
@@ -203,8 +208,6 @@ function verifyTotals(stats, success) {
     assert.gt(totals.totalBytesToClone, 0, "totalBytesToClone");
     assert.gt(totals.totalDocumentsToClone, 0, "totalDocumentsToClone");
     assert.gt(totals.averageDocSize, 0, "averageDocSize");
-    assert(totals.hasOwnProperty("totalWritesDuringCriticalSection"),
-           "Missing totalWritesDuringCriticalSection");
 
     assert.gt(totals.totalBytesCloned, 0, "totalBytesCloned");
     assert.gt(totals.totalDocumentsCloned, 0, "totalDocumentsCloned");
@@ -213,4 +216,20 @@ function verifyTotals(stats, success) {
         assert.gt(totals.totalOplogsApplied, 0, "totalOplogsApplied");
     }
     assert.gt(totals.maxRecipientIndexes, 0, "maxRecipientIndexes");
+}
+
+function verifyCriticalSection(stats, success) {
+    assert(stats.hasOwnProperty("criticalSection") === success,
+           "Incorrect critical section presence");
+    if (!success) {
+        return;
+    }
+    const criticalSection = stats.criticalSection;
+    assert(criticalSection.hasOwnProperty("interval"), "Missing interval");
+    const interval = criticalSection.interval;
+    assert(interval.hasOwnProperty("start"), "Missing criticalSection start");
+    assert(interval.hasOwnProperty("stop"), "Missing criticalSection stop");
+    assert(criticalSection.hasOwnProperty("expiration"), "Missing expiration");
+    assert(criticalSection.hasOwnProperty("totalWritesDuringCriticalSection"),
+           "Missing totalWritesDuringCriticalSection");
 }
