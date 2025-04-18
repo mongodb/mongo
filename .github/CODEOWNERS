@@ -1718,10 +1718,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/OWNERS.yml
 /src/mongo/db/modules/enterprise/BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/.gitignore @10gen/devprod-build @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/.git-blame-ignore-revs @10gen/devprod-build @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/.clang-format @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/db/modules/enterprise/.eslintrc.yml @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/db/modules/enterprise/README.md @10gen/server-release @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/distsrc/OWNERS.yml

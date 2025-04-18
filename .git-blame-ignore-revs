@@ -1,17 +1,22 @@
 # SERVER-72197 Clang format v12.0.1
 f63255ee677ecae5896d6f35dd712ed60ae8c39a
+ff917ea96cf91f76bbd73b0d88d626a8523c5ec0
 
 # SERVER-66490 Apply pylinters to build system code
 9ea1d6f0419938770eea612479c75838f75752b7
+ac953266322ad51ac712c1d7533af1848f6ee99b
 
 # SERVER-41772 Clang format v7.0.1
 134a4083953270e8a11430395357fb70a29047ad
+94b542762b5eed8dddd6964752436fc4c66dc2c1
 
 # SERVER-23971 Clang-Format code
 6dcdd23dd37ef12c87e71cf59ef01cd82432efe0
+53c007e02d0bd34c9e4f070829af74e00e8bbba2
 
 # SERVER-22470 Format JS code with approved style
 f5a6c794a0af1a5d57db2617c2e9464eaad9f221
+ccf5c5c4bbba2bfc99afd2fe13a4f35dc8618c2f
 
 # SERVER-22469 Format JS code with approved style in src/mongo/shell & src/mongo/scripting
 a025d43f3ce2efc1fb1282a718f5d286fa0a4dc1
@@ -21,15 +26,19 @@ c3996780b76316793758b43fa1fca5b9d0857b6c
 
 # SERVER-18579: Clang-Format - reformat code
 9c2ed42daa8fbbef4a919c21ec564e2db55e8d60
+a0b4965b391968a531bcc65a01882653238910ca
 
 # SERVER-79735 Convert jstest corpus to use es modules
 a4f458fe4d7a44eba056f5c150753e73067c8e4d
+41f32193f6464f9ec94294232d6fd9e46461fb3c
 
 # SERVER-78551 Migrate analyze_plan library to module
 1e98a0f23d62eb1f149658d190f0285879d91db5
+e7310f8ef1ec7817e00fef496611ca9c7086be17
 
 # SERVER-78419 Convert FSM to load workloads as modules
 1ce8128b8b286c2500ed8fdf6f7f18382b2cdd14
+30e8ed22011ec82011f69d28311a15b5c1fbb492
 
 # SERVER-74787 Prepare jstest corpus for implicit strict mode
 43b87324302209cbfa240d6c6b520007669e4ea6
