@@ -1,11 +1,18 @@
-// The {$set: {x: maxStr}}} update takes multiple seconds to execute.
-// @tags: [operations_longer_than_stepdown_interval]
-
 /**
  * Confirms that:
  *  - Documents at the maximum BSON size limit can be written and read back.
  *  - Documents over the maximum BSON size limit cannot be written.
+ *
+ * @tags: [
+ *     # The {$set: {x: maxStr}}} update takes multiple seconds to execute.
+ *     operations_longer_than_stepdown_interval,
+ *
+ *     # In some passthroughs, specifically on tsan variants, this test can exhaust the number of
+ *     # available retries or otherwise fail because of a long-running operation.
+ *     tsan_incompatible,
+ *  ]
  */
+
 const maxBsonObjectSize = db.hello().maxBsonObjectSize;
 const docOverhead = Object.bsonsize({_id: new ObjectId(), x: ''});
 const maxStrSize = maxBsonObjectSize - docOverhead;
