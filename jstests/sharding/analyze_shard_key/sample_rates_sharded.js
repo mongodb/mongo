@@ -11,6 +11,7 @@
  *    requires_fast_memory,
  *    incompatible_aubsan,
  *    tsan_incompatible,
+ *    incompatible_ppc,
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";

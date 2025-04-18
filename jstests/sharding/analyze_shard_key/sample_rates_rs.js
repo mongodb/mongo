@@ -8,6 +8,7 @@
  *    # On slow machines, the number of sampled queries could fall outside the expected range.
  *    incompatible_aubsan,
  *    tsan_incompatible,
+ *    incompatible_ppc,
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";

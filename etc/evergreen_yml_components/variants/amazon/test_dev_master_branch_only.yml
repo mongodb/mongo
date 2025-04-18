@@ -117,6 +117,8 @@ buildvariants:
       compile_variant: *rhel81-ppc64le-bazel-compile
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel81
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_ppc
     tasks:
       - name: compile_bazel_TG
 
