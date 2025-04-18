@@ -94,11 +94,12 @@ protected:
                              const UUID& uuid,
                              uint16_t numPreviouslyCommittedMeasurements);
 
-    InsertResult _insertOneHelper(OperationContext* opCtx,
-                                  BucketCatalog& catalog,
-                                  const mongo::NamespaceString& nss,
-                                  const UUID& uuid,
-                                  const mongo::BSONObj& doc);
+    std::shared_ptr<bucket_catalog::WriteBatch> _insertOneWithoutReopening(
+        OperationContext* opCtx,
+        BucketCatalog& catalog,
+        const mongo::NamespaceString& nss,
+        const UUID& uuid,
+        const mongo::BSONObj& doc);
 
     // Check that each group of objects has compatible schema with itself, but that inserting the
     // first object in new group closes the existing bucket and opens a new one
@@ -222,22 +223,86 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
     _commit(ns, batch, numPreviouslyCommittedMeasurements);
 }
 
-InsertResult BucketCatalogTest::_insertOneHelper(OperationContext* opCtx,
-                                                 BucketCatalog& catalog,
-                                                 const mongo::NamespaceString& nss,
-                                                 const UUID& uuid,
-                                                 const mongo::BSONObj& doc) {
+std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithoutReopening(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    const mongo::NamespaceString& nss,
+    const UUID& uuid,
+    const mongo::BSONObj& doc) {
+    auto timeseriesOptions = _getTimeseriesOptions(nss);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(catalog,
+                                                        uuid,
+                                                        timeseriesOptions,
+                                                        {doc},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<Date_t>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
-    auto insertContextAndTime =
-        uassertStatusOK(prepareInsert(catalog, uuid, _getTimeseriesOptions(nss), doc));
+    auto& stripe = *catalog.stripes[batchedInsertCtx.stripeNumber];
+    auto bucketKey = batchedInsertCtx.key;
+    auto options = batchedInsertCtx.options;
+    auto& stats = batchedInsertCtx.stats;
+    auto collator = _getCollator(nss);
+    Bucket& bucket = [&]() -> Bucket& {
+        auto allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
+        auto bucketOpenedDueToMetadata = true;
+        if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
+                                                               stripe,
+                                                               WithLock::withoutLock(),
+                                                               doc,
+                                                               bucketKey,
+                                                               measurementTimestamp,
+                                                               options,
+                                                               collator,
+                                                               _storageCacheSizeBytes,
+                                                               allowQueryBasedReopening,
+                                                               stats,
+                                                               bucketOpenedDueToMetadata)) {
+            return *eligibleBucket;
+        }
 
-    return insert(catalog,
-                  _getCollator(nss),
-                  doc,
-                  opCtx->getOpID(),
-                  std::get<InsertContext>(insertContextAndTime),
-                  std::get<Date_t>(insertContextAndTime),
-                  _storageCacheSizeBytes);
+        // Roll over buckets to preemptively update the stats.
+        findAndRolloverOpenBuckets(catalog,
+                                   stripe,
+                                   WithLock::withoutLock(),
+                                   bucketKey,
+                                   measurementTimestamp,
+                                   Seconds(*options.getBucketMaxSpanSeconds()),
+                                   allowQueryBasedReopening,
+                                   bucketOpenedDueToMetadata);
+
+        return internal::allocateBucket(catalog,
+                                        stripe,
+                                        WithLock::withoutLock(),
+                                        bucketKey,
+                                        options,
+                                        measurementTimestamp,
+                                        collator,
+                                        stats);
+    }();
+
+    auto opId = opCtx->getOpID();
+    size_t currentPosition = 0;
+    std::shared_ptr<bucket_catalog::WriteBatch> writeBatch =
+        activeBatch(catalog.trackingContexts, bucket, opId, batchedInsertCtx.stripeNumber, stats);
+    ASSERT(bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
+                                                                        opId,
+                                                                        collator,
+                                                                        batchedInsertCtx,
+                                                                        stripe,
+                                                                        WithLock::withoutLock(),
+                                                                        _storageCacheSizeBytes,
+                                                                        bucket,
+                                                                        currentPosition,
+                                                                        writeBatch));
+
+    return writeBatch;
 }
 
 void BucketCatalogTest::_testMeasurementSchema(
@@ -255,9 +320,8 @@ void BucketCatalogTest::_testMeasurementSchema(
             timestampedDoc.appendElements(doc);
 
             auto pre = _getExecutionStat(_uuid1, kNumSchemaChanges);
-            auto result =
-                _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, timestampedDoc.obj());
-            auto& batch = get<SuccessfulInsertion>(result).batch;
+            auto batch = _insertOneWithoutReopening(
+                _opCtx, *_bucketCatalog, _ns1, _uuid1, timestampedDoc.obj());
             ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
             finish(*_bucketCatalog, batch);
             auto post = _getExecutionStat(_uuid1, kNumSchemaChanges);
@@ -669,14 +733,12 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucketWithoutMetaFieldI
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
     // A subsequent insert into the same bucket should land in the same batch.
-    auto result2 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_EQ(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     // The batch hasn't actually been committed yet.
@@ -699,60 +761,55 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
 }
 
 TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
-    auto result =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch = get<SuccessfulInsertion>(result).batch;
+    auto batch = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     auto bucketId = batch->bucketId;
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, bucketId));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
-    auto result1 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now() << _metaField << "123"));
-    auto result2 = _insertOneHelper(_opCtx,
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now() << _metaField << BSONObj()));
-    auto result3 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns2, _uuid2, BSON(_timeField << Date_t::now()));
+    auto batch1 =
+        _insertOneWithoutReopening(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   _uuid1,
+                                   BSON(_timeField << Date_t::now() << _metaField << "123"));
+    auto batch2 =
+        _insertOneWithoutReopening(_opCtx,
+                                   *_bucketCatalog,
+                                   _ns1,
+                                   _uuid1,
+                                   BSON(_timeField << Date_t::now() << _metaField << BSONObj()));
+    auto batch3 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns2, _uuid2, BSON(_timeField << Date_t::now()));
 
     // Inserts should all be into three distinct buckets (and therefore batches).
-    ASSERT_NE(get<SuccessfulInsertion>(result1).batch, get<SuccessfulInsertion>(result2).batch);
-    ASSERT_NE(get<SuccessfulInsertion>(result1).batch, get<SuccessfulInsertion>(result3).batch);
-    ASSERT_NE(get<SuccessfulInsertion>(result2).batch, get<SuccessfulInsertion>(result3).batch);
+    ASSERT_NE(batch1, batch2);
+    ASSERT_NE(batch1, batch3);
+    ASSERT_NE(batch2, batch3);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(
-        BSON(_metaField << "123"),
-        getMetadata(*_bucketCatalog, get<SuccessfulInsertion>(result1).batch->bucketId));
-    ASSERT_BSONOBJ_EQ(
-        BSON(_metaField << BSONObj()),
-        getMetadata(*_bucketCatalog, get<SuccessfulInsertion>(result2).batch->bucketId));
-    ASSERT(
-        getMetadata(*_bucketCatalog, get<SuccessfulInsertion>(result3).batch->bucketId).isEmpty());
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"), getMetadata(*_bucketCatalog, batch1->bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
+                      getMetadata(*_bucketCatalog, batch2->bucketId));
+    ASSERT(getMetadata(*_bucketCatalog, batch3->bucketId).isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
-    _commit(_ns1, get<SuccessfulInsertion>(result1).batch, 0);
-    _commit(_ns1, get<SuccessfulInsertion>(result2).batch, 0);
-    _commit(_ns2, get<SuccessfulInsertion>(result3).batch, 0);
+    _commit(_ns1, batch1, 0);
+    _commit(_ns1, batch2, 0);
+    _commit(_ns2, batch3, 0);
 }
 
 TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
     BucketCatalog temporaryBucketCatalog(/*numberOfStripes=*/1,
                                          getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes);
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
-    auto result2 = _insertOneHelper(
+    auto batch2 = _insertOneWithoutReopening(
         _opCtx, temporaryBucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
 
     // Inserts should be into different buckets (and therefore batches) because they went through
     // different bucket catalogs.
@@ -895,17 +952,15 @@ TEST_F(BucketCatalogTest, DropNamespaceBuckets) {
 }
 
 TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before finish so there's a second batch live at the same time.
-    auto result2 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     (void)write_ops_utils::makeTimeseriesInsertOp(batch1,
@@ -919,9 +974,8 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
 }
 
 TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDoc) {
-    auto result = _insertOneHelper(
+    auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _nsNoMeta, _uuidNoMeta, BSON(_timeField << Date_t::now()));
-    auto batch = get<SuccessfulInsertion>(result).batch;
 
     ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, batch->bucketId));
 
@@ -930,12 +984,11 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDoc) {
 
 TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
     // Creating a new bucket should return all fields from the initial measurement.
-    auto result = _insertOneHelper(_opCtx,
-                                   *_bucketCatalog,
-                                   _nsNoMeta,
-                                   _uuidNoMeta,
-                                   BSON(_timeField << Date_t::now() << "a" << 0));
-    auto batch = get<SuccessfulInsertion>(result).batch;
+    auto batch = _insertOneWithoutReopening(_opCtx,
+                                            *_bucketCatalog,
+                                            _nsNoMeta,
+                                            _uuidNoMeta,
+                                            BSON(_timeField << Date_t::now() << "a" << 0));
     auto oldId = batch->bucketId;
     _commit(_nsNoMeta, batch, 0);
     ASSERT_EQ(2U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
@@ -943,47 +996,43 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
     ASSERT(batch->newFieldNamesToBeInserted.count("a")) << batch->toBSON();
 
     // Inserting a new measurement with the same fields should return an empty set of new fields.
-    result = _insertOneHelper(_opCtx,
-                              *_bucketCatalog,
-                              _nsNoMeta,
-                              _uuidNoMeta,
-                              BSON(_timeField << Date_t::now() << "a" << 1));
-    batch = get<SuccessfulInsertion>(result).batch;
+    batch = _insertOneWithoutReopening(_opCtx,
+                                       *_bucketCatalog,
+                                       _nsNoMeta,
+                                       _uuidNoMeta,
+                                       BSON(_timeField << Date_t::now() << "a" << 1));
     _commit(_nsNoMeta, batch, 1);
     ASSERT_EQ(0U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
 
     // Insert a new measurement with the a new field.
-    result = _insertOneHelper(_opCtx,
-                              *_bucketCatalog,
-                              _nsNoMeta,
-                              _uuidNoMeta,
-                              BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2));
-    batch = get<SuccessfulInsertion>(result).batch;
+    batch = _insertOneWithoutReopening(_opCtx,
+                                       *_bucketCatalog,
+                                       _nsNoMeta,
+                                       _uuidNoMeta,
+                                       BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2));
     _commit(_nsNoMeta, batch, 2);
     ASSERT_EQ(1U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted.count("b")) << batch->toBSON();
 
     // Fill up the bucket.
     for (auto i = 3; i < gTimeseriesBucketMaxCount; ++i) {
-        result = _insertOneHelper(_opCtx,
-                                  *_bucketCatalog,
-                                  _nsNoMeta,
-                                  _uuidNoMeta,
-                                  BSON(_timeField << Date_t::now() << "a" << i));
-        batch = get<SuccessfulInsertion>(result).batch;
+        batch = _insertOneWithoutReopening(_opCtx,
+                                           *_bucketCatalog,
+                                           _nsNoMeta,
+                                           _uuidNoMeta,
+                                           BSON(_timeField << Date_t::now() << "a" << i));
         _commit(_nsNoMeta, batch, i);
         ASSERT_EQ(0U, batch->newFieldNamesToBeInserted.size()) << i << ":" << batch->toBSON();
     }
 
     // When a bucket overflows, committing to the new overflow bucket should return the fields of
     // the first measurement as new fields.
-    auto result2 =
-        _insertOneHelper(_opCtx,
-                         *_bucketCatalog,
-                         _nsNoMeta,
-                         _uuidNoMeta,
-                         BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
-    auto& batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(
+        _opCtx,
+        *_bucketCatalog,
+        _nsNoMeta,
+        _uuidNoMeta,
+        BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
     ASSERT_NE(oldId, batch2->bucketId) << batch2->toBSON();
     _commit(_nsNoMeta, batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted.size()) << batch2->toBSON();
@@ -992,17 +1041,15 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
 }
 
 TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before finish so there's a second batch live at the same time.
-    auto result2 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     abort(*_bucketCatalog, batch2, {ErrorCodes::TimeseriesBucketCleared, ""});
@@ -1015,9 +1062,8 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
 }
 
 TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
-    auto result =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch = get<SuccessfulInsertion>(result).batch;
+    auto batch = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
     clear(*_bucketCatalog, _uuid1);
 
@@ -1025,9 +1071,8 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
     ASSERT(isWriteBatchFinished(*batch));
     ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 
-    result =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    batch = get<SuccessfulInsertion>(result).batch;
+    batch = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
@@ -1046,9 +1091,8 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
 
 
 TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
-    auto result =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch = get<SuccessfulInsertion>(result).batch;
+    auto batch = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
@@ -1061,18 +1105,16 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 }
 
-TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+TEST_F(BucketCatalogTest, PrepareCommitOnClearedBucketWithAlreadyPreparedBatch) {
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before clear so there's a second batch live at the same time.
-    auto result2 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
     ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
 
@@ -1089,9 +1131,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
 
     // Make sure a subsequent insert, which opens a new bucket, doesn't corrupt the old bucket
     // state and prevent us from finishing the first batch.
-    auto result3 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch3 = get<SuccessfulInsertion>(result3).batch;
+    auto batch3 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1, batch3) << batch1->toBSON() << batch3->toBSON();
     ASSERT_NE(batch2, batch3) << batch2->toBSON() << batch3->toBSON();
     ASSERT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
@@ -1105,9 +1146,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
 }
 
 TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
-    auto result =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch = get<SuccessfulInsertion>(result).batch;
+    auto batch = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch));
@@ -1119,16 +1159,14 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
 }
 
 TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
-    auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(_makeOperationContext().second.get(),
+                                             *_bucketCatalog,
+                                             _ns1,
+                                             _uuid1,
+                                             BSON(_timeField << Date_t::now()));
 
     // Batch 2 will not be able to commit until batch 1 has finished.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
@@ -1136,7 +1174,7 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
             "hangTimeSeriesBatchPrepareWaitingForConflictingOperation", [&]() {
-                ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
+                ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns1)));
             }};
 
         // Finish the first batch.
@@ -1149,23 +1187,20 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
-    auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(_makeOperationContext().second.get(),
+                                             *_bucketCatalog,
+                                             _ns1,
+                                             _uuid1,
+                                             BSON(_timeField << Date_t::now()));
 
-    auto result3 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()));
-    auto batch3 = get<SuccessfulInsertion>(result3).batch;
+    auto batch3 = _insertOneWithoutReopening(_makeOperationContext().second.get(),
+                                             *_bucketCatalog,
+                                             _ns1,
+                                             _uuid1,
+                                             BSON(_timeField << Date_t::now()));
 
     ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
     ASSERT_EQ(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
@@ -1194,23 +1229,20 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     ASSERT(isWriteBatchFinished(*batch2));
 
     // Make sure a new batch ends up in a new bucket.
-    auto result4 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch4 = get<SuccessfulInsertion>(result4).batch;
+    auto batch4 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch2->bucketId, batch4->bucketId) << batch2->toBSON() << batch4->toBSON();
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
-    auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(_makeOperationContext().second.get(),
+                                             *_bucketCatalog,
+                                             _ns1,
+                                             _uuid1,
+                                             BSON(_timeField << Date_t::now()));
 
     // Batch 1 and 2 use the same bucket.
     ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
@@ -1225,23 +1257,20 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
 
     // Ensure a batch started after batch 2 aborts, does not insert future measurements into the
     // aborted batch/bucket.
-    auto result3 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch3 = get<SuccessfulInsertion>(result3).batch;
+    auto batch3 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
-    auto result1 =
-        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto batch1 = get<SuccessfulInsertion>(result1).batch;
+    auto batch1 = _insertOneWithoutReopening(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
 
-    auto result2 = _insertOneHelper(_makeOperationContext().second.get(),
-                                    *_bucketCatalog,
-                                    _ns1,
-                                    _uuid1,
-                                    BSON(_timeField << Date_t::now()));
-    auto batch2 = get<SuccessfulInsertion>(result2).batch;
+    auto batch2 = _insertOneWithoutReopening(_makeOperationContext().second.get(),
+                                             *_bucketCatalog,
+                                             _ns1,
+                                             _uuid1,
+                                             BSON(_timeField << Date_t::now()));
 
     // Batch 2 is the first batch to commit the time field.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
@@ -1531,17 +1560,16 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     ASSERT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is compatible with the reopened bucket.
-    auto result =
-        _insertOneHelper(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _uuid1,
-                         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
+    auto batch = _insertOneWithoutReopening(
+        _opCtx,
+        *_bucketCatalog,
+        _ns1,
+        _uuid1,
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"));
 
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
-    auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
 
@@ -1578,17 +1606,16 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     ASSERT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is incompatible with the reopened bucket.
-    auto result =
-        _insertOneHelper(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _uuid1,
-                         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
+    auto batch = _insertOneWithoutReopening(
+        _opCtx,
+        *_bucketCatalog,
+        _ns1,
+        _uuid1,
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":{},"b":{}})"));
 
     ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
-    auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
 
@@ -2015,9 +2042,8 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
     auto time = Date_t::now();
     // Insert a measurement to create a bucket.
-    auto result = _insertOneHelper(
+    auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
-    auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT(batch);
 
     auto doc = BSON(_timeField << time << _metaField << "B");
@@ -2043,9 +2069,8 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
 
     // We should see bucket collision that gets retried, leading to the insert eventually
     // succeeding.
-    result = _insertOneHelper(
+    auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "B"));
-    auto batch2 = get<SuccessfulInsertion>(result).batch;
     ASSERT_NE(nextBucketId, batch2->bucketId) << batch2->toBSON();
     // We should check that the bucketID that we failed to create is not stored in the stripe.
     ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
@@ -2054,9 +2079,8 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
 TEST_F(BucketCatalogTest, WriteConflictIfPrepareCommitOnClearedBucket) {
     auto time = Date_t::now();
     // Set up an insert to create a bucket.
-    auto result = _insertOneHelper(
+    auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
-    auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT(batch);
 
     directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId);
@@ -2070,9 +2094,8 @@ TEST_F(BucketCatalogTest, WriteConflictIfPrepareCommitOnClearedBucket) {
 TEST_F(BucketCatalogTest, WriteConflictIfDirectWriteOnPreparedBucket) {
     auto time = Date_t::now();
 
-    auto result = _insertOneHelper(
+    auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
-    auto batch = get<SuccessfulInsertion>(result).batch;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
 
     // A direct write on a prepared bucket will throw a write conflict.
@@ -2083,11 +2106,10 @@ TEST_F(BucketCatalogTest, WriteConflictIfDirectWriteOnPreparedBucket) {
 
 TEST_F(BucketCatalogTest, DirectWritesCanStack) {
     auto time = Date_t::now();
-    auto result = _insertOneHelper(
+    // The batch can be used for both, as it is only used to obtain the bucketId.
+    auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
 
-    // The batch can be used for both, as it is only used to obtain the bucketId.
-    auto batch = get<SuccessfulInsertion>(result).batch;
     directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId);
     directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId);
 
