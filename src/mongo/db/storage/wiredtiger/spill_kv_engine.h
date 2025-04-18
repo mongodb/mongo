@@ -91,12 +91,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& collOptions,
-        StringData ident,
-        const IndexConfig& config) override {
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                const NamespaceString& nss,
+                                                                const UUID& uuid,
+                                                                StringData ident,
+                                                                const IndexConfig& config,
+                                                                KeyFormat keyFormat) override {
         MONGO_UNREACHABLE;
     }
 
@@ -133,11 +133,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status createSortedDataInterface(RecoveryUnit&,
-                                     const NamespaceString& nss,
-                                     const CollectionOptions& collOptions,
-                                     StringData ident,
-                                     const IndexConfig& config) override {
+    Status createSortedDataInterface(
+        RecoveryUnit&,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        StringData ident,
+        const IndexConfig& indexConfig,
+        const boost::optional<mongo::BSONObj>& storageEngineOptions) override {
         MONGO_UNREACHABLE;
     }
 

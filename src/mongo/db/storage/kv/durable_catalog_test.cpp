@@ -277,7 +277,7 @@ protected:
         getDurableCatalog()->putMetaData(operationContext(), catalogId, *md);
 
         ASSERT_OK(getDurableCatalog()->createIndex(
-            operationContext(), catalogId, nss, {}, descriptor.toIndexConfig()));
+            operationContext(), catalogId, nss, {.uuid = UUID::gen()}, descriptor.toIndexConfig()));
         idxIdent = getDurableCatalog()->getIndexIdent(
             operationContext(), catalogId, descriptor.indexName());
 

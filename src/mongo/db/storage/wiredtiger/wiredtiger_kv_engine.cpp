@@ -69,9 +69,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
-#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_names.h"
@@ -1757,17 +1755,19 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     return std::move(ret);
 }
 
-Status WiredTigerKVEngine::createSortedDataInterface(RecoveryUnit& ru,
-                                                     const NamespaceString& nss,
-                                                     const CollectionOptions& collOptions,
-                                                     StringData ident,
-                                                     const IndexConfig& indexConfig) {
+Status WiredTigerKVEngine::createSortedDataInterface(
+    RecoveryUnit& ru,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    StringData ident,
+    const IndexConfig& indexConfig,
+    const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) {
 
     std::string collIndexOptions;
 
-    if (auto storageEngineOptions = collOptions.indexOptionDefaults.getStorageEngine()) {
+    if (storageEngineIndexOptions) {
         collIndexOptions = ::mongo::bson::extractElementAtDottedPath(
-                               *storageEngineOptions, _canonicalName + ".configString")
+                               *storageEngineIndexOptions, _canonicalName + ".configString")
                                .str();
     }
 
@@ -1792,7 +1792,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(RecoveryUnit& ru,
         2,
         "WiredTigerKVEngine::createSortedDataInterface uuid: {collection_uuid} ident: {ident} "
         "config: {config}",
-        "collection_uuid"_attr = collOptions.uuid,
+        logAttrs(uuid),
         "ident"_attr = ident,
         "config"_attr = config);
     auto ensuredIdent = _ensureIdentPath(ident);
@@ -1830,31 +1830,29 @@ Status WiredTigerKVEngine::dropSortedDataInterface(RecoveryUnit& ru, StringData 
 std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionOptions& collOptions,
+    const UUID& uuid,
     StringData ident,
-    const IndexConfig& config) {
-    invariant(collOptions.uuid);
+    const IndexConfig& config,
+    KeyFormat keyFormat) {
 
     bool isReplSet = getGlobalReplSettings().isReplSet();
     bool shouldRecoverFromOplogAsStandalone =
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
 
     if (config.isIdIndex) {
-        invariant(!collOptions.clusteredIndex);
         return std::make_unique<WiredTigerIdIndex>(
             opCtx,
             WiredTigerUtil::buildTableUri(ident),
-            *collOptions.uuid,
+            uuid,
             ident,
             config,
             WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone));
     }
-    auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
     if (config.unique) {
         return std::make_unique<WiredTigerIndexUnique>(
             opCtx,
             WiredTigerUtil::buildTableUri(ident),
-            *collOptions.uuid,
+            uuid,
             ident,
             keyFormat,
             config,
@@ -1864,7 +1862,7 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
     return std::make_unique<WiredTigerIndexStandard>(
         opCtx,
         WiredTigerUtil::buildTableUri(ident),
-        *collOptions.uuid,
+        uuid,
         ident,
         keyFormat,
         config,

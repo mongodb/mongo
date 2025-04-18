@@ -105,9 +105,11 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
 
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto desc = entry->descriptor();
+    auto keyFormat =
+        collectionOptions.clusteredIndex.has_value() ? KeyFormat::String : KeyFormat::Long;
     auto makeSDI = [&] {
         return engine->getSortedDataInterface(
-            opCtx, nss, collectionOptions, ident, desc->toIndexConfig());
+            opCtx, nss, *collectionOptions.uuid, ident, desc->toIndexConfig(), keyFormat);
     };
     const std::string& type = desc->getAccessMethodName();
 

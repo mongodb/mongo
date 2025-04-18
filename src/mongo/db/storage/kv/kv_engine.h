@@ -104,12 +104,12 @@ public:
                                                                  StringData ident,
                                                                  KeyFormat keyFormat) = 0;
 
-    virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& collOptions,
-        StringData ident,
-        const IndexConfig& config) = 0;
+    virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                        const NamespaceString& nss,
+                                                                        const UUID& uuid,
+                                                                        StringData ident,
+                                                                        const IndexConfig& config,
+                                                                        KeyFormat keyFormat) = 0;
 
     /**
      * The create and drop methods on KVEngine are not transactional. Transactional semantics
@@ -211,11 +211,13 @@ public:
 
     virtual bool underCachePressure() = 0;
 
-    virtual Status createSortedDataInterface(RecoveryUnit&,
-                                             const NamespaceString& nss,
-                                             const CollectionOptions& collOptions,
-                                             StringData ident,
-                                             const IndexConfig& config) = 0;
+    virtual Status createSortedDataInterface(
+        RecoveryUnit&,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        StringData ident,
+        const IndexConfig& indexConfig,
+        const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) = 0;
 
     /**
      * Similar to createSortedDataInterface but this imports from an existing table with the

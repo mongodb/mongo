@@ -89,11 +89,13 @@ public:
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;
 
-    Status createSortedDataInterface(RecoveryUnit&,
-                                     const NamespaceString& nss,
-                                     const CollectionOptions& collOptions,
-                                     StringData ident,
-                                     const IndexConfig& config) override {
+    Status createSortedDataInterface(
+        RecoveryUnit&,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        StringData ident,
+        const IndexConfig& indexConfig,
+        const boost::optional<mongo::BSONObj>& storageEngineOptions) override {
         return Status::OK();
     }
 
@@ -101,12 +103,12 @@ public:
         return Status::OK();
     }
 
-    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& collOptions,
-        StringData ident,
-        const IndexConfig& config) override;
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                const NamespaceString& nss,
+                                                                const UUID& uuid,
+                                                                StringData ident,
+                                                                const IndexConfig& config,
+                                                                KeyFormat keyFormat) override;
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,

@@ -359,17 +359,20 @@ public:
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;
 
-    Status createSortedDataInterface(RecoveryUnit&,
-                                     const NamespaceString& ns,
-                                     const CollectionOptions& collOptions,
-                                     StringData ident,
-                                     const IndexConfig& config) override;
-    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx,
+    Status createSortedDataInterface(
+        RecoveryUnit&,
         const NamespaceString& nss,
-        const CollectionOptions& collOptions,
+        const UUID& uuid,
         StringData ident,
-        const IndexConfig& config) override;
+        const IndexConfig& indexConfig,
+        const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) override;
+
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                const NamespaceString& nss,
+                                                                const UUID& uuid,
+                                                                StringData ident,
+                                                                const IndexConfig& config,
+                                                                KeyFormat keyFormat) override;
 
     /**
      * panicOnCorruptWtMetadata - determines whether WT should panic or error upon corrupt metadata

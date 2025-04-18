@@ -318,9 +318,16 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(engine->createSortedDataInterface(
-            *shard_role_details::getRecoveryUnit(opCtx.get()), nss, options, ident, config));
-        sorted = engine->getSortedDataInterface(opCtx.get(), nss, options, ident, config);
+        ASSERT_OK(
+            engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx.get()),
+                                              nss,
+                                              *options.uuid,
+                                              ident,
+                                              config,
+                                              options.indexOptionDefaults.getStorageEngine()));
+        auto keyFormat = options.clusteredIndex.has_value() ? KeyFormat::String : KeyFormat::Long;
+        sorted = engine->getSortedDataInterface(
+            opCtx.get(), nss, *options.uuid, ident, config, keyFormat);
         ASSERT(sorted);
     }
 

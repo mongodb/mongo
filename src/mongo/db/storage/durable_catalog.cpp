@@ -507,8 +507,14 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
                                    const IndexConfig& indexConfig) {
     std::string ident = getIndexIdent(opCtx, catalogId, indexConfig.indexName);
 
-    Status status = _engine->createSortedDataInterface(
-        *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, indexConfig);
+    invariant(collOptions.uuid);
+    Status status =
+        _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
+                                           nss,
+                                           *collOptions.uuid,
+                                           ident,
+                                           indexConfig,
+                                           collOptions.indexOptionDefaults.getStorageEngine());
     if (status.isOK()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
@@ -664,8 +670,13 @@ Status DurableCatalog::dropAndRecreateIndexIdentForResume(OperationContext* opCt
     if (!status.isOK())
         return status;
 
-    status = _engine->createSortedDataInterface(
-        *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, indexConfig);
+    invariant(collOptions.uuid);
+    status = _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
+                                                nss,
+                                                *collOptions.uuid,
+                                                ident,
+                                                indexConfig,
+                                                collOptions.indexOptionDefaults.getStorageEngine());
 
     return status;
 }

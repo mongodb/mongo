@@ -79,12 +79,12 @@ public:
                                                 const CollectionOptions& options) override {
         return {};
     }
-    std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const CollectionOptions& collOptions,
-        StringData ident,
-        const IndexConfig& config) override {
+    std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                const NamespaceString& nss,
+                                                                const UUID& uuid,
+                                                                StringData ident,
+                                                                const IndexConfig& config,
+                                                                KeyFormat keyFormat) override {
         return nullptr;
     }
 
@@ -107,11 +107,13 @@ public:
                                                           KeyFormat keyFormat) override {
         return {};
     }
-    Status createSortedDataInterface(RecoveryUnit&,
-                                     const NamespaceString& nss,
-                                     const CollectionOptions& collOptions,
-                                     StringData ident,
-                                     const IndexConfig& config) override {
+    Status createSortedDataInterface(
+        RecoveryUnit&,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        StringData ident,
+        const IndexConfig& indexConfig,
+        const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) override {
         return Status::OK();
     }
     Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override {
