@@ -95,7 +95,7 @@ public:
         }
     }
 
-    Bucket& createBucket(InsertContext& info, Date_t time) {
+    Bucket& createBucket(BatchedInsertContext& info, Date_t time) {
         auto ptr = &internal::allocateBucket(*this,
                                              *stripes[info.stripeNumber],
                                              withLock,
@@ -176,18 +176,27 @@ public:
     BucketKey bucketKey3{uuid3, bucketMetadata};
     Date_t date = Date_t::now();
     TimeseriesOptions options;
-    InsertContext info1{std::move(bucketKey1),
-                        internal::getStripeNumber(*this, bucketKey1),
-                        options,
-                        internal::getOrInitializeExecutionStats(*this, uuid1)};
-    InsertContext info2{std::move(bucketKey2),
-                        internal::getStripeNumber(*this, bucketKey2),
-                        options,
-                        internal::getOrInitializeExecutionStats(*this, uuid2)};
-    InsertContext info3{std::move(bucketKey3),
-                        internal::getStripeNumber(*this, bucketKey3),
-                        options,
-                        internal::getOrInitializeExecutionStats(*this, uuid3)};
+    ExecutionStatsController stats1 = internal::getOrInitializeExecutionStats(*this, uuid1);
+    ExecutionStatsController stats2 = internal::getOrInitializeExecutionStats(*this, uuid1);
+    ExecutionStatsController stats3 = internal::getOrInitializeExecutionStats(*this, uuid1);
+    std::vector<BatchedInsertTuple> measurementsTimesAndIndices1;
+    std::vector<BatchedInsertTuple> measurementsTimesAndIndices2;
+    std::vector<BatchedInsertTuple> measurementsTimesAndIndices3;
+    BatchedInsertContext info1{bucketKey1,
+                               internal::getStripeNumber(*this, bucketKey1),
+                               options,
+                               stats1,
+                               measurementsTimesAndIndices1};
+    BatchedInsertContext info2{bucketKey2,
+                               internal::getStripeNumber(*this, bucketKey2),
+                               options,
+                               stats2,
+                               measurementsTimesAndIndices2};
+    BatchedInsertContext info3{bucketKey3,
+                               internal::getStripeNumber(*this, bucketKey3),
+                               options,
+                               stats3,
+                               measurementsTimesAndIndices3};
 };
 
 

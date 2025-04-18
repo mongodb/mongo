@@ -90,9 +90,6 @@ protected:
                  const std::shared_ptr<WriteBatch>& batch,
                  uint16_t numPreviouslyCommittedMeasurements,
                  size_t expectedBatchSize = 1);
-    void _insertOneAndCommit(const NamespaceString& ns,
-                             const UUID& uuid,
-                             uint16_t numPreviouslyCommittedMeasurements);
 
     std::shared_ptr<bucket_catalog::WriteBatch> _insertOneWithoutReopening(
         OperationContext* opCtx,
@@ -120,8 +117,6 @@ protected:
     BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
 
     RolloverReason _rolloverReason(const std::shared_ptr<WriteBatch>& batch);
-
-    void _testUseBucketSkipsConflictingBucket(std::function<void(BucketCatalog&, Bucket&)>);
 
     void _testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
                                           const BSONObj& expectedMetadata);
@@ -203,24 +198,6 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
                                       &insertOps,
                                       &updateOps);
     finish(*_bucketCatalog, batch);
-}
-
-void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
-                                            const UUID& uuid,
-                                            uint16_t numPreviouslyCommittedMeasurements) {
-    auto time = Date_t::now();
-    auto insertContextAndTime = uassertStatusOK(
-        prepareInsert(*_bucketCatalog, uuid, _getTimeseriesOptions(ns), BSON(_timeField << time)));
-
-    auto result = insert(*_bucketCatalog,
-                         _getCollator(ns),
-                         BSON(_timeField << time),
-                         _opCtx->getOpID(),
-                         std::get<InsertContext>(insertContextAndTime),
-                         std::get<Date_t>(insertContextAndTime),
-                         _storageCacheSizeBytes);
-    auto& batch = get<SuccessfulInsertion>(result).batch;
-    _commit(ns, batch, numPreviouslyCommittedMeasurements);
 }
 
 std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithoutReopening(
@@ -370,8 +347,6 @@ StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket
                                         metadata,
                                         metaFieldName}};
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
-    auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
-    InsertContext insertContext{key, stripeNumber, *options, stats};
     auto validator = [opCtx = _opCtx, &coll](const BSONObj& bucketDoc) -> auto {
         return coll->checkValidation(opCtx, bucketDoc);
     };
@@ -379,12 +354,12 @@ StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket
 
     return internal::rehydrateBucket(*_bucketCatalog,
                                      bucketDoc,
-                                     insertContext.key,
-                                     insertContext.options,
+                                     key,
+                                     *options,
                                      era,
                                      coll->getDefaultCollator(),
                                      validator,
-                                     insertContext.stats);
+                                     stats);
 }
 
 Status BucketCatalogTest::_reopenBucket(
@@ -414,8 +389,6 @@ Status BucketCatalogTest::_reopenBucket(
                                  metaFieldName}});
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
     auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
-    InsertContext insertContext{key, stripeNumber, *options, stats};
-
     // Validate the bucket document against the schema.
     auto validator =
         documentValidator.value_or([opCtx = _opCtx, &coll](const BSONObj& bucketDoc) -> auto {
@@ -425,29 +398,24 @@ Status BucketCatalogTest::_reopenBucket(
 
     auto res = internal::rehydrateBucket(*_bucketCatalog,
                                          bucketDoc,
-                                         insertContext.key,
-                                         insertContext.options,
+                                         key,
+                                         *options,
                                          era,
                                          coll->getDefaultCollator(),
                                          validator,
-                                         insertContext.stats);
+                                         stats);
     if (!res.isOK()) {
         return res.getStatus();
     }
     auto bucket = std::move(res.getValue());
 
     // Register the reopened bucket with the catalog.
-    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
+    auto& stripe = *_bucketCatalog->stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     era = loadBucketIntoCatalogEra.value_or(getCurrentEra(_bucketCatalog->bucketStateRegistry));
-    return internal::loadBucketIntoCatalog(*_bucketCatalog,
-                                           stripe,
-                                           stripeLock,
-                                           insertContext.stats,
-                                           insertContext.key,
-                                           std::move(bucket),
-                                           era)
+    return internal::loadBucketIntoCatalog(
+               *_bucketCatalog, stripe, stripeLock, stats, key, std::move(bucket), era)
         .getStatus();
 }
 
@@ -456,42 +424,6 @@ RolloverReason BucketCatalogTest::_rolloverReason(const std::shared_ptr<WriteBat
         _bucketCatalog->stripes[internal::getStripeNumber(*_bucketCatalog, batch->bucketId)];
     auto& [key, bucket] = *stripe->openBucketsById.find(batch->bucketId);
     return bucket->rolloverReason;
-}
-
-void BucketCatalogTest::_testUseBucketSkipsConflictingBucket(
-    std::function<void(BucketCatalog&, Bucket&)> makeBucketConflict) {
-    BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
-
-    Bucket& bucket1 = internal::allocateBucket(*_bucketCatalog,
-                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                               WithLock::withoutLock(),
-                                               insertCtx.key,
-                                               insertCtx.options,
-                                               time,
-                                               nullptr,
-                                               insertCtx.stats);
-    makeBucketConflict(*_bucketCatalog, bucket1);
-
-    Bucket& bucket2 = internal::allocateBucket(*_bucketCatalog,
-                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                               WithLock::withoutLock(),
-                                               insertCtx.key,
-                                               insertCtx.options,
-                                               time,
-                                               nullptr,
-                                               insertCtx.stats);
-
-    ASSERT_EQ(&bucket2,
-              internal::useBucket(*_bucketCatalog,
-                                  *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                  WithLock::withoutLock(),
-                                  insertCtx,
-                                  time,
-                                  nullptr));
 }
 
 void BucketCatalogTest::_testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
@@ -829,127 +761,142 @@ TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
-    auto insertContextAndTime1 = uassertStatusOK(prepareInsert(
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
-        _getTimeseriesOptions(_ns1),
-        BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1)))));
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1)))},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
+    auto batchedInsertContexts2 = write_ops::internal::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
-        _getTimeseriesOptions(_ns1),
-        BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0)))));
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0)))},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Check metadata in buckets.
-    ASSERT_EQ(std::get<InsertContext>(insertContextAndTime1),
-              std::get<InsertContext>(insertContextAndTime2));
+    ASSERT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
-    auto insertContextAndTime1 = uassertStatusOK(prepareInsert(
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
-        _getTimeseriesOptions(_ns1),
-        BSON(_timeField << Date_t::now() << _metaField
-                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
-                                                          << BSON("f" << 1 << "g" << 0)))))));
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField
+                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
+                                                           << BSON("f" << 1 << "g" << 0)))))},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
+    auto batchedInsertContexts2 = write_ops::internal::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
-        _getTimeseriesOptions(_ns1),
-        BSON(_timeField << Date_t::now() << _metaField
-                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
-                                                          << BSON("g" << 0 << "f" << 1)))))));
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField
+                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
+                                                           << BSON("g" << 0 << "f" << 1)))))},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Check metadata in buckets.
-    ASSERT_EQ(std::get<InsertContext>(insertContextAndTime1),
-              std::get<InsertContext>(insertContextAndTime2));
+    ASSERT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
 }
 
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
-    auto insertContextAndTime1 = uassertStatusOK(prepareInsert(
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
-        _getTimeseriesOptions(_ns1),
-        BSON(_timeField << Date_t::now() << _metaField
-                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
-                                                          << BSON_ARRAY("123" << "456")))))));
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField
+                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
+                                                           << BSON_ARRAY("123" << "456")))))},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
+    auto batchedInsertContexts2 = write_ops::internal::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
-        _getTimeseriesOptions(_ns1),
-        BSON(_timeField << Date_t::now() << _metaField
-                        << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
-                                                          << BSON_ARRAY("123" << "456")))))));
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField
+                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
+                                                           << BSON_ARRAY("123" << "456")))))},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Check metadata in buckets.
-    ASSERT_EQ(std::get<InsertContext>(insertContextAndTime1),
-              std::get<InsertContext>(insertContextAndTime2));
+    ASSERT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
 }
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
-    auto insertContextAndTime1 =
-        uassertStatusOK(prepareInsert(*_bucketCatalog,
-                                      _uuid1,
-                                      _getTimeseriesOptions(_ns1),
-                                      BSON(_timeField << Date_t::now() << _metaField << BSONNULL)));
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
+        *_bucketCatalog,
+        _uuid1,
+        timeseriesOptions,
+        {BSON(_timeField << Date_t::now() << _metaField << BSONNULL)},
+        /*startIndex=*/0,
+        /*numDocsToStage=*/1,
+        /*docsToRetry=*/{},
+        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
-        *_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), BSON(_timeField << Date_t::now())));
-
+    auto batchedInsertContexts2 =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {BSON(_timeField << Date_t::now())},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Inserts should all be into two distinct buckets.
-    ASSERT_NE(std::get<InsertContext>(insertContextAndTime1),
-              std::get<InsertContext>(insertContextAndTime2));
+    ASSERT_NE(batchedInsertCtx1.key, batchedInsertCtx2.key);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
-                      std::get<InsertContext>(insertContextAndTime1).key.metadata.toBSON());
-    ASSERT(std::get<InsertContext>(insertContextAndTime2).key.metadata.toBSON().isEmpty());
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL), batchedInsertCtx1.key.metadata.toBSON());
+    ASSERT(batchedInsertCtx2.key.metadata.toBSON().isEmpty());
 }
 
-TEST_F(BucketCatalogTest, NumCommittedMeasurementsAccumulates) {
-    // The numCommittedMeasurements returned when committing should accumulate as more entries in
-    // the bucket are committed.
-    _insertOneAndCommit(_ns1, _uuid1, 0);
-    _insertOneAndCommit(_ns1, _uuid1, 1);
-
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
-}
-
-TEST_F(BucketCatalogTest, ClearNamespaceBuckets) {
-    _insertOneAndCommit(_ns1, _uuid1, 0);
-    _insertOneAndCommit(_ns2, _uuid2, 0);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
-    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
-
-    // Clearing the UUID does not immediately remove tracking from the bucket catalog as this is
-    // async.
-    clear(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
-    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
-
-    _insertOneAndCommit(_ns1, _uuid1, 0);
-    _insertOneAndCommit(_ns2, _uuid2, 1);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
-    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
-}
-
-TEST_F(BucketCatalogTest, DropNamespaceBuckets) {
-    _insertOneAndCommit(_ns1, _uuid1, 0);
-    _insertOneAndCommit(_ns2, _uuid2, 0);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumActiveBuckets));
-    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
-
-    // Dropping the UUID immediately remove tracking from the bucket catalog.
-    drop(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumActiveBuckets));
-    ASSERT_EQ(1, _getExecutionStat(_uuid2, kNumActiveBuckets));
-}
 
 TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
     auto batch1 = _insertOneWithoutReopening(
@@ -2047,16 +1994,28 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     ASSERT(batch);
 
     auto doc = BSON(_timeField << time << _metaField << "B");
-    // Get the insertContext so that we can get the key signature for the BucketID — again, to
-    // trigger a collision of our frozen bucketID with the bucketID of the bucket we will allocate.
-    auto insertContext = std::get<InsertContext>(
-        uassertStatusOK(prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), doc)));
+    // Get the batchedInsertContexts so that we can get the key signature for the BucketID - again,
+    // to trigger a collision of our frozen bucketID with the bucketID of the bucket we will
+    // allocate.
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {doc},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx = batchedInsertContexts[0];
 
     // Get the next sequential OID so that we can trigger an ID collision down the line.
-    auto OIDAndRoundedTime = internal::generateBucketOID(time, insertContext.options);
+    auto OIDAndRoundedTime = internal::generateBucketOID(time, batchedInsertCtx.options);
     OID nextBucketOID = std::get<OID>(OIDAndRoundedTime);
 
-    BucketId nextBucketId{_uuid1, nextBucketOID, insertContext.key.signature()};
+    BucketId nextBucketId{_uuid1, nextBucketOID, batchedInsertCtx.key.signature()};
 
     // Mark the next bucketID as being frozen. We could arrive at this state if there was a bucket
     // that we tried reopening that was not compressed, and was also corrupted; when we try to
@@ -2129,24 +2088,6 @@ TEST_F(BucketCatalogTest, DirectWritesCanStack) {
     ASSERT_EQ(std::get<BucketState>(*bucketState), BucketState::kCleared);
 }
 
-TEST_F(BucketCatalogTest, UseBucketSkipsBucketWithDirectWrite) {
-    _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
-        directWriteStart(catalog.bucketStateRegistry, bucket.bucketId);
-    });
-}
-
-TEST_F(BucketCatalogTest, UseBucketSkipsClearedBucket) {
-    _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
-        clear(catalog, bucket.bucketId.collectionUUID);
-    });
-}
-
-TEST_F(BucketCatalogTest, UseBucketSkipsFrozenBucket) {
-    _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
-        freezeBucket(catalog.bucketStateRegistry, bucket.bucketId);
-    });
-}
-
 TEST_F(BucketCatalogTest, FindOpenBucketsEmptyCatalog) {
     auto dummyBucketKey =
         BucketKey(_uuid1,
@@ -2162,101 +2103,147 @@ TEST_F(BucketCatalogTest, FindOpenBucketsEmptyCatalog) {
 }
 
 TEST_F(BucketCatalogTest, FindOpenBucketsReturnsBucket) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
-    auto openBuckets = internal::findOpenBuckets(
-        *_bucketCatalog->stripes[insertCtx.stripeNumber], WithLock::withoutLock(), insertCtx.key);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
+    auto openBuckets =
+        internal::findOpenBuckets(*_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                  WithLock::withoutLock(),
+                                  batchedInsertCtx.key);
     ASSERT_EQ(1, openBuckets.size());
     ASSERT_EQ(&bucket, openBuckets[0]);
 }
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     directWriteStart(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
 
     // Ineligible for inserts. Remove from 'openBucketsByKey'.
     ASSERT(internal::isBucketStateEligibleForInsertsAndCleanup(
                *_bucketCatalog,
-               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+               *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                WithLock::withoutLock(),
                &bucket) == internal::BucketStateForInsertAndCleanup::kInsertionConflict);
-    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+    ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
 }
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithClearedBucket) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     clear(*_bucketCatalog, bucket.bucketId.collectionUUID);
 
     // Ineligible for inserts. Remove from 'openBucketsByKey'.
     ASSERT(internal::isBucketStateEligibleForInsertsAndCleanup(
                *_bucketCatalog,
-               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+               *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                WithLock::withoutLock(),
                &bucket) == internal::BucketStateForInsertAndCleanup::kInsertionConflict);
-    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+    ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
 }
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithFrozenBucket) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     freezeBucket(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
 
     // Ineligible for inserts. Remove from 'openBucketsByKey'.
     ASSERT(internal::isBucketStateEligibleForInsertsAndCleanup(
                *_bucketCatalog,
-               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+               *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                WithLock::withoutLock(),
                &bucket) == internal::BucketStateForInsertAndCleanup::kInsertionConflict);
-    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+    ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
@@ -2565,29 +2552,41 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     auto bucketOpenedDueToMetadata = true;
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                   *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                    WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   batchedInsertCtx.key,
+                                   measurementTimestamp,
+                                   Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                    allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
@@ -2597,30 +2596,42 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     auto bucketOpenedDueToMetadata = true;
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     bucket.rolloverReason = RolloverReason::kTimeForward;
     AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                   *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                    WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   batchedInsertCtx.key,
+                                   measurementTimestamp,
+                                   Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                    allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
@@ -2630,30 +2641,42 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     auto bucketOpenedDueToMetadata = true;
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     bucket.rolloverReason = RolloverReason::kTimeForward;
     AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                   *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                    WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time + Hours(2),
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   batchedInsertCtx.key,
+                                   measurementTimestamp + Hours(2),
+                                   Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                    allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
@@ -2662,30 +2685,42 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     auto bucketOpenedDueToMetadata = true;
 
-    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                              WithLock::withoutLock(),
-                                              insertCtx.key,
-                                              insertCtx.options,
-                                              time,
-                                              nullptr,
-                                              insertCtx.stats);
+    Bucket& bucket =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     bucket.rolloverReason = RolloverReason::kTimeBackward;
     AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                   *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                    WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   batchedInsertCtx.key,
+                                   measurementTimestamp,
+                                   Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                    allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
@@ -2695,10 +2730,21 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     std::vector<RolloverReason> allHardClosedRolloverReasons = {RolloverReason::kCount,
                                                                 RolloverReason::kSchemaChange,
                                                                 RolloverReason::kCachePressure,
@@ -2706,38 +2752,50 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
 
     for (size_t i = 0; i < allHardClosedRolloverReasons.size(); i++) {
         auto bucketOpenedDueToMetadata = true;
-        Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                                  *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                                  WithLock::withoutLock(),
-                                                  insertCtx.key,
-                                                  insertCtx.options,
-                                                  time,
-                                                  nullptr,
-                                                  insertCtx.stats);
+        Bucket& bucket =
+            internal::allocateBucket(*_bucketCatalog,
+                                     *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                     WithLock::withoutLock(),
+                                     batchedInsertCtx.key,
+                                     batchedInsertCtx.options,
+                                     measurementTimestamp,
+                                     nullptr,
+                                     batchedInsertCtx.stats);
 
         bucket.rolloverReason = allHardClosedRolloverReasons[i];
         AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
         auto potentialBuckets =
             findAndRolloverOpenBuckets(*_bucketCatalog,
-                                       *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                       *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                        WithLock::withoutLock(),
-                                       insertCtx.key,
-                                       time,
-                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                       batchedInsertCtx.key,
+                                       measurementTimestamp,
+                                       Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                        allowQueryBasedReopening,
                                        bucketOpenedDueToMetadata);
         ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
-        ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+        ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
         ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
     }
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     std::vector<RolloverReason> allHardClosedRolloverReasons = {RolloverReason::kCount,
                                                                 RolloverReason::kSchemaChange,
                                                                 RolloverReason::kCachePressure,
@@ -2745,14 +2803,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
 
     for (size_t i = 0; i < allHardClosedRolloverReasons.size(); i++) {
         auto bucketOpenedDueToMetadata = true;
-        Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
-                                                  *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                                  WithLock::withoutLock(),
-                                                  insertCtx.key,
-                                                  insertCtx.options,
-                                                  time,
-                                                  nullptr,
-                                                  insertCtx.stats);
+        Bucket& bucket =
+            internal::allocateBucket(*_bucketCatalog,
+                                     *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                     WithLock::withoutLock(),
+                                     batchedInsertCtx.key,
+                                     batchedInsertCtx.options,
+                                     measurementTimestamp,
+                                     nullptr,
+                                     batchedInsertCtx.stats);
 
         bucket.rolloverReason = allHardClosedRolloverReasons[i];
         std::shared_ptr<WriteBatch> batch;
@@ -2761,56 +2820,69 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
         AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
         auto potentialBuckets =
             findAndRolloverOpenBuckets(*_bucketCatalog,
-                                       *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                       *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                        WithLock::withoutLock(),
-                                       insertCtx.key,
-                                       time,
-                                       Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                       batchedInsertCtx.key,
+                                       measurementTimestamp,
+                                       Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                        allowQueryBasedReopening,
                                        bucketOpenedDueToMetadata);
 
         // No results returned. Do not close the bucket because of uncommitted batches.
         ASSERT(!bucketOpenedDueToMetadata);
         ASSERT_EQ(0, potentialBuckets.size());
-        ASSERT(!_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+        ASSERT(!_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
         ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
     }
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
-    ASSERT_OK(swResult);
-    auto& [insertCtx, time] = swResult.getValue();
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts =
+        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
+                                                        _uuid1,
+                                                        timeseriesOptions,
+                                                        {_measurement},
+                                                        /*startIndex=*/0,
+                                                        /*numDocsToStage=*/1,
+                                                        /*docsToRetry=*/{},
+                                                        errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
     auto bucketOpenedDueToMetadata = true;
 
-    Bucket& bucket1 = internal::allocateBucket(*_bucketCatalog,
-                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                               WithLock::withoutLock(),
-                                               insertCtx.key,
-                                               insertCtx.options,
-                                               time,
-                                               nullptr,
-                                               insertCtx.stats);
+    Bucket& bucket1 =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
     bucket1.rolloverReason = RolloverReason::kTimeBackward;
 
-    Bucket& bucket2 = internal::allocateBucket(*_bucketCatalog,
-                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
-                                               WithLock::withoutLock(),
-                                               insertCtx.key,
-                                               insertCtx.options,
-                                               time,
-                                               nullptr,
-                                               insertCtx.stats);
+    Bucket& bucket2 =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 nullptr,
+                                 batchedInsertCtx.stats);
 
     AllowQueryBasedReopening allowQueryBasedReopening = AllowQueryBasedReopening::kAllow;
     auto potentialBuckets =
         findAndRolloverOpenBuckets(*_bucketCatalog,
-                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                   *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
                                    WithLock::withoutLock(),
-                                   insertCtx.key,
-                                   time,
-                                   Seconds(*insertCtx.options.getBucketMaxSpanSeconds()),
+                                   batchedInsertCtx.key,
+                                   measurementTimestamp,
+                                   Seconds(*batchedInsertCtx.options.getBucketMaxSpanSeconds()),
                                    allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
