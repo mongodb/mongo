@@ -151,6 +151,29 @@ public:
         ASSERT_EQ(succeeded, counters.succeeded);
     }
 
+    void assertNumOpsSoon(uint64_t canceled,
+                          uint64_t timedOut,
+                          uint64_t failed,
+                          uint64_t succeeded,
+                          Milliseconds timeout,
+                          long long period = 100) {
+        ClockSource::StopWatch stopwatch;
+        NetworkInterface::Counters counters;
+        while (stopwatch.elapsed() < timeout) {
+            counters = net().getCounters();
+            if (counters.canceled == canceled && counters.timedOut == timedOut &&
+                counters.failed == failed && counters.succeeded == succeeded) {
+                break;
+            }
+            sleepmillis(period);
+        }
+
+        ASSERT_EQ(canceled, counters.canceled);
+        ASSERT_EQ(timedOut, counters.timedOut);
+        ASSERT_EQ(failed, counters.failed);
+        ASSERT_EQ(succeeded, counters.succeeded);
+    }
+
     void setUp() override {
         startNet();
     }
@@ -727,7 +750,10 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     ASSERT_GTE(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
     ASSERT_LT(result.elapsed.value(), requestTimeout);
     ASSERT_EQ(result.target, fixture().getServers().front());
-    assertNumOps(0u, 1u, 0u, 0u);
+
+    // Sleep has timed out but _killOperations may still be running. We can't use
+    // waitForCommandToStop since there is no guarantee when _killOperations starts.
+    assertNumOpsSoon(0u, 1u, 0u, 1u, kMaxWait);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
@@ -770,7 +796,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     ASSERT_LT(duration_cast<Milliseconds>(result.elapsed.value() + networkStartCommandDelay),
               opCtxDeadline);
 
-    assertNumOps(0u, 1u, 0u, 0u);
+    // Sleep has timed out but _killOperations may still be running. We can't use
+    // waitForCommandToStop since there is no guarantee when _killOperations starts.
+    assertNumOpsSoon(0u, 1u, 0u, 1u, kMaxWait);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, StartCommand) {
