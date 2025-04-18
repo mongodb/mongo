@@ -15,8 +15,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const databaseName = "my-database";
 const collectionName = "my-collection";
 
-function generateFindCommand(maxTimeMS) {
-    return {find: collectionName, maxTimeMS: maxTimeMS};
+function generateFindCommand(options = {}) {
+    return {find: collectionName, ...options};
 }
 
 const st = new ShardingTest({shards: 1, mongos: 1});
@@ -26,7 +26,7 @@ const collection = database.getCollection(collectionName);
 assert.commandWorked(
     database.runCommand({create: collection.getName(), writeConcern: {w: "majority"}}));
 
-assert.commandWorked(database.runCommand(generateFindCommand(1000)));
+assert.commandWorked(database.runCommand(generateFindCommand()));
 
 // Mimic 1 second connection acquisition timeout via fail point.
 const failpoint =
@@ -34,7 +34,7 @@ const failpoint =
 
 // We test that connection acquisition errors are rewritten to MaxTimeMSExpired due to the user
 // provided maxTimeMS.
-assert.commandFailedWithCode(database.runCommand(generateFindCommand(1000)),
+assert.commandFailedWithCode(database.runCommand(generateFindCommand({maxTimeMS: 1000})),
                              ErrorCodes.MaxTimeMSExpired);
 
 failpoint.off();
