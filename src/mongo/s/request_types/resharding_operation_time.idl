@@ -36,9 +36,40 @@ imports:
 
 commands:
     _shardsvrReshardingOperationTime:
-        description: "An internal command to query the operation time for participant shards."
+        description: "An internal command to query the operation time for recipient shards."
         command_name: _shardsvrReshardingOperationTime
         strict: true
         namespace: type
         api_version: ""
         type: namespacestring
+
+structs:
+    ShardsvrReshardingOperationTimeResponse:
+        description: >-
+            The response for the _shardsvrReshardingOperationTime command.
+        strict: false
+        fields:
+            elapsedMillis:
+                description:
+                    The amount of time the resharding operation has been running on this recipient
+                    shard.
+                type: milliseconds
+                validator:
+                    gte: 0
+                optional: true
+            remainingMillis:
+                description:
+                    The estimated amount of time this recipient shard needs to apply the remaining
+                    oplog entries.
+                type: milliseconds
+                validator:
+                    gte: 0
+                optional: true
+            majorityReplicationLagMillis:
+                description:
+                    The amount of time between the last applied optime on the primary node on this
+                    recipient shard and the last majority committed optime.
+                type: milliseconds
+                validator:
+                    gte: 0
+                optional: true

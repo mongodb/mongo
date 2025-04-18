@@ -31,6 +31,7 @@ export var ReshardingTest = class {
         periodicNoopIntervalSecs: periodicNoopIntervalSecs = undefined,
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
+        chainingAllowed: chainingAllowed = true,
         logComponentVerbosity: logComponentVerbosity = undefined,
         oplogSize: oplogSize = undefined,
         maxNumberOfTransactionOperationsInSingleOplogEntry:
@@ -63,6 +64,8 @@ export var ReshardingTest = class {
         this._writePeriodicNoops = writePeriodicNoops;
         /** @private */
         this._enableElections = enableElections;
+        /** @private */
+        this._chainingAllowed = chainingAllowed;
         /** @private */
         this._logComponentVerbosity = logComponentVerbosity;
         this._oplogSize = oplogSize;
@@ -132,8 +135,14 @@ export var ReshardingTest = class {
 
             // Increase the likelihood that writes which aren't yet majority-committed end up
             // getting rolled back.
-            rsOptions.settings = {catchUpTimeoutMillis: 0};
-            configReplSetTestOptions.settings = {catchUpTimeoutMillis: 0};
+            rsOptions.settings = {
+                catchUpTimeoutMillis: 0,
+                chainingAllowed: this._chainingAllowed,
+            };
+            configReplSetTestOptions.settings = {
+                catchUpTimeoutMillis: 0,
+                chainingAllowed: this._chainingAllowed,
+            };
 
             rsOptions.setParameter.enableElectionHandoff = 0;
             configOptions.setParameter.enableElectionHandoff = 0;

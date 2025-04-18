@@ -60,27 +60,8 @@ namespace {
 class ShardsvrReshardingOperationTimeCmd final
     : public TypedCommand<ShardsvrReshardingOperationTimeCmd> {
 public:
-    class OperationTime {
-    public:
-        explicit OperationTime(boost::optional<Milliseconds> elapsedMillis,
-                               boost::optional<Milliseconds> remainingMillis)
-            : _elapsedMillis{elapsedMillis}, _remainingMillis{remainingMillis} {}
-        void serialize(BSONObjBuilder* bob) const {
-            if (_elapsedMillis) {
-                bob->append("elapsedMillis", _elapsedMillis->count());
-            }
-            if (_remainingMillis) {
-                bob->append("remainingMillis", _remainingMillis->count());
-            }
-        }
-
-    private:
-        boost::optional<Milliseconds> _elapsedMillis;
-        boost::optional<Milliseconds> _remainingMillis;
-    };
-
     using Request = _shardsvrReshardingOperationTime;
-    using Response = OperationTime;
+    using Response = ShardsvrReshardingOperationTimeResponse;
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -126,13 +107,23 @@ public:
             auto instances = resharding::getReshardingStateMachines<
                 ReshardingRecipientService,
                 ReshardingRecipientService::RecipientStateMachine>(opCtx, ns());
+
             if (instances.empty()) {
-                return Response{boost::none, boost::none};
+                return {};
             }
+
             invariant(instances.size() == 1);
             const auto& metrics = instances[0]->getMetrics();
-            return Response{duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs()),
-                            metrics.getHighEstimateRemainingTimeMillis()};
+            const auto elapsedTime =
+                duration_cast<Milliseconds>(metrics.getOperationRunningTimeSecs());
+            const auto remainingTime = metrics.getHighEstimateRemainingTimeMillis();
+            const auto majorityReplicationLag = resharding::getMajorityReplicationLag(opCtx);
+
+            Response response;
+            response.setElapsedMillis(elapsedTime);
+            response.setRemainingMillis(remainingTime);
+            response.setMajorityReplicationLagMillis(majorityReplicationLag);
+            return response;
         }
     };
 };

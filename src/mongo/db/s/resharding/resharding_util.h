@@ -402,5 +402,11 @@ boost::optional<ReshardingCoordinatorDocument> tryGetCoordinatorDoc(OperationCon
 ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
                                                 const UUID& reshardingUUID);
 
+/**
+ * To be called on a primary only. Returns the amount of time between the last applied optime on the
+ * primary and the last majority committed optime.
+ */
+Milliseconds getMajorityReplicationLag(OperationContext* opCtx);
+
 }  // namespace resharding
 }  // namespace mongo
