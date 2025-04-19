@@ -71,7 +71,7 @@ server_parameters:
         # If the user doesn't set a default, let wiredtiger choose one.
         default: 0
         validator:
-            gte: 60
+            gte: 1
             lte: 100000
         redact: false
 
