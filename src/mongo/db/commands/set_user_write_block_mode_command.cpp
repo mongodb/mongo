@@ -112,14 +112,14 @@ public:
                     UserWritesRecoverableCriticalSectionService::get(opCtx)
                         ->acquireRecoverableCriticalSectionBlockingUserWrites(
                             opCtx,
-                            UserWritesRecoverableCriticalSectionService::
-                                kGlobalUserWritesNamespace);
+                            UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace,
+                            request().getReason());
                 } else {
                     UserWritesRecoverableCriticalSectionService::get(opCtx)
                         ->releaseRecoverableCriticalSection(
                             opCtx,
-                            UserWritesRecoverableCriticalSectionService::
-                                kGlobalUserWritesNamespace);
+                            UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace,
+                            request().getReason());
                 }
             }
 

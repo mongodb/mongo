@@ -245,6 +245,7 @@ public:
         }
         {
             auto state = UserWriteBlockState::kUnknown;
+            auto reason = UserWritesBlockReasonEnum::kUnspecified;
             // Try to lock. If we fail (i.e. lock is already held in write mode), don't read the
             // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
             Lock::GlobalLock lk(
@@ -259,8 +260,11 @@ public:
                 state = GlobalUserWriteBlockState::get(opCtx)->isUserWriteBlockingEnabled(opCtx)
                     ? UserWriteBlockState::kEnabled
                     : UserWriteBlockState::kDisabled;
+                reason = GlobalUserWriteBlockState::get(opCtx)->getUserWriteBlockingReason(opCtx);
             }
             result.append("userWriteBlockMode", state);
+            result.append("userWriteBlockReason", reason);
+            GlobalUserWriteBlockState::get(opCtx)->appendUserWriteBlockModeCounters(result);
         }
 
         return result.obj();

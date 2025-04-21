@@ -150,9 +150,18 @@ idl_generator(
 )
 
 idl_generator(
+    name = "user_writes_block_reason_gen",
+    src = "user_writes_block_reason.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "user_writes_critical_section_document_gen",
     src = "user_writes_critical_section_document.idl",
     deps = [
+        ":user_writes_block_reason_gen",
         "//src/mongo/db:basic_types_gen",
     ],
 )
@@ -497,6 +506,14 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:shard_role",
         "//src/mongo/s:analyze_shard_key_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_writes_block_reason_idl",
+    srcs = ["user_writes_block_reason_gen"],
+    deps = [
+        "//src/mongo/db:server_base",
     ],
 )
 

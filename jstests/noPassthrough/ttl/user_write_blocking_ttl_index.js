@@ -69,7 +69,7 @@ function runTest(conn, testCase) {
                     "code": ErrorCodes.UserWritesBlocked,
                     "codeName": "UserWritesBlocked",
                     "errmsg":
-                        "Plan executor error during delete :: caused by :: User writes blocked"
+                        "Plan executor error during delete :: caused by :: User writes blocked, reason: Unspecified"
                 }
             });
         }

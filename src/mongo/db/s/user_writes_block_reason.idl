@@ -1,4 +1,4 @@
-# Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2025-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,36 +26,17 @@
 # it in the license file.
 #
 
-# This file defines the format of documents stored in config.user_writes_critical_sections.
-# Each document is used to represent that user writes are blocked, for a particular collection or
-# globally.
-
 global:
     cpp_namespace: "mongo"
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/s/user_writes_block_reason.idl"
 
-structs:
-    userWriteBlockingCriticalSectionDocument:
-        description: "Represents an ongoing user-writes blocking critical section."
-        generate_comparison_operators: false
-        strict: false
-        fields:
-            _id:
-                type: namespacestring
-                description:
-                    "The namespace of the collection that is under the collection critical
-                    section. Empty namespacestring indicates global write blocking to all
-                    collections."
-                cpp_name: nss
-            blockNewUserShardedDDL:
-                type: bool
-                default: false
-            blockUserWrites:
-                type: bool
-                default: false
-            blockUserWritesReason:
-                type: UserWritesBlockReason
-                optional: true
+enums:
+    UserWritesBlockReason:
+        description: The reason for blocking writes on the cluster.
+        type: string
+        values:
+            kUnspecified: "Unspecified"
+            kClusterToClusterMigrationInProgress: "ClusterToClusterMigrationInProgress"
+            kDiskUseThresholdExceeded: "DiskUseThresholdExceeded"

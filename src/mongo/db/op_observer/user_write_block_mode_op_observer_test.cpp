@@ -341,7 +341,8 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     Lock::GlobalLock lock(opCtx.get(), MODE_X);
 
     // Enable blocking and ensure bypass is disabled
-    GlobalUserWriteBlockState::get(opCtx.get())->enableUserWriteBlocking(opCtx.get());
+    GlobalUserWriteBlockState::get(opCtx.get())
+        ->enableUserWriteBlocking(opCtx.get(), UserWritesBlockReasonEnum::kUnspecified);
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure user writes now fail, while non-user writes still succeed
@@ -369,7 +370,8 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     Lock::GlobalLock lock(opCtx.get(), MODE_X);
 
     // Enable blocking and enable bypass
-    GlobalUserWriteBlockState::get(opCtx.get())->enableUserWriteBlocking(opCtx.get());
+    GlobalUserWriteBlockState::get(opCtx.get())
+        ->enableUserWriteBlocking(opCtx.get(), UserWritesBlockReasonEnum::kUnspecified);
     auto authSession = AuthorizationSession::get(opCtx->getClient());
     authSession->grantInternalAuthorization();
     ASSERT(authSession->mayBypassWriteBlockingMode());

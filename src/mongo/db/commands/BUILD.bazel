@@ -437,6 +437,7 @@ idl_generator(
     src = "set_user_write_block_mode.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/s:user_writes_block_reason_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
@@ -888,6 +889,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/s:user_writes_block_reason_idl",
     ],
 )
 
