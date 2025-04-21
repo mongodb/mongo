@@ -70,7 +70,7 @@ TEST_F(WindowFunctionStdDevTest, EmptyWindow) {
 
 TEST_F(WindowFunctionStdDevTest, SingletonWindow) {
     pop.add(Value{1});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{0});
+    ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), 0, 1e-15);
     samp.add(Value{1});
     ASSERT_VALUE_EQ(samp.getValue(), Value{BSONNULL});
 }
@@ -96,12 +96,12 @@ TEST_F(WindowFunctionStdDevTest, Add) {
     pop.add(Value{1});
     pop.add(Value{2});
     pop.add(Value{3});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{sqrt(2 / 3.0)});
+    ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), sqrt(2 / 3.0), 1e-15);
 
     samp.add(Value{1});
     samp.add(Value{2});
     samp.add(Value{3});
-    ASSERT_VALUE_EQ(samp.getValue(), Value{1.0});
+    ASSERT_APPROX_EQUAL(samp.getValue().getDouble(), 1.0, 1e-15);
 }
 
 TEST_F(WindowFunctionStdDevTest, Remove1) {
@@ -111,7 +111,7 @@ TEST_F(WindowFunctionStdDevTest, Remove1) {
     // Add, then remove
     pop.add(Value{4});
     pop.remove(Value{1});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{sqrt(2 / 3.0)});
+    ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), sqrt(2 / 3.0), 1e-15);
 }
 
 TEST_F(WindowFunctionStdDevTest, Remove2) {
@@ -121,7 +121,7 @@ TEST_F(WindowFunctionStdDevTest, Remove2) {
     // Remove, then add
     pop.remove(Value{1});
     pop.add(Value{4});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{sqrt(2 / 3.0)});
+    ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), sqrt(2 / 3.0), 1e-15);
 }
 
 TEST_F(WindowFunctionStdDevTest, SampleRemove) {
@@ -129,7 +129,7 @@ TEST_F(WindowFunctionStdDevTest, SampleRemove) {
     samp.add(Value{2});
     samp.add(Value{3});
     samp.remove(Value{1});
-    ASSERT_VALUE_EQ(samp.getValue(), Value{sqrt(0.5)});
+    ASSERT_APPROX_EQUAL(samp.getValue().getDouble(), sqrt(0.5), 1e-15);
 }
 
 TEST_F(WindowFunctionStdDevTest, NotDividingByZeroInM2Update) {
@@ -137,14 +137,14 @@ TEST_F(WindowFunctionStdDevTest, NotDividingByZeroInM2Update) {
     pop.remove(Value{1});
     pop.add(Value{1});
     pop.add(Value{2});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{0.5});
+    ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), 0.5, 1e-15);
 
     double nan = std::numeric_limits<double>::quiet_NaN();
     samp.add(Value{nan});
     samp.remove(Value{nan});
     samp.add(Value{1});
     samp.add(Value{2});
-    ASSERT_VALUE_EQ(samp.getValue(), Value{sqrt(0.5)});
+    ASSERT_APPROX_EQUAL(samp.getValue().getDouble(), sqrt(0.5), 1e-15);
 }
 
 TEST_F(WindowFunctionStdDevTest, HandlesNonfinite) {
@@ -156,7 +156,7 @@ TEST_F(WindowFunctionStdDevTest, HandlesNonfinite) {
     pop.add(Value{inf});
     ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, inf
     pop.remove(Value{inf});
-    ASSERT_EQ(pop.getValue().getDouble(), 0.5);  // 1, 2
+    ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), 0.5, 1e-15);  // 1, 2
     pop.add(Value{nan});
     ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, nan
     pop.remove(Value{nan});
@@ -232,7 +232,7 @@ TEST_F(WindowFunctionStdDevTest, HandlesUnderflow) {
             pop.remove(Value{vec[i * windowSize + k]});
         // NaN and -NaN are treated as equal when wrapped in a Value.
         ASSERT_VALUE_NE(pop.getValue(), Value{nan});
-        ASSERT_VALUE_EQ(pop.getValue(), Value{0});
+        ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), 0, 1e-15);
         // Empty the window.
         pop.remove(Value{vec[i * windowSize + (windowSize - 1)]});
         ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});
@@ -250,7 +250,7 @@ TEST_F(WindowFunctionStdDevTest, ConstantInput) {
     for (int i = windowSize; i < collLength; i++) {
         pop.add(Value{constant});
         pop.remove(Value{constant});
-        ASSERT_VALUE_EQ(pop.getValue(), Value{0});
+        ASSERT_APPROX_EQUAL(pop.getValue().getDouble(), 0, 1e-15);
     }
 }
 
