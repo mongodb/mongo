@@ -870,6 +870,7 @@ error_codes:
       categories: [InternalOnly],
     }
   - {code: 447, name: ObjectAlreadyExists, categories: [InternalOnly]}
+  - {code: 448, name: StreamProcessorAtlasReadError}
 
   # Error codes 4000-8999 are reserved.
 
