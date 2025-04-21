@@ -28,8 +28,9 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
     assert.neq(null, conn, 'Client was unable to connect to the load balancer port');
     assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
 
-    const fcv = conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    if (fcv === latestFCV) {
+    const fcv = assert.commandWorked(
+        st.configRS.getPrimary().adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+    if (fcv.featureCompatibilityVersion.version === latestFCV) {
         assert(checkLog.checkContainsOnceJsonStringMatch(st.s, 22943, "isLoadBalanced", "true"),
                "isLoadBalanced was set to false");
         assert(checkLog.checkContainsOnceJsonStringMatch(
