@@ -35,13 +35,16 @@
 namespace mongo {
 
 /**
- * The $querySettings stage is an alias for a $queue stage containing all QueryShapeConfigurations
- * stored in 'querySettings' cluster parameter, followed by an optional $addFields stage.
+ * The $querySettings stage returns all QueryShapeConfigurations stored in the cluster.
  */
-class DocumentSourceQuerySettings final {
+class DocumentSourceQuerySettings final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$querySettings"_sd;
     static constexpr StringData kDebugQueryShapeFieldName = "debugQueryShape"_sd;
+    static const Id& id;
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -84,6 +87,10 @@ public:
         const PrivilegeVector _privileges;
     };
 
+    DocumentSourceQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                std::vector<query_settings::QueryShapeConfiguration> configs,
+                                bool showDebugQueryShape);
+
     /**
      * Returns the stage constraints used to override 'DocumentSourceQueue'. The 'kLocalOnly' host
      * type requirement is needed to ensure that the reported query settings are consistent with
@@ -91,7 +98,7 @@ public:
      * report configurations which are present on 'mongod' instances, but not yet present on
      * 'mongos' ones and consequently won't be enforced.
      */
-    static StageConstraints constraints() {
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints{DocumentSource::StreamType::kStreaming,
                                      DocumentSource::PositionRequirement::kFirst,
                                      DocumentSource::HostTypeRequirement::kLocalOnly,
@@ -105,8 +112,29 @@ public:
         return constraints;
     }
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    const char* getSourceName() const final {
+        return kStageName.rawData();
+    }
+
+    Id getId() const override {
+        return id;
+    }
+
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+        return boost::none;
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+
+private:
+    GetNextResult doGetNext() final;
+
+    std::vector<query_settings::QueryShapeConfiguration> _configs;
+    std::vector<query_settings::QueryShapeConfiguration>::const_iterator _iterator;
+
+    bool _showDebugQueryShape;
 };
 
 }  // namespace mongo

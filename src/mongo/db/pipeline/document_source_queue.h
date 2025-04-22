@@ -169,8 +169,8 @@ protected:
     // to indicate the name the user provided, not the internal $queue name.
     boost::optional<StringData> _stageNameOverride = boost::none;
 
-    // An optional value provided for cases like '$querySettings' and '$indexStats' where it's
-    // desireable to serialize the stage as something other than '$queue'.
+    // An optional value provided for cases like '$indexStats' where it's desireable to serialize
+    // the stage as something other than '$queue'.
     boost::optional<Value> _serializeOverride = boost::none;
 
     // An optional 'StageConstraints' override useful for cases such as '$indexStats' where fine
