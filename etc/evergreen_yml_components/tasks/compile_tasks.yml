@@ -54,6 +54,7 @@ variables:
       - func: "save failed unittests"
       - func: "save bazel headers"
       - func: "save bazel jvm dump"
+      - func: "save bazel exec logs"
       - func: "save hang analyzer debugger files"
       - func: "save disk statistics"
       - func: "save system resource information"

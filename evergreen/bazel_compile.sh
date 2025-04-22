@@ -85,6 +85,22 @@ if [ "${build_mongot}" = "true" ]; then
   bazel_args="${bazel_args} --include_mongot=True"
 fi
 
+# This is hacky way to pass off build time from archive_dist_test to archive_dist_test_debug
+# We create stripped binaries in archive_dist_test to avoid link time due to debug symbols
+# We then create the symbols normally in archive_dist_test_debug. We have to force the
+# build-id for debugging as they will be different when -Wl,-S is passed in.
+# The relinked binaries should still be hash identical when stripped with strip
+if [ "${skip_debug_link}" = "true" ]; then
+  export compile_variant="${compile_variant}"
+  export version_id="${version_id}"
+  if [ "${task_name}" = "archive_dist_test" ]; then
+    task_compile_flags="${task_compile_flags} --simple_build_id=True --linkopt='-Wl,-S' --separate_debug=False"
+  fi
+  if [ "${task_name}" = "archive_dist_test_debug" ]; then
+    task_compile_flags="${task_compile_flags} --simple_build_id=True"
+  fi
+fi
+
 set -o pipefail
 
 # Use `eval` to force evaluation of the environment variables in the echo statement:

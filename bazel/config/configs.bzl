@@ -392,6 +392,20 @@ compress_debug_compile = rule(
 )
 
 # =========
+# simple_build_id
+# =========
+
+simple_build_id_provider = provider(
+    doc = "Replace linker build-id with a simpler one based off output file name.",
+    fields = ["enabled"],
+)
+
+simple_build_id = rule(
+    implementation = lambda ctx: simple_build_id_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # detect_odr_violations
 # =========
 

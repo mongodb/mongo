@@ -94,6 +94,7 @@ buildvariants:
       download_mongot_release: true
       compile_variant: *amazon-linux2023-arm64-static-compile
       evergreen_remote_exec: on
+      skip_debug_link: true
     tasks:
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG

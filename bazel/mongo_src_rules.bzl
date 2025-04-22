@@ -32,6 +32,7 @@ load(
     "extract_debuginfo_test",
 )
 load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
+load("@evergreen_variables//:evergreen_variables.bzl", "UNSAFE_COMPILE_VARIANT", "UNSAFE_VERSION_ID")
 
 # These will throw an error if the following condition is not met:
 # (libunwind == on && os == linux) || libunwind == off || libunwind == auto
@@ -814,6 +815,9 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//bazel/config:bolt_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//conditions:default": [],
+        }) + select({
+            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x%x%x" % (hash(name), hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+            "//conditions:default": [],
         }),
         "linkstatic": LINKSTATIC_ENABLED,
         "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
@@ -821,6 +825,9 @@ def _mongo_cc_binary_and_test(
         "includes": includes,
         "features": SKIP_ARCHIVE_FEATURE + ["-pic", "pie"] + features + select({
             "//bazel/config:windows_debug_symbols_enabled": ["generate_pdb_file"],
+            "//conditions:default": [],
+        }) + select({
+            "//bazel/config:simple_build_id_enabled": ["-build_id"],
             "//conditions:default": [],
         }),
         "dynamic_deps": select({

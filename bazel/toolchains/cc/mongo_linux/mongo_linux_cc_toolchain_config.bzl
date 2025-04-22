@@ -1067,9 +1067,6 @@ def _impl(ctx):
             flag_set(
                 actions = all_link_actions,
                 flag_groups = [flag_group(flags = [
-                    # Explicitly enable GNU build id's if the linker supports it.
-                    "-Wl,--build-id",
-
                     # Explicitly use the new gnu hash section if the linker offers it.
                     "-Wl,--hash-style=gnu",
 
@@ -1083,6 +1080,20 @@ def _impl(ctx):
 
                     # If possible with the current linker, mark relocations as read-only.
                     "-Wl,-z,relro",
+                ])],
+            ),
+        ],
+    )
+
+    build_id_feature = feature(
+        name = "build_id",
+        enabled = ctx.attr.compiler == COMPILERS.CLANG or ctx.attr.compiler == COMPILERS.GCC,
+        flag_sets = [
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = [
+                    # Explicitly enable GNU build id's if the linker supports it.
+                    "-Wl,--build-id",
                 ])],
             ),
         ],
@@ -1210,6 +1221,7 @@ def _impl(ctx):
         compress_debug_sections_feature,
         rdynamic_feature,
         global_libs_feature,
+        build_id_feature,
     ]
 
     return [

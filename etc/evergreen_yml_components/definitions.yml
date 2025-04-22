@@ -2560,6 +2560,19 @@ functions:
       content_type: application/gzip
       display_name: Bazel JVM dump
 
+  "save bazel exec logs":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/bazel_exec.log
+      content_type: application/octet-stream
+      remote_file: ${project}/${build_variant}/${revision}/artifacts/bazel-exec.log.${build_id}-${task_name}.${execution}
+      bucket: mciuploads
+      permissions: public-read
+      display_name: Bazel exec log
+
   ### Attach report & artifacts ###
   "create bazel test report":
     command: subprocess.exec

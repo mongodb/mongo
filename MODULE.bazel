@@ -176,3 +176,7 @@ register_toolchains(
 setup_local_host_values = use_repo_rule("//bazel/platforms:local_host_values.bzl", "setup_local_host_values")
 
 setup_local_host_values(name = "local_host_values")
+
+setup_evergreen_variables = use_repo_rule("//bazel/repository_rules:evergreen_variables.bzl", "setup_evergreen_variables")
+
+setup_evergreen_variables(name = "evergreen_variables")

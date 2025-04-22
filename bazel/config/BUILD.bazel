@@ -35,6 +35,7 @@ load(
     "separate_debug",
     "server_js",
     "shared_archive",
+    "simple_build_id",
     "skip_archive",
     "spider_monkey_dbg",
     "ssl",
@@ -2645,6 +2646,22 @@ selects.config_setting_group(
         ":linux_gcc",
         ":compress_debug_compile_disabled",
     ],
+)
+
+# --------------------------------------
+# simple_build_id
+# --------------------------------------
+
+bool_flag(
+    name = "simple_build_id",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "simple_build_id_enabled",
+    flag_values = {
+        "//bazel/config:simple_build_id": "True",
+    },
 )
 
 # --------------------------------------
