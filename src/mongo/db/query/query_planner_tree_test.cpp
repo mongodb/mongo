@@ -3142,6 +3142,14 @@ TEST_F(QueryPlannerTest, NoEOFForHintedIndex) {
         BSON("three" << 1));
 }
 
+BSONObj combineBson(const std::vector<BSONObj>& inputs) {
+    BSONObj result;
+    for (const auto& input : inputs) {
+        result = result.addFields(input);
+    }
+    return result;
+};
+
 /**
  * Given N collections of BSONObjs, first take the cartesian product of all collections, then for
  * each member of the cartesian product, find all permutations.
@@ -3169,13 +3177,6 @@ TEST_F(QueryPlannerTest, NoEOFForHintedIndex) {
  * possible sort values for a query.
  */
 auto getBsonPermutations(const auto&... inputRanges) {
-    static constexpr auto combineBson = [](const std::vector<BSONObj>& inputs) {
-        BSONObj result;
-        for (const auto& input : inputs) {
-            result = result.addFields(input);
-        }
-        return result;
-    };
     std::set<BSONObj, SimpleBSONObjComparator::LessThan> results;
 
     for (const auto& valuesTuple : utils::cartesian_product(inputRanges...)) {
@@ -3200,6 +3201,20 @@ auto getBsonPermutations(const auto&... inputRanges) {
     return results;
 }
 
+auto getBsonCartesianProduct(const auto&... inputRanges) {
+    std::set<BSONObj, SimpleBSONObjComparator::LessThan> results;
+
+    for (const auto& valuesTuple : utils::cartesian_product(inputRanges...)) {
+        // The cartesian product results are a tuple; convert to a vector of BSONObjs.
+        auto values =
+            std::apply([](const auto&... values) { return std::vector{values...}; }, valuesTuple);
+
+        // insert to set
+        results.insert(combineBson(values));
+    }
+    return results;
+}
+
 TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchWithSortOrProj) {
     // Test with each of the following queries.
     static const auto queries = std::array{
@@ -3207,7 +3222,6 @@ TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchWithSortOrProj) {
         fromjson("{one: 1, $or:[{two:{$in:[]}}]}"),
         fromjson("{one: 1, $and:[{two:{$in:[]}}]}"),
     };
-
 
     // Test with all possible permutations of the following sorts.
     // This will include, for example, both {one:1, two:1} and {two:1, one:1}.
@@ -3221,11 +3235,10 @@ TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchWithSortOrProj) {
         // Sort on _id : <none>, forward, backward
         std::array{BSONObj(), BSON("_id" << 1), BSON("_id" << -1)});
 
-
-    // Test with all possible permutations of the following projections.
+    // Test with the cartesian product of the following projections.
     // Projections can't mix inclusion and exclusion, except for excluding _id.
     static const auto possibleProjectionValues = []() {
-        auto res = getBsonPermutations(
+        auto res = getBsonCartesianProduct(
             // Project on field "one" : <none>, included
             std::array{BSONObj(), BSON("one" << 1)},
             // Project on field "two" : <none>, included
@@ -3235,8 +3248,8 @@ TEST_F(QueryPlannerTest, EOFForTriviallyFalseMatchWithSortOrProj) {
             // Project on _id : <none>, included, excluded
             std::array{BSONObj(), BSON("_id" << 1), BSON("_id" << 0)});
 
-        // Test with all possible permutations of the following projections.
-        res.merge(getBsonPermutations(
+        // Test with the cartesian product of the following projections.
+        res.merge(getBsonCartesianProduct(
             // Project on field "one" : <none>, excluded
             std::array{BSONObj(), BSON("one" << 0)},
             // Project on field "two" : <none>, excluded
