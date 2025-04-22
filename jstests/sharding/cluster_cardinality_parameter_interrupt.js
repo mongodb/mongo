@@ -7,10 +7,7 @@
  * to be updated by the addShard command.
  *
  * @tags: [
- *   requires_fcv_80,
- *   # The behavior changed in terms of interrupting add shard, and this test reflects the new
- *   # behavior
- *   featureFlagUseTopologyChangeCoordinators,
+ *   requires_fcv_82,
  * ]
  */
 
