@@ -77,6 +77,11 @@ BSONObj makeExplainCommand(const BSONObj& initialCommand) {
     return explainCommandBuilder.obj();
 }
 
+std::string overrideOptionToTestTypeString(const OverrideOption overrideOption) {
+    uassert(10387102, "Unexpected override type", overrideOption == OverrideOption::QueryShapeHash);
+    return ":queryShapeHash";
+}
+
 BSONObj toBSONObj(const std::vector<BSONObj>& objs) {
     auto bob = BSONObjBuilder{};
     bob.append("res", objs.begin(), objs.end());
@@ -222,7 +227,8 @@ NormalizationOptsSet Test::parseResultType(const std::string& type) {
 Test Test::parseTest(std::fstream& fs,
                      const ModeOption mode,
                      const bool optimizationsOff,
-                     const size_t nextTestNum) {
+                     const size_t nextTestNum,
+                     const OverrideOption overrideOption) {
     auto lineFromFile = std::string{};
     tassert(9670404,
             "Expected file to be open and ready for reading, but it wasn't",
@@ -324,7 +330,8 @@ Test Test::parseTest(std::fstream& fs,
                     std::move(preQueryComments),
                     std::move(postQueryComments),
                     std::move(postTestComments),
-                    std::move(expectedResult));
+                    std::move(expectedResult),
+                    overrideOption);
     } else {
         // There is a newline at the end of every test case.
         postQueryComments = readAndAssertNewline(fs, "End of single test without results");
@@ -335,11 +342,18 @@ Test Test::parseTest(std::fstream& fs,
                     std::move(preTestComments),
                     std::move(preQueryComments),
                     std::move(postQueryComments),
-                    std::move(postTestComments));
+                    std::move(postTestComments),
+                    {} /* expectedResult */,
+                    overrideOption);
     }
 }
 
 void Test::parseTestQueryLine() {
+    // Override the test type if the override flag was passed.
+    if (_overrideOption != OverrideOption::None) {
+        _testLine = _testLine.replace(
+            0, _testLine.find(' '), overrideOptionToTestTypeString(_overrideOption));
+    }
     // First word is test type.
     const auto endTestType = _testLine.find(' ');
     _testType = parseResultType(_testLine.substr(0, endTestType));
@@ -415,6 +429,29 @@ ModeOption stringToModeOption(const std::string& modeString) {
         return itr->second;
     } else {
         uasserted(9670422, "Only valid options for --mode are 'run', 'compare', and 'normalize'");
+    }
+}
+
+OverrideOption stringToOverrideOption(const std::string& overrideString) {
+    static const auto kStringToOverrideOptionMap = std::map<std::string, OverrideOption>{
+        {"queryShapeHash", OverrideOption::QueryShapeHash},
+    };
+
+    if (auto itr = kStringToOverrideOptionMap.find(overrideString);
+        itr != kStringToOverrideOptionMap.end()) {
+        return itr->second;
+    }
+    uasserted(10387100, "Invalid override option: " + overrideString);
+}
+
+boost::optional<std::string> overrideOptionToExtensionPrefix(const OverrideOption overrideOption) {
+    switch (overrideOption) {
+        case OverrideOption::None:
+            return boost::none;
+        case OverrideOption::QueryShapeHash:
+            return std::string{".queryShapeHash"};
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 

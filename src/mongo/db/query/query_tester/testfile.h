@@ -56,11 +56,16 @@ inline constexpr auto kTmpFailureFile = "tmp_failed_queries";
 
 class QueryFile {
 public:
-    QueryFile(std::filesystem::path filePath, const bool optimizationsOff)
+    QueryFile(std::filesystem::path filePath,
+              const bool optimizationsOff,
+              const OverrideOption overrideOption = OverrideOption::None)
         : _filePath(filePath),
           _optimizationsOff(optimizationsOff),
-          _expectedPath(std::filesystem::path{filePath}.replace_extension(".results")),
-          _actualPath(std::filesystem::path{filePath}.replace_extension(".actual")),
+          _overrideOption(overrideOption),
+          _expectedPath(std::filesystem::path{filePath}.replace_extension(
+              overrideOptionToExtensionPrefix(_overrideOption).get_value_or("") + ".results")),
+          _actualPath(std::filesystem::path{filePath}.replace_extension(
+              overrideOptionToExtensionPrefix(_overrideOption).get_value_or("") + ".actual")),
           _failedQueryCount(0) {}
 
     // Delete certain constructors to avoid accidental I/O races.
@@ -155,6 +160,7 @@ protected:
     std::vector<Test> _tests;
     size_t _testsRun = 0;
     const bool _optimizationsOff;
+    const OverrideOption _overrideOption;
     std::filesystem::path _expectedPath;
     std::filesystem::path _actualPath;
     struct {

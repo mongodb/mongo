@@ -1,0 +1,19 @@
+testB
+test
+basic.coll as fuzzer_coll
+
+1
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {_id: {$lt: 0}}}], cursor: {}}
+[
+{"queryShapeHash":"7F8FC040CD08AF37584CE6381AEB0349B191E7A1A3000DDEC1133F7715316460"}
+]
+
+2
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit: -1}], cursor: {}}
+Failed to execute test number 2. Expected OK command result but got { ok: 0.0, errmsg: "invalid argument to $limit stage: Expected a non-negative number in: $limit: -1.0", code: 5107201, codeName: "Location5107201" }
+
+3
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit: 5}], cursor: {}}
+[
+{"queryShapeHash":"9B479A1A978ABC2E692C7FF12E1F8D743CE5751D4E670D1C25EDE33E4ADA88FB"}
+]

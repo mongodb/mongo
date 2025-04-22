@@ -74,7 +74,8 @@ std::string formatResultSet(const BSONObj& obj) {
 
 void moveResultsFile(const std::filesystem::path& actualPath,
                      const std::filesystem::path& filePath,
-                     const WriteOutOptions writeOutOpts) {
+                     const WriteOutOptions writeOutOpts,
+                     const boost::optional<std::string>& overrideExtensionPrefix) {
     switch (writeOutOpts) {
         case WriteOutOptions::kNone: {
             // Clean up.
@@ -84,7 +85,8 @@ void moveResultsFile(const std::filesystem::path& actualPath,
         case WriteOutOptions::kOnelineResult:
         case WriteOutOptions::kResult: {
             std::filesystem::rename(actualPath,
-                                    std::filesystem::path{filePath}.replace_extension(".results"));
+                                    std::filesystem::path{filePath}.replace_extension(
+                                        overrideExtensionPrefix.get_value_or("") + ".results"));
             break;
         }
     }
@@ -478,7 +480,7 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
     while (!fs.eof()) {
         auto currByteOffset = fs.tellg();
         try {
-            auto test = Test::parseTest(fs, mode, _optimizationsOff, nextTestNum);
+            auto test = Test::parseTest(fs, mode, _optimizationsOff, nextTestNum, _overrideOption);
             // The test number (localTestNum) from the file may differ from the expected sequence
             // (nextTestNum).
             auto localTestNum = test.getTestNum();
@@ -510,7 +512,7 @@ bool QueryFile::readInEntireFile(const ModeOption mode,
         const auto narrowedPath = std::filesystem::path{_expectedPath}.concat(".narrowed");
         auto narrowedStream = std::fstream{narrowedPath, std::ios::out | std::ios::trunc};
 
-        auto testsWithResults = QueryFile{_expectedPath, false};
+        auto testsWithResults = QueryFile{_expectedPath, false, _overrideOption};
         testsWithResults.readInEntireFile(ModeOption::Normalize, startRange, endRange);
         testsWithResults.writeOutAndNumber(narrowedStream, WriteOutOptions::kResult);
         narrowedStream.close();
@@ -601,7 +603,8 @@ bool QueryFile::writeAndValidate(const ModeOption mode,
         uassert(9670450,
                 "Must have run query file before writing out result file",
                 !includeResults || _testsRun == _tests.size() || _testsRun > 0);
-        moveResultsFile(_actualPath, _filePath, writeOutOpts);
+        moveResultsFile(
+            _actualPath, _filePath, writeOutOpts, overrideOptionToExtensionPrefix(_overrideOption));
         return _testsRun == _tests.size();
     }
 }

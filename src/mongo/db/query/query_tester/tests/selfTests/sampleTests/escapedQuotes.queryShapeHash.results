@@ -1,0 +1,99 @@
+escapedQuotes
+escapedQuotes
+escapedQuotes.coll as fuzzer_coll
+
+0
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$project: {a: 1, fieldLength: {$strLenCP: "$a"}}}], cursor: {}}
+[
+{"queryShapeHash":"BB14F977BA0124A4DE02C7FAD37A150A329EF4747A572AD06A756C7F006C8E0C"}
+]
+
+1
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: ""}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+2
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "Yippee!"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+3
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\""}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+4
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\"\""}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+5
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\"Yippee!\""}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+6
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: ''}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+7
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\''}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+8
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\'\''}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+9
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: '\'Yippee!\''}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+10
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\\"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+11
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\n"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+12
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\b"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+13
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\f"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+14
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\r"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]
+
+15
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$match: {a: "\t"}}], cursor: {}}
+[
+{"queryShapeHash":"655122DD76124BECDE5847F3185B5B79CB28C7E73229D2E6DF75A3057E1AA5A9"}
+]

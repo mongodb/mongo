@@ -1,0 +1,21 @@
+indexOptions
+indexOptions
+indexOptions.coll as fuzzer_coll
+
+0
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:5}], cursor: {}}
+[
+{"queryShapeHash":"72249F1616D48EA8D78237193AA67E9CDD96C70A32C7383D15FC1EB1E7B4AE90"}
+]
+
+1
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"queryShapeHash":"72249F1616D48EA8D78237193AA67E9CDD96C70A32C7383D15FC1EB1E7B4AE90"}
+]
+
+2
+:queryShapeHash {aggregate: "fuzzer_coll", pipeline: [{$limit:1}], cursor: {}}
+[
+{"queryShapeHash":"72249F1616D48EA8D78237193AA67E9CDD96C70A32C7383D15FC1EB1E7B4AE90"}
+]

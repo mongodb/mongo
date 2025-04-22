@@ -132,7 +132,8 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const bool optimizationsOff,
                    const bool populateAndExit,
                    const ErrorLogLevel errorLogLevel,
-                   const DiffStyle diffStyle) {
+                   const DiffStyle diffStyle,
+                   const OverrideOption overrideOption) {
     // Run the tests.
     auto versionInfo = MockVersionInfo{};
     auto conn = buildConn(uriString, &versionInfo, mode);
@@ -148,7 +149,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
     auto failedQueryCount = size_t{0};
     auto totalTestsRun = size_t{0};
     for (const auto& [testPath, startRange, endRange] : testsToRun) {
-        auto currFile = query_tester::QueryFile(testPath, optimizationsOff);
+        auto currFile = query_tester::QueryFile(testPath, optimizationsOff, overrideOption);
 
         // Treat data load errors as failures, too.
         try {
@@ -292,7 +293,8 @@ void printHelpString() {
         {"-t",
          "Test. This should be followed by a test name. This can appear "
          "multiple times to run multiple tests."},
-        {"-v (verbose)", "Appends a summary of failing queries to an unsuccessful test file run."}};
+        {"-v (verbose)", "Appends a summary of failing queries to an unsuccessful test file run."},
+        {"--override", "Follow with the test type override. Optional"}};
     for (const auto& [key, val] : kHelpMap) {
         std::cout << key << ": " << val << std::endl;
     }
@@ -317,6 +319,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto populateAndExit = false;
     auto verbose = false;
     auto diffStyle = DiffStyle::kWord;
+    auto overrideOption = OverrideOption::None;
     for (auto argNum = size_t{1}; argNum < parsedArgs.size(); ++argNum) {
         // Same order as in the help menu.
         if (parsedArgs[argNum] == "--diff") {
@@ -387,6 +390,10 @@ int queryTesterMain(const int argc, const char** const argv) {
             expectingNumAt = argNum + 1;
         } else if (parsedArgs[argNum] == "-v") {
             verbose = true;
+        } else if (parsedArgs[argNum] == "--override") {
+            assertNextArgExists(parsedArgs, argNum, "--override");
+            overrideOption = stringToOverrideOption(parsedArgs[argNum + 1]);
+            ++argNum;
         } else {
             exitWithError(1, std::string{"Unexpected argument "} + parsedArgs[argNum]);
         }
@@ -448,7 +455,8 @@ int queryTesterMain(const int argc, const char** const argv) {
                               optimizationsOff,
                               populateAndExit,
                               errorLogLevel,
-                              diffStyle);
+                              diffStyle,
+                              overrideOption);
     } catch (AssertionException& ex) {
         exitWithError(1, ex.reason());
     }

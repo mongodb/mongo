@@ -45,6 +45,10 @@ using shell_utils::NormalizationOptsSet;
 enum class ModeOption { Run, Compare, Normalize };
 ModeOption stringToModeOption(const std::string&);
 
+enum class OverrideOption { None, QueryShapeHash };
+OverrideOption stringToOverrideOption(const std::string&);
+boost::optional<std::string> overrideOptionToExtensionPrefix(OverrideOption);
+
 class Test {
 public:
     Test(const std::string& testLine,
@@ -55,9 +59,11 @@ public:
          std::vector<std::string>&& preQueryComments,
          std::vector<std::string>&& postQueryComments,
          std::vector<std::string>&& postTestComments,
-         std::vector<BSONObj>&& expectedResult = {})
+         std::vector<BSONObj>&& expectedResult = {},
+         const OverrideOption overrideOption = OverrideOption::None)
         : _testLine(testLine),
           _optimizationsOff(optimizationsOff),
+          _overrideOption(overrideOption),
           _testNum(testNum),
           _testName(testName),
           _comments({preTestComments, preQueryComments, postQueryComments, postTestComments}),
@@ -95,7 +101,8 @@ public:
     <result if result file>
     <----- End Test Format ----->
      */
-    static Test parseTest(std::fstream&, ModeOption, bool optimizationsOff, size_t nextTestNum);
+    static Test parseTest(
+        std::fstream&, ModeOption, bool optimizationsOff, size_t nextTestNum, OverrideOption);
 
     /**
      * Runs the test and records the result returned by the server.
@@ -112,6 +119,7 @@ private:
     void parseTestQueryLine();
     std::string _testLine;
     const bool _optimizationsOff;
+    const OverrideOption _overrideOption;
     size_t _testNum;
     boost::optional<std::string> _testName;
     struct {

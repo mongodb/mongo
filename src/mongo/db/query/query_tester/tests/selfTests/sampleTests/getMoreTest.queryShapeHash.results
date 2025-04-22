@@ -1,0 +1,21 @@
+getMoreTest
+getMoreData
+getMoreTest.coll
+
+0
+:queryShapeHash {aggregate: "getMoreTest", pipeline: [ { "$match": {} } ], cursor: {}}
+[
+{"queryShapeHash":"41FF8D56E4F281B3306DB6C453722054175FB6E2F2C183CEF73A2CCBFB42AD8F"}
+]
+
+1
+:queryShapeHash {aggregate: "getMoreTest", pipeline: [ { "$match": {} } ], cursor: {}}
+[
+{"queryShapeHash":"41FF8D56E4F281B3306DB6C453722054175FB6E2F2C183CEF73A2CCBFB42AD8F"}
+]
+
+2
+:queryShapeHash {aggregate: "getMoreTest", pipeline: [ { "$match": { "a": { "$ne": 102 } } } ], cursor: {}}
+[
+{"queryShapeHash":"5B5C4075C2C69B25BEDF818B2BC78EDE749438D9A5F5E5E3271D1D5BD254FE4B"}
+]

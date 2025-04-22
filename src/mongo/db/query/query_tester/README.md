@@ -50,6 +50,7 @@ To perform other operations, consult the table below.
 | --out [result, oneline]          | Only available in non-compare modes. **Result:** Generate a new '.results' file from the file being run, with each result in a test's result set appearing on a separate line. Will overwrite existing `.results` files. **Oneline:** Generate a new '.results' file from the file being run, with a test's entire result set appearing on one line. Will overwrite existing `.results` files. All of these apply to every file being run, and will add test numbers to tests if not already present. |
 | --populateAndExit                | Drops current data and loads documents and indexes per specification in the `*.test` file. No tests are run. `--drop` and `--load` are implicitly applied.                                                                                                                                                                                                                                                                                                                                            |
 | --diff [plain, word]             | Specify the type of diff to use when displaying result set differences. Defaults to word-based diff with color if not specified. It is recommended to use the default (`word`) if the terminal `query_tester` is being run in supports ANSI color codes for easier to read output. `plain` uses line based diff with no color.                                                                                                                                                                        |
+| --override [queryShapeHash]      | (Optional) Specify what override to use when running a test. When providing the `queryShapeHash` override, it uses the existing corpus of tests but runs explain of the original command instead, extracting the queryShapeHash and asserting that they match the corresponding `file.queryShapeHash.results` file.                                                                                                                                                                                   |
 
 ## File types and formats
 
@@ -89,6 +90,7 @@ The template is as follows:
 | :normalizeNulls               | Null, undefined, and missing will be considered the same. All documents in each set must appear in the other.                                                                                                            |
 | :normalizeNonNull             | Combination of :sortFull and :normalizeNumerics. All documents in each set must appear in the other.                                                                                                                     |
 | :normalizeFull                | Combination of :sortFull, :normalizeNumerics, and :normalizeNulls. All documents in each set must appear in the other. This is the widest normalization setting.                                                         |
+| :queryShapeHash               | Runs the given query as an explain command, extracts the queryShapeHash and asserts that it is the same as the as expected.                                                                                              |
 | :explain                      | Not yet implemented. We will eventually support some form of the explain command.                                                                                                                                        |
 
 ### .results
@@ -111,6 +113,8 @@ The template is as follows:
 ]
 ... further tests and results
 ```
+
+Some files have a `.queryShapeHash.results` extension. These are the expected results for the queryShapeHash test type, and they only contain the queryShapeHash, as in the `tests/manual_tests/example/testQueryShapeHash.queryShapeHash.results` example.
 
 ### .coll
 
