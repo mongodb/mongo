@@ -20,6 +20,9 @@ executor:
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
           setParameters:
             bsonTestValidationVersion: 1
+            logComponentVerbosity:
+              accessControl: 2
+              command: 2
       nodb: ""
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
       username: __system

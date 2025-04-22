@@ -35,6 +35,9 @@ executor:
         TestData:
           setParameters:
             bsonTestValidationVersion: 1
+            logComponentVerbosity:
+              accessControl: 2
+              command: 2
           auth: true
           #          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
