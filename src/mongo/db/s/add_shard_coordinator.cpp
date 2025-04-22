@@ -511,8 +511,6 @@ void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
     setFcvCmd.setDbName(DatabaseName::kAdmin);
     setFcvCmd.setFromConfigServer(true);
     generic_argument_util::setMajorityWriteConcern(setFcvCmd);
-    // TODO(SERVER-101740): Find out why this fails if we pass a session info
-    // generic_argument_util::setOperationSessionInfo(setFcvCmd, sessionInfo);
 
     uassertStatusOK(
         topology_change_helpers::runCommandForAddShard(

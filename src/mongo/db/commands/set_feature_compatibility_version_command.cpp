@@ -527,6 +527,12 @@ public:
         uassert(5563600,
                 "'phase' field is only valid to be specified on shards",
                 !request.getPhase() || (role && role->has(ClusterRole::ShardServer)));
+        // TODO (SERVER-97816): Remove feature flag check once 9.0 becomes last lts.
+        uassert(
+            1034131,
+            "'phase' field must be present on shards",
+            !feature_flags::gUseTopologyChangeCoordinators.isEnabledOnVersion(requestedVersion) ||
+                request.getPhase() || (!role || !role->hasExclusively(ClusterRole::ShardServer)));
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
