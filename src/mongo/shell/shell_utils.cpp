@@ -1031,6 +1031,12 @@ BSONObj removeNullAndUndefined(const BSONObj& input) {
 
 BSONObj normalizeBSONObj(const BSONObj& input, NormalizationOptsSet opts) {
     BSONObj result = input;
+    if (isSet(opts, NormalizationOpts::kQueryShapeHash)) {
+        uassert(10384200,
+                "expected explain mode to be set when using the queryShapeHash option",
+                isSet(opts, NormalizationOpts::kExplain));
+        return BSON(input.getField("queryShapeHash"));
+    }
     if (isSet(opts, NormalizationOpts::kConflateNullAndMissing)) {
         result = removeNullAndUndefined(result);
     }
