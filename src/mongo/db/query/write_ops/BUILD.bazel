@@ -45,6 +45,37 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "parsed_update_and_delete",
+    srcs = [
+        "parsed_delete.cpp",
+        "parsed_update.cpp",
+        "update_result.cpp",
+    ],
+    hdrs = [
+        "parsed_delete.h",
+        "parsed_update.h",
+        "update_result.h",
+    ],
+    deps = [
+        "delete_request_idl",
+        "parsed_update",
+        "//src/mongo:base",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/matcher:expressions_mongod_only",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+        "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/db/storage:feature_document_util",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/update:update_driver",
+    ],
+)
+
 idl_generator(
     name = "single_write_result_gen",
     src = "single_write_result.idl",

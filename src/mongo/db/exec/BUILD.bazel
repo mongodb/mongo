@@ -305,3 +305,13 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
+
+mongo_cc_library(
+    name = "docval_to_sbeval",
+    hdrs = [
+        "docval_to_sbeval.h",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+    ],
+)
