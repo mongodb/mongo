@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
@@ -67,16 +66,6 @@ DocumentSource::DocumentSource(const StringData stageName,
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
         } else {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
-        }
-    }
-}
-
-void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
-                                        PlanSummaryStats& planSummaryStats) {
-    auto visitor = PlanSummaryStatsVisitor(planSummaryStats);
-    for (auto&& source : pipeline.getSources()) {
-        if (auto specificStats = source->getSpecificStats()) {
-            specificStats->acceptVisitor(&visitor);
         }
     }
 }

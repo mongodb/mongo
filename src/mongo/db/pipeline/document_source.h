@@ -68,7 +68,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/service_context.h"
@@ -986,12 +985,5 @@ private:
      */
     virtual void doForceSpill() {}
 };
-
-/**
- * Method to accumulate the plan summary stats from all stages of the pipeline into the given
- * `planSummaryStats` object.
- */
-void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
-                                        PlanSummaryStats& planSummaryStats);
 
 }  // namespace mongo

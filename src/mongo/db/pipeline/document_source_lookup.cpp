@@ -671,8 +671,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
         objsize = safeSum;
         results.emplace_back(std::move(*result));
     }
-
-    accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
+    pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
 
     // Check if pipeline uses disk.
     _stats.planSummaryStats.usedDisk = _stats.planSummaryStats.usedDisk || pipeline->usedDisk();
@@ -1093,7 +1092,7 @@ bool DocumentSourceLookUp::usedDisk() {
 
 void DocumentSourceLookUp::doDispose() {
     if (_pipeline) {
-        accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
+        _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
         _pipeline->dispose(pExpCtx->getOperationContext());
         _pipeline.reset();
     }
@@ -1136,7 +1135,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         // avoid missing the accumulation of stats on an early exit (below) if the input (i.e., left
         // side of the lookup) is done.
         if (_pipeline) {
-            accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
+            _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
             _pipeline->dispose(pExpCtx->getOperationContext());
         }
 

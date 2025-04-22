@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/service_context.h"
@@ -547,6 +548,11 @@ public:
         return CursorType_serializer(pipelineType);
     }
 
+    /**
+     * Method to accumulate the plan summary stats from all stages of the pipeline into the given
+     * `planSummaryStats` object.
+     */
+    void accumulatePipelinePlanSummaryStats(PlanSummaryStats& planSummaryStats);
 
 private:
     friend class PipelineDeleter;

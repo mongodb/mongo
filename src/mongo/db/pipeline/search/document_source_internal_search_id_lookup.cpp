@@ -166,7 +166,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
                                         << ", " << next->toString() << "]");
             }
 
-            accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
+            pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
         }
     }
 

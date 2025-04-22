@@ -211,7 +211,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
                 results[facetId].emplace_back(next.releaseDocument());
             }
             allPipelinesEOF = allPipelinesEOF && next.isEOF();
-            accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
+            pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
         }
     }
 

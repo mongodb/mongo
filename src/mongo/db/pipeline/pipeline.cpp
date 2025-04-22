@@ -65,6 +65,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/atomic_word.h"
@@ -1056,6 +1057,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
                             std::make_move_iterator(currentPipeline.end()));
 
     return Pipeline::makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
+}
+
+void Pipeline::accumulatePipelinePlanSummaryStats(PlanSummaryStats& planSummaryStats) {
+    auto visitor = PlanSummaryStatsVisitor(planSummaryStats);
+    for (auto&& source : this->getSources()) {
+        if (auto specificStats = source->getSpecificStats()) {
+            specificStats->acceptVisitor(&visitor);
+        }
+    }
 }
 
 }  // namespace mongo

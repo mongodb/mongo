@@ -380,7 +380,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
                 addToCache(*next, queried);
             }
             checkMemoryUsage();
-            accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
+            pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
         }
 
         ++depth;

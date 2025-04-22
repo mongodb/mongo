@@ -327,7 +327,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         return std::move(*res);
 
     // Record the plan summary stats after $unionWith operation is done.
-    accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
+    _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
 
     _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
@@ -389,7 +389,7 @@ void DocumentSourceUnionWith::doDispose() {
         _pipeline.get_deleter().dismissDisposal();
         _stats.planSummaryStats.usedDisk =
             _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-        accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
+        _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
 
         if (!_pipeline->getContext()->getExplain()) {
             _pipeline->dispose(pExpCtx->getOperationContext());
