@@ -16,7 +16,11 @@ function testCombination(tlsMode, sslShell, shouldSucceed) {
 
     var fixture = new TLSTest(serverOptionOverrides, clientOptions);
 
-    assert.eq(shouldSucceed, fixture.connectWorked());
+    if (shouldSucceed) {
+        assert(fixture.connectWorked());
+    } else {
+        assert(fixture.connectFails());
+    }
 }
 
 testCombination("disabled", false, true);

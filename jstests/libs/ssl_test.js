@@ -85,3 +85,32 @@ TLSTest.prototype.connectWorked = function() {
     }
     return true;
 };
+
+/**
+ * Starts a server with the parameters passed to the fixture constructor and then attempts to
+ * connect with a shell created with the configured options. Returns immediately with true
+ * if a connection cannot be established using the configured client options.
+ */
+TLSTest.prototype.connectFails = function() {
+    const connectTimeoutMillis = 3 * 60 * 1000;
+
+    let waitForConnectClientOpts = this.noTLSClientOptions;
+    if (this.serverOpts.tlsMode === "requireTLS") {
+        waitForConnectClientOpts = this.defaultTLSClientOptions;
+    }
+    waitForConnectClientOpts.port = this.port;
+
+    const serverArgv = MongoRunner.arrOptions("mongod", this.serverOpts);
+    const failingClientArgv = MongoRunner.arrOptions("mongo", this.clientOpts);
+    const workingClientArgv = MongoRunner.arrOptions("mongo", waitForConnectClientOpts);
+    const serverPID = _startMongoProgram.apply(null, serverArgv);
+
+    // Wait until we can connect to mongod using the working client args
+    assert.soon(function() {
+        return checkProgram(serverPID).alive &&
+            (0 === _runMongoProgram.apply(null, workingClientArgv));
+    }, "connect failed", connectTimeoutMillis);
+    const result = _runMongoProgram.apply(null, failingClientArgv);
+    _stopMongoProgram(this.port);
+    return result !== 0;
+};
