@@ -53,7 +53,7 @@ public:
     }
 
     explicit WindowFunctionAddToSet(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx),
+        : WindowFunctionState(expCtx, internalQueryMaxAddToSetBytes.load()),
           _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {
         _memUsageTracker.set(sizeof(*this));
     }
@@ -61,6 +61,11 @@ public:
     void add(Value value) override {
         _values.emplace(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                         std::move(value));
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream() << "$addToSet used too much memory and cannot spill to disk. Used: "
+                              << _memUsageTracker.currentMemoryBytes() << " bytes. Memory limit: "
+                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                _memUsageTracker.withinMemoryLimit());
     }
 
     /**

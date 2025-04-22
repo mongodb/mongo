@@ -55,7 +55,8 @@ public:
         return std::make_unique<WindowFunctionPush>(expCtx);
     }
 
-    explicit WindowFunctionPush(ExpressionContext* const expCtx) : WindowFunctionState(expCtx) {
+    explicit WindowFunctionPush(ExpressionContext* const expCtx)
+        : WindowFunctionState(expCtx, internalQueryMaxPushBytes.load()) {
         _memUsageTracker.set(sizeof(*this));
     }
 
@@ -65,6 +66,11 @@ public:
         }
         _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
                              std::move(value));
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream() << "$push used too much memory and cannot spill to disk. Used: "
+                              << _memUsageTracker.currentMemoryBytes() << "bytes. Memory limit: "
+                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                _memUsageTracker.withinMemoryLimit());
     }
 
     /**
