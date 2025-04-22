@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/crypto/fle_tokens.h"
 #include <functional>
 #include <initializer_list>
 #include <map>
@@ -61,31 +62,23 @@ public:
     MockTextSearchPredicate(const QueryRewriterInterface* rewriter,
                             StrTagMap tags,
                             std::set<StringData> encryptedFields)
-        : TextSearchPredicate(rewriter), _tags(tags), _encryptedFields(encryptedFields) {}
+        : TextSearchPredicate(rewriter) {}
 
-    void setEncryptedTags(std::pair<StringData, StringData> fieldvalue,
-                          std::vector<PrfBlock> tags) {
-        _encryptedFields.insert(fieldvalue.first);
-        _tags[fieldvalue] = tags;
-        _exprTags[fieldvalue.second] = tags;
-    }
-
-    void addEncryptedField(StringData field) {
-        _encryptedFields.insert(field);
+    void setEncryptedTags(StringData payload, std::vector<PrfBlock> tags) {
+        _exprTags[payload] = tags;
     }
 
 
 protected:
     bool isPayload(const BSONElement& elt) const override {
-        return _encryptedFields.find(elt.fieldNameStringData()) != _encryptedFields.end();
+        // We should never use this function since we don't support match expressions.
+        MONGO_UNREACHABLE_TASSERT(10172500);
+        return false;
     }
 
     bool isPayload(const Value& v) const override {
-        // Consider it a payload if either 1) we have configured encrypted fields but no tags set (a
-        // shortcut for tests that aren't bothering with tag generation) or 2) we have tags for this
-        // value.
-        return (!_encryptedFields.empty() && _exprTags.empty()) ||
-            (_exprTags.contains(v.coerceToString()));
+        // For text search, we must always have tags set.
+        return _exprTags.contains(v.coerceToString());
     }
 
     std::vector<PrfBlock> generateTags(BSONValue payload) const override {
@@ -104,12 +97,9 @@ protected:
     }
 
 private:
-    StrTagMap _tags;
     // Key the tags for agg expressions based on values only, since we don't have access to the
     // field name.
     std::map<StringData, std::vector<PrfBlock>> _exprTags;
-
-    std::set<StringData> _encryptedFields;
 };
 
 class TextSearchPredicateRewriteTest : public EncryptedPredicateRewriteTest {
@@ -120,14 +110,158 @@ protected:
     MockTextSearchPredicate _predicate;
 };
 
-std::unique_ptr<Expression> makeEncStrStartsWithAggExpr(ExpressionContext* const expCtx,
-                                                        StringData path,
-                                                        Value value) {
+class MockTextSearchPredicateWithFFP : public TextSearchPredicate {
+public:
+    MockTextSearchPredicateWithFFP(const QueryRewriterInterface* rewriter)
+        : TextSearchPredicate(rewriter) {}
+    MockTextSearchPredicateWithFFP(const QueryRewriterInterface* rewriter,
+                                   StrTagMap tags,
+                                   std::set<StringData> encryptedFields)
+        : TextSearchPredicate(rewriter) {}
+
+    void setEncryptedTags(Value payload, std::vector<PrfBlock> tags) {
+        _exprTags.emplace(payload, tags);
+    }
+
+
+protected:
+    std::vector<PrfBlock> generateTags(BSONValue payload) const override {
+        return visit(OverloadedVisitor{[&](BSONElement p) {
+                                           // We will never generateTags for a MatchExpression for
+                                           // any encrypted text search.
+                                           MONGO_UNREACHABLE_TASSERT(10172501);
+                                           return std::vector<PrfBlock>();
+                                       },
+                                       [&](std::reference_wrapper<Value> v) {
+                                           ASSERT(_exprTags.find(v) != _exprTags.end());
+                                           return _exprTags.find(v)->second;
+                                       }},
+                     payload);
+    }
+
+private:
+    struct KeyHash {
+        std::size_t operator()(const Value& k) const {
+            return std::hash<int>()(k.getBinData().length);
+        }
+    };
+
+    struct KeyEqual {
+        bool operator()(const Value& lhs, const Value& rhs) const {
+            auto lhsBinData = lhs.getBinData();
+            auto rhsBinData = rhs.getBinData();
+            if (lhsBinData.type != rhsBinData.type) {
+                return false;
+            }
+            if (lhsBinData.length != rhsBinData.length) {
+                return false;
+            }
+            auto lhsData = (const uint8_t*)lhsBinData.data;
+            auto rhsData = (const uint8_t*)rhsBinData.data;
+            for (int i = 0; i < lhsBinData.length; ++i) {
+                if (lhsData[i] != rhsData[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    };
+    // Key the tags for agg expressions based on values only, since we don't have access to the
+    // field name. The Value in the map must contain BSONBinData type used for payloads.
+    std::unordered_map<Value, std::vector<PrfBlock>, KeyHash, KeyEqual> _exprTags;
+};
+
+class TextSearchPredicateRewriteTestWithFFP : public EncryptedPredicateRewriteTest {
+public:
+    TextSearchPredicateRewriteTestWithFFP() : _predicate(&_mock) {}
+
+protected:
+    MockTextSearchPredicateWithFFP _predicate;
+};
+
+// This duplicates text search contexts in "query_analysis.h" located in the enterprise module.
+enum class EncryptionPlaceholderContext {
+    kTextPrefixComparison,
+    kTextSuffixComparison,
+    kTextSubstringComparison,
+    kTextNormalizedComparison,
+};
+
+BSONObj generateFFP(StringData path, Value value, EncryptionPlaceholderContext context) {
+    auto indexKey = getIndexKey();
+    FLEIndexKeyAndId indexKeyAndId(indexKey.data, indexKeyId);
+    auto userKey = getUserKey();
+    FLEUserKeyAndId userKeyAndId(userKey.data, indexKeyId);
+
+    BSONObj doc = BSON("value" << value);
+    auto element = doc.firstElement();
+    auto cdrValue = ConstDataRange(element.value(), element.value() + element.valuesize());
+    auto fpp = FLEClientCrypto::serializeFindPayloadV2(indexKeyAndId, userKeyAndId, element, 0);
+
+    // Tokens are made according to fle_tokens.h.
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.data);
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto serverToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.data);
+
+    FLE2FindTextPayload payload;
+    // Set some default values here.
+    payload.setCaseFold(false);
+    payload.setDiacriticFold(false);
+    payload.setMaxCounter(22);
+    payload.setTokenSets(mongo::TextSearchFindTokenSets{});
+
+    // Create tokens specific to each type, also from fle_tokens.h.
+    switch (context) {
+        case EncryptionPlaceholderContext::kTextPrefixComparison: {
+            auto edcTextPrefixToken = EDCTextPrefixToken::deriveFrom(edcToken);
+            auto edcTextPrefixDerivedFromDataToken =
+                EDCTextPrefixDerivedFromDataToken::deriveFrom(edcTextPrefixToken, cdrValue);
+
+            auto escTextPrefixToken = ESCTextPrefixToken::deriveFrom(escToken);
+            auto escTextPrefixDerivedFromDataToken =
+                ESCTextPrefixDerivedFromDataToken::deriveFrom(escTextPrefixToken, cdrValue);
+
+            auto serverTextPrefixToken = ServerTextPrefixToken::deriveFrom(serverToken);
+            auto serverTextPrefixDerivedFromDataToken =
+                ServerTextPrefixDerivedFromDataToken::deriveFrom(serverTextPrefixToken, cdrValue);
+
+            payload.getTokenSets().setPrefixTokens(
+                TextPrefixFindTokenSet{edcTextPrefixDerivedFromDataToken,
+                                       escTextPrefixDerivedFromDataToken,
+                                       serverTextPrefixDerivedFromDataToken});
+        } break;
+        default:
+            MONGO_UNIMPLEMENTED_TASSERT(10172502);
+    }
+
+    BSONObjBuilder builder;
+    FLE2FindTextPayload::parse(IDLParserContext{"FLE2FindTextPayload"}, payload.toBSON());
+    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindTextPayload, payload, &builder);
+    return builder.obj();
+}
+
+
+template <typename T>
+std::unique_ptr<Expression> makeEncStrStartsWith(ExpressionContext* const expCtx,
+                                                 StringData path,
+                                                 T value) {
+    // A BSONObj corresponds to tests using an actual FindTextPayload, while a Value is used
+    // otherwise.
+    static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
+
     auto fieldpath = ExpressionFieldPath::createPathFromString(
         expCtx, path.toString(), expCtx->variablesParseState);
-    auto textExpr = make_intrusive<ExpressionConstant>(expCtx, value);
-    return std::make_unique<ExpressionEncStrStartsWith>(
-        expCtx, std::move(fieldpath), std::move(textExpr));
+
+    if constexpr (std::is_same_v<T, BSONObj>) {
+        return std::make_unique<ExpressionEncStrStartsWith>(
+            expCtx,
+            std::move(fieldpath),
+            ExpressionConstant::parse(expCtx, value.firstElement(), expCtx->variablesParseState));
+    } else {
+        return std::make_unique<ExpressionEncStrStartsWith>(
+            expCtx, std::move(fieldpath), make_intrusive<ExpressionConstant>(expCtx, value));
+    }
 }
 
 std::unique_ptr<Expression> makeEncStrEndsWithAggExpr(ExpressionContext* const expCtx,
@@ -160,24 +294,42 @@ std::unique_ptr<Expression> makeEncStrNormalizedEqAggExpr(ExpressionContext* con
         expCtx, std::move(fieldpath), std::move(textExpr));
 }
 
+template <typename T>
+void runEncStrStartsWithTest(T& predicate,
+                             ExpressionContext* const expCtx,
+                             StringData fieldName,
+                             StringData valueSD,
+                             std::vector<PrfBlock> tags,
+                             BSONObj expectedResult) {
+    static_assert(std::is_same_v<T, MockTextSearchPredicate> ||
+                  std::is_same_v<T, MockTextSearchPredicateWithFFP>);
+
+    std::unique_ptr<Expression> input = nullptr;
+    Value value = Value(valueSD);
+
+    if constexpr (std::is_same_v<T, MockTextSearchPredicateWithFFP>) {
+        BSONObj ffp =
+            generateFFP(fieldName, value, EncryptionPlaceholderContext::kTextPrefixComparison);
+        predicate.setEncryptedTags(Value(ffp.firstElement()), tags);
+        input = makeEncStrStartsWith(expCtx, fieldName, ffp);
+    } else {
+        predicate.setEncryptedTags(valueSD, std::move(tags));
+        input = makeEncStrStartsWith(expCtx, fieldName, value);
+    }
+
+    auto actual = predicate.rewrite(input.get());
+    auto actualBson = actual->serialize().getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(expectedResult, actualBson);
+}
+
 TEST_F(TextSearchPredicateRewriteTest, Enc_Starts_With_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrStartsWithAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+        makeEncStrStartsWith(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
     ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
 }
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Starts_With_Expr) {
-    std::unique_ptr<Expression> input =
-        makeEncStrStartsWithAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
-    std::vector<PrfBlock> tags = {{1}, {2}};
-
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
-
-    auto actual = _predicate.rewrite(input.get());
-    auto actualBson = actual->serialize().getDocument().toBson();
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
+    auto expectedResult = fromjson(R"({
             "$or": [
                 {
                     "$in": [
@@ -196,8 +348,35 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Starts_With_Expr) {
                     ]
                 }
             ]
-        })",
-        actualBson);
+})");
+    runEncStrStartsWithTest(
+        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+}
+
+// Testing the same scenario again with an actual payload.
+TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Starts_With_FFP_Expr) {
+    auto expectedResult = fromjson(R"({
+            "$or": [
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                },
+                {
+                    "$in": [
+                        {
+                            "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                        },
+                        "$__safeContent__"
+                    ]
+                }
+            ]
+})");
+    runEncStrStartsWithTest(
+        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
 }
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Ends_With_NoFFP_Expr) {
@@ -211,7 +390,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Ends_With_Expr) {
         makeEncStrEndsWithAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
     std::vector<PrfBlock> tags = {{1}, {2}};
 
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto actual = _predicate.rewrite(input.get());
     auto actualBson = actual->serialize().getDocument().toBson();
@@ -251,7 +430,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_Contains_Expr) {
         makeEncStrContainsAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
     std::vector<PrfBlock> tags = {{1}, {2}};
 
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto actual = _predicate.rewrite(input.get());
     auto actualBson = actual->serialize().getDocument().toBson();
@@ -291,7 +470,7 @@ TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_Expr) {
         makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
     std::vector<PrfBlock> tags = {{1}, {2}};
 
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto actual = _predicate.rewrite(input.get());
     auto actualBson = actual->serialize().getDocument().toBson();
@@ -332,13 +511,13 @@ protected:
 
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Starts_With_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrStartsWithAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+        makeEncStrStartsWith(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
 
     std::vector<PrfBlock> tags = {{1}, {2}};
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto result = _predicate.rewrite(input.get());
 
@@ -358,7 +537,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Ends_With_Expr) {
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
 
     std::vector<PrfBlock> tags = {{1}, {2}};
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto result = _predicate.rewrite(input.get());
 
@@ -378,7 +557,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Contains_Expr) {
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
 
     std::vector<PrfBlock> tags = {{1}, {2}};
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto result = _predicate.rewrite(input.get());
 
@@ -398,7 +577,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_NormalizedEq_Expr) {
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
 
     std::vector<PrfBlock> tags = {{1}, {2}};
-    _predicate.setEncryptedTags({"ssn", "hello"}, tags);
+    _predicate.setEncryptedTags("hello", tags);
 
     auto result = _predicate.rewrite(input.get());
 
@@ -409,7 +588,6 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_NormalizedEq_Expr) {
     // Make sure the original expression hasn't changed.
     ASSERT_BSONOBJ_EQ(input->serialize().getDocument().toBson(), expressionPreRewrite);
 }
-
 
 }  // namespace
 }  // namespace mongo::fle
