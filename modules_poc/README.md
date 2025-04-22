@@ -23,7 +23,7 @@ module name to team name to directory path to list of file names.
 For unassigned files it uses `__NONE__` as the module name, and for unowned
 files it uses `__NO_OWNER__` as the team, both of which conveniently sort first.
 For owned files it uses the part of the team-name after `@10gen/` with `-`
-replaced with `*` to be friendlier to querying. In cases where multiple teams
+replaced with `_` to be friendlier to querying. In cases where multiple teams
 own a file, the file is duplicated to each team's list.
 
 This file can be viewed directly in VSCode. The yaml plugin's breadcrumbs and
