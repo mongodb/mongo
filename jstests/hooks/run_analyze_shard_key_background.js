@@ -6,6 +6,7 @@ import {
 
 assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a server?");
 
+const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
@@ -235,6 +236,12 @@ function analyzeShardKey(ns, shardKey, indexKey) {
     if (res.code == ErrorCodes.StaleConfig) {
         print(`Failed to analyze the shard key because it failed with a StaleConfig error. ` +
               `${tojsononeline(res)}`);
+        return res;
+    }
+    if (res.code == ErrorCodes.NetworkInterfaceExceededTimeLimit && buildInfo.debug) {
+        print(
+            `Failed to analyze the shard key because network exceeded time limit in debug build. ` +
+            `${tojsononeline(res)}`);
         return res;
     }
 
