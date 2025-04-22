@@ -44,6 +44,9 @@ common --remote_download_outputs=toplevel
 # Files we always want to download for debugging and error checking
 common --remote_download_regex=.*\.(dwo|h|cpp)$
 
+# Disable caching of test results by default since many of our tests are non-deterministic.
+common --cache_test_results=no
+
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
 common:windows --features=-compiler_param_file
