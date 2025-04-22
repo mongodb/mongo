@@ -31,6 +31,21 @@
 
 #include "mongo/platform/compiler.h"
 
+/**
+ * This header contains macros used to mark the public API of a module.
+ * Including this header marks the including header as being completely marked,
+ * which makes all declarations in that header default to private unless they
+ * are explicitly made public. In the rare case where some declarations need to
+ * be marked, but you do not want to mark the header as being completely marked,
+ * include "mongo/util/modules_incompletely_marked_header.h" instead.
+ *
+ * If you want to mark everything in a header as private, just include this header.
+ * TODO Once all headers are completely marked, remove this paragraph (including
+ * the pragma) and grep for all files that include this file without using any
+ * MONGO_MOD macro directly and remove the inclusion.
+ */
+// IWYU pragma: always_keep (see above)
+
 /** Marks a declaration and everything inside as public to other modules */
 #define MONGO_MOD_PUB MONGO_MOD_ATTR_(public)
 

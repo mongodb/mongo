@@ -5,6 +5,8 @@ core:
   - src/mongo/stdx/
   - src/mongo/util/
   - src/mongo/db/json.h
+  # Unsure about this but putting here for now:
+  - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
 
 core.service:
   - src/mongo/db/commands[._]* # not the commands directory
@@ -17,11 +19,13 @@ core.unittest:
 
 query:
   - src/mongo/db/commands/query_cmd/
+  - src/mongo/db/commands/server_status*
   - src/mongo/db/exec/
   - src/mongo/db/fts/
   - src/mongo/db/geo/
   - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
   - src/mongo/db/matcher/
+  - src/mongo/db/memory_tracking/
   - src/mongo/db/modules/enterprise/src/fle/query_analysis
   - src/mongo/db/pipeline/
   - src/mongo/db/query/
@@ -29,10 +33,14 @@ query:
   - src/mongo/db/s/*query*analyzer* # note the filename pattern
   - src/mongo/db/stats/
   - src/mongo/db/update/
+  - src/mongo/util/safe_num*
   - src/mongo/db/views/
 
 catalog:
   - src/mongo/db/catalog/
+  - src/mongo/db/catalog_raii*
+  - src/mongo/db/namespace_string*
+  - src/mongo/util/namespace_string* # needs to be same module as db/namespace_string.h
 
 replication:
   - src/mongo/db/repl/ # excluding ./dbcheck*

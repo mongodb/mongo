@@ -30,6 +30,7 @@ class Decl(TypedDict):
     other_mods: dict[str, set[str]]  # merged
     used_from: dict[str, set[str]]  # merged
     usr: str
+    visibility: str
     defined: bool
 
 
@@ -196,14 +197,15 @@ def main(
             yaml.dump(out, f, Dumper=Dumper, width=1000000)
         timer.mark("dumped yaml")
 
-    out: Any = [
-        d for d in no_self_decls.values() if d["used_from"] and d["visibility"] == "private"
-    ]
+    out = [d for d in no_self_decls.values() if d["used_from"] and d["visibility"] == "private"]
+    out.sort(key=lambda d: d["display_name"])
     for decl in out:
         print(f"Illegal use of {decl['display_name']} outside of module {decl['mod']}:")
-        for locs in decl["used_from"].values():
+        print(f"  loc: {decl['loc']}")
+        print("  usages:")
+        for mod, locs in decl["used_from"].items():
             for loc in locs:
-                print(f"  {loc}")
+                print(f"    {loc} ({mod})")
     timer.mark("checked for privacy violations")
     if out:
         sys.exit(1)

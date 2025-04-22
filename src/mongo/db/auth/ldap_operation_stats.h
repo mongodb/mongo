@@ -40,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo {
@@ -155,6 +156,6 @@ private:
      * Metrics associated with binding and search/querying an LDAP server.
      */
     Stats _bindStats;
-    Stats _searchStats;
+    MONGO_MOD_NEEDS_REPLACEMENT Stats _searchStats;  // Used by a friend-ed test.
 };
 }  // namespace mongo

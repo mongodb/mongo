@@ -61,6 +61,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 

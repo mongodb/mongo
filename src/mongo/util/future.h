@@ -42,6 +42,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace MONGO_MOD_PUB mongo {

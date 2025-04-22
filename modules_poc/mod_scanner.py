@@ -32,7 +32,16 @@ sys.path.append(str(file.parent))
 # os.chdir(parent.parent)  # repo root (uncomment for python debugger)
 
 import cindex as clang
-from cindex import Config, Cursor, CursorKind, Index, LinkageKind, RefQualifierKind, TranslationUnit
+from cindex import (
+    AccessSpecifier,
+    Config,
+    Cursor,
+    CursorKind,
+    Index,
+    LinkageKind,
+    RefQualifierKind,
+    TranslationUnit,
+)
 from cindex import File as ClangFile
 
 # Monkey patch some features into clang's python binding. Keeping commented out for now in case we decide not to use modified lib.
@@ -375,43 +384,57 @@ def get_visibility(c: DecoratedCursor, scanning_parent=False):
                 )
             return (attr, alt)
 
-    # Some rules for implicitly private decls
-    # TODO: Unfortunately these rules are violated on 64 declarations,
-    # so it can't be enabled yet.
-    #
-    # - Some of the forTest methods appear to be intended as helpers for
-    #   consumers writing tests. We may want to use a different suffix like
-    #   "forTests" for that.
-    # - The usages of details namespace violations are more tricky, and there
-    #   appear to be a few kinds:
-    #   - True violations: we should fix these.
-    #   - Files not mapped to modules correctly: we should fix the mapping.
-    #   - APIs intended to be used from macro implementations: We might be
-    #     able to fix these by using clang_getFileLocation rather than
-    #     clang_getInstantiationLocation, but I don't think we want to do
-    #     that everywhere and it isn't currently exposed from python.
-    #     For now we may just want to mark those as public.
-    #   - Types not intended to be named directly by consumers, but used as
-    #     part of public APIs (eg return types or base classes) such that
-    #     consumers are expected to use their APIs. Maybe they should be
-    #     declared public anyway?
-    if 0:  # :(
-        if c.spelling.endswith("forTest"):
-            return "private"
+    # Apply high-priority defaults that override parent's visibility
+    if not scanning_parent:
+        # TODO consider making PROTECTED also default to module private
+        if c.access_specifier == AccessSpecifier.PRIVATE:
+            return ("private", None)
 
-        # details and internal namespaces
-        if c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling):
-            return "private"
+        # TODO: Unfortunately these rules are violated on 64 declarations,
+        # so it can't be enabled yet.
+        #
+        # - Some of the forTest methods appear to be intended as helpers for
+        #   consumers writing tests. We may want to use a different suffix like
+        #   "forTests" for that.
+        # - The usages of details namespace violations are more tricky, and there
+        #   appear to be a few kinds:
+        #   - True violations: we should fix these.
+        #   - Files not mapped to modules correctly: we should fix the mapping.
+        #   - APIs intended to be used from macro implementations: We might be
+        #     able to fix these by using clang_getFileLocation rather than
+        #     clang_getInstantiationLocation, but I don't think we want to do
+        #     that everywhere and it isn't currently exposed from python.
+        #     For now we may just want to mark those as public.
+        #   - Types not intended to be named directly by consumers, but used as
+        #     part of public APIs (eg return types or base classes) such that
+        #     consumers are expected to use their APIs. Maybe they should be
+        #     declared public anyway?
+        if 0:  # :(
+            if c.spelling.endswith("forTest"):
+                return "private"
 
-    if not c.normalized_parent:
-        return ("UNKNOWN", None)  # break recursion
+            # details and internal namespaces
+            if c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling):
+                return "private"
 
-    return get_visibility(c.normalized_parent, scanning_parent=True)
+    if c.normalized_parent:
+        parent_vis = get_visibility(c.normalized_parent, scanning_parent=True)
+    else:
+        parent_vis = ("UNKNOWN", None)  # break recursion
+
+    # Apply low-priority defaults that defer to parent's visibility
+    if not scanning_parent and parent_vis[0] == "UNKNOWN":
+        if normpath_for_file(c) in complete_headers:
+            return ("private", None)
+
+    return parent_vis
 
 
-def normpath_for_file(f: ClangFile | str | None) -> str | None:
+def normpath_for_file(f: Cursor | ClangFile | str | None) -> str | None:
     if f is None:
         return None
+    if isinstance(f, Cursor):
+        return normpath_for_file(f.location.file)
 
     name = f.name if type(f) == ClangFile else f
     if "/third_party/" in name:
@@ -426,6 +449,8 @@ def normpath_for_file(f: ClangFile | str | None) -> str | None:
 
 
 file_mod_map: dict[str | None, str | None] = {None: None}
+complete_headers = set[str]()
+incomplete_headers = set[str]()
 
 
 def mod_for_file(f: ClangFile | str | None) -> str | None:
@@ -660,6 +685,12 @@ def is_local_decl(c: Cursor):
 
 
 def find_usages(mod: str, c: Cursor):
+    if c.kind == CursorKind.ANNOTATE_ATTR and c.spelling.startswith("mongo::mod::"):
+        if not any(normpath_for_file(c) in s for s in (complete_headers, incomplete_headers)):
+            perr_exit(
+                f"{pretty_location(c)}:ERROR: usage of MONGO_MOD macro without directly including "
+                + '"mongo/util/modules.h" or modules_incompletely_marked_header.h'
+            )
     ref = c.referenced
     # Handle children first. This makes it possible to use early returns below
     for child in c.get_children():
@@ -907,6 +938,19 @@ def parseTU(args: list[str] | str):
     for d in tu.diagnostics:
         perr(d)
     timer.mark("parsed")
+
+    for include in tu.get_includes():
+        if "src/mongo" not in include.include.name:
+            continue
+
+        # Note: using bytes to avoid unicode handling overhead since the
+        # needles we are looking for are ascii-only.
+        content = Path(include.include.name).read_bytes()
+        if b'"mongo/util/modules.h"' in content:
+            complete_headers.add(normpath_for_file(include.include))
+        elif b'"mongo/util/modules_incompletely_marked_header.h"' in content:
+            incomplete_headers.add(normpath_for_file(include.include))
+    timer.mark("checked header completeness")
     return tu
 
 
@@ -917,8 +961,8 @@ def dump_unused_inputs(outPath: str, tu: TranslationUnit):
     universe = set(glob("src/mongo/**/*.h", recursive=True))
     timer.mark("globbed")
     for include in tu.get_includes():
-        if include.source:
-            universe.discard(include.source.name)
+        if include.include:
+            universe.discard(include.include.name)
     with open(outPath, "w") as file:
         file.write("\n".join(sorted(universe)))
     timer.mark("outfile written")

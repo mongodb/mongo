@@ -41,6 +41,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace mongo {
     methods throw the eof exception if the operation would pass the end of the
     buffer with which we are working.
 */
-class BufReader {
+class MONGO_MOD_PUB BufReader {
     BufReader(const BufReader&) = delete;
     BufReader& operator=(const BufReader&) = delete;
 

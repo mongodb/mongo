@@ -140,6 +140,25 @@ class Decl:
             case _:
                 return Text.assemble((self.kind, style("info_string")))
 
+    @property
+    def fancy_visibility(self):
+        match self.visibility:
+            case "public":
+                return Text("pub", "green")
+            case "private":
+                return Text("priv", "yellow3")
+            case "file_private":
+                return Text("file_priv", "yellow3")
+            case "needs_replacement":
+                return Text("needs_repl", "orange1")
+            case "use_replacement":
+                # Not showing self.alt here
+                return Text("use_repl", "orange1")
+            case "UNKNOWN":
+                return Text("¿vis?", "red")
+            case _:
+                raise ValueError(f"unexpected visibility: {self.visibility}")
+
 
 @dataclass
 class File:
@@ -147,6 +166,7 @@ class File:
     mod: str
     top_level_decls: list[Decl] = dataclasses.field(default_factory=list, compare=False)
     detached_decls: list[Decl] = dataclasses.field(default_factory=list, compare=False)
+    all_decls: list[Decl] = dataclasses.field(default_factory=list, compare=False)
 
     def unknown_count(self):
         return unknown_count(self.top_level_decls) + unknown_count(self.detached_decls)
@@ -163,7 +183,7 @@ def add_decl_node(node: TreeNode, d: Decl):
         label += f" [i]children:[/]{len(d.sem_children)}"
     if d.lex_children:
         label += f" [i]lex_children:[/]{len(d.lex_children)}"
-    node.add(Text.assemble(d.fancy_kind, " ", Text.from_markup(label)), d)
+    node.add(Text.assemble(d.fancy_visibility, " ", d.fancy_kind, " ", Text.from_markup(label)), d)
 
 
 def add_decl_nodes(node: TreeNode, ds: list[Decl]):
@@ -362,11 +382,22 @@ class FilesTree(Tree):
                 node.add("detached decls ({len(file.detached_decls)})", expand=True),
                 file.detached_decls,
             )
+        # Show flat lists of all decls grouped by visibility.
+        vis_map = dict[str, list[Decl]]()
+        for decl in file.all_decls:
+            vis_map.setdefault(decl.visibility, []).append(decl)
+        for vis, decls in sorted(vis_map.items(), key=lambda kv: len(kv[1]), reverse=True):
+            add_decl_nodes(
+                node.add(f"all {vis} decls ({len(decls)})", expand=False),
+                decls,
+            )
 
     def fill_decl_node(self, node: TreeNode[Decl]):
         d = node.data
         node.add_leaf(f"[i]loc:[/] {d.loc}")
-        node.add_leaf(f"[i]usr:[/] {d.usr}")
+        node.add_leaf(f"[i]usr:[/] {d.usr}")  # TODO: hide unless in "developer mode"
+        if d.alt:
+            node.add_leaf(f"[i]replacement:[/] {d.alt}")
 
         if d.other_mods:
             add_mod_loc_mapping_nodes(node, d.other_mods, "declared in other_mods", expand=True)
@@ -470,6 +501,7 @@ def getFile(d: Decl):
 
 top_level_usrs = {d.usr for d in decls}
 for d in decls:
+    getFile(d).all_decls.append(d)
     if d.sem_par in decl_ix:
         decl_ix[d.sem_par].sem_children.append(d)
         top_level_usrs.remove(d.usr)
@@ -486,9 +518,14 @@ for d in decls:
         # top_level_usrs.remove(d.usr)
         assert decl_ix[d.lex_par].loc.file == d.loc.file
 
-top_level_decls = sorted((decl_ix[u] for u in top_level_usrs), key=lambda d: d.loc)
-for d in top_level_decls:
+for u in top_level_usrs:
+    d = decl_ix[u]
     getFile(d).top_level_decls.append(d)
+
+for f in files.values():
+    f.all_decls.sort(key=lambda d: d.loc)
+    f.top_level_decls.sort(key=lambda d: d.loc)
+    f.detached_decls.sort(key=lambda d: d.loc)
 
 files = {k: v for k, v in sorted(files.items(), key=lambda kv: kv[1].unknown_count(), reverse=True)}
 modules = {d.mod for d in decls}

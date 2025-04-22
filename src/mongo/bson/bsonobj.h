@@ -66,7 +66,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/modules.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/string_map.h"
 

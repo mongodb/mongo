@@ -66,6 +66,7 @@
 #include "mongo/util/inline_memory.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -919,7 +920,9 @@ private:
     std::unique_ptr<Locker> _locker;
 
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
-    WriteUnitOfWork::RecoveryUnitState _ruState =
+
+    // This is used directly by WriteUnitOfWork
+    MONGO_MOD_NEEDS_REPLACEMENT WriteUnitOfWork::RecoveryUnitState _ruState =
         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 
     // Operations run within a transaction will hold a WriteUnitOfWork for the duration in order

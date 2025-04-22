@@ -52,6 +52,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 
 namespace mongo {
 
@@ -383,7 +384,8 @@ private:
 
     // Many query stages require going from an IndexDescriptor to its IndexCatalogEntry, so for
     // now we need this.
-    const IndexCatalogEntry* _entry = nullptr;
+    // TODO: once direct usage has been replaced, check if any of the friends below can be removed.
+    MONGO_MOD_USE_REPLACEMENT(setEntry()) const IndexCatalogEntry* _entry = nullptr;
 
     friend class IndexCatalog;
     friend class IndexCatalogEntryImpl;

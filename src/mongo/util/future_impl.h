@@ -72,7 +72,7 @@ class SharedPromise;
 template <typename T>
 class SharedSemiFuture;
 
-namespace MONGO_MOD_PRIVATE future_details {
+namespace future_details {
 
 template <typename T>
 class FutureImpl;
@@ -1426,5 +1426,5 @@ inline FutureImpl<void> FutureImpl<T>::ignoreValue() && noexcept {
     return std::move(*this).then([](auto&&) {});
 }
 
-}  // namespace MONGO_MOD_PRIVATE future_details
+}  // namespace future_details
 }  // namespace mongo
