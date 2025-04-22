@@ -686,6 +686,13 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
             expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
     });
 
+    // If the pipeline contains $exchange, set a flag so the individual
+    // DocumentSources can check. Pipelines containing $exchange are incompatible with reporting
+    // memory tracking to upstream channels like CurOp because they create multiple cursors.
+    if (_aggExState.getRequest().getExchange().has_value()) {
+        expCtx->setIncompatibleWithMemoryTracking(true);
+    }
+
     return expCtx;
 }
 

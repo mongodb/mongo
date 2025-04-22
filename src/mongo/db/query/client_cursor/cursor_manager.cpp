@@ -48,6 +48,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
@@ -459,6 +460,10 @@ void CursorManager::deregisterAndDestroyCursor(
 void CursorManager::_destroyCursor(OperationContext* opCtx,
                                    std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     LOGV2_DEBUG(8928406, 2, "Destroying cursor", "cursorId"_attr = cursor->cursorid());
+    // The memory tracker needs to be moved from the cursor to the opCtx in order for memory
+    // metrics to be reset on a valid tracker.
+    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursor.get(), opCtx);
+
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did
     // so, any caller of a CursorManager method which already held a lock manager lock could induce

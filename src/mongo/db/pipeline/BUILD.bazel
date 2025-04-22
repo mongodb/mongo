@@ -694,6 +694,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline/spilling",
         "//src/mongo/db/query:bucket_predicate_generator",
         "//src/mongo/db/query:projection_ast",

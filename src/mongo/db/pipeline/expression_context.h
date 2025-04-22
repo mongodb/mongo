@@ -883,6 +883,15 @@ public:
         return _requiresTimeseriesExtendedRangeSupport;
     }
 
+    // Sets a flag which tells DocumentSource parsers whether the pipeline contains an exchange
+    // stage.
+    void setIncompatibleWithMemoryTracking(bool v) {
+        _isIncompatibleWithMemoryTracking = v;
+    }
+    bool isIncompatibleWithMemoryTracking() const {
+        return _isIncompatibleWithMemoryTracking;
+    }
+
     const query_settings::QuerySettings& getQuerySettings() const {
         static const auto kEmptySettings = query_settings::QuerySettings();
         return _querySettings.get_value_or(kEmptySettings);
@@ -1198,6 +1207,8 @@ private:
     bool _isCappedDelete = false;
 
     bool _requiresTimeseriesExtendedRangeSupport = false;
+
+    bool _isIncompatibleWithMemoryTracking = false;
 
     InterruptChecker _interruptChecker;
 

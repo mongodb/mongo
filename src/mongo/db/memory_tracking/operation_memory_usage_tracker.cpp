@@ -64,7 +64,9 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    // TODO SERVER-102382 Remove router check.
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() || expCtx.getInRouter() ||
+        expCtx.isIncompatibleWithMemoryTracking()) {
         return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
     }
 
@@ -75,10 +77,11 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, bool allowDiskUse, int64_t maxMemoryUsageBytes) {
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+    // TODO SERVER-102382 Remove router check.
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() || expCtx.getInRouter() ||
+        expCtx.isIncompatibleWithMemoryTracking()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
     }
-
     OperationContext* opCtx = expCtx.getOperationContext();
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
     return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes};

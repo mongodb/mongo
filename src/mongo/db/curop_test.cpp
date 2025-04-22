@@ -436,17 +436,17 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     ASSERT_EQ(0, curop->getInUseMemoryBytes());
     ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
 
-    curop->setMemoryTrackingStats(10 /* inUseMemoryBytes */, 15 /* maxUsedMemoryBytes */);
+    curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
     ASSERT_EQ(10, curop->getInUseMemoryBytes());
     ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
 
     // The max memory usage is updated if the new max is greater than the current max.
-    curop->setMemoryTrackingStats(21 /*currentMemoryBytes*/, 20 /*maxUsedMemoryBytes*/);
+    curop->setMemoryTrackingStats(21 /*inUseMemoryBytes*/, 20 /*maxUsedMemoryBytes*/);
     ASSERT_EQ(21, curop->getInUseMemoryBytes());
     ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
 
     // The max memory usage is not updated if the new max is not greater than the current max.
-    curop->setMemoryTrackingStats(31 /*currentMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
+    curop->setMemoryTrackingStats(31 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
     ASSERT_EQ(31, curop->getInUseMemoryBytes());
     ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
 }
@@ -460,7 +460,7 @@ DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
 
     ASSERT_EQ(0, curop->getInUseMemoryBytes());
     ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
-    curop->setMemoryTrackingStats(10 /* inUseMemoryBytes */, 15 /* maxUsedMemoryBytes */);
+    curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
 }
 
 /**

@@ -203,5 +203,52 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
     ASSERT_EQ(docs.size(), 0);
 }
 
+TEST_F(RunAggregateTest, MemoryTrackerWithinSubpipelineIsProperlyDestroyedOnKillCursor) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               true);
+
+    // Set up the collection.
+    BSONArrayBuilder docsBuilder;
+    for (size_t i = 0; i < 10; ++i) {
+        docsBuilder.append(fromjson(fmt::format("{{id: {}, val: {}}}", i, i)));
+    }
+    auto insertCmdObj =
+        BSON("insert" << "coll" << "documents" << docsBuilder.arr() << "ordered" << true);
+    BSONObj res = runCommand(insertCmdObj.getOwned());
+    ASSERT_EQ(res["ok"].Number(), 1.0);
+    ASSERT_EQ(res["n"].Int(), 10);
+
+    // Create a pipeline with a memory-tracked stage ($group) within a subpipeline.
+    auto aggCmdObj = fromjson(R"({
+        aggregate: "coll",
+        pipeline: [
+            {
+                $facet: {
+                    grouped: [
+                        { $group: {
+                            _id: null,
+                            sum: { $sum: "$val" }
+                        }}
+                    ]
+                }
+            }
+        ],
+        cursor: { batchSize: 1 }
+    })");
+    res = runCommand(aggCmdObj.getOwned());
+    ASSERT_EQ(res["ok"].Number(), 1.0);
+    ASSERT_BSONOBJ_EQ(res["cursor"]["firstBatch"].Array()[0].Obj(),
+                      BSON("grouped" << BSON_ARRAY(BSON("_id" << BSONNULL << "sum" << 45))));
+
+    // Sending a killCursor command to the aggregation should safely dispose of the memory tracker
+    // without crashing.
+    int64_t cursorId = res["cursor"].Obj()["id"].Long();
+    auto killCursorCmdObj = BSON("killCursors" << "coll"
+                                               << "cursors" << BSON_ARRAY(cursorId));
+    res = runCommand(killCursorCmdObj.getOwned());
+    ASSERT_EQ(res["ok"].Number(), 1.0);
+    auto cursorsKilled = res["cursorsKilled"].Array();
+    ASSERT_TRUE(cursorsKilled.size() == 1 && cursorsKilled[0].Long() == cursorId);
+}
 }  // namespace
 }  // namespace mongo

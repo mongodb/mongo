@@ -133,6 +133,12 @@ public:
     auto makePlanCtx(OrderedPathSet shardKeys) {
         return makePlanCtx("[]", std::move(shardKeys));
     }
+
+    std::pair<int64_t, int64_t> getCurOpMemoryStats() {
+        OperationContext* opCtx = getExpCtx()->getOperationContext();
+        CurOp* curOp = CurOp::get(opCtx);
+        return {curOp->getInUseMemoryBytes(), curOp->getMaxUsedMemoryBytes()};
+    }
 };
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
@@ -591,8 +597,99 @@ TEST_F(DocumentSourceGroupTest,
     ASSERT_TRUE(distributedPlanLogic);
 }
 
-TEST_F(DocumentSourceGroupTest, MemoryTracking) {
+TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
     auto expCtx = getExpCtx();
+
+    for (bool flagStatus : {true, false}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                                   flagStatus);
+
+        // Pause between input docs so we have a chance to check memory tracking.
+        auto mock = DocumentSourceMock::createForTest(
+            {
+                Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
+                DocumentSource::GetNextResult::makePauseExecution(),
+                Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
+                DocumentSource::GetNextResult::makePauseExecution(),
+                Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"_sd << "elephant"_sd)}},
+                DocumentSource::GetNextResult::makePauseExecution(),
+                Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"_sd << "giraffe"_sd)}},
+            },
+            expCtx);
+
+        auto group = [&expCtx, &mock]() {
+            auto spec = fromjson(R"({
+                $group: {
+                    _id: "$k",
+                    concatted: {$concatArrays: "$arr"}
+                }
+            })");
+            auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
+            src->setSource(mock.get());
+            return boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+        }();
+
+        GroupProcessor* groupProcessor = group->getGroupProcessor();
+        const MemoryUsageTracker& memTracker = groupProcessor->getMemoryTracker();
+        ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
+
+        // Tracked memory increases as rows are processed. Different platforms have different
+        // amounts of memory here, so just show that the amount is increasing.
+        ASSERT_TRUE(group->getNext().isPaused());
+        int64_t curBytes1 = memTracker.currentMemoryBytes();
+        ASSERT_GREATER_THAN(curBytes1, 0);
+
+        ASSERT_TRUE(group->getNext().isPaused());
+        int64_t curBytes2 = memTracker.currentMemoryBytes();
+        ASSERT_GREATER_THAN(curBytes2, curBytes1);
+
+        ASSERT_TRUE(group->getNext().isPaused());
+        int64_t curBytes3 = memTracker.currentMemoryBytes();
+        ASSERT_GREATER_THAN(curBytes3, curBytes2);
+
+        std::vector<Document> outDocs;
+        {
+            auto result = group->getNext();
+            ASSERT_TRUE(result.isAdvanced());
+            int64_t curBytes4 = memTracker.currentMemoryBytes();
+            ASSERT_GREATER_THAN(curBytes4, curBytes3);
+            outDocs.push_back(result.releaseDocument());
+
+            // There are no more input documents, so memory usage stays the same here.
+            result = group->getNext();
+            ASSERT_TRUE(result.isAdvanced());
+            int64_t curBytes5 = memTracker.currentMemoryBytes();
+            ASSERT_EQUALS(curBytes4, curBytes5);
+            outDocs.push_back(result.releaseDocument());
+        }
+
+        // Output order of documents will not be deterministic, so sort them.
+        std::sort(outDocs.begin(), outDocs.end(), [](const Document& d0, const Document& d1) {
+            return Value::compare(d0["_id"], d1["_id"], nullptr) < 0;
+        });
+        ASSERT_DOCUMENT_EQ(
+            outDocs[0],
+            Document{fromjson(R"({_id: 10, concatted: ["foo", "bar", "baz", "mongo"]})")});
+        ASSERT_DOCUMENT_EQ(
+            outDocs[1],
+            Document{fromjson(R"({_id: 20, concatted: ["bird", "elephant", "dog", "giraffe"]})")});
+
+        ASSERT_TRUE(group->getNext().isEOF());
+        // Tracked memory goes back to zero once all output has been produced.
+        ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
+    }
+}
+
+/**
+ * Check that when the memory tracking feature flag is on, the memory tracking not only tracks
+ * memory as expected, but also reports these memory stats upstream to the operation's CurOp
+ * instance.
+ */
+TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
+    auto expCtx = getExpCtx();
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               true);
+
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = DocumentSourceMock::createForTest(
         {
@@ -618,41 +715,57 @@ TEST_F(DocumentSourceGroupTest, MemoryTracking) {
         return boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
     }();
 
-    GroupProcessor* groupProcessor = group->getGroupProcessor();
-    const MemoryUsageTracker& memTracker = groupProcessor->getMemoryTracker();
-    ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
+    int64_t inUseMemoryBytes, maxUsedMemoryBytes;
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseMemoryBytes, 0);
+    ASSERT_EQ(maxUsedMemoryBytes, 0);
 
-    // Tracked memory increases as rows are processed. Different platforms have different amounts of
-    // memory here, so just show that the amount is increasing.
+    // Tracked memory increases as rows are processed. Different platforms have different
+    // amounts of memory here, so just show that the amount is increasing.
     ASSERT_TRUE(group->getNext().isPaused());
-    int64_t curBytes1 = memTracker.currentMemoryBytes();
-    ASSERT_GREATER_THAN(curBytes1, 0);
-
-    ASSERT_TRUE(group->getNext().isPaused());
-    int64_t curBytes2 = memTracker.currentMemoryBytes();
-    ASSERT_GREATER_THAN(curBytes2, curBytes1);
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_GREATER_THAN(inUseMemoryBytes, 0);
+    ASSERT_GREATER_THAN(maxUsedMemoryBytes, 0);
 
     ASSERT_TRUE(group->getNext().isPaused());
-    int64_t curBytes3 = memTracker.currentMemoryBytes();
-    ASSERT_GREATER_THAN(curBytes3, curBytes2);
+    int64_t prevInUseMemoryBytes, prevMaxUsedMemoryBytes;
+    prevInUseMemoryBytes = inUseMemoryBytes;
+    prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
+    ASSERT_GREATER_THAN_OR_EQUALS(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+
+    ASSERT_TRUE(group->getNext().isPaused());
+    prevInUseMemoryBytes = inUseMemoryBytes;
+    prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
+    ASSERT_GREATER_THAN(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
 
     std::vector<Document> outDocs;
     {
         auto result = group->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        int64_t curBytes4 = memTracker.currentMemoryBytes();
-        ASSERT_GREATER_THAN(curBytes4, curBytes3);
+        prevInUseMemoryBytes = inUseMemoryBytes;
+        prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
+        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_GREATER_THAN(inUseMemoryBytes, prevInUseMemoryBytes);
+        ASSERT_GREATER_THAN(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+
         outDocs.push_back(result.releaseDocument());
 
         // There are no more input documents, so memory usage stays the same here.
         result = group->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        int64_t curBytes5 = memTracker.currentMemoryBytes();
-        ASSERT_EQUALS(curBytes4, curBytes5);
+        prevInUseMemoryBytes = inUseMemoryBytes;
+        prevMaxUsedMemoryBytes = maxUsedMemoryBytes;
+        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseMemoryBytes, prevInUseMemoryBytes);
+        ASSERT_EQ(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
         outDocs.push_back(result.releaseDocument());
     }
 
-    // output order of documents will not be deterministic, so sort them.
+    // Output order of documents will not be deterministic, so sort them.
     std::sort(outDocs.begin(), outDocs.end(), [](const Document& d0, const Document& d1) {
         return Value::compare(d0["_id"], d1["_id"], nullptr) < 0;
     });
@@ -662,9 +775,84 @@ TEST_F(DocumentSourceGroupTest, MemoryTracking) {
         outDocs[1],
         Document{fromjson(R"({_id: 20, concatted: ["bird", "elephant", "dog", "giraffe"]})")});
 
+    // When we reach the end of the documents, current memory goes to zero, while the max used
+    // remains the same.
     ASSERT_TRUE(group->getNext().isEOF());
-    // Tracked memory goes back to zero once all output has been produced.
-    ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQUALS(inUseMemoryBytes, 0);
+    ASSERT_EQ(maxUsedMemoryBytes, prevMaxUsedMemoryBytes);
+}
+
+/**
+ * Even when $group is consuming memory, show that we don't aggregate memory stats in CurOp when the
+ * feature flag is off. In this case, CurOp's memory stats should stay at zero.
+ */
+TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
+    auto expCtx = getExpCtx();
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               false);
+
+    // Pause between input docs so we have a chance to check memory tracking.
+    auto mock = DocumentSourceMock::createForTest(
+        {
+            Document{{"_id", 0}, {"k", 10}, {"arr", BSON_ARRAY("foo"_sd << "bar"_sd)}},
+            Document{{"_id", 1}, {"k", 10}, {"arr", BSON_ARRAY("baz"_sd << "mongo"_sd)}},
+            Document{{"_id", 2}, {"k", 20}, {"arr", BSON_ARRAY("bird"_sd << "elephant"_sd)}},
+            Document{{"_id", 3}, {"k", 20}, {"arr", BSON_ARRAY("dog"_sd << "giraffe"_sd)}},
+        },
+        expCtx);
+
+    auto group = [&expCtx, &mock]() {
+        auto spec = fromjson(R"({
+                $group: {
+                    _id: "$k",
+                    concatted: {$concatArrays: "$arr"}
+                }
+            })");
+        auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
+        src->setSource(mock.get());
+        return boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+    }();
+
+    int64_t inUseMemoryBytes, maxUsedMemoryBytes;
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseMemoryBytes, 0);
+    ASSERT_EQ(maxUsedMemoryBytes, 0);
+
+    std::vector<Document> outDocs;
+    {
+        auto result = group->getNext();
+        ASSERT_TRUE(result.isAdvanced());
+        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseMemoryBytes, 0);
+        ASSERT_EQ(maxUsedMemoryBytes, 0);
+
+        outDocs.push_back(result.releaseDocument());
+
+        // There are no more input documents, so memory usage stays the same here.
+        result = group->getNext();
+        ASSERT_TRUE(result.isAdvanced());
+        std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+        ASSERT_EQ(inUseMemoryBytes, 0);
+        ASSERT_EQ(maxUsedMemoryBytes, 0);
+        outDocs.push_back(result.releaseDocument());
+    }
+
+    // Output order of documents will not be deterministic, so sort them.
+    std::sort(outDocs.begin(), outDocs.end(), [](const Document& d0, const Document& d1) {
+        return Value::compare(d0["_id"], d1["_id"], nullptr) < 0;
+    });
+    ASSERT_DOCUMENT_EQ(
+        outDocs[0], Document{fromjson(R"({_id: 10, concatted: ["foo", "bar", "baz", "mongo"]})")});
+    ASSERT_DOCUMENT_EQ(
+        outDocs[1],
+        Document{fromjson(R"({_id: 20, concatted: ["bird", "elephant", "dog", "giraffe"]})")});
+
+    // All output has been produced.
+    ASSERT_TRUE(group->getNext().isEOF());
+    std::tie(inUseMemoryBytes, maxUsedMemoryBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseMemoryBytes, 0);
+    ASSERT_EQ(maxUsedMemoryBytes, 0);
 }
 
 BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {

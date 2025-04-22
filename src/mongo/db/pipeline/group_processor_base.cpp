@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/stats/counters.h"
@@ -41,7 +42,8 @@ namespace mongo {
 GroupProcessorBase::GroupProcessorBase(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        int64_t maxMemoryUsageBytes)
     : _expCtx(expCtx),
-      _memoryTracker{expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryUsageBytes},
+      _memoryTracker{OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
+          *expCtx, expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryUsageBytes)},
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()) {}
 
 void GroupProcessorBase::addAccumulationStatement(AccumulationStatement accumulationStatement) {

@@ -341,6 +341,12 @@ void OpDebug::report(OperationContext* opCtx,
                      sortTotalDataSizeBytes,
                      [&](const auto& name, const auto& value) { pAttrs->add(name, value); });
 
+    if (int64_t inUseMemoryBytes = curop.getInUseMemoryBytes()) {
+        pAttrs->add("inUseMemBytes", inUseMemoryBytes);
+    }
+    if (int64_t maxUsedMemBytes = curop.getMaxUsedMemoryBytes()) {
+        pAttrs->add("maxUsedMemBytes", maxUsedMemBytes);
+    }
     if (planCacheShapeHash) {
         // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
         std::string planCacheShapeHashStr = zeroPaddedHex(*planCacheShapeHash);
@@ -543,6 +549,9 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
 
+    if (int64_t inUseMemBytes = curop.getInUseMemoryBytes()) {
+        b.append("inUseMemBytes", inUseMemBytes);
+    }
     if (int64_t maxUsedMemBytes = curop.getMaxUsedMemoryBytes()) {
         b.append("maxUsedMemBytes", maxUsedMemBytes);
     }
