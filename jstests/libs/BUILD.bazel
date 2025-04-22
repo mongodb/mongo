@@ -23,6 +23,13 @@ filegroup(
 )
 
 filegroup(
+    name = "test_crt_files",
+    srcs = glob([
+        "*.crt",
+    ]),
+)
+
+filegroup(
     name = "mock_krb5",
     srcs = [
         "mockkrb5.conf",

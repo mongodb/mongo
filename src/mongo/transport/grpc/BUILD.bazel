@@ -223,7 +223,8 @@ mongo_cc_unit_test(
         "//src/mongo/transport:transport_layer_manager_grpc_test.cpp",
     ],
     data = [
-        "//jstests/libs:server_SAN.pem",
+        "//jstests/libs:test_crt_files",
+        "//jstests/libs:test_pem_files",
     ],
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
