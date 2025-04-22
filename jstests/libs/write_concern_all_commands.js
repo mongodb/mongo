@@ -2596,7 +2596,7 @@ const wcCommandsTests = {
             admin: true,
         },
         failure: {
-            // Default RWConcern is unset
+            // Default write concern cannot be unset once it is set
             req: {setDefaultRWConcern: 1, defaultWriteConcern: {}},
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandWorked(coll.getDB().adminCommand(
@@ -2607,11 +2607,16 @@ const wcCommandsTests = {
                 if (clusterType == "sharded") {
                     secondariesRunning[0].getDB('admin').fsyncLock();
                 }
+
+                // Unacknowledged write on the CSRS to force a WCE upon command failure
+                assert.commandWorkedIgnoringWriteConcernErrors(
+                    coll.getDB().getSiblingDB('config').tmp.insert(
+                        {x: 1}, {writeConcern: {w: 'majority', wtimeout: 1000}}));
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
                 assert.eq(coll.getDB().adminCommand({getDefaultRWConcern: 1}).defaultWriteConcern,
-                          {"w": 3, "wtimeout": 0});
+                          {"w": 1, "wtimeout": 1234});
 
                 if (clusterType == "sharded") {
                     secondariesRunning[0].getDB('admin').fsyncUnlock();
@@ -5956,10 +5961,8 @@ function shouldSkipTestCase(
     }
 
     if (testCase == "failure") {
-        // TODO SERVER-100942 setDefaultRWConcern does not return WCE
         if (clusterType == "sharded" &&
-            (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
-             command == "setDefaultRWConcern")) {
+            shardedDDLCommandsRequiringMajorityCommit.includes(command)) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
