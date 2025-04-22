@@ -22,12 +22,14 @@ executor:
           # Other fuzzers test commands against sharded clusters with logical session ids.
           disableImplicitSessions: true
           shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
           runningWithBalancer: true
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
+      add_remove_random_shards: true
       move_primary_comment: *movePrimaryComment
       move_sessions_collection: true
     - class: FuzzerRestoreSettings
@@ -45,6 +47,7 @@ executor:
           TestData:
             skipValidationOnInvalidViewDefinitions: true
             shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
     - class: CheckRoutingTableConsistency
       shell_options:
         global_vars:

@@ -110,12 +110,14 @@ executor:
           alwaysInjectTransactionNumber: true
           runningWithBalancer: true
           shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
           sessionOptions:
             retryWrites: true
   hooks:
     - class: ContinuousAddRemoveShard
       random_balancer_on: false
       transition_configsvr: true
+      add_remove_random_shards: true
       move_primary_comment: *movePrimaryComment
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
@@ -123,6 +125,7 @@ executor:
         global_vars:
           TestData:
             shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

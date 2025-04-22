@@ -131,6 +131,7 @@ executor:
         TestData:
           runningWithBalancer: true
           shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
@@ -149,6 +150,7 @@ executor:
         global_vars:
           TestData:
             shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
