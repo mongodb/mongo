@@ -43,10 +43,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // If running with causal consistency, the writes may not have propagated to the secondaries
         // yet.
         assert.soon(() => {
-            return this.numDocs ==
-                db[this.collWithMigrations]
-                    .find({"_id.tid": this.tid, "_id.count": this.threadRunCount})
-                    .itcount();
+            let count;
+            try {
+                count = db[this.collWithMigrations]
+                            .find({"_id.tid": this.tid, "_id.count": this.threadRunCount})
+                            .itcount();
+            } catch (e) {
+                if (e.code != ErrorCodes.QueryPlanKilled) {
+                    // When this query is run on a secondary, it might be killed with
+                    // ErrorCodes::QueryPlanKilled due to an ongoing range deletion.
+                    throw e;
+                }
+                return false;
+            }
+            return this.numDocs == count;
         });
 
         this.threadRunCount += 1;
