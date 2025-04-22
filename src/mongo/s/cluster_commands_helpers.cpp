@@ -770,14 +770,14 @@ RawResponsesResult appendRawResponses(
         }
 
         const auto& resObj = shardResponse.swResponse.getValue().data;
+        if (!firstWriteConcernErrorReceived && resObj["writeConcernError"]) {
+            firstWriteConcernErrorReceived.emplace(shardId, resObj["writeConcernError"]);
+        }
+
         const auto commandStatus = getStatusFromCommandResult(resObj);
         if (!commandStatus.isOK()) {
             processError(shardId, commandStatus);
             continue;
-        }
-
-        if (!firstWriteConcernErrorReceived && resObj["writeConcernError"]) {
-            firstWriteConcernErrorReceived.emplace(shardId, resObj["writeConcernError"]);
         }
 
         successResponsesReceived.emplace_back(shardId, resObj);
@@ -817,13 +817,15 @@ RawResponsesResult appendRawResponses(
     }
     output->append("raw", rawShardResponses.done());
 
-    // If there were no errors, report success (possibly with a writeConcern error).
+    // Always add the WCE if any when the command fails
+    if (firstWriteConcernErrorReceived &&
+        (appendWriteConcernError || !genericErrorsReceived.empty())) {
+        appendWriteConcernErrorToCmdResponse(
+            firstWriteConcernErrorReceived->first, firstWriteConcernErrorReceived->second, *output);
+    }
+
+    // If there were no errors, report success.
     if (genericErrorsReceived.empty()) {
-        if (firstWriteConcernErrorReceived && appendWriteConcernError) {
-            appendWriteConcernErrorToCmdResponse(firstWriteConcernErrorReceived->first,
-                                                 firstWriteConcernErrorReceived->second,
-                                                 *output);
-        }
         return {
             true, shardsWithSuccessResponses, successARSResponses, firstStaleConfigErrorReceived};
     }

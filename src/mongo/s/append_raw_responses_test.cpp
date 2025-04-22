@@ -595,10 +595,13 @@ TEST_F(AppendRawResponsesTest, SomeShardsReturnSuccessWithWriteConcernErrorRestR
          makeWriteConcernErrorResponse(kWriteConcernError1Status),
          makeHostAndPort(kShard5)}};
 
-    // The first non-ShardNotFound error is returned, and no writeConcern error is reported at the
-    // top level.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShard3, kShard4, kShard5}, {kShard5});
+    // The first non-ShardNotFound error is returned, and writeConcern error is reported at the top
+    // level.
+    runAppendRawResponsesExpect(shardResponses,
+                                kError1Status,
+                                {kShard3, kShard4, kShard5},
+                                {kShard5},
+                                kWriteConcernError1Status);
 }
 
 TEST_F(AppendRawResponsesTest,
@@ -612,10 +615,14 @@ TEST_F(AppendRawResponsesTest,
          makeWriteConcernErrorResponse(kWriteConcernError1Status),
          makeHostAndPort(kShard5)}};
 
-    // The first non-ShardNotFound error is returned, and no writeConcern error is reported at the
-    // top level.
-    runAppendRawResponsesExpect(
-        shardResponses, kError1Status, {kShard3, kShard4, kShard5}, {kShard5}, Status::OK(), true);
+    // The first non-ShardNotFound error is returned, and writeConcern error is reported at the top
+    // level.
+    runAppendRawResponsesExpect(shardResponses,
+                                kError1Status,
+                                {kShard3, kShard4, kShard5},
+                                {kShard5},
+                                kWriteConcernError1Status,
+                                true);
 }
 
 }  // namespace
