@@ -21,6 +21,22 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 
+def get_input_box_with_label(driver, label_to_match, timeout):
+    caps = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    label_xpath = (
+        f"//label[contains(translate(., '{caps}', '{caps.lower()}'), '{label_to_match.lower()}')]"
+    )
+    label = WebDriverWait(driver, timeout).until(
+        EC.presence_of_element_located((By.XPATH, label_xpath))
+    )
+    for_value = label.get_attribute("for")
+    if not for_value:
+        raise Exception(f"Failed to find input box with label '{label_to_match}'")
+    return WebDriverWait(driver, timeout).until(
+        EC.element_to_be_clickable((By.XPATH, f"//input[@id='{for_value}']"))
+    )
+
+
 def authenticate_okta(activation_endpoint, userCode, username, test_credentials):
     # Install GeckoDriver if needed.
     geckodriver_autoinstaller.install()
@@ -33,9 +49,7 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
 
     try:
         # Wait for activation code input box and next button to load and click.
-        activationCode_input_box = WebDriverWait(driver, 30).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@id='user-code']"))
-        )
+        activationCode_input_box = get_input_box_with_label(driver, "Activation Code", 30)
         next_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable(
                 (By.XPATH, "//input[@class='button button-primary'][@value='Next']")
@@ -47,12 +61,10 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
         next_button.click()
 
         # Wait for the username prompt and next button to load.
-        username_input_box = WebDriverWait(driver, 30).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@name='username']"))
-        )
+        username_input_box = get_input_box_with_label(driver, "Username", 30)
         next_button_username = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable(
-                (By.XPATH, "//input[@id='idp-discovery-submit'][@value='Next']")
+                (By.XPATH, "//input[@class='button button-primary'][@value='Next']")
             )
         )
 
@@ -61,12 +73,10 @@ def authenticate_okta(activation_endpoint, userCode, username, test_credentials)
         next_button_username.click()
 
         # Wait for the password prompt and next button to load.
-        password_input_box = WebDriverWait(driver, 30).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@name='password']"))
-        )
+        password_input_box = get_input_box_with_label(driver, "Password", 30)
         verify_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable(
-                (By.XPATH, "//input[@class='button button-primary'][@value='Sign In']")
+                (By.XPATH, "//input[@class='button button-primary'][@value='Verify']")
             )
         )
 
