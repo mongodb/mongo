@@ -73,7 +73,10 @@ def install(src, install_type):
                             os.link(src, dst)
                         # If you try hardlinking across drives link will fail
                         except OSError:
-                            shutil.copy(src, dst)
+                            try:
+                                shutil.copy(src, dst)
+                            except shutil.SameFileError:
+                                pass
                 except FileExistsError as exc:
                     if link_dst == dst:
                         # if multiple installs are requested at once and happen
