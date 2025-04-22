@@ -13,7 +13,6 @@
  *   does_not_support_transactions,
  *   # releaseMemory needs special permission
  *   assumes_superuser_permissions,
- *   featureFlagSbeFull,
  * ]
  */
 
@@ -28,13 +27,20 @@ function getSpillCounter() {
 }
 
 const memoryKnob = "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill";
-function getServerParameter() {
-    return assert.commandWorked(db.adminCommand({getParameter: 1, [memoryKnob]: 1}))[memoryKnob];
+const sbeIncreasedSpillingKnob = "internalQuerySlotBasedExecutionHashAggIncreasedSpilling";
+
+function getServerParameter(knob) {
+    return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
 }
-function setServerParameter(value) {
-    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), memoryKnob, value);
+function setServerParameter(knob, value) {
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
 }
-const memoryInitialValue = getServerParameter();
+
+const memoryInitialValue = getServerParameter(memoryKnob);
+const sbeIncreasedSpillingInitialValue = getServerParameter(sbeIncreasedSpillingKnob);
+
+// HashLookup in SBE might use HashAgg. We want to control spilling. Disable increased spilling.
+setServerParameter(sbeIncreasedSpillingKnob, "never");
 
 const students = db[jsTestName() + "_students"];
 students.drop();
@@ -94,7 +100,7 @@ for (let {localColl, pipeline} of [{localColl: people, pipeline: lookupWithPipel
     const expectedResults = localColl.aggregate(pipeline, {"allowDiskUse": false}).toArray();
     {
         jsTest.log(`Running no spill in first batch`);
-        setServerParameter(100 * 1024 * 1024);
+        setServerParameter(memoryKnob, 100 * 1024 * 1024);
         let initialSpillCount = getSpillCounter();
 
         // Retrieve the first batch without spilling.
@@ -120,13 +126,13 @@ for (let {localColl, pipeline} of [{localColl: people, pipeline: lookupWithPipel
 
         assertArrayEq({actual: results, expected: expectedResults});
 
-        setServerParameter(memoryInitialValue);
+        setServerParameter(memoryKnob, memoryInitialValue);
     }
 
     // Run query with increased spilling to spill while creating the first batch.
     {
         jsTest.log(`Running spill in first batch`);
-        setServerParameter(1);
+        setServerParameter(memoryKnob, 1);
         let initialSpillCount = getSpillCounter();
 
         // Retrieve the first batch.
@@ -152,6 +158,8 @@ for (let {localColl, pipeline} of [{localColl: people, pipeline: lookupWithPipel
 
         assertArrayEq({actual: results, expected: expectedResults});
 
-        setServerParameter(memoryInitialValue);
+        setServerParameter(memoryKnob, memoryInitialValue);
     }
 }
+
+setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);
