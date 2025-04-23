@@ -367,6 +367,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/window_function:window_function_expression.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_integral.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_min_max_scaler_util.cpp",
+        "//src/mongo/db/pipeline/window_function:window_function_percentile.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_shift.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_sum.cpp",
     ],

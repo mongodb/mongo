@@ -47,7 +47,7 @@ public:
         return p * (n - 1);
     }
 
-    double linearInterpolate(
+    static double linearInterpolate(
         double rank, int rank_ceil, int rank_floor, double value_ceil, double value_floor);
 
     boost::optional<double> computePercentile(double p) final;

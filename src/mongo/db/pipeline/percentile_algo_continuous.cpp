@@ -71,38 +71,40 @@ boost::optional<double> ContinuousPercentile::computePercentile(double p) {
     int rank_ceil = ceil(rank);
     int rank_floor = floor(rank);
 
-    // The data might be sorted either by construction or because too many percentiles have been
-    // requested at once, in which case we can just return the corresponding element, otherwise,
-    // use std::nth_element algorithm which does partial sorting of the range and places n_th order
-    // statistic at its place in the vector. The algorithm runs in O(_accumulatedValues.size()).
-    if (_shouldSort) {
-        if (rank_ceil == rank && rank == rank_floor) {
-            auto it = _accumulatedValues.begin() + rank;
-            std::nth_element(_accumulatedValues.begin(), it, _accumulatedValues.end());
-            return *it;
-        } else {
-            auto ceil_it = _accumulatedValues.begin() + rank_ceil;
-            auto floor_it = _accumulatedValues.begin() + rank_floor;
-            std::nth_element(_accumulatedValues.begin(), ceil_it, _accumulatedValues.end());
-            std::nth_element(_accumulatedValues.begin(), floor_it, _accumulatedValues.end());
-            return linearInterpolate(rank,
-                                     rank_ceil,
-                                     rank_floor,
-                                     _accumulatedValues[rank_ceil],
-                                     _accumulatedValues[rank_floor]);
-        }
-    }
+    // The data might be already sorted either by construction or because too many percentiles have
+    // been requested at once, in which case we can just return the corresponding element without
+    // any prior sorting. Otherwise, use some partial sort algorithm of the range such that the
+    // rank_ceil_th and rank_floor_th elements are in the correct place in the vector.
 
     if (rank_ceil == rank && rank == rank_floor) {
-        return _accumulatedValues[(int)rank];
-    } else {
-        return linearInterpolate(rank,
-                                 rank_ceil,
-                                 rank_floor,
-                                 _accumulatedValues[*_previousValues.second],
-                                 _accumulatedValues[*_previousValues.first]);
+        // The correct percentile is exactly one of the accumulated values. Simply return this value
+        // for the continuous percentile.
+        auto it = _accumulatedValues.begin() + rank;
+        if (_shouldSort) {
+            // std::nth_element runs in O(_accumulatedValues.size()).
+            std::nth_element(_accumulatedValues.begin(), it, _accumulatedValues.end());
+        }
+        return *it;
     }
+
+    // The correct percentile lies in between two of the accumulated values. Linear interpolate
+    // between them for a continuous percentile.
+    if (_shouldSort) {
+        // std::partial_sort(first, middle, last) sorts the collection such that the [first,
+        // middle) contains the sorted (middle - first) smallest elements in the range [first,
+        // last). Sort the collection from [begin, ceiling iterator), such that accesses to the
+        // rank_floor-th and rank_ceil-th elements give the linear interpolation bounds.
+        // Note that std::nth_element cannot be used because it only partitions the data around
+        // one iterator - it does not sort either side. std::partial_sort runs in approximately
+        // O(_accumulatedValues.size() * log(rank_ceil)).
+        auto ceil_it = _accumulatedValues.begin() + rank_ceil;
+        std::partial_sort(_accumulatedValues.begin(), ceil_it + 1, _accumulatedValues.end());
+    }
+
+    return linearInterpolate(
+        rank, rank_ceil, rank_floor, _accumulatedValues[rank_ceil], _accumulatedValues[rank_floor]);
 }
+
 
 boost::optional<double> ContinuousPercentile::computeSpilledPercentile(double p) {
     double rank = computeTrueRank(_numTotalValuesSpilled + _posInfCount + _negInfCount, p);
