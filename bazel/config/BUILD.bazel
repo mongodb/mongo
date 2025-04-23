@@ -566,14 +566,6 @@ config_setting(
     },
 )
 
-selects.config_setting_group(
-    name = "not_windows_debug_symbols_disabled",
-    match_all = [
-        ":not_windows",
-        ":debug_symbols_disabled",
-    ],
-)
-
 # We can't disable windows symbol generation with a flag, we can only omit the flags that generate them
 selects.config_setting_group(
     name = "windows_debug_symbols_enabled",
