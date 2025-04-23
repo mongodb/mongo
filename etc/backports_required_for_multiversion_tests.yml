@@ -430,6 +430,8 @@ last-continuous:
       ticket: SERVER-102693
     - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
       ticket: SERVER-103932
+    - test_file: jstests/sharding/resharding_oplog_fetcher_repl_lag.js
+      ticket: SERVER-103554
   suites: null
 last-lts:
   all:
@@ -915,4 +917,6 @@ last-lts:
       ticket: SERVER-102693
     - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
       ticket: SERVER-103932
+    - test_file: jstests/sharding/resharding_oplog_fetcher_repl_lag.js
+      ticket: SERVER-103554
   suites: null

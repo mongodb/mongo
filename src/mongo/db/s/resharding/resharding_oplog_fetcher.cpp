@@ -280,9 +280,7 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::schedule(
-    std::shared_ptr<executor::TaskExecutor> executor,
-    const CancellationToken& cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
     if (_startAt == kFinalOpAlreadyFetched) {
         LOGV2_INFO(6077400,
                    "Resharding oplog fetcher resumed with no more work to do",
@@ -292,8 +290,8 @@ ExecutorFuture<void> ReshardingOplogFetcher::schedule(
     }
 
     return ExecutorFuture(executor)
-        .then([this, executor, cancelToken, factory]() mutable {
-            return _reschedule(std::move(executor), cancelToken, factory);
+        .then([this, executor, cancelToken]() mutable {
+            return _reschedule(std::move(executor), cancelToken);
         })
         .onError([](Status status) {
             LOGV2_INFO(5192101, "Resharding oplog fetcher aborting", "reason"_attr = status);
@@ -302,20 +300,25 @@ ExecutorFuture<void> ReshardingOplogFetcher::schedule(
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
-    std::shared_ptr<executor::TaskExecutor> executor,
-    const CancellationToken& cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
     return ExecutorFuture(executor)
-        .then([this, executor, cancelToken, factory] {
+        .then([this, executor, cancelToken] {
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service()->getService(ClusterRole::ShardServer),
                                 ClientOperationKillableByStepdown{false});
-            return iterate(client.get(), factory);
+
+            boost::optional<CancelableOperationContextFactory> aggOpCtxFactory;
+            {
+                stdx::lock_guard lk(_mutex);
+                _aggCancelSource.emplace(cancelToken);
+                aggOpCtxFactory.emplace(_aggCancelSource->token(), executor);
+            }
+            return iterate(client.get(), *aggOpCtxFactory);
         })
-        .then([this, executor, cancelToken, factory](bool moreToCome) mutable {
+        .then([this, executor, cancelToken](bool moreToCome) mutable {
             if (!moreToCome) {
                 LOGV2_INFO(6077401,
                            "Resharding oplog fetcher done fetching",
@@ -331,14 +334,14 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                            "Resharding oplog fetcher canceled due to abort or stepdown"});
             }
 
-            // Wait a little before re-running the aggregation pipeline on the donor's oplog. The
-            // 1-second value was chosen to match the default awaitData timeout that would have been
-            // used if the aggregation cursor was TailableModeEnum::kTailableAndAwaitData.
-            return executor
-                ->sleepFor(Milliseconds{resharding::gReshardingOplogFetcherSleepMillis.load()},
-                           cancelToken)
-                .then([this, executor, cancelToken, factory] {
-                    return _reschedule(std::move(executor), cancelToken, factory);
+            // Wait a little before re-running the aggregation pipeline on the donor's oplog.
+            auto sleepDuration = Milliseconds{
+                _inCriticalSection.load()
+                    ? resharding::gReshardingOplogFetcherSleepMillisDuringCriticalSection.load()
+                    : resharding::gReshardingOplogFetcherSleepMillisBeforeCriticalSection.load()};
+            return executor->sleepFor(sleepDuration, cancelToken)
+                .then([this, executor, cancelToken] {
+                    return _reschedule(std::move(executor), cancelToken);
                 });
         });
 }
@@ -429,9 +432,11 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
         aggRequest.setReadConcern(readConcernArgs);
     }
 
-    ReadPreferenceSetting readPref(ReadPreference::Nearest,
-                                   ReadPreferenceSetting::kMinimalMaxStalenessValue);
-    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
+    auto readPref = _inCriticalSection.load()
+        ? ReadPreferenceSetting{ReadPreference::PrimaryOnly}
+        : ReadPreferenceSetting{ReadPreference::Nearest,
+                                ReadPreferenceSetting::kMinimalMaxStalenessValue};
+    aggRequest.setUnwrappedReadPref(BSON("$readPreference" << readPref.toInnerBSON()));
 
     aggRequest.setWriteConcern(WriteConcernOptions());
     aggRequest.setHint(BSON("$natural" << 1));
@@ -595,6 +600,15 @@ bool ReshardingOplogFetcher::consume(Client* client,
         }));
 
     return moreToCome;
+}
+
+void ReshardingOplogFetcher::onEnteringCriticalSection() {
+    _inCriticalSection.store(true);
+    stdx::lock_guard lk(_mutex);
+    // Stop consuming the current aggregation and start a new one.
+    if (_aggCancelSource) {
+        _aggCancelSource->cancel();
+    }
 }
 
 }  // namespace mongo
