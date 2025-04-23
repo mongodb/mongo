@@ -143,7 +143,6 @@ executor:
           traceExceptions: false
           runningWithBalancer: true
           shardsAddedRemoved: true
-          hasRandomShardsAddedRemoved: true
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
@@ -151,7 +150,6 @@ executor:
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
-      add_remove_random_shards: true
       move_primary_comment: *movePrimaryComment
       is_fsm_workload: true
     - class: CheckShardFilteringMetadata
@@ -162,7 +160,6 @@ executor:
         global_vars:
           TestData:
             shardsAddedRemoved: true
-            hasRandomShardsAddedRemoved: true
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
