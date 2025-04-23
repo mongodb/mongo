@@ -13,6 +13,15 @@ if (_isWindows()) {
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+function assertContainsOnceJsonStringMatch(connOrFile, id, attrName, attrText, errorMsg) {
+    const quote = JSON.stringify;
+    const foundMatch =
+        checkLog.checkContainsOnceJsonStringMatch(connOrFile, id, attrName, attrText);
+    const fullErrorMsg = `${errorMsg}: ${quote(attrText)} not found in the ${
+        quote(attrName)} attribute of log messages having ID ${id}`;
+    assert(foundMatch, fullErrorMsg);
+}
+
 // Test that you can connect to the load balancer port over a proxy.
 function testProxyProtocolConnect(ingressPort, egressPort, version) {
     let proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
@@ -31,14 +40,19 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
 
     const fcv = conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
     if (fcv.featureCompatibilityVersion.version === latestFCV) {
-        assert(checkLog.checkContainsOnceJsonStringMatch(st.s, 22943, "isLoadBalanced", "true"),
-               "isLoadBalanced was set to false");
-        assert(checkLog.checkContainsOnceJsonStringMatch(
-                   st.s, 22943, "remote", `127.0.0.1:${proxyServerPort}`),
-               "Remote had a different address");
-        assert(checkLog.checkContainsOnceJsonStringMatch(
-                   st.s, 22943, "sourceClient", `127.0.0.1:${mongoShellPort}`),
-               "Source client was not included, or had a different address");
+        assertContainsOnceJsonStringMatch(
+            st.s, 22943, "isLoadBalanced", "true", "isLoadBalanced was set to false");
+        assertContainsOnceJsonStringMatch(st.s,
+                                          22943,
+                                          "remote",
+                                          `127.0.0.1:${proxyServerPort}`,
+                                          "Remote had a different address");
+        assertContainsOnceJsonStringMatch(
+            st.s,
+            22943,
+            "sourceClient",
+            `127.0.0.1:${mongoShellPort}`,
+            "Source client was not included, or had a different address");
     }
 
     proxy_server.stop();

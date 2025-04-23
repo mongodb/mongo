@@ -104,53 +104,42 @@ export class ProxyProtocolServer {
 
     /**
      * Get the proxy server port used to connect to the egress port provided.
+     * That is, return port3 in the following:
+     *
+     *     [client] port1 <-----> ingress_port [proxy] port3 <------> egress_port [mongo(s|d)]
      */
     getServerPort() {
-        const regexPattern = `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`;
-        const commands = [
-            ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`],
-            ["netstat", "-nt"],
+        const tools = [
+            {
+                args: ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`],
+                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`
+            },
+            {
+                args: ["netstat", "-nt"],
+                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}\\s*ESTABLISHED`
+            },
         ];
 
-        let output = "";
-        let match = null;
-
-        for (const args of commands) {
-            const cmd = args[0];
+        for (const {args, regex} of tools) {
             clearRawMongoProgramOutput();
-            _startMongoProgram({args: args});
-
-            try {
-                assert.soon(() => {
-                    output = rawMongoProgramOutput(".*");
-
-                    match = output.match(regexPattern);
-                    if (match) {
-                        return true;
-                    }
-
-                    if (output.match("(?:not found|No such file or directory)")) {
-                        return true;
-                    }
-
-                    print(`Did not receive output of ${cmd} command, retrying`);
-                    sleep(1000);
-                    return false;
-                }, `Timed out waiting for ${cmd} command output`, 30 * 1000);
-
-                if (match) {
-                    break;
-                }
-            } catch (e) {
-                print(`Command ${cmd} timed out: ${e}`);
+            const exitStatus = waitProgram(_startMongoProgram({args: args}));
+            if (exitStatus !== 0) {
+                print(`Attempt to use command "${args[0]}" failed with exit status ${exitStatus}`);
+                continue;
             }
+
+            const match = rawMongoProgramOutput(".*").match(regex);
+            if (match === null) {
+                throw Error(`The output of ${args[0]} did not contain a connection to egress port ${
+                    this.egress_port}`);
+            }
+
+            return parseInt(match[1], 10);
         }
 
-        if (!match) {
-            throw Error(`Could not find connection to egress port: ${this.egress_port}`);
-        }
-
-        return parseInt(match[1]);
+        const commandsJson = JSON.stringify(tools.map(tool => tool.args[0]));
+        throw Error(`Could not find connection to egress port ${
+            this.egress_port}: all of the following commands failed: ${commandsJson}`);
     }
 
     /**
