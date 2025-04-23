@@ -119,6 +119,10 @@ BAZEL_BINARY=$(bazel_get_binary_path)
 TIMEOUT_CMD=""
 if [ -n "${build_timeout_seconds}" ]; then
   TIMEOUT_CMD="timeout ${build_timeout_seconds}"
+elif [[ "${evergreen_remote_exec}" == "on" ]]; then
+  # Timeout remote execution runs in 60 minutes as a workaround for
+  # scheduling timeout bugs
+  TIMEOUT_CMD="timeout 3600"
 fi
 
 if is_ppc64le; then
