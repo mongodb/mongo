@@ -802,18 +802,13 @@ protected:
     }
 
     std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(BSONObj obj, uint64_t cm = 0) {
-        auto s = getTestESCDataToken(obj);
-        auto d = getTestEDCDataToken(obj);
-        auto nssEsc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
-        return mongo::fle::getCountInfoSets(_queryImpl.get(), nssEsc, s, d, cm);
+        return mongo::fle::getCountInfoSets(
+            _queryImpl.get(), _escNs, getTestESCDataToken(obj), getTestEDCDataToken(obj), cm);
     }
 
     std::vector<PrfBlock> readTags(BSONObj obj, uint64_t cm = 0) {
-        auto s = getTestESCDataToken(obj);
-        auto d = getTestEDCDataToken(obj);
-        auto nssEsc = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
-
-        return mongo::fle::readTags(_queryImpl.get(), nssEsc, s, d, cm);
+        return mongo::fle::readTags(
+            _queryImpl.get(), _escNs, getTestESCDataToken(obj), getTestEDCDataToken(obj), cm);
     }
 };
 
@@ -1625,7 +1620,7 @@ TEST_F(FleTagsTest, MemoryLimit) {
     const auto tagLimit = 10;
 
     // Set memory limit to 10 tags * 40 bytes per tag
-    internalQueryFLERewriteMemoryLimit.store(tagLimit * 40);
+    const auto oldLimit = internalQueryFLERewriteMemoryLimit.swap(tagLimit * 40);
 
     // Do 10 inserts
     for (auto i = 0; i < tagLimit; i++) {
@@ -1644,6 +1639,8 @@ TEST_F(FleTagsTest, MemoryLimit) {
 
     // readTags returns 11 tags which does exceed memory limit.
     ASSERT_THROWS_CODE(readTags(doc), DBException, ErrorCodes::FLEMaxTagLimitExceeded);
+
+    internalQueryFLERewriteMemoryLimit.store(oldLimit);
 }
 
 TEST_F(FleTagsTest, SampleMemoryLimit) {
@@ -1700,21 +1697,23 @@ TEST_F(FleTagsTest, SampleMemoryLimit) {
     }
 }
 
-struct TextSearchSchema {
-    QueryTypeEnum type;
-    uint32_t lb;
-    uint32_t ub;
-    uint32_t mlen;
-    bool casef;
-    bool diacf;
-};
-
 class QETextSearchCrudTest : public FleCrudTest {
+public:
+    struct TextSearchSchema {
+        QueryTypeEnum type;
+        uint32_t lb;
+        uint32_t ub;
+        uint32_t mlen;
+        bool casef;
+        bool diacf;
+    };
+
 protected:
     void setUp() override {
         FleCrudTest::setUp();
         _ffctrl.emplace("featureFlagQETextSearchPreview", true);
     }
+
     void tearDown() override {
         FleCrudTest::tearDown();
     }
@@ -1723,16 +1722,38 @@ protected:
     void addSchema(TextSearchSchema schema) {
         _schemas.push_back(std::move(schema));
     }
+
     EncryptedFieldConfig getEFC();
     BSONObj generateInsertSpec(BSONElement value);
     std::vector<char> generatePlaceholder(BSONElement value);
+
     void doInsert(int id, BSONElement element);
-    ESCTwiceDerivedTagToken getTestESCToken(BSONElement value, boost::optional<QueryTypeEnum> type);
+
+    PrfBlock getTestESCDataToken(BSONElement value, boost::optional<QueryTypeEnum> type);
+    PrfBlock getTestEDCDataToken(BSONElement value, boost::optional<QueryTypeEnum> type);
+
+    ESCTwiceDerivedTagToken getTestESCTwiceDerivedToken(BSONElement value,
+                                                        boost::optional<QueryTypeEnum> type);
+    EDCTwiceDerivedToken getTestEDCTwiceDerivedToken(BSONElement value,
+                                                     boost::optional<QueryTypeEnum> type);
+
     BSONObj findESCNonAnchor(BSONElement element,
                              uint64_t cpos,
                              boost::optional<QueryTypeEnum> qtype);
-    void checkExactInserted(StringData exactString, uint32_t exactCount);
-    void checkPaddingInserted(StringData exactString, uint32_t padCount, QueryTypeEnum qtype);
+
+    void verifyESCEntriesForString(StringData testString,
+                                   uint32_t expectedCount,
+                                   boost::optional<QueryTypeEnum> type = boost::none,
+                                   bool padding = false);
+
+    std::vector<PrfBlock> readTags(BSONElement value, boost::optional<QueryTypeEnum> type) {
+        return mongo::fle::readTags(_queryImpl.get(),
+                                    _escNs,
+                                    ESCDerivedFromDataToken{getTestESCDataToken(value, type)},
+                                    EDCDerivedFromDataToken{getTestEDCDataToken(value, type)},
+                                    0);
+    }
+
     stdx::unordered_set<std::string> getExpectedSubstrings(const unicode::String& foldedString,
                                                            uint32_t lb,
                                                            uint32_t ub);
@@ -1747,11 +1768,20 @@ protected:
                                   uint32_t ub,
                                   uint32_t mlen);
     uint32_t getMsizeForPrefixSuffix(StringData unfoldedString, uint32_t lb, uint32_t ub);
+
     void verifyExpectationsAfterInsertions(
         const std::vector<std::pair<StringData, StringData>>& inserted);
+
+    /**
+     * Given an array of unfolded & folded string pairs, inserts each unfolded string
+     * as the value of kTestFieldName, which is an indexed-encrypted field utilizing the current
+     * substring/suffix/prefix encryption schemas. After each insertion, the EDC/ESC/ECOC are
+     * verified to have the correct number of entries.
+     */
     void doInsertsAndVerifyExpectations(
         const std::vector<std::pair<StringData, StringData>>& inserts);
 
+    static constexpr StringData kTestFieldName = "field"_sd;
     std::vector<TextSearchSchema> _schemas;
     StackBufBuilder _stackBuf;
     boost::optional<RAIIServerParameterControllerForTest> _ffctrl;
@@ -1771,13 +1801,13 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
         qtc.setDiacriticSensitive(!schema.diacf);
         qtcs.push_back(std::move(qtc));
     }
-    EncryptedField ef(UUID::gen(), "field");
+    EncryptedField ef(UUID::gen(), kTestFieldName.toString());
     std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig> vqtcs = std::move(qtcs);
     ef.setBsonType("string"_sd);
     ef.setQueries(vqtcs);
     EncryptedFieldConfig efc({std::move(ef)});
-    efc.setEscCollection("enxcol_.coll.esc"_sd);
-    efc.setEcocCollection("enxcol_.coll.ecoc"_sd);
+    efc.setEscCollection(_escNs.coll());
+    efc.setEcocCollection(_ecocNs.coll());
     efc.setStrEncodeVersion(1);
     return efc;
 }
@@ -1841,49 +1871,94 @@ void QETextSearchCrudTest::doInsert(int id, BSONElement element) {
     uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
 }
 
-ESCTwiceDerivedTagToken QETextSearchCrudTest::getTestESCToken(BSONElement element,
-                                                              boost::optional<QueryTypeEnum> type) {
+PrfBlock QETextSearchCrudTest::getTestESCDataToken(BSONElement element,
+                                                   boost::optional<QueryTypeEnum> type) {
     auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
     auto escToken = ESCToken::deriveFrom(c1token);
-
-    PrfBlock escDataTokenBlk;
     if (!type.has_value()) {
         auto escTextToken = ESCTextExactToken::deriveFrom(escToken);
-        auto escDataToken =
-            ESCTextExactDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
-        escDataTokenBlk =
-            ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(escDataToken, 0)
+        return ESCTextExactDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
+            .asPrfBlock();
+    }
+    switch (*type) {
+        case QueryTypeEnum::SubstringPreview: {
+            auto escTextToken = ESCTextSubstringToken::deriveFrom(escToken);
+            return ESCTextSubstringDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
                 .asPrfBlock();
+        }
+        case QueryTypeEnum::SuffixPreview: {
+            auto escTextToken = ESCTextSuffixToken::deriveFrom(escToken);
+            return ESCTextSuffixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
+                .asPrfBlock();
+        }
+        case QueryTypeEnum::PrefixPreview: {
+            auto escTextToken = ESCTextPrefixToken::deriveFrom(escToken);
+            return ESCTextPrefixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element))
+                .asPrfBlock();
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+PrfBlock QETextSearchCrudTest::getTestEDCDataToken(BSONElement element,
+                                                   boost::optional<QueryTypeEnum> type) {
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
+    auto edcToken = EDCToken::deriveFrom(c1token);
+    if (!type.has_value()) {
+        auto edcTextToken = EDCTextExactToken::deriveFrom(edcToken);
+        return EDCTextExactDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
+            .asPrfBlock();
+    }
+    switch (*type) {
+        case QueryTypeEnum::SubstringPreview: {
+            auto edcTextToken = EDCTextSubstringToken::deriveFrom(edcToken);
+            return EDCTextSubstringDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
+                .asPrfBlock();
+        }
+        case QueryTypeEnum::SuffixPreview: {
+            auto edcTextToken = EDCTextSuffixToken::deriveFrom(edcToken);
+            return EDCTextSuffixDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
+                .asPrfBlock();
+        }
+        case QueryTypeEnum::PrefixPreview: {
+            auto edcTextToken = EDCTextPrefixToken::deriveFrom(edcToken);
+            return EDCTextPrefixDerivedFromDataToken::deriveFrom(edcTextToken, toCDR(element))
+                .asPrfBlock();
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+ESCTwiceDerivedTagToken QETextSearchCrudTest::getTestESCTwiceDerivedToken(
+    BSONElement element, boost::optional<QueryTypeEnum> type) {
+    PrfBlock dataTokenBlk = getTestESCDataToken(element, type);
+    PrfBlock cfTokenBlk;
+
+    if (!type.has_value()) {
+        cfTokenBlk = ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                         ESCTextExactDerivedFromDataToken{dataTokenBlk}, 0)
+                         .asPrfBlock();
     } else {
         switch (*type) {
             case QueryTypeEnum::SubstringPreview: {
-                auto escTextToken = ESCTextSubstringToken::deriveFrom(escToken);
-                auto escDataToken =
-                    ESCTextSubstringDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
-                escDataTokenBlk =
+                cfTokenBlk =
                     ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                        escDataToken, 0)
+                        ESCTextSubstringDerivedFromDataToken{dataTokenBlk}, 0)
                         .asPrfBlock();
                 break;
             }
             case QueryTypeEnum::SuffixPreview: {
-                auto escTextToken = ESCTextSuffixToken::deriveFrom(escToken);
-                auto escDataToken =
-                    ESCTextSuffixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
-                escDataTokenBlk =
-                    ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                        escDataToken, 0)
-                        .asPrfBlock();
+                cfTokenBlk = ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                                 ESCTextSuffixDerivedFromDataToken{dataTokenBlk}, 0)
+                                 .asPrfBlock();
                 break;
             }
             case QueryTypeEnum::PrefixPreview: {
-                auto escTextToken = ESCTextPrefixToken::deriveFrom(escToken);
-                auto escDataToken =
-                    ESCTextPrefixDerivedFromDataToken::deriveFrom(escTextToken, toCDR(element));
-                escDataTokenBlk =
-                    ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                        escDataToken, 0)
-                        .asPrfBlock();
+                cfTokenBlk = ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                                 ESCTextPrefixDerivedFromDataToken{dataTokenBlk}, 0)
+                                 .asPrfBlock();
                 break;
             }
             default:
@@ -1891,39 +1966,94 @@ ESCTwiceDerivedTagToken QETextSearchCrudTest::getTestESCToken(BSONElement elemen
         }
     }
     return ESCTwiceDerivedTagToken::deriveFrom(
-        ESCDerivedFromDataTokenAndContentionFactorToken{escDataTokenBlk});
+        ESCDerivedFromDataTokenAndContentionFactorToken{cfTokenBlk});
+}
+
+EDCTwiceDerivedToken QETextSearchCrudTest::getTestEDCTwiceDerivedToken(
+    BSONElement element, boost::optional<QueryTypeEnum> type) {
+    PrfBlock dataTokenBlk = getTestEDCDataToken(element, type);
+    PrfBlock cfTokenBlk;
+
+    if (!type.has_value()) {
+        cfTokenBlk = EDCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                         EDCTextExactDerivedFromDataToken{dataTokenBlk}, 0)
+                         .asPrfBlock();
+    } else {
+        switch (*type) {
+            case QueryTypeEnum::SubstringPreview: {
+                cfTokenBlk =
+                    EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                        EDCTextSubstringDerivedFromDataToken{dataTokenBlk}, 0)
+                        .asPrfBlock();
+                break;
+            }
+            case QueryTypeEnum::SuffixPreview: {
+                cfTokenBlk = EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                                 EDCTextSuffixDerivedFromDataToken{dataTokenBlk}, 0)
+                                 .asPrfBlock();
+                break;
+            }
+            case QueryTypeEnum::PrefixPreview: {
+                cfTokenBlk = EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                                 EDCTextPrefixDerivedFromDataToken{dataTokenBlk}, 0)
+                                 .asPrfBlock();
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    return EDCTwiceDerivedToken::deriveFrom(
+        EDCDerivedFromDataTokenAndContentionFactorToken{cfTokenBlk});
 }
 
 BSONObj QETextSearchCrudTest::findESCNonAnchor(BSONElement element,
                                                uint64_t cpos,
                                                boost::optional<QueryTypeEnum> qtype) {
     return _queryImpl->getById(
-        _escNs, ESCCollection::generateNonAnchorId(getTestESCToken(element, qtype), cpos));
+        _escNs,
+        ESCCollection::generateNonAnchorId(getTestESCTwiceDerivedToken(element, qtype), cpos));
 }
 
-void QETextSearchCrudTest::checkExactInserted(StringData exactString, uint32_t exactCount) {
-    auto doc = BSON("field" << exactString);
+void QETextSearchCrudTest::verifyESCEntriesForString(StringData testString,
+                                                     uint32_t expectedCount,
+                                                     boost::optional<QueryTypeEnum> qtype,
+                                                     bool padding) {
+    auto doc = BSON(kTestFieldName << testString);
+    if (padding) {
+        ASSERT(qtype.has_value());  // padding values must always have a query type
+        doc = BSON(kTestFieldName << (testString.toString() + "\xff"));
+    }
     auto element = doc.firstElement();
 
-    // check expected number of exact match ESC entries were inserted
-    for (uint32_t ct = 1; ct <= exactCount; ct++) {
-        ASSERT_FALSE(findESCNonAnchor(element, ct, boost::none).isEmpty());
+    // check expected number of matching ESC entries were inserted
+    for (uint32_t ct = 1; ct <= expectedCount; ct++) {
+        ASSERT_FALSE(findESCNonAnchor(element, ct, qtype).isEmpty())
+            << "No ESC entry found for string='" << testString << "' count=" << ct;
     }
-    ASSERT_TRUE(findESCNonAnchor(element, exactCount + 1, boost::none).isEmpty());
-}
+    ASSERT_TRUE(findESCNonAnchor(element, expectedCount + 1, qtype).isEmpty())
+        << "Unexpected ESC entry found for string='" << testString
+        << "' count=" << (expectedCount + 1);
+    ;
 
-void QETextSearchCrudTest::checkPaddingInserted(StringData exactString,
-                                                uint32_t padCount,
-                                                QueryTypeEnum qtype) {
-    const std::string padString = exactString.toString() + "\xff";
-    auto padDoc = BSON("field" << padString);
-    auto padElement = padDoc.firstElement();
-
-    // check expected number of ESC entries of the expected type were inserted
-    for (uint32_t ct = 1; ct <= padCount; ct++) {
-        ASSERT_FALSE(findESCNonAnchor(padElement, ct, qtype).isEmpty());
+    // check readTags returns correct number tags
+    std::vector<PrfBlock> tags;
+    try {
+        tags = readTags(element, qtype);
+    } catch (DBException& ex) {
+        ASSERT_EQ(ex.toStatus().code(), ErrorCodes::FLEMaxTagLimitExceeded);
+        return;
     }
-    ASSERT_TRUE(findESCNonAnchor(padElement, padCount + 1, qtype).isEmpty());
+    ASSERT_EQ(tags.size(), expectedCount);
+
+    // check the read tags are as expected
+    HmacContext hmacCtx;
+    auto edcTwiceDerivedToken = getTestEDCTwiceDerivedToken(element, qtype);
+    for (uint32_t i = 1; i <= expectedCount; i++) {
+        auto tagToFind = EDCServerCollection::generateTag(&hmacCtx, edcTwiceDerivedToken, i);
+        ASSERT_NE(tags.end(), std::find(tags.begin(), tags.end(), tagToFind))
+            << "readTags output missing tag for count=" << i << " total=" << expectedCount;
+    }
 }
 
 stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedSubstrings(
@@ -1936,6 +2066,7 @@ stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedSubstrings(
     }
     return res;
 }
+
 stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedSuffixes(
     const unicode::String& foldedString, uint32_t lb, uint32_t ub) {
     stdx::unordered_set<std::string> res;
@@ -1946,6 +2077,7 @@ stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedSuffixes(
     }
     return res;
 }
+
 stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedPrefixes(
     const unicode::String& foldedString, uint32_t lb, uint32_t ub) {
     stdx::unordered_set<std::string> res;
@@ -1988,39 +2120,31 @@ uint32_t QETextSearchCrudTest::getMsizeForPrefixSuffix(StringData unfoldedString
     return std::min(ub, padded_len) - lb + 1;
 }
 
-static uint8_t queryTypeToIndex(QueryTypeEnum qt) {
-    switch (qt) {
-        case QueryTypeEnum::SubstringPreview:
-            return 0;
-        case QueryTypeEnum::SuffixPreview:
-            return 1;
-        case QueryTypeEnum::PrefixPreview:
-            return 2;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-static QueryTypeEnum indexToQueryType(uint8_t idx) {
-    switch (idx) {
-        case 0:
-            return QueryTypeEnum::SubstringPreview;
-        case 1:
-            return QueryTypeEnum::SuffixPreview;
-        case 2:
-            return QueryTypeEnum::PrefixPreview;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
     const std::vector<std::pair<StringData, StringData>>& inserted) {
     stdx::unordered_map<std::string, int> affixCounts[3];
     stdx::unordered_map<std::string, int> exactCounts;
     stdx::unordered_map<std::string, uint32_t> paddingCounts[3];
     uint32_t totalTags = 0;
+
+    auto queryTypeToIndex = [](QueryTypeEnum qt) -> uint8_t {
+        switch (qt) {
+            case QueryTypeEnum::SubstringPreview:
+                return 0;
+            case QueryTypeEnum::SuffixPreview:
+                return 1;
+            case QueryTypeEnum::PrefixPreview:
+                return 2;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    };
+
     for (const auto& [unfoldedStr, foldedStr] : inserted) {
+        if (_schemas.empty()) {
+            continue;
+        }
+
         totalTags++;  // exact
         unicode::String unicodeFoldedStr(foldedStr);
         auto foldedStrStd = foldedStr.toString();
@@ -2054,38 +2178,34 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
             totalTags += msize;
         }
     }
+
     for (const auto& [exactStr, count] : exactCounts) {
-        checkExactInserted(exactStr, count);
+        verifyESCEntriesForString(exactStr, count);
     }
+
     for (auto qt : {QueryTypeEnum::SubstringPreview,
                     QueryTypeEnum::SuffixPreview,
                     QueryTypeEnum::PrefixPreview}) {
         auto qt_index = queryTypeToIndex(qt);
         for (const auto& [exactStr, count] : paddingCounts[qt_index]) {
-            checkPaddingInserted(exactStr, count, qt);
+            verifyESCEntriesForString(exactStr, count, qt, true /*padding*/);
         }
         for (const auto& [affix, count] : affixCounts[qt_index]) {
-            auto strDoc = BSON("k" << affix);
-            auto strElement = strDoc.firstElement();
-            // If we inserted a substring ct times, we should expect to find matching non-anchors up
-            // to and including ct, but not beyond.
-            for (int ct = 1; ct <= count; ct++) {
-                ASSERT_FALSE(findESCNonAnchor(strElement, ct, qt).isEmpty());
-            }
-            ASSERT_TRUE(findESCNonAnchor(strElement, count + 1, qt).isEmpty());
+            verifyESCEntriesForString(affix, count, qt);
         }
     }
 
     assertDocumentCounts(inserted.size(), totalTags, totalTags);
-    assertECOCDocumentCountByField("field", totalTags);
+    assertECOCDocumentCountByField(kTestFieldName, totalTags);
 }
 
 void QETextSearchCrudTest::doInsertsAndVerifyExpectations(
     const std::vector<std::pair<StringData, StringData>>& inserts) {
     std::vector<std::pair<StringData, StringData>> inserted;
     verifyExpectationsAfterInsertions(inserted);
+
     for (size_t i = 0; i < inserts.size(); i++) {
-        auto toInsert = BSON("field" << inserts[i].first);
+        auto toInsert = BSON(kTestFieldName << inserts[i].first);
         doInsert(i + 1, toInsert.firstElement());
         inserted.push_back(inserts[i]);
         verifyExpectationsAfterInsertions(inserted);
@@ -2101,6 +2221,7 @@ TEST_F(QETextSearchCrudTest, BasicSubstring) {
                .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
+
 TEST_F(QETextSearchCrudTest, BasicSuffix) {
     addSchema({.type = QueryTypeEnum::SuffixPreview,
                .lb = 10,
@@ -2109,6 +2230,7 @@ TEST_F(QETextSearchCrudTest, BasicSuffix) {
                .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
+
 TEST_F(QETextSearchCrudTest, BasicPrefix) {
     addSchema({.type = QueryTypeEnum::PrefixPreview,
                .lb = 10,
@@ -2117,6 +2239,7 @@ TEST_F(QETextSearchCrudTest, BasicPrefix) {
                .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
+
 TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffix) {
     addSchema({.type = QueryTypeEnum::SuffixPreview,
                .lb = 10,
@@ -2130,6 +2253,7 @@ TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffix) {
                .diacf = false});
     doInsertsAndVerifyExpectations({{"demonstration", "demonstration"}});
 }
+
 TEST_F(QETextSearchCrudTest, RepeatingSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
                .lb = 10,
@@ -2139,6 +2263,7 @@ TEST_F(QETextSearchCrudTest, RepeatingSubstring) {
                .diacf = false});
     doInsertsAndVerifyExpectations({{"aaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaa"}});
 }
+
 TEST_F(QETextSearchCrudTest, FoldAsciiSuffix) {
     addSchema({.type = QueryTypeEnum::SuffixPreview,
                .lb = 10,
@@ -2149,6 +2274,7 @@ TEST_F(QETextSearchCrudTest, FoldAsciiSuffix) {
     doInsertsAndVerifyExpectations(
         {{"D^e`````^^M^o^^^^n``st```rA^^`^`^`^tI``on", "demonstration"}});
 }
+
 TEST_F(QETextSearchCrudTest, UnicodeSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
                .lb = 1,
@@ -2158,6 +2284,7 @@ TEST_F(QETextSearchCrudTest, UnicodeSubstring) {
                .diacf = false});
     doInsertsAndVerifyExpectations({{"私はぺんです.", "私はぺんです."}});
 }
+
 TEST_F(QETextSearchCrudTest, FoldUnicodeSubstring) {
     addSchema({.type = QueryTypeEnum::SubstringPreview,
                .lb = 3,
@@ -2184,6 +2311,7 @@ TEST_F(QETextSearchCrudTest, BasicSubstringMultipleInserts) {
                                     {"aaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaa"},
                                     {"aaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaa"}});
 }
+
 TEST_F(QETextSearchCrudTest, BasicSuffixMultipleInserts) {
     addSchema({.type = QueryTypeEnum::SuffixPreview,
                .lb = 10,
@@ -2197,6 +2325,7 @@ TEST_F(QETextSearchCrudTest, BasicSuffixMultipleInserts) {
                                     {"aaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaa"},
                                     {"aaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaa"}});
 }
+
 TEST_F(QETextSearchCrudTest, BasicPrefixMultipleInserts) {
     addSchema({.type = QueryTypeEnum::PrefixPreview,
                .lb = 10,
@@ -2210,6 +2339,7 @@ TEST_F(QETextSearchCrudTest, BasicPrefixMultipleInserts) {
                                     {"aaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaa"},
                                     {"aaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaa"}});
 }
+
 TEST_F(QETextSearchCrudTest, BasicPrefixAndSuffixMultipleInserts) {
     addSchema({.type = QueryTypeEnum::SuffixPreview,
                .lb = 10,
