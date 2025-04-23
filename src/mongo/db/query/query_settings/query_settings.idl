@@ -115,3 +115,15 @@ structs:
             representativeQuery:
                 type: object_owned
                 optional: true
+
+    QueryShapeRepresentativeQuery:
+        description: >-
+            A structure to store 'QueryShapeHash' with the corresponding 'QueryInstance'.
+        strict: false
+        fields:
+            _id:
+                type: QueryShapeHash
+                stability: internal
+            representativeQuery:
+                type: object_owned
+                stability: internal

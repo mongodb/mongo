@@ -249,6 +249,11 @@ NSS_CONSTANT(kConfigSampledQueriesNamespace, DatabaseName::kConfig, "sampledQuer
 // Namespace used for storing the diffs for sampled update queries.
 NSS_CONSTANT(kConfigSampledQueriesDiffNamespace, DatabaseName::kConfig, "sampledQueriesDiff"_sd)
 
+// Namespace used for storing query shape representative queries.
+NSS_CONSTANT(kQueryShapeRepresentativeQueriesNamespace,
+             DatabaseName::kConfig,
+             "queryShapeRepresentativeQueries"_sd)
+
 // Namespace used for the health log.
 NSS_CONSTANT(kLocalHealthLogNamespace, DatabaseName::kLocal, "system.healthlog"_sd)
 
