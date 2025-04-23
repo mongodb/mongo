@@ -1,6 +1,6 @@
 # Open telemetry (OTel) in resmoke
 
-OTel is one of two systems we use to capture metrics from resmoke. For mongo-tooling-metrics please see the documentation [here](README.md).
+OTel is what we use to capture metrics from resmoke.
 
 ## What Do We Capture
 

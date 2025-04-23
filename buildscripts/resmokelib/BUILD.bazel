@@ -41,12 +41,12 @@ py_library(
             group = "build-metrics",
         ),
         dependency(
-            "mongo-tooling-metrics",
-            group = "tooling-metrics",
-        ),
-        dependency(
             "pyyaml",
             group = "core",
+        ),
+        dependency(
+            "gitpython",
+            group = "evergreen",
         ),
         dependency(
             "opentelemetry-api",

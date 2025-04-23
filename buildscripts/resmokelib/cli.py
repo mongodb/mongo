@@ -2,10 +2,8 @@
 
 import os
 import time
-from datetime import datetime
 
 import psutil
-from mongo_tooling_metrics.lib.top_level_metrics import ResmokeToolingMetrics
 
 from buildscripts.resmokelib import parser
 
@@ -27,9 +25,5 @@ def main(argv):
         "For more information, see the help message for each subcommand.\n"
         "For example: resmoke.py run -h\n"
         "Note: bisect, setup-multiversion and symbolize subcommands have been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n",
-    )
-    ResmokeToolingMetrics.register_metrics(
-        utc_starttime=datetime.utcfromtimestamp(__start_time),
-        parser=parser.get_parser(),
     )
     subcommand.execute()
