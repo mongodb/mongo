@@ -162,7 +162,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 "on the collection.",
                 logAttrs(ns),
                 "recordId"_attr = member->recordId,
-                "indexKeyData"_attr = indexKeyData);
+                "indexKeyData"_attr = redact(indexKeyData));
         }
         return false;
     }

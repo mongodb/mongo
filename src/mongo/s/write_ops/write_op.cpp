@@ -422,7 +422,7 @@ void WriteOp::_noteWriteWithoutShardKeyWithIdBatchResponseWithSingleWrite(
                 LOGV2_DEBUG(8083900,
                             4,
                             "Ignoring write without shard key with id child op error.",
-                            "error"_attr = childOp.error->serialize());
+                            "error"_attr = redact(childOp.error->serialize()));
                 childOp.state = WriteOpState_Completed;
                 childOp.error = boost::none;
             }

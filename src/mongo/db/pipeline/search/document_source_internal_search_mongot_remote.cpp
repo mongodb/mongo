@@ -99,7 +99,7 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
     LOGV2_DEBUG(9497006,
                 5,
                 "Creating DocumentSourceInternalSearchMongotRemote",
-                "spec"_attr = _spec.toBSON());
+                "spec"_attr = redact(_spec.toBSON()));
     if (_spec.getSortSpec().has_value()) {
         _sortKeyGen.emplace(SortPattern{*_spec.getSortSpec(), pExpCtx}, pExpCtx->getCollator());
     }
@@ -289,7 +289,7 @@ void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
         _cursor->getCursorVars()) {
         // Variables on the cursor must be an object.
         auto varsObj = Value(_cursor->getCursorVars().value());
-        LOGV2_DEBUG(8569400, 4, "Setting meta vars", "varsObj"_attr = varsObj);
+        LOGV2_DEBUG(8569400, 4, "Setting meta vars", "varsObj"_attr = redact(varsObj.toString()));
         auto metaVal = varsObj.getDocument().getField(
             Variables::getBuiltinVariableName(Variables::kSearchMetaId));
         if (!metaVal.missing()) {
@@ -314,7 +314,10 @@ void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
 
 DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextAfterSetup() {
     auto response = _getNext();
-    LOGV2_DEBUG(8569401, 5, "getting next after setup", "response"_attr = response);
+    LOGV2_DEBUG(8569401,
+                5,
+                "getting next after setup",
+                "response"_attr = response.map([](const BSONObj& b) { return redact(b); }));
     auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
 
     if (opDebug.msWaitingForMongot) {

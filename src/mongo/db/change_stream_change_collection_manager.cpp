@@ -256,7 +256,7 @@ public:
                               .binaryEqual(insertStatement.doc));
                 LOGV2(7282901,
                       "Ignoring DuplicateKey error for change collection insert",
-                      "doc"_attr = insertStatement.doc.toString());
+                      "doc"_attr = redact(insertStatement.doc.toString()));
                 // Continue to the next insert statement as we've ommitted the current one.
                 continue;
             } else if (!status.isOK()) {

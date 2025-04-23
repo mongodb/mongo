@@ -100,7 +100,7 @@ void noteStaleCollVersionResponses(OperationContext* opCtx,
                     4,
                     "Noting stale config response",
                     "shardId"_attr = error.endpoint.shardName,
-                    "status"_attr = error.error.getStatus());
+                    "status"_attr = redact(error.error.getStatus()));
 
         auto extraInfo = error.error.getStatus().extraInfo<StaleConfigInfo>();
         invariant(extraInfo);
@@ -117,7 +117,7 @@ void noteStaleDbVersionResponses(OperationContext* opCtx,
                     4,
                     "Noting stale database response",
                     "shardId"_attr = error.endpoint.shardName,
-                    "status"_attr = error.error.getStatus());
+                    "status"_attr = redact(error.error.getStatus()));
         auto extraInfo = error.error.getStatus().extraInfo<StaleDbRoutingVersion>();
         invariant(extraInfo);
         targeter->noteStaleDbVersionResponse(opCtx, *extraInfo);
@@ -131,7 +131,7 @@ void noteCannotImplicitlyCreateCollectionResponses(OperationContext* opCtx,
         LOGV2_DEBUG(8037202,
                     4,
                     "Noting cannot implicitly create collection response",
-                    "status"_attr = error.error.getStatus());
+                    "status"_attr = redact(error.error.getStatus()));
         auto extraInfo = error.error.getStatus().extraInfo<CannotImplicitlyCreateCollectionInfo>();
         invariant(extraInfo);
         targeter->noteCannotImplicitlyCreateCollectionResponse(opCtx, *extraInfo);
@@ -798,7 +798,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             LOGV2_DEBUG(9986801,
                         4,
                         "Encountered a targeter error",
-                        "error"_attr = statusWithWriteType.getStatus(),
+                        "error"_attr = redact(statusWithWriteType.getStatus()),
                         "will refresh"_attr = !refreshedTargeter);
 
             // Don't do anything until a targeter refresh
