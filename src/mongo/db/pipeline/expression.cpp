@@ -2002,7 +2002,8 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* 
                                                            MetaType::kSearchSequenceToken,
                                                            MetaType::kScore,
                                                            MetaType::kScoreDetails,
-                                                           MetaType::kStream};
+                                                           MetaType::kStream,
+                                                           MetaType::kChangeStreamControlEvent};
     const bool usesUnstableField = kUnstableMetaFields.contains(type);
     uassert(ErrorCodes::APIStrictError,
             str::stream() << "Provided apiStrict is true with an unstable meta field \""

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace exec {
@@ -48,6 +49,13 @@ public:
     enum class ReturnStatus {
         // There is a result to be processed.
         kAdvanced,
+
+        // There is a control document to be processed. Control documents are documents with
+        // additional metadata that will be passed on by most pipeline stages unmodified and
+        // without further inspection.
+        // Currently only produced inside change streams.
+        kAdvancedControlDocument,
+
         // There will be no further results.
         kEOF,
         // There is not a result to be processed yet, but there may be more results in the future.
@@ -65,28 +73,40 @@ public:
     }
 
     /**
+     * Builder method to create an 'advanced' GetNextResult containing a change stream control
+     * event.
+     */
+    static GetNextResult makeAdvancedControlDocument(Document&& result) {
+        dassert(result.metadata().isChangeStreamControlEvent());
+        return GetNextResult(ReturnStatus::kAdvancedControlDocument, std::move(result));
+    }
+
+    /**
      * Shortcut constructor for the common case of creating an 'advanced' GetNextResult from the
      * given 'result'. Accepts only an rvalue reference as an argument, since a Stage
      * will want to move 'result' into this GetNextResult, and should have to opt in to making a
      * copy.
      */
     /* implicit */ GetNextResult(Document&& result)
-        : _status(ReturnStatus::kAdvanced), _result(std::move(result)) {}
+        : GetNextResult(ReturnStatus::kAdvanced, std::move(result)) {
+        dassert(!_result.metadata().isChangeStreamControlEvent());
+    }
 
     /**
-     * Gets the result document. It is an error to call this if isAdvanced() returns false.
+     * Gets the result document. It is an error to call this if both 'isAdvanced()' and
+     * 'isAdvancedControlDocument()' return false.
      */
     const Document& getDocument() const {
-        dassert(isAdvanced());
+        dassert(isAdvanced() || isAdvancedControlDocument());
         return _result;
     }
 
     /**
      * Releases the result document, transferring ownership to the caller. It is an error to
-     * call this if isAdvanced() returns false.
+     * call this if both 'isAdvanced()' and 'isAdvancedControlDocument()' return false.
      */
     Document releaseDocument() {
-        dassert(isAdvanced());
+        dassert(isAdvanced() || isAdvancedControlDocument());
         return std::move(_result);
     }
 
@@ -106,8 +126,16 @@ public:
         return _status == ReturnStatus::kPauseExecution;
     }
 
+    bool isAdvancedControlDocument() const {
+        return _status == ReturnStatus::kAdvancedControlDocument;
+    }
+
 private:
+    // Private constructors, called from public constructor or builder methods above.
     GetNextResult(ReturnStatus status) : _status(status) {}
+
+    GetNextResult(ReturnStatus status, Document&& result)
+        : _status(status), _result(std::move(result)) {}
 
     ReturnStatus _status;
     Document _result;

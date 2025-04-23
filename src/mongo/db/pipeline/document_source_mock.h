@@ -159,7 +159,12 @@ public:
      * of this stage.
      */
     void emplace_back(Document doc, int32_t count = 1) {
-        _queue.push_back(QueueItem{GetNextResult(std::move(doc)), count});
+        if (doc.metadata().isChangeStreamControlEvent()) {
+            _queue.push_back(
+                QueueItem{GetNextResult::makeAdvancedControlDocument(std::move(doc)), count});
+        } else {
+            _queue.push_back(QueueItem{GetNextResult(std::move(doc)), count});
+        }
     }
 
     /**

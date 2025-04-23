@@ -145,6 +145,9 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                                 redact(nextInput.getDocument().toString()));
                 break;  // Try again with the next document.
             }
+            case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+                tasserted(10358902, "Sample from random cursor does not support control events");
+            }
             case GetNextResult::ReturnStatus::kPauseExecution: {
                 MONGO_UNREACHABLE;  // Our input should be a random cursor, which should never
                                     // result in kPauseExecution.

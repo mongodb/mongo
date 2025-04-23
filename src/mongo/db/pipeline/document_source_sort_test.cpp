@@ -56,6 +56,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -426,6 +427,21 @@ TEST_F(DocumentSourceSortExecutionTest, RandMeta) {
 
     createSort(BSON("$computed0" << BSON("$meta" << "randVal")));
     checkResults({first.freeze(), second.freeze()}, sort(), "[{_id:1},{_id:0}]");
+}
+
+/**
+ * Sort tasserts on control event.
+ */
+DEATH_TEST_REGEX_F(DocumentSourceSortExecutionTest,
+                   CannotHandleControlEvent,
+                   "Tripwire assertion.*10358905") {
+    MutableDocument doc(Document{{"_id", 0}});
+    doc.metadata().setChangeStreamControlEvent();
+
+    createSort(BSON("_id" << 1));
+    auto source = DocumentSourceMock::createForTest({doc.freeze()}, getExpCtx());
+    sort()->setSource(source.get());
+    ASSERT_THROWS_CODE(sort()->getNext(), AssertionException, 10358905);
 }
 
 /** A missing nested object within an array returns an empty array. */

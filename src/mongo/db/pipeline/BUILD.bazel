@@ -1388,6 +1388,7 @@ mongo_cc_unit_test(
         "pipeline_metadata_tree.h",
         "pipeline_metadata_tree_test.cpp",
         "pipeline_test.cpp",
+        "plan_executor_pipeline_test.cpp",
         "resume_token_test.cpp",
         "sampling_based_initial_split_policy_test.cpp",
         "semantic_analysis_test.cpp",

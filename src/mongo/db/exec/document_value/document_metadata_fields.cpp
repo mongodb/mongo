@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
@@ -69,6 +68,8 @@ static const std::string scoreDetailsName = "scoreDetails";
 static const std::string scoreDetailsScoreField = "value";
 static const std::string streamName = "stream";
 
+static const std::string changeStreamControlEventName = "changeStreamControlEvent";
+
 static const StringMap<MetaType> kMetaNameToMetaType = {
     {scoreName, MetaType::kScore},
     {vectorSearchScoreName, MetaType::kVectorSearchScore},
@@ -87,6 +88,7 @@ static const StringMap<MetaType> kMetaNameToMetaType = {
     {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
     {scoreDetailsName, MetaType::kScoreDetails},
     {streamName, MetaType::kStream},
+    {changeStreamControlEventName, MetaType::kChangeStreamControlEvent},
 };
 
 static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
@@ -107,6 +109,7 @@ static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
     {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
     {MetaType::kScoreDetails, scoreDetailsName},
     {MetaType::kStream, streamName},
+    {MetaType::kChangeStreamControlEvent, changeStreamControlEventName},
 };
 }  // namespace
 
@@ -231,6 +234,10 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             assertType(BSONType::Object);
             setStream(std::move(val));
             break;
+        case DocumentMetadataFields::kChangeStreamControlEvent:
+            // The value is completely ignored here. We only set the relevant bit in the bitset.
+            setChangeStreamControlEvent();
+            break;
         default:
             MONGO_UNREACHABLE_TASSERT(9733902);
     }
@@ -322,6 +329,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasStream() && other.hasStream()) {
         setStream(other.getStream());
     }
+    if (!isChangeStreamControlEvent() && other.isChangeStreamControlEvent()) {
+        setChangeStreamControlEvent();
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -375,6 +385,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     }
     if (other.hasStream()) {
         setStream(other.getStream());
+    }
+    if (other.isChangeStreamControlEvent()) {
+        setChangeStreamControlEvent();
     }
 }
 
@@ -482,6 +495,11 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kStream + 1));
         getStream().serializeForSorter(buf);
     }
+    if (isChangeStreamControlEvent()) {
+        // When this metadata field is set, it is implicitly true, so we do not need to serialize
+        // any further value for it.
+        buf.appendNum(static_cast<char>(MetaType::kChangeStreamControlEvent + 1));
+    }
 
     buf.appendNum(static_cast<char>(0));
 }
@@ -535,6 +553,10 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kStream) + 1) {
             out->setStream(Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kChangeStreamControlEvent) + 1) {
+            // When this metadata field is set, it is implicitly true, so it is not followed by any
+            // further serialized value.
+            out->setChangeStreamControlEvent();
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -606,6 +628,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "scoreDetails";
         case DocumentMetadataFields::kStream:
             return "stream processing metadata";
+        case DocumentMetadataFields::kChangeStreamControlEvent:
+            return "change stream control event";
         default:
             MONGO_UNREACHABLE;
     }

@@ -832,6 +832,57 @@ TEST(DocumentTest, ToBsonSizeTraits) {
 
 namespace MetaFields {
 using mongo::Document;
+
+TEST(MetaFields, ChangeStreamControlDocument) {
+    // Documents should not have the 'control event' flag set.
+    ASSERT_FALSE(Document().metadata().isChangeStreamControlEvent());
+
+    // Empty document created via building should not have the 'control event' flag set.
+    {
+        MutableDocument docBuilder;
+        Document doc = docBuilder.freeze();
+        ASSERT_FALSE(doc.metadata().isChangeStreamControlEvent());
+
+        // Cloning the document should also not set the flag.
+        Document cloned = doc.clone();
+        ASSERT_FALSE(cloned.metadata().isChangeStreamControlEvent());
+        ASSERT_FALSE(doc.metadata().isChangeStreamControlEvent());
+    }
+
+    // Explicitly setting the 'control event' flag on the document should work.
+    {
+        MutableDocument docBuilder;
+        docBuilder.metadata().setChangeStreamControlEvent();
+        Document doc = docBuilder.freeze();
+        ASSERT_TRUE(doc.metadata().isChangeStreamControlEvent());
+
+        // Cloning the document should also clone the flag.
+        Document cloned = doc.clone();
+        ASSERT_TRUE(cloned.metadata().isChangeStreamControlEvent());
+        ASSERT_TRUE(doc.metadata().isChangeStreamControlEvent());
+    }
+
+    // Creating a regular document from BSON should not set the flag.
+    {
+        Document source = Document::fromBsonWithMetaData(BSON("foo" << "bar"));
+
+        MutableDocument docBuilder;
+        docBuilder.copyMetaDataFrom(source);
+        auto doc = docBuilder.freeze();
+        ASSERT_FALSE(doc.metadata().isChangeStreamControlEvent());
+    }
+
+    // Creating a document from BSON with the flag present should set the flag correctly.
+    for (auto value : {true, false}) {
+        Document doc = Document::fromBsonWithMetaData(
+            BSON("foo" << "bar" << "$changeStreamControlEvent" << value));
+
+        // Note: the presence of '$changeStreamControlEvent' is enough to set the equivalent
+        // metadata bit. The value that '$changeStreamControlEvent' is set to does not matter.
+        ASSERT_TRUE(doc.metadata().isChangeStreamControlEvent());
+    }
+}
+
 TEST(MetaFields, TextScoreBasics) {
     // Documents should not have a text score until it is set.
     ASSERT_FALSE(Document().metadata().hasTextScore());
@@ -988,6 +1039,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     ASSERT_BSONOBJ_EQ(result.metadata().getSearchSortValues(), BSON("a" << 1));
     ASSERT_EQ(result.metadata().getVectorSearchScore(), 6.7);
     ASSERT_EQ(result.metadata().getScore(), 8.1);
+    ASSERT_FALSE(result.metadata().isChangeStreamControlEvent());
 }
 
 class SerializationTest : public unittest::Test {
@@ -1038,6 +1090,8 @@ protected:
         if (input.metadata().hasScore()) {
             ASSERT_EQ(output.metadata().getScore(), input.metadata().getScore());
         }
+        ASSERT_EQ(input.metadata().isChangeStreamControlEvent(),
+                  output.metadata().isChangeStreamControlEvent());
 
         ASSERT(output.toBson().binaryEqual(input.toBson()));
     }
@@ -1066,6 +1120,7 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails" << "foo"));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
+    docBuilder.metadata().setChangeStreamControlEvent();
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -1091,6 +1146,7 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setSearchSortValues(BSON("a" << 42));
     docBuilder.metadata().setVectorSearchScore(40.0);
     docBuilder.metadata().setScore(60.0);
+    docBuilder.metadata().setChangeStreamControlEvent();
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData();
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
@@ -1103,6 +1159,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), obj[Document::metaFieldSearchSortValues].Obj());
     ASSERT_EQ(40.0, obj[Document::metaFieldVectorSearchScore].Double());
     ASSERT_EQ(60.0, obj[Document::metaFieldScore].Double());
+    ASSERT_TRUE(obj[Document::metaFieldChangeStreamControlEvent].boolean());
     Document fromBson = Document::fromBsonWithMetaData(obj);
     ASSERT_TRUE(fromBson.metadata().hasTextScore());
     ASSERT_TRUE(fromBson.metadata().hasRandVal());
@@ -1112,6 +1169,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), fromBson.metadata().getSearchSortValues());
     ASSERT_EQ(40.0, fromBson.metadata().getVectorSearchScore());
     ASSERT_EQ(60.0, fromBson.metadata().getScore());
+    ASSERT_TRUE(fromBson.metadata().isChangeStreamControlEvent());
 }
 
 TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {
@@ -1119,14 +1177,17 @@ TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {
     // Create a document with a backing BSONObj and separate metadata.
     auto origObjNoMetadata = BSON("a" << 42);
     ASSERT_FALSE(origObjNoMetadata.hasField(Document::metaFieldSortKey));
+    ASSERT_FALSE(origObjNoMetadata.hasField(Document::metaFieldChangeStreamControlEvent));
 
     MutableDocument docBuilder;
     docBuilder.reset(origObjNoMetadata, false);
     docBuilder.metadata().setSortKey(sortKey, true);
+    docBuilder.metadata().setChangeStreamControlEvent();
     Document docWithSeparateBsonAndMetadata = docBuilder.freeze();
 
     BSONObj origObjWithMetadata = docWithSeparateBsonAndMetadata.toBsonWithMetaData();
     ASSERT_TRUE(origObjWithMetadata.hasField(Document::metaFieldSortKey));
+    ASSERT_TRUE(origObjWithMetadata.hasField(Document::metaFieldChangeStreamControlEvent));
     Document restoredDocWithMetadata = Document::fromBsonWithMetaData(origObjWithMetadata);
     ASSERT_DOCUMENT_EQ(docWithSeparateBsonAndMetadata, restoredDocWithMetadata);
 

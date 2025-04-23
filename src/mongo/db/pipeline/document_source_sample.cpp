@@ -84,6 +84,9 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
             case GetNextResult::ReturnStatus::kAdvanced: {
                 MONGO_UNREACHABLE;  // We consumed all advances above.
             }
+            case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+                tasserted(10358901, "Sample does not support control events");
+            }
             case GetNextResult::ReturnStatus::kPauseExecution: {
                 return nextInput;  // Propagate the pause.
             }

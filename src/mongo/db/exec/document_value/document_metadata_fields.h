@@ -83,6 +83,7 @@ public:
         kScore,
         kScoreDetails,
         kStream,
+        kChangeStreamControlEvent,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -449,6 +450,14 @@ public:
     Value getStream() const {
         tassert(9484101, "stream must be present in metadata", hasStream());
         return _holder->stream;
+    }
+
+    bool isChangeStreamControlEvent() const {
+        return _holder && _holder->metaFields.test(MetaType::kChangeStreamControlEvent);
+    }
+
+    void setChangeStreamControlEvent() {
+        _setCommon(MetaType::kChangeStreamControlEvent);
     }
 
     void serializeForSorter(BufBuilder& buf) const;

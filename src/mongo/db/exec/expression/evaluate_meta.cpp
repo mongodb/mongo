@@ -91,6 +91,9 @@ Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* vari
             return metadata.hasScoreDetails() ? metadata.getScoreDetails() : Value();
         case DocumentMetadataFields::MetaType::kStream:
             return metadata.hasStream() ? metadata.getStream() : Value();
+        case DocumentMetadataFields::MetaType::kChangeStreamControlEvent:
+            return Value(metadata.isChangeStreamControlEvent());
+
         default:
             MONGO_UNREACHABLE;
     }

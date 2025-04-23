@@ -71,7 +71,13 @@ size_t DocumentSourceMock::size() const {
 
 boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(
     Document doc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceMock({std::move(doc)}, expCtx);
+    std::deque<GetNextResult> results;
+    if (doc.metadata().isChangeStreamControlEvent()) {
+        results.push_back(GetNextResult::makeAdvancedControlDocument(std::move(doc)));
+    } else {
+        results.push_back(std::move(doc));
+    }
+    return new DocumentSourceMock(std::move(results), expCtx);
 }
 
 boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(

@@ -47,7 +47,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -73,11 +72,10 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -321,6 +319,59 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     // The next should realize it's used too much memory.
     ASSERT_THROWS_CODE(
         group->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+}
+
+DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
+                   CannotHandleControlEvent,
+                   "Tripwire assertion.*10358900") {
+    auto expCtx = getExpCtx();
+    expCtx->setInRouter(true);  // Disallow external sort.
+                                // This is the only way to do this in a debug build.
+    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
+    auto accumulatorArg = BSON("" << 1);
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement countStatement{"count", accExpr};
+    auto group = DocumentSourceGroup::create(
+        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
+
+    // Create a control event.
+    MutableDocument doc(Document{{"_id", 0}});
+    doc.metadata().setChangeStreamControlEvent();
+    auto mock = DocumentSourceMock::createForTest({doc.freeze()}, expCtx);
+    group->setSource(mock.get());
+
+    ASSERT_THROWS_CODE(group->getNext(), AssertionException, 10358900);
+}
+
+DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
+                   StreamingGroupCannotHandleControlEvent,
+                   "Tripwire assertion.*10358903") {
+    auto expCtx = getExpCtx();
+    expCtx->setInRouter(true);  // Disallow external sort.
+                                // This is the only way to do this in a debug build.
+
+    auto spec = fromjson(R"({
+    $_internalStreamingGroup: {
+        _id: {
+            a: "$a",
+            b: "$b"
+        },
+        a: {
+            $first: '$b'
+        },
+        $monotonicIdFields: [ "a", "b" ]
+    }
+})");
+    auto group = DocumentSourceStreamingGroup::createFromBson(spec.firstElement(), expCtx);
+
+    // Create a control event.
+    MutableDocument doc(Document{{"_id", 0}});
+    doc.metadata().setChangeStreamControlEvent();
+
+    auto mock = DocumentSourceMock::createForTest({doc.freeze()}, expCtx);
+    group->setSource(mock.get());
+
+    ASSERT_THROWS_CODE(group->getNext(), AssertionException, 10358903);
 }
 
 TEST_F(DocumentSourceGroupTest, ShouldReportSingleFieldGroupKeyAsARename) {

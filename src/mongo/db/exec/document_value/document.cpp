@@ -107,7 +107,8 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldSearchSequenceToken,
                                                     Document::metaFieldScore,
                                                     Document::metaFieldScoreDetails,
-                                                    Document::metaFieldStream};
+                                                    Document::metaFieldStream,
+                                                    Document::metaFieldChangeStreamControlEvent};
 
 DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
     : _bsonIt(std::move(bsonIt)),
@@ -524,6 +525,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setScoreDetails(Value(elem));
             } else if (fieldName == Document::metaFieldStream) {
                 _metadataFields.setStream(Value(elem));
+            } else if (fieldName == Document::metaFieldChangeStreamControlEvent) {
+                _metadataFields.setChangeStreamControlEvent();
             }
         }
     }
@@ -597,6 +600,7 @@ constexpr StringData Document::metaFieldSearchSortValues;
 constexpr StringData Document::metaFieldVectorSearchScore;
 constexpr StringData Document::metaFieldScore;
 constexpr StringData Document::metaFieldStream;
+constexpr StringData Document::metaFieldChangeStreamControlEvent;
 
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     toBson(builder);
@@ -638,6 +642,9 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     }
     if (metadata().hasStream()) {
         metadata().getStream().addToBsonObj(builder, metaFieldStream);
+    }
+    if (metadata().isChangeStreamControlEvent()) {
+        builder->append(metaFieldChangeStreamControlEvent, true);
     }
 }
 

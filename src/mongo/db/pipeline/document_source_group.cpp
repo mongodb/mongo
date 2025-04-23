@@ -741,6 +741,9 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::perfo
         case DocumentSource::GetNextResult::ReturnStatus::kAdvanced: {
             MONGO_UNREACHABLE;  // We consumed all advances above.
         }
+        case DocumentSource::GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+            tasserted(10358900, "Group does not support control events");
+        }
         case DocumentSource::GetNextResult::ReturnStatus::kPauseExecution: {
             return input;  // Propagate pause.
         }

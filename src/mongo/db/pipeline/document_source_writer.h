@@ -284,6 +284,10 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
             case GetNextResult::ReturnStatus::kAdvanced: {
                 MONGO_UNREACHABLE;  // We consumed all advances above.
             }
+            case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+                MONGO_UNREACHABLE_TASSERT(
+                    10358904);  // No support for control events in this document source.
+            }
             case GetNextResult::ReturnStatus::kPauseExecution: {
                 return nextInput;  // Propagate the pause.
             }

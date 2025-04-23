@@ -33,7 +33,6 @@
 #include <iterator>
 #include <list>
 #include <tuple>
-#include <type_traits>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -58,6 +57,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -116,6 +116,10 @@ struct CompDesc {
         return 0;
     }
 };
+
+[[noreturn]] void throwCannotHandleControlEvent() {
+    tasserted(10358905, "Sort does not support control events");
+}
 
 using TimeSorterAscMin =
     BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerMin>;
@@ -182,6 +186,9 @@ DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek()
             _timeSorterNextDoc = next.getDocument();
             return status;
         }
+        case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+            throwCannotHandleControlEvent();
+        }
         case GetNextResult::ReturnStatus::kEOF:
             _timeSorterInputEOF = true;
             return status;
@@ -208,6 +215,9 @@ DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeekSa
             return status;
         case GetNextResult::ReturnStatus::kAdvanced:
             break;
+        case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+            throwCannotHandleControlEvent();
+        }
     }
 
     if (!_timeSorterPartitionKeyGen) {
@@ -247,9 +257,10 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
         while (_timeSorter->getState() == TimeSorterInterface::State::kWait) {
             auto status = timeSorterPeekSamePartition();
             switch (status) {
-                case GetNextResult::ReturnStatus::kPauseExecution:
+                case GetNextResult::ReturnStatus::kPauseExecution: {
                     return GetNextResult::makePauseExecution();
-                case GetNextResult::ReturnStatus::kEOF:
+                }
+                case GetNextResult::ReturnStatus::kEOF: {
                     // We've reached the end of the current partition. Tell _timeSorter there will
                     // be no more input. In response, its state will never be kWait again unless we
                     // restart it, so we can proceed to drain all the documents currently held by
@@ -260,11 +271,16 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
                         "DocumentSourceSort::_timeSorter waiting for input that will not arrive",
                         _timeSorter->getState() != TimeSorterInterface::State::kWait);
                     continue;
-                case GetNextResult::ReturnStatus::kAdvanced:
+                }
+                case GetNextResult::ReturnStatus::kAdvanced: {
                     auto [time, doc] = extractTime(timeSorterGetNext());
 
                     _timeSorter->add({time}, doc);
                     continue;
+                }
+                case GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+                    throwCannotHandleControlEvent();
+                }
             }
         }
 
@@ -278,6 +294,9 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
 
     if (!_populated) {
         auto populationResult = populate();
+        if (MONGO_unlikely(populationResult.isAdvancedControlDocument())) {
+            throwCannotHandleControlEvent();
+        }
         if (populationResult.isPaused()) {
             return populationResult;
         }

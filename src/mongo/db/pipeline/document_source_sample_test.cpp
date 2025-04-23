@@ -35,7 +35,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -190,6 +189,17 @@ TEST_F(SampleBasics, ShouldPropagatePauses) {
     ASSERT_TRUE(sample()->getNext().isAdvanced());
     ASSERT_TRUE(sample()->getNext().isAdvanced());
     assertEOF();
+}
+
+DEATH_TEST_REGEX_F(SampleBasics, CannotHandleControlEvent, "Tripwire assertion.*10358901") {
+    createSample(2);
+
+    // Create a control event.
+    MutableDocument doc(Document{{"_id", 0}});
+    doc.metadata().setChangeStreamControlEvent();
+    source()->push_back(DocumentSource::GetNextResult::makeAdvancedControlDocument(doc.freeze()));
+
+    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 10358901);
 }
 
 TEST_F(SampleBasics, RedactsCorrectly) {
@@ -419,6 +429,19 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
     // Should see the first result, then see a pause and fail.
     ASSERT_TRUE(sample()->getNext().isAdvanced());
     sample()->getNext();
+}
+
+DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
+                   CannotHandleControlEvent,
+                   "Tripwire assertion.*10358902") {
+    createSample(2);
+
+    // Create a control event.
+    MutableDocument doc(Document{{"_id", 0}});
+    doc.metadata().setChangeStreamControlEvent();
+    source()->push_back(DocumentSource::GetNextResult::makeAdvancedControlDocument(doc.freeze()));
+
+    ASSERT_THROWS_CODE(sample()->getNext(), AssertionException, 10358901);
 }
 
 TEST_F(SampleFromRandomCursorBasics, RedactsCorrectly) {

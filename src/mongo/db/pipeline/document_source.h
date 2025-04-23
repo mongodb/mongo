@@ -200,7 +200,7 @@ namespace mongo {
 
 class DocumentSource : public exec::agg::Stage {
 public:
-    // In general a parser returns a list of DocumentSources, to accomodate "multi-stage aliases"
+    // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.
     using Parser = std::function<std::list<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;

@@ -34,7 +34,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/util/str.h"
 
@@ -56,7 +56,17 @@ namespace mongo {
 namespace {
 auto& changeStreamsLargeEventsFailedCounter =
     *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
+
+// Tests if we are currently running in a router or in a replica set context.
+bool isRouterOrReplicaSet(ExpressionContext* expCtx) {
+    if (expCtx->getInRouter()) {
+        return true;
+    }
+    auto* replCoord = repl::ReplicationCoordinator::get(expCtx->getOperationContext());
+    return replCoord && replCoord->getSettings().isReplSet();
 }
+
+}  // namespace
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
@@ -123,16 +133,19 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document* docOut,
 }
 
 bool PlanExecutorPipeline::isEOF() const {
-    if (!_stash.empty()) {
-        return false;
-    }
-
-    return _pipelineIsEof;
+    return _stash.empty() && _pipelineIsEof;
 }
 
 boost::optional<Document> PlanExecutorPipeline::_getNext() {
     auto nextDoc = _tryGetNext();
-    if (!nextDoc) {
+    if (nextDoc) {
+        // No change stream control events should ever escape an aggregation pipeline on the router
+        // or the replica set.
+        tassert(10358906,
+                "No control events should escape this aggregation pipeline",
+                !nextDoc->metadata().isChangeStreamControlEvent() ||
+                    !isRouterOrReplicaSet(_expCtx.get()));
+    } else {
         _pipelineIsEof = true;
     }
 

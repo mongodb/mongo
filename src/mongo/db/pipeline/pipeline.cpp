@@ -667,6 +667,8 @@ boost::optional<Document> Pipeline::getNext() {
             nextResult = _sources.back()->getNext();
         }
         if (!nextResult.isEOF()) {
+            // We'll get here for both statuses 'GetNextResult::ReturnStatus::kAdvanced' and
+            // 'GetNextResult::ReturnStatus::kAdvancedControlDocument'.
             return nextResult.releaseDocument();
         }
     }

@@ -730,8 +730,6 @@ private:
     // released by a call to 'releaseMetadata()'.
     mutable bool _haveLazyLoadedMetadata = false;
 
-    mutable DocumentMetadataFields _metadataFields;
-
     // True if this storage was constructed from BSON with metadata. Serializing this object using
     // the 'toBson()' method will omit (strip) the metadata fields.
     bool _bsonHasMetadata{false};
@@ -739,6 +737,8 @@ private:
     // This flag is set to true anytime the storage returns a mutable field. It is used to optimize
     // a conversion to BSON; i.e. if there are not any modifications we can directly return _bson.
     bool _modified{false};
+
+    mutable DocumentMetadataFields _metadataFields;
 
     size_t _snapshottedSize{0};
 

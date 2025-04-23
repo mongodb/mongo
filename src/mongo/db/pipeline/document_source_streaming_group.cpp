@@ -228,6 +228,10 @@ DocumentSourceStreamingGroup::readyNextBatchInner(GetNextResult input) {
         case DocumentSource::GetNextResult::ReturnStatus::kAdvanced: {
             MONGO_UNREACHABLE;  // We consumed all advances above.
         }
+        case DocumentSource::GetNextResult::ReturnStatus::kAdvancedControlDocument: {
+            MONGO_UNREACHABLE_TASSERT(
+                10358903);  // No support for control events in this document source.
+        }
         case DocumentSource::GetNextResult::ReturnStatus::kPauseExecution: {
             return input;  // Propagate pause.
         }

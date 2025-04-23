@@ -50,6 +50,98 @@ TEST_F(DocumentSourceMockTest, OneDoc) {
     ASSERT(source->getNext().isEOF());
 }
 
+// Test if we can return a control event.
+TEST_F(DocumentSourceMockTest, SingleControlEvent) {
+    auto orig = Document{{"_id", 0}};
+    // Create a control event.
+    MutableDocument doc(orig);
+    doc.metadata().setChangeStreamControlEvent();
+
+    auto source = DocumentSourceMock::createForTest(doc.freeze(), getExpCtx());
+    auto next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_FALSE(next.isAdvanced());
+    ASSERT_FALSE(next.isPaused());
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+
+    ASSERT_DOCUMENT_EQ(next.getDocument(), orig);
+    ASSERT_TRUE(next.getDocument().metadata().isChangeStreamControlEvent());
+    ASSERT_TRUE(source->getNext().isEOF());
+}
+
+// Test if we can return control events mixed with other events.
+TEST_F(DocumentSourceMockTest, ControlEventsAndOtherEvents) {
+    std::deque<DocumentSource::GetNextResult> docs;
+    docs.push_back(Document{{"a", 1}});
+    docs.push_back(DocumentSource::GetNextResult::makePauseExecution());
+    docs.push_back(Document{{"a", 2}});
+    {
+        auto doc = Document{{"c", 1}};
+        MutableDocument docBuilder(doc);
+        docBuilder.metadata().setChangeStreamControlEvent();
+        docs.push_back(
+            DocumentSource::GetNextResult::makeAdvancedControlDocument(docBuilder.freeze()));
+    }
+    docs.push_back(Document{{"a", 3}});
+    {
+        auto doc = Document{{"c", 2}};
+        MutableDocument docBuilder(doc);
+        docBuilder.metadata().setChangeStreamControlEvent();
+        docs.push_back(
+            DocumentSource::GetNextResult::makeAdvancedControlDocument(docBuilder.freeze()));
+    }
+
+    auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    // Regular document: '{a:1}'.
+    auto next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_FALSE(next.isPaused());
+    ASSERT_FALSE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"a", 1}}));
+
+    // Pause.
+    next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_FALSE(next.isAdvanced());
+    ASSERT_TRUE(next.isPaused());
+    ASSERT_FALSE(next.isAdvancedControlDocument());
+
+    // Regular document: '{a:2}'.
+    next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_FALSE(next.isPaused());
+    ASSERT_FALSE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"a", 2}}));
+
+    // Control document: '{c:1}'.
+    next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_FALSE(next.isAdvanced());
+    ASSERT_FALSE(next.isPaused());
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"c", 1}}));
+    ASSERT_TRUE(next.getDocument().metadata().isChangeStreamControlEvent());
+
+    // Regular document: '{a:3}'.
+    next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_FALSE(next.isPaused());
+    ASSERT_FALSE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"a", 3}}));
+
+    // Control document: '{c:2}'.
+    next = source->getNext();
+    ASSERT_FALSE(next.isEOF());
+    ASSERT_FALSE(next.isAdvanced());
+    ASSERT_FALSE(next.isPaused());
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(next.getDocument(), (Document{{"c", 2}}));
+}
+
 TEST_F(DocumentSourceMockTest, ShouldBeConstructableFromInitializerListOfDocuments) {
     auto source =
         DocumentSourceMock::createForTest({Document{{"a", 1}}, Document{{"a", 2}}}, getExpCtx());
