@@ -88,6 +88,9 @@ function testForReplicaSet() {
 
     rewriteReplicaSetCatalog(rst, coll.getFullName());
 
+    // rewriteReplicaSetCatalog is applied to all nodes in the replica, no need to wait for
+    // replication.
+
     // Check metadata is in 4.2 format.
     rst.nodes.forEach((node) => {
         assertExpectedCollectionIndexSpecWithNamespaceField(node, true);
@@ -95,6 +98,9 @@ function testForReplicaSet() {
 
     assert.commandWorked(
         rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+
+    // Ensure changes are replicated to all nodes before asserting.
+    rst.awaitReplication();
 
     // Check metadata has been cleaned up.
     rst.nodes.forEach((node) => {
@@ -127,6 +133,9 @@ function testForShardedCluster() {
 
     rewriteReplicaSetCatalog(st.rs0, fullCollName);
 
+    // rewriteReplicaSetCatalog is applied to all nodes in the replica, no need to wait for
+    // replication.
+
     st.rs0.nodes.forEach((node) => {
         assertExpectedCollectionIndexSpecWithNamespaceField(node, true);
     });
@@ -140,6 +149,10 @@ function testForShardedCluster() {
 
     assert.commandWorked(
         st.s.adminCommand({moveChunk: fullCollName, find: {x: 0}, to: st.shard1.shardName}));
+
+    // Ensure changes are replicated to all nodes before asserting.
+    st.rs0.awaitReplication();
+    st.rs1.awaitReplication();
 
     // Verify shard1 has cloned collection.
     assert.eq(
