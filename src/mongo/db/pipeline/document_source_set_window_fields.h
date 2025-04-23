@@ -190,7 +190,7 @@ public:
 
     DocumentSource::GetNextResult doGetNext() override;
 
-    void setSource(DocumentSource* source) final {
+    void setSource(Stage* source) final {
         pSource = source;
         _iterator.setSource(source);
     }

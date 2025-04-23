@@ -52,16 +52,13 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -69,10 +66,6 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/util/deferred.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/version_context.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -205,7 +198,7 @@ namespace mongo {
     }                                                                 \
     const DocumentSource::Id& constName = _dsid_##name;
 
-class DocumentSource : public RefCountable {
+class DocumentSource : public exec::agg::Stage {
 public:
     // In general a parser returns a list of DocumentSources, to accomodate "multi-stage aliases"
     // like $bucket.
@@ -224,6 +217,7 @@ public:
     using TransactionRequirement = StageConstraints::TransactionRequirement;
     using LookupRequirement = StageConstraints::LookupRequirement;
     using UnionRequirement = StageConstraints::UnionRequirement;
+    using GetNextResult = exec::agg::GetNextResult;
 
     /**
      * Used to identify different DocumentSource sub-classes, without requiring RTTI.
@@ -236,81 +230,6 @@ public:
     struct ParserRegistration {
         DocumentSource::Parser parser;
         CheckableFeatureFlagRef featureFlag;
-    };
-
-    /**
-     * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
-     * (ReturnStatus, Document) pair, with the first entry being used to communicate information
-     * about the execution of the DocumentSource, such as whether or not it has been exhausted.
-     */
-    class GetNextResult {
-    public:
-        enum class ReturnStatus {
-            // There is a result to be processed.
-            kAdvanced,
-            // There will be no further results.
-            kEOF,
-            // There is not a result to be processed yet, but there may be more results in the
-            // future. If a DocumentSource retrieves this status from its child, it must propagate
-            // it without doing any further work.
-            kPauseExecution,
-        };
-
-        static GetNextResult makeEOF() {
-            return GetNextResult(ReturnStatus::kEOF);
-        }
-
-        static GetNextResult makePauseExecution() {
-            return GetNextResult(ReturnStatus::kPauseExecution);
-        }
-
-        /**
-         * Shortcut constructor for the common case of creating an 'advanced' GetNextResult from the
-         * given 'result'. Accepts only an rvalue reference as an argument, since DocumentSources
-         * will want to move 'result' into this GetNextResult, and should have to opt in to making a
-         * copy.
-         */
-        /* implicit */ GetNextResult(Document&& result)
-            : _status(ReturnStatus::kAdvanced), _result(std::move(result)) {}
-
-        /**
-         * Gets the result document. It is an error to call this if isAdvanced() returns false.
-         */
-        const Document& getDocument() const {
-            dassert(isAdvanced());
-            return _result;
-        }
-
-        /**
-         * Releases the result document, transferring ownership to the caller. It is an error to
-         * call this if isAdvanced() returns false.
-         */
-        Document releaseDocument() {
-            dassert(isAdvanced());
-            return std::move(_result);
-        }
-
-        ReturnStatus getStatus() const {
-            return _status;
-        }
-
-        bool isAdvanced() const {
-            return _status == ReturnStatus::kAdvanced;
-        }
-
-        bool isEOF() const {
-            return _status == ReturnStatus::kEOF;
-        }
-
-        bool isPaused() const {
-            return _status == ReturnStatus::kPauseExecution;
-        }
-
-    private:
-        GetNextResult(ReturnStatus status) : _status(status) {}
-
-        ReturnStatus _status;
-        Document _result;
     };
 
     /**
@@ -380,16 +299,6 @@ public:
     ~DocumentSource() override {}
 
     /**
-     * The stage spills its data and asks from all its children to spill their data as well.
-     */
-    void forceSpill() {
-        doForceSpill();
-        if (pSource) {
-            pSource->forceSpill();
-        }
-    }
-
-    /**
      * Makes a deep clone of the DocumentSource by serializing and re-parsing it. DocumentSources
      * that cannot be safely cloned this way should override this method. Callers can optionally
      * specify 'newExpCtx' to construct the deep clone with it instead of defaulting to the
@@ -418,34 +327,6 @@ public:
     }
 
     /**
-     * The main execution API of a DocumentSource. Returns an intermediate query result generated by
-     * this DocumentSource.
-     *
-     * For performance reasons, a streaming stage must not keep references to documents across calls
-     * to getNext(). Such stages must retrieve a result from their child and then release it (or
-     * return it) before asking for another result. Failing to do so can result in extra work, since
-     * the Document/Value library must copy data on write when that data has a refcount above one.
-     */
-    GetNextResult getNext() {
-        pExpCtx->checkForInterrupt();
-
-        if (MONGO_likely(!pExpCtx->shouldCollectDocumentSourceExecStats())) {
-            return doGetNext();
-        }
-
-        auto serviceCtx = pExpCtx->getOperationContext()->getServiceContext();
-        dassert(serviceCtx);
-
-        auto timer = getOptTimer(serviceCtx);
-
-        ++_commonStats.works;
-
-        GetNextResult next = doGetNext();
-        _commonStats.advanced += static_cast<unsigned>(next.isAdvanced());
-        return next;
-    }
-
-    /**
      * Returns a struct containing information about any special constraints imposed on using this
      * stage. Input parameter Pipeline::SplitState is used by stages whose requirements change
      * depending on whether they are in a split or unsplit pipeline.
@@ -463,53 +344,12 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(7183905);
     };
 
-    /**
-     * Informs the stage that it is no longer needed and can release its resources. After dispose()
-     * is called the stage must still be able to handle calls to getNext(), but can return kEOF.
-     *
-     * This is a non-virtual public interface to ensure dispose() is threaded through the entire
-     * pipeline. Subclasses should override doDispose() to implement their disposal.
-     */
-    void dispose() {
-        doDispose();
-        if (pSource) {
-            pSource->dispose();
-        }
-    }
-
-    /**
-     * Get the CommonStats for this DocumentSource.
-     */
-    const CommonStats& getCommonStats() const {
-        return _commonStats;
-    }
-
-    /**
-     * Get the stats specific to the DocumentSource. It is legal for the DocumentSource to return
-     * nullptr to indicate that no specific stats are available.
-     */
-    virtual const SpecificStats* getSpecificStats() const {
-        return nullptr;
-    }
-
-    /**
-     * Get the stage's name.
-     */
-    virtual const char* getSourceName() const = 0;
 
     /**
      * Returns the DocumentSource::Id value of a given stage object.
      * Each child class should override this and return that class's static `id` value.
      */
     virtual Id getId() const = 0;
-
-    /**
-     * Set the underlying source this source should use to get Documents from. Must not throw
-     * exceptions.
-     */
-    virtual void setSource(DocumentSource* source) {
-        pSource = source;
-    }
 
     /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
@@ -532,22 +372,6 @@ public:
      */
     virtual void addInvolvedCollections(
         stdx::unordered_set<NamespaceString>* collectionNames) const {}
-
-    virtual void detachFromOperationContext() {}
-
-    virtual void reattachToOperationContext(OperationContext* opCtx) {}
-
-    /**
-     * Validate that all operation contexts associated with this document source, including any
-     * subpipelines, match the argument.
-     */
-    virtual bool validateOperationContext(const OperationContext* opCtx) const {
-        return getContext()->getOperationContext() == opCtx;
-    }
-
-    virtual bool usedDisk() {
-        return false;
-    }
 
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
@@ -653,29 +477,6 @@ private:
 
         return pushMatchBefore(itr, container) || pushSampleBefore(itr, container) ||
             pushSingleDocumentTransformOrRedactBefore(itr, container);
-    }
-
-    /**
-     * Returns an optional timer which is used to collect the execution time.
-     * May return boost::none if it is not necessary to collect timing info.
-     */
-    boost::optional<ScopedTimer> getOptTimer(ServiceContext* serviceCtx) {
-        if (serviceCtx &&
-            _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
-            if (MONGO_likely(_commonStats.executionTime.precision ==
-                             QueryExecTimerPrecision::kMillis)) {
-                return boost::optional<ScopedTimer>(
-                    boost::in_place_init,
-                    &_commonStats.executionTime.executionTimeEstimate,
-                    serviceCtx->getFastClockSource());
-            } else {
-                return boost::optional<ScopedTimer>(
-                    boost::in_place_init,
-                    &_commonStats.executionTime.executionTimeEstimate,
-                    serviceCtx->getTickSource());
-            }
-        }
-        return boost::none;
     }
 
 public:
@@ -824,13 +625,6 @@ public:
     }
 
     /**
-     * Returns the expression context from the stage's context.
-     */
-    const boost::intrusive_ptr<ExpressionContext>& getContext() const {
-        return pExpCtx;
-    }
-
-    /**
      * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.
@@ -901,12 +695,6 @@ protected:
     DocumentSource(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
-     * The main execution API of a DocumentSource. Returns an intermediate query result generated by
-     * this DocumentSource. See comment at getNext().
-     */
-    virtual GetNextResult doGetNext() = 0;
-
-    /**
      * Attempt to perform an optimization with the following source in the pipeline. 'container'
      * refers to the entire pipeline, and 'itr' points to this stage within the pipeline.
      *
@@ -923,29 +711,11 @@ protected:
     };
 
     /**
-     * Release any resources held by this stage. After doDispose() is called the stage must still be
-     * able to handle calls to getNext(), but can return kEOF.
-     */
-    virtual void doDispose() {}
-
-    /**
      * Utility which describes when a stage needs to nominate a merging shard.
      */
     virtual boost::optional<ShardId> computeMergeShardId() const {
         return boost::none;
     }
-
-    /*
-      Most DocumentSources have an underlying source they get their data
-      from.  This is a convenience for them.
-
-      The default implementation of setSource() sets this; if you don't
-      need a source, override that to verify().  The default is to
-      verify() if this has already been set.
-    */
-    DocumentSource* pSource;
-
-    boost::intrusive_ptr<ExpressionContext> pExpCtx;
 
     /**
      * Tracks this stage's merge ShardId, if one exists.
@@ -968,8 +738,6 @@ private:
     // during process initialization and const thereafter.
     static StringMap<ParserRegistration> parserMap;
 
-    CommonStats _commonStats;
-
     /**
      * Create a Value that represents the document source.
      *
@@ -978,12 +746,6 @@ private:
      * being added to the array for this stage (DocumentSource).
      */
     virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
-
-    /**
-     * Spills the stage's data to disk. Stages that can spill their own data need to override this
-     * method.
-     */
-    virtual void doForceSpill() {}
 };
 
 }  // namespace mongo

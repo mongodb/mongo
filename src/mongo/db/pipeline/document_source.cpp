@@ -58,17 +58,8 @@ using boost::intrusive_ptr;
 
 StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
 
-DocumentSource::DocumentSource(const StringData stageName,
-                               const intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.rawData()) {
-    if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
-        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
-        } else {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
-        }
-    }
-}
+DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<ExpressionContext>& pCtx)
+    : Stage(stageName, pCtx) {}
 
 void DocumentSource::registerParser(std::string name,
                                     Parser parser,

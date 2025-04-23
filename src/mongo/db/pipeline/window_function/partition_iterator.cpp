@@ -92,7 +92,7 @@ static optional<boost::intrusive_ptr<ExpressionFieldPath>> exprFromSort(
 }  // namespace
 
 PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
-                                     DocumentSource* source,
+                                     exec::agg::Stage* source,
                                      MemoryUsageTracker* tracker,
                                      optional<boost::intrusive_ptr<Expression>> partitionExpr,
                                      const optional<SortPattern>& sortPattern)

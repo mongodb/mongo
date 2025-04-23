@@ -40,9 +40,9 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/partition_key_comparator.h"
@@ -67,7 +67,7 @@ namespace mongo {
 class PartitionIterator {
 public:
     PartitionIterator(ExpressionContext* expCtx,
-                      DocumentSource* source,
+                      exec::agg::Stage* source,
                       MemoryUsageTracker* tracker,
                       boost::optional<boost::intrusive_ptr<Expression>> partitionExpr,
                       const boost::optional<SortPattern>& sortPattern);
@@ -121,9 +121,9 @@ public:
     }
 
     /**
-     * Sets the input DocumentSource for this iterator to 'source'.
+     * Sets the input Stage for this iterator to 'source'.
      */
-    void setSource(DocumentSource* source) {
+    void setSource(exec::agg::Stage* source) {
         _source = source;
     }
 
@@ -281,7 +281,7 @@ private:
         const boost::optional<std::pair<int, int>>& hint);
 
     ExpressionContext* _expCtx;
-    DocumentSource* _source;
+    exec::agg::Stage* _source;
     boost::optional<boost::intrusive_ptr<Expression>> _partitionExpr;
 
     // '_sortExpr' tells us which field is the "time" field. When the user writes
@@ -392,7 +392,7 @@ public:
                 // With this policy, all documents before the lower bound can be marked as expired.
                 // They will only be released on the next call to releaseExpired(), so when
                 // getEndpoints() returns, the caller may also look at documents from the previous
-                // result of getEndpoints(), until it returns control to the DocumentSource.
+                // result of getEndpoints(), until it returns control to the Stage.
                 if (endpoints) {
                     _iter->expireUpTo(_slot, endpoints->first - 1);
                 }
@@ -401,7 +401,7 @@ public:
                 // With this policy, all documents before the upper bound can be marked as expired.
                 // They will only be released on the next call to releaseExpired(), so when
                 // getEndpoints() returns, the caller may also look at documents from the previous
-                // result of getEndpoints(), until it returns control to the DocumentSource.
+                // result of getEndpoints(), until it returns control to the Stage.
                 if (endpoints) {
                     _iter->expireUpTo(_slot, endpoints->second - 1);
                 }

@@ -143,7 +143,7 @@ public:
     /**
      * Sets 'source' as the source of '_teeBuffer'.
      */
-    void setSource(DocumentSource* source) final;
+    void setSource(Stage* source) final;
 
     /**
      * The $facet stage must be run on the merging shard.

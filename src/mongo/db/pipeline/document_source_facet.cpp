@@ -174,7 +174,7 @@ intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
         std::move(facetPipelines), expCtx, bufferSizeBytes, maxOutputDocBytes);
 }
 
-void DocumentSourceFacet::setSource(DocumentSource* source) {
+void DocumentSourceFacet::setSource(Stage* source) {
     _teeBuffer->setSource(source);
 }
 

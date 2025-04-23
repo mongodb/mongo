@@ -633,6 +633,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:sort_key_comparator.h",
         "//src/mongo/db/exec:working_set.h",
         "//src/mongo/db/exec:working_set_common.h",
+        "//src/mongo/db/exec/agg:stage.h",
         "//src/mongo/db/exec/document_value:document_comparator.h",
         "//src/mongo/db/exec/document_value:value_comparator.h",
         "//src/mongo/db/exec/sbe/values:bson.h",

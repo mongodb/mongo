@@ -36,6 +36,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -59,7 +60,7 @@ public:
     static boost::intrusive_ptr<TeeBuffer> create(
         size_t nConsumers, int bufferSizeBytes = internalQueryFacetBufferSizeBytes.load());
 
-    void setSource(DocumentSource* source) {
+    void setSource(exec::agg::Stage* source) {
         _source = source;
     }
 
@@ -97,7 +98,7 @@ private:
      */
     void loadNextBatch();
 
-    DocumentSource* _source = nullptr;
+    exec::agg::Stage* _source = nullptr;
 
     const size_t _bufferSizeBytes;
     std::vector<DocumentSource::GetNextResult> _buffer;

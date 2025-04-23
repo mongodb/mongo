@@ -257,7 +257,7 @@ public:
      * DocumentSourceExchange does not have a direct source (it is reading through the shared
      * Exchange pipeline).
      */
-    void setSource(DocumentSource* source) final {
+    void setSource(Stage* source) final {
         invariant(!source);
     }
 
