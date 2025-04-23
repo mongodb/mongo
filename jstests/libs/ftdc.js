@@ -3,7 +3,6 @@
  */
 
 import {isClusterNode, isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export function getParameter(adminDb, field) {
@@ -93,12 +92,15 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     assert.eq(getparam("diagnosticDataCollectionEnabled"), isEnabled);
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 1000);
 
-    const topology = DiscoverTopology.findConnectedNodes(adminDb.getMongo());
-    if (topology.type === Topology.kShardedCluster &&
+    const diagnosticDataCollectionDirectorySizeMB =
+        getparam("diagnosticDataCollectionDirectorySizeMB");
+
+    const isShardedCluster = adminDb.system.version.findOne({_id: "shardIdentity"});
+    if (isShardedCluster &&
         FeatureFlagUtil.isPresentAndEnabled(adminDb, "MultiServiceLogAndFTDCFormat") && !isMongos) {
-        assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 400);
+        assert.eq(diagnosticDataCollectionDirectorySizeMB, 500);
     } else {
-        assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 250);
+        assert.eq(diagnosticDataCollectionDirectorySizeMB, 250);
     }
 
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
@@ -137,7 +139,8 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
 
     // Reset
     assert.commandWorked(setparam({"diagnosticDataCollectionFileSizeMB": 10}));
-    assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMB": 200}));
+    assert.commandWorked(setparam(
+        {"diagnosticDataCollectionDirectorySizeMB": diagnosticDataCollectionDirectorySizeMB}));
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 1000}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 300}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));
