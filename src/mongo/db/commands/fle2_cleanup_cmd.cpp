@@ -73,6 +73,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
@@ -205,18 +206,20 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
 
     bool createEcoc = false;
     bool renameEcoc = false;
+
     {
-        // Acquire IS locks on ecocNss and ecocRenameNss in ascending resourceId order
-        std::vector<NamespaceStringOrUUID> secondaryNss = {namespaces.ecocRenameNss};
-        AutoGetCollection ecoc(opCtx,
-                               namespaces.ecocNss,
-                               MODE_IS,
-                               AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                   secondaryNss.cbegin(), secondaryNss.cend()));
-        auto catalog = CollectionCatalog::get(opCtx);
-        // TODO(SERVER-103402): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        auto ecocCompact = CollectionPtr::CollectionPtr_UNSAFE(
-            catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss));
+        CollectionAcquisitionRequests acquisitionRequests = {
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, namespaces.ecocNss, AcquisitionPrerequisites::OperationType::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, namespaces.ecocRenameNss, AcquisitionPrerequisites::OperationType::kRead)};
+        // acquireCollections changes the order provided by acquisitionRequests and returns a
+        // vector sorted by the ResourceId. Creates the map to access the corresponding collection.
+        auto acquisitions =
+            makeAcquisitionMap(acquireCollectionsMaybeLockFree(opCtx, acquisitionRequests));
+
+        const auto& ecoc = acquisitions.at(namespaces.ecocNss).getCollectionPtr();
+        const auto& ecocCompact = acquisitions.at(namespaces.ecocRenameNss).getCollectionPtr();
 
         // Early exit if there's no ECOC
         if (!ecoc && !ecocCompact) {
