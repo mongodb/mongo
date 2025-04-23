@@ -8,7 +8,7 @@
  *  uses_transactions,
  *  # Requires all nodes to be running the latest binary.
  *  multiversion_incompatible,
- *  # TODO (SERVER-88539) Re-enable this test once downgrade works with chunk migrations.
+ *  # TODO (SERVER-104171) Re-enable this test once downgrade works with chunk migrations.
  *  __TEMPORARILY_DISABLED__,
  * ]
  */

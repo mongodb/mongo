@@ -9,9 +9,6 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO (SERVER-88539) the timeseries setup runs a migration. Remove the upgrade-downgrade
- *   # incompatible tag once migrations  work during downgrade.
- *   cannot_run_during_upgrade_downgrade,
  *   # TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
  *   # re-created with a different uuid, causing the aggregation to fail with QueryPlannedKilled
  *   # when the mongos is fetching data from the shard using getMore(). Remove the tag the issue
