@@ -1,18 +1,14 @@
 version: 1.0.0
 filters:
-  # The top-level command implementations are neither clearly QE or QO, so files in this directory
-  # are owned by the entire query team by default.
+  # QO owns most of the query commands, so by default files will be owned by QO.
   - "*":
     approvers:
-      - 10gen/query
+      - 10gen/query-optimization
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads
       - 10gen/query-optimization-staff-leads
       - 10gen/query-integration-staff-leads
-  - "analyze_cmd*":
-    approvers:
-      - 10gen/query-optimization
   - "change_stream_state_command.cpp":
     approvers:
       - 10gen/query-execution-change-streams
@@ -22,18 +18,30 @@ filters:
   - "index_filter_commands.*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "explain.idl":
-    approvers:
-      - 10gen/query-optimization
-  - "explain_test.cpp":
-    approvers:
-      - 10gen/query-optimization
-  - "plan_cache*":
-    approvers:
-      - 10gen/query-optimization
   - "query_settings_cmds.*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "search_index_commands.*":
+  - "search_*":
     approvers:
       - 10gen/query-integration-search
+  - "external_data_source_commands*":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "getmore_cmd.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "index_filter_commands_test.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "killcursors*":
+    approvers:
+      - 10gen/query-execution
+  - "map_reduce*":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "mr_*":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "update_metrics.*":
+    approvers:
+      - 10gen/query-execution
