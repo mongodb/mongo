@@ -340,7 +340,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) noexcept {
+    const CancellationToken& abortToken) {
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor, abortToken](const auto& factory) {
             return ExecutorFuture(**executor)
@@ -433,7 +433,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDecision(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) noexcept {
+    const CancellationToken& abortToken) {
     if (_recipientCtx.getState() > RecipientStateEnum::kStrictConsistency) {
         // The recipient has progressed past the point where it needs to update the coordinator in
         // order for the coordinator to make its decision.
@@ -464,7 +464,7 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishReshardingOperation(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& stepdownToken,
-    bool aborted) noexcept {
+    bool aborted) {
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor, aborted, stepdownToken](const auto& factory) {
             return ExecutorFuture<void>(**executor)

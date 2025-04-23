@@ -222,7 +222,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                  hostTargeted = std::move(hostAndShard.hostTargeted),
                  shard = std::move(hostAndShard.shard),
                  promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))](
-                    const RemoteCommandCallbackArgs& args) mutable noexcept {
+                    const RemoteCommandCallbackArgs& args) mutable {
                     auto status = args.response.status;
                     shard->updateReplSetMonitor(hostTargeted, status);
 

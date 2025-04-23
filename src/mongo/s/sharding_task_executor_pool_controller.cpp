@@ -54,7 +54,7 @@ namespace mongo {
 namespace {
 
 template <typename Map, typename Key>
-auto& getOrInvariant(Map&& map, const Key& key) noexcept {
+auto& getOrInvariant(Map&& map, const Key& key) {
     auto it = map.find(key);
     invariant(it != map.end(), "Unable to find key in map");
 
@@ -62,7 +62,7 @@ auto& getOrInvariant(Map&& map, const Key& key) noexcept {
 }
 
 template <typename Map, typename... Args>
-void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
+void emplaceOrInvariant(Map&& map, Args&&... args) {
     auto ret = std::forward<Map>(map).emplace(std::forward<Args>(args)...);
     invariant(ret.second, "Element already existed in map/set");
 }
@@ -180,22 +180,22 @@ public:
     explicit ReplicaSetChangeListener(ShardingTaskExecutorPoolController* controller)
         : _controller(controller) {}
 
-    void onFoundSet(const Key& key) noexcept override {
+    void onFoundSet(const Key& key) override {
         // Do nothing
     }
 
-    void onConfirmedSet(const State& state) noexcept override {
+    void onConfirmedSet(const State& state) override {
         stdx::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, state.connStr.getSetName());
         _controller->_addGroup(lk, state);
     }
 
-    void onPossibleSet(const State& state) noexcept override {
+    void onPossibleSet(const State& state) override {
         // Do nothing
     }
 
-    void onDroppedSet(const Key& key) noexcept override {
+    void onDroppedSet(const Key& key) override {
         stdx::lock_guard lk(_controller->_mutex);
 
         _controller->_removeGroup(lk, key);

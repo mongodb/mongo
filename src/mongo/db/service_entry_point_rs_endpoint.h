@@ -49,12 +49,11 @@ public:
     ServiceEntryPointRSEndpoint(std::unique_ptr<ServiceEntryPointShardRole> shardSep)
         : _shardSep{std::move(shardSep)} {}
 
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept final;
+    Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) final;
 
 private:
     Future<DbResponse> _replicaSetEndpointHandleRequest(OperationContext* opCtx,
-                                                        const Message& request) noexcept;
+                                                        const Message& request);
 
     std::unique_ptr<ServiceEntryPointShardRole> _shardSep;
 };

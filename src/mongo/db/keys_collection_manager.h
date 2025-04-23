@@ -206,7 +206,7 @@ private:
         /**
          * Returns true if keys have ever successfully been returned from the config server.
          */
-        bool hasSeenKeys() const noexcept;
+        bool hasSeenKeys() const;
 
         /**
          * Returns if the periodic runner has entered shutdown.

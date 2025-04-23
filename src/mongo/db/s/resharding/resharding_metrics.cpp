@@ -194,7 +194,7 @@ ReshardingMetrics::~ReshardingMetrics() {
     _scopedObserver.reset();
 }
 
-std::string ReshardingMetrics::createOperationDescription() const noexcept {
+std::string ReshardingMetrics::createOperationDescription() const {
     return fmt::format("ReshardingMetrics{}Service {}",
                        ShardingDataTransformMetrics::getRoleName(_role),
                        _instanceId.toString());
@@ -237,7 +237,7 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance(UUID instance
                                                getDefaultState(role));
 }
 
-StringData ReshardingMetrics::getStateString() const noexcept {
+StringData ReshardingMetrics::getStateString() const {
     return visit(OverloadedVisitor{
                      [](CoordinatorStateEnum state) { return CoordinatorState_serializer(state); },
                      [](RecipientStateEnum state) { return RecipientState_serializer(state); },
@@ -247,7 +247,7 @@ StringData ReshardingMetrics::getStateString() const noexcept {
                  getState());
 }
 
-BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
+BSONObj ReshardingMetrics::reportForCurrentOp() const {
     BSONObjBuilder builder;
     reportDurationsForAllPhases<Seconds>(
         kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});

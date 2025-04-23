@@ -153,17 +153,17 @@ ShardingDataTransformInstanceMetrics::Role ShardingDataTransformInstanceMetrics:
     return _role;
 }
 
-std::string ShardingDataTransformInstanceMetrics::createOperationDescription() const noexcept {
+std::string ShardingDataTransformInstanceMetrics::createOperationDescription() const {
     return fmt::format("ShardingDataTransformMetrics{}Service {}",
                        ShardingDataTransformMetrics::getRoleName(_role),
                        _instanceId.toString());
 }
 
-StringData ShardingDataTransformInstanceMetrics::getStateString() const noexcept {
+StringData ShardingDataTransformInstanceMetrics::getStateString() const {
     return "Unknown";
 }
 
-BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcept {
+BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const {
 
     BSONObjBuilder builder;
     builder.append(_fieldNames->getForType(), "op");

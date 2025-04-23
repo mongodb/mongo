@@ -89,7 +89,7 @@
 namespace mongo {
 
 Future<DbResponse> ServiceEntryPointRSEndpoint::_replicaSetEndpointHandleRequest(
-    OperationContext* opCtx, const Message& m) noexcept try {
+    OperationContext* opCtx, const Message& m) try {
     // TODO (SERVER-81551): Move the OpMsgRequest parsing above ServiceEntryPoint::handleRequest().
     auto opMsgReq = rpc::opMsgRequestFromAnyProtocol(m, opCtx->getClient());
     if (m.operation() == dbQuery) {
@@ -129,7 +129,7 @@ Future<DbResponse> ServiceEntryPointRSEndpoint::_replicaSetEndpointHandleRequest
     return ex.toStatus();
 }
 Future<DbResponse> ServiceEntryPointRSEndpoint::handleRequest(OperationContext* opCtx,
-                                                              const Message& m) noexcept {
+                                                              const Message& m) {
     if (replica_set_endpoint::isReplicaSetEndpointClient(VersionContext::getDecoration(opCtx),
                                                          opCtx->getClient())) {
         return _replicaSetEndpointHandleRequest(opCtx, m);

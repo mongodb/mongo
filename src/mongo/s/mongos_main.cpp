@@ -204,9 +204,9 @@ public:
         : _serviceContext(serviceContext) {}
     ~ShardingReplicaSetChangeListener() final = default;
 
-    void onFoundSet(const Key& key) noexcept final {}
+    void onFoundSet(const Key& key) final {}
 
-    void onConfirmedSet(const State& state) noexcept final {
+    void onConfirmedSet(const State& state) final {
         const auto& connStr = state.connStr;
 
         try {
@@ -224,7 +224,7 @@ public:
         }
     }
 
-    void onPossibleSet(const State& state) noexcept final {
+    void onPossibleSet(const State& state) final {
         try {
             Grid::get(_serviceContext)
                 ->shardRegistry()
@@ -238,7 +238,7 @@ public:
         }
     }
 
-    void onDroppedSet(const Key& key) noexcept final {}
+    void onDroppedSet(const Key& key) final {}
 
 private:
     ServiceContext* _serviceContext;

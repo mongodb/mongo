@@ -77,7 +77,7 @@ inline constexpr ShardingDataTransformMetrics::Role getRoleForStateDocument() {
     MONGO_UNREACHABLE;
 }
 
-void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info) noexcept;
+void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info);
 
 template <typename T>
 std::string getMetricsPrefix() {

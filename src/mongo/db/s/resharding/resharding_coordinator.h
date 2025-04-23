@@ -163,13 +163,13 @@ public:
     /*
      * Sets _coordinatorDoc equal to the supplied doc.
      */
-    void _installCoordinatorDoc(const ReshardingCoordinatorDocument& doc) noexcept;
+    void _installCoordinatorDoc(const ReshardingCoordinatorDocument& doc);
 
     /**
      * Replace in-memory representation of the CoordinatorDoc and logs state transition.
      */
     void installCoordinatorDocOnStateTransition(OperationContext* opCtx,
-                                                const ReshardingCoordinatorDocument& doc) noexcept;
+                                                const ReshardingCoordinatorDocument& doc);
 
     CommonReshardingMetadata getMetadata() const {
         return _metadata;
@@ -236,14 +236,14 @@ private:
      * Runs resharding up through preparing to persist the decision.
      */
     ExecutorFuture<ReshardingCoordinatorDocument> _runUntilReadyToCommit(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) noexcept;
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Runs resharding through persisting the decision until cleanup.
      */
     ExecutorFuture<void> _commitAndFinishReshardOperation(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const ReshardingCoordinatorDocument& updatedCoordinatorDoc) noexcept;
+        const ReshardingCoordinatorDocument& updatedCoordinatorDoc);
 
     /**
      * Inform all of the donors and recipients of this resharding operation to begin.

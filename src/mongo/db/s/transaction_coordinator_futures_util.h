@@ -87,20 +87,19 @@ public:
      * set with its result.
      */
     template <class Callable>
-    Future<FutureContinuationResult<Callable, OperationContext*>> scheduleWork(
-        Callable&& task) noexcept {
+    Future<FutureContinuationResult<Callable, OperationContext*>> scheduleWork(Callable&& task) {
         return scheduleWorkIn(Milliseconds(0), std::forward<Callable>(task));
     }
 
     template <class Callable>
     Future<FutureContinuationResult<Callable, OperationContext*>> scheduleWorkIn(
-        Milliseconds millis, Callable&& task) noexcept {
+        Milliseconds millis, Callable&& task) {
         return scheduleWorkAt(_executor->now() + millis, std::forward<Callable>(task));
     }
 
     template <class Callable>
-    Future<FutureContinuationResult<Callable, OperationContext*>> scheduleWorkAt(
-        Date_t when, Callable&& task) noexcept {
+    Future<FutureContinuationResult<Callable, OperationContext*>> scheduleWorkAt(Date_t when,
+                                                                                 Callable&& task) {
         using ReturnType = FutureContinuationResult<Callable, OperationContext*>;
         auto pf = makePromiseFuture<ReturnType>();
         auto taskCompletionPromise = std::make_shared<Promise<ReturnType>>(std::move(pf.promise));
@@ -111,7 +110,7 @@ public:
             auto scheduledWorkHandle = uassertStatusOK(_executor->scheduleWorkAt(
                 when,
                 [this, task = std::forward<Callable>(task), taskCompletionPromise](
-                    const executor::TaskExecutor::CallbackArgs& args) mutable noexcept {
+                    const executor::TaskExecutor::CallbackArgs& args) mutable {
                     taskCompletionPromise->setWith([&] {
                         {
                             stdx::lock_guard lk(_mutex);

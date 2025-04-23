@@ -306,7 +306,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) noexcept {
+    const CancellationToken& abortToken) {
     return resharding::WithAutomaticRetry([this, executor, abortToken] {
                return ExecutorFuture(**executor)
                    .then([this] {
@@ -393,7 +393,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinatorAndAwaitDecision(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) noexcept {
+    const CancellationToken& abortToken) {
     if (_donorCtx.getState() == DonorStateEnum::kDone) {
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -423,7 +423,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardingOperation(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& stepdownToken,
-    bool aborted) noexcept {
+    bool aborted) {
     return resharding::WithAutomaticRetry([this, executor, stepdownToken, aborted] {
                if (!aborted) {
                    // If a failover occured after the donor transitioned to done locally, but before

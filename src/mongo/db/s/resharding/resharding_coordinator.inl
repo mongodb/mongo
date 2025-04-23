@@ -163,13 +163,13 @@ ReshardingCoordinator::ReshardingCoordinator(
 }
 
 void ReshardingCoordinator::_installCoordinatorDoc(
-    const ReshardingCoordinatorDocument& doc) noexcept {
+    const ReshardingCoordinatorDocument& doc) {
     invariant(doc.getReshardingUUID() == _coordinatorDoc.getReshardingUUID());
     _coordinatorDoc = doc;
 }
 
 void ReshardingCoordinator::installCoordinatorDocOnStateTransition(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) noexcept {
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) {
     const auto previousState = _coordinatorDoc.getState();
 
     _installCoordinatorDoc(doc);
@@ -339,7 +339,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
 }
 
 ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilReadyToCommit(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) noexcept {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return resharding::WithAutomaticRetry([this, executor] {
                return ExecutorFuture<void>(**executor)
                    .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
@@ -423,7 +423,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
 
 ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const ReshardingCoordinatorDocument& updatedCoordinatorDoc) noexcept {
+    const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
     return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
                return ExecutorFuture<void>(**executor)
                    .then(

@@ -77,7 +77,7 @@ public:
                                          ObserverPtr observer);
     virtual ~ShardingDataTransformInstanceMetrics() = default;
 
-    virtual BSONObj reportForCurrentOp() const noexcept;
+    virtual BSONObj reportForCurrentOp() const;
 
     boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const;
     boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const;
@@ -132,8 +132,8 @@ protected:
     }
     void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void restoreWritesToStashCollections(int64_t writesToStashCollections);
-    virtual std::string createOperationDescription() const noexcept;
-    virtual StringData getStateString() const noexcept;
+    virtual std::string createOperationDescription() const;
+    virtual StringData getStateString() const;
     virtual boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const = 0;
 
     ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();

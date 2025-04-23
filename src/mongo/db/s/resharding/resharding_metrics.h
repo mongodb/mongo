@@ -197,7 +197,7 @@ public:
         _scopedObserver.reset();
     }
 
-    BSONObj reportForCurrentOp() const noexcept override;
+    BSONObj reportForCurrentOp() const override;
 
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
 
@@ -217,10 +217,10 @@ public:
 
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
-    StringData getStateString() const noexcept override;
+    StringData getStateString() const override;
 
 private:
-    std::string createOperationDescription() const noexcept override;
+    std::string createOperationDescription() const override;
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
     void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
     void restoreIndexBuildDurationFields(const ReshardingRecipientMetrics& metrics);

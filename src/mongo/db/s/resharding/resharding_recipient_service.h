@@ -151,7 +151,7 @@ public:
      */
     ExecutorFuture<void> _runUntilStrictConsistencyOrErrored(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken) noexcept;
+        const CancellationToken& abortToken);
 
     /**
      * Notifies the coordinator if the recipient is in kStrictConsistency or kError and waits for
@@ -160,7 +160,7 @@ public:
      */
     ExecutorFuture<void> _notifyCoordinatorAndAwaitDecision(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken) noexcept;
+        const CancellationToken& abortToken);
 
     /**
      * Finishes the work left remaining on the recipient after the coordinator persists its decision
@@ -169,7 +169,7 @@ public:
     ExecutorFuture<void> _finishReshardingOperation(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& stepdownToken,
-        bool aborted) noexcept;
+        bool aborted);
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;

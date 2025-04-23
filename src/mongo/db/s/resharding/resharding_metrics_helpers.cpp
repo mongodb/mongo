@@ -100,7 +100,7 @@ void onCriticalSectionErrorThrows(OperationContext* opCtx, const StaleConfigInfo
 }  // namespace
 
 
-void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info) noexcept {
+void onCriticalSectionError(OperationContext* opCtx, const StaleConfigInfo& info) {
     try {
         onCriticalSectionErrorThrows(opCtx, info);
     } catch (const DBException& e) {

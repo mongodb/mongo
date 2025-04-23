@@ -428,7 +428,7 @@ void KeysCollectionManager::PeriodicRunner::stop() {
     _backgroundThread.join();
 }
 
-bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const noexcept {
+bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const {
     return _hasSeenKeys.load();
 }
 
