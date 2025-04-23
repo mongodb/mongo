@@ -417,6 +417,7 @@ mongo_cc_unit_test(
         "fle_crypto_test.cpp",
         "fle_crypto_test_vectors.cpp",
         "fle_field_schema_test.cpp",
+        "fle_numeric_test.cpp",
         "fle_stats_test.cpp",
         "libbsonvalue_test.cpp",
         "mechanism_scram_test.cpp",
