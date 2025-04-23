@@ -36,7 +36,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/version.h"
-#include "mongo/util/version_constants.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -46,43 +45,43 @@ namespace {
 
 class InterpolatedVersionInfo : public VersionInfoInterface {
 public:
-    int majorVersion() const noexcept final {
-        return version::kMajorVersion;
+    int majorVersion() const final {
+        return kMajorVersion;
     }
 
-    int minorVersion() const noexcept final {
-        return version::kMinorVersion;
+    int minorVersion() const final {
+        return kMinorVersion;
     }
 
-    int patchVersion() const noexcept final {
-        return version::kPatchVersion;
+    int patchVersion() const final {
+        return kPatchVersion;
     }
 
-    int extraVersion() const noexcept final {
-        return version::kExtraVersion;
+    int extraVersion() const final {
+        return kExtraVersion;
     }
 
-    StringData version() const noexcept final {
-        return version::kVersion;
+    StringData version() const final {
+        return kVersion;
     }
 
-    StringData gitVersion() const noexcept final {
-        return version::kGitVersion;
+    StringData gitVersion() const final {
+        return kGitVersion;
     }
 
     std::vector<StringData> modules() const final {
-        return version::modulesList();
+        return modulesList;
     }
 
-    StringData allocator() const noexcept final {
-        return version::kAllocator;
+    StringData allocator() const final {
+        return kAllocator;
     }
 
-    StringData jsEngine() const noexcept final {
-        return version::kJsEngine;
+    StringData jsEngine() const final {
+        return kJsEngine;
     }
 
-    StringData targetMinOS() const noexcept final {
+    StringData targetMinOS() const final {
 #if defined(_WIN32)
 #if (NTDDI_VERSION >= NTDDI_WIN7)
         return "Windows 7/Windows Server 2008 R2";
@@ -95,8 +94,23 @@ public:
     }
 
     std::vector<BuildInfoField> buildInfo() const final {
-        return version::buildEnvironment();
+        return buildEnvironment;
     }
+
+private:
+    // clang-format off
+    StringData kVersion = "@mongo_version@"_sd;
+    int kMajorVersion = @mongo_version_major@;
+    int kMinorVersion = @mongo_version_minor@;
+    int kPatchVersion = @mongo_version_patch@;
+    int kExtraVersion = @mongo_version_extra@;
+    StringData kVersionExtraStr = "@mongo_version_extra_str@"_sd;
+    StringData kGitVersion = "@mongo_git_hash@"_sd;
+    StringData kAllocator = "@buildinfo_allocator@"_sd;
+    StringData kJsEngine = "@buildinfo_js_engine@"_sd;
+    std::vector<StringData> modulesList{@buildinfo_modules@};
+    std::vector<VersionInfoInterface::BuildInfoField> buildEnvironment{@buildinfo_environment_data@};
+    // clang-format on
 };
 
 const InterpolatedVersionInfo interpolatedVersionInfo;

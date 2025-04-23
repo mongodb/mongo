@@ -695,9 +695,6 @@ mongo_cc_library(
     srcs = [
         "version_impl.cpp",
     ],
-    hdrs = [
-        "version_constants.h",
-    ],
     deps = [
         "//src/mongo:base",
     ],
@@ -804,8 +801,8 @@ generate_config_header(
         "//conditions:default": {},
     }),
     logfile = "version_constants_gen.log",
-    output = "version_constants.h",
-    template = "version_constants.h.in",
+    output = "version_impl.cpp",
+    template = "version_impl.tpl.cpp",
 )
 
 mongo_cc_unit_test(
