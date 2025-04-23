@@ -65,7 +65,7 @@ __wt_txn_log_op_check(WT_SESSION_IMPL *session)
         return (false);
 
     /* No logging during recovery. */
-    if (F_ISSET(conn, WT_CONN_RECOVERING))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING))
         return (false);
 
     return (true);
@@ -557,7 +557,7 @@ __wt_txn_timestamp_usage_check(
      * Do not check for timestamp usage in recovery. We don't expect recovery to be using timestamps
      * when applying commits, and it is possible that timestamps may be out-of-order in log replay.
      */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING))
         return (0);
 
     /* Check for disallowed timestamps. */
@@ -777,7 +777,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
      */
     WT_ACQUIRE_READ_WITH_BARRIER(oldest_id, txn_global->oldest_id);
 
-    if (!F_ISSET(conn, WT_CONN_RECOVERING) || session->dhandle == NULL ||
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING) || session->dhandle == NULL ||
       F_ISSET(S2BT(session), WT_BTREE_LOGGED)) {
         /*
          * Checkpoint transactions often fall behind ordinary application threads. If there is an
@@ -930,7 +930,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
      * When shutting down, the transactional system has finished running and all we care about is
      * eviction, make everything visible.
      */
-    if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING))
         return (true);
 
     if (!__txn_visible_all_id(session, id))
@@ -1561,7 +1561,8 @@ retry:
     }
 
     /* If there's no visible update in the update chain or ondisk, check the history store file. */
-    if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(session->dhandle, WT_DHANDLE_HS)) {
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN) &&
+      !F_ISSET(session->dhandle, WT_DHANDLE_HS)) {
         /*
          * Stressing this code path may slow down the system too much. To minimize the impact, sleep
          * on every random 100th iteration when this is enabled.
@@ -1709,7 +1710,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
     }
 
     F_SET(txn, WT_TXN_RUNNING);
-    if (F_ISSET(S2C(session), WT_CONN_READONLY))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READONLY))
         F_SET(txn, WT_TXN_READONLY);
 
     WT_ASSERT_ALWAYS(
@@ -1874,7 +1875,7 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
         return (0);
 
     /* Skip checks during recovery. */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING))
         return (0);
 
     /* Verify if the table should always or never use a read timestamp. */

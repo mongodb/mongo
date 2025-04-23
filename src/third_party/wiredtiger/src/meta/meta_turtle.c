@@ -160,7 +160,8 @@ __metadata_entry_worker(WT_SESSION_IMPL *session, WT_ITEM *key, WT_ITEM *value, 
      * backup remove list.
      */
     metadata_key = (char *)key->data;
-    if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) && WT_PREFIX_MATCH(metadata_key, "table:")) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) &&
+      WT_PREFIX_MATCH(metadata_key, "table:")) {
         /* Assert that there should be no WiredTiger tables with a table format. */
         WT_ASSERT(session, __wt_name_check(session, (const char *)key->data, key->size, true) == 0);
         /*
@@ -223,8 +224,9 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
     if (!exist)
         goto err;
 
-    F_SET(conn, WT_CONN_WAS_BACKUP);
-    if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) && meta_state.partial_backup_names != NULL) {
+    F_SET_ATOMIC_32(conn, WT_CONN_WAS_BACKUP);
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) &&
+      meta_state.partial_backup_names != NULL) {
         WT_ERR(__wt_calloc_def(session, meta_state.slot + 1, &conn->partial_backup_remove_ids));
         file_len = strlen("file:") + meta_state.max_len + strlen(".wt") + 1;
         WT_ERR(__wt_calloc_def(session, file_len, &filename));
@@ -336,7 +338,7 @@ __wt_turtle_validate_version(WT_SESSION_IMPL *session)
 
     version = WT_NO_VERSION;
 
-    if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_LIVE_RESTORE_FS))
         ret = __wt_live_restore_turtle_read(session, WT_METADATA_VERSION, &version_string);
     else
         WT_WITH_TURTLE_LOCK(
@@ -449,7 +451,7 @@ __metadata_load_target_uri_list(
         if (!exist_backup)
             WT_RET_MSG(session, EINVAL,
               "restoring a partial backup requires the WiredTiger metadata backup file.");
-        F_SET(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE);
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_BACKUP_PARTIAL_RESTORE);
 
         /*
          * Check that the configuration string only has table schema formats in the target list and
@@ -523,8 +525,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
         /*
          * Failure to read means a bad turtle file. Remove it and create a new turtle file.
          */
-        if (F_ISSET(conn, WT_CONN_SALVAGE)) {
-            if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_SALVAGE)) {
+            if (F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS))
                 ret = __wt_live_restore_turtle_read(session, WT_METAFILE_URI, &unused_value);
             else
                 WT_WITH_TURTLE_LOCK(
@@ -584,7 +586,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta, const char *cfg[])
     if (load || load_turtle) {
         /* Create the turtle file. */
         WT_ERR(__metadata_config(session, &metaconf));
-        if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS))
             ret = __wt_live_restore_turtle_update(session, WT_METAFILE_URI, metaconf, true);
         else
             WT_WITH_TURTLE_LOCK(
@@ -679,9 +681,10 @@ err:
      * Failure to read the turtle file when salvaging means it can't be used for salvage.
      */
     if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 ||
-      strcmp(key, WT_METADATA_LIVE_RESTORE) == 0 || F_ISSET(S2C(session), WT_CONN_SALVAGE))
+      strcmp(key, WT_METADATA_LIVE_RESTORE) == 0 ||
+      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_SALVAGE))
         return (ret);
-    F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+    F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
     WT_RET_PANIC(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error %d at %s",
       WT_METADATA_TURTLE, ret, msg);
 }
@@ -717,13 +720,13 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
     /*
      * If a compatibility setting has been explicitly set, save it out to the turtle file.
      */
-    if (F_ISSET(conn, WT_CONN_COMPATIBILITY))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_COMPATIBILITY))
         WT_ERR(__wt_fprintf(session, fs,
           "%s\n"
           "major=%" PRIu16 ",minor=%" PRIu16 "\n",
           WT_METADATA_COMPAT, conn->compat_version.major, conn->compat_version.minor));
 
-    if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS)) {
         WT_ERR(__wt_scr_alloc(session, WT_LIVE_RESTORE_STATE_STRING_MAX, &state_str));
         WT_ERR(__wt_live_restore_get_state_string(session, state_str));
 
@@ -757,6 +760,6 @@ err:
      */
     if (ret == 0)
         return (ret);
-    F_SET(conn, WT_CONN_DATA_CORRUPTION);
+    F_SET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION);
     WT_RET_PANIC(session, ret, "%s: fatal turtle file update error", WT_METADATA_TURTLE);
 }

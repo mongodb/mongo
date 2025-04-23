@@ -1025,7 +1025,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[], bool commit)
 
     /* Timestamps are only logged in debugging mode. */
     if (set_ts && FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING) &&
-      F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) && !F_ISSET(conn, WT_CONN_RECOVERING))
+      F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) && !F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING))
         WT_RET(__wti_txn_ts_log(session));
 
     return (0);
@@ -1084,7 +1084,7 @@ __wt_txn_set_timestamp_uint(WT_SESSION_IMPL *session, WT_TS_TXN_TYPE which, wt_t
 
     /* Timestamps are only logged in debugging mode. */
     if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING) &&
-      F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) && !F_ISSET(conn, WT_CONN_RECOVERING))
+      F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) && !F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING))
         WT_RET(__wti_txn_ts_log(session));
 
     return (0);

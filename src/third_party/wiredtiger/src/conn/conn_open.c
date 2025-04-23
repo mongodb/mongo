@@ -80,7 +80,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     session = conn->default_session;
 
     /* Shut down the subsystems, ensuring workers see the state change. */
-    F_SET(conn, WT_CONN_CLOSING);
+    F_SET_ATOMIC_32(conn, WT_CONN_CLOSING);
     WT_FULL_BARRIER();
 
     /* The default session is used to access data handles during close. */
@@ -106,7 +106,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wti_capacity_server_destroy(session));
 
     /* There should be no more file opens after this point. */
-    F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
+    F_SET_ATOMIC_32(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
     WT_FULL_BARRIER();
 
     /* Close open data handles. */
@@ -181,7 +181,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
      * The session split stash, hazard information and handle arrays aren't discarded during normal
      * session close, they persist past the life of the session. Discard them now.
      */
-    if (!F_ISSET(conn, WT_CONN_LEAK_MEMORY))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_LEAK_MEMORY))
         if ((s = WT_CONN_SESSIONS_GET(conn)) != NULL)
             for (i = 0; i < conn->session_array.size; ++s, ++i) {
                 __wt_free(session, s->cursor_cache);

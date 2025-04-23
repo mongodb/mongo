@@ -393,7 +393,7 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * Close the file where we tracked long operations. Do this before releasing resources, as we do
      * scratch buffer management when we flush optrack buffers to disk.
      */
-    if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
         if (session->optrackbuf_ptr > 0) {
             __wt_optrack_flush_buffer(session);
             WT_TRET(__wt_close(session, &session->optrack_fh));
@@ -816,8 +816,8 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
      * - The session is an internal session
      * - The connection is minimally ready and the URI is "statistics:"
      */
-    if (!F_ISSET(S2C(session), WT_CONN_READY) && !F_ISSET(session, WT_SESSION_INTERNAL) &&
-      (!F_ISSET(S2C(session), WT_CONN_MINIMAL) || strcmp(uri, "statistics:") != 0))
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY) && !F_ISSET(session, WT_SESSION_INTERNAL) &&
+      (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_MINIMAL) || strcmp(uri, "statistics:") != 0))
         WT_ERR_MSG(
           session, EINVAL, "cannot open a non-statistics cursor before connection is opened");
 
@@ -881,7 +881,7 @@ __session_alter_internal(WT_SESSION_IMPL *session, const char *uri, const char *
     WT_DECL_RET;
 
     /* In-memory ignores alter operations. */
-    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
         goto err;
 
     /* Disallow objects in the WiredTiger name space. */
@@ -2383,7 +2383,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * Make sure we don't try to open a new session after the application closes the connection.
      * This is particularly intended to catch cases where server threads open sessions.
      */
-    WT_ASSERT(session, !F_ISSET(conn, WT_CONN_CLOSING));
+    WT_ASSERT(session, !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING));
 
     /* Find the first inactive session slot. */
     for (session_ret = WT_CONN_SESSIONS_GET(conn), i = 0; i < conn->session_array.size;
@@ -2404,10 +2404,10 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __wt_atomic_store32(&conn->session_array.cnt, i + 1);
 
     /* Find the set of methods appropriate to this session. */
-    if (F_ISSET(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
         session_ret->iface = stds_min;
     else
-        session_ret->iface = F_ISSET(conn, WT_CONN_READONLY) ? stds_readonly : stds;
+        session_ret->iface = F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY) ? stds_readonly : stds;
     session_ret->iface.connection = &conn->iface;
 
     session_ret->name = NULL;
@@ -2486,7 +2486,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
       session, session_ret->stat_dsrc_bucket == session_ret->id % WT_STAT_DSRC_COUNTER_SLOTS);
 
     /* Allocate the buffer for operation tracking */
-    if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK)) {
         WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE, &session_ret->optrack_buf));
         session_ret->optrackbuf_ptr = 0;
     }
@@ -2494,7 +2494,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     __wt_stat_session_init_single(&session_ret->stats);
 
     /* Set the default value for session flags. */
-    if (F_ISSET(conn, WT_CONN_CACHE_CURSORS))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_CURSORS))
         F_SET(session_ret, WT_SESSION_CACHE_CURSORS);
 
     /*

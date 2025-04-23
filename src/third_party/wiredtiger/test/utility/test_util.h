@@ -60,6 +60,9 @@ extern "C" {
 #define LAZYFS_CONTROL_FILE_TEMPLATE "lazyfs-control-XXXXXX" LAZYFS_CONTROL_FILE_SUFFIX
 #define LAZYFS_LOG_FILE "lazyfs.log"
 
+/* Subdirectory name for MongoDB per directory db usage. */
+#define SUB_DIR "sub_dir"
+
 #ifdef _WIN32
 #include "windows_shim.h"
 #endif

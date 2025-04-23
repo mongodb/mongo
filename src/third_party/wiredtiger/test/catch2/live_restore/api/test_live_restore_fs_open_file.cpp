@@ -56,6 +56,8 @@ TEST_CASE("Live Restore fs_open_file", "[live_restore],[live_restore_open_file]"
 
     std::string file_1 = "file1.txt";
     std::string subfolder = "subfolder";
+    std::string sub_dir = "sub_dir";
+    int sub_dir_depth = 3;
 
     SECTION("fs_open - File")
     {
@@ -87,9 +89,29 @@ TEST_CASE("Live Restore fs_open_file", "[live_restore],[live_restore_open_file]"
         validate_lr_fh(lr_fh, env, file_1);
         lr_fh->iface.close((WT_FILE_HANDLE *)lr_fh, (WT_SESSION *)env.session);
 
-        // If the file exists in both source and destination open is successful.
+        /*
+         * If the file has a nested subdirectory structure, and it only exists in the source. Open
+         * is successful and we create subdirectories along with a copy of the file in the
+         * destination.
+         */
         testutil_remove(env.dest_file_path(file_1).c_str());
         testutil_remove(env.source_file_path(file_1).c_str());
+        std::string sub_dir_path = "";
+        for (int i = 0; i < sub_dir_depth; i++) {
+            sub_dir_path += sub_dir;
+            testutil_mkdir(env.source_file_path(sub_dir_path).c_str());
+            sub_dir_path += "/";
+        }
+        std::string file_2 = sub_dir_path + file_1;
+        create_file(env.source_file_path(file_2));
+        lr_fh = open_file(env, file_2, WT_FS_OPEN_FILE_TYPE_REGULAR);
+        REQUIRE(testutil_exists(".", env.dest_file_path(file_2).c_str()));
+        validate_lr_fh(lr_fh, env, file_2);
+        lr_fh->iface.close((WT_FILE_HANDLE *)lr_fh, (WT_SESSION *)env.session);
+
+        // If the file exists in both source and destination open is successful.
+        testutil_remove(env.dest_file_path(file_2).c_str());
+        testutil_remove(env.source_file_path(file_2).c_str());
 
         create_file(env.dest_file_path(file_1));
         create_file(env.source_file_path(file_1));

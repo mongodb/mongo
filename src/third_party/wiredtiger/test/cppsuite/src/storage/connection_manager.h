@@ -56,8 +56,8 @@ public:
     ~connection_manager();
 
     void close();
-    void create(
-      const std::string &config, const std::string &home, bool create_log_directory = false);
+    void create(const std::string &config, const std::string &home,
+      bool create_log_directory = false, bool subdirectory = false);
     void reopen(const std::string &config, const std::string &home);
     scoped_session create_session();
 

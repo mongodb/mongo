@@ -513,7 +513,7 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
      * If the connection is closing we do not need eviction from an application thread. The eviction
      * subsystem is already closed.
      */
-    if (F_ISSET(S2C(session), WT_CONN_CLOSING))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING))
         return (false);
 
     clean_needed = __wt_evict_clean_needed(session, &pct_full);
@@ -687,7 +687,7 @@ __wt_evict_app_assist_worker_check(
         return (0);
 
     /* In memory configurations don't block when the cache is full. */
-    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
         return (0);
 
     /*

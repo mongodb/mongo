@@ -1052,7 +1052,7 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
      * We're creating a tiered table. Set the initial tiers list to empty. Opening the table will
      * cause us to create our first file or tiered object.
      */
-    if (!F_ISSET(conn, WT_CONN_READONLY)) {
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY)) {
         if (session->import_list != NULL) {
             WT_RET(__wt_find_import_metadata(session, uri, &metadata));
             free_metadata = false;

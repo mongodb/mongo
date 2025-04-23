@@ -248,7 +248,8 @@ __rts_btree(WT_SESSION_IMPL *session, const char *uri, wt_timestamp_t rollback_t
      * Ignore rollback to stable failures on files that don't exist or files where corruption is
      * detected.
      */
-    if (ret == ENOENT || (ret == WT_ERROR && F_ISSET(S2C(session), WT_CONN_DATA_CORRUPTION))) {
+    if (ret == ENOENT ||
+      (ret == WT_ERROR && F_ISSET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_SKIP_DAMAGE
           "%s: skipped performing rollback to stable because the file %s",
@@ -357,7 +358,7 @@ __wti_rts_btree_walk_btree_apply(
     }
 
     /* Skip empty and newly-created tables during recovery. */
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) && addr_size == 0) {
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING) && addr_size == 0) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_FILE_SKIP
           "skipping rollback to stable on file=%s because has never been checkpointed",
@@ -418,7 +419,7 @@ __wti_rts_btree_walk_btree_apply(
      * 2. In-memory database - In this scenario, there is no history store to truncate.
      */
     if ((file_skipped && !modified) && max_durable_ts == WT_TS_NONE &&
-      !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+      !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY)) {
         WT_RET(__wt_config_getones(session, config, "id", &cval));
         btree_id = (uint32_t)cval.val;
         WT_RET(__wti_rts_history_btree_hs_truncate(session, btree_id));

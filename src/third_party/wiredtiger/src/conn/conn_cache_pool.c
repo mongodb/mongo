@@ -59,7 +59,7 @@ __cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
     pool_name = NULL;
     cp = NULL;
 
-    if (F_ISSET(conn, WT_CONN_CACHE_POOL))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL))
         updating = true;
     else {
         WT_RET(__wt_config_gets_none(session, cfg, "shared_cache.name", &cval));
@@ -206,7 +206,7 @@ __cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
       "Configured cache pool %s. Size: %" PRIu64 ", chunk size: %" PRIu64, cp->name, cp->size,
       cp->chunk);
 
-    F_SET(conn, WT_CONN_CACHE_POOL);
+    F_SET_ATOMIC_32(conn, WT_CONN_CACHE_POOL);
 err:
     __wt_spin_unlock(session, &__wt_process.spinlock);
 
@@ -341,11 +341,11 @@ __wti_conn_cache_pool_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets_none(session, cfg, "shared_cache.name", &cval));
     now_shared = cval.len != 0;
-    was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
+    was_shared = F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL);
 
     if (now_shared) {
         WT_RET(__cache_pool_config(session, cfg));
-        WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
+        WT_ASSERT(session, F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL));
         if (!was_shared)
             WT_RET(__conn_cache_pool_open(session));
     }
@@ -373,9 +373,9 @@ __wti_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
     found = false;
     cp = __wt_process.cache_pool;
 
-    if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL))
         return (0);
-    F_CLR(conn, WT_CONN_CACHE_POOL);
+    F_CLR_ATOMIC_32(conn, WT_CONN_CACHE_POOL);
 
     __wt_spin_lock(session, &cp->cache_pool_lock);
     cp_locked = true;

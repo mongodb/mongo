@@ -30,7 +30,7 @@ bool
 __wt_live_restore_migration_in_progress(WT_SESSION_IMPL *session)
 {
     /* If live restore is not enabled then background migration is by definition not in progress. */
-    if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_LIVE_RESTORE_FS))
         return (false);
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)S2C(session)->file_system;
     WTI_LIVE_RESTORE_STATE state = __wti_live_restore_get_state(session, lr_fs);
@@ -100,7 +100,7 @@ __live_restore_get_state_from_file(
      * need this lock as we'll never modify the state.
      */
     WT_CONNECTION_IMPL *conn = S2C(session);
-    if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS)) {
         WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)conn->file_system;
         WT_ASSERT_ALWAYS(session, __wt_spin_owned(session, &lr_fs->state_lock),
           "Live restore state lock not held!");
@@ -273,7 +273,7 @@ int
 __wt_live_restore_get_state_string(WT_SESSION_IMPL *session, WT_ITEM *lr_state_str)
 {
     WT_CONNECTION_IMPL *conn = S2C(session);
-    WT_ASSERT_ALWAYS(session, F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS),
+    WT_ASSERT_ALWAYS(session, F_ISSET_ATOMIC_32(conn, WT_CONN_LIVE_RESTORE_FS),
       "Can't fetch state string when live restore is not enabled!");
 
     WTI_LIVE_RESTORE_FS *lr_fs = (WTI_LIVE_RESTORE_FS *)conn->file_system;
@@ -411,6 +411,23 @@ __wti_live_restore_validate_directories(WT_SESSION_IMPL *session, WTI_LIVE_RESTO
         for (uint32_t i = 0; i < num_dest_files; ++i) {
             if (WT_PREFIX_MATCH(dirlist_dest[i], WT_WIREDTIGER) ||
               WT_SUFFIX_MATCH(dirlist_dest[i], ".wt"))
+                /*
+                 * This error is thrown for two reasons:
+                 *
+                 * 1) A live restore is attempted on a destination that already contains data. In
+                 * this scenario we prevent unintentionally corrupting whatever data is already
+                 * present in the destination.
+                 *
+                 * 2) When live restore starts there is a brief period where the live restore state
+                 * is set in memory but not yet persisted to the turtle file. During this period
+                 * WiredTiger files such as WiredTiger.lock are created in the destination, so if we
+                 * crash and restart we'll see the live restore state is NONE, detect these files,
+                 * and assume we're trying to overwrite a valid destination. This crash window is
+                 * very short and difficult to recover from programmatically. Instead we expect the
+                 * user to delete these orphan files and restart the live restore. The crash happens
+                 * very early in startup so there's no chance that the user has written data that
+                 * could be lost.
+                 */
                 WT_ERR_MSG(session, EINVAL,
                   "Attempting to begin a live restore on a directory that already contains "
                   "WiredTiger files '%s'! It's possible this file will be overwritten.",
@@ -465,7 +482,7 @@ __wt_live_restore_validate_non_lr_system(WT_SESSION_IMPL *session)
 void
 __wt_live_restore_init_stats(WT_SESSION_IMPL *session)
 {
-    if (F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS)) {
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_LIVE_RESTORE_FS)) {
         /*
          * The live restore external state is known on initialization, but at that time the stat
          * server hasn't begun so we can't actually set the state. This must be called after the

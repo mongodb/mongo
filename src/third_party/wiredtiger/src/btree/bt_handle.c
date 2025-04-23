@@ -83,7 +83,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 
     /* Checkpoint and verify files are readonly. */
     if (WT_DHANDLE_IS_CHECKPOINT(dhandle) || F_ISSET(btree, WT_BTREE_VERIFY) ||
-      F_ISSET(S2C(session), WT_CONN_READONLY))
+      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READONLY))
         F_SET(btree, WT_BTREE_READONLY);
 
     WT_LIVE_RESTORE_FH_META lr_fh_meta;
@@ -218,7 +218,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
      * entries, it can't be a metadata file, nor can it be the history store file.
      */
     WT_ASSERT(session,
-      !F_ISSET(S2C(session), WT_CONN_HS_OPEN) || !btree->hs_entries ||
+      !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN) || !btree->hs_entries ||
         (!WT_IS_METADATA(btree->dhandle) && !WT_IS_HS(btree->dhandle)));
 
     /* Clear the saved checkpoint information. */
@@ -381,7 +381,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
 
     WT_RET(__wt_config_gets(session, cfg, "ignore_in_memory_cache_size", &cval));
     if (cval.val) {
-        if (!F_ISSET(conn, WT_CONN_IN_MEMORY))
+        if (!F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY))
             WT_RET_MSG(session, EINVAL,
               "ignore_in_memory_cache_size setting is only valid with databases configured to run "
               "in-memory");
@@ -401,7 +401,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
         if (cval.val)
             F_SET(btree, WT_BTREE_LOGGED);
     }
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY)) {
         F_SET(btree, WT_BTREE_LOGGED);
         WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
         if (!cval.val)
@@ -579,7 +579,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * happen during the recovery due to the unavailability of history store file, or when reading a
      * checkpoint.
      */
-    if ((!F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET(btree, WT_BTREE_LOGGED) ||
+    if ((!F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING) || F_ISSET(btree, WT_BTREE_LOGGED) ||
           ckpt->run_write_gen < conn->ckpt.last_base_write_gen) &&
       !is_ckpt)
         btree->base_write_gen = btree->run_write_gen;
@@ -658,7 +658,7 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
      * Flag any failed read or verification: if we're in startup, it may be fatal.
      */
     if (ret != 0)
-        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
     F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
     if (ret != 0)
         __wt_err(session, ret, "unable to read root page from %s", session->dhandle->name);
@@ -992,7 +992,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     btree->maxmempage = (uint64_t)cval.val;
 
 #define WT_MIN_PAGES 10
-    if (!F_ISSET(conn, WT_CONN_CACHE_POOL) && (cache_size = conn->cache_size) > 0)
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL) && (cache_size = conn->cache_size) > 0)
         btree->maxmempage = (uint64_t)WT_MIN(btree->maxmempage,
           ((conn->evict->eviction_dirty_trigger * cache_size) / 100) / WT_MIN_PAGES);
 
@@ -1040,7 +1040,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
      * In-memory configuration overrides any key/value sizes, there's no such thing as an overflow
      * item in an in-memory configuration.
      */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY)) {
         btree->maxleafkey = WT_BTREE_MAX_OBJECT_SIZE;
         btree->maxleafvalue = WT_BTREE_MAX_OBJECT_SIZE;
         return (0);

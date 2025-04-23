@@ -694,8 +694,8 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
             WT_ASSERT_ALWAYS(session, !F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE), "%s",
               "A btree is marked dirty during RTS");
             WT_ASSERT_ALWAYS(session,
-              !F_ISSET(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT), "%s",
-              "A btree is marked dirty during recovery or shutdown");
+              !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT),
+              "%s", "A btree is marked dirty during recovery or shutdown");
         }
         S2BT(session)->modified = true;
         WT_FULL_BARRIER();
@@ -731,8 +731,8 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
      */
     if (__wt_page_is_modified(page)) {
         WT_ASSERT_ALWAYS(session,
-          F_ISSET(session->dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING) ||
-            !__wt_page_is_reconciling(page),
+          F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+            F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) || !__wt_page_is_reconciling(page),
           "Illegal attempt to mark a page clean that is being reconciled");
 
         /*

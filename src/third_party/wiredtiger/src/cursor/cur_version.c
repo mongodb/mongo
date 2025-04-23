@@ -673,7 +673,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
     WT_ERR(__wt_open_cursor(session, uri, cursor, file_cursor_cfg, &version_cursor->file_cursor));
 
     /* Open the history store cursor for operations on the regular history store .*/
-    if (F_ISSET(S2C(session), WT_CONN_HS_OPEN)) {
+    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_HS_OPEN)) {
         WT_ERR(__wt_curhs_open(session, cursor, &version_cursor->hs_cursor));
         F_SET(version_cursor->hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
     } else

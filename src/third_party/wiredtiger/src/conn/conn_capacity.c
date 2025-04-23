@@ -203,7 +203,8 @@ __wti_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
      * If it is a read only connection or if background fsync is not supported, then there is
      * nothing to do.
      */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY) || !__wt_fsync_background_chk(session))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY) ||
+      !__wt_fsync_background_chk(session))
         return (0);
 
     if (conn->capacity.total != 0)
@@ -307,7 +308,7 @@ __throttle_chunkcache(WT_SESSION_IMPL *session, WT_CAPACITY *cap, uint64_t bytes
     WT_STAT_CONN_INCRV(session, capacity_bytes_chunkcache, bytes);
     WT_STAT_CONN_INCRV(session, capacity_bytes_written, bytes);
 
-    if (capacity == 0 || F_ISSET(S2C(session), WT_CONN_RECOVERING))
+    if (capacity == 0 || F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING))
         return;
 
     __capacity_signal(session);
@@ -397,7 +398,8 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes, WT_THROTTLE_TYP
      * consider one subsystem may be turned off at some point in the future. If this subsystem is
      * not throttled there's nothing to do.
      */
-    if (__wt_atomic_load64(&cap->total) == 0 || capacity == 0 || F_ISSET(conn, WT_CONN_RECOVERING))
+    if (__wt_atomic_load64(&cap->total) == 0 || capacity == 0 ||
+      F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING))
         return;
 
     /*

@@ -193,7 +193,7 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
     uint64_t time_diff_ms;
 
-    if (!F_ISSET(S2C(session), WT_CONN_READY)) {
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY)) {
         /*
          * Wait until the connection has finished opening to begin migration. Otherwise we could
          * start up, see an empty queue, and immediately call the live restore clean up logic. This
@@ -342,7 +342,7 @@ __live_restore_init_work_queue(WT_SESSION_IMPL *session)
      * restoring from a backup we don't need to queue it. Otherwise we need to ensure we transfer it
      * over.
      */
-    if (!F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_BACKUP_PARTIAL_RESTORE))
         WT_ERR(__insert_queue_item(session, (char *)("file:" WT_METAFILE), &work_count));
 
     WT_STAT_CONN_SET(session, live_restore_work_remaining, work_count);
@@ -369,7 +369,7 @@ __wt_live_restore_server_create(WT_SESSION_IMPL *session, const char *cfg[])
      * Check that we have a live restore file system before starting the threads or allocating the
      * the server.
      */
-    if (!F_ISSET(S2C(session), WT_CONN_LIVE_RESTORE_FS))
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_LIVE_RESTORE_FS))
         return (0);
 
     WT_CONNECTION_IMPL *conn = S2C(session);

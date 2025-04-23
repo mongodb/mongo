@@ -94,7 +94,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
          * cannot have a prepared transaction on it and a fast deleted page in the history store
          * should never be reinstantiated as it is globally visible.
          */
-        if (F_ISSET(S2C(session), WT_CONN_RECOVERING) && !WT_IS_HS(session->dhandle)) {
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING) && !WT_IS_HS(session->dhandle)) {
             WT_ASSERT(session, first_upd->type == WT_UPDATE_TOMBSTONE);
             WT_ASSERT(session,
               F_ISSET(
@@ -539,7 +539,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * in the cache will be problematic. The transaction id of pages which are in disk will be
          * automatically reset as part of unpacking cell when loaded to cache.
          */
-        if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING))
             upd->txnid = WT_TXN_NONE;
         else
             upd->txnid = hs_tw->start_txn;
@@ -579,7 +579,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
              * updates in the cache will be problematic. The transaction id of pages which are in
              * disk will be automatically reset as part of unpacking cell when loaded to cache.
              */
-            if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+            if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING))
                 tombstone->txnid = WT_TXN_NONE;
             else
                 tombstone->txnid = hs_tw->stop_txn;
@@ -710,7 +710,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
           tw->durable_start_ts > rollback_timestamp ? "true" : "false",
           !__wti_rts_visibility_txn_visible_id(session, tw->start_txn) ? "true" : "false",
           !WT_TIME_WINDOW_HAS_STOP(tw) && prepared ? "true" : "false");
-        if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+        if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
             return (__rts_btree_ondisk_fixup_key(
               session, ref, rip, recno, row_key, vpack, rollback_timestamp));
         else {
@@ -734,7 +734,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
         if (tw->start_ts == tw->stop_ts && tw->durable_start_ts == tw->durable_stop_ts &&
           tw->start_txn == tw->stop_txn) {
             WT_ASSERT(session, prepared == true);
-            if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+            if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
                 return (__rts_btree_ondisk_fixup_key(
                   session, ref, rip, recno, row_key, vpack, rollback_timestamp));
             else {
@@ -762,7 +762,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
              * updates in the cache will be problematic. The transaction id of pages which are in
              * disk will be automatically reset as part of unpacking cell when loaded to cache.
              */
-            if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+            if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING))
                 upd->txnid = WT_TXN_NONE;
             else
                 upd->txnid = tw->start_txn;

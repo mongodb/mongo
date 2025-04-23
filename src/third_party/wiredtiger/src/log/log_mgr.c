@@ -335,7 +335,7 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 
     WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
     if (cval.val != 0) {
-        if (F_ISSET(conn, WT_CONN_READONLY))
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY))
             WT_RET_MSG(
               session, EINVAL, "Read-only configuration incompatible with zero-filling log files");
         F_SET(&conn->log_mgr, WT_LOG_ZERO_FILL);

@@ -76,12 +76,12 @@ struct __wt_optrack_record {
  */
 #define WT_TRACK_OP_DECL static uint16_t __func_id = 0
 #define WT_TRACK_OP_INIT(s)                                                 \
-    if (F_ISSET(S2C(s), WT_CONN_OPTRACK) && (s)->id != 0) {                 \
+    if (F_ISSET_ATOMIC_32(S2C(s), WT_CONN_OPTRACK) && (s)->id != 0) {       \
         if (__func_id == 0)                                                 \
             __wt_optrack_record_funcid(s, __PRETTY_FUNCTION__, &__func_id); \
         WT_TRACK_OP(s, 0);                                                  \
     }
 
-#define WT_TRACK_OP_END(s)                                \
-    if (F_ISSET(S2C(s), WT_CONN_OPTRACK) && (s)->id != 0) \
+#define WT_TRACK_OP_END(s)                                          \
+    if (F_ISSET_ATOMIC_32(S2C(s), WT_CONN_OPTRACK) && (s)->id != 0) \
         WT_TRACK_OP(s, 1);

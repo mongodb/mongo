@@ -715,7 +715,7 @@ __wti_background_compact_server_create(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY))
         return (0);
 
     /* Set first, the thread might run before we finish up. */
@@ -798,7 +798,7 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
     stripped_config = NULL;
 
     /* The background compaction server is not compatible with in-memory or readonly databases. */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
         __wt_verbose_warning(session, WT_VERB_COMPACT, "%s",
           "Background compact cannot be configured for in-memory or readonly databases.");
         return (ENOTSUP);

@@ -221,7 +221,7 @@ __wt_schema_close_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 
     WT_ASSERT(session,
       FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE) ||
-        F_ISSET(S2C(session), WT_CONN_CLOSING));
+        F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING));
     table->cg_complete = table->idx_complete = false;
 
     return (ret);

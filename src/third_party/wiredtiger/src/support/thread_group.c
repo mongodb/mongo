@@ -51,7 +51,7 @@ err:
      */
     WT_ASSERT(session,
       !F_ISSET(thread, WT_THREAD_RUN) ||
-        F_ISSET(S2C(session), WT_CONN_CLOSING | WT_CONN_PANIC | WT_CONN_RECOVERING));
+        F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING | WT_CONN_PANIC | WT_CONN_RECOVERING));
 
     return (WT_THREAD_RET_VALUE);
 }

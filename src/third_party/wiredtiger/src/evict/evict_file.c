@@ -108,7 +108,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              * not exhaustive, but provides basic checking on the page's status.
              */
             WT_ASSERT(session,
-              F_ISSET(dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING) ||
+              F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
+                F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING) ||
                 __wt_page_can_evict(session, ref, NULL));
             __wt_ref_out(session, ref);
             break;

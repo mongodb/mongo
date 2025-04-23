@@ -28,11 +28,10 @@
 
 /*
  * [live_restore]: live_restore_fs.c
- * This file tests WiredTiger's live restore behavior. If called with the -f flag it will populate a
- * test database and place it in a "backup" folder. Subsequent runs that don't have -f will open
- * WiredTiger in live restore mode using the backup folder as the source. It will then perform
- * random updates to the database, testing that we can perform operations on the database while live
- * restore copies data across from source in parallel.
+ * This file tests WiredTiger's live restore behavior. It will populate a test database and place it
+ * in a "backup" folder. Subsequent runs will open WiredTiger in live restore mode using the backup
+ * folder as the source. It will then perform random updates to the database, testing that we can
+ * perform operations on the database while live restore copies data across from source in parallel.
  */
 #include "src/common/constants.h"
 #include "src/common/logger.h"
@@ -61,9 +60,11 @@ class database_model {
 public:
     /* Collection names start from zero. */
     void
-    add_new_collection(scoped_session &session)
+    add_new_collection(scoped_session &session, bool subdirectory)
     {
-        auto uri = database::build_collection_name(collection_count());
+        auto uri = subdirectory ? std::string("table:") + SUB_DIR + DIR_DELIM + SUB_DIR +
+            DIR_DELIM + "collection_" + std::to_string(collection_count()) :
+                                  database::build_collection_name(collection_count());
         testutil_check(session->create(
           session.get(), uri.c_str(), (DEFAULT_FRAMEWORK_SCHEMA + file_config).c_str()));
         _collections.emplace_back(uri);
@@ -122,7 +123,7 @@ static const char *SOURCE_PATH = "WT_LIVE_RESTORE_SOURCE";
 static const char *HOME_PATH = DEFAULT_DIR;
 
 /* Declarations to avoid the error raised by -Werror=missing-prototypes. */
-void create_collection(scoped_session &session);
+void create_collection(scoped_session &session, bool subdirectory = false);
 void read(scoped_session &session);
 void trigger_fs_truncate(scoped_session &session);
 void write(scoped_session &session, bool fresh_start);
@@ -245,9 +246,9 @@ write(scoped_session &session, bool fresh_start)
 }
 
 void
-create_collection(scoped_session &session)
+create_collection(scoped_session &session, bool subdirectory)
 {
-    db.add_new_collection(session);
+    db.add_new_collection(session, subdirectory);
 }
 
 void
@@ -262,7 +263,7 @@ reopen_conn(scoped_session &session, const std::string &conn_config, const std::
 static void
 do_random_crud(scoped_session &session, const int64_t collection_count, const int64_t op_count,
   const bool fresh_start, const std::string &conn_config, const std::string &home,
-  const bool allow_reopen = true)
+  const bool allow_reopen = true, bool subdirectory = false)
 {
     bool file_created = fresh_start == false;
 
@@ -275,7 +276,7 @@ do_random_crud(scoped_session &session, const int64_t collection_count, const in
             if (static_cast<size_t>(collection_count) == db.collection_count())
                 continue;
             // Create a new file, if none exist force this path.
-            create_collection(session);
+            create_collection(session, subdirectory);
             file_created = true;
             continue;
         }
@@ -366,6 +367,16 @@ take_backup_and_delete_original(const std::string &home, const std::string &back
                 file = "journal/" + file;
             }
 
+            // Create a nested subdirectory to simulate directory per db usage if it does not exist.
+            if (WT_PREFIX_MATCH(file_c_str, SUB_DIR)) {
+                if (!testutil_exists(backup_dir.c_str(), SUB_DIR)) {
+                    auto path = backup_dir + std::string(DIR_DELIM_STR) + SUB_DIR;
+                    testutil_mkdir(path.c_str());
+                    path += std::string(DIR_DELIM_STR) + SUB_DIR;
+                    testutil_mkdir(path.c_str());
+                }
+            }
+
             std::string dest_file = home + "/" + file;
             std::string source_file = backup_dir + "/" + file;
             testutil_copy(dest_file.c_str(), source_file.c_str());
@@ -379,7 +390,7 @@ take_backup_and_delete_original(const std::string &home, const std::string &back
 static void
 run_restore(const std::string &home, const std::string &source, const int64_t thread_count,
   const int64_t collection_count, const int64_t op_count, const int64_t verbose_level,
-  const bool die, const bool recovery)
+  const bool die, const bool recovery, bool subdirectory)
 {
     /* Create a connection, set the cache size and specify the home directory. */
     const std::string verbose_string = verbose_level == 0 ?
@@ -395,14 +406,18 @@ run_restore(const std::string &home, const std::string &source, const int64_t th
     if (recovery)
         connection_manager::instance().reopen(conn_config, home);
     else
+        /*
+         * We don't want connection_manager::create() to create the nested subdirectory structure,
+         * leave subdirectory as default false and let live restore handle this.
+         */
         connection_manager::instance().create(conn_config, home, true);
 
     auto crud_session = connection_manager::instance().create_session();
     if (recovery)
         configure_database(crud_session);
     // Run 90% of random crud here and do the rest when live restore completes.
-    do_random_crud(
-      crud_session, collection_count, (int64_t)(op_count * 0.9), false, conn_config, home);
+    do_random_crud(crud_session, collection_count, (int64_t)(op_count * 0.9), false, conn_config,
+      home, true, subdirectory);
     if (die)
         raise(SIGKILL);
 
@@ -427,8 +442,8 @@ run_restore(const std::string &home, const std::string &source, const int64_t th
     logger::log_msg(LOG_INFO, "Run random crud after live restore completion");
     // We've deleted the source folder, so reopening the connection will fail. Disable reopens and
     // do the remaining 10% of random crud operations.
-    do_random_crud(
-      crud_session, collection_count, (int64_t)(op_count * 0.1), false, conn_config, home, false);
+    do_random_crud(crud_session, collection_count, (int64_t)(op_count * 0.1), false, conn_config,
+      home, false, subdirectory);
 
     // We need to close the session here because the connection close will close it out for us if we
     // don't. Then we'll crash because we'll double close a WT session.
@@ -440,17 +455,18 @@ run_restore(const std::string &home, const std::string &source, const int64_t th
 // and after that we can use the restored database from the prior iterations as the source.
 static void
 create_db(const std::string &home, const int64_t thread_count, const int64_t collection_count,
-  const int64_t op_count, const int64_t verbose_level)
+  const int64_t op_count, const int64_t verbose_level, bool subdirectory)
 {
     const std::string conn_config = CONNECTION_CREATE +
       ",cache_size=5GB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true,"
       "path=journal)";
 
     // Open the connection and create the log folder. In future runs this is copied by live restore.
-    connection_manager::instance().create(conn_config, home, true);
+    connection_manager::instance().create(conn_config, home, true, subdirectory);
 
     auto crud_session = connection_manager::instance().create_session();
-    do_random_crud(crud_session, collection_count, op_count, true, conn_config, home);
+    do_random_crud(
+      crud_session, collection_count, op_count, true, conn_config, home, true, subdirectory);
 
     crud_session.close_session();
     connection_manager::instance().close();
@@ -467,6 +483,9 @@ usage()
     std::cout << "OPTIONS" << std::endl;
     std::cout << "\t-c The maximum number of collections to run the test with, if unset "
                  "collections are created at random."
+              << std::endl;
+    std::cout << "\t-D Simulate MongoDB directory per db and directory for indexes configurations "
+                 "by creating a subdirectory for the table to populate."
               << std::endl;
     std::cout << "\t-d Die randomly while applying crud operation." << std::endl;
     std::cout << "\t-H Specifies the database home directory." << std::endl;
@@ -485,7 +504,7 @@ usage()
     std::cout << "\t-t Thread count for the background thread. A value greater than 0 must be "
                  "specified."
               << std::endl;
-    std::cout << "\t-o Verbose level, this setting will set WT_VERB_FILE_OPS with whatever level "
+    std::cout << "\t-v Verbose level, this setting will set WT_VERB_FILE_OPS with whatever level "
                  "is provided. The default is off."
               << std::endl;
 }
@@ -530,6 +549,10 @@ main(int argc, char *argv[])
         logger::log_msg(LOG_INFO, "Collection count: " + std::to_string(coll_count));
     }
 
+    // Get the subdirectory config.
+    auto subdirectory = option_exists("-D", argc, argv);
+    logger::log_msg(LOG_INFO, "Subdirectory enabled: " + std::string(subdirectory ? "Y" : "N"));
+
     // Get the death mode config.
     auto death_mode = option_exists("-d", argc, argv);
     logger::log_msg(LOG_INFO, "Death mode: " + std::string(death_mode ? "Y" : "N"));
@@ -567,7 +590,7 @@ main(int argc, char *argv[])
         testutil_remove(home_path.c_str());
 
         // We need to create a database to restore from initially.
-        create_db(home_path, thread_count, coll_count, op_count, verbose_level);
+        create_db(home_path, thread_count, coll_count, op_count, verbose_level, subdirectory);
         take_backup_and_delete_original(home_path, std::string(SOURCE_PATH));
     }
 
@@ -580,7 +603,7 @@ main(int argc, char *argv[])
     for (int i = 0; i < it_count; i++) {
         logger::log_msg(LOG_INFO, "!!!! Beginning iteration: " + std::to_string(i) + " !!!!");
         run_restore(home_path, SOURCE_PATH, thread_count, coll_count, op_count, verbose_level,
-          i == death_it, recovery);
+          i == death_it, recovery, subdirectory);
         take_backup_and_delete_original(home_path, std::string(SOURCE_PATH));
     }
 

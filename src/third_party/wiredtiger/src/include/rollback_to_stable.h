@@ -57,13 +57,14 @@
 #define WT_RTS_VERB_TAG_UPDATE_CHAIN_VERIFY "[UPDATE_CHAIN_VERIFY] "
 #define WT_RTS_VERB_TAG_WAIT_THREADS "[WAIT_THREADS] "
 
-#define WT_CHECK_RECOVERY_FLAG_TXNID(session, txnid)                                           \
-    (F_ISSET(S2C(session), WT_CONN_RECOVERING) && S2C(session)->recovery_ckpt_snap_min != 0 && \
+#define WT_CHECK_RECOVERY_FLAG_TXNID(session, txnid)        \
+    (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING) && \
+      S2C(session)->recovery_ckpt_snap_min != 0 &&          \
       (txnid) >= S2C(session)->recovery_ckpt_snap_min)
 
 /* Enable rollback to stable verbose messaging during recovery. */
 #define WT_VERB_RECOVERY_RTS(session)                                                              \
-    (F_ISSET(S2C(session), WT_CONN_RECOVERING) ?                                                   \
+    (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_RECOVERING) ?                                         \
         WT_DECL_VERBOSE_MULTI_CATEGORY(((WT_VERBOSE_CATEGORY[]){WT_VERB_RECOVERY, WT_VERB_RTS})) : \
         WT_DECL_VERBOSE_MULTI_CATEGORY(((WT_VERBOSE_CATEGORY[]){WT_VERB_RTS})))
 

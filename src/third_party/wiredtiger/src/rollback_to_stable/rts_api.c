@@ -160,7 +160,7 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
           "the stable timestamp is not set; set the rollback timestamp to the maximum timestamp");
     }
 
-    if (F_ISSET(conn, WT_CONN_RECOVERING))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING))
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_RECOVER_CKPT "recovered checkpoint snapshot_min=%" PRIu64
                                        ", snapshot_max=%" PRIu64 ", snapshot_count=%" PRIu32,
@@ -181,7 +181,7 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
      * ensure that both in-memory and on-disk versions are the same unless caller requested for no
      * checkpoint.
      */
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !no_ckpt && !dryrun)
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY) && !no_ckpt && !dryrun)
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
 err:

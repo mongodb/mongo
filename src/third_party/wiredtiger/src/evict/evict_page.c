@@ -267,7 +267,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     /* Update the reference and discard the page. */
     if (__wt_ref_is_root(ref))
         __wt_ref_out(session, ref);
-    else if ((clean_page && !F_ISSET(conn, WT_CONN_IN_MEMORY)) || tree_dead)
+    else if ((clean_page && !F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY)) || tree_dead)
         /*
          * Pages that belong to dead trees never write back to disk and can't support page splits.
          */
@@ -674,7 +674,7 @@ __evict_review_obsolete_time_window(WT_SESSION_IMPL *session, WT_REF *ref)
         return (0);
 
     /* Do not perform any obsolete time window cleanup during the startup or shutdown phase. */
-    if (F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT))
         return (0);
 
     /* If the file is being checkpointed, other threads can't evict dirty pages. */
@@ -807,7 +807,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * Clean pages can't be evicted when running in memory only. This should be uncommon - we don't
      * add clean pages to the queue.
      */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY) && !modified && !closing)
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY) && !modified && !closing)
         return (__wt_set_return(session, EBUSY));
 
     /* Check if the page can be evicted. */
@@ -900,7 +900,7 @@ __evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
     else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(btree->dhandle))
         ;
     /* Always do update restore for in-memory database. */
-    else if (F_ISSET(conn, WT_CONN_IN_MEMORY))
+    else if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY))
         LF_SET(WT_REC_IN_MEMORY | WT_REC_SCRUB);
     /* For data store leaf pages, write the history to history store except for metadata. */
     else if (!WT_IS_METADATA(btree->dhandle)) {

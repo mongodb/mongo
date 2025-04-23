@@ -197,13 +197,6 @@ functions:
         fi
         popd
         git clone $mongo_repo -b $mongo_branch
-        # FIXME-WT-14185 The depreciation ticket requires changes from the private repository. As a
-        # workaround apply a manual patch onto the mongodb master branch.
-        if [[ $mongo_branch == "master" ]]; then
-          cd mongo
-          git checkout -b wt-13948-workaround
-          git apply ../wiredtiger/test/evergreen/wt-13948.patch
-        fi
   "import wiredtiger into mongo" :
     command: shell.exec
     type: setup
@@ -232,7 +225,7 @@ functions:
         echo "startup --output_user_root=${workdir}/bazel-output-root" >> ~/.bazelrc
         echo "BAZELISK_HOME=${workdir}/bazelisk_home" >> ~/.bazeliskrc
 
-        bazel build --mongo_toolchain_version=v4 --config=opt --build_enterprise=False install-mongod
+        bazel build --mongo_toolchain_version=v5 --config=opt --build_enterprise=False install-mongod
   "configure wiredtiger": &configure_wiredtiger
     command: shell.exec
     params:

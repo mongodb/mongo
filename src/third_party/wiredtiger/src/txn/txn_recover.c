@@ -130,7 +130,7 @@ __txn_backup_post_recovery(WT_RECOVERY *r)
             clear = false;
     }
     if (clear) {
-        F_CLR(conn, WT_CONN_INCR_BACKUP);
+        F_CLR_ATOMIC_32(conn, WT_CONN_INCR_BACKUP);
         F_CLR(&conn->log_mgr, WT_LOG_INCR_BACKUP);
         conn->incr_granularity = 0;
     }
@@ -891,7 +891,7 @@ __hs_exists(WT_SESSION_IMPL *session, WT_CURSOR *metac, const char *cfg[], bool 
              */
             ret = __wt_hs_config(session, cfg);
             if (ret != 0) {
-                if (F_ISSET(conn, WT_CONN_SALVAGE)) {
+                if (F_ISSET_ATOMIC_32(conn, WT_CONN_SALVAGE)) {
                     wt_session = &session->iface;
                     WT_ERR(wt_session->salvage(wt_session, WT_HS_URI, NULL));
                 } else
@@ -903,7 +903,7 @@ __hs_exists(WT_SESSION_IMPL *session, WT_CURSOR *metac, const char *cfg[], bool 
              * the metadata and pretend it never existed. As such we won't run rollback to stable
              * later.
              */
-            if (F_ISSET(conn, WT_CONN_SALVAGE)) {
+            if (F_ISSET_ATOMIC_32(conn, WT_CONN_SALVAGE)) {
                 *hs_exists = false;
                 metac->remove(metac);
             } else
@@ -938,7 +938,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     bool do_checkpoint, eviction_started, hs_exists, needs_rec, rts_executed, was_backup;
 
     conn = S2C(session);
-    F_SET(conn, WT_CONN_RECOVERING);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECOVERING);
 
     WT_CLEAR(r);
     WT_INIT_LSN(&r.ckpt_lsn);
@@ -946,7 +946,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     do_checkpoint = hs_exists = true;
     rts_executed = false;
     eviction_started = false;
-    was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
+    was_backup = F_ISSET_ATOMIC_32(conn, WT_CONN_WAS_BACKUP);
 
     __wt_verbose_level_multi(
       session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO, "%s", "starting WiredTiger recovery");
@@ -1020,7 +1020,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * If this is a read-only connection, check if the checkpoint LSN in the metadata file is up to
      * date, indicating a clean shutdown.
      */
-    if (F_ISSET(conn, WT_CONN_READONLY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY)) {
         WT_ERR(__wt_log_needs_recovery(session, &metafile->ckpt_lsn, &needs_rec));
         if (needs_rec)
             WT_ERR_MSG(session, WT_RUN_RECOVERY, "Read-only database needs recovery");
@@ -1036,7 +1036,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
         ret = __wt_log_scan(
           session, &metafile->ckpt_lsn, NULL, WT_LOGSCAN_RECOVER_METADATA, __txn_log_recover, &r);
     }
-    if (F_ISSET(conn, WT_CONN_SALVAGE))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_SALVAGE))
         ret = 0;
     /* We need to do some work after recovering backup information. Do that now. */
     __txn_backup_post_recovery(&r);
@@ -1045,7 +1045,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * some sort.
      */
     if (ret == ENOENT) {
-        F_SET(conn, WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION);
         ret = WT_ERROR;
     }
 
@@ -1093,13 +1093,13 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
      * automatic recovery.
      */
     if (needs_rec &&
-      (F_ISSET(&conn->log_mgr, WT_LOG_RECOVER_ERR) || F_ISSET(conn, WT_CONN_READONLY))) {
-        if (F_ISSET(conn, WT_CONN_READONLY))
+      (F_ISSET(&conn->log_mgr, WT_LOG_RECOVER_ERR) || F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY))) {
+        if (F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY))
             WT_ERR_MSG(session, WT_RUN_RECOVERY, "Read-only database needs recovery");
         WT_ERR_MSG(session, WT_RUN_RECOVERY, "Database needs recovery");
     }
 
-    if (F_ISSET(conn, WT_CONN_READONLY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY)) {
         do_checkpoint = false;
         goto done;
     }
@@ -1132,7 +1132,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
           session, NULL, NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
     else
         ret = __wt_log_scan(session, &r.ckpt_lsn, NULL, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
-    if (F_ISSET(conn, WT_CONN_SALVAGE))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_SALVAGE))
         ret = 0;
     WT_ERR(ret);
 
@@ -1172,7 +1172,7 @@ done:
      *    any changes that need to be done on the database other than reading.
      * 2. The history store file was found in the metadata.
      */
-    if (hs_exists && !F_ISSET(conn, WT_CONN_READONLY)) {
+    if (hs_exists && !F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY)) {
         const char *rts_cfg[] = {
           WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
         __wt_timer_start(session, &rts_timer);
@@ -1277,8 +1277,8 @@ err:
         WT_TRET(__wt_evict_threads_destroy(session));
 
     WT_TRET(__wt_session_close_internal(session));
-    F_SET(conn, WT_CONN_RECOVERY_COMPLETE);
-    F_CLR(conn, WT_CONN_RECOVERING);
+    F_SET_ATOMIC_32(conn, WT_CONN_RECOVERY_COMPLETE);
+    F_CLR_ATOMIC_32(conn, WT_CONN_RECOVERING);
 
     return (ret);
 }

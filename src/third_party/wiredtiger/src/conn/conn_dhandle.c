@@ -386,7 +386,8 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead, bo
          *
          */
         if (!discard && !marked_dead) {
-            if (F_ISSET(conn, WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+            if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY) ||
+              F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
                 discard = true;
             else {
                 WT_TRET(__wt_checkpoint_close(session, final));
@@ -522,7 +523,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
 
     WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) && !LF_ISSET(WT_DHANDLE_LOCK_ONLY));
 
-    WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
+    WT_ASSERT(session, !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
     /* Turn off eviction. */
     if (WT_DHANDLE_BTREE(dhandle))
@@ -621,7 +622,7 @@ err:
     }
 
     if (ret == ENOENT && F_ISSET(dhandle, WT_DHANDLE_IS_METADATA)) {
-        F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
         return (WT_ERROR);
     }
 
@@ -707,7 +708,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
         if (WT_SESSION_IS_CHECKPOINT(session)) {
             time_start = __wt_clock(session);
             __wt_checkpoint_handle_stats_clear(session);
-            F_SET(conn, WT_CONN_CKPT_GATHER);
+            F_SET_ATOMIC_32(conn, WT_CONN_CKPT_GATHER);
         }
         for (dhandle = NULL;;) {
             WT_WITH_HANDLE_LIST_READ_LOCK(
@@ -723,7 +724,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
         }
 done:
         if (time_start != 0) {
-            F_CLR(conn, WT_CONN_CKPT_GATHER);
+            F_CLR_ATOMIC_32(conn, WT_CONN_CKPT_GATHER);
             time_stop = __wt_clock(session);
             time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
             __wt_checkpoint_handle_stats(session, time_diff);
@@ -733,7 +734,7 @@ done:
     }
 
 err:
-    F_CLR(conn, WT_CONN_CKPT_GATHER);
+    F_CLR_ATOMIC_32(conn, WT_CONN_CKPT_GATHER);
     WT_DHANDLE_RELEASE(dhandle);
     return (ret);
 }
@@ -930,7 +931,8 @@ restart:
             continue;
 
         WT_WITH_DHANDLE(session, dhandle,
-          WT_TRET(__wti_conn_dhandle_discard_single(session, true, F_ISSET(conn, WT_CONN_PANIC))));
+          WT_TRET(__wti_conn_dhandle_discard_single(
+            session, true, F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC))));
         goto restart;
     }
 
@@ -956,7 +958,8 @@ restart:
     WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle, &conn->dhqh, q, dhandle_tmp)
     {
         WT_WITH_DHANDLE(session, dhandle,
-          WT_TRET(__wti_conn_dhandle_discard_single(session, true, F_ISSET(conn, WT_CONN_PANIC))));
+          WT_TRET(__wti_conn_dhandle_discard_single(
+            session, true, F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC))));
     }
     WT_TAILQ_SAFE_REMOVE_END
 

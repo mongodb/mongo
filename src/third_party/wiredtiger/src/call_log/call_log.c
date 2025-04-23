@@ -23,7 +23,7 @@ __wt_conn_call_log_setup(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Do not setup call log file if the connection is in readonly mode. */
-    if (F_ISSET(conn, WT_CONN_READONLY)) {
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_READONLY)) {
         return (ret);
     }
 
@@ -34,7 +34,7 @@ __wt_conn_call_log_setup(WT_SESSION_IMPL *session)
            WT_STREAM_APPEND, &conn->call_log_fst)) != 0)
         WT_ERR_MSG(session, ret, "Failed to open call log.");
 
-    F_SET(conn, WT_CONN_CALL_LOG_ENABLED);
+    F_SET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED);
 
 err:
     __wt_scr_free(session, &file_name);
@@ -52,7 +52,7 @@ __wt_conn_call_log_teardown(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     return (__wt_fclose(session, &conn->call_log_fst));
@@ -165,7 +165,7 @@ int
 __wt_call_log_print_return(
   WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session, int ret_val, const char *err_msg)
 {
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     return (__wt_fprintf(session, conn->call_log_fst,
@@ -188,7 +188,7 @@ __wt_call_log_open_session(WT_SESSION_IMPL *session, int ret_val)
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "connection", "open_session"));
@@ -219,7 +219,7 @@ __wt_call_log_set_timestamp(WT_SESSION_IMPL *session, const char *config, int re
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "connection", "set_timestamp"));
@@ -254,7 +254,7 @@ __wt_call_log_query_timestamp(
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     /*
@@ -303,7 +303,7 @@ __wt_call_log_begin_transaction(WT_SESSION_IMPL *session, const char *config, in
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "session", "begin_transaction"));
@@ -335,7 +335,7 @@ __wt_call_log_prepare_transaction(WT_SESSION_IMPL *session, const char *config, 
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "session", "prepare_transaction"));
@@ -367,7 +367,7 @@ __wt_call_log_commit_transaction(WT_SESSION_IMPL *session, const char *config, i
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "session", "commit_transaction"));
@@ -399,7 +399,7 @@ __wt_call_log_rollback_transaction(WT_SESSION_IMPL *session, const char *config,
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "session", "rollback_transaction"));
@@ -430,7 +430,7 @@ __wt_call_log_timestamp_transaction(WT_SESSION_IMPL *session, const char *config
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "session", "timestamp_transaction"));
@@ -465,7 +465,7 @@ __wt_call_log_timestamp_transaction_uint(
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     name = "unknown";
@@ -513,7 +513,7 @@ __wt_call_log_close_session(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_CALL_LOG_ENABLED))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_CALL_LOG_ENABLED))
         return (0);
 
     WT_RET(__call_log_print_start(session, "session", "close_session"));

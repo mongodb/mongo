@@ -33,11 +33,11 @@ TEST_CASE("Test functions for error handling in compaction workflows",
     SECTION("Test __wt_background_compact_signal - in-memory or readonly database")
     {
         // Set database as in-memory and readonly.
-        F_SET(conn_impl, WT_CONN_IN_MEMORY | WT_CONN_READONLY);
+        F_SET_ATOMIC_32(conn_impl, WT_CONN_IN_MEMORY | WT_CONN_READONLY);
         CHECK(__wt_background_compact_signal(session_impl, NULL) == ENOTSUP);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
         // Clear in-memory and read only flag as connection close requires them to be cleared.
-        F_CLR(conn_impl, WT_CONN_IN_MEMORY | WT_CONN_READONLY);
+        F_CLR_ATOMIC_32(conn_impl, WT_CONN_IN_MEMORY | WT_CONN_READONLY);
     }
 
     SECTION("Test __wt_background_compact_signal - changes in config string")

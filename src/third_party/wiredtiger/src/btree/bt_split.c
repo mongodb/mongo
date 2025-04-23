@@ -1429,7 +1429,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      * In-memory databases restore non-obsolete updates directly in this function, don't call the
      * underlying page functions to do it.
      */
-    if (prepare && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+    if (prepare && !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
         WT_RET(__wti_page_inmem_prepare(session, ref));
 
     __wt_evict_inherit_page_state(orig, page);
@@ -1471,7 +1471,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
          * them back to their original update chains. Truncate before we restore them to ensure the
          * size of the page is correct.
          */
-        if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+        if (supd->onpage_upd != NULL && !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY)) {
             /*
              * If there is an on-page tombstone we need to remove it as well while performing update
              * restore eviction.
@@ -1611,7 +1611,7 @@ __split_multi_inmem_final(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *mul
          * value when the tombstone is globally visible. Do not free them here as it is possible
          * that the globally visible tombstone is already freed as part of update obsolete check.
          */
-        if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+        if (supd->onpage_upd != NULL && !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY)) {
             tmp = supd->onpage_tombstone != NULL ? &supd->onpage_tombstone : &supd->onpage_upd;
             __wt_free_update_list(session, tmp);
             supd->onpage_tombstone = supd->onpage_upd = NULL;
@@ -1631,7 +1631,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *mult
     WT_UPDATE *tmp, *upd;
     uint32_t i, slot;
 
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+    if (!F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
         /* Append the onpage values back to the original update chains. */
         for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd) {
             /*

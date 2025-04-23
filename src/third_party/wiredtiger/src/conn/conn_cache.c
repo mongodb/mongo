@@ -27,7 +27,7 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 
     WT_RET(__wt_config_gets_none(session, cfg, "shared_cache.name", &cval));
     now_shared = cval.len != 0;
-    was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
+    was_shared = F_ISSET_ATOMIC_32(conn, WT_CONN_CACHE_POOL);
 
     /* Cleanup if reconfiguring */
     if (reconfig && was_shared && !now_shared)

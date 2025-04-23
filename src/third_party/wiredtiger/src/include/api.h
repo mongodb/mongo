@@ -339,12 +339,12 @@
       s, WT_CURSOR, remove, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle); \
     SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, remove)
 
-#define CURSOR_UPDATE_API_CALL_BTREE(cur, s, ret, func_name)                                  \
-    (s) = CUR2S(cur);                                                                         \
-    TXN_API_CALL_NOCONF(s, WT_CURSOR, func_name, ((WT_CURSOR_BTREE *)(cur))->dhandle);        \
-    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, func_name);                                  \
-    if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) && !F_ISSET(CUR2BT(cur), WT_BTREE_IGNORE_CACHE) && \
-      __wt_cache_full(s))                                                                     \
+#define CURSOR_UPDATE_API_CALL_BTREE(cur, s, ret, func_name)                           \
+    (s) = CUR2S(cur);                                                                  \
+    TXN_API_CALL_NOCONF(s, WT_CURSOR, func_name, ((WT_CURSOR_BTREE *)(cur))->dhandle); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, func_name);                           \
+    if (F_ISSET_ATOMIC_32(S2C(s), WT_CONN_IN_MEMORY) &&                                \
+      !F_ISSET(CUR2BT(cur), WT_BTREE_IGNORE_CACHE) && __wt_cache_full(s))              \
         WT_ERR(WT_CACHE_FULL);
 
 #define CURSOR_UPDATE_API_CALL(cur, s, ret, func_name)  \

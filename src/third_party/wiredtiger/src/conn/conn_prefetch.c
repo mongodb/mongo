@@ -15,7 +15,7 @@
 static bool
 __prefetch_thread_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2C(session), WT_CONN_PREFETCH_RUN));
+    return (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_PREFETCH_RUN));
 }
 
 /*
@@ -37,7 +37,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     /* Mark the session as a prefetch thread session. */
     F_SET(session, WT_SESSION_PREFETCH_THREAD);
 
-    if (F_ISSET(conn, WT_CONN_PREFETCH_RUN))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_PREFETCH_RUN))
         __wt_cond_wait(session, conn->prefetch_threads.wait_cond, WT_THOUSAND * WT_THOUSAND, NULL);
 
     while (!TAILQ_EMPTY(&conn->pfqh)) {
@@ -92,7 +92,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          * these deleted pages into the cache if the fast truncate information is visible in the
          * session transaction snapshot.
          */
-        if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) && pe->ref->page_del == NULL)
+        if (!F_ISSET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION) && pe->ref->page_del == NULL)
             WT_WITH_DHANDLE(session, pe->dhandle, ret = __wt_prefetch_page_in(session, pe));
 
         /*
@@ -146,7 +146,7 @@ __wti_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
     if (!conn->prefetch_available)
         return (0);
 
-    F_SET(conn, WT_CONN_PREFETCH_RUN);
+    F_SET_ATOMIC_32(conn, WT_CONN_PREFETCH_RUN);
 
     session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_ERR(__wt_thread_group_create(session, &conn->prefetch_threads, "prefetch-server",
@@ -298,10 +298,10 @@ __wti_prefetch_destroy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    if (!F_ISSET(conn, WT_CONN_PREFETCH_RUN))
+    if (!F_ISSET_ATOMIC_32(conn, WT_CONN_PREFETCH_RUN))
         return (0);
 
-    F_CLR(conn, WT_CONN_PREFETCH_RUN);
+    F_CLR_ATOMIC_32(conn, WT_CONN_PREFETCH_RUN);
 
     /* Ensure that the pre-fetch queue is drained. */
     WT_TRET(__wt_conn_prefetch_clear_tree(session, true));

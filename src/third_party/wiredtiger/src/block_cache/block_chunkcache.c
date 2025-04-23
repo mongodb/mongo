@@ -1237,7 +1237,7 @@ __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[])
         if (cval.len == 0)
             WT_RET_MSG(session, EINVAL, "chunk cache storage path not provided in the config.");
 
-        if (F_ISSET(S2C(session), WT_CONN_READONLY))
+        if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READONLY))
             WT_RET_MSG(
               session, EINVAL, "on-disk chunk cache incompatible with read-only connection");
 
