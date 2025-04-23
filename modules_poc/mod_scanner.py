@@ -859,14 +859,21 @@ timer = Timer()
 # TODO: this should probably be pulled out to a separate program, with all functions
 # only called by it moved out as well. That requires pulling mod_for_file() out to a lib.
 # It is only part of mod_scanner because it needs that function.
-def dump_modules() -> None:
-    out: dict[str, dict[str, dict[str, list[str]]]] = {}
+
+
+def glob_paths():
     for path in glob("src/mongo/**/*", recursive=True):
         if "/third_party/" in path:
             continue
         extensions = ("h", "cpp", "idl", "c", "defs", "inl", "hpp")
         if not any(path.endswith(f".{ext}") for ext in extensions):
             continue
+        yield path
+
+
+def dump_modules() -> None:
+    out: dict[str, dict[str, dict[str, list[str]]]] = {}
+    for path in glob_paths():
         mod = mod_for_file(path)
         assert mod  # None would mean not first-party, but that is already filtered out.
         (dir, leaf) = path.rsplit("/", 1)
@@ -880,6 +887,11 @@ def dump_modules() -> None:
             for files in dirs.values():
                 files.sort()
     yaml.dump(out, open("modules.yaml", "w"))
+
+
+def dump_list() -> None:
+    for line in sorted(f"{path} -- {mod_for_file(path)}" for path in glob_paths()):
+        print(line)
 
 
 def parseTU(args: list[str] | str):
@@ -976,6 +988,10 @@ def main():
 
     if args == ["--dump-modules"]:
         dump_modules()
+        sys.exit()
+
+    if args == ["--dump-modules-list"]:
+        dump_list()
         sys.exit()
 
     tu = parseTU(args)
