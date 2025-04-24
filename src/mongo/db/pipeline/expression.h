@@ -95,6 +95,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+constexpr size_t kMaxArgumentCountForSwitchAndSetExprForSbe = 100;
 
 class BSONArrayBuilder;
 class BSONElement;
@@ -533,7 +534,7 @@ public:
 
     virtual const char* getOpName() const = 0;
 
-    virtual void validateArguments(const ExpressionVector& args) const {}
+    virtual void validateChildren() const {}
 
     static ExpressionVector parseArguments(ExpressionContext* expCtx,
                                            BSONElement bsonExpr,
@@ -556,10 +557,9 @@ public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
                                                   BSONElement bsonExpr,
                                                   const VariablesParseState& vps) {
-        auto expr = make_intrusive<SubClass>(expCtx);
         ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
-        expr->validateArguments(args);
-        expr->_children = std::move(args);
+        auto expr = make_intrusive<SubClass>(expCtx, std::move(args));
+        expr->validateChildren();
         return expr;
     }
 
@@ -618,12 +618,12 @@ public:
     ExpressionRangedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
         : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 
-    void validateArguments(const Expression::ExpressionVector& args) const override {
+    void validateChildren() const override {
         uassert(28667,
                 str::stream() << "Expression " << this->getOpName() << " takes at least " << MinArgs
-                              << " arguments, and at most " << MaxArgs << ", but " << args.size()
-                              << " were passed in.",
-                MinArgs <= args.size() && args.size() <= MaxArgs);
+                              << " arguments, and at most " << MaxArgs << ", but "
+                              << this->_children.size() << " were passed in.",
+                MinArgs <= this->_children.size() && this->_children.size() <= MaxArgs);
     }
 };
 
@@ -636,11 +636,11 @@ public:
     ExpressionFixedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
         : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 
-    void validateArguments(const Expression::ExpressionVector& args) const override {
+    void validateChildren() const override {
         uassert(16020,
                 str::stream() << "Expression " << this->getOpName() << " takes exactly " << NArgs
-                              << " arguments. " << args.size() << " were passed in.",
-                args.size() == NArgs);
+                              << " arguments. " << this->_children.size() << " were passed in.",
+                this->_children.size() == NArgs);
     }
 };
 
@@ -654,6 +654,13 @@ class ExpressionFromAccumulator
 public:
     explicit ExpressionFromAccumulator(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+
+    ExpressionFromAccumulator(ExpressionContext* const expCtx,
+                              Expression::ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionFromAccumulator<AccumulatorState>>(expCtx,
+                                                                          std::move(children)) {
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
@@ -1291,6 +1298,11 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
+    ExpressionLast(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionLast, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -1307,6 +1319,9 @@ class ExpressionObjectToArray final : public ExpressionFixedArity<ExpressionObje
 public:
     explicit ExpressionObjectToArray(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx) {}
+
+    ExpressionObjectToArray(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionObjectToArray, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1344,6 +1359,9 @@ class ExpressionBsonSize final : public ExpressionFixedArity<ExpressionBsonSize,
 public:
     explicit ExpressionBsonSize(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionBsonSize, 1>(expCtx) {}
+
+    ExpressionBsonSize(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionBsonSize, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final {
@@ -1512,6 +1530,9 @@ public:
 class ExpressionCond final : public ExpressionFixedArity<ExpressionCond, 3> {
 public:
     explicit ExpressionCond(ExpressionContext* const expCtx) : Base(expCtx) {}
+
+    ExpressionCond(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : Base(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2229,9 +2250,12 @@ public:
     explicit ExpressionIfNull(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionIfNull>(expCtx) {}
 
+    ExpressionIfNull(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionIfNull>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
-    void validateArguments(const ExpressionVector& args) const final;
+    void validateChildren() const final;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2252,7 +2276,9 @@ public:
     }
 
     ExpressionIn(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionIn, 2>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionIn, 2>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -2276,7 +2302,9 @@ public:
     }
 
     ExpressionIndexOfArray(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx, std::move(children)) {}
+        : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const override;
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
@@ -2854,6 +2882,9 @@ public:
     explicit ExpressionRange(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx) {}
 
+    ExpressionRange(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionRange, 2, 3>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -3014,8 +3045,6 @@ public:
 
 class ExpressionSetDifference final : public ExpressionFixedArity<ExpressionSetDifference, 2> {
 public:
-    explicit ExpressionSetDifference(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx) {}
     ExpressionSetDifference(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx, std::move(children)) {}
 
@@ -3034,15 +3063,18 @@ public:
 
 class ExpressionSetEquals final : public ExpressionVariadic<ExpressionSetEquals> {
 public:
-    explicit ExpressionSetEquals(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetEquals>(expCtx) {}
     ExpressionSetEquals(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {}
+        : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {
+        if (!internalQueryEnableSbeForNaryExpression.load() &&
+            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        }
+    }
 
     [[nodiscard]] boost::intrusive_ptr<Expression> optimize() override;
     Value evaluate(const Document& root, Variables* variables) const override;
     const char* getOpName() const final;
-    void validateArguments(const ExpressionVector& args) const final;
+    void validateChildren() const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -3064,10 +3096,13 @@ private:
 
 class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetIntersection> {
 public:
-    explicit ExpressionSetIntersection(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetIntersection>(expCtx) {}
     ExpressionSetIntersection(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetIntersection>(expCtx, std::move(children)) {}
+        : ExpressionVariadic<ExpressionSetIntersection>(expCtx, std::move(children)) {
+        if (!internalQueryEnableSbeForNaryExpression.load() &&
+            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        }
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3095,6 +3130,7 @@ class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset,
 public:
     explicit ExpressionSetIsSubset(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx) {}
+
     ExpressionSetIsSubset(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx, std::move(children)) {}
 
@@ -3117,10 +3153,13 @@ private:
 
 class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
-    explicit ExpressionSetUnion(ExpressionContext* const expCtx)
-        : ExpressionVariadic<ExpressionSetUnion>(expCtx) {}
     ExpressionSetUnion(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetUnion>(expCtx, std::move(children)) {}
+        : ExpressionVariadic<ExpressionSetUnion>(expCtx, std::move(children)) {
+        if (!internalQueryEnableSbeForNaryExpression.load() &&
+            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        }
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3153,6 +3192,11 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
+    ExpressionSize(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSize, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -3170,6 +3214,9 @@ class ExpressionReverseArray final : public ExpressionFixedArity<ExpressionRever
 public:
     explicit ExpressionReverseArray(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx) {}
+
+    ExpressionReverseArray(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3224,7 +3271,9 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
     ExpressionSlice(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx, std::move(children)) {}
+        : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3474,6 +3523,11 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
+    ExpressionBinarySize(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionBinarySize, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -3555,6 +3609,10 @@ public:
                      std::vector<boost::intrusive_ptr<Expression>> children)
         : Expression(expCtx, std::move(children)) {
         uassert(40068, "$switch requires at least one branch", numBranches() >= 1);
+        if (!internalQueryEnableSbeForNaryExpression.load() &&
+            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        }
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -3726,7 +3784,9 @@ public:
     }
 
     ExpressionType(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionType, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionType, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3744,6 +3804,9 @@ class ExpressionIsNumber final : public ExpressionFixedArity<ExpressionIsNumber,
 public:
     explicit ExpressionIsNumber(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionIsNumber, 1>(expCtx) {}
+
+    ExpressionIsNumber(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionIsNumber, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

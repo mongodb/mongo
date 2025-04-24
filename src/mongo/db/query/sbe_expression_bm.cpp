@@ -62,6 +62,7 @@
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -95,6 +96,9 @@ public:
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& benchmarkState,
                              const std::vector<Document>& documents) final {
+        RAIIServerParameterControllerForTest controller{"internalQueryEnableSbeForNaryExpression",
+                                                        true};
+
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
