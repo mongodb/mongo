@@ -288,7 +288,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
-    boost::optional<WriteConcernErrorDetail>* wce) {
+    boost::optional<WriteConcernErrorDetail>& wce) {
     if (opCtx->isRetryableWrite()) {
         tassert(7260900,
                 "Retryable writes must have an explicit stmtId",
@@ -394,9 +394,9 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
 
     if (swResult.isOK()) {
         // Check if 'swResult' contains a 'WriteConcernError', and if so, populate the 'wce' out
-        // variable if it exists.
-        if (wce != nullptr && swResult.getValue().wcError.isValid(nullptr)) {
-            wce->emplace(swResult.getValue().wcError);
+        // variable.
+        if (swResult.getValue().wcError.isValid(nullptr)) {
+            wce.emplace(swResult.getValue().wcError);
         }
         if (swResult.getValue().getEffectiveStatus().isOK()) {
             return StatusWith<ClusterWriteWithoutShardKeyResponse>(

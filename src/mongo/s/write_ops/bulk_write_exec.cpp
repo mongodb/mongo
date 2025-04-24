@@ -622,11 +622,16 @@ void executeWriteWithoutShardKey(
                                                    allowShardKeyUpdatesWithoutFullShardKeyInQuery)
                           .toBSON();
 
+        boost::optional<WriteConcernErrorDetail> wce;
         auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
-            opCtx, targeter->getNS(), std::move(cmdObj));
+            opCtx, targeter->getNS(), std::move(cmdObj), wce);
 
         BulkWriteCommandReply bulkWriteResponse;
         WriteConcernErrorDetail wcError;
+        if (wce.has_value()) {
+            wcError = std::move(*wce);
+        }
+
         Status responseStatus = swRes.getStatus();
         if (swRes.isOK()) {
             std::string errMsg;

@@ -92,14 +92,13 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
  * Both phases are run transactionally using an internal transaction.
  * The write phase can produce a 'WriteConcernError', which can be orthogonal to other errors
  * reported by the write. The optional 'wce' out variable can be used to capture the
- * 'WriteConcernError' separately, so the caller can handle it. If 'wce' is a nullptr, no separate
- * 'WriteConcernError' will be reported.
+ * 'WriteConcernError' separately, so the caller can handle it.
  **/
 StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
-    boost::optional<WriteConcernErrorDetail>* wce = nullptr);
+    boost::optional<WriteConcernErrorDetail>& wce);
 /**
  * Return a formatted 'explain' response that describes the work done in the two phase write
  * protocol.

@@ -1003,7 +1003,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
 
     boost::optional<WriteConcernErrorDetail> wce;
     auto swRes =
-        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough, &wce);
+        write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough, wce);
 
     // runTwoPhaseWriteProtocol returns an empty response when there are no matching documents
     // and {upsert: false}.
