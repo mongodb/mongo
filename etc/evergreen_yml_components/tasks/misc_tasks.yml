@@ -1594,7 +1594,7 @@ tasks:
             - "--base=${revision}"
 
   - name: version_burn_in_gen
-    run_on: ubuntu2004-medium
+    run_on: ubuntu2404-medium
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
@@ -1609,7 +1609,7 @@ tasks:
       - func: "generate version burn in"
 
   - name: version_gen
-    run_on: ubuntu2004-medium
+    run_on: ubuntu2404-medium
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
       - command: manifest.load
@@ -1624,7 +1624,7 @@ tasks:
       - func: "generate version"
 
   - name: version_gen_validation
-    run_on: ubuntu2004-medium
+    run_on: ubuntu2404-medium
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",

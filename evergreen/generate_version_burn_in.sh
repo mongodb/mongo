@@ -19,7 +19,7 @@ RUST_BACKTRACE=full PATH=$PATH:$HOME:/ ./mongo-task-generator \
   --evg-auth-file ./.evergreen.yml \
   --evg-project-file ${evergreen_config_file_path} \
   --generate-sub-tasks-config etc/generate_subtasks_config.yml \
-  --s3-test-stats-endpoint https://mongo-test-stats.s3.amazonaws.com \
+  --s3-test-stats-bucket mongo-test-stats \
   --include-fully-disabled-feature-tests \
   --burn-in \
   --burn-in-tests-command "python buildscripts/burn_in_tests.py run --origin-rev=$base_revision" \
