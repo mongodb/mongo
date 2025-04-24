@@ -40,8 +40,14 @@ function runTest(readConcernLevel) {
     const mongo1 = new Mongo(primary.host);
     const session1 = mongo1.startSession();
     const sessionDB1 = session1.getDatabase(dbName);
+    // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
+    const versionSupportsAbortWaitingForWC =
+        MongoRunner.compareBinVersions(mongo1.adminCommand({serverStatus: 1}).version, "8.0") >= 0;
     session1.startTransaction({
-        writeConcern: {w: "majority", wtimeout: successTimeoutMS},
+        writeConcern: {
+            w: "majority",
+            wtimeout: versionSupportsAbortWaitingForWC ? failTimeoutMS : successTimeoutMS
+        },
         readConcern: {level: readConcernLevel}
     });
     const fruitlessUpdate1 = {update: collName, updates: [{q: {x: 1}, u: {$set: {x: 1}}}]};
@@ -103,7 +109,13 @@ function runTest(readConcernLevel) {
     jsTestLog("Run test commands, with replication stopped");
 
     jsTestLog("Unprepared Abort Test");
-    assert.commandWorked(session1.abortTransaction_forTesting());
+    // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
+    if (versionSupportsAbortWaitingForWC) {
+        assert.commandFailedWithCode(session1.abortTransaction_forTesting(),
+                                     ErrorCodes.WriteConcernFailed);
+    } else {
+        assert.commandWorked(session1.abortTransaction_forTesting());
+    }
 
     jsTestLog("Prepared Abort Test");
     assert.commandFailedWithCode(session2.abortTransaction_forTesting(),

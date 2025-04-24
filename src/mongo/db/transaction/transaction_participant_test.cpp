@@ -7246,6 +7246,45 @@ TEST_F(ShardTxnParticipantTest, EagerlyReapRetryableSessionsUponNewClientTransac
     ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
 }
 
+TEST_F(TxnParticipantTest, LastOpSetWhenUnstashingForAbort) {
+    // Test that unstashing for an abort sets lastOp.
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+
+    ASSERT_TRUE(repl::ReplClientInfo::forClient(opCtx()->getClient())
+                    .lastOpWasSetExplicitlyByClientForCurrentOperation(opCtx()));
+}
+
+TEST_F(TxnParticipantTest, LastOpSetWhenUnstashingForAlreadyAbortedTxn) {
+    // Test that unstashing for an abort sets lastOp even if the transaction has already been
+    // aborted.
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.transitionToAbortedWithoutPrepareforTest(opCtx());
+    ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction"),
+                       DBException,
+                       ErrorCodes::NoSuchTransaction);
+
+    ASSERT_TRUE(repl::ReplClientInfo::forClient(opCtx()->getClient())
+                    .lastOpWasSetExplicitlyByClientForCurrentOperation(opCtx()));
+}
+
+TEST_F(TxnParticipantTest, LastOpNotSetWhenUnstashingForNonAbort) {
+    // Test that non-abort commands do not set lastOp when unstashing.
+    const auto lsid = makeLogicalSessionIdWithTxnUUIDForTest();
+    opCtx()->setLogicalSessionId(lsid);
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    ASSERT_FALSE(repl::ReplClientInfo::forClient(opCtx()->getClient())
+                     .lastOpWasSetExplicitlyByClientForCurrentOperation(opCtx()));
+}
+
 TEST_F(ShardTxnParticipantTest, EagerlyReapRetryableSessionsUponNewClientRetryableWrite) {
     auto sessionCatalog = SessionCatalog::get(getServiceContext());
     ASSERT_EQ(sessionCatalog->size(), 0);

@@ -849,6 +849,8 @@ last-continuous:
     ticket: SERVER-102477
   - test_file: jstests/sharding/remove_shard_with_unsharded.js
     ticket: SERVER-89883
+  - test_file: jstests/core/txns/multi_statement_transaction_abort.js
+    ticket: SERVER-84081
   suites: null
 last-lts:
   all:
@@ -1760,4 +1762,6 @@ last-lts:
     ticket: SERVER-102477
   - test_file: jstests/sharding/remove_shard_with_unsharded.js
     ticket: SERVER-89883
+  - test_file: jstests/core/txns/multi_statement_transaction_abort.js
+    ticket: SERVER-84081
   suites: null

@@ -103,6 +103,9 @@ const BSONObj kWriteConcernError = BSON("code" << ErrorCodes::WriteConcernFailed
 const BSONObj kResWithWriteConcernError =
     BSON("ok" << 1 << "writeConcernError" << kWriteConcernError);
 
+const BSONObj kNonOkResWithWriteConcernError =
+    BSON("ok" << 0 << "writeConcernError" << kWriteConcernError);
+
 const BSONObj kRetryableWriteConcernError =
     BSON("code" << ErrorCodes::PrimarySteppedDown << "errmsg"
                 << "mock");
@@ -836,7 +839,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
                 uasserted(ErrorCodes::InternalError, "Mock error");
                 return SemiFuture<void>::makeReady();
             });
-        ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+        ASSERT_EQ(swResult.getStatus(), Status::OK());
+        ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
 
         waitForAllEarlierTasksToComplete();  // Wait for the final best effort abort to complete.
         expectSentAbort(txnNumber /* txnNumber */, writeConcern.toBSON());
@@ -945,7 +949,8 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
             uasserted(ErrorCodes::InternalError, "Mock error");
             return SemiFuture<void>::makeReady();
         });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
 
     waitForAllEarlierTasksToComplete();  // Wait for the final best effort abort to complete.
     expectSentAbort(0 /* txnNumber */, WriteConcernOptions().toBSON());
@@ -960,7 +965,8 @@ TEST_F(TxnAPITest, OwnSession_SkipsAbortIfNoCommandsWereRun) {
             uasserted(ErrorCodes::InternalError, "Mock error");
             return SemiFuture<void>::makeReady();
         });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
 
     // Would wait for the best effort abort if it was scheduled.
     waitForAllEarlierTasksToComplete();
@@ -1523,7 +1529,8 @@ TEST_F(TxnAPITest, UnyieldsAfterBodyError) {
             uasserted(ErrorCodes::InternalError, "Simulated body error");
             return SemiFuture<void>::makeReady();
         });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
     // Yield before starting and corresponding unyield.
     ASSERT_EQ(resourceYielder()->timesYielded(), 1);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
@@ -1594,7 +1601,8 @@ TEST_F(TxnAPITest, TransactionErrorTakesPrecedenceOverUnyieldError) {
 
     // The transaction should fail with the error the transaction failed with instead of the
     // ResourceYielder error.
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
     // Yield before starting and corresponding unyield.
     ASSERT_EQ(resourceYielder()->timesYielded(), 1);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
@@ -1932,7 +1940,8 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotBestEffortAbortOnFailure) {
             return SemiFuture<void>::makeReady();
         });
     // The error should have been propagated.
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
 
     // No best effort abort should have been sent.
     auto lastRequest = mockClient()->getLastSentRequest();
@@ -1968,7 +1977,8 @@ TEST_F(TxnAPITest, ClientTransaction_DoesNotRetryOnTransientErrors) {
             return SemiFuture<void>::makeReady();
         });
     // The transient error should have been propagated.
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::HostUnreachable);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::HostUnreachable);
 
     // No best effort abort should have been sent.
     auto lastRequest = mockClient()->getLastSentRequest();
@@ -2281,7 +2291,8 @@ TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
             return SemiFuture<void>::makeReady();
         });
     // The transient error should have been propagated.
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::HostUnreachable);
+    ASSERT_EQ(swResult.getStatus(), Status::OK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::HostUnreachable);
 
     // We get 4 due to the initial try and then 3 follow up retries because
     // overrideTransactionApiMaxRetriesToThree sets the max retry attempts to 3.
@@ -2475,7 +2486,8 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionBodyError
                 return SemiFuture<void>::makeReady();
             });
         if (!expectSuccess) {
-            ASSERT_EQ(swResult.getStatus(), status);
+            ASSERT_EQ(swResult.getStatus(), Status::OK());
+            ASSERT_EQ(swResult.getValue().getEffectiveStatus(), status);
 
             // The API should have returned without trying to abort.
             auto lastRequest = mockClient()->getLastSentRequest();
@@ -2671,7 +2683,9 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
 
                 return SemiFuture<void>::makeReady();
             });
-        ASSERT_EQ(swResult.getStatus(), ErrorCodes::BadValue);
+        ASSERT_EQ(swResult.getStatus(), Status::OK());
+        ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::BadValue);
+        ASSERT_EQ(swResult.getValue().wcError.toStatus(), Status::OK());
     });
 
     // The future should time out since it's blocked waiting for the best effort abort to finish.
@@ -2763,6 +2777,55 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     // Wait for tasks so destructors run on the main test thread.
     executor->shutdown();
     executor->join();
+}
+
+TEST_F(TxnAPITest, WriteConcernErrorFromCleanupAbortExposedInResult) {
+    auto expectedTxnNum = 0;
+    auto runTxnAndRespondToCleanupAbortWith = [&](BSONObj cleanupAbortResponse,
+                                                  ErrorCodes::Error expectedWCErrorCode) {
+        resetTxnWithRetries();
+
+        // Start the transaction with an insert.
+        mockClient()->setNextCommandResponse(kOKInsertResponse);
+
+        mockClient()->setNextCommandResponse(cleanupAbortResponse);
+
+        auto future = stdx::async(stdx::launch::async, [&] {
+            auto swResult = txnWithRetries().runNoThrow(
+                opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                    txnClient
+                        .runCommand(
+                            DatabaseName::createDatabaseName_forTest(boost::none, "user"_sd),
+                            BSON("insert"
+                                 << "foo"
+                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                        .get();
+
+                    // Throw a non-transient error once to trigger a best effort cleanup abort with
+                    // no retry.
+                    uasserted(ErrorCodes::BadValue, "Mock non-transient error");
+
+                    return SemiFuture<void>::makeReady();
+                });
+            ASSERT_EQ(swResult.getStatus(), Status::OK());
+            ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::BadValue);
+
+            // The WCE from the cleanup abort should be exposed in the result.
+            ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
+        });
+
+        future.get();
+
+        expectSentAbort(++expectedTxnNum, WriteConcernOptions().toBSON());
+    };
+
+    // Best effort cleanup abort responds with ok: 1 and a WCE.
+    runTxnAndRespondToCleanupAbortWith(kResWithWriteConcernError,
+                                       ErrorCodes::WriteConcernFailed /* Expected WC error code */);
+
+    // Best effort cleanup abort responds with ok: 0 and a WCE.
+    runTxnAndRespondToCleanupAbortWith(kNonOkResWithWriteConcernError,
+                                       ErrorCodes::WriteConcernFailed /* Expected WC error code */);
 }
 
 }  // namespace

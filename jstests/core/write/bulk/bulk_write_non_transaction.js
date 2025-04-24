@@ -392,8 +392,16 @@ summaryFieldsValidator(
     res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
-assert.eq(res.cursor.firstBatch[0].errmsg,
-          "Constant values may only be specified for pipeline updates");
+
+// TODO SERVER-99035: Re-enable exact match assertion and delete partial match assertion. Currently
+// the TXN API returns a CommitResult struct which pre-pends "Command error committing internal
+// transaction" even for transactions that failed before committing. SERVER-99035 will refactor it
+// so that a general struct is returned instead that will not prepend that message.
+//
+// assert.eq(res.cursor.firstBatch[0].errmsg,
+//           "Constant values may only be specified for pipeline updates");
+assert(res.cursor.firstBatch[0].errmsg.includes(
+    "Constant values may only be specified for pipeline updates"));
 
 coll.drop();
 
