@@ -204,7 +204,8 @@ feature_flags:
     featureFlagSnapshotFCVInDDLCoordinators:
         description: "Feature flag to enable snapshotting of the operation FCV at the start of DDL operations."
         cpp_varname: feature_flags::gSnapshotFCVInDDLCoordinators
-        default: false
+        default: true
+        version: 8.2
         shouldBeFCVGated: true
     # TODO (SERVER-103838): remove feature once 9.0 becomes LTS.
     featureFlagPersistRecipientPlacementInfoInMigrationRecoveryDoc:

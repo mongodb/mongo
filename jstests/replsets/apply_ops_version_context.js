@@ -4,8 +4,8 @@
  *
  * @tags: [
  *   requires_replication,
- *   # versionContext is only guaranteed to be available when the feature flag is enabled.
- *   featureFlagSnapshotFCVInDDLCoordinators,
+ *   # versionContext is only guaranteed to be available from fcv 8.2 onwards.
+ *   requires_fcv_82,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
