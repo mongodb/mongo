@@ -107,6 +107,15 @@ struct CommitResult {
 };
 
 /**
+ * Encapsulates the command status and write concern error from a response to an abortTransaction
+ * command.
+ */
+struct AbortResult {
+    Status cmdStatus;
+    WriteConcernErrorDetail wcError;
+};
+
+/**
  * Interface for the “backend” of an internal transaction responsible for executing commands.
  * Intended to be overriden and customized for different use cases.
  */
@@ -221,11 +230,9 @@ public:
                                std::shared_ptr<executor::InlineExecutor> executor,
                                std::unique_ptr<TransactionClient> txnClient = nullptr);
     /**
-     * Returns a bundle with the commit command status and write concern error, if any. Any error
-     * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
-     * given callback) will result in a non-ok StatusWith. Note that abort errors are not returned
-     * because an abort will only happen implicitly when another error has occurred, and that
-     * original error is returned instead.
+     * Returns a bundle with the transaction command status and write concern error, if any. Note
+     * that abort errors are not returned because an abort will only happen implicitly when another
+     * error has occurred, and that original error is returned instead.
      *
      * Will yield resources on the given opCtx before running if a resourceYielder was provided in
      * the constructor and unyield after running. Unyield will always be attempted if yield
@@ -447,10 +454,10 @@ public:
 
     /**
      * Used by the transaction runner to abort the transaction. Returns a future with a non-OK
-     * status if there was an error sending the command, a non-ok command result, or a write concern
-     * error.
+     * status if there was an error sending the command, otherwise returns a future with a bundle
+     * with the command and write concern statuses.
      */
-    SemiFuture<void> abort();
+    SemiFuture<AbortResult> abort();
 
     /**
      * Handles the given transaction result based on where the transaction is in its lifecycle and
@@ -667,7 +674,7 @@ public:
      * Schedules the necessary work to clean up the transacton, assuming it needs cleanup. Callers
      * can wait for cleanup by waiting on the returned future.
      */
-    SemiFuture<void> cleanUp();
+    SemiFuture<AbortResult> cleanUp();
 
 private:
     // Helper methods for running a transaction.
@@ -678,7 +685,7 @@ private:
     /**
      * Attempts to abort the active internal transaction, logging on errors after swallowing them.
      */
-    ExecutorFuture<void> _bestEffortAbort();
+    ExecutorFuture<AbortResult> _bestEffortAbort();
 
     std::shared_ptr<Transaction> _internalTxn;
     std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;

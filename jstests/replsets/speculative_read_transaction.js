@@ -41,11 +41,25 @@ function runTest(sessionOptions) {
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 
-    // Abort does not wait for write concern.
-    jsTestLog("Starting majority-abort transaction");
-    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
-    assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
-    assert.commandWorked(session.abortTransaction_forTesting());
+    // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
+    const versionSupportsAbortWaitingForWC =
+        MongoRunner.compareBinVersions(testDB.getMongo().adminCommand({serverStatus: 1}).version,
+                                       "8.0") >= 0;
+    if (versionSupportsAbortWaitingForWC) {
+        // Abort waits for write concern.
+        jsTestLog("Starting majority-abort transaction");
+        session.startTransaction(
+            {readConcern: {level: "snapshot"}, writeConcern: {w: "majority", wtimeout: 1000}});
+        assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.WriteConcernFailed);
+    } else {
+        // Abort does not wait for write concern.
+        jsTestLog("Starting majority-abort transaction");
+        session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+        assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
+        assert.commandWorked(session.abortTransaction_forTesting());
+    }
 
     // This transaction should complete because it does not use majority write concern.
     jsTestLog("Starting non-majority commit transaction");

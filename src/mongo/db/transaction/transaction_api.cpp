@@ -164,6 +164,7 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     repl::ReplClientInfo::forClient(opCtx->getClient())
         .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
 
+    boost::optional<AbortResult> cleanupAbortResult;
     if (_txn->needsCleanup()) {
         // Schedule cleanup on an out of line executor so it runs even if the transaction was
         // cancelled. Attempt to wait for cleanup so it appears synchronous for most callers, but
@@ -171,16 +172,19 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
         //
         // Also schedule after getting the transaction's operation time so the best effort abort
         // can't unnecessarily advance it.
-        ExecutorFuture<void>(_cleanupExecutor)
-            .then([txn = _txn, inlineExecutor = _inlineExecutor]() mutable {
-                Notification<void> mayReturnFromCleanup;
-                auto cleanUpFuture = txn->cleanUp().unsafeToInlineFuture().tapAll(
-                    [&](auto&&) { mayReturnFromCleanup.set(); });
-                runFutureInline(inlineExecutor.get(), mayReturnFromCleanup);
-                return cleanUpFuture;
-            })
-            .getNoThrow(opCtx)
-            .ignore();
+        auto abortResult = ExecutorFuture<void>(_cleanupExecutor)
+                               .then([txn = _txn, inlineExecutor = _inlineExecutor]() mutable {
+                                   Notification<void> mayReturnFromCleanup;
+                                   auto cleanUpFuture =
+                                       txn->cleanUp().unsafeToInlineFuture().tapAll(
+                                           [&](auto&&) { mayReturnFromCleanup.set(); });
+                                   runFutureInline(inlineExecutor.get(), mayReturnFromCleanup);
+                                   return cleanUpFuture;
+                               })
+                               .getNoThrow(opCtx);
+        if (abortResult.isOK()) {
+            cleanupAbortResult = abortResult.getValue();
+        }
     }
 
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
@@ -194,7 +198,16 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
             // presumably more meaningful error the caller was interrupted with.
             return interruptStatus;
         }
-        return txnResult;
+
+        // TODO SERVER-99035: Use a more general TxnResult struct instead of CommitResult.
+        //
+        // We include the write concern error from the cleanup abort to ensure that the client
+        // is informed of any replication issues with the speculative snapshot that the internal
+        // transaction operated on, even if the transaction has failed and the commit
+        // (which would normally provide a write concern error) did not occur.
+        return StatusWith(CommitResult{txnResult.getStatus(),
+                                       cleanupAbortResult ? cleanupAbortResult->wcError
+                                                          : WriteConcernErrorDetail()});
     } else if (!unyieldStatus.isOK()) {
         return unyieldStatus;
     }
@@ -375,7 +388,7 @@ ExecutorFuture<void> TransactionWithRetries::_runBodyHandleErrors(int bodyAttemp
                 _internalTxn->primeForCleanup();
                 iassert(bodyStatus);
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
-                return _bestEffortAbort().then([this, bodyStatus] {
+                return _bestEffortAbort().then([this, bodyStatus](AbortResult result) {
                     InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
                         ->incrementRetriedTransactions();
                     _internalTxn->primeForTransactionRetry();
@@ -440,12 +453,16 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitWithRetries() {
         .on(_executor, _token);
 }
 
-ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
-    return _internalTxn->abort().thenRunOn(_executor).onError([this](Status abortStatus) {
-        LOGV2(5875900,
-              "Unable to abort internal transaction",
-              "reason"_attr = redact(abortStatus),
-              "txnInfo"_attr = _internalTxn->reportStateForLog());
+ExecutorFuture<AbortResult> TransactionWithRetries::_bestEffortAbort() {
+    return _internalTxn->abort().thenRunOn(_executor).then([this](AbortResult result) {
+        if (!result.cmdStatus.isOK() || !result.wcError.toStatus().isOK()) {
+            LOGV2(5875900,
+                  "Unable to abort internal transaction",
+                  "commandStatus"_attr = redact(result.cmdStatus),
+                  "writeConcernStatus"_attr = redact(result.wcError.toStatus()),
+                  "txnInfo"_attr = _internalTxn->reportStateForLog());
+        }
+        return result;
     });
 }
 
@@ -725,12 +742,16 @@ SemiFuture<CommitResult> Transaction::commit() {
         .semi();
 }
 
-SemiFuture<void> Transaction::abort() {
+SemiFuture<AbortResult> Transaction::abort() {
     return _commitOrAbort(DatabaseName::kAdmin, AbortTransaction::kCommandName)
         .thenRunOn(_executor)
         .then([](BSONObj res) {
-            uassertStatusOK(getStatusFromCommandResult(res));
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(res));
+            auto wcErrorHolder = getWriteConcernErrorDetailFromBSONObj(res);
+            WriteConcernErrorDetail wcError;
+            if (wcErrorHolder) {
+                wcErrorHolder->cloneTo(&wcError);
+            }
+            return AbortResult{getStatusFromCommandResult(res), wcError};
         })
         .semi();
 }
@@ -917,7 +938,7 @@ bool TransactionWithRetries::needsCleanup() {
     return _internalTxn->needsCleanup();
 }
 
-SemiFuture<void> TransactionWithRetries::cleanUp() {
+SemiFuture<AbortResult> TransactionWithRetries::cleanUp() {
     tassert(7567600, "Unnecessarily cleaning up transaction", _internalTxn->needsCleanup());
 
     return _bestEffortAbort()
