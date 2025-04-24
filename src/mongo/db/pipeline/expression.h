@@ -2881,8 +2881,8 @@ class ExpressionSetEquals final : public ExpressionVariadic<ExpressionSetEquals>
 public:
     ExpressionSetEquals(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {
-        if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled() &&
-            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
         }
     }
@@ -2918,8 +2918,8 @@ class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetI
 public:
     ExpressionSetIntersection(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionSetIntersection>(expCtx, std::move(children)) {
-        if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled() &&
-            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
         }
     }
@@ -2982,8 +2982,8 @@ class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
     ExpressionSetUnion(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionSetUnion>(expCtx, std::move(children)) {
-        if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled() &&
-            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
         }
     }
@@ -3428,8 +3428,8 @@ public:
                      std::vector<boost::intrusive_ptr<Expression>> children)
         : Expression(expCtx, std::move(children)) {
         uassert(40068, "$switch requires at least one branch", numBranches() >= 1);
-        if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled() &&
-            _children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe) {
+        if (_children.size() > kMaxArgumentCountForSwitchAndSetExprForSbe &&
+            !feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
         }
     }

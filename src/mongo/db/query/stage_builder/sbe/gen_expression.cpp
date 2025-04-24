@@ -677,7 +677,7 @@ public:
         // Build a linear tree for a small number of children so that we can pre-validate all
         // arguments.
         if (arity < kArgumentCountForBinaryTree ||
-            feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+            feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             visitFast(expr);
             return;
         }
@@ -2326,7 +2326,7 @@ public:
         _context->ensureArity(arity);
 
         if (arity < kArgumentCountForBinaryTree ||
-            feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+            feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
             visitFast(expr);
             return;
         }

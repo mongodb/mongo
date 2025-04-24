@@ -63,7 +63,7 @@ abt::ABT makeBooleanOpTree(abt::Operations logicOp, std::vector<abt::ABT> leaves
         return std::move(leaves[0]);
     }
     if ((logicOp == abt::Operations::And || logicOp == abt::Operations::Or) &&
-        feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+        feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
         return abt::make<abt::NaryOp>(logicOp, std::move(leaves));
     } else {
         auto builder = [=](abt::ABT lhs, abt::ABT rhs) {
@@ -113,7 +113,7 @@ abt::ABT makeBinaryOp(abt::Operations binaryOp, abt::ABT lhs, abt::ABT rhs) {
 
 abt::ABT makeNaryOp(abt::Operations op, abt::ABTVector args) {
     tassert(10199700, "Expected at least one argument", !args.empty());
-    if (feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+    if (feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
         return abt::make<abt::NaryOp>(op, std::move(args));
     } else {
         return std::accumulate(
@@ -239,7 +239,7 @@ abt::ABT buildABTMultiBranchConditional(abt::ABT defaultCase) {
 
 abt::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
     std::vector<ABTCaseValuePair> caseValuePairs, abt::ABT defaultValue) {
-    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
         return std::accumulate(
             std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.end())),
             std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.begin())),
@@ -289,7 +289,7 @@ abt::ABT makeLet(sbe::FrameId frameId, abt::ABT bindExpr, abt::ABT expr) {
 }
 
 abt::ABT makeLet(sbe::FrameId frameId, abt::ABTVector bindExprs, abt::ABT expr) {
-    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
         for (size_t idx = bindExprs.size(); idx > 0;) {
             --idx;
             expr = abt::make<abt::Let>(
@@ -312,7 +312,7 @@ abt::ABT makeLet(sbe::FrameId frameId, abt::ABTVector bindExprs, abt::ABT expr) 
 abt::ABT makeLet(std::vector<abt::ProjectionName> bindNames,
                  abt::ABTVector bindExprs,
                  abt::ABT inExpr) {
-    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.isEnabled()) {
+    if (!feature_flags::gFeatureFlagSbeUpgradeBinaryTrees.checkEnabled()) {
         for (size_t idx = bindExprs.size(); idx > 0;) {
             --idx;
             inExpr = abt::make<abt::Let>(

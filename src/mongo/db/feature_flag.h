@@ -74,7 +74,7 @@ public:
      * Configure the flag according to a user-supplied bool value.
      *
      * Intended for use by 'FeatureFlagServerParameter' to implement client configuration of the
-     * flag. Do not use this interface to udpate the flag.
+     * flag. Do not use this interface to update the flag.
      */
     virtual void setForServerParameter(bool enabled) = 0;
 
