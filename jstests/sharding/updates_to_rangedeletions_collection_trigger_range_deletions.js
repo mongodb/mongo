@@ -24,8 +24,6 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 assert.commandWorked(st.s.adminCommand(
     {moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}));
 
-const shardVersion = ShardVersioningUtil.getShardVersion(st.shard0, ns);
-
 let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
 
@@ -78,7 +76,7 @@ let testColl = testDB.foo;
         numOrphanDocs: orphanCount,
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now",
-        preMigrationShardVersion: shardVersion
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion
     };
 
     const rangeDeletionNs = "config.rangeDeletions";
@@ -132,7 +130,7 @@ let testColl = testDB.foo;
         numOrphanDocs: 0,
         range: {min: {x: 70}, max: {x: 90}},
         whenToClean: "now",
-        preMigrationShardVersion: shardVersion
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion
     };
 
     const rangeDeletionNs = "config.rangeDeletions";
