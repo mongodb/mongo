@@ -283,10 +283,10 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         if (sync.size() >= _maxOpenSessions && !isPrivilegedSession) {
             _sessions->incrementRejected();
             if (verbose) {
+                ClientSummary cs(client);
                 LOGV2(22942,
                       "Connection refused because there are too many open connections",
-                      "remote"_attr = session->remote(),
-                      "connectionCount"_attr = sync.size());
+                      logv2::DynamicAttributes{logAttrs(cs), "connectionCount"_attr = sync.size()});
             }
             session->end();
             return;
