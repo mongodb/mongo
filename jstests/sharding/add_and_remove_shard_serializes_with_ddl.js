@@ -175,8 +175,11 @@ let coll1 = db["coll1"];
             // invalid after restarting the configsvr.
             db = st.s.getDB(dbName);
             coll1 = db["coll1"];
-        } else if (testCase === "stepDown") {
+        } else if (testCase === "stepUp") {
+            // Wait for replication to ensure the step up does not fail due to a lagged secondary.
+            st.configRS.awaitReplication();
             assert.commandWorked(st.configRS.getSecondary().adminCommand({replSetStepUp: 1}));
+            st.configRS.awaitNodesAgreeOnPrimary();
         }
 
         // Turn off the failpoint for the coordinator case where the command is still stuck
@@ -214,11 +217,11 @@ let coll1 = db["coll1"];
     test("killOp");
     if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB("admin"),
                                             "UseTopologyChangeCoordinators")) {
-        // Test step down rather than stop because stopping the primary will hang due to the
+        // Test step up rather than stop because stopping the primary will hang due to the
         // coordinator waiting for the failpoint. Only run this test if we have some secondary to
         // step up (auto bootstrap runs with a single CSRS node).
         if (st.configRS.nodes.length > 1) {
-            test("stepDown");
+            test("stepUp");
         }
     } else {
         test("stopServer");
