@@ -598,7 +598,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
                 !request.getNumSamplesPerChunk().has_value());
     }
     coordinatorDoc.setNumSamplesPerChunk(request.getNumSamplesPerChunk());
-
+    coordinatorDoc.setDemoMode(request.getDemoMode());
     return coordinatorDoc;
 }
 

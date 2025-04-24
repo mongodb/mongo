@@ -618,7 +618,9 @@ TypeCollectionRecipientFields constructRecipientFields(
         std::move(donorShards),
         coordinatorDoc.getSourceUUID(),
         coordinatorDoc.getSourceNss(),
-        resharding::gReshardingMinimumOperationDurationMillis.load());
+        coordinatorDoc.getDemoMode()
+            ? 0
+            : resharding::gReshardingMinimumOperationDurationMillis.load());
 
     resharding::emplaceCloneTimestampIfExists(recipientFields, coordinatorDoc.getCloneTimestamp());
     resharding::emplaceApproxBytesToCopyIfExists(

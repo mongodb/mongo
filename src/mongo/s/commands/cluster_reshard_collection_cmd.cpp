@@ -114,6 +114,8 @@ public:
                 reshardCollectionRequest.setNumSamplesPerChunk(request().getNumSamplesPerChunk());
             }
 
+            reshardCollectionRequest.setDemoMode(request().getDemoMode());
+
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));
 

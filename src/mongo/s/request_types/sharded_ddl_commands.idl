@@ -443,6 +443,12 @@ structs:
                 type: safeInt64
                 description: "The number of documents to sample on new chunks"
                 optional: true
+            demoMode:
+                type: optionalBool
+                description: >-
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    for quick demo of reshardCollection operation"
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"

@@ -231,6 +231,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             }
 
             configsvrReshardCollection.setProvenance(provenance);
+            configsvrReshardCollection.setDemoMode(_doc.getDemoMode());
             generic_argument_util::setMajorityWriteConcern(configsvrReshardCollection,
                                                            &opCtx->getWriteConcern());
 

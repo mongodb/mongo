@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include <algorithm>
 #include <cstddef>
 #include <deque>
@@ -39,7 +40,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -51,7 +51,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -64,8 +64,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 
@@ -436,6 +434,67 @@ TEST_F(ReshardingUtilTest, GetMajorityReplicationLag) {
 
     auto actualReplicationLag = getMajorityReplicationLag(operationContext());
     ASSERT_EQ(expectedReplicationLag, actualReplicationLag);
+}
+
+TEST_F(ReshardingUtilTest, SetDemoModeThroughConfigsvrReshardCollectionRequest) {
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+    configsvrReshardCollection.setUnique(true);
+    const auto collationObj = BSON("locale" << "en_US");
+    configsvrReshardCollection.setCollation(collationObj);
+    configsvrReshardCollection.setDemoMode(true);
+
+    boost::optional<ReshardingProvenanceEnum> provenance(
+        ReshardingProvenanceEnum::kReshardCollection);
+    configsvrReshardCollection.setProvenance(provenance);
+
+    ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+    auto demoModeOpt = coordinatorDoc.getDemoMode();
+    ASSERT_TRUE(demoModeOpt.has_value() && demoModeOpt);
+
+    // When demoMode is set to true, reshardingMinimumOperationDurationMillis value is overridden
+    // to 0 for the reshardCollection operation.
+    auto recipientFields = constructRecipientFields(coordinatorDoc);
+    ASSERT_EQ(recipientFields.getMinimumOperationDurationMillis(), 0);
+}
+
+TEST_F(ReshardingUtilTest, EmptyDemoModeReshardCollectionRequest) {
+    const CollectionType collEntry(nss(),
+                                   OID::gen(),
+                                   Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                                   Date_t::now(),
+                                   UUID::gen(),
+                                   keyPattern());
+
+    ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+    configsvrReshardCollection.setDbName(nss().dbName());
+    configsvrReshardCollection.setUnique(true);
+    const auto collationObj = BSON("locale" << "en_US");
+    configsvrReshardCollection.setCollation(collationObj);
+
+    boost::optional<ReshardingProvenanceEnum> provenance(
+        ReshardingProvenanceEnum::kReshardCollection);
+    configsvrReshardCollection.setProvenance(provenance);
+
+    ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+    auto demoModeOpt = coordinatorDoc.getDemoMode();
+    ASSERT_FALSE(demoModeOpt.has_value());
+
+    // If demoMode is not specified or is set to False, then
+    // reshardingMinimumOperationDurationMillis will default to the server's predefined parameter
+    // value.
+    auto recipientFields = constructRecipientFields(coordinatorDoc);
+    ASSERT_EQ(recipientFields.getMinimumOperationDurationMillis(),
+              gReshardingMinimumOperationDurationMillis.load());
 }
 
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {

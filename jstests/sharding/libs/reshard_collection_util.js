@@ -304,8 +304,8 @@ export class ReshardCollectionCmdTest {
 
         this._verifyDocumentsExist(docs, collection);
 
-        // Do not drop the collection if this._skipCollectionSetup because the caller owns the
-        // setup/teardown of the collection.
+        // Do not drop the collection if this._skipCollectionSetup is true because the caller owns
+        // the setup/teardown of the collection.
         if (!this._skipCollectionSetup) {
             this._mongos.getDB(this._dbName)[this._collName].drop();
         }
