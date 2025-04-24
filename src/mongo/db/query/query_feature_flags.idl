@@ -249,3 +249,9 @@ feature_flags:
         cpp_varname: gFeatureFlagUUIDExpression
         default: false
         shouldBeFCVGated: true
+
+    featureFlagPQSBackfill:
+        description: "Enables PQS representative query backfilling"
+        cpp_varname: gFeatureFlagPQSBackfill
+        default: false
+        shouldBeFCVGated: true
