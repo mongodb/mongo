@@ -265,6 +265,20 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
     }
 }
 
+unsigned getMaxReplicationLagSecondsBeforeBuildingIndexes() {
+    return resharding::gReshardingMaxReplicationLagSecondsBeforeBuildingIndexes.load();
+}
+
+bool containsNonIdIndex(const std::vector<BSONObj>& indexSpecs) {
+    for (const auto& indexSpec : indexSpecs) {
+        BSONObj key = indexSpec.getObjectField("key");
+        if (key.nFields() > 1 || key.firstElementFieldName() != "_id"_sd) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 ThreadPool::Limits ReshardingRecipientService::getThreadPoolLimits() const {
@@ -1111,102 +1125,136 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
         reshardingPauseRecipientBeforeBuildingIndex.pauseWhileSet(opCtx.get());
     }
 
-    return future_util::withCancellation(
-               [this, &factory] {
-                   auto opCtx = factory.makeOperationContext(&cc());
-                   // We call validateShardKeyIndexExistsOrCreateIfPossible again here in case if we
-                   // restarted after creatingCollection phase, whatever indexSpec we get in that
-                   // phase will go away.
-                   shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
-                   behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+    return ExecutorFuture<void>(**executor)
+        .then([this, &factory] {
+            auto opCtx = factory.makeOperationContext(&cc());
+            // We call validateShardKeyIndexExistsOrCreateIfPossible again here in case if we
+            // restarted after creatingCollection phase, whatever indexSpec we get in that
+            // phase will go away.
+            shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
+            behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
 
-                   if (!_metadata.getProvenance() ||
-                       _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
-                       auto [collOptions, _] = _externalState->getCollectionOptions(
-                           opCtx.get(),
-                           _metadata.getSourceNss(),
-                           _metadata.getSourceUUID(),
-                           *_cloneTimestamp,
-                           "loading collection options to build shard key index for resharding."_sd);
-                       CollectionOptions collectionOptions =
-                           uassertStatusOK(CollectionOptions::parse(
-                               collOptions, CollectionOptions::parseForStorage));
-
-                       shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                           opCtx.get(),
-                           _metadata.getSourceNss(),
-                           ShardKeyPattern{_metadata.getReshardingKey()},
-                           CollationSpec::kSimpleSpec,
-                           false /* unique */,
-                           true /* enforceUniquenessCheck */,
-                           behaviors,
-                           collectionOptions.timeseries /* tsOpts */);
-                   }
-
-                   // Get all indexSpecs need to build.
-                   auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
-                   auto [indexSpecs, _] = _externalState->getCollectionIndexes(
-                       opCtx.get(),
-                       _metadata.getSourceNss(),
-                       _metadata.getSourceUUID(),
-                       *_cloneTimestamp,
-                       "loading indexes to create indexes on temporary resharding collection"_sd);
-                   auto shardKeyIndexSpec = behaviors.getShardKeyIndexSpec();
-                   if (shardKeyIndexSpec) {
-                       indexSpecs.push_back(*shardKeyIndexSpec);
-                   }
-                   // Build all the indexes.
-                   auto buildUUID = UUID::gen();
-                   IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
-                       CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
-                   auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
-                       opCtx.get(),
-                       _metadata.getTempReshardingNss().dbName(),
-                       // When we create the collection we use the metadata resharding UUID as the
-                       // collection UUID.
-                       _metadata.getReshardingUUID(),
-                       indexSpecs,
-                       buildUUID,
-                       IndexBuildProtocol::kTwoPhase,
-                       indexBuildOptions);
-                   if (indexBuildFuture.isOK()) {
-                       return indexBuildFuture.getValue();
-                   } else if (indexBuildFuture == ErrorCodes::IndexBuildAlreadyInProgress ||
-                              indexBuildFuture == ErrorCodes::IndexAlreadyExists) {
-                       // In case of failover, the index build could have been started by oplog
-                       // applier, so we just wait those finish.
-                       indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
-                           opCtx.get(), _metadata.getReshardingUUID());
-                       return SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>(
-                           ReplIndexBuildState::IndexCatalogStats());
-                   } else {
-                       return uassertStatusOK(indexBuildFuture);
-                   }
-               }(),
-               abortToken)
-        .thenRunOn(**executor)
-        .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
-            if (auto opCtx = factory.makeOperationContext(&cc());
-                resharding::gFeatureFlagReshardingVerification.isEnabled(
-                    VersionContext::getDecoration(opCtx.get()),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
+            if (!_metadata.getProvenance() ||
+                _metadata.getProvenance() == ReshardingProvenanceEnum::kReshardCollection) {
+                auto [collOptions, _] = _externalState->getCollectionOptions(
                     opCtx.get(),
                     _metadata.getSourceNss(),
                     _metadata.getSourceUUID(),
                     *_cloneTimestamp,
-                    "loading indexes to validate indexes on temporary resharding collection"_sd,
-                    /*expandSimpleCollation*/ false);
+                    "loading collection options to build shard key index for resharding."_sd);
+                CollectionOptions collectionOptions = uassertStatusOK(
+                    CollectionOptions::parse(collOptions, CollectionOptions::parseForStorage));
 
-                DBDirectClient client(opCtx.get());
-                auto tempCollIdxSpecs =
-                    client.getIndexSpecs(_metadata.getTempReshardingNss(), false, 0);
-                resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
-                                                  sourceIdxSpecs.cend(),
-                                                  tempCollIdxSpecs.cbegin(),
-                                                  tempCollIdxSpecs.cend());
+                shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                    opCtx.get(),
+                    _metadata.getSourceNss(),
+                    ShardKeyPattern{_metadata.getReshardingKey()},
+                    CollationSpec::kSimpleSpec,
+                    false /* unique */,
+                    true /* enforceUniquenessCheck */,
+                    behaviors,
+                    collectionOptions.timeseries /* tsOpts */);
             }
-            _transitionToApplying(factory);
+
+            // Get all indexSpecs need to build.
+            auto [indexSpecs, _] = _externalState->getCollectionIndexes(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                _metadata.getSourceUUID(),
+                *_cloneTimestamp,
+                "loading indexes to create indexes on temporary resharding collection"_sd);
+            auto shardKeyIndexSpec = behaviors.getShardKeyIndexSpec();
+            if (shardKeyIndexSpec) {
+                indexSpecs.push_back(*shardKeyIndexSpec);
+            }
+            return indexSpecs;
+        })
+        .then([this, executor, abortToken, &factory](const std::vector<BSONObj>& indexSpecs) {
+            // The index builds in resharding use the "votingMembers" commit quorum. Making each
+            // recipient wait for the cloning to have replicated to all voting nodes before building
+            // indexes can help reduce the chance of the nodes not being able to catch up later on
+            // and reduce the performance impact on the shard. Only wait if there are indexes to
+            // build, i.e. the collection has non-id indexes.
+            if (containsNonIdIndex(indexSpecs)) {
+                LOGV2(10356603,
+                      "Start waiting for replication before building indexes",
+                      "reshardingUUID"_attr = _metadata.getReshardingUUID());
+                return future_util::withCancellation(
+                           resharding::waitForReplicationOnVotingMembers(
+                               **executor,
+                               abortToken,
+                               factory,
+                               getMaxReplicationLagSecondsBeforeBuildingIndexes),
+                           abortToken)
+                    .thenRunOn(**executor)
+                    .then([indexSpecs] { return indexSpecs; });
+            }
+
+            return ExecutorFuture(**executor, indexSpecs);
+        })
+        .then([this, executor, abortToken, &factory](const std::vector<BSONObj>& indexSpecs) {
+            return future_util::withCancellation(
+                       [this, &factory, &indexSpecs] {
+                           // Build all the indexes.
+                           LOGV2(10356604,
+                                 "Start building indexes",
+                                 "reshardingUUID"_attr = _metadata.getReshardingUUID());
+                           auto opCtx = factory.makeOperationContext(&cc());
+
+                           auto buildUUID = UUID::gen();
+                           IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
+                               CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
+
+                           auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
+                           auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
+                               opCtx.get(),
+                               _metadata.getTempReshardingNss().dbName(),
+                               // When we create the collection we use the metadata resharding UUID
+                               // as the collection UUID.
+                               _metadata.getReshardingUUID(),
+                               indexSpecs,
+                               buildUUID,
+                               IndexBuildProtocol::kTwoPhase,
+                               indexBuildOptions);
+                           if (indexBuildFuture.isOK()) {
+                               return indexBuildFuture.getValue();
+                           } else if (indexBuildFuture == ErrorCodes::IndexBuildAlreadyInProgress ||
+                                      indexBuildFuture == ErrorCodes::IndexAlreadyExists) {
+                               // In case of failover, the index build could have been started by
+                               // oplog applier, so we just wait those finish.
+                               indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
+                                   opCtx.get(), _metadata.getReshardingUUID());
+                               return SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>(
+                                   ReplIndexBuildState::IndexCatalogStats());
+                           } else {
+                               return uassertStatusOK(indexBuildFuture);
+                           }
+                       }(),
+                       abortToken)
+                .thenRunOn(**executor)
+                .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
+                    if (auto opCtx = factory.makeOperationContext(&cc());
+                        resharding::gFeatureFlagReshardingVerification.isEnabled(
+                            VersionContext::getDecoration(opCtx.get()),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
+                            opCtx.get(),
+                            _metadata.getSourceNss(),
+                            _metadata.getSourceUUID(),
+                            *_cloneTimestamp,
+                            "loading indexes to validate indexes on temporary resharding collection"_sd,
+                            /*expandSimpleCollation*/ false);
+
+                        DBDirectClient client(opCtx.get());
+                        auto tempCollIdxSpecs =
+                            client.getIndexSpecs(_metadata.getTempReshardingNss(), false, 0);
+                        resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
+                                                          sourceIdxSpecs.cend(),
+                                                          tempCollIdxSpecs.cbegin(),
+                                                          tempCollIdxSpecs.cend());
+                    }
+                    _transitionToApplying(factory);
+                });
         });
 }
 

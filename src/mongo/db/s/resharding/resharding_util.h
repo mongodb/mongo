@@ -479,6 +479,15 @@ SemiFuture<void> waitForMajority(const CancellationToken& token,
                                  const CancelableOperationContextFactory& factory);
 
 /**
+ * Waits for the replication lag across all voting members to be below the given threshold.
+ */
+ExecutorFuture<void> waitForReplicationOnVotingMembers(
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const CancellationToken& cancelToken,
+    const CancelableOperationContextFactory& factory,
+    std::function<unsigned()> getMaxLagSecs);
+
+/**
  * To be called on a primary only. Returns the amount of time between the last applied optime on the
  * primary and the last majority committed optime.
  */

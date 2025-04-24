@@ -64,6 +64,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -79,6 +80,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
@@ -637,6 +639,53 @@ SemiFuture<void> waitForMajority(const CancellationToken& token,
     auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
     return WaitForMajorityService::get(client->getServiceContext())
         .waitUntilMajorityForWrite(opTime, token);
+}
+
+ExecutorFuture<void> waitForReplicationOnVotingMembers(
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const CancellationToken& cancelToken,
+    const CancelableOperationContextFactory& factory,
+    std::function<unsigned()> getMaxLagSecs) {
+    return AsyncTry([&factory, getMaxLagSecs] {
+               auto opCtx = factory.makeOperationContext(&cc());
+
+               auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+               replClientInfo.setLastOpToSystemLastOpTime(opCtx.get());
+               auto lastOpTime = replClientInfo.getLastOp();
+               auto maxLagSecs = getMaxLagSecs();
+
+               auto awaitTimestamp =
+                   Timestamp(std::max(lastOpTime.getTimestamp().getSecs() - maxLagSecs, 0U),
+                             lastOpTime.getTimestamp().getInc());
+               auto awaitTerm = lastOpTime.getTerm();
+               auto awaitOpTime = repl::OpTime(awaitTimestamp, awaitTerm);
+
+               auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+               auto numNodes = replCoord->getConfig().getWritableVotingMembersCount();
+               auto waitTimeout =
+                   Seconds(resharding::gReshardingWaitForReplicationTimeoutSeconds.load());
+               WriteConcernOptions writeConcern{
+                   numNodes, WriteConcernOptions::SyncMode::UNSET, waitTimeout};
+
+               LOGV2(10356601,
+                     "Start waiting for replication",
+                     "numNodes"_attr = numNodes,
+                     "waitTimeout"_attr = waitTimeout,
+                     "lastOpTime"_attr = lastOpTime,
+                     "awaitOpTime"_attr = awaitOpTime);
+               auto statusAndDuration =
+                   replCoord->awaitReplication(opCtx.get(), awaitOpTime, writeConcern);
+               LOGV2(10356602,
+                     "Finished waiting for replication",
+                     "status"_attr = statusAndDuration.status,
+                     "duration"_attr = statusAndDuration.duration);
+
+               return statusAndDuration.status;
+           })
+        .until([](Status status) { return status.isOK(); })
+        .withDelayBetweenIterations(
+            Milliseconds(resharding::gReshardingWaitForReplicationIntervalMilliseconds.load()))
+        .on(executor, cancelToken);
 }
 
 Milliseconds getMajorityReplicationLag(OperationContext* opCtx) {

@@ -355,3 +355,40 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+
+    reshardingWaitForReplicationIntervalMilliseconds:
+        description: >-
+            The amount of time to wait before retrying after a failed replication lag wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingWaitForReplicationIntervalMilliseconds
+        default:
+            expr: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingWaitForReplicationTimeoutSeconds:
+        description: >-
+            The amount of time to wait during each replication lag wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingWaitForReplicationTimeoutSeconds
+        default:
+            expr: 60
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingMaxReplicationLagSecondsBeforeBuildingIndexes:
+        description: >-
+            The maximum replication lag across all nodes when a recipient shard starts building
+            indexes.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingMaxReplicationLagSecondsBeforeBuildingIndexes
+        default:
+            expr: 5
+        validator:
+            gte: 0
+        redact: false
