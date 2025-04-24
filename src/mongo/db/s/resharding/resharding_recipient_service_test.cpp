@@ -557,7 +557,7 @@ public:
             SemiFuture<void> future =
                 notifyToStartCloningUsingCmd(cancelSource.token(), recipient, recipientDoc);
             cancelSource.cancel();
-            ASSERT(future.getNoThrow() == ErrorCodes::CallbackCanceled);
+            ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
         } else {
             _onReshardingFieldsChanges(
                 opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
