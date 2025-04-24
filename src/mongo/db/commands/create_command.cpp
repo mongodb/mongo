@@ -213,7 +213,7 @@ void checkTimeseriesBucketsCollectionOptions(OperationContext* opCtx,
         opCtx,
         // TODO (SERVER-82072): Do not skip shard version checks.
         CollectionAcquisitionRequest{bucketsNs,
-                                     PlacementConcern{},
+                                     PlacementConcern::kPretendUnsharded,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::OperationType::kRead});
     uassert(error.code(), error.reason(), coll.exists());

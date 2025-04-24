@@ -12,6 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 var staticMongod = MongoRunner.runMongod({});
 
@@ -89,8 +90,13 @@ let configConn = new Mongo(st.configRS.getSecondary().host);
 configConn.setReadPref('secondary');
 configConn.setSlaveOk(true);
 
-let findCmd =
-    {find: 'user', filter: {_id: 9876}, databaseVersion: dbVersion, readConcern: {level: 'local'}};
+let findCmd = {
+    find: 'user',
+    filter: {_id: 9876},
+    databaseVersion: dbVersion,
+    shardVersion: ShardVersioningUtil.kUntrackedShardVersion,
+    readConcern: {level: 'local'}
+};
 assert.commandFailedWithCode(configConn.getDB('test').runCommand(findCmd),
                              ErrorCodes.StaleDbVersion);
 

@@ -312,8 +312,12 @@ protected:
                                                              true,
                                                              &applyOplogEntryOrGroupedInserts));
             } else {
-                auto coll = acquireCollection(
-                    &_opCtx, {nss(), {}, {}, AcquisitionPrerequisites::kWrite}, MODE_IX);
+                auto coll = acquireCollection(&_opCtx,
+                                              {nss(),
+                                               PlacementConcern::kPretendUnsharded,
+                                               {},
+                                               AcquisitionPrerequisites::kWrite},
+                                              MODE_IX);
                 WriteUnitOfWork wunit(&_opCtx);
                 auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
                                        ->getMyLastAppliedOpTime()

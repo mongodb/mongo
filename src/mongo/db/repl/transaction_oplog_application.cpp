@@ -202,13 +202,13 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                 scopedVersionContext.emplace(opCtx, *op.getVersionContext());
             }
 
-            auto coll = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest(op.getNss(),
-                                             AcquisitionPrerequisites::kPretendUnsharded,
-                                             repl::ReadConcernArgs::get(opCtx),
-                                             AcquisitionPrerequisites::kWrite),
-                MODE_IX);
+            auto coll =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(op.getNss(),
+                                                               PlacementConcern::kPretendUnsharded,
+                                                               repl::ReadConcernArgs::get(opCtx),
+                                                               AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
             const bool isDataConsistent = true;
             auto status = [&] {
                 if (op.isCommand()) {

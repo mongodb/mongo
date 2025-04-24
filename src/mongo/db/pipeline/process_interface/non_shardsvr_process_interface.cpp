@@ -242,13 +242,13 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns, [&] {
             // We use kPretendUnsharded since this is an a non_shardsvr process interface.
-            auto coll = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest(ns,
-                                             AcquisitionPrerequisites::kPretendUnsharded,
-                                             repl::ReadConcernArgs::get(opCtx),
-                                             AcquisitionPrerequisites::kWrite),
-                MODE_X);
+            auto coll =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(ns,
+                                                               PlacementConcern::kPretendUnsharded,
+                                                               repl::ReadConcernArgs::get(opCtx),
+                                                               AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
 
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create indexes for aggregation because collection "

@@ -52,18 +52,40 @@
 
 namespace mongo {
 
+class PlacementConcern {
+public:
+    PlacementConcern(boost::optional<DatabaseVersion> dbVersion,
+                     boost::optional<ShardVersion> shardVersion)
+        : _dbVersion(std::move(dbVersion)), _shardVersion(std::move(shardVersion)) {}
 
-struct PlacementConcern {
-    boost::optional<DatabaseVersion> dbVersion;
-    boost::optional<ShardVersion> shardVersion;
-};
-
-struct AcquisitionPrerequisites {
     // Pretends that the collection is unsharded. Acquisitions with this PlacementConcern will have
     // always have UNSHARDED description and filter, even if they are sharded. Only for use in
     // internal code paths that require it. Possible data loss if used incorrectly!
     static const PlacementConcern kPretendUnsharded;
 
+    const boost::optional<DatabaseVersion>& getDbVersion() const {
+        return _dbVersion;
+    }
+    const boost::optional<ShardVersion>& getShardVersion() const {
+        return _shardVersion;
+    }
+
+    bool operator==(const PlacementConcern&) const = default;
+
+private:
+    PlacementConcern(boost::optional<DatabaseVersion> dbVersion,
+                     boost::optional<ShardVersion> shardVersion,
+                     bool pretendUnsharded)
+        : _dbVersion(std::move(dbVersion)),
+          _shardVersion(std::move(shardVersion)),
+          _pretendUnsharded(pretendUnsharded) {}
+
+    boost::optional<DatabaseVersion> _dbVersion;
+    boost::optional<ShardVersion> _shardVersion;
+    bool _pretendUnsharded = false;
+};
+
+struct AcquisitionPrerequisites {
     enum PlacementConcernPlaceholder {
         /**
          * Special PlacementConcern which mimics direct connection to a shard, causing the

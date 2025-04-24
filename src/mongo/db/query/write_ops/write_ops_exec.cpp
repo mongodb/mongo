@@ -1100,7 +1100,7 @@ StatusWith<int> getIndexCountForCollectionBatchTuning(OperationContext* opCtx,
             opCtx,
             CollectionAcquisitionRequest(nss,
                                          collectionUUID,
-                                         AcquisitionPrerequisites::kPretendUnsharded,
+                                         PlacementConcern::kPretendUnsharded,
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);

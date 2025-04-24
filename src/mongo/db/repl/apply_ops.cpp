@@ -164,7 +164,7 @@ Status _applyOps(OperationContext* opCtx,
                     auto collection = acquireCollection(
                         opCtx,
                         CollectionAcquisitionRequest(nss,
-                                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                                     PlacementConcern::kPretendUnsharded,
                                                      repl::ReadConcernArgs::get(opCtx),
                                                      AcquisitionPrerequisites::kWrite),
                         fixLockModeForSystemDotViewsChanges(nss, MODE_IX));

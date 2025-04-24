@@ -474,7 +474,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     coll.emplace(
                         acquireCollection(opCtx,
                                           {getNsOrUUID(nss, *op),
-                                           AcquisitionPrerequisites::kPretendUnsharded,
+                                           PlacementConcern::kPretendUnsharded,
                                            repl::ReadConcernArgs::get(opCtx),
                                            AcquisitionPrerequisites::kWrite},
                                           fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
@@ -486,7 +486,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                         coll.emplace(
                             acquireCollection(opCtx,
                                               {nss,
-                                               AcquisitionPrerequisites::kPretendUnsharded,
+                                               PlacementConcern::kPretendUnsharded,
                                                repl::ReadConcernArgs::get(opCtx),
                                                AcquisitionPrerequisites::kWrite},
                                               fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));

@@ -1918,7 +1918,7 @@ void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetri
                 _metadata.getTempReshardingNss(),
                 // We just want to read the local catalog this resharding recipient is using
                 // so we don't care about placement and read concern.
-                PlacementConcern{},
+                PlacementConcern::kPretendUnsharded,
                 repl::ReadConcernArgs::kLocal,
                 AcquisitionPrerequisites::OperationType::kRead));
         uassert(ErrorCodes::NamespaceNotFound,

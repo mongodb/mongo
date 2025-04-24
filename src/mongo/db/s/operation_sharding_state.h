@@ -192,6 +192,14 @@ public:
         _shouldSkipDirectConnectionChecks = skipDirectConnectionChecks;
     }
 
+    void setBypassCheckAllShardRoleAcquisitionsVersioned(bool set) {
+        _bypassCheckAllShardRoleAcquisitionsVersioned = set;
+    }
+
+    bool getBypassCheckAllShardRoleAcquisitionsVersioned() const {
+        return _bypassCheckAllShardRoleAcquisitionsVersioned;
+    }
+
 private:
     friend class ScopedSetShardRole;
     friend class ScopedStashShardRole;
@@ -236,6 +244,27 @@ private:
     // Set when an operation wishes to entirely skip direct shard connection checks. This should be
     // false in almost all situations.
     bool _shouldSkipDirectConnectionChecks{false};
+
+    // Set to request ShardRole acquisitions to not assert that all operations originating from a
+    // router perform all their ShardRole collection acquisitions with an explicit shard version.
+    bool _bypassCheckAllShardRoleAcquisitionsVersioned{false};
+};
+
+class BypassCheckAllShardRoleAcquisitionsVersioned {
+public:
+    BypassCheckAllShardRoleAcquisitionsVersioned(OperationContext* opCtx) : _opCtx(opCtx) {
+        OperationShardingState::get(opCtx).setBypassCheckAllShardRoleAcquisitionsVersioned(true);
+    }
+    ~BypassCheckAllShardRoleAcquisitionsVersioned() {
+        OperationShardingState::get(_opCtx).setBypassCheckAllShardRoleAcquisitionsVersioned(false);
+    }
+    BypassCheckAllShardRoleAcquisitionsVersioned(
+        const BypassCheckAllShardRoleAcquisitionsVersioned&) = delete;
+    BypassCheckAllShardRoleAcquisitionsVersioned(BypassCheckAllShardRoleAcquisitionsVersioned&&) =
+        delete;
+
+private:
+    OperationContext* const _opCtx;
 };
 
 }  // namespace mongo

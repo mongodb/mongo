@@ -1792,6 +1792,10 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     bool hasEncryptionInformation = false;
 
+    // TODO: SERVER-103226 Remove this.
+    BypassCheckAllShardRoleAcquisitionsVersioned bypassCheckAllShardRoleAcquisitionsAreVersioned(
+        opCtx);
+
     // Tell mongod what the shard and database versions are. This will cause writes to fail in
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.

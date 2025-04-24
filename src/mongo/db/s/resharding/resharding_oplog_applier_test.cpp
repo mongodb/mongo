@@ -460,10 +460,10 @@ protected:
     const UUID kCrudUUID = UUID::gen();
     const NamespaceString kAppliedToNs = NamespaceString::createNamespaceString_forTest(
         "foo", fmt::format("system.resharding.{}", kCrudUUID.toString()));
-    const NamespaceString kStashNs = NamespaceString::createNamespaceString_forTest(
-        "foo", fmt::format("{}.{}", kCrudNs.coll(), kOplogNs.coll()));
-    const NamespaceString kOtherDonorStashNs = NamespaceString::createNamespaceString_forTest(
-        "foo", fmt::format("{}.{}", "otherstash", "otheroplog"));
+    const NamespaceString kStashNs =
+        NamespaceString::makeReshardingLocalConflictStashNSS(UUID::gen(), "1");
+    const NamespaceString kOtherDonorStashNs =
+        NamespaceString::makeReshardingLocalConflictStashNSS(UUID::gen(), "2");
     const std::vector<NamespaceString> kStashCollections{kStashNs, kOtherDonorStashNs};
     const ShardId kMyShardId{"shard1"};
     const ShardId kOtherShardId{"shard2"};

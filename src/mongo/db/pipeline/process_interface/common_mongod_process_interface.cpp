@@ -86,6 +86,7 @@
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
@@ -271,7 +272,7 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
     const auto acquisition = acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest(ns,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                     PlacementConcern::kPretendUnsharded,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead));
     std::vector<Document> indexStats;
@@ -439,7 +440,7 @@ void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
     auto acquisition = acquireCollectionOrViewMaybeLockFree(
         opCtx,
         CollectionOrViewAcquisitionRequest(nss,
-                                           AcquisitionPrerequisites::kPretendUnsharded,
+                                           PlacementConcern::kPretendUnsharded,
                                            repl::ReadConcernArgs::get(opCtx),
                                            AcquisitionPrerequisites::kRead));
     if (!isQEColl(acquisition)) {
@@ -474,7 +475,7 @@ void CommonMongodProcessInterface::appendOperationStats(OperationContext* opCtx,
     auto acquisition = acquireCollectionOrViewMaybeLockFree(
         opCtx,
         CollectionOrViewAcquisitionRequest(nss,
-                                           AcquisitionPrerequisites::kPretendUnsharded,
+                                           PlacementConcern::kPretendUnsharded,
                                            repl::ReadConcernArgs::get(opCtx),
                                            AcquisitionPrerequisites::kRead));
     if (!isQEColl(acquisition)) {
@@ -489,7 +490,7 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
     auto acquisition = acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest(nss,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                     PlacementConcern::kPretendUnsharded,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead));
     if (!acquisition.exists()) {
@@ -583,6 +584,14 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     bool shouldUseCollectionDefaultCollator,
     ExecShardFilterPolicy shardFilterPolicy) {
     auto expCtx = ownedPipeline->getContext();
+
+    // TODO: SPM-4050 Remove this.
+    boost::optional<BypassCheckAllShardRoleAcquisitionsVersioned>
+        bypassCheckAllShardRoleAcquisitionsAreVersioned(
+            boost::in_place_init_if,
+            std::holds_alternative<ProofOfUpstreamFiltering>(shardFilterPolicy),
+            expCtx->getOperationContext());
+
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
 
@@ -836,7 +845,7 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     auto acquisition =
         acquireCollection(opCtx,
                           CollectionAcquisitionRequest(nss,
-                                                       AcquisitionPrerequisites::kPretendUnsharded,
+                                                       PlacementConcern::kPretendUnsharded,
                                                        repl::ReadConcernArgs::get(opCtx),
                                                        AcquisitionPrerequisites::kRead),
                           MODE_IS);
@@ -884,7 +893,7 @@ CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     const auto collection = acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest(nss,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                     PlacementConcern::kPretendUnsharded,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead));
     if (!collection.exists()) {
@@ -1157,7 +1166,7 @@ boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLoca
     const auto acquisition = acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest(nss,
-                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                     PlacementConcern::kPretendUnsharded,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead));
     BSONObj document;

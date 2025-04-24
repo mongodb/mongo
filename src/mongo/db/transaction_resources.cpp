@@ -43,8 +43,8 @@
 
 namespace mongo {
 
-const PlacementConcern AcquisitionPrerequisites::kPretendUnsharded =
-    PlacementConcern{boost::none, boost::none};
+const PlacementConcern PlacementConcern::kPretendUnsharded =
+    PlacementConcern{boost::none, boost::none, true};
 
 namespace shard_role_details {
 namespace {

@@ -709,10 +709,11 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
         using Result = StatusWith<std::vector<BSONObj>>;
 
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-        auto request = CollectionAcquisitionRequest::fromOpCtx(
-            opCtx,
-            nsOrUUID,
-            isFind ? AcquisitionPrerequisites::kRead : AcquisitionPrerequisites::kWrite);
+        auto request = CollectionAcquisitionRequest(nsOrUUID,
+                                                    PlacementConcern::kPretendUnsharded,
+                                                    ReadConcernArgs::get(opCtx),
+                                                    isFind ? AcquisitionPrerequisites::kRead
+                                                           : AcquisitionPrerequisites::kWrite);
         const auto collection = isFind ? acquireCollectionMaybeLockFree(opCtx, request)
                                        : acquireCollection(opCtx, request, collectionAccessMode);
         if (!collection.exists()) {

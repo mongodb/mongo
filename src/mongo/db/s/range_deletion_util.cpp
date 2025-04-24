@@ -337,13 +337,12 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
             const auto nss = [&]() {
                 try {
                     const auto nssOrUuid = NamespaceStringOrUUID{dbName, collectionUuid};
-                    const auto collection =
-                        acquireCollection(opCtx,
-                                          {nssOrUuid,
-                                           AcquisitionPrerequisites::kPretendUnsharded,
-                                           repl::ReadConcernArgs::get(opCtx),
-                                           AcquisitionPrerequisites::kWrite},
-                                          MODE_IX);
+                    const auto collection = acquireCollection(opCtx,
+                                                              {nssOrUuid,
+                                                               PlacementConcern::kPretendUnsharded,
+                                                               repl::ReadConcernArgs::get(opCtx),
+                                                               AcquisitionPrerequisites::kWrite},
+                                                              MODE_IX);
 
                     LOGV2_DEBUG(6777800,
                                 1,

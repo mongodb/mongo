@@ -569,7 +569,7 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
         opCtx,
         CollectionOrViewAcquisitionRequest(originalNss,
                                            request.getCollectionUUID(),
-                                           {},  // placement version
+                                           PlacementConcern::kPretendUnsharded,
                                            repl::ReadConcernArgs::get(opCtx),
                                            AcquisitionPrerequisites::OperationType::kRead,
                                            AcquisitionPrerequisites::kCanBeView));
@@ -609,7 +609,7 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
             opCtx,
             CollectionOrViewAcquisitionRequest(originalNss.getTimeseriesViewNamespace(),
                                                request.getCollectionUUID(),
-                                               {},  // placement version
+                                               PlacementConcern::kPretendUnsharded,
                                                repl::ReadConcernArgs::get(opCtx),
                                                AcquisitionPrerequisites::OperationType::kRead,
                                                AcquisitionPrerequisites::kCanBeView));
@@ -622,7 +622,7 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
             opCtx,
             CollectionOrViewAcquisitionRequest(originalNss.makeTimeseriesBucketsNamespace(),
                                                request.getCollectionUUID(),
-                                               {},  // placement version
+                                               PlacementConcern::kPretendUnsharded,
                                                repl::ReadConcernArgs::get(opCtx),
                                                AcquisitionPrerequisites::OperationType::kRead,
                                                AcquisitionPrerequisites::kCanBeView));
@@ -647,7 +647,7 @@ bool isBucketWithoutTheView(OperationContext* opCtx, const NamespaceString& targ
         auto coll = acquireCollectionOrViewMaybeLockFree(
             opCtx,
             CollectionOrViewAcquisitionRequest(targetNss.getTimeseriesViewNamespace(),
-                                               {},  // placement version
+                                               PlacementConcern::kPretendUnsharded,
                                                repl::ReadConcernArgs::get(opCtx),
                                                AcquisitionPrerequisites::OperationType::kRead,
                                                AcquisitionPrerequisites::kCanBeView));

@@ -69,7 +69,7 @@ const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const Namespace
             // only trying to safely grab the index metadata. Callers are expected to validate that
             // we obtain the correct shard version, storage snapshot, etc. with their own lock
             // acquisitions.
-            AcquisitionPrerequisites::kPretendUnsharded,
+            PlacementConcern::kPretendUnsharded,
             repl::ReadConcernArgs::get(opCtx),
             AcquisitionPrerequisites::kRead));
 

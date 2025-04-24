@@ -353,7 +353,7 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
         acquireCollectionOrView(operationContext(),
                                 {
                                     secondaryView1,
-                                    {},
+                                    PlacementConcern::kPretendUnsharded,
                                     repl::ReadConcernArgs(),
                                     AcquisitionPrerequisites::kWrite,
                                     AcquisitionPrerequisites::kCanBeView,
@@ -364,7 +364,7 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
         acquireCollectionOrView(operationContext(),
                                 {
                                     secondaryView2,
-                                    {},
+                                    PlacementConcern::kPretendUnsharded,
                                     repl::ReadConcernArgs(),
                                     AcquisitionPrerequisites::kWrite,
                                     AcquisitionPrerequisites::kCanBeView,

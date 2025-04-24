@@ -139,7 +139,7 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
         const auto acquisition = acquireCollectionOrViewMaybeLockFree(
             opCtx,
             CollectionAcquisitionRequest(nss(),
-                                         AcquisitionPrerequisites::kPretendUnsharded,
+                                         PlacementConcern::kPretendUnsharded,
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead));
 
@@ -198,7 +198,7 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
             const auto acquisition = acquireCollectionOrViewMaybeLockFree(
                 opCtx,
                 CollectionAcquisitionRequest(NamespaceStringOrUUID{nss().dbName(), targetUUID},
-                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             PlacementConcern::kPretendUnsharded,
                                              repl::ReadConcernArgs::get(opCtx),
                                              AcquisitionPrerequisites::kRead));
 
@@ -337,7 +337,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     auto collection = acquireCollectionMaybeLockFree(
                         opCtx,
                         CollectionAcquisitionRequest(nss(),
-                                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                                     PlacementConcern::kPretendUnsharded,
                                                      repl::ReadConcernArgs::get(opCtx),
                                                      AcquisitionPrerequisites::kRead));
                     auto defaultCollator = collection.getCollectionPtr()->getDefaultCollator();

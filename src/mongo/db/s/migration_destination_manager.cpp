@@ -1870,13 +1870,13 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
             totalDocs++;
-            const auto collection = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest(_nss,
-                                             AcquisitionPrerequisites::kPretendUnsharded,
-                                             repl::ReadConcernArgs::get(opCtx),
-                                             AcquisitionPrerequisites::kWrite),
-                MODE_IX);
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(_nss,
+                                                               PlacementConcern::kPretendUnsharded,
+                                                               repl::ReadConcernArgs::get(opCtx),
+                                                               AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",
@@ -1914,13 +1914,13 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
             totalDocs++;
-            auto collection = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest(_nss,
-                                             AcquisitionPrerequisites::kPretendUnsharded,
-                                             repl::ReadConcernArgs::get(opCtx),
-                                             AcquisitionPrerequisites::kWrite),
-                MODE_IX);
+            auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(_nss,
+                                                               PlacementConcern::kPretendUnsharded,
+                                                               repl::ReadConcernArgs::get(opCtx),
+                                                               AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",

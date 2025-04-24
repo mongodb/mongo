@@ -274,8 +274,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
     {
         auto acquisition = CollectionAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(boost::none, acquisition.placementConcern.dbVersion);
-        ASSERT_EQ(boost::none, acquisition.placementConcern.shardVersion);
+        ASSERT_EQ(boost::none, acquisition.placementConcern.getDbVersion());
+        ASSERT_EQ(boost::none, acquisition.placementConcern.getShardVersion());
     }
 
     {
@@ -285,8 +285,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
             operationContext(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(boost::none, acquisition.placementConcern.dbVersion);
-        ASSERT_EQ(boost::none, acquisition.placementConcern.shardVersion);
+        ASSERT_EQ(boost::none, acquisition.placementConcern.getDbVersion());
+        ASSERT_EQ(boost::none, acquisition.placementConcern.getShardVersion());
     }
 
     {
@@ -295,8 +295,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         ScopedSetShardRole setShardRole(operationContext(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
-        ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
+        ASSERT_EQ(dbVersion, acquisition.placementConcern.getDbVersion());
+        ASSERT_EQ(shardVersion, acquisition.placementConcern.getShardVersion());
     }
 
     {
@@ -305,8 +305,8 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         ScopedSetShardRole setShardRole(operationContext(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
-        ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
+        ASSERT_EQ(dbVersion, acquisition.placementConcern.getDbVersion());
+        ASSERT_EQ(shardVersion, acquisition.placementConcern.getShardVersion());
     }
 
     {
@@ -315,45 +315,52 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         ScopedSetShardRole setShardRole(operationContext(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
             operationContext(), nss, AcquisitionPrerequisites::kWrite);
-        ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
-        ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
+        ASSERT_EQ(dbVersion, acquisition.placementConcern.getDbVersion());
+        ASSERT_EQ(shardVersion, acquisition.placementConcern.getShardVersion());
     }
 }
 
 TEST_F(ShardRoleTest, AcquisitionWithInvalidNamespaceFails) {
     const auto checkAcquisitionByNss = [&](const NamespaceString& nss) {
         // With locks
-        ASSERT_THROWS_CODE(
-            acquireCollection(operationContext(),
-                              {nss, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
-                              MODE_IX),
-            DBException,
-            ErrorCodes::InvalidNamespace);
+        ASSERT_THROWS_CODE(acquireCollection(operationContext(),
+                                             {nss,
+                                              PlacementConcern::kPretendUnsharded,
+                                              repl::ReadConcernArgs(),
+                                              AcquisitionPrerequisites::kWrite},
+                                             MODE_IX),
+                           DBException,
+                           ErrorCodes::InvalidNamespace);
 
         // Without locks
         ASSERT_THROWS_CODE(
-            acquireCollectionsOrViewsMaybeLockFree(
-                operationContext(),
-                {{nss, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead}}),
+            acquireCollectionsOrViewsMaybeLockFree(operationContext(),
+                                                   {{nss,
+                                                     PlacementConcern::kPretendUnsharded,
+                                                     repl::ReadConcernArgs(),
+                                                     AcquisitionPrerequisites::kRead}}),
             DBException,
             ErrorCodes::InvalidNamespace);
     };
 
     const auto checkAcquisitionByNssOrUUID = [&](const NamespaceStringOrUUID& nssOrUuid) {
         // With locks
-        ASSERT_THROWS_CODE(
-            acquireCollection(
-                operationContext(),
-                {nssOrUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
-                MODE_IX),
-            DBException,
-            ErrorCodes::InvalidNamespace);
+        ASSERT_THROWS_CODE(acquireCollection(operationContext(),
+                                             {nssOrUuid,
+                                              PlacementConcern::kPretendUnsharded,
+                                              repl::ReadConcernArgs(),
+                                              AcquisitionPrerequisites::kWrite},
+                                             MODE_IX),
+                           DBException,
+                           ErrorCodes::InvalidNamespace);
 
         // Without locks
         ASSERT_THROWS_CODE(
-            acquireCollectionsOrViewsMaybeLockFree(
-                operationContext(),
-                {{nssOrUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead}}),
+            acquireCollectionsOrViewsMaybeLockFree(operationContext(),
+                                                   {{nssOrUuid,
+                                                     PlacementConcern::kPretendUnsharded,
+                                                     repl::ReadConcernArgs(),
+                                                     AcquisitionPrerequisites::kRead}}),
             DBException,
             ErrorCodes::InvalidNamespace);
     };
@@ -1128,7 +1135,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDButWrongDbNameThrows) {
             operationContext(),
             {NamespaceStringOrUUID(
                  DatabaseName::createDatabaseName_forTest(boost::none, "anotherDbName"), uuid),
-             {},
+             PlacementConcern::kPretendUnsharded,
              repl::ReadConcernArgs(),
              AcquisitionPrerequisites::kWrite},
             MODE_IX),
@@ -1140,7 +1147,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByWrongUUID) {
     const auto uuid = UUID::gen();
     ASSERT_THROWS_CODE(acquireCollection(operationContext(),
                                          {NamespaceStringOrUUID(dbNameTestDb, uuid),
-                                          {},
+                                          PlacementConcern::kPretendUnsharded,
                                           repl::ReadConcernArgs(),
                                           AcquisitionPrerequisites::kWrite},
                                          MODE_IX),
@@ -1209,13 +1216,14 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
                           operationContext(), nssOrUUID),
                   nss);
 
-    ASSERT_THROWS_CODE(
-        acquireCollection(
-            operationContext(),
-            {nssOrUUID, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
-            MODE_IX),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(acquireCollection(operationContext(),
+                                         {nssOrUUID,
+                                          PlacementConcern::kPretendUnsharded,
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kWrite},
+                                         MODE_IX),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 
     {
         stdx::unique_lock lock(mutex);
@@ -1286,10 +1294,12 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurab
                           operationContext(), nssOrUUID),
                   nss);
 
-    ASSERT(acquireCollection(
-               operationContext(),
-               {nssOrUUID, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
-               MODE_IX)
+    ASSERT(acquireCollection(operationContext(),
+                             {nssOrUUID,
+                              PlacementConcern::kPretendUnsharded,
+                              repl::ReadConcernArgs(),
+                              AcquisitionPrerequisites::kWrite},
+                             MODE_IX)
                .exists());
 
     {
@@ -1334,7 +1344,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByNssAndExpectedUUID) {
     const auto acquisition = acquireCollection(operationContext(),
                                                {nssUnshardedCollection1,
                                                 uuid,
-                                                {},
+                                                PlacementConcern::kPretendUnsharded,
                                                 repl::ReadConcernArgs(),
                                                 AcquisitionPrerequisites::kWrite},
                                                MODE_IX);
@@ -1355,17 +1365,22 @@ TEST_F(ShardRoleTest, AcquireCollectionByNssAndWrongExpectedUUIDThrows) {
         ASSERT_EQ(boost::none, exInfo->actualCollection());
     };
 
+    ASSERT_THROWS_WITH_CHECK(acquireCollection(operationContext(),
+                                               {nss,
+                                                wrongUuid,
+                                                PlacementConcern::kPretendUnsharded,
+                                                repl::ReadConcernArgs(),
+                                                AcquisitionPrerequisites::kWrite},
+                                               MODE_IX),
+                             ExceptionFor<ErrorCodes::CollectionUUIDMismatch>,
+                             validateException);
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollection(
-            operationContext(),
-            {nss, wrongUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
-            MODE_IX),
-        ExceptionFor<ErrorCodes::CollectionUUIDMismatch>,
-        validateException);
-    ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsMaybeLockFree(
-            operationContext(),
-            {{nss, wrongUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead}}),
+        acquireCollectionsOrViewsMaybeLockFree(operationContext(),
+                                               {{nss,
+                                                 wrongUuid,
+                                                 PlacementConcern::kPretendUnsharded,
+                                                 repl::ReadConcernArgs(),
+                                                 AcquisitionPrerequisites::kRead}}),
         ExceptionFor<ErrorCodes::CollectionUUIDMismatch>,
         validateException);
 }
@@ -1376,7 +1391,7 @@ TEST_F(ShardRoleTest, AcquireViewWithExpectedUUIDAlwaysThrows) {
     ASSERT_THROWS_CODE(acquireCollectionsOrViews(operationContext(),
                                                  {{nssView,
                                                    expectedUUID,
-                                                   {},
+                                                   PlacementConcern::kPretendUnsharded,
                                                    repl::ReadConcernArgs(),
                                                    AcquisitionPrerequisites::kWrite,
                                                    AcquisitionPrerequisites::kCanBeView}},
@@ -1392,7 +1407,7 @@ TEST_F(ShardRoleTest, AcquireCollectionOrView) {
     ASSERT_THROWS_CODE(acquireCollectionOrView(operationContext(),
                                                {
                                                    nssView,
-                                                   {},
+                                                   PlacementConcern::kPretendUnsharded,
                                                    repl::ReadConcernArgs(),
                                                    AcquisitionPrerequisites::kWrite,
                                                    AcquisitionPrerequisites::kMustBeCollection,
@@ -1405,7 +1420,7 @@ TEST_F(ShardRoleTest, AcquireCollectionOrView) {
         auto acquisition = acquireCollectionOrView(operationContext(),
                                                    {
                                                        nssView,
-                                                       {},
+                                                       PlacementConcern::kPretendUnsharded,
                                                        repl::ReadConcernArgs(),
                                                        AcquisitionPrerequisites::kWrite,
                                                        AcquisitionPrerequisites::kCanBeView,
@@ -1418,7 +1433,7 @@ TEST_F(ShardRoleTest, AcquireCollectionOrView) {
         auto acquisition = acquireCollectionOrView(operationContext(),
                                                    {
                                                        nssUnshardedCollection1,
-                                                       {},
+                                                       PlacementConcern::kPretendUnsharded,
                                                        repl::ReadConcernArgs(),
                                                        AcquisitionPrerequisites::kWrite,
                                                        AcquisitionPrerequisites::kCanBeView,
@@ -2551,13 +2566,13 @@ TEST_F(ShardRoleTest,
     const auto testFn = [&](bool withLocks) {
         const auto acquisitionRequest1 =
             CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                         PlacementConcern{},
+                                         PlacementConcern::kPretendUnsharded,
                                          repl::ReadConcernArgs(),
                                          AcquisitionPrerequisites::kRead);
 
         const auto acquisitionRequest2 =
             CollectionAcquisitionRequest(nssShardedCollection1,
-                                         PlacementConcern{},
+                                         PlacementConcern::kPretendUnsharded,
                                          repl::ReadConcernArgs(),
                                          AcquisitionPrerequisites::kRead);
 
@@ -2612,13 +2627,13 @@ TEST_F(ShardRoleTest,
     const auto testFn = [&](bool withLocks) {
         const auto acquisitionRequest1 =
             CollectionAcquisitionRequest(nssUnshardedCollection1,
-                                         PlacementConcern{},
+                                         PlacementConcern::kPretendUnsharded,
                                          repl::ReadConcernArgs(),
                                          AcquisitionPrerequisites::kRead);
 
         const auto acquisitionRequest2 =
             CollectionAcquisitionRequest(nssShardedCollection1,
-                                         PlacementConcern{},
+                                         PlacementConcern::kPretendUnsharded,
                                          repl::ReadConcernArgs(),
                                          AcquisitionPrerequisites::kRead);
 

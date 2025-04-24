@@ -81,6 +81,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -291,13 +292,13 @@ void verifyDbAndCollection(OperationContext* opCtx,
 void checkPlacementVersion(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const PlacementConcern& placementConcern) {
-    const auto& receivedDbVersion = placementConcern.dbVersion;
+    const auto& receivedDbVersion = placementConcern.getDbVersion();
     if (receivedDbVersion) {
         const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, nss.dbName());
         scopedDss->assertMatchingDbVersion(opCtx, *receivedDbVersion);
     }
 
-    const auto& receivedShardVersion = placementConcern.shardVersion;
+    const auto& receivedShardVersion = placementConcern.getShardVersion();
     if (receivedShardVersion) {
         const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
         scopedCSS->checkShardVersionOrThrow(opCtx, *receivedShardVersion);
@@ -363,16 +364,16 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
 
     const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
     auto collectionDescription =
-        scopedCSS->getCollectionDescription(opCtx, placementConcern.shardVersion.has_value());
+        scopedCSS->getCollectionDescription(opCtx, placementConcern.getShardVersion().has_value());
 
-    invariant(!collectionDescription.isSharded() || placementConcern.shardVersion);
-    auto optOwnershipFilter = placementConcern.shardVersion.has_value()
+    invariant(!collectionDescription.isSharded() || placementConcern.getShardVersion());
+    auto optOwnershipFilter = placementConcern.getShardVersion().has_value()
         ? boost::optional<ScopedCollectionFilter>(scopedCSS->getOwnershipFilter(
               opCtx,
               prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead
                   ? CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup
                   : CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
-              *placementConcern.shardVersion))
+              *placementConcern.getShardVersion()))
         : boost::none;
 
     // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr.
@@ -419,7 +420,7 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
 
         const boost::optional<ShardVersion> placementConcernShardVersion =
             holds_alternative<PlacementConcern>(prerequisites.placementConcern)
-            ? get<PlacementConcern>(prerequisites.placementConcern).shardVersion
+            ? get<PlacementConcern>(prerequisites.placementConcern).getShardVersion()
             : boost::none;
 
         if (placementConcernShardVersion == ShardVersion::UNSHARDED()) {
@@ -564,7 +565,11 @@ NamespaceStringOrUUIDRequests toNamespaceStringOrUUIDs(
     return requests;
 }
 
-void validateRequests(const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
+void validateRequests(OperationContext* opCtx,
+                      const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
+    const auto& oss = OperationShardingState::get(opCtx);
+    const bool isComingFromRouter = oss.isComingFromRouter(opCtx);
+
     for (const auto& ar : acquisitionRequests) {
         if (ar.nssOrUUID.isNamespaceString()) {
             uassert(ErrorCodes::InvalidNamespace,
@@ -579,6 +584,49 @@ void validateRequests(const CollectionOrViewAcquisitionRequests& acquisitionRequ
                                           DatabaseName::DollarInDbNameBehavior::Allow));
         } else {
             MONGO_UNREACHABLE;
+        }
+
+        // Check that if the operation came from a router, all collection acquisitions declare an
+        // explicit Placement Version.
+        const auto checkProperPlacementVersionDeclared = [&]() {
+            const auto declaresPlacementVersion = [](const CollectionOrViewAcquisitionRequest& ar) {
+                return ar.placementConcern.getShardVersion() ||
+                    ar.placementConcern == PlacementConcern::kPretendUnsharded;
+            };
+
+            const auto doesNotNeedPlacementVersion =
+                [](const CollectionOrViewAcquisitionRequest& ar) {
+                    return ar.nssOrUUID.isNamespaceString() &&
+                        (ar.nssOrUUID.nss().isNamespaceAlwaysUntracked() ||
+                         ar.nssOrUUID.nss().isShardLocalNamespace());
+                };
+
+            // TODO: SERVER-80719 Remove this.
+            if (ar.nssOrUUID.isNamespaceString() &&
+                ar.nssOrUUID.nss().isTimeseriesBucketsCollection()) {
+                return true;
+            }
+
+            return !isComingFromRouter || oss.getBypassCheckAllShardRoleAcquisitionsVersioned() ||
+                declaresPlacementVersion(ar) || doesNotNeedPlacementVersion(ar);
+        };
+
+        if (!checkProperPlacementVersionDeclared()) {
+            if (TestingProctor::instance().isEnabled()) {
+                tasserted(10317000,
+                          str::stream()
+                              << "ShardRole collection acquisition without a declared placement "
+                                 "version detected on an operation originating from a router. Nss: "
+                              << redact(ar.nssOrUUID.toStringForErrorMsg()));
+            } else {
+                static logv2::SeveritySuppressor logSeverity{
+                    Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+                LOGV2_DEBUG(10317001,
+                            logSeverity().toInt(),
+                            "ShardRole collection acquisition without a declared placement version "
+                            "detected on an operation originating from a router.",
+                            "nss"_attr = redact(ar.nssOrUUID.toStringForErrorMsg()));
+            }
         }
     }
 }
@@ -1166,7 +1214,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
         return {};
     }
 
-    validateRequests(acquisitionRequests);
+    validateRequests(opCtx, acquisitionRequests);
 
     // We shouldn't have an open snapshot unless a previous lock-free acquisition opened and
     // stashed it already.
@@ -1213,7 +1261,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         return {};
     }
 
-    validateRequests(acquisitionRequests);
+    validateRequests(opCtx, acquisitionRequests);
 
     while (true) {
         // Optimistically populate the nss and uuid parts of the resolved acquisition requests and

@@ -14,6 +14,15 @@ export var ShardVersioningUtil = (function() {
     };
 
     /*
+     * Shard version representing an UNTRACKED collection.
+     */
+    const kUntrackedShardVersion = {
+        e: ObjectId("000000000000000000000000"),
+        t: Timestamp(0, 0),
+        v: Timestamp(0, 0)
+    };
+
+    /*
      * Returns the metadata for the collection in the shard's catalog cache.
      */
     let getMetadataOnShard = function(shard, ns, waitForRefresh = false) {
@@ -84,6 +93,7 @@ export var ShardVersioningUtil = (function() {
 
     return {
         kIgnoredShardVersion,
+        kUntrackedShardVersion,
         getMetadataOnShard,
         getShardVersion,
         assertCollectionVersionEquals,

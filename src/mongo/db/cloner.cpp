@@ -129,7 +129,7 @@ struct DefaultClonerImpl::BatchHandler {
             return acquireCollection(
                 opCtx,
                 CollectionAcquisitionRequest(nss,
-                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             PlacementConcern::kPretendUnsharded,
                                              repl::ReadConcernArgs::get(opCtx),
                                              AcquisitionPrerequisites::kWrite),
                 MODE_IX);
