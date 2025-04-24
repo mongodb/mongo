@@ -13,23 +13,6 @@ load(
 # Flags listed in this file is only visible to the bazel build system.
 visibility("//bazel/toolchains/cc")
 
-LINUX_OPT_COPTS = select({
-    # This is opt=debug, not to be confused with (opt=on && dbg=on)
-    "//bazel/config:gcc_or_clang_opt_debug": [
-        "-Og",
-    ],
-    "//bazel/config:gcc_or_clang_opt_off": [
-        "-O0",
-    ],
-    "//bazel/config:gcc_or_clang_opt_on": [
-        "-O2",
-    ],
-    "//bazel/config:gcc_or_clang_opt_size": [
-        "-Os",
-    ],
-    "//conditions:default": [],
-})
-
 # SERVER-9761: Ensure early detection of missing symbols in dependent libraries
 # at program startup. For non-release dynamic builds we disable this behavior in
 # the interest of improved mongod startup times. Xcode15 removed bind_at_load
@@ -375,7 +358,6 @@ MONGO_LINUX_CC_COPTS = (
     UNDEFINED_SANITIZER_COPTS +
     THREAD_SANITIZER_COPTS +
     ANY_SANITIZER_AVAILABLE_COPTS +
-    LINUX_OPT_COPTS +
     COMPRESS_DEBUG_COPTS +
     DEBUG_TYPES_SECTION_FLAGS +
     IMPLICIT_FALLTHROUGH_COPTS +

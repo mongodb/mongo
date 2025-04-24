@@ -176,9 +176,9 @@ def configure_osx_toolchain(repository_ctx):
     ###
     # mongodb customization
     cc_toolchain_config = Label("@//bazel/toolchains/cc/mongo_apple:mongo_apple_cc_toolchain_config.bzl")
-
+    build_template = Label("@//bazel/toolchains/cc/mongo_apple:BUILD.tpl")
     ###
-    build_template = Label("@build_bazel_apple_support//crosstool:BUILD.tpl")
+
     libtool_check_unique_src_path = str(repository_ctx.path(
         Label("@build_bazel_apple_support//crosstool:libtool_check_unique.cc"),
     ))

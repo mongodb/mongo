@@ -35,14 +35,7 @@ load("@build_bazel_apple_support//lib:apple_support.bzl", "apple_support")
 
 ###
 # mongodb customization
-load(
-    "@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl",
-    "mongo_frameworks_feature",
-    "mongo_fsized_deallocation_feature",
-    "mongo_general_linkflags_feature",
-    "mongo_general_warnings_feature",
-    "mongo_preprocessor_defines_feature",
-)
+load("@//bazel/toolchains/cc/mongo_apple:mongo_custom_features.bzl", "get_apple_features")
 ###
 
 # TODO: Remove when we drop bazel 6.x support
@@ -2690,14 +2683,6 @@ please file an issue at https://github.com/bazelbuild/apple_support/issues/new
         relative_ast_path_feature,
         gcc_quoting_for_param_files_feature,
         user_link_flags_feature,
-        ###
-        # mongodb customization
-        mongo_frameworks_feature,
-        mongo_preprocessor_defines_feature,
-        mongo_general_warnings_feature,
-        mongo_fsized_deallocation_feature,
-        mongo_general_linkflags_feature,
-        ###
         default_link_flags_feature,
         no_deduplicate_feature,
         dead_strip_feature,
@@ -2721,7 +2706,7 @@ please file an issue at https://github.com/bazelbuild/apple_support/issues/new
         layering_check_feature,
         external_include_paths_feature,
         header_parsing_env_feature,
-    ]
+    ] + get_apple_features(ctx)  #### mongodb customization ###
 
     if (ctx.attr.cpu == "darwin_x86_64" or
         ctx.attr.cpu == "darwin_arm64" or
@@ -2798,6 +2783,10 @@ cc_toolchain_config = rule(
             fragment = "apple",
             name = "xcode_config_label",
         )),
+        ###
+        # mongodb customization
+        "optimization_level": attr.string(mandatory = False),
+        ###
     },
     provides = [CcToolchainConfigInfo],
     executable = True,

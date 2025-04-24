@@ -9,6 +9,10 @@ load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
     "COMMON_LINK_FLAGS",
     "GCC_INCLUDE_DIRS",
 )
+load(
+    "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "FEATURES_ATTR_NAMES",
+    "get_common_features_attrs")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -86,6 +90,8 @@ DISABLE_DEBUG_SYMBOLS = select({
 
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
+feature_attrs = get_common_features_attrs()
+
 mongo_linux_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
     bin_dirs = COMMON_BINDIRS,
@@ -121,6 +127,7 @@ mongo_linux_cc_toolchain_config(
     fission = FISSION_ENABLED,
     debug_level = DEBUG_LEVEL,
     disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
+    optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
 )
 
 mongo_linux_cc_toolchain_config(
@@ -163,6 +170,7 @@ mongo_linux_cc_toolchain_config(
     fission = FISSION_ENABLED,
     debug_level = DEBUG_LEVEL,
     disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
+    optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
 )
 
 cc_toolchain(
