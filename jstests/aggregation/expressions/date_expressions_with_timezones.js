@@ -1,3 +1,13 @@
+/**
+ * Test of date expressions with TZ.
+ * Due to a change in format from int to long (SERVER-93063) this test is excluded for older version
+ * from multiversion.
+ *
+ * @tags: [
+ * requires_fcv_81,
+ * ]
+ */
+
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 const coll = db.date_expressions_with_time_zones;
