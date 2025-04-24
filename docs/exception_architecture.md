@@ -187,10 +187,8 @@ void func() try {
 ```
 
 **As with invariant, be very careful when putting `noexcept` on a function that
-interacts with untrusted input.** This has caused bugs, such as
-[SERVER-94316](https://jira.mongodb.org/browse/SERVER-94316), where an error
-parsing untrusted input was able to cause an exception to reach a `noexcept`
-boundary.
+interacts with untrusted input.** This has been the root cause of serious past
+bugs.
 
 ### Adding or Removing noexcept
 
