@@ -300,6 +300,14 @@ tasks:
           binary: bash
           args:
             - "src/evergreen/crypt_run_tests.sh"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "evergreen/macos_notary.py"
+            - "bazel-bin/mongo_crypt-stripped.${ext|tgz}"
       - command: s3.put
         params:
           aws_key: ${aws_key}
