@@ -449,7 +449,8 @@ private:
     //
     void _alloc(const void* objPtr, size_t objLen) {
         // still profiling?
-        if (sampleIntervalBytes == 0)
+        size_t nBytes = sampleIntervalBytes;
+        if (nBytes == 0)
             return;
 
         // Sample every sampleIntervalBytes bytes of allocation.
@@ -458,8 +459,7 @@ private:
         // number of samples will be correct.
         size_t lastSample = bytesAllocated.fetch_add(objLen);
         size_t currentSample = lastSample + objLen;
-        size_t accountedLen = sampleIntervalBytes *
-            (currentSample / sampleIntervalBytes - lastSample / sampleIntervalBytes);
+        size_t accountedLen = nBytes * (currentSample / nBytes - lastSample / nBytes);
         if (accountedLen == 0)
             return;
 
