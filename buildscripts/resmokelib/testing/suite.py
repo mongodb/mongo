@@ -111,8 +111,8 @@ class Suite(object):
             self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
         return self._excluded
 
-    def _get_tests_for_kind(self, test_kind):
-        """Return the tests to run based on the 'test_kind'-specific filtering policy."""
+    def _get_tests_for_kind(self, test_kind) -> tuple[List[any], List[str]]:
+        """Return the tests to run and those that were excluded, based on the 'test_kind'-specific filtering policy."""
         selector_config = self.get_selector_config()
 
         # The mongos_test doesn't have to filter anything, the selector_config is just the
@@ -131,32 +131,30 @@ class Suite(object):
         # 3. Test selection is enabled
         if tests and _config.EVERGREEN_TASK_ID and _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
             evg_api = evergreen_conn.get_evergreen_api()
+            test_selection_strategy = str(_config.EVERGREEN_TEST_SELECTION_STRATEGY)
+            request = {
+                "project_id": str(_config.EVERGREEN_PROJECT_NAME),
+                "build_variant": str(_config.EVERGREEN_VARIANT_NAME),
+                "requester": str(_config.EVERGREEN_REQUESTER),
+                "task_id": str(_config.EVERGREEN_TASK_ID),
+                "task_name": str(_config.EVERGREEN_TASK_NAME),
+                "tests": tests,
+                "strategies": test_selection_strategy,
+            }
             try:
-                result = evg_api.select_tests(
-                    str(_config.EVERGREEN_PROJECT_NAME),
-                    str(_config.EVERGREEN_VARIANT_NAME),
-                    str(_config.EVERGREEN_REQUESTER),
-                    str(_config.EVERGREEN_TASK_ID),
-                    str(_config.EVERGREEN_TASK_NAME),
-                    tests,
-                )
+                result = evg_api.select_tests(**request)
             except Exception as ex:
-                print(
-                    "ERROR: failure using the select tests evergreen endpoint with the following arguments:"
-                )
-                print(f"Project name: {str(_config.EVERGREEN_PROJECT_NAME)}")
-                print(f"Variant name: {str(_config.EVERGREEN_VARIANT_NAME)}")
-                print(f"Requester: {str(_config.EVERGREEN_REQUESTER)}")
-                print(f"Task ID: {str(_config.EVERGREEN_TASK_ID)}")
-                print(f"Task name: {str(_config.EVERGREEN_TASK_NAME)}")
-                print(f"Tests: {tests}")
-                raise ex
+                message = f"Failure using the select tests evergreen endpoint with the following request:\n{request}"
+                raise RuntimeError(message) from ex
 
             evergreen_filtered_tests = result["tests"]
             evergreen_excluded_tests = set(evergreen_filtered_tests).symmetric_difference(
                 set(tests)
             )
-            print(f"Evergreen excluded the following tests: {evergreen_excluded_tests}")
+            print(
+                f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
+            )
+            print(f"to exclude the following tests: {evergreen_excluded_tests}")
             excluded.extend(evergreen_excluded_tests)
             tests = evergreen_filtered_tests
 

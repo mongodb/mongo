@@ -1696,6 +1696,13 @@ class RunPlugin(PluginInterface):
             help="Enable test selection using the Evergreen API",
         )
 
+        parser.add_argument(
+            "--evergreenTestSelectionStrategy",
+            dest="test_selection_strategies_array",
+            action="append",
+            help="Specify test selection strategy. Can be specified multiple times.",
+        )
+
         configure_resmoke.add_otel_args(parser)
 
         mongodb_server_options = parser.add_argument_group(

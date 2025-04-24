@@ -99,6 +99,8 @@ parameters:
   - key: enable_evergreen_api_test_selection
     value: false
     description: "Enable test selection using Evergreen API"
+  - key: test_selection_strategies_array
+    description: "Array of test selection strategies"
 
 commit_queue_aliases:
   - variant: "commit-queue"

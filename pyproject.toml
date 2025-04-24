@@ -134,7 +134,7 @@ cryptography = "^44.0.2"
 [tool.poetry.group.testing.dependencies]
 curatorbin = "^1.2.4"
 PyKMIP = "0.10.0"
-evergreen-py = "^3.9.0"
+evergreen-py = "^3.11.0"
 mock = "^5.1.0"
 shrub-py = "^3.1.4"
 ocspresponder = "^0.5.0"

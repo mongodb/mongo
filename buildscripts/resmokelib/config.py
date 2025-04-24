@@ -118,6 +118,7 @@ DEFAULTS = {
     "majority_read_concern": "on",
     "enable_enterprise_tests": "on",
     "enable_evergreen_api_test_selection": False,
+    "test_selection_strategies_array": None,
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
@@ -352,6 +353,9 @@ ENABLE_ENTERPRISE_TESTS = None
 
 # if set, enables test selection using the Evergreen API
 ENABLE_EVERGREEN_API_TEST_SELECTION = None
+
+# If set, requests Evergreen to use the specified test selection strategies.
+EVERGREEN_TEST_SELECTION_STRATEGY = None
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None

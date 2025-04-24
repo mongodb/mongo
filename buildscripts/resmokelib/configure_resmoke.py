@@ -438,6 +438,7 @@ be invoked as either:
     _config.MULTIVERSION_BIN_VERSION = config.pop("old_bin_version")
 
     _config.ENABLE_EVERGREEN_API_TEST_SELECTION = config.pop("enable_evergreen_api_test_selection")
+    _config.EVERGREEN_TEST_SELECTION_STRATEGY = config.pop("test_selection_strategies_array")
 
     _config.INSTALL_DIR = config.pop("install_dir")
     if values.command == "run" and _config.INSTALL_DIR is None:

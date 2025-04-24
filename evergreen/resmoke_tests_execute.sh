@@ -129,6 +129,12 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --enableEvergreenApiTestSelection"
   fi
 
+  # Split comma separated list of strategies
+  IFS=',' read -a strategies <<< "$test_selection_strategies_array"
+  for strategy in "${strategies[@]}"; do
+    extra_args+=" --evergreenTestSelectionStrategy=${strategy}"
+  done
+
   path_value="$PATH:/data/multiversion"
 
   # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.
