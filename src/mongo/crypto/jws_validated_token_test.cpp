@@ -213,6 +213,80 @@ TEST_F(JWKManagerTest, testTenancyExpectPrefix) {
     ASSERT_TRUE(*body.getExpectPrefix());
 }
 
+TEST_F(JWKManagerTest, parsingErrors) {
+    jwksFetcher()->setKeys(getTestJWKSet());
+    ASSERT_OK(jwkManager()->loadKeys());
+
+    // invalid number of '.' delimiters
+    ASSERT_THROWS_CODE(JWSValidatedToken(jwkManager(), "foo"), DBException, 8039401);
+    ASSERT_THROWS_CODE(JWSValidatedToken(jwkManager(), "foo.bar"), DBException, 8039402);
+    ASSERT_THROWS_CODE(JWSValidatedToken(jwkManager(), "foo.foo.bar.bar"), DBException, 8039403);
+
+    // invalid base64url
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(jwkManager(),
+                          fmt::format("foo+.{}.{}", validTokenBody, validTokenSignature)),
+        DBException,
+        40537);
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(jwkManager(),
+                          fmt::format("{}.foo+.{}", validTokenHeader, validTokenSignature)),
+        DBException,
+        40537);
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(jwkManager(),
+                          fmt::format("{}.{}.foo+", validTokenHeader, validTokenBody)),
+        DBException,
+        40537);
+
+    // invalid json post-decode
+    auto invalidJsonBase64 = base64url::encode("hello");
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(
+            jwkManager(),
+            fmt::format("{}.{}.{}", invalidJsonBase64, validTokenBody, validTokenSignature)),
+        DBException,
+        16619);
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(
+            jwkManager(),
+            fmt::format("{}.{}.{}", validTokenHeader, invalidJsonBase64, validTokenSignature)),
+        DBException,
+        16619);
+
+    // invalid JWS Header post-decode
+    auto badJWSHeaderNoRequired = base64url::encode(R"({"typ":"JWT"})");
+    auto badJWSHeaderBadType = base64url::encode(R"({"typ":"JWK","alg":"RS256","kid":"foo"})");
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(
+            jwkManager(),
+            fmt::format("{}.{}.{}", badJWSHeaderNoRequired, validTokenBody, validTokenSignature)),
+        DBException,
+        ErrorCodes::IDLFailedToParse);
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(
+            jwkManager(),
+            fmt::format("{}.{}.{}", badJWSHeaderBadType, validTokenBody, validTokenSignature)),
+        DBException,
+        7095401);
+
+    // invalid JWT post-decode
+    auto badJWTFieldType = base64url::encode(R"({"iss":45,"sub":"f","aud":"f"})");
+    auto badJWTNoRequired = base64url::encode(R"({})");
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(
+            jwkManager(),
+            fmt::format("{}.{}.{}", validTokenHeader, badJWTFieldType, validTokenSignature)),
+        DBException,
+        ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        JWSValidatedToken(
+            jwkManager(),
+            fmt::format("{}.{}.{}", validTokenHeader, badJWTNoRequired, validTokenSignature)),
+        DBException,
+        ErrorCodes::IDLFailedToParse);
+}
+
 #endif
 }  // namespace mongo::crypto::test
 
