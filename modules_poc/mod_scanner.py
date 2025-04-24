@@ -181,8 +181,8 @@ with open(parent / "modules.yaml") as f:
     def parseModules():
         raw_mods = yaml.load(f, Loader=Loader)
         lines = []
-        for mod, globs in raw_mods.items():
-            for glob in globs:
+        for mod, info in raw_mods.items():
+            for glob in info["files"]:
                 lines.append(f"/{glob} @10gen/{mod}")
                 if glob.endswith(".idl"):
                     lines.append(f"/{glob[:-4]}_gen.* @10gen/{mod}")

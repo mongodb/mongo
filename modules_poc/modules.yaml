@@ -1,153 +1,272 @@
+# This file defines the modules for the MongoDB project.
+#
+# Top-level keys are modules names. Dots can be used to create submodules.
+# Each module has a meta section with information about the module and a files section
+# with a list of globs that belong to the module. Any metadata missing from submodules
+# will be inherited from their parent.
+#
+# How metadata is used:
+#   slack:
+#     Slack channel for questions about the the module. This will be included in
+#     error messages about accessing private APIs, so that developers know where
+#     to go to ask what they should do instead. Because # starts comments in YAML,
+#     you should just write server-foo instead of #server-foo.
+#
+#   jira:
+#     Jira "Assigned Team" that should be used when filing tickets for the module.
+#
+#   If unsure about these, or if multiple teams are involved, please pick a good place
+#   to send questions/tickets to initially, understanding that we can always send them
+#   somewhere else if needed.
+
 core:
-  - src/mongo/bson/
-  - src/mongo/base/
-  - src/mongo/platform/
-  - src/mongo/stdx/
-  - src/mongo/util/
-  - src/mongo/db/json.h
-  # Unsure about this but putting here for now:
-  - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
+  meta:
+    slack: server-programmability
+    jira: Server Programmability
+  files:
+    - src/mongo/bson/
+    - src/mongo/base/
+    - src/mongo/platform/
+    - src/mongo/stdx/
+    - src/mongo/util/
+    - src/mongo/db/json.h
+    # Unsure about this but putting here for now:
+    - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
 
 core.service:
-  - src/mongo/db/commands[._]* # not the commands directory
-  - src/mongo/db/*operation_context*
-  - src/mongo/db/client*
-  - src/mongo/db/service_context*
+  files:
+    - src/mongo/db/commands[._]* # not the commands directory
+    - src/mongo/db/*operation_context*
+    - src/mongo/db/client*
+    - src/mongo/db/service_context*
 
 core.unittest:
-  - src/mongo/unittest/
+  files:
+    - src/mongo/unittest/
 
 query:
-  - src/mongo/db/commands/query_cmd/
-  - src/mongo/db/commands/server_status*
-  - src/mongo/db/exec/
-  - src/mongo/db/fts/
-  - src/mongo/db/geo/
-  - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
-  - src/mongo/db/matcher/
-  - src/mongo/db/memory_tracking/
-  - src/mongo/db/modules/enterprise/src/fle/query_analysis
-  - src/mongo/db/pipeline/
-  - src/mongo/db/query/
-  - src/mongo/db/s/query_analysis* # note the filename pattern
-  - src/mongo/db/s/*query*analyzer* # note the filename pattern
-  - src/mongo/db/stats/
-  - src/mongo/db/update/
-  - src/mongo/util/safe_num*
-  - src/mongo/db/views/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/commands/query_cmd/
+    - src/mongo/db/commands/server_status*
+    - src/mongo/db/exec/
+    - src/mongo/db/fts/
+    - src/mongo/db/geo/
+    - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
+    - src/mongo/db/matcher/
+    - src/mongo/db/memory_tracking/
+    - src/mongo/db/modules/enterprise/src/fle/query_analysis
+    - src/mongo/db/pipeline/
+    - src/mongo/db/query/
+    - src/mongo/db/s/query_analysis* # note the filename pattern
+    - src/mongo/db/s/*query*analyzer* # note the filename pattern
+    - src/mongo/db/stats/
+    - src/mongo/db/update/
+    - src/mongo/util/safe_num*
+    - src/mongo/db/views/
 
 catalog:
-  - src/mongo/db/catalog/
-  - src/mongo/db/catalog_raii*
-  - src/mongo/db/namespace_string*
-  - src/mongo/util/namespace_string* # needs to be same module as db/namespace_string.h
+  meta:
+    slack: server-catalog-and-routing
+    jira: Catalog and Routing
+  files:
+    - src/mongo/db/catalog/
+    - src/mongo/db/catalog_raii*
+    - src/mongo/db/namespace_string*
+    - src/mongo/util/namespace_string* # needs to be same module as db/namespace_string.h
 
 replication:
-  - src/mongo/db/repl/ # excluding ./dbcheck*
-  - src/mongo/db/transaction/
-  - src/mongo/db/op_observer/op_observer_impl* # specific files
-  - src/mongo/db/op_observer/fcv_op_observer* # specific files
-  - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/repl/ # excluding ./dbcheck*
+    - src/mongo/db/transaction/
+    - src/mongo/db/op_observer/op_observer_impl* # specific files
+    - src/mongo/db/op_observer/fcv_op_observer* # specific files
+    - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
 
 storage_engine:
-  - src/third_party/wiredtiger/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/third_party/wiredtiger/
 
 access_control:
-  - src/mongo/db/auth/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/auth/
 
 admission:
-  - src/mongo/db/admission/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/admission/
 
 security:
-  - src/mongo/crypto
-  - src/mongo/db/modules/enterprise/src/audit
-  - src/mongo/db/modules/enterprise/src/encryptdb
-  - src/mongo/db/modules/enterprise/src/fips
-  - src/mongo/db/modules/enterprise/src/kerberos
-  - src/mongo/db/modules/enterprise/src/kmip
-  - src/mongo/db/modules/enterprise/src/ldap
-  - src/mongo/db/modules/enterprise/src/sasl
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/crypto
+    - src/mongo/db/modules/enterprise/src/audit
+    - src/mongo/db/modules/enterprise/src/encryptdb
+    - src/mongo/db/modules/enterprise/src/fips
+    - src/mongo/db/modules/enterprise/src/kerberos
+    - src/mongo/db/modules/enterprise/src/kmip
+    - src/mongo/db/modules/enterprise/src/ldap
+    - src/mongo/db/modules/enterprise/src/sasl
 
 router_role:
-  - src/mongo/s/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/s/
 
 shard_role:
-  - src/mongo/db/s/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/s/
 
 data_movement:
-  - src/mongo/db/s/migration* # note the filename pattern
-  - src/mongo/db/s/resharding
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/s/migration* # note the filename pattern
+    - src/mongo/db/s/resharding
 
 logging:
-  - src/mongo/logv2/
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/logv2/
 
 networking:
-  - src/mongo/db/rpc/
-  - src/mongo/util/net
-  - src/mongo/transport
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/rpc/
+    - src/mongo/util/net
+    - src/mongo/transport
 
 timeseries_bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
-  - src/mongo/db/timeseries/bucket_catalog
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/timeseries/bucket_catalog
 
 collection_write_path: # authoritative: @10gen/server-collection-write-path
-  - src/mongo/db/collection_crud
-  - src/mongo/db/timeseries # excluding ./bucket_catalog
-  - src/mongo/db/commands/collection_to_capped* # specific files
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/collection_crud
+    - src/mongo/db/timeseries # excluding ./bucket_catalog
+    - src/mongo/db/commands/collection_to_capped* # specific files
 
 bsoncolumn: # authoritative: @10gen/server-bsoncolumn
-  - src/mongo/bson/util/bsonobj_traversal.h
-  - src/mongo/bson/column
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/bson/util/bsonobj_traversal.h
+    - src/mongo/bson/column
 
 external_sorter: # authoritative: @10gen/server-external-sorter
-  - src/mongo/db/sorter
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/sorter
 
 index_builds: # authoritative: @10gen/server-index-builds
-  - src/mongo/db/index_builds
-  - src/mongo/db/index/index_access_methods* # specific files
-  - src/mongo/db/catalog/index_key_validate* # specific files
-  - src/mongo/db/catalog/index_spec_validate* # specific files
-  - src/mongo/db/commands/create_indexes* # specific files
-  - src/mongo/db/commands/set_index_commit_quorum* # specific files
-  - src/mongo/db/commands/vote*index_build* # specific files
-  - src/mongo/dbtests/indexupdatetests.cpp # specific file
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/index_builds
+    - src/mongo/db/index/index_access_methods* # specific files
+    - src/mongo/db/catalog/index_key_validate* # specific files
+    - src/mongo/db/catalog/index_spec_validate* # specific files
+    - src/mongo/db/commands/create_indexes* # specific files
+    - src/mongo/db/commands/set_index_commit_quorum* # specific files
+    - src/mongo/db/commands/vote*index_build* # specific files
+    - src/mongo/dbtests/indexupdatetests.cpp # specific file
 
 key_string: # authoritative: @10gen/server-key-string
-  - src/mongo/db/storage/key_string
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/storage/key_string
 
 storage_engine_integration: # authoritative: @10gen/server-storage-engine-integration
-  - src/mongo/db/storage # excluding ./key_string
-  - src/mongo/db/record_id* # specific files
-  - src/mongo/db/repair* # specific files
-  - src/mongo/db/prepare_conflict_tracker* # specific files
-  - src/mongo/db/server_recovery* # specific files
-  - src/mongo/db/mongod_options_storage.idl # specific file
-  - src/mongo/db/dbhelpers* # specific files
-  - src/mongo/db/dbcommands.idl # specific file
-  - src/mongo/db/catalog/import* # specific files
-  - src/mongo/db/catalog/index_repair* # specific files
-  - src/mongo/db/commands/fsync* # specific files
-  - src/mongo/db/commands/dbcommands* # specific files
-  - src/mongo/db/commands/resize_oplog* # specific files
-  - src/mongo/db/op_observer/batched_write* # specific files
-  - src/mongo/db/stats/storage_stats* # specific files
-  - src/mongo/db/stats/*resource_consumption* # specific files
-  - src/mongo/dbtests/storage_debug_util* # specific files
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/storage # excluding ./key_string
+    - src/mongo/db/record_id* # specific files
+    - src/mongo/db/repair* # specific files
+    - src/mongo/db/prepare_conflict_tracker* # specific files
+    - src/mongo/db/server_recovery* # specific files
+    - src/mongo/db/mongod_options_storage.idl # specific file
+    - src/mongo/db/dbhelpers* # specific files
+    - src/mongo/db/dbcommands.idl # specific file
+    - src/mongo/db/catalog/import* # specific files
+    - src/mongo/db/catalog/index_repair* # specific files
+    - src/mongo/db/commands/fsync* # specific files
+    - src/mongo/db/commands/dbcommands* # specific files
+    - src/mongo/db/commands/resize_oplog* # specific files
+    - src/mongo/db/op_observer/batched_write* # specific files
+    - src/mongo/db/stats/storage_stats* # specific files
+    - src/mongo/db/stats/*resource_consumption* # specific files
+    - src/mongo/dbtests/storage_debug_util* # specific files
 
 validate: # authoritative: @10gen/server-validate
-  - src/mongo/db/catalog/collection_validation* # specific files
-  - src/mongo/db/catalog/throttle_cursor* # specific files
-  - src/mongo/db/commands/validate.cpp # specific file
-  - src/mongo/db/validate
-  - src/mongo/dbtests/validate.cpp # specific file
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/catalog/collection_validation* # specific files
+    - src/mongo/db/catalog/throttle_cursor* # specific files
+    - src/mongo/db/commands/validate.cpp # specific file
+    - src/mongo/db/validate
+    - src/mongo/dbtests/validate.cpp # specific file
 
 dbcheck: # authoritative: @10gen/server-dbcheck
-  - src/mongo/db/catalog/health_log* # specific files
-  - src/mongo/db/commands/dbcheck* # specific files
-  - src/mongo/db/concurrency/deferred_writer* # specific files
-  - src/mongo/db/repl/dbcheck* # specific files
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/catalog/health_log* # specific files
+    - src/mongo/db/commands/dbcheck* # specific files
+    - src/mongo/db/concurrency/deferred_writer* # specific files
+    - src/mongo/db/repl/dbcheck* # specific files
 
 ttl: # authoritative: @10gen/server-ttl
-  - src/mongo/db/ttl
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/db/ttl
 
 tracking_allocators: # authoritative: @10gen/server-tracking-allocators
-  - src/mongo/util/tracking
+  meta:
+    slack: TODO
+    jira: TODO
+  files:
+    - src/mongo/util/tracking
