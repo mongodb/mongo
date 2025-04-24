@@ -550,6 +550,10 @@ def pretty_location(loc: clang.SourceLocation | clang.Cursor):
             # location, but have an extent. Use the start of the extent instead.
             extent_start = loc.extent.start  # type: clang.SourceLocation
             loc = extent_start
+    # NOTE: not using normpath_for_file() here because we don't want to convert
+    # bazel-out/blah/src/mongo/beep to src/mongo/beep. All paths output by pretty_location
+    # should be relative to the repo root. This is important for the browser to be able to
+    # load the file. We still want to use os.path.normpath to fix up foo/bar/../baz to  foo/baz.
     name = os.path.normpath(loc.file.name) if loc.file else "<unknown>"
     # return f"{name}({loc.line},{loc.column})"  # MSVC format
     return f"{name}:{loc.line}:{loc.column}"  # gcc format
@@ -741,6 +745,21 @@ def find_usages(mod: str, c: Cursor):
         # at the internal declaration. Make sure that this isn't causing us to skip
         # any first-party declarations.
         assert not ref.location.file or mod_for_file(ref.location.file) is None
+        return
+
+    if c.kind == CursorKind.CALL_EXPR and c.referenced.kind != CursorKind.CONSTRUCTOR:
+        # For a call expression like a.b(c) or a::b(c) the whole thing is considered a reference of
+        # a.b, but unfortunately the reported location is that of a, while we'd really want it to be
+        # that of b. This was frequently resulting in two usage locations being reported for each
+        # method call. Luckily, in most cases, the first child of the call expression (or one of its
+        # transitive children) is the sub-expression a.b, which has a reference to b with the right
+        # location. So we can safely ignore the call expression and rely on the post-order traversal
+        # already adding a relevant used_from reference for this expression. The one exception is
+        # that for constructor calls, the child refers to the *type* a::b, rather than the specific
+        # constructor a::b::b() chosen, so we still need to add this location (even if not ideal) to
+        # ensure that we mark the constructor's usage. I ran this with an assert to check that this
+        # doesn't cause us to lose any usages, but it is too slow to keep (O(n^2) for n calls to a
+        # method in a TU, causing some TUs to take several minutes).
         return
 
     if is_local_decl(ref):
