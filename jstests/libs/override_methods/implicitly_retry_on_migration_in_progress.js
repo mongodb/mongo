@@ -21,6 +21,8 @@ function _runAndExhaustQueryWithRetryUponMigration(
     let attempt = 0;
     const collName = commandObj[commandName];
     const lsid = commandObj['lsid'];
+    const apiVersion = commandObj['apiVersion'];
+    const apiStrict = commandObj['apiStrict'];
 
     assert.soon(
         () => {
@@ -35,6 +37,8 @@ function _runAndExhaustQueryWithRetryUponMigration(
                     getMore: latestBatchResponse.cursor.id,
                     collection: collName,
                     lsid: lsid,
+                    apiVersion: apiVersion,
+                    apiStrict: apiStrict,
                 };
                 latestBatchResponse = func.apply(conn, makeFuncArgs(getMoreCommandObj));
 
