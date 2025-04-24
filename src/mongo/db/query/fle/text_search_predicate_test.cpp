@@ -267,8 +267,26 @@ BSONObj generateFFP(StringData path, Value value, EncryptionPlaceholderContext c
                                           escTextSubstringDerivedFromDataToken,
                                           serverTextSubstringDerivedFromDataToken});
         } break;
+        case EncryptionPlaceholderContext::kTextNormalizedComparison: {
+            auto edcTextExactToken = EDCTextExactToken::deriveFrom(edcToken);
+            auto edcTextExactDerivedFromDataToken =
+                EDCTextExactDerivedFromDataToken::deriveFrom(edcTextExactToken, cdrValue);
+
+            auto escTextExactToken = ESCTextExactToken::deriveFrom(escToken);
+            auto escTextExactDerivedFromDataToken =
+                ESCTextExactDerivedFromDataToken::deriveFrom(escTextExactToken, cdrValue);
+
+            auto serverTextExactToken = ServerTextExactToken::deriveFrom(serverToken);
+            auto serverTextExactDerivedFromDataToken =
+                ServerTextExactDerivedFromDataToken::deriveFrom(serverTextExactToken, cdrValue);
+
+            payload.getTokenSets().setExactTokens(
+                TextExactFindTokenSet{edcTextExactDerivedFromDataToken,
+                                      escTextExactDerivedFromDataToken,
+                                      serverTextExactDerivedFromDataToken});
+        } break;
         default:
-            MONGO_UNIMPLEMENTED_TASSERT(10172502);
+            MONGO_UNREACHABLE_TASSERT(10256200);
     }
 
     BSONObjBuilder builder;
@@ -341,14 +359,25 @@ std::unique_ptr<Expression> makeEncStrContains(ExpressionContext* const expCtx,
     }
 }
 
-std::unique_ptr<Expression> makeEncStrNormalizedEqAggExpr(ExpressionContext* const expCtx,
-                                                          StringData path,
-                                                          Value value) {
+template <typename T>
+std::unique_ptr<Expression> makeEncStrNormalizedEq(ExpressionContext* const expCtx,
+                                                   StringData path,
+                                                   T value) {
+    // A BSONObj corresponds to using an actual FindTextPayload, while a Value is used otherwise.
+    static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
+
     auto fieldpath = ExpressionFieldPath::createPathFromString(
         expCtx, path.toString(), expCtx->variablesParseState);
-    auto textExpr = make_intrusive<ExpressionConstant>(expCtx, value);
-    return std::make_unique<ExpressionEncStrNormalizedEq>(
-        expCtx, std::move(fieldpath), std::move(textExpr));
+
+    if constexpr (std::is_same_v<T, BSONObj>) {
+        return std::make_unique<ExpressionEncStrNormalizedEq>(
+            expCtx,
+            std::move(fieldpath),
+            ExpressionConstant::parse(expCtx, value.firstElement(), expCtx->variablesParseState));
+    } else {
+        return std::make_unique<ExpressionEncStrNormalizedEq>(
+            expCtx, std::move(fieldpath), make_intrusive<ExpressionConstant>(expCtx, value));
+    }
 }
 
 template <typename T>
@@ -428,6 +457,34 @@ void runEncStrContainsTest(T& predicate,
     } else {
         predicate.setEncryptedTags(valueSD, std::move(tags));
         input = makeEncStrContains(expCtx, fieldName, value);
+    }
+
+    auto actual = predicate.rewrite(input.get());
+    auto actualBson = actual->serialize().getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(expectedResult, actualBson);
+}
+
+template <typename T>
+void runEncStrNormalizedEqTest(T& predicate,
+                               ExpressionContext* const expCtx,
+                               StringData valueSD,
+                               StringData fieldName,
+                               std::vector<PrfBlock> tags,
+                               BSONObj expectedResult) {
+    static_assert(std::is_same_v<T, MockTextSearchPredicate> ||
+                  std::is_same_v<T, MockTextSearchPredicateWithFFP>);
+
+    std::unique_ptr<Expression> input = nullptr;
+    Value value = Value(valueSD);
+
+    if constexpr (std::is_same_v<T, MockTextSearchPredicateWithFFP>) {
+        BSONObj ffp =
+            generateFFP(fieldName, value, EncryptionPlaceholderContext::kTextNormalizedComparison);
+        predicate.setEncryptedTags(Value(ffp.firstElement()), tags);
+        input = makeEncStrNormalizedEq(expCtx, fieldName, ffp);
+    } else {
+        predicate.setEncryptedTags(valueSD, std::move(tags));
+        input = makeEncStrNormalizedEq(expCtx, fieldName, value);
     }
 
     auto actual = predicate.rewrite(input.get());
@@ -608,42 +665,59 @@ TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Str_Contains_Expr) {
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_NoFFP_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
+        makeEncStrNormalizedEq(_mock.getExpressionContext(), "ssn"_sd, Value("5"_sd));
     ASSERT_EQ(_predicate.rewrite(input.get()), nullptr);
 }
 
 TEST_F(TextSearchPredicateRewriteTest, Enc_Str_NormalizedEq_Expr) {
-    std::unique_ptr<Expression> input =
-        makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
-    std::vector<PrfBlock> tags = {{1}, {2}};
+    auto expectedResult = fromjson(R"({
+        "$or": [
+            {
+                "$in": [
+                    {
+                        "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                    },
+                    "$__safeContent__"
+                ]
+            },
+            {
+                "$in": [
+                    {
+                        "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                    },
+                    "$__safeContent__"
+                ]
+            }
+        ]
+})");
+    runEncStrNormalizedEqTest(
+        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
+}
 
-    _predicate.setEncryptedTags("hello", tags);
-
-    auto actual = _predicate.rewrite(input.get());
-    auto actualBson = actual->serialize().getDocument().toBson();
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$or": [
-                {
-                    "$in": [
-                        {
-                            "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
-                        },
-                        "$__safeContent__"
-                    ]
-                },
-                {
-                    "$in": [
-                        {
-                            "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
-                        },
-                        "$__safeContent__"
-                    ]
-                }
-            ]
-        })",
-        actualBson);
+// Tests same as above with an actual FindTextPayload.
+TEST_F(TextSearchPredicateRewriteTestWithFFP, Enc_Str_NormalizedEq_Expr) {
+    auto expectedResult = fromjson(R"({
+        "$or": [
+            {
+                "$in": [
+                    {
+                        "$const": {"$binary":{"base64":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                    },
+                    "$__safeContent__"
+                ]
+            },
+            {
+                "$in": [
+                    {
+                        "$const": {"$binary":{"base64":"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","subType":"0"}}
+                    },
+                    "$__safeContent__"
+                ]
+            }
+        ]
+})");
+    runEncStrNormalizedEqTest(
+        _predicate, _mock.getExpressionContext(), "ssn"_sd, "hello"_sd, {{1}, {2}}, expectedResult);
 }
 
 class TextSearchPredicateCollScanRewriteTest : public EncryptedPredicateRewriteTest {
@@ -718,7 +792,7 @@ TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_Contains_Expr) {
 
 TEST_F(TextSearchPredicateCollScanRewriteTest, Enc_Str_NormalizedEq_Expr) {
     std::unique_ptr<Expression> input =
-        makeEncStrNormalizedEqAggExpr(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
+        makeEncStrNormalizedEq(_mock.getExpressionContext(), "ssn"_sd, Value("hello"_sd));
 
     // Serialize the expression before any rewrites occur to validate later.
     auto expressionPreRewrite = input->serialize().getDocument().toBson();
