@@ -1332,6 +1332,13 @@ var ShardingTest = function ShardingTest(params) {
         return [...new Set(nodes)];
     };
 
+    /**
+     * Returns all shards in the cluster.
+     */
+    ShardingTest.prototype.getAllShards = function() {
+        return this._rs.map(obj => obj.test);
+    };
+
     // ShardingTest initialization
 
     assert(isObject(params), 'ShardingTest configuration must be a JSON object');
