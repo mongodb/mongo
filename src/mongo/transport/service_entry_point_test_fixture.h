@@ -325,6 +325,9 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kWrite;
+    }
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const DatabaseName&,
                              const BSONObj&,
