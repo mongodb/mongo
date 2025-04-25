@@ -167,3 +167,8 @@ feature_flags:
         cpp_varname: gFeatureFlagIntentRegistration
         default: false
         shouldBeFCVGated: false
+    featureFlagRecordDelinquentMetrics:
+        description: "Enables delinquent metrics recording"
+        cpp_varname: gFeatureFlagRecordDelinquentMetrics
+        default: false
+        shouldBeFCVGated: false
