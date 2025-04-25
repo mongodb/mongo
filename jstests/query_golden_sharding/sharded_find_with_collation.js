@@ -93,11 +93,12 @@ let suspendRangeDeletionShard0;
 
 for (let shardKey of [{a: 1}, {_id: 1}, {a: "hashed"}, {_id: "hashed"}]) {
     let shardKeyJson = tojson(shardKey);
+    let key = Object.keys(shardKey)[0];
     let splitPoints = Object.values(shardKey)[0] == "hashed"
-        ? [{a: convertShardKeyToHashed(0)}, {a: convertShardKeyToHashed('b')}]
-        : [{a: 0}, {a: 'b'}];
+        ? [{[key]: convertShardKeyToHashed(0)}, {[key]: convertShardKeyToHashed('b')}]
+        : [{[key]: 0}, {[key]: 'b'}];
     suspendRangeDeletionShard0 = configureFailPoint(st.shard0, 'suspendRangeDeletion');
-    setupCollection({shardKey: {a: 1}, splits: splitPoints});
+    setupCollection({shardKey: shardKey, splits: splitPoints});
 
     section(`Find *without* collation on collection sharded on ${shardKeyJson}`);
     doQueries(false);

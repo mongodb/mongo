@@ -913,32 +913,20 @@
 ## 3. Find *without* collation on collection sharded on { "_id" : 1 }
 ### Find : "{ "a" : "a" }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
 		"direction" : "forward",
-		"indexBounds" : {
-			"a" : [
-				"[\"a\", \"a\"]"
-			]
+		"filter" : {
+			"a" : {
+				"$eq" : "a"
+			}
 		},
-		"indexName" : "a_1",
-		"indexVersion" : 2,
-		"isMultiKey" : false,
-		"isPartial" : false,
-		"isSparse" : false,
-		"isUnique" : false,
-		"keyPattern" : {
-			"a" : 1
-		},
-		"multiKeyPaths" : {
-			"a" : [ ]
-		},
-		"stage" : "IXSCAN"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -948,35 +936,20 @@
 
 ### Find : "{ "a" : { "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"\", \"a\"]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lte" : "a"
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -986,35 +959,20 @@
 
 ### Find : "{ "a" : { "$gte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"a\", {})"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gte" : "a"
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1024,35 +982,29 @@
 
 ### Find : "{ "a" : { "$gte" : "a", "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"a\", \"a\"]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lte" : "a"
+					}
+				},
+				{
+					"a" : {
+						"$gte" : "a"
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1067,30 +1019,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gt" : { "$minKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1105,30 +1042,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lt" : { "$maxKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1143,30 +1065,24 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lt" : { "$maxKey" : 1 }
+					}
+				},
+				{
+					"a" : {
+						"$gt" : { "$minKey" : 1 }
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1176,7 +1092,7 @@
 
 ### Find : "{ "_id" : "a" }", additional params: { }
 ### Stage
-`"SHARD_MERGE"`
+`"SINGLE_SHARD"`
 ### Shard winning plans
 ```json
 {
@@ -1192,7 +1108,7 @@
 
 ### Find : "{ "_id" : { "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SHARD_MERGE"`
+`"SINGLE_SHARD"`
 ### Shard winning plans
 ```json
 {
@@ -1215,9 +1131,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1227,7 +1143,7 @@
 
 ### Find : "{ "_id" : { "$gte" : "a" } }", additional params: { }
 ### Stage
-`"SHARD_MERGE"`
+`"SINGLE_SHARD"`
 ### Shard winning plans
 ```json
 {
@@ -1250,9 +1166,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1262,7 +1178,7 @@
 
 ### Find : "{ "_id" : { "$gte" : "a", "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SHARD_MERGE"`
+`"SINGLE_SHARD"`
 ### Shard winning plans
 ```json
 {
@@ -1285,9 +1201,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1320,9 +1236,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1355,9 +1271,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1390,9 +1306,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1509,30 +1425,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gt" : { "$minKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1547,30 +1448,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lt" : { "$maxKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1585,30 +1471,24 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lt" : { "$maxKey" : 1 }
+					}
+				},
+				{
+					"a" : {
+						"$gt" : { "$minKey" : 1 }
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1742,9 +1622,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1777,9 +1657,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1812,9 +1692,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -1829,24 +1709,26 @@
 ### Shard winning plans
 ```json
 {
+	"filter" : {
+		"a" : {
+			"$eq" : "a"
+		}
+	},
 	"inputStage" : {
 		"direction" : "forward",
 		"indexBounds" : {
 			"a" : [
-				"[\"a\", \"a\"]"
+				"[2780795045148116090, 2780795045148116090]"
 			]
 		},
-		"indexName" : "a_1",
+		"indexName" : "a_hashed",
 		"indexVersion" : 2,
 		"isMultiKey" : false,
 		"isPartial" : false,
 		"isSparse" : false,
 		"isUnique" : false,
 		"keyPattern" : {
-			"a" : 1
-		},
-		"multiKeyPaths" : {
-			"a" : [ ]
+			"a" : "hashed"
 		},
 		"stage" : "IXSCAN"
 	},
@@ -1860,35 +1742,20 @@
 
 ### Find : "{ "a" : { "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"\", \"a\"]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lte" : "a"
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1898,35 +1765,20 @@
 
 ### Find : "{ "a" : { "$gte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"a\", {})"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gte" : "a"
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1936,35 +1788,29 @@
 
 ### Find : "{ "a" : { "$gte" : "a", "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"a\", \"a\"]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lte" : "a"
+					}
+				},
+				{
+					"a" : {
+						"$gte" : "a"
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -1979,30 +1825,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gt" : { "$minKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2017,30 +1848,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lt" : { "$maxKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2055,30 +1871,24 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lt" : { "$maxKey" : 1 }
+					}
+				},
+				{
+					"a" : {
+						"$gt" : { "$minKey" : 1 }
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2421,30 +2231,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gt" : { "$minKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2459,30 +2254,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lt" : { "$maxKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2497,30 +2277,24 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lt" : { "$maxKey" : 1 }
+					}
+				},
+				{
+					"a" : {
+						"$gt" : { "$minKey" : 1 }
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2737,32 +2511,20 @@
 ## 7. Find *without* collation on collection sharded on { "_id" : "hashed" }
 ### Find : "{ "a" : "a" }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
 		"direction" : "forward",
-		"indexBounds" : {
-			"a" : [
-				"[\"a\", \"a\"]"
-			]
+		"filter" : {
+			"a" : {
+				"$eq" : "a"
+			}
 		},
-		"indexName" : "a_1",
-		"indexVersion" : 2,
-		"isMultiKey" : false,
-		"isPartial" : false,
-		"isSparse" : false,
-		"isUnique" : false,
-		"keyPattern" : {
-			"a" : 1
-		},
-		"multiKeyPaths" : {
-			"a" : [ ]
-		},
-		"stage" : "IXSCAN"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2772,35 +2534,20 @@
 
 ### Find : "{ "a" : { "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"\", \"a\"]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lte" : "a"
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2810,35 +2557,20 @@
 
 ### Find : "{ "a" : { "$gte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"a\", {})"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gte" : "a"
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2848,35 +2580,29 @@
 
 ### Find : "{ "a" : { "$gte" : "a", "$lte" : "a" } }", additional params: { }
 ### Stage
-`"SINGLE_SHARD"`
+`"SHARD_MERGE"`
 ### Shard winning plans
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[\"a\", \"a\"]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lte" : "a"
+					}
+				},
+				{
+					"a" : {
+						"$gte" : "a"
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2891,30 +2617,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gt" : { "$minKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2929,30 +2640,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lt" : { "$maxKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -2967,30 +2663,24 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lt" : { "$maxKey" : 1 }
+					}
+				},
+				{
+					"a" : {
+						"$gt" : { "$minKey" : 1 }
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -3000,7 +2690,7 @@
 
 ### Find : "{ "_id" : "a" }", additional params: { }
 ### Stage
-`"SHARD_MERGE"`
+`"SINGLE_SHARD"`
 ### Shard winning plans
 ```json
 {
@@ -3039,9 +2729,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3074,9 +2764,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3109,9 +2799,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3144,9 +2834,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3179,9 +2869,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3214,9 +2904,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3333,30 +3023,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey]"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$gt" : { "$minKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -3371,30 +3046,15 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"[MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"a" : {
+				"$lt" : { "$maxKey" : 1 }
+			}
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -3409,30 +3069,24 @@
 ```json
 {
 	"inputStage" : {
-		"inputStage" : {
-			"direction" : "forward",
-			"indexBounds" : {
-				"a" : [
-					"(MinKey, MaxKey)"
-				]
-			},
-			"indexName" : "a_1",
-			"indexVersion" : 2,
-			"isMultiKey" : false,
-			"isPartial" : false,
-			"isSparse" : false,
-			"isUnique" : false,
-			"keyPattern" : {
-				"a" : 1
-			},
-			"multiKeyPaths" : {
-				"a" : [ ]
-			},
-			"stage" : "IXSCAN"
+		"direction" : "forward",
+		"filter" : {
+			"$and" : [
+				{
+					"a" : {
+						"$lt" : { "$maxKey" : 1 }
+					}
+				},
+				{
+					"a" : {
+						"$gt" : { "$minKey" : 1 }
+					}
+				}
+			]
 		},
-		"stage" : "SHARDING_FILTER"
+		"stage" : "COLLSCAN"
 	},
-	"stage" : "FETCH"
+	"stage" : "SHARDING_FILTER"
 }
 ```
 ### Results
@@ -3566,9 +3220,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3601,9 +3255,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
@@ -3636,9 +3290,9 @@
 			},
 			"stage" : "IXSCAN"
 		},
-		"stage" : "FETCH"
+		"stage" : "SHARDING_FILTER"
 	},
-	"stage" : "SHARDING_FILTER"
+	"stage" : "FETCH"
 }
 ```
 ### Results
