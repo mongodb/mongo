@@ -47,6 +47,9 @@ common --remote_download_regex=.*\.(dwo|h|cpp)$
 # Disable caching of test results by default since many of our tests are non-deterministic.
 common --cache_test_results=no
 
+# Stream the test output so users can see the test progression.
+common --test_output=streamed
+
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
 common:windows --features=-compiler_param_file
