@@ -23,8 +23,18 @@ py_library(
         "sharded_cluster_util.py",
     ],
     visibility = ["//visibility:public"],
-    deps = [dependency(
-        "evergreen-py",
-        group = "testing",
-    )],
+    deps = [
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+    ],
 )
