@@ -1,0 +1,26 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "folly_token_bucket",
+    hdrs = [
+        "dist/folly/TokenBucket.h",
+    ],
+    includes = ["./dist"],
+)
+
+mongo_cc_unit_test(
+    name = "token_bucket_test",
+    srcs = [
+        "test/token_bucket_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-workload-scheduling",
+    ],
+    deps = [
+        ":folly_token_bucket",
+        "//src/mongo:base",
+    ],
+)

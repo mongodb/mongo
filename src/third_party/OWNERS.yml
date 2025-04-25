@@ -24,6 +24,9 @@ filters:
   - "fmt":
     approvers:
       - 10gen/server-programmability
+  - "folly":
+    approvers:
+      - 10gen/server-workload-scheduling
   - "gperftools":
     approvers:
       - 10gen/server-workload-scheduling

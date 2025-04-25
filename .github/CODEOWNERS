@@ -2813,6 +2813,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/cares @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/croaring @10gen/query-execution @svc-auto-approve-bot
 /src/third_party/**/fmt @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/folly @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/third_party/**/gperftools @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/third_party/**/grpc @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/icu4c* @10gen/query-execution @svc-auto-approve-bot
