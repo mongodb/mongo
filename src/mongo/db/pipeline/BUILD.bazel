@@ -1602,3 +1602,14 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "window_function_add_to_set_bm",
+    srcs = [
+        "//src/mongo/db/pipeline/window_function:window_function_add_to_set_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":expression_context_for_test",
+    ],
+)
