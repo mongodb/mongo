@@ -1,6 +1,8 @@
 /**
  * Test the $sampleRate match expression.
  * @tags: [
+ *     # TODO(SERVER-60823): remove incompatible_with_gcov
+ *     incompatible_with_gcov,
  * ]
  */
 (function() {
