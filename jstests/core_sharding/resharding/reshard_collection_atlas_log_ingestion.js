@@ -148,6 +148,7 @@ function verifyDonorMetrics(stats, success) {
         assert(donor.hasOwnProperty("shardName"), "Missing donor shardName");
         assert.gt(donor.bytesToClone, 0, "bytesToClone");
         assert.gt(donor.documentsToClone, 0, "documentsToClone");
+        assert.gt(donor.indexCount, 0, "donor indexCount");
         assert(donor.hasOwnProperty("writesDuringCriticalSection"),
                "Missing writesDuringCriticalSection");
         if (success) {
@@ -185,7 +186,7 @@ function verifyRecipientMetrics(stats, success) {
                 assert(recipient.phaseDurations.hasOwnProperty(expected),
                        `Successful operation did not report ${expected}`);
             }
-            assert.gt(recipient.indexCount, 0, "indexCount");
+            assert.gt(recipient.indexCount, 0, "recipient indexCount");
         }
     }
     assert.gt(recipientTotalBytes, 0, "recipientTotalBytes");
@@ -215,6 +216,7 @@ function verifyTotals(stats, success) {
     if (success) {
         assert.gt(totals.totalOplogsApplied, 0, "totalOplogsApplied");
     }
+    assert.gt(totals.maxDonorIndexes, 0, "maxDonorIndexes");
     assert.gt(totals.maxRecipientIndexes, 0, "maxRecipientIndexes");
 }
 

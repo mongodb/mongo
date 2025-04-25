@@ -1914,15 +1914,11 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
         }();
         _recipientCtx.setTotalNumDocuments(totalDocumentCount);
         _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx));
+    }
 
-        auto indexCount = coll->getIndexCatalog()->numIndexesTotal();
-        if (coll->isClustered()) {
-            // There is an implicit 'clustered' index on a clustered collection.
-            // Increment the total index count similar to storage stats:
-            // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
-            indexCount += 1;
-        }
-        _recipientCtx.setNumOfIndexes(indexCount);
+    auto optionalIndexCount = resharding::getIndexCount(opCtx, _metadata.getTempReshardingNss());
+    if (optionalIndexCount) {
+        _recipientCtx.setNumOfIndexes(*optionalIndexCount);
     }
 
     _metrics->updateRecipientCtx(_recipientCtx);

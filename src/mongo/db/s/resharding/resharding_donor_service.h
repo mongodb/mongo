@@ -261,7 +261,8 @@ private:
     // Transitions the on-disk and in-memory state to DonorStateEnum::kDonatingInitialData.
     void _transitionToDonatingInitialData(Timestamp minFetchTimestamp,
                                           int64_t bytesToClone,
-                                          int64_t documentsToClone);
+                                          int64_t documentsToClone,
+                                          int64_t indexCount);
 
     // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
     void _transitionToError(Status abortReason);

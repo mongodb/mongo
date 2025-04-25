@@ -493,5 +493,9 @@ ExecutorFuture<void> waitForReplicationOnVotingMembers(
  */
 Milliseconds getMajorityReplicationLag(OperationContext* opCtx);
 
+// Returns the number of indexes on the given namespace or boost::none if the collection does not
+// exist.
+boost::optional<int> getIndexCount(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace resharding
 }  // namespace mongo

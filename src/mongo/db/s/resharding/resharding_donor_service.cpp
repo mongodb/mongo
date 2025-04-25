@@ -671,10 +671,15 @@ void ReshardingDonorService::DonorStateMachine::
 
     int64_t bytesToClone = 0;
     int64_t documentsToClone = 0;
+    int64_t indexCount = 0;
 
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
+
+        if (auto optionalCount = resharding::getIndexCount(rawOpCtx, _metadata.getSourceNss())) {
+            indexCount = *optionalCount;
+        }
 
         AutoGetCollection coll(rawOpCtx, _metadata.getSourceNss(), MODE_IS);
         if (coll) {
@@ -758,7 +763,7 @@ void ReshardingDonorService::DonorStateMachine::
                 "documentsToClone"_attr = documentsToClone,
                 "reshardingUUID"_attr = _metadata.getReshardingUUID());
 
-    _transitionToDonatingInitialData(minFetchTimestamp, bytesToClone, documentsToClone);
+    _transitionToDonatingInitialData(minFetchTimestamp, bytesToClone, documentsToClone, indexCount);
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
@@ -1131,12 +1136,16 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionToDonatingInitialData(
-    Timestamp minFetchTimestamp, int64_t bytesToClone, int64_t documentsToClone) {
+    Timestamp minFetchTimestamp,
+    int64_t bytesToClone,
+    int64_t documentsToClone,
+    int64_t indexCount) {
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kDonatingInitialData);
     newDonorCtx.setMinFetchTimestamp(minFetchTimestamp);
     newDonorCtx.setBytesToClone(bytesToClone);
     newDonorCtx.setDocumentsToClone(documentsToClone);
+    newDonorCtx.setIndexCount(indexCount);
     _transitionState(std::move(newDonorCtx));
 }
 

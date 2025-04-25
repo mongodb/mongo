@@ -199,6 +199,10 @@ structs:
                     "Number of documents on this donor shard in the collection being
                     resharded."
                 optional: true
+            indexCount:
+                type: long
+                description: "Number of indexes on this donor shard in the collection being resharded."
+                optional: true
             writesDuringCriticalSection:
                 type: long
                 description: "Number of writes during critical section on this donor shard."
