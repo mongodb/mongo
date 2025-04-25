@@ -808,6 +808,15 @@ functions:
           dir: src/buildscripts/antithesis/base_images/workload/src
     - *configure_evergreen_api_credentials
 
+  "do pre workstation setup":
+    - command: manifest.load
+    - *git_get_shallow_project
+    - *f_expansions_write
+    - *restore_git_history_and_tags
+    - *add_git_tag
+    - *kill_processes
+    - *cleanup_environment
+
   "do non-compile setup":
     - command: manifest.load
     - *git_get_shallow_project
@@ -1266,6 +1275,17 @@ functions:
     # because we don't intend for any human to look at this failure.
     - *check_run_tests_infrastructure_failure
     - *check_resmoke_failure
+
+  "set up then check workstation script":
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "-c"
+          - |
+            cd ./src
+            ./etc/set_up_workstation.sh
+            ./evergreen/check_workstation_setup.sh
 
   "run tests":
     - *f_expansions_write

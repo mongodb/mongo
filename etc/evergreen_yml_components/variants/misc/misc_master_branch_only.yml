@@ -26,6 +26,9 @@ buildvariants:
       - name: monitor_build_status
         distros:
           - ubuntu2404-large
+      - name: check_workstation_setup_script
+        distros:
+          - ubuntu2204-arm64-small
 
   # Experimental variant running bazel targets for integration tests. To be removed with SERVER-103537.
   - name: bazel-integration-tests

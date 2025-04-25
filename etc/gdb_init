@@ -1,0 +1,38 @@
+add-auto-load-safe-path /
+ 
+set pagination off
+set print object on
+ 
+set print static-members off
+set print pretty on
+#set print elements 0
+
+# include venv in the Python path
+python
+import os, subprocess, sys
+try:
+    gdb_python_version = sys.version.split()[0]
+    shell_python_version = subprocess.check_output('python -c "import sys;print(sys.version.split()[0])"', shell=True).decode("utf-8").strip()
+    if gdb_python_version == shell_python_version:
+        # Execute a Python using the user's shell and pull out the sys.path (for site-packages)
+        shell_paths = subprocess.check_output('python -c "import os,sys;print(os.linesep.join(sys.path).strip())"', shell=True).decode("utf-8").split()
+        # Extend GDB's Python's search path
+        sys.path.extend(path for path in shell_paths if not path in sys.path)
+        print("Included venv Python path")
+    else:
+        print("Failed to include venv Python path: Python version mismatch (shell {}, gdb {})".format(shell_python_version, gdb_python_version))
+except Exception as e:
+    print("Failed to include venv Python path: " + str(e))
+end
+
+# register boost pretty printers
+python
+import sys, pathlib
+try:
+    sys.path.insert(1, os.path.join(pathlib.Path.home(), 'Boost-Pretty-Printer'))
+    import boost
+    boost.register_printers(boost_version=(1,60,0))
+    print("Loaded boost pretty printers")
+except Exception as e:
+    print("Failed to load the boost pretty printers: " + str(e))
+end
