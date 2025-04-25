@@ -822,18 +822,19 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
     const bool clearDbInfo =
         _doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone;
 
-    const auto& beforeReleasingAction = clearDbInfo
-        ? static_cast<const ShardingRecoveryService::BeforeReleasingCustomAction&>(
-              ShardingRecoveryService::FilteringMetadataClearer())
-        : static_cast<const ShardingRecoveryService::BeforeReleasingCustomAction&>(
-              ShardingRecoveryService::NoCustomAction());
+    std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
+    if (clearDbInfo) {
+        actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+    } else {
+        actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+    }
 
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
         NamespaceString(_dbName),
         _csReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        beforeReleasingAction,
+        *actionPtr,
         false /*throwIfReasonDiffers*/);
 }
 

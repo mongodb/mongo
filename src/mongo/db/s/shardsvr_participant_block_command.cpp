@@ -112,21 +112,21 @@ public:
                 auto service = ShardingRecoveryService::get(opCtx);
                 switch (blockType) {
                     case CriticalSectionBlockTypeEnum::kUnblock: {
-                        const auto& beforeReleasingAction =
-                            (ns().isDbOnly() && !request().getClearDbInfo())
-                            ? static_cast<
-                                  const ShardingRecoveryService::BeforeReleasingCustomAction&>(
-                                  ShardingRecoveryService::NoCustomAction())
-                            : static_cast<
-                                  const ShardingRecoveryService::BeforeReleasingCustomAction&>(
-                                  ShardingRecoveryService::FilteringMetadataClearer());
+                        std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
+                            actionPtr;
+                        if (ns().isDbOnly() && !request().getClearDbInfo()) {
+                            actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+                        } else {
+                            actionPtr = std::make_unique<
+                                ShardingRecoveryService::FilteringMetadataClearer>();
+                        }
 
                         service->releaseRecoverableCriticalSection(
                             opCtx,
                             ns(),
                             reason,
                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            beforeReleasingAction,
+                            *actionPtr,
                             request().getThrowIfReasonDiffers().value_or(true));
                         break;
                     }
