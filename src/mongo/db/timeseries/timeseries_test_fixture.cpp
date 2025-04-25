@@ -360,7 +360,8 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
               (reason == bucket_catalog::RolloverReason::kTimeForward ||
                reason == bucket_catalog::RolloverReason::kTimeBackward ||
                reason == bucket_catalog::RolloverReason::kSchemaChange ||
-               reason == bucket_catalog::RolloverReason::kNone));
+               reason == bucket_catalog::RolloverReason::kNone ||
+               reason == bucket_catalog::RolloverReason::kCount));
 
     // Besides kNone, we depend on numMeasurements > 2 so that we can make the output vector have
     // the appropriate RolloverReason.
@@ -369,7 +370,8 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
     // If the user inputs numMeasurements > gTimeseriesBucketMaxCount, we may not properly be
     // simulating the RolloverReason we want to because this measurements vector is now eligible
     // for RolloverReason::kCount.
-    invariant(numMeasurements <= static_cast<size_t>(gTimeseriesBucketMaxCount));
+    invariant(numMeasurements <= static_cast<size_t>(gTimeseriesBucketMaxCount) ||
+              reason == bucket_catalog::RolloverReason::kCount);
 
     // We should only be setting the idxWithDiffMeasurement if we have the rollover reasons
     // kTimeForward, kTimeBackward, or kSchemaChange.
@@ -378,16 +380,16 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
                reason == bucket_catalog::RolloverReason::kTimeBackward ||
                reason == bucket_catalog::RolloverReason::kSchemaChange));
 
-    // We need to ensure that the idxWithDiffMeasurement isn't the first element. Otherwise, we may
-    // not create a vector that causes the input RolloverReason.
+    // We need to ensure that 'idxWithDiffMeasurement' is within the range of [1, numMeasurements).
+    // Otherwise, we may not create a vector that leads to the input RolloverReason.
     invariant(numMeasurements == 1 ||
-              (idxWithDiffMeasurement >= 1 && idxWithDiffMeasurement <= numMeasurements));
+              (idxWithDiffMeasurement >= 1 && idxWithDiffMeasurement < numMeasurements));
 
+    // TODO(SERVER-103984): Enable us to support metaValueType after merging this ticket.
     // We should not be setting the metaValueType if the measurements don't have a metaValue.
-    invariant(metaValue != boost::none || metaValueType == String);
-    auto measurement = (metaValue)
-        ? _generateMeasurementWithMetaFieldType(metaValueType, timeValue, *metaValue)
-        : BSON(_timeField << timeValue);
+    invariant(metaValueType == String);
+    auto measurement = (metaValue) ? BSON(_metaField << *metaValue << _timeField << timeValue)
+                                   : BSON(_timeField << timeValue);
 
     switch (reason) {
         case bucket_catalog::RolloverReason::kNone:
@@ -396,7 +398,7 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
             }
             return measurements;
         case bucket_catalog::RolloverReason::kCount:
-            for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
+            for (size_t i = 0; i < numMeasurements; i++) {
                 measurements.emplace_back(measurement);
             }
             return measurements;
@@ -405,8 +407,8 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
                 measurements.emplace_back(measurement);
             }
             auto kTimeForwardMeasurement = (metaValue)
-                ? BSON(_timeField << timeValue + Hours(2) << _metaField << *metaValue)
-                : BSON(_timeField << timeValue + Hours(2));
+                ? BSON(_timeField << (timeValue + Hours(2)) << _metaField << *metaValue)
+                : BSON(_timeField << (timeValue + Hours(2)));
             for (size_t i = idxWithDiffMeasurement; i < numMeasurements; i++) {
                 measurements.emplace_back(kTimeForwardMeasurement);
             }
@@ -483,8 +485,9 @@ std::vector<BSONObj> TimeseriesTestFixture::_generateMeasurementsWithRolloverRea
 bucket_catalog::Bucket* TimeseriesTestFixture::_generateBucketWithBatch(
     const NamespaceString& ns,
     const UUID& collectionUUID,
-    bucket_catalog::BatchedInsertContext& batch) {
-    auto measurementTimestamp = std::get<Date_t>(batch.measurementsTimesAndIndices[0]);
+    bucket_catalog::BatchedInsertContext& batch,
+    size_t batchIdx) const {
+    auto measurementTimestamp = std::get<Date_t>(batch.measurementsTimesAndIndices[batchIdx]);
     return &bucket_catalog::internal::allocateBucket(*_bucketCatalog,
                                                      *_bucketCatalog->stripes[batch.stripeNumber],
                                                      WithLock::withoutLock(),
@@ -586,20 +589,20 @@ TimeseriesTestFixture::_generateBucketsWithMeasurements(
     const UUID& collectionUUID,
     const std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>&
         measurementsAndRolloverReasons) {
-    bool kNoneReasonEncountered = false;
     absl::InlinedVector<bucket_catalog::Bucket*, 8> buckets;
     auto options = _getTimeseriesOptions(ns);
 
     for (size_t i = 0; i < measurementsAndRolloverReasons.size(); i++) {
         std::vector<BSONObj> measurements = measurementsAndRolloverReasons[i].first;
         bucket_catalog::RolloverReason reason = measurementsAndRolloverReasons[i].second;
-        if (reason == bucket_catalog::RolloverReason::kNone) {
-            // We can only have one bucket be empty and have a kNone rollover action because we are
-            // creating buckets that all have the same meta field value or are in collection without
-            // a meta field.
-            ASSERT(!kNoneReasonEncountered);
-            kNoneReasonEncountered = true;
-        }
+        // We don't enable creating buckets with kNone rollover reasons unless we are only creating
+        // one bucket, because trying to call allocateBucket in debug mode with an uncleared open
+        // bucket will invariant.
+        //
+        // We require the caller of this function to be responsible for setting/unsetting the
+        // bucket's rollover reason as it is staging/committing writes to the bucket.
+        ASSERT(measurementsAndRolloverReasons.size() == 1 ||
+               reason != bucket_catalog::RolloverReason::kNone);
         std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
         auto batchedInsertContexts =
             write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
@@ -618,10 +621,9 @@ TimeseriesTestFixture::_generateBucketsWithMeasurements(
             numMeasurements += batchedInsertContexts[i].measurementsTimesAndIndices.size();
         }
         ASSERT_EQ(numMeasurements, measurements.size());
-        auto currentBatch = batchedInsertContexts[0];
-        bucket_catalog::Bucket* curBucket =
-            _generateBucketWithBatch(ns, collectionUUID, currentBatch);
-        _stageInsertOneBatchIntoEligibleBucketHelper(ns, collectionUUID, currentBatch, curBucket);
+        auto curBatch = batchedInsertContexts[0];
+        bucket_catalog::Bucket* curBucket = _generateBucketWithBatch(ns, collectionUUID, curBatch);
+        _stageInsertOneBatchIntoEligibleBucketHelper(ns, collectionUUID, curBatch, curBucket);
         curBucket->rolloverReason = reason;
         // Check that we have the same metadata across all the buckets we create; we know that all
         // the measurements within the same batch have the same meta field value if we didn't assert

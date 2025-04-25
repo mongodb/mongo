@@ -127,9 +127,6 @@ protected:
         boost::optional<StmtId> stmtId = boost::none,
         boost::optional<std::vector<StmtId>&> executedStmtIds = boost::none);
 
-    // Strings used to simulate kSize/kCachePressure rollover reason.
-    std::string _bigStr = std::string(1000, 'a');
-
     // Should not be called
     bucket_catalog::CompressAndWriteBucketFunc _compressBucket = nullptr;
 };
@@ -975,8 +972,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchFillsUpSingleBucketWithou
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonCountWithMetaField) {
-    auto batchOfMeasurementsWithCount =
-        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kCount});
+    auto batchOfMeasurementsWithCount = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kCount,
+         .numMeasurements = static_cast<size_t>(2 * gTimeseriesBucketMaxCount)});
 
     // batchOfMeasurements will be 2 * gTimeseriesBucketMaxCount measurements with all the
     // measurements having the same meta field and time, which means we should have two buckets.
@@ -988,7 +986,9 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonCoun
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonCountWithoutMetaField) {
     auto batchOfMeasurementsWithCountNoMetaField = _generateMeasurementsWithRolloverReason(
-        {.reason = bucket_catalog::RolloverReason::kCount, .metaValue = boost::none});
+        {.reason = bucket_catalog::RolloverReason::kCount,
+         .numMeasurements = static_cast<size_t>(2 * gTimeseriesBucketMaxCount),
+         .metaValue = boost::none});
 
     // batchOfMeasurements will be 2 * gTimeseriesBucketMaxCount measurements with all the
     // measurements having the same meta field and time, which means we should have two buckets.
@@ -1190,9 +1190,10 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverMixed) {
                                                  .numMeasurements = 50,
                                                  .timeValue = Date_t::now()});
 
-    auto batchOfMeasurementsWithCount =
-        _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kCount,
-                                                 .timeValue = Date_t::now() + Seconds(1)});
+    auto batchOfMeasurementsWithCount = _generateMeasurementsWithRolloverReason(
+        {.reason = bucket_catalog::RolloverReason::kCount,
+         .numMeasurements = static_cast<size_t>(2 * gTimeseriesBucketMaxCount),
+         .timeValue = Date_t::now() + Seconds(1)});
 
     auto batchOfMeasurementsWithTimeForward = _generateMeasurementsWithRolloverReason(
         {.reason = bucket_catalog::RolloverReason::kTimeForward,

@@ -133,7 +133,8 @@ protected:
 
     bucket_catalog::Bucket* _generateBucketWithBatch(const NamespaceString& ns,
                                                      const UUID& collectionUUID,
-                                                     bucket_catalog::BatchedInsertContext& batch);
+                                                     bucket_catalog::BatchedInsertContext& batch,
+                                                     size_t batchIdx = 0) const;
 
     /**
      * Without inserting 'batch', asserts that 'batch' doesn't rollover 'bucket'.
@@ -158,9 +159,12 @@ protected:
      * will not rollover and will assert otherwise.
      * We require that measurementsAndRolloverReasons have the same meta value or the collection has
      * no meta value and will assert otherwise.
-     * We require that there is only one kNone reason in measurementsAndRolloverReasons because for
-     * buckets with the same meta field/collections with no meta field value, there can only be one
-     * uncleared kNone bucket.
+     * We require that there is no kNone reason unless there is only one bucket being created  in
+     * measurementsAndRolloverReasons because for buckets with the same meta field/collections with
+     * no meta field value, there can only be one uncleared kNone bucket. If we call
+     * allocateBucket with an uncleared kNone bucket, we will invariant.
+     * It is the responsibility of the caller of this function to set/unset the returned bucket's
+     * rollover reasons before staging/committing writes.
      */
     absl::InlinedVector<bucket_catalog::Bucket*, 8> _generateBucketsWithMeasurements(
         const NamespaceString& ns,
