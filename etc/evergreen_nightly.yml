@@ -51,6 +51,9 @@ include:
   ### Uncomment when using this file for a LTS release branch. ###
   # - filename: etc/evergreen_yml_components/variants/windows/test_dev_master_and_lts_branches_only.yml
 
+  - filename: etc/evergreen_yml_components/tasks/coverity_tasks.yml
+  - filename: etc/evergreen_yml_components/variants/coverity.yml
+
 parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen_nightly.yml"
