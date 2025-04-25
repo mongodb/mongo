@@ -9,3 +9,6 @@ filters:
   - "prepare_standalone_replication_recovery.js":
     approvers:
       - 10gen/server-transactions
+  - "*dbcheck*":
+    approvers:
+      - 10gen/server-dbcheck

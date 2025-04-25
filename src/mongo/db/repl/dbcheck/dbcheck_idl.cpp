@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/dbcheck_idl.h"
+#include "mongo/db/repl/dbcheck/dbcheck_idl.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"

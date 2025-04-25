@@ -30,9 +30,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-#include "mongo/db/repl/dbcheck.h"
-#include "mongo/db/repl/dbcheck_gen.h"
-#include "mongo/db/repl/dbcheck_idl.h"
+#include "mongo/db/repl/dbcheck/dbcheck.h"
+#include "mongo/db/repl/dbcheck/dbcheck_gen.h"
+#include "mongo/db/repl/dbcheck/dbcheck_idl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/background.h"

@@ -1186,10 +1186,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/replsets/**/*startup_recovery* @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/**/*fcv* @10gen/server-fcv @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/replsets/dbcheck/OWNERS.yml
+/jstests/replsets/dbcheck/**/* @10gen/server-dbcheck @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/replsets/libs/OWNERS.yml
 /jstests/replsets/libs/**/*initial_sync* @10gen/server-initial-sync @svc-auto-approve-bot
 /jstests/replsets/libs/**/*rollback* @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/libs/**/prepare_standalone_replication_recovery.js @10gen/server-transactions @svc-auto-approve-bot
+/jstests/replsets/libs/**/*dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/replsets/split_horizon/OWNERS.yml
 /jstests/replsets/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
@@ -2144,6 +2148,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/*external_state* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*heartbeat* @10gen/server-replication-coordinator @svc-auto-approve-bot
 /src/mongo/db/repl/**/*topology_coordinator* @10gen/server-replication-coordinator @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/repl/dbcheck/OWNERS.yml
+/src/mongo/db/repl/dbcheck/**/* @10gen/server-dbcheck @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/repl/hello/OWNERS.yml
 /src/mongo/db/repl/hello/**/* @10gen/server-hello @svc-auto-approve-bot

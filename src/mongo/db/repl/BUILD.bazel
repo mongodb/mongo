@@ -23,18 +23,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "dbcheck_gen",
-    src = "dbcheck.idl",
-    deps = [
-        ":replication_types_gen",
-        "//src/mongo/bson:bson_validate_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db:record_id_gen",
-        "//src/mongo/db:write_concern_options_gen",
-    ],
-)
-
 mongo_cc_library(
     name = "intent_registry",
     srcs = [
@@ -893,31 +881,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "dbcheck",
-    srcs = [
-        "dbcheck.cpp",
-        "dbcheck_idl.cpp",
-        ":dbcheck_gen",
-    ],
-    hdrs = [
-        "dbcheck.h",
-        "dbcheck_idl.h",
-    ],
-    deps = [
-        "//src/mongo/bson:bson_validate",
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db:record_id_helpers",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/catalog:health_log_interface",
-        "//src/mongo/db/catalog:throttle_cursor",
-        "//src/mongo/db/repl:repl_server_parameters",
-        "//src/mongo/util:md5",
-    ],
-)
-
-mongo_cc_library(
     name = "primary_only_service",
     srcs = [
         "primary_only_service.cpp",
@@ -968,7 +931,6 @@ mongo_cc_library(
     ],
     deps = [
         ":apply_ops_command_info",
-        ":dbcheck",
         ":image_collection_entry",
         ":oplog_constraint_violation_logger",
         ":repl_coordinator_interface",
@@ -998,6 +960,7 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/db/query/write_ops",
+        "//src/mongo/db/repl/dbcheck",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
@@ -1668,33 +1631,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "dbcheck_test_fixture",
-    srcs = [
-        "dbcheck_test_fixture.cpp",
-    ],
-    hdrs = [
-        "dbcheck_test_fixture.h",
-        "//src/mongo/db/op_observer:operation_logger_mock.h",
-    ],
-    deps = [
-        ":dbcheck",
-        ":storage_interface",
-        "//src/mongo:base",
-        "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/catalog:catalog_test_fixture",
-        "//src/mongo/db/catalog:health_log",
-        "//src/mongo/db/catalog:health_log_interface",
-        "//src/mongo/db/collection_crud",
-        "//src/mongo/db/commands:dbcheck_command",
-        "//src/mongo/db/index_builds:index_builds_coordinator",
-        "//src/mongo/db/op_observer",
-        "//src/mongo/db/op_observer:op_observer_impl",
-        "//src/mongo/unittest",
-    ],
-)
-
 # TODO(SERVER-96856): Remove cycle created by moving //src/mongo/db/repl:optime.h to //src/mongo/db/repl:optime
 filegroup(
     name = "optime_hdrs",
@@ -2055,8 +1991,6 @@ mongo_cc_unit_test(
     deps = [
         "abstract_async_component",
         ":data_replicator_external_state_mock",
-        ":dbcheck",
-        ":dbcheck_test_fixture",
         ":delayable_timeout_callback",
         ":idempotency_test_fixture",
         ":idempotency_test_util",
@@ -2122,32 +2056,6 @@ mongo_cc_unit_test(
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:transport_layer_mock",
-        "//src/mongo/unittest",
-        "//src/mongo/unittest:task_executor_proxy",
-        "//src/mongo/util:clock_source_mock",
-        "//src/mongo/util/concurrency:thread_pool",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "dbcheck_test",
-    srcs = [
-        "dbcheck_test.cpp",
-    ],
-    tags = [
-        "mongo_unittest_fifth_group",
-        "server-rss-sydney-smoke",
-    ],
-    target_compatible_with = select({
-        "//bazel/config:use_wiredtiger_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":dbcheck",
-        ":dbcheck_test_fixture",
-        "//src/mongo/db/catalog:catalog_helpers",
-        "//src/mongo/db/catalog:catalog_test_fixture",
-        "//src/mongo/db/catalog:health_log",
         "//src/mongo/unittest",
         "//src/mongo/unittest:task_executor_proxy",
         "//src/mongo/util:clock_source_mock",

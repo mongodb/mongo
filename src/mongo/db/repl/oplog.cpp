@@ -101,7 +101,7 @@
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/dbcheck.h"
+#include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
