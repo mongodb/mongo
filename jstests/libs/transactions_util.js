@@ -31,8 +31,7 @@ var TransactionsUtil = (function() {
     // still execute concurrently with other transactions. Pipelines with $changeStream or $out
     // cannot run within a transaction.
     function commandIsNonTxnAggregation(cmdName, cmdObj) {
-        return !("explain" in cmdObj) &&
-            OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj) ||
+        return OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj);
     }
 
@@ -108,11 +107,6 @@ var TransactionsUtil = (function() {
             res.errorLabels.includes('TransientTransactionError');
     }
 
-    function isConflictingOperationInProgress(res) {
-        return res != null && res.hasOwnProperty('codeName') &&
-            res.codeName === "ConflictingOperationInProgress";
-    }
-
     // Runs a function 'func()' in a transaction on database 'db'. Invokes function
     // 'beforeTransactionFunc()' before the transaction (can be used to get references to
     // collections etc.). Ensures that the transaction is successfully committed, by retrying the
@@ -147,7 +141,6 @@ var TransactionsUtil = (function() {
         commandTypeCanSupportTxn,
         deepCopyObject,
         isTransientTransactionError,
-        isConflictingOperationInProgress,
         runInTransaction,
     };
 })();
