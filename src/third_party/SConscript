@@ -27,6 +27,7 @@ thirdPartyEnvironmentModifications = {
         ],
     },
     'croaring': {'CPPPATH': ['#src/third_party/croaring/dist'], },
+    'folly': {'CPPPATH': ['#src/third_party/folly/dist'], },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
     'immer': {'CPPPATH': ['#src/third_party/immer/dist'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
