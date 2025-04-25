@@ -951,7 +951,6 @@ int mongo_main(int argc, char* argv[]) {
         mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
         mongo::getGlobalScriptEngine()->setJSHeapLimitMB(shellGlobalParams.jsHeapLimitMB);
         mongo::getGlobalScriptEngine()->setScopeInitCallback(mongo::shell_utils::initScope);
-        mongo::getGlobalScriptEngine()->enableJIT(!shellGlobalParams.nojit);
         mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
             shellGlobalParams.javascriptProtection);
 

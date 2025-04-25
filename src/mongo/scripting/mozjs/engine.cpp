@@ -121,14 +121,6 @@ void MozJSScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
     }
 }
 
-void MozJSScriptEngine::enableJIT(bool value) {
-    gDisableJavaScriptJIT.store(!value);
-}
-
-bool MozJSScriptEngine::isJITEnabled() const {
-    return !gDisableJavaScriptJIT.load();
-}
-
 void MozJSScriptEngine::enableJavaScriptProtection(bool value) {
     gJavascriptProtection.store(value);
 }

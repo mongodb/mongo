@@ -259,9 +259,6 @@ public:
 
     virtual bool utf8Ok() const = 0;
 
-    virtual void enableJIT(bool value) = 0;
-    virtual bool isJITEnabled() const = 0;
-
     virtual void enableJavaScriptProtection(bool value) = 0;
     virtual bool isJavaScriptProtectionEnabled() const = 0;
 

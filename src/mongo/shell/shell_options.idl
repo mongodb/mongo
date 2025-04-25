@@ -114,15 +114,6 @@ configs:
         source: [cli]
         hidden: true
 
-    "disableJavaScriptJIT":
-        description: "disable the Javascript Just In Time compiler"
-        arg_vartype: Switch
-        conflicts: "enableJavaScriptJIT"
-    "enableJavaScriptJIT":
-        description: "enable the Javascript Just In Time compiler"
-        arg_vartype: Switch
-        conflicts: "disableJavaScriptJIT"
-
     "disableJavaScriptProtection":
         description: "allow automatic JavaScript function marshalling"
         arg_vartype: Switch

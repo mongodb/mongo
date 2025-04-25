@@ -30,14 +30,6 @@ global:
     cpp_namespace: "mongo"
 
 server_parameters:
-    disableJavaScriptJIT:
-        description: "disable the Javascript Just In Time compiler"
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gDisableJavaScriptJIT
-        default: true
-        redact: false
-
     javascriptProtection:
         description: "disable automatic JavaScript function marshalling"
         set_at: [startup, runtime]

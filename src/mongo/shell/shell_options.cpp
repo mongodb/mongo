@@ -205,12 +205,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
     if (params.count("disableJavaScriptProtection")) {
         shellGlobalParams.javascriptProtection = false;
     }
-    if (params.count("disableJavaScriptJIT")) {
-        shellGlobalParams.nojit = true;
-    }
-    if (params.count("enableJavaScriptJIT")) {
-        shellGlobalParams.nojit = false;
-    }
     if (params.count("files")) {
         shellGlobalParams.files = params["files"].as<vector<string>>();
     }

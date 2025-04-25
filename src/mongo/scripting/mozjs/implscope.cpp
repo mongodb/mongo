@@ -452,47 +452,24 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
             JS_NewContext(kMaxBytesBeforeGC), [](JSContext* ptr) { JS_DestroyContext(ptr); });
         uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSContext", _context);
 
-        // We turn on a variety of optimizations if the jit is enabled
-        if (engine->isJITEnabled()) {
-            if (!gFirstRuntimeCreated) {
-                // The process-wide baseline JIT is enabled as part of creating the first JS
-                // runtime. If JIT is later disabled for a specific JS runtime, then the ION JIT
-                // engine gets disabled, but the baseline JIT is still enabled.
-                JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_BASELINE_ENABLE, 1);
-                JS_SetGlobalJitCompilerOption(
-                    _context.get(), JSJITCOMPILER_BASELINE_INTERPRETER_ENABLE, 1);
-                JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_ION_ENABLE, 1);
-            }
-            JS::ContextOptionsRef(_context.get())
-                .setAsmJS(true)
-                .setThrowOnAsmJSValidationFailure(true)
-                .setWasmBaseline(true)
-                .setWasmIon(true)
-                .setAsyncStack(false);
-        } else {
-            if (!gFirstRuntimeCreated) {
-                // The process-wide baseline JIT is disabled as part of creating the first JS
-                // runtime. If JIT is later enabled for a specific JS runtime, then the ION JIT
-                // engine gets enabled.
-                JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_BASELINE_ENABLE, 0);
-                JS_SetGlobalJitCompilerOption(
-                    _context.get(), JSJITCOMPILER_BASELINE_INTERPRETER_ENABLE, 0);
-                JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_ION_ENABLE, 0);
-            }
-            JS::ContextOptionsRef(_context.get())
-                .setAsmJS(false)
-                .setThrowOnAsmJSValidationFailure(false)
-                .setWasmBaseline(false)
-                .setDisableIon()
-                .setWasmIon(false)
-                .setAsyncStack(false);
-        }
-
         if (!gFirstRuntimeCreated) {
+            // The process-wide baseline JIT is disabled as part of creating the first JS
+            // runtime.
+            JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_BASELINE_ENABLE, 0);
+            JS_SetGlobalJitCompilerOption(
+                _context.get(), JSJITCOMPILER_BASELINE_INTERPRETER_ENABLE, 0);
+            JS_SetGlobalJitCompilerOption(_context.get(), JSJITCOMPILER_ION_ENABLE, 0);
             // If this is the first one, hold the lock until after the first
             // one's done
             gFirstRuntimeCreated = true;
         }
+        JS::ContextOptionsRef(_context.get())
+            .setAsmJS(false)
+            .setThrowOnAsmJSValidationFailure(false)
+            .setWasmBaseline(false)
+            .setDisableIon()
+            .setWasmIon(false)
+            .setAsyncStack(false);
 
         uassert(ErrorCodes::JSInterpreterFailure,
                 "UseInternalJobQueues",
