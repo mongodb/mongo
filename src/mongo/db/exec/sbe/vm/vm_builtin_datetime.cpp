@@ -181,7 +181,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToString(Ari
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto [strTag, strValue] = sbe::value::makeNewString(formatted.str());
+    auto [strTag, strValue] = sbe::value::makeNewString(formatted.stringData());
     return {true, strTag, strValue};
 }
 

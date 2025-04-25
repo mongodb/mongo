@@ -1213,7 +1213,7 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
     std::transform(stats.indexesUsed.begin(),
                    stats.indexesUsed.end(),
                    std::back_inserter(indexesUsedVec),
-                   [](std::string idx) -> Value { return Value(idx); });
+                   [](const std::string& idx) -> Value { return Value(idx); });
     doc["indexesUsed"] = Value{std::move(indexesUsedVec)};
 }
 

@@ -882,7 +882,9 @@ public:
         };
         table[BSONType::NumberInt][BSONType::String] = [](ExpressionContext* const expCtx,
                                                           Value inputValue) {
-            return Value(static_cast<std::string>(str::stream() << inputValue.getInt()));
+            str::stream str;
+            str << inputValue.getInt();
+            return Value(StringData(str));
         };
         table[BSONType::NumberInt][BSONType::Bool] = [](ExpressionContext* const expCtx,
                                                         Value inputValue) {
@@ -908,7 +910,9 @@ public:
         };
         table[BSONType::NumberLong][BSONType::String] = [](ExpressionContext* const expCtx,
                                                            Value inputValue) {
-            return Value(static_cast<std::string>(str::stream() << inputValue.getLong()));
+            str::stream str;
+            str << inputValue.getLong();
+            return Value(StringData(str));
         };
         table[BSONType::NumberLong][BSONType::Bool] = [](ExpressionContext* const expCtx,
                                                          Value inputValue) {
@@ -1194,7 +1198,9 @@ private:
         } else if (doubleValue == 0.0 && std::signbit(doubleValue)) {
             return Value("-0"_sd);
         } else {
-            return Value(static_cast<std::string>(str::stream() << fmt::format("{}", doubleValue)));
+            str::stream str;
+            str << fmt::format("{}", doubleValue);
+            return Value(StringData(str));
         }
     }
 

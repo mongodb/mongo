@@ -412,18 +412,20 @@ ExpressionMinMaxScaler::parseMinMaxScalerArgs(BSONElement minMaxScalerElem,
     std::pair<Value, Value> sMinAndsMax{0, 1};
     {
         // Helper lambda to parse out numerical constants from BSON
-        auto parseNumericalValueConstant = [&expCtx](std::string argName,
+        auto parseNumericalValueConstant = [&expCtx](StringData argName,
                                                      BSONElement expressionElem) -> Value {
             auto expr = ::mongo::Expression::parseOperand(
                             expCtx, expressionElem, expCtx->variablesParseState)
                             ->optimize();
             ExpressionConstant* exprConst = dynamic_cast<ExpressionConstant*>(expr.get());
             uassert(ErrorCodes::FailedToParse,
-                    "'" + argName + "' argument to $minMaxScaler must be a constant",
+                    str::stream() << "'" << argName
+                                  << "' argument to $minMaxScaler must be a constant",
                     exprConst);
             Value v = exprConst->getValue();
             uassert(ErrorCodes::FailedToParse,
-                    "'" + argName + "' argument to $minMaxScaler must be a numeric type",
+                    str::stream() << "'" << argName
+                                  << "' argument to $minMaxScaler must be a numeric type",
                     v.numeric());
             return v;
         };
@@ -443,13 +445,13 @@ ExpressionMinMaxScaler::parseMinMaxScalerArgs(BSONElement minMaxScalerElem,
                 uassert(ErrorCodes::FailedToParse,
                         "'min' cannot be specified more than once to $minMaxScaler",
                         !minSpecified);
-                sMinAndsMax.first = parseNumericalValueConstant(std::string(kMinArg), arg);
+                sMinAndsMax.first = parseNumericalValueConstant(kMinArg, arg);
                 minSpecified = true;
             } else if (argName == kMaxArg) {
                 uassert(ErrorCodes::FailedToParse,
                         "'max' cannot be specified more than once to $minMaxScaler",
                         !maxSpecified);
-                sMinAndsMax.second = parseNumericalValueConstant(std::string(kMaxArg), arg);
+                sMinAndsMax.second = parseNumericalValueConstant(kMaxArg, arg);
                 maxSpecified = true;
             } else {
                 uasserted(ErrorCodes::FailedToParse,

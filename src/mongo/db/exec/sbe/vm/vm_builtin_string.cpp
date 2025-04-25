@@ -249,18 +249,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(A
 
     switch (operandTag) {
         case value::TypeTags::NumberInt32: {
-            std::string str = str::stream() << value::bitcastTo<int32_t>(operandVal);
-            auto [strTag, strVal] = value::makeNewString(str);
+            str::stream str;
+            str << value::bitcastTo<int32_t>(operandVal);
+            auto [strTag, strVal] = value::makeNewString(StringData(str));
             return {true, strTag, strVal};
         }
         case value::TypeTags::NumberInt64: {
-            std::string str = str::stream() << value::bitcastTo<int64_t>(operandVal);
-            auto [strTag, strVal] = value::makeNewString(str);
+            str::stream str;
+            str << value::bitcastTo<int64_t>(operandVal);
+            auto [strTag, strVal] = value::makeNewString(StringData(str));
             return {true, strTag, strVal};
         }
         case value::TypeTags::NumberDouble: {
-            std::string str = str::stream() << value::bitcastTo<double>(operandVal);
-            auto [strTag, strVal] = value::makeNewString(str);
+            str::stream str;
+            str << value::bitcastTo<double>(operandVal);
+            auto [strTag, strVal] = value::makeNewString(StringData(str));
             return {true, strTag, strVal};
         }
         case value::TypeTags::NumberDecimal: {
@@ -269,12 +272,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(A
             return {true, strTag, strVal};
         }
         case value::TypeTags::Date: {
-            std::string str = str::stream()
-                << TimeZoneDatabase::utcZone().formatDate(
-                       kIsoFormatStringZ,
-                       Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(operandVal)));
-            auto [strTag, strVal] = value::makeNewString(str);
-            return {true, strTag, strVal};
+            if (auto formatted = TimeZoneDatabase::utcZone().formatDate(
+                    kIsoFormatStringZ,
+                    Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(operandVal)));
+                formatted.isOK()) {
+                // Date formatting successful.
+                auto [strTag, strVal] = value::makeNewString(formatted.getValue());
+                return {true, strTag, strVal};
+            } else {
+                // Date formatting failed. Return stringified status.
+                str::stream str;
+                str << formatted.getStatus();
+                auto [strTag, strVal] = value::makeNewString(StringData(str));
+                return {true, strTag, strVal};
+            }
         }
         case value::TypeTags::Timestamp: {
             Timestamp ts{value::bitcastTo<uint64_t>(operandVal)};
@@ -301,7 +312,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType
         result << sbe::value::getStringView(tag, value);
     }
 
-    auto [strTag, strValue] = sbe::value::makeNewString(result.str());
+    auto [strTag, strValue] = sbe::value::makeNewString(result.stringData());
     return {true, strTag, strValue};
 }
 

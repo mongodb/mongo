@@ -56,7 +56,7 @@ Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* va
         result << val.coerceToString();
     }
 
-    return Value(result.str());
+    return Value(result.stringData());
 }
 
 namespace {
@@ -222,7 +222,7 @@ Value evaluate(const ExpressionSubstrBytes& expr, const Document& root, Variable
         // empty string if lower is not a valid string index.
         return Value(StringData());
     }
-    return Value(str.substr(lower, length));
+    return Value(StringData(str).substr(lower, length));
 }
 
 Value evaluate(const ExpressionSubstrCP& expr, const Document& root, Variables* variables) {

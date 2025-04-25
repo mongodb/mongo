@@ -83,7 +83,7 @@ void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONOb
     visit(OverloadedVisitor{[&](int64_t wNumNodes) {
                                 builder->appendNumber(fieldName, static_cast<long long>(wNumNodes));
                             },
-                            [&](std::string wMode) { builder->append(fieldName, wMode); },
+                            [&](const std::string& wMode) { builder->append(fieldName, wMode); },
                             [&](WTags wTags) {
                                 builder->append(fieldName, wTags);
                             }},

@@ -173,15 +173,14 @@ public:
         bool isInternalClient = false;
 
         static void appendToBSON(const Specification& spec, BSONObjBuilder* bob) {
-            auto appendWireVersion = [bob](std::string tag,
-                                           const WireVersionInfo& wireVersionInfo) {
+            auto appendWireVersion = [bob](StringData tag, const WireVersionInfo& wireVersionInfo) {
                 BSONObjBuilder builder = bob->subobjStart(tag);
                 WireVersionInfo::appendToBSON(wireVersionInfo, &builder);
             };
 
-            appendWireVersion("incomingExternalClient", spec.incomingExternalClient);
-            appendWireVersion("incomingInternalClient", spec.incomingInternalClient);
-            appendWireVersion("outgoing", spec.outgoing);
+            appendWireVersion("incomingExternalClient"_sd, spec.incomingExternalClient);
+            appendWireVersion("incomingInternalClient"_sd, spec.incomingInternalClient);
+            appendWireVersion("outgoing"_sd, spec.outgoing);
 
             bob->append("isInternalClient", spec.isInternalClient);
         }
