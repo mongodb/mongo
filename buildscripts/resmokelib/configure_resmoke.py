@@ -31,6 +31,7 @@ from buildscripts.resmokelib import mongo_fuzzer_configs, utils
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 from buildscripts.util.read_config import read_config_file
+from evergreen.config import get_auth
 
 BASE_16_TO_INT = 16
 COLLECTOR_ENDPOINT = "otel-collector.prod.corp.mongodb.com:443"
@@ -140,8 +141,7 @@ def _validate_config(parser):
         for version in _config.MIXED_BIN_VERSIONS:
             if version not in set(["old", "new"]):
                 parser.error(
-                    "Must specify binary versions as 'old' or 'new' in format"
-                    " 'version1-version2'"
+                    "Must specify binary versions as 'old' or 'new' in format 'version1-version2'"
                 )
 
     if not _config.TLS_MODE or _config.TLS_MODE == "disabled":
@@ -250,6 +250,10 @@ def _set_up_tracing(
         try:
             user_email = git.config.GitConfigParser().get_value("user", "email")
             extra_context["user.email"] = user_email
+
+            evg_auth = get_auth()
+            if evg_auth is not None:
+                extra_context["user.evg"] = evg_auth.username
             processor = BatchedBaggageSpanProcessor(OTLPSpanExporter(endpoint=COLLECTOR_ENDPOINT))
             provider.add_span_processor(processor)
         except Exception:
@@ -308,7 +312,7 @@ into the bin directory of each installation.""")
 Based on the current value of resmoke.ini, after rebuilding, resmoke.py should
 be invoked as either:
 - {shlex.quote(f"{user_config['install_dir']}/resmoke.py")}
-- buildscripts/resmoke.py --installDir {shlex.quote(user_config['install_dir'])}""")
+- buildscripts/resmoke.py --installDir {shlex.quote(user_config["install_dir"])}""")
         raise RuntimeError(err)
 
     def process_feature_flag_file(path):
