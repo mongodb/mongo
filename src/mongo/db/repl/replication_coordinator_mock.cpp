@@ -767,7 +767,7 @@ void ReplicationCoordinatorMock::createWMajorityWriteAvailabilityDateWaiter(OpTi
 WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
     if (wc.syncMode == WriteConcernOptions::SyncMode::UNSET) {
-        if (wc.isMajority()) {
+        if (wc.isMajority() && getWriteConcernMajorityShouldJournal()) {
             wc.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         } else {
             wc.syncMode = WriteConcernOptions::SyncMode::NONE;
