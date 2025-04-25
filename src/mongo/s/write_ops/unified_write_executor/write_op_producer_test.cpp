@@ -330,26 +330,22 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerDifferentNamespaces) {
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
     ASSERT_EQ(op0->getId(), 0);
-    ASSERT_EQ(op0->getBulkWriteOp().getNsInfo().getNs(), nss0);
-    ASSERT_BSONOBJ_EQ(
-        std::get<mongo::BulkWriteInsertOp>(op0->getBulkWriteOp().getOp()).getDocument(),
-        BSON("a" << 0));
+    ASSERT_EQ(op0->getNss(), nss0);
+    ASSERT_BSONOBJ_EQ(op0->getRef().getDocument(), BSON("a" << 0));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
     ASSERT_EQ(op1->getId(), 1);
-    ASSERT_EQ(op1->getBulkWriteOp().getNsInfo().getNs(), nss1);
-    ASSERT_BSONOBJ_EQ(std::get<mongo::BulkWriteUpdateOp>(op1->getBulkWriteOp().getOp()).getFilter(),
-                      BSON("a" << 1));
+    ASSERT_EQ(op1->getNss(), nss1);
+    ASSERT_BSONOBJ_EQ(op1->getRef().getUpdateRef().getFilter(), BSON("a" << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
     ASSERT_EQ(op2->getId(), 2);
-    ASSERT_EQ(op2->getBulkWriteOp().getNsInfo().getNs(), nss2);
-    ASSERT_BSONOBJ_EQ(std::get<mongo::BulkWriteDeleteOp>(op2->getBulkWriteOp().getOp()).getFilter(),
-                      BSON("a" << 2));
+    ASSERT_EQ(op2->getNss(), nss2);
+    ASSERT_BSONOBJ_EQ(op2->getRef().getDeleteRef().getFilter(), BSON("a" << 2));
     producer.advance();
 
     auto noop = producer.peekNext();

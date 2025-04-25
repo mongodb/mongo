@@ -80,6 +80,19 @@ RoutingContext::RoutingContext(OperationContext* opCtx,
     }
 }
 
+RoutingContext RoutingContext::createForTest(
+    stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap) {
+    return RoutingContext(nssMap);
+}
+RoutingContext::RoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap)
+    : _nssToCriMap([nssMap = std::move(nssMap)]() {
+          NssCriMap result;
+          for (auto&& [nss, cri] : nssMap) {
+              result.emplace(std::move(nss), std::make_pair(std::move(cri), boost::none));
+          }
+          return result;
+      }()) {}
+
 const CollectionRoutingInfo& RoutingContext::getCollectionRoutingInfo(
     const NamespaceString& nss) const {
     auto it = _nssToCriMap.find(nss);

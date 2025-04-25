@@ -222,10 +222,11 @@ void WriteOp::targetWrites(OperationContext* opCtx,
     const bool targetAllShards = [&]() {
         if (endpoints.size() > 1u && !inTransaction) {
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            auto* clusterCardinalityParam = clusterParameters->get<
+            auto* onlyTargetDataOwningShardsForMultiWritesParam = clusterParameters->get<
                 ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
                 "onlyTargetDataOwningShardsForMultiWrites");
-            return !clusterCardinalityParam->getValue(boost::none).getEnabled();
+            return !onlyTargetDataOwningShardsForMultiWritesParam->getValue(boost::none)
+                        .getEnabled();
         }
         return false;
     }();

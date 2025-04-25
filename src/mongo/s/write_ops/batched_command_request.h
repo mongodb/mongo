@@ -509,6 +509,27 @@ public:
         }
     }
 
+    const NamespaceString& getNss() const {
+        if (_batchedRequest) {
+            return _batchedRequest->getNS();
+        } else {
+            auto op = BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]);
+            return _bulkWriteRequest->getNsInfo()[op.getNsInfoIdx()].getNs();
+        }
+    }
+
+    bool isMulti() const {
+        switch (getOpType()) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return false;
+            case BatchedCommandRequest::BatchType_Update:
+                return getUpdateRef().getMulti();
+            case BatchedCommandRequest::BatchType_Delete:
+                return getDeleteRef().getMulti();
+        }
+        MONGO_UNREACHABLE;
+    }
+
     /**
      * Gets an estimate of how much space, in bytes, the referred-to write operation would add to a
      * batched write command, i.e. insert, update, or delete. This method *must* only be called if

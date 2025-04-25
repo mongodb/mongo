@@ -27,50 +27,43 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <boost/optional.hpp>
-#include <variant>
-
-#include "mongo/s/write_ops/batched_command_request.h"
-
+#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 
 namespace mongo {
 namespace unified_write_executor {
-enum WriteType {
-    kInsert = BatchedCommandRequest::BatchType_Insert,
-    kUpdate = BatchedCommandRequest::BatchType_Update,
-    kDelete = BatchedCommandRequest::BatchType_Delete,
-    kFindAndMod,  // TODO SERVER-103949 will use this type or remove it.
-};
 
-class WriteOp {
-public:
-    WriteOp(const BulkWriteCommandRequest& request, int index) : _op(&request, index) {}
-
-    int getId() const {
-        return _op.getItemIndex();
+Analysis analyze(OperationContext* opCtx, const RoutingContext& routingCtx, const WriteOp& op) {
+    auto cri = routingCtx.getCollectionRoutingInfo(op.getNss());
+    // TODO SERVER-103782 Don't use CRITargeter.
+    CollectionRoutingInfoTargeter targeter(op.getNss(), cri);
+    // TODO SERVER-103780 Add support for kNoKey.
+    // TODO SERVER-103781 Add support for kParitalKeyWithId.
+    // TODO SERVER-103146 Add kChangesOwnership.
+    std::vector<ShardEndpoint> shardsAffected = [&]() {
+        switch (op.getType()) {
+            case WriteType::kInsert: {
+                return std::vector<ShardEndpoint>{
+                    targeter.targetInsert(opCtx, op.getRef().getDocument())};
+            }
+            case WriteType::kUpdate: {
+                return targeter.targetUpdate(opCtx, op.getRef());
+            }
+            case WriteType::kDelete: {
+                return targeter.targetDelete(opCtx, op.getRef());
+            }
+            case WriteType::kFindAndMod:
+                MONGO_UNIMPLEMENTED;
+        }
+        MONGO_UNREACHABLE;
+    }();
+    tassert(10346500, "Expected write to affect at least one shard", !shardsAffected.empty());
+    if (shardsAffected.size() == 1 && !op.isMulti()) {
+        return {BatchType::kSingleShard, std::move(shardsAffected)};
+    } else {
+        return {BatchType::kMultiShard, std::move(shardsAffected)};
     }
-
-    const NamespaceString& getNss() const {
-        return _op.getNss();
-    }
-
-    WriteType getType() const {
-        return WriteType(_op.getOpType());
-    }
-
-    BatchItemRef getRef() const {
-        return _op;
-    }
-
-    bool isMulti() const {
-        return _op.isMulti();
-    }
-
-private:
-    BatchItemRef _op;
-};
+}
 
 }  // namespace unified_write_executor
 }  // namespace mongo

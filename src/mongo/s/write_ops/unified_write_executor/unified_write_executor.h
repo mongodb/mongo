@@ -30,47 +30,25 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <variant>
 
-#include "mongo/s/write_ops/batched_command_request.h"
-
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/routing_context.h"
+#include "mongo/s/write_ops/unified_write_executor/write_op.h"
 
 namespace mongo {
 namespace unified_write_executor {
-enum WriteType {
-    kInsert = BatchedCommandRequest::BatchType_Insert,
-    kUpdate = BatchedCommandRequest::BatchType_Update,
-    kDelete = BatchedCommandRequest::BatchType_Delete,
-    kFindAndMod,  // TODO SERVER-103949 will use this type or remove it.
+enum BatchType { kSingleShard, kMultiShard };
+
+struct Analysis {
+    BatchType type;
+    std::vector<ShardEndpoint> shardsAffected;
 };
 
-class WriteOp {
-public:
-    WriteOp(const BulkWriteCommandRequest& request, int index) : _op(&request, index) {}
-
-    int getId() const {
-        return _op.getItemIndex();
-    }
-
-    const NamespaceString& getNss() const {
-        return _op.getNss();
-    }
-
-    WriteType getType() const {
-        return WriteType(_op.getOpType());
-    }
-
-    BatchItemRef getRef() const {
-        return _op;
-    }
-
-    bool isMulti() const {
-        return _op.isMulti();
-    }
-
-private:
-    BatchItemRef _op;
-};
+/**
+ * Analyzes the given write op to determine which shards it would affect, and if it could be
+ * combined into a batch with other writes.
+ */
+Analysis analyze(OperationContext* opCtx, const RoutingContext& routingCtx, const WriteOp& op);
 
 }  // namespace unified_write_executor
 }  // namespace mongo

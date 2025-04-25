@@ -12,13 +12,17 @@ exports_files(
 mongo_cc_library(
     name = "unified_write_executor",
     srcs = [
+        "unified_write_executor.cpp",
         "write_op_producer.cpp",
     ],
     hdrs = [
+        "unified_write_executor.h",
         "write_op.h",
         "write_op_producer.h",
     ],
     deps = [
+        "//src/mongo/s:sharding_api",
+        "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/write_ops:batch_write_types",
     ],
 )
@@ -26,10 +30,14 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "unified_write_executor_test",
     srcs = [
+        "analyze_write_op_test.cpp",
         "write_op_producer_test.cpp",
     ],
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":unified_write_executor",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
+        "//src/mongo/s:sharding_mongos_test_fixture",
+        "//src/mongo/s:sharding_test_fixture_common",
     ],
 )

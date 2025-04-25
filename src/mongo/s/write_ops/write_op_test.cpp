@@ -234,7 +234,7 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
                                   boost::optional<CollectionIndexes>(boost::none)),
         boost::none);
     ShardEndpoint endpointC(
-        ShardId("shardB"),
+        ShardId("shardC"),
         ShardVersionFactory::make(ChunkVersion(gen, {20, 0}),
                                   boost::optional<CollectionIndexes>(boost::none)),
         boost::none);
