@@ -3895,7 +3895,8 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
     if (testCase == "success") {
         // TODO SERVER-100936 create does not return WCE
         if (clusterType == "sharded" &&
-            (shardedDDLCommandsRequiringMajorityCommit.includes(command) || command == "create")) {
+            (shardedDDLCommandsRequiringMajorityCommit.includes(command) || command == "create" ||
+             (TestData.configShard && command == "enableSharding"))) {
             jsTestLog("Skipping " + command + " test for success case.");
             return true;
         }
@@ -3926,8 +3927,7 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
             command == "createRole" || command == "createUser" || command == "dropRole" ||
             command == "dropUser" || command == "grantRolesToUser" || command == "updateRole" ||
             command == "updateUser" || command == "setDefaultRWConcern" ||
-            (command == "findOneAndUpdate") || (command == "findAndModify") ||
-            (TestData.configShard && command == "enableSharding")) {
+            (command == "findOneAndUpdate") || (command == "findAndModify")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
