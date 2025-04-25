@@ -85,6 +85,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDrainingCommandStates);
+MONGO_FAIL_POINT_DEFINE(increaseTimeoutOnKillOp);
 
 auto& numConnectionNetworkTimeouts =
     *MetricBuilder<Counter64>("operation.numConnectionNetworkTimeouts");
@@ -651,8 +652,8 @@ void NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try {
         DatabaseName::kAdmin,
         BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(*operationKey)),
         nullptr,
-        TestingProctor::instance().isEnabled() ? kCancelCommandTimeout_forTest
-                                               : kCancelCommandTimeout);
+        increaseTimeoutOnKillOp.shouldFail() ? kCancelCommandTimeout_forTest
+                                             : kCancelCommandTimeout);
     auto cbHandle = executor::TaskExecutor::CallbackHandle();
     auto killOpCmdState = std::make_shared<CommandState>(
         this, killOpRequest, cbHandle, nullptr, CancellationToken::uncancelable());
