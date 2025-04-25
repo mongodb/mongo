@@ -279,9 +279,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor = executor, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             if (_doc.getPhase() > Phase::kUnset) {
                 _performNoopRetryableWriteOnParticipants(opCtx, **executor);

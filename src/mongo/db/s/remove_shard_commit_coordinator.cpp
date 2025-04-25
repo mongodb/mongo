@@ -85,9 +85,8 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
                 return status;
             }
 
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {
                 triggerCleanup(opCtx, status);
@@ -103,9 +102,8 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_cleanupOnAbort(
     const Status& status) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, token, executor = executor, status, anchor = shared_from_this()] {
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             _resumeDDLOperations(opCtx);
         });

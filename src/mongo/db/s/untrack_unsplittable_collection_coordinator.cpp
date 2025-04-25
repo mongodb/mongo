@@ -62,9 +62,8 @@ void UntrackUnsplittableCollectionCoordinator::checkIfOptionsConflict(
 }
 
 void UntrackUnsplittableCollectionCoordinator::_checkPreconditions() {
-    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtxHolder = makeOperationContext();
     auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
     _completeOnError = true;
 
     const auto chunkManager = uassertStatusOK(

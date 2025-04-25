@@ -811,9 +811,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             // a versioned command to the participant shards to get the current indexes.
             if (_doc.getPhase() < Phase::kCheckPreconditions &&
                 _doc.getRenameCollectionRequest().getExpectedIndexes()) {
-                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
                 checkExpectedTargetIndexesMatch(
                     opCtx,
                     _request.getTo(),

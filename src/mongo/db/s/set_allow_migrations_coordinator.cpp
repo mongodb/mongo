@@ -104,9 +104,8 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
-        auto opCtxHolder = cc().makeOperationContext();
+        auto opCtxHolder = this->makeOperationContext();
         auto* opCtx = opCtxHolder.get();
-        getForwardableOpMetadata().setOn(opCtx);
 
         uassert(ErrorCodes::NamespaceNotSharded,
                 "Collection must be sharded so migrations can be blocked",

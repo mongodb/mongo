@@ -255,7 +255,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
             // Select a cluster parameter time only once, when the coordinator is run the first

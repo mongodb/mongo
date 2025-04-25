@@ -219,7 +219,7 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
                 "newPhase"_attr = RenameCollectionParticipantPhase_serializer(newDoc.getPhase()),
                 "oldPhase"_attr = RenameCollectionParticipantPhase_serializer(_doc.getPhase()));
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = makeOperationContext();
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
 
     if (_doc.getPhase() == Phase::kUnset) {
@@ -301,7 +301,7 @@ SemiFuture<void> RenameParticipantInstance::run(
             }
 
             try {
-                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 _removeStateDocument(opCtx);
             } catch (DBException& ex) {
@@ -416,7 +416,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             }
 
             // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 

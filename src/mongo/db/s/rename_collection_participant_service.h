@@ -180,11 +180,20 @@ private:
                 _enterPhase(newPhase);
             }
 
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            _doc.getForwardableOpMetadata().setOn(opCtx);
             return handlerFn(opCtx);
         };
+    }
+
+    /**
+     * Create an `OperationContext` with the `ForwardableOperationMetadata` from the participant
+     * document set on it. Use this instead of `cc().makeOperationContext()`.
+     */
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        auto opCtxHolder = cc().makeOperationContext();
+        _doc.getForwardableOpMetadata().setOn(opCtxHolder.get());
+        return opCtxHolder;
     }
 
     void _removeStateDocument(OperationContext* opCtx);

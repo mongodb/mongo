@@ -541,9 +541,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 }
             }))
         .then([this, executor = executor, dbNss, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             if (MONGO_unlikely(dropDatabaseCoordinatorPauseAfterConfigCommit.shouldFail())) {
                 dropDatabaseCoordinatorPauseAfterConfigCommit.pauseWhileSet();
@@ -568,9 +567,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 false /* throwIfReasonDiffers */);
         })
         .then([this, token, dbNss, executor = executor, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             if (_doc.getAuthoritativeMetadataAccessLevel() ==
                 AuthoritativeMetadataAccessLevelEnum::kNone) {
@@ -598,9 +596,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
             LOGV2(5494506, "Database dropped", "db"_attr = _dbName);
         })
         .then([this, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             BatchedCommandRequest request([&] {
                 write_ops::DeleteOpEntry deleteDatabaseEntryOp{

@@ -199,6 +199,16 @@ protected:
 
     ShardingDDLCoordinatorExternalState* _getExternalState();
 
+    /**
+     * Create an `OperationContext` with the `ForwardableOperationMetadata` from the coordinator
+     * document set on it. Use this instead of `cc().makeOperationContext()`.
+     */
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        auto opCtxHolder = cc().makeOperationContext();
+        getForwardableOpMetadata().setOn(opCtxHolder.get());
+        return opCtxHolder;
+    }
+
     ShardingDDLCoordinatorService* _service;
     const ShardingDDLCoordinatorId _coordId;
 
@@ -378,9 +388,8 @@ protected:
                 _enterPhase(newPhase);
             }
 
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = this->makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            this->getForwardableOpMetadata().setOn(opCtx);
             return handlerFn(opCtx);
         };
     }
@@ -405,7 +414,7 @@ protected:
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         auto opCtx = cc().getOperationContext();
         if (!opCtx) {
-            uniqueOpCtx = cc().makeOperationContext();
+            uniqueOpCtx = this->makeOperationContext();
             opCtx = uniqueOpCtx.get();
         }
 

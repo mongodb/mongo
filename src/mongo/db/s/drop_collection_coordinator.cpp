@@ -224,9 +224,8 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
 }
 
 void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
-    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtxHolder = makeOperationContext();
     auto* opCtx = opCtxHolder.get();
-    getForwardableOpMetadata().setOn(opCtx);
 
     // If the request had an expected UUID for the collection being dropped, we should verify that
     // it matches the one from the local catalog

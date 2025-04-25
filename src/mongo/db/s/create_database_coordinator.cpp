@@ -70,7 +70,7 @@ void refreshDatabaseCache(OperationContext* opCtx,
 }  // namespace
 
 void CreateDatabaseCoordinator::_checkPreconditions() {
-    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtxHolder = makeOperationContext();
     auto* opCtx = opCtxHolder.get();
     const auto& dbName = nss().dbName();
 
@@ -99,9 +99,8 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
             // Exits the critical section if the shard selected by the user is found to be draining
             // when committing the database creation.
             if (_doc.getPhase() == Phase::kCommitOnShardingCatalog) {
-                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
 
                 _exitCriticalSection(opCtx, executor, token, true /* throwIfReasonDiffers */);
             }
@@ -245,9 +244,8 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                 return status;
             }
 
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
             const auto& dbName = nss().dbName();
 
             // We may get 'ShardNotFound' in two scenarios:

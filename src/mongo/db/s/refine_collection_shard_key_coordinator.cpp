@@ -176,9 +176,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .then([this, anchor = shared_from_this()] {
             // Run local checks.
             if (_doc.getPhase() < Phase::kRemoteIndexValidation) {
-                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
 
                 // Make sure the latest placement version is recovered as of the time of the
                 // invocation of the command.
@@ -399,18 +398,16 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 logRefineCollectionShardKey(opCtx, nss(), "end", BSONObj());
             }))
         .then([this, anchor = shared_from_this(), executor] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             // Refresh all shards so cache is warmed up for queries.
             sharding_util::tellShardsToRefreshCollection(
                 opCtx, getShardsWithDataForCollection(opCtx, nss()), nss(), **executor);
         })
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             Status finalStatus =
                 status == ErrorCodes::RequestAlreadyFulfilled ? Status::OK() : status;

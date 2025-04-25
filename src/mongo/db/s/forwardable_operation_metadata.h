@@ -43,7 +43,7 @@ namespace mongo {
  *
  * example:
  * 		auto opMetadata = ForwardableOperationMetadata(opCtx);
- * 		setOn(newOpCtx);
+ * 		opMetadata.setOn(newOpCtx);
  */
 class ForwardableOperationMetadata : public ForwardableOperationMetadataBase {
 public:

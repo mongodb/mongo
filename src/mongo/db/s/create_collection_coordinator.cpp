@@ -1472,9 +1472,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
             if (_doc.getPhase() < Phase::kEnterWriteCriticalSectionOnCoordinator) {
-                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
                 _checkPreconditions(opCtx);
             }
         })
@@ -1553,9 +1552,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                [this, token, executor = executor, anchor = shared_from_this()](
                                    auto* opCtx) { _exitCriticalSection(opCtx, executor, token); }))
         .then([this, executor = executor, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             auto involvedShards = *_doc.getShardIds();
             auto addIfNotPresent = [&](const ShardId& shard) {
@@ -1608,9 +1606,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 return status;
             }
 
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             // If a shard has been removed, remove it from the list of involved shards.
             if (_doc.getShardIds() && status == ErrorCodes::ShardNotFound) {
@@ -2205,9 +2202,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
     const Status& status) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, token, executor = executor, status, anchor = shared_from_this()] {
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getNewSession(opCtx), **executor);
@@ -2253,9 +2249,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                 opCtx, true /* throwIfReasonDiffers */, _critSecReason, originalNss());
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
 
             // If a shard has been removed, remove it from the list of involved shards.
             if (_doc.getShardIds() && status == ErrorCodes::ShardNotFound) {

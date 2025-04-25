@@ -291,7 +291,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                  }))
         .onError([this, _ = shared_from_this()](const Status& status) {
             if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {
-                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 triggerCleanup(opCtx, status);
             }
@@ -306,7 +306,7 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
     const Status& status) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, token, status, executor, _ = shared_from_this()] {
-            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
                 _restoreUserWrites(opCtx, **executor);

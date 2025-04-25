@@ -98,6 +98,15 @@ protected:
 
     OperationSessionInfo _getCurrentSession() const;
 
+    /**
+     * Create an `OperationContext`. Provided for consistency with `ShardingDDLCoordinator`,
+     * which provides a similar method which also sets the `ForwardableOperationMetadata`.
+     * Prefer this to `cc().makeOperationContext()`.
+     */
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        return cc().makeOperationContext();
+    }
+
     stdx::mutex _mutex;
     SharedPromise<void> _completionPromise;
 };
@@ -204,7 +213,7 @@ protected:
                 _enterPhase(newPhase);
             }
 
-            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             return handlerFn(opCtx);
         };
@@ -224,7 +233,7 @@ protected:
                     "newPhase"_attr = serializePhase(newDoc.getPhase()),
                     "oldPhase"_attr = serializePhase(_doc.getPhase()));
 
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = makeOperationContext();
 
         if (_doc.getPhase() == Phase::kUnset) {
             PersistentTaskStore<StateDoc> store(NamespaceString::kConfigsvrCoordinatorsNamespace);
