@@ -3436,7 +3436,9 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
     ExpressionStrcasecmp(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3458,7 +3460,9 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
     ExpressionSubstrBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const override;
@@ -3480,7 +3484,9 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
     ExpressionSubstrCP(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -3548,7 +3554,9 @@ public:
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
     ExpressionStrLenCP(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
