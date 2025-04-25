@@ -443,3 +443,19 @@ buildvariants:
     tasks:
       - name: compile_and_package_serial_no_unittests_TG
       - name: package_supplementary_data
+  - name: amazon2023-arm64-streams-compile
+    display_name: "* Compile Streams Amazon Linux 2023 arm64 for sys-perf"
+    tags: ["suggested"]
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    expansions:
+      <<: *sys_perf_compile_expansions
+      compile_variant: amazon2023-arm64-streams-compile
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --release=True
+        --streams_release_build=True
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
