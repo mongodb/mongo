@@ -926,6 +926,21 @@ stacktraceEnv.Benchmark(
     # LIBDEPS=...
 )
 
+follyEnv = env.Clone()
+follyEnv.InjectThirdParty(libraries=[
+    'folly',
+])
+
+follyEnv.CppUnitTest(
+    target='token_bucket_test',
+    source=[
+        '$BUILD_DIR/third_party/folly/test/token_bucket_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.Benchmark(
     target='string_bm',
     source='string_bm.cpp',
