@@ -51,6 +51,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerShortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayer1sProxyTimeout);
 
 namespace {
 
@@ -423,15 +424,27 @@ auto CommonAsioSession::getSocket() -> GenericSocket& {
 ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
     invariant(_isIngressSession);
     invariant(reactor);
+    const Backoff kExponentialBackoff(Milliseconds(2), Milliseconds::max());
+    const Seconds proxyHeaderTimeout =
+        MONGO_unlikely(asioTransportLayer1sProxyTimeout.shouldFail()) ? Seconds(1) : Seconds(120);
+    const Date_t deadline = reactor->now() + proxyHeaderTimeout;
+
     auto buffer = std::make_shared<std::array<char, kProxyProtocolHeaderSizeUpperBound>>();
     return AsyncTry([this, buffer] {
                const auto bytesRead = peekASIOStream(
                    _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
                return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead));
            })
-        .until([](StatusWith<boost::optional<ParserResults>> sw) {
+        .until([deadline, proxyHeaderTimeout, reactor](
+                   StatusWith<boost::optional<ParserResults>> sw) {
+            uassert(10382800,
+                    fmt::format("Did not receive proxy protocol header within the time limit: {}",
+                                proxyHeaderTimeout.toString()),
+                    reactor->now() < deadline);
+
             return !sw.isOK() || sw.getValue();
         })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(reactor, CancellationToken::uncancelable())
         .then([this, buffer](const boost::optional<ParserResults>& results) mutable {
             invariant(results);
