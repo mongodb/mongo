@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/auth/restriction_environment.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -51,3 +53,13 @@ server_parameters:
         cpp_vartype: bool
         default: true
         redact: false
+
+    clientSourceAuthenticationRestrictionMode:
+        description: 'Specifies which address should be used for AuthenticationRestriction in a proxied connection. Valid options are "origin" or "peer".'
+        set_at: startup
+        cpp_varname: "clientSourceAuthenticationRestrictionMode"
+        cpp_vartype: "std::string"
+        default: "peer"
+        redact: false
+        validator:
+            callback: "validateClientSourceAuthenticationRestrictionMode"

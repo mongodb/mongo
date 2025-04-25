@@ -8,21 +8,27 @@ export class ProxyProtocolServer {
     /**
      * Create a new proxy protocol server.
      */
-    constructor(ingress_port, egress_port, version) {
+    constructor(
+        ingressPort,
+        egressPort,
+        version,
+        ingressAddress = '127.0.0.1',
+        egressAddress = '127.0.0.1',
+    ) {
         this.python = getPython3Binary();
-
         print("Using python interpreter: " + this.python);
-        this.web_server_py = "jstests/sharding/libs/proxy_protocol_server.py";
 
+        this.web_server_py = "jstests/sharding/libs/proxy_protocol_server.py";
         this.pid = undefined;
-        this.ingress_port = ingress_port;
-        this.egress_port = egress_port;
+
+        this.ingress_port = ingressPort;
+        this.egress_port = egressPort;
 
         assert(version === 1 || version === 2);
         this.version = version;
 
-        this.ingress_address = '127.0.0.1';
-        this.egress_address = '127.0.0.1';
+        this.ingress_address = ingressAddress;
+        this.egress_address = egressAddress;
     }
 
     /**
