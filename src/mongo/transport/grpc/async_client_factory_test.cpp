@@ -673,11 +673,8 @@ TEST_F(MockGRPCAsyncClientFactoryTest, FailStreamEstablishment) {
         FailPointEnableBlock fpb("grpcFailStreamEstablishment");
 
         auto cbh = executor::TaskExecutor::CallbackHandle();
-        executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
-                                               DatabaseName::kAdmin,
-                                               BSON("ping" << 1),
-                                               nullptr,
-                                               Milliseconds(100));
+        executor::RemoteCommandRequest request(
+            HostAndPort("localhost", 12345), DatabaseName::kAdmin, BSON("ping" << 1), nullptr);
         auto res = getNet().startCommand(cbh, request).get();
         ASSERT_EQ(res.status, ErrorCodes::HostUnreachable);
         ASSERT_EQ(getNet().getCounters().sent, 0);
