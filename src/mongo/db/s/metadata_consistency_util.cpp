@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
@@ -70,6 +71,7 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -1141,11 +1143,38 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
 
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog) {
-    std::vector<MetadataInconsistencyItem> inconsistencies;
-
     const auto dbName = dbInGlobalCatalog.getDbName();
     const auto dbVersionInGlobalCatalog = dbInGlobalCatalog.getVersion();
     const auto primaryShard = dbInGlobalCatalog.getPrimary();
+
+    // TODO (SERVER-98118): Unconditionally return the inconsistencies found when we check for the
+    // database metadata consistency optimistically - without serializing with the FCV.
+
+    // Happy path: Check the consistency of the database metadata without serializing with the FCV.
+    // In the most probable case, there is no concurrent FCV downgrade that could interfere with
+    // this check and potentially result in false positives.
+    //
+    // If the database metadata is checked during an FCV downgrade, the execution may begin under
+    // the assumption that shards are database-authoritative, but complete after the downgrade,
+    // when the shard is no longer database-authoritative. This leads to fewer guarantees — for
+    // example, the shard catalog may not be in sync with the global catalog.
+
+    if (checkDatabaseMetadataConsistencyInShardCatalog(
+            opCtx, dbName, dbVersionInGlobalCatalog, primaryShard)
+            .empty()) {
+        return {};
+    }
+
+    // Fallback path: Recheck database metadata consistency, this time serializing with the FCV.
+    // This ensures that there are no concurrent FCV downgrades that might incorrectly invalidate
+    // the assumption that the shard catalog is authoritative.
+
+    FixedFCVRegion fixedFcvRegion(opCtx);
+
+    if (!feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+            VersionContext::getDecoration(opCtx), fixedFcvRegion->acquireFCVSnapshot())) {
+        return {};
+    }
 
     return checkDatabaseMetadataConsistencyInShardCatalog(
         opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);
