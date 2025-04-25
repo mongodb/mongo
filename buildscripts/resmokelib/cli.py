@@ -18,6 +18,12 @@ def main(argv):
     __start_time = time.time()
     os.environ["RESMOKE_PARENT_PROCESS"] = str(os.getpid())
     os.environ["RESMOKE_PARENT_CTIME"] = str(psutil.Process().create_time())
+
+    # If invoked by "bazel run", ensure it runs in the workspace root.
+    workspace_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
+    if workspace_dir:
+        os.chdir(workspace_dir)
+
     subcommand = parser.parse_command_line(
         argv[1:],
         start_time=__start_time,

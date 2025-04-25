@@ -60,5 +60,12 @@ py_library(
             "opentelemetry-exporter-otlp-proto-common",
             group = "testing",
         ),
-    ],
+    ] + select({
+        "@platforms//cpu:s390x": [],
+        "@platforms//cpu:ppc": [],
+        "//conditions:default": [dependency(
+            "opentelemetry-exporter-otlp-proto-grpc",
+            group = "testing",
+        )],
+    }),
 )
