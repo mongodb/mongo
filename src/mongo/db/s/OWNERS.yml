@@ -53,10 +53,10 @@ filters:
       - 10gen/server-cluster-scalability
   - "*transaction*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "*txn*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "balancer_stats_registry*":
     approvers:
       - 10gen/server-catalog-and-routing

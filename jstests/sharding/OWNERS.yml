@@ -26,13 +26,13 @@ filters:
       - 10gen/server-cluster-scalability
   - "*retryable_write*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "*transaction*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "*txn*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "*_with_id_without_shard_key*":
     approvers:
       - "10gen/server-cluster-scalability"

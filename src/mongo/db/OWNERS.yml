@@ -131,7 +131,7 @@ filters:
       - 10gen/server-programmability
   - "*transaction*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "*transaction_resources.h":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -140,7 +140,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "*txn*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/server-transactions
   - "dbdirectclient*":
     approvers:
       - 10gen/server-programmability

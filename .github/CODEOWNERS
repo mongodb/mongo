@@ -118,7 +118,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/queryable_wt* @10gen/server-backup-restore @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/read_only* @10gen/server-rss-sydney @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/no_passthrough_network* @10gen/server-networking-and-observability @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/core_txns* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/cwrwc* @10gen/server-rw-concerns @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/fcv* @10gen/server-fcv @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/jstestfuzz_replication* @10gen/server-jstest-infra @svc-auto-approve-bot
@@ -128,6 +127,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/retryable_writes* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/rollback* @10gen/server-recovery @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/unified_write_executor.yml @10gen/query-execution-router @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_unified_write_executor.yml @10gen/query-execution-router @svc-auto-approve-bot
@@ -1220,9 +1220,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/proxy_protocol_connect.js @10gen/server-security @svc-auto-approve-bot
 /jstests/sharding/**/*range*deleter* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*range*deletion* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/sharding/**/*retryable_write* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/sharding/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/sharding/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/sharding/**/*retryable_write* @10gen/server-transactions @svc-auto-approve-bot
+/jstests/sharding/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
+/jstests/sharding/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /jstests/sharding/**/*_with_id_without_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/*zone* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
@@ -1414,10 +1414,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/replica_set_endpoint* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/**/repair* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/throw_hook* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/db/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/db/**/*transaction_resources.h @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/*transaction_resources.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/db/**/dbdirectclient* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/service_entry_point* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/audit* @10gen/server-security @svc-auto-approve-bot
@@ -2179,8 +2179,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_runtime_d_params* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*split*vector* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/start_chunk_clone_request* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/s/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
+/src/mongo/db/s/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/db/s/**/balancer_stats_registry* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/chunk_operation_precondition_checks* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/collection_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2470,7 +2470,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/*refine_collection_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/session_catalog_router* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/s/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/**/*transaction* @10gen/server-transactions @svc-auto-approve-bot
+/src/mongo/s/**/*txn* @10gen/server-transactions @svc-auto-approve-bot
 /src/mongo/s/**/*unshard*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/cannot_implicitly_create_collection_info.* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/catalog_cache* @10gen/server-catalog-and-routing @svc-auto-approve-bot

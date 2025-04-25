@@ -95,9 +95,6 @@ filters:
   - "no_passthrough_network*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "core_txns*":
-    approvers:
-      - 10gen/server-transactions
   - "cwrwc*":
     approvers:
       - 10gen/server-rw-concerns
@@ -125,6 +122,9 @@ filters:
   - "rollback*":
     approvers:
       - 10gen/server-recovery
+  - "*txn*":
+    approvers:
+      - 10gen/server-transactions
   - "write_concern*":
     approvers:
       - 10gen/server-rw-concerns
