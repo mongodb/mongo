@@ -176,6 +176,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeEnteringCriticalSection);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
+MONGO_FAIL_POINT_DEFINE(overrideDefaultShardingCatalogClientWriteConcernTimeout);
 
 }  // namespace
 
@@ -410,13 +411,26 @@ void MigrationSourceManager::startClone() {
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
+    auto wcOptions = [&]() {
+        auto wcOptions = ShardingCatalogClient::kMajorityWriteConcern;
+
+        overrideDefaultShardingCatalogClientWriteConcernTimeout.execute([&](const BSONObj& data) {
+            auto elem = data.getField("wTimeoutMillis");
+            auto wcTimeout = WriteConcernOptions::Timeout(
+                duration_cast<Milliseconds>(Milliseconds(elem.exactNumberLong())));
+            wcOptions = WriteConcernOptions(
+                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wcTimeout);
+        });
+        return wcOptions;
+    }();
+
     uassertStatusOK(ShardingLogging::get(_opCtx)->logChangeChecked(
         _opCtx,
         "moveChunk.start",
         nss(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
-        ShardingCatalogClient::kMajorityWriteConcern));
+        wcOptions));
 
     _cloneAndCommitTimer.reset();
 
