@@ -337,21 +337,24 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
                 return false;
             }
 
-            // If the path is dotted it is not safe to return true here because of the case where
-            // the document contains an array that doesn't contain objects at a point in the path
-            // where we want to access sub-objects (i.e. there are more elements to the path). For
-            // example:
-            // - Document: {a: []}
-            // - find({"a.b": {$ne: null}}) returns the document
-            // - find({"a.b": {$exists: true}}) does not
-            // So in this case, the {$ne: null} expression is NOT a subset of the $exists
-            // expression. It is also unsafe to return true if the path is dotted but has a numeric:
-            // - Document: {a: []}
-            // - find({"a.0": {$ne: null}}) returns the document
-            // - find({"a.0": {$exists: true}}) does not
-            // Therefore it is sufficient to just inspect the path for a dot here.
-            if (lhs->getChild(0)->path().find('.') != std::string::npos) {
-                return false;
+            if (internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue.load()) {
+                // If the path is dotted it is not safe to return true here because of the case
+                // where the document contains an array that doesn't contain objects at a point in
+                // the path where we want to access sub-objects (i.e. there are more elements to the
+                // path). For example:
+                // - Document: {a: []}
+                // - find({"a.b": {$ne: null}}) returns the document
+                // - find({"a.b": {$exists: true}}) does not
+                // So in this case, the {$ne: null} expression is NOT a subset of the $exists
+                // expression. It is also unsafe to return true if the path is dotted but has a
+                // numeric:
+                // - Document: {a: []}
+                // - find({"a.0": {$ne: null}}) returns the document
+                // - find({"a.0": {$exists: true}}) does not
+                // Therefore it is sufficient to just inspect the path for a dot here.
+                if (lhs->getChild(0)->path().find('.') != std::string::npos) {
+                    return false;
+                }
             }
 
             switch (lhs->getChild(0)->matchType()) {

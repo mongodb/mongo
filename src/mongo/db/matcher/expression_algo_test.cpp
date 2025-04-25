@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/server_parameter_test_util.h"
 #include <algorithm>
 #include <cstddef>
 #include <initializer_list>
@@ -698,6 +699,8 @@ TEST(ExpressionAlgoIsSubsetOf, NinAndExists) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_Nin_Dotted_Path) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue", true);
     ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
     ParsedMatchExpressionForTest aBNin("{'a.b': {$nin: [1, 2, 3]}}");
     ParsedMatchExpressionForTest aBNinWithNull("{'a.b': {$nin: [1, null, 3]}}");
@@ -707,6 +710,19 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_Nin_Dotted_Path) {
     // This behavior is inconsistent with how top-level fields work. The behavior is similar to the
     // one described in SERVER-36681.
     ASSERT_FALSE(expression::isSubsetOf(aBNinWithNull.get(), aBExists.get()));
+}
+
+TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_Nin_Dotted_Path_Knob_Disabled) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue", false);
+    ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
+    ParsedMatchExpressionForTest aBNin("{'a.b': {$nin: [1, 2, 3]}}");
+    ParsedMatchExpressionForTest aBNinWithNull("{'a.b': {$nin: [1, null, 3]}}");
+
+    ASSERT_FALSE(expression::isSubsetOf(aBNin.get(), aBExists.get()));
+
+    // This behavior was changed in SERVER-36635 and is True only when the above knob is disabled.
+    ASSERT_TRUE(expression::isSubsetOf(aBNinWithNull.get(), aBExists.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
@@ -721,6 +737,8 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Path) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue", true);
     ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
     ParsedMatchExpressionForTest aBNotEqual1("{'a.b': {$ne: 1}}");
     ParsedMatchExpressionForTest aBNotEqualNull("{'a.b': {$ne: null}}");
@@ -731,7 +749,22 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Path) {
     ASSERT_FALSE(expression::isSubsetOf(aBNotEqualNull.get(), aBExists.get()));
 }
 
+TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Path_Knob_Disabled) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue", false);
+    ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
+    ParsedMatchExpressionForTest aBNotEqual1("{'a.b': {$ne: 1}}");
+    ParsedMatchExpressionForTest aBNotEqualNull("{'a.b': {$ne: null}}");
+
+    ASSERT_FALSE(expression::isSubsetOf(aBNotEqual1.get(), aBExists.get()));
+
+    // This behavior was changed in SERVER-36635 and is True only when the above knob is disabled.
+    ASSERT_TRUE(expression::isSubsetOf(aBNotEqualNull.get(), aBExists.get()));
+}
+
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Numeric) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue", true);
     ParsedMatchExpressionForTest a0Exists("{'a.0': {$exists: true}}");
     ParsedMatchExpressionForTest a0NotEqual1("{'a.0': {$ne: 1}}");
     ParsedMatchExpressionForTest a0NotEqualNull("{'a.0': {$ne: null}}");
@@ -740,6 +773,19 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Numeric) {
 
     // This behavior is inconsistent with how top-level fields work. See SERVER-36681.
     ASSERT_FALSE(expression::isSubsetOf(a0NotEqualNull.get(), a0Exists.get()));
+}
+
+TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Numeric_Knob_Disabled) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue", false);
+    ParsedMatchExpressionForTest a0Exists("{'a.0': {$exists: true}}");
+    ParsedMatchExpressionForTest a0NotEqual1("{'a.0': {$ne: 1}}");
+    ParsedMatchExpressionForTest a0NotEqualNull("{'a.0': {$ne: null}}");
+
+    ASSERT_FALSE(expression::isSubsetOf(a0NotEqual1.get(), a0Exists.get()));
+
+    // This behavior was changed in SERVER-36635 and is True only when the above knob is disabled.
+    ASSERT_TRUE(expression::isSubsetOf(a0NotEqualNull.get(), a0Exists.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_EQ) {

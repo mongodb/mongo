@@ -16,6 +16,10 @@ import {isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 
+const getDisableDottedPathIsSubsetOfExistsTrue =
+    db.adminCommand({getParameter: 1, internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue: 1})
+        .internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue;
+
 /**
  * Tests the behavior of a query on a document both:
  * 1) Without any secondary indexes.
@@ -120,6 +124,10 @@ function testPartialFilterExpression(
 // presence of an index. We expect the query with the dotted path to not utilize the given index.
 // See SERVER-36635 for more context on this behavior.
 (function testABNeNull() {
+    // Skip tests if query knob is disabled.
+    if (!getDisableDottedPathIsSubsetOfExistsTrue) {
+        return;
+    }
     const query = {"a.b": {$ne: null}};
     const indexSpec = {"a.b": 1};
     const pfe = {partialFilterExpression: {"a.b": {$exists: true}}};
@@ -205,6 +213,10 @@ function testPartialFilterExpression(
 // We expect the query with the dotted path to not utilize the given index. See SERVER-36635 for
 // more context on this behavior.
 (function testABNinNull() {
+    // Skip tests if query knob is disabled.
+    if (!getDisableDottedPathIsSubsetOfExistsTrue) {
+        return;
+    }
     // $nin array must be at least 2 elements to prevent it from being parsed as $ne
     const query = {"a.b": {$nin: [null, 100]}};
     const indexSpec = {"a.b": 1};
