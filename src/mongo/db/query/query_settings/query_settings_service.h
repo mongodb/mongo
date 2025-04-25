@@ -70,6 +70,126 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
                                                  const QueryInstance& queryInstance,
                                                  const boost::optional<TenantId>& tenantId);
 
+class QuerySettingsService {
+public:
+    /**
+     * Gets the instance of the class using the service context.
+     */
+    static QuerySettingsService& get(ServiceContext* serviceContext);
+
+    /**
+     * Gets the instance of the class using the operation context.
+     */
+    static QuerySettingsService& get(OperationContext* opCtx);
+
+    /**
+     * Returns the name of the cluster parameter that stores QuerySettings for all QueryShapes.
+     */
+    static std::string getQuerySettingsClusterParameterName();
+
+    /**
+     * Returns a set of system and administrative aggregation pipeline stages that, if used as the
+     * initial stage, prevent the query from being rejected via query settings.
+     *
+     * Query settings module is responsible for maintaining the information about what aggregation
+     * stages can be rejected.
+     */
+    static const stdx::unordered_set<StringData, StringMapHasher>& getRejectionIncompatibleStages();
+
+    virtual ~QuerySettingsService() = default;
+
+    /**
+     * Returns the appropriate QuerySettings:
+     *
+     * - On router and shard in replica set deployment performs QuerySettings lookup for a specified
+     * 'queryShape'. If no settings are found or if the 'queryShape' is ineligible (e.g., IDHACK
+     * queries), returns empty QuerySettings. If the QuerySettings include 'reject: true' and is not
+     * run in explain, a uassert is thrown with the QueryRejectedBySettings error code, rejecting
+     * the query. Additionally, records the QueryShapeHash within the CurOp
+     *
+     * - On shard in sharded cluster returns 'querySettingsFromOriginalCommand'. This corresponds to
+     * the QuerySettings looked up on the router and passed to shards as part of the command.
+     * Rejection check is not performed here, as queries with 'reject: true' in their QuerySettings
+     * would already have been rejected by the router.
+     */
+    virtual QuerySettings lookupQuerySettingsWithRejectionCheck(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const query_shape::DeferredQueryShape& queryShape,
+        const NamespaceString& nss,
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
+            boost::none) const = 0;
+
+    /**
+     * Returns all the query shape configurations and the timestamp of the last modification.
+     */
+    virtual QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
+        const boost::optional<TenantId>& tenantId) const = 0;
+
+    /**
+     * Sets all the query shape configurations with the given timestamp.
+     */
+    virtual void setAllQueryShapeConfigurations(
+        QueryShapeConfigurationsWithTimestamp&& queryShapeConfigurations,
+        const boost::optional<TenantId>& tenantId) = 0;
+
+    /**
+     * Removes all query shape configurations.
+     */
+    virtual void removeAllQueryShapeConfigurations(const boost::optional<TenantId>& tenantId) = 0;
+
+    /**
+     * Returns the LogicalTime of the 'querySettings' cluster parameter.
+     */
+    virtual LogicalTime getClusterParameterTime(
+        const boost::optional<TenantId>& tenantId) const = 0;
+
+    /**
+     * Refreshes the local copy of all QueryShapeConfiguration by fetching the latest version from
+     * the configsvr. Is a no-op when called on shard.
+     */
+    virtual void refreshQueryShapeConfigurations(OperationContext* opCtx) = 0;
+
+    /**
+     * Validates that 'querySettings' do not have:
+     * - empty settings or settings with default values
+     * - index hints specified without namespace information
+     * - index hints specified for the same namespace more than once
+     *
+     * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
+     */
+    void validateQuerySettings(const QuerySettings& querySettings) const;
+
+    /**
+     * Validates that QuerySettings can be applied to the query represented by 'queryInfo'.
+     * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
+     */
+    void validateQueryCompatibleWithAnyQuerySettings(
+        const RepresentativeQueryInfo& queryInfo) const;
+
+    /**
+     * Validates that 'querySettings' can be applied to the query represented by 'queryInfo'.
+     * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
+     */
+    void validateQueryCompatibleWithQuerySettings(const RepresentativeQueryInfo& queryInfo,
+                                                  const QuerySettings& querySettings) const;
+
+    /**
+     * Simplifies 'querySettings' in-place by:
+     * - resetting the 'reject' field to boost::none if it contains a false value
+     * - removing index hints that specify empty 'allowedIndexes', potentially resetting
+     * 'indexHints' to boost::none if all 'allowedIndexes' are empty.
+     */
+    void simplifyQuerySettings(QuerySettings& querySettings) const;
+
+    /**
+     * Sanitizes the 'queryShapeConfigurations' removing those hints that contain invalid index key
+     * pattern. In case the underlying query settings object contains only the default settings, the
+     * corresponding QueryShapeConfiguration is removed.
+     */
+    void sanitizeQuerySettingsHints(
+        std::vector<QueryShapeConfiguration>& queryShapeConfigurations) const;
+};
+
 void initializeForRouter(ServiceContext* serviceContext);
 void initializeForShard(ServiceContext* serviceContext);
 void initializeForTest(ServiceContext* serviceContext);
@@ -113,14 +233,6 @@ QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId);
 
 /**
- * Sets all the query shape configurations with the given timestamp.
- */
-void setAllQueryShapeConfigurations(
-    OperationContext* opCtx,
-    QueryShapeConfigurationsWithTimestamp&& queryShapeConfigurations,
-    const boost::optional<TenantId>& tenantId);
-
-/**
  * Refreshes the local copy of all QueryShapeConfiguration by fetching the latest version from the
  * configsvr. Is a no-op when called on shard.
  */
@@ -130,15 +242,6 @@ void refreshQueryShapeConfigurations(OperationContext* opCtx);
  * Returns the name of the cluster parameter that stores QuerySettings for all QueryShapes.
  */
 std::string getQuerySettingsClusterParameterName();
-
-/**
- * Returns a set of system and administrative aggregation pipeline stages that, if used as the
- * initial stage, prevent the query from being rejected via query settings.
- *
- * Query settings module is responsible for maintaining the information about what aggregation
- * stages can be rejected.
- */
-const stdx::unordered_set<StringData, StringMapHasher>& getRejectionIncompatibleStages();
 
 /**
  * Returns true if the aggregation pipeline 'pipeline' does not start with rejection incompatible
@@ -156,42 +259,4 @@ bool allowQuerySettingsFromClient(Client* client);
  * Returns true if given QuerySettings instance contains only default values.
  */
 bool isDefault(const QuerySettings& querySettings);
-
-/**
- * Validates that 'querySettings' do not have:
- * - empty settings or settings with default values
- * - index hints specified without namespace information
- * - index hints specified for the same namespace more than once
- *
- * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
- */
-void validateQuerySettings(const QuerySettings& querySettings);
-
-/**
- * Validates that QuerySettings can be applied to the query represented by 'queryInfo'.
- * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
- */
-void validateQueryCompatibleWithAnyQuerySettings(const RepresentativeQueryInfo& queryInfo);
-
-/**
- * Validates that 'querySettings' can be applied to the query represented by 'queryInfo'.
- * Throws a uassert if compatibility checks fail, indicating that 'querySettings' cannot be set.
- */
-void validateQueryCompatibleWithQuerySettings(const RepresentativeQueryInfo& queryInfo,
-                                              const QuerySettings& querySettings);
-
-/**
- * Simplifies 'querySettings' in-place by:
- * - resetting the 'reject' field to boost::none if it contains a false value
- * - removing index hints that specify empty 'allowedIndexes', potentially resetting 'indexHints'
- * to boost::none if all 'allowedIndexes' are empty.
- */
-void simplifyQuerySettings(QuerySettings& querySettings);
-
-/**
- * Sanitizes the 'queryShapeConfigurations' removing those hints that contain invalid index key
- * pattern. In case the underlying query settings object contains only the default settings, the
- * corresponding QueryShapeConfiguration is removed.
- */
-void sanitizeQuerySettingsHints(std::vector<QueryShapeConfiguration>& queryShapeConfigurations);
 }  // namespace mongo::query_settings

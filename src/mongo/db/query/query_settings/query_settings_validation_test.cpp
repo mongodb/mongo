@@ -46,6 +46,11 @@ protected:
         ShardingState::create(getServiceContext());
         expCtx = make_intrusive<ExpressionContextForTest>();
         gAggregateOperationResourceConsumptionMetrics = true;
+        query_settings::initializeForTest(getServiceContext());
+    }
+
+    QuerySettingsService& service() {
+        return QuerySettingsService::get(getServiceContext());
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -59,7 +64,8 @@ void assertInvalidQueryWithAnyQuerySettings(OperationContext* opCtx,
                                             size_t errorCode) {
     auto representativeQueryInfo =
         createRepresentativeInfo(opCtx, representativeQuery, boost::none);
-    ASSERT_THROWS_CODE(validateQueryCompatibleWithAnyQuerySettings(representativeQueryInfo),
+    ASSERT_THROWS_CODE(QuerySettingsService::get(opCtx).validateQueryCompatibleWithAnyQuerySettings(
+                           representativeQueryInfo),
                        DBException,
                        errorCode);
 }
@@ -70,10 +76,10 @@ void assertInvalidQueryAndQuerySettingsCombination(OperationContext* opCtx,
                                                    size_t errorCode) {
     auto representativeQueryInfo =
         createRepresentativeInfo(opCtx, representativeQuery, boost::none);
-    ASSERT_THROWS_CODE(
-        validateQueryCompatibleWithQuerySettings(representativeQueryInfo, querySettings),
-        DBException,
-        errorCode);
+    ASSERT_THROWS_CODE(QuerySettingsService::get(opCtx).validateQueryCompatibleWithQuerySettings(
+                           representativeQueryInfo, querySettings),
+                       DBException,
+                       errorCode);
 }
 
 NamespaceSpec makeNamespace(StringData dbName, StringData collName) {
@@ -137,7 +143,7 @@ TEST_F(QuerySettingsValidationTestFixture,
             "$operationMetrics"_sd,
         };
 
-    for (auto&& stage : getRejectionIncompatibleStages()) {
+    for (auto&& stage : QuerySettingsService::getRejectionIncompatibleStages()) {
         // Avoid testing these stages, as they require more complex setup.
         if (stage == "$listLocalSessions" || stage == "$listSessions" ||
             stage == "$listSampledQueries") {
@@ -186,21 +192,21 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndicesCannotReferToSame
     auto indexSpecA = IndexHintSpec(ns, {IndexHint("sku")});
     auto indexSpecB = IndexHintSpec(ns, {IndexHint("uks")});
     querySettings.setIndexHints({{indexSpecA, indexSpecB}});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 7746608);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746608);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotBeEmpty) {
     QuerySettings querySettings;
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 7746604);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746604);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotHaveDefaultValues) {
     QuerySettings querySettings;
     querySettings.setReject(false);
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 7746604);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746604);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoDbSpecified) {
@@ -208,8 +214,8 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoDbSpecif
     NamespaceSpec ns;
     ns.setColl("collName"_sd);
     querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 8727500);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 8727500);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoCollSpecified) {
@@ -218,17 +224,17 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithNoCollSpec
     ns.setDb(DatabaseNameUtil::deserialize(
         boost::none /* tenantId */, "dbName"_sd, SerializationContext::stateDefault()));
     querySettings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a")})}});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 8727501);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 8727501);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithEmptyAllowedIndexes) {
     QuerySettings querySettings;
     auto ns = makeNamespace("testDB", "testColl");
     querySettings.setIndexHints({{IndexHintSpec(ns, {})}});
-    simplifyQuerySettings(querySettings);
+    service().simplifyQuerySettings(querySettings);
     ASSERT_EQUALS(querySettings.getIndexHints(), boost::none);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 7746604);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746604);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithAllEmptyAllowedIndexes) {
@@ -238,9 +244,9 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithAllEmptyAl
         IndexHintSpec(makeNamespace("testDB", "testColl2"), {}),
         IndexHintSpec(makeNamespace("testDB", "testColl3"), {}),
     }});
-    simplifyQuerySettings(querySettings);
+    service().simplifyQuerySettings(querySettings);
     ASSERT_EQUALS(querySettings.getIndexHints(), boost::none);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 7746604);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 7746604);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithSomeEmptyAllowedIndexes) {
@@ -251,7 +257,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithSomeEmptyA
     }});
     const auto expectedIndexHintSpec =
         IndexHintSpec(makeNamespace("testDB", "testColl2"), {IndexHint("a")});
-    simplifyQuerySettings(querySettings);
+    service().simplifyQuerySettings(querySettings);
     const auto simplifiedIndexHints = querySettings.getIndexHints();
 
     ASSERT_NE(simplifiedIndexHints, boost::none);
@@ -259,7 +265,7 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithSomeEmptyA
     ASSERT_EQ(indexHintsList.size(), 1);
     const auto& actualIndexHintSpec = indexHintsList[0];
     ASSERT_BSONOBJ_EQ(expectedIndexHintSpec.toBSON(), actualIndexHintSpec.toBSON());
-    ASSERT_DOES_NOT_THROW(validateQuerySettings(querySettings));
+    ASSERT_DOES_NOT_THROW(service().validateQuerySettings(querySettings));
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithEmptyKeyPattern) {
@@ -267,8 +273,8 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithEmptyKeyPa
     querySettings.setIndexHints({{
         IndexHintSpec(makeNamespace("testDB", "testColl"), {IndexHint(BSONObj{})}),
     }});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 9646000);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 9646000);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidKeyPattern) {
@@ -278,8 +284,8 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidKey
                       {IndexHint(BSON("a" << 1 << "b"
                                           << "some-string"))}),
     }});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 9646001);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 9646001);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidNaturalHint) {
@@ -288,8 +294,8 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidNat
         IndexHintSpec(makeNamespace("testDB", "testColl"),
                       {IndexHint(BSON("$natural" << 1 << "b" << 2))}),
     }});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 9646001);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 9646001);
 }
 
 TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidNaturalHintInverse) {
@@ -298,8 +304,8 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidNat
         IndexHintSpec(makeNamespace("testDB", "testColl"),
                       {IndexHint(BSON("b" << 2 << "$natural" << 1))}),
     }});
-    simplifyQuerySettings(querySettings);
-    ASSERT_THROWS_CODE(validateQuerySettings(querySettings), DBException, 9646001);
+    service().simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(service().validateQuerySettings(querySettings), DBException, 9646001);
 }
 
 }  // namespace

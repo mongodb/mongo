@@ -213,17 +213,19 @@ void validateAndSimplifyQuerySettings(
     const boost::optional<const RepresentativeQueryInfo&>& representativeQueryInfo,
     const boost::optional<QueryInstance>& previousRepresentativeQuery,
     QuerySettings& querySettings) {
+    auto& service = QuerySettingsService::get(opCtx);
+
     // In case the representative query was not provided but the previous representative query is
     // available, assert that query settings will be set on a valid query.
     if (!representativeQueryInfo && previousRepresentativeQuery) {
-        validateQueryCompatibleWithAnyQuerySettings(
+        service.validateQueryCompatibleWithAnyQuerySettings(
             createRepresentativeInfo(opCtx, *previousRepresentativeQuery, tenantId));
     }
     if (representativeQueryInfo) {
-        validateQueryCompatibleWithQuerySettings(*representativeQueryInfo, querySettings);
+        service.validateQueryCompatibleWithQuerySettings(*representativeQueryInfo, querySettings);
     }
-    simplifyQuerySettings(querySettings);
-    validateQuerySettings(querySettings);
+    service.simplifyQuerySettings(querySettings);
+    service.validateQuerySettings(querySettings);
 }
 
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
@@ -312,7 +314,8 @@ public:
 
             // Assert that query settings will be set on a valid query.
             if (representativeQuery) {
-                validateQueryCompatibleWithAnyQuerySettings(*representativeQueryInfo);
+                QuerySettingsService::get(opCtx).validateQueryCompatibleWithAnyQuerySettings(
+                    *representativeQueryInfo);
             }
 
             SetQuerySettingsCommandReply reply;
