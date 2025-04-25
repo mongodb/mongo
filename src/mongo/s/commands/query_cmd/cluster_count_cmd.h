@@ -262,7 +262,6 @@ public:
 
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 expCtx,
-                dbName,
                 nss,
                 cri,
                 applyReadWriteConcern(
@@ -430,7 +429,6 @@ public:
         try {
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.dbName(),
                                                            nss,
                                                            cri,
                                                            explainCmd,

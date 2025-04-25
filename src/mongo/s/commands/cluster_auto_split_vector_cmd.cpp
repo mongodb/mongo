@@ -79,8 +79,7 @@ public:
             // constraint is not respected we will get a InvalidOptions as part of the response.
             auto response =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.dbName(),
-                                                           ns(),
+                                                           nss,
                                                            cri,
                                                            filteredCmdObj,
                                                            ReadPreferenceSetting::get(opCtx),

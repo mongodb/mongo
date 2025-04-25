@@ -1174,6 +1174,7 @@ void createCollectionOnShards(OperationContext* opCtx,
     if (!requests.empty()) {
         auto responses = gatherResponses(opCtx,
                                          nss.dbName(),
+                                         nss,
                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                          Shard::RetryPolicy::kIdempotent,
                                          requests);

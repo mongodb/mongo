@@ -499,7 +499,6 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
             auto cmdObj = cmdBuilder.obj();
             auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                ns.dbName(),
                 ns,
                 cri,
                 cmdObj,

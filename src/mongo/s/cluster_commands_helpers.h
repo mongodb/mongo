@@ -153,6 +153,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,
+    const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests);
@@ -163,7 +164,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
  */
 std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
-    StringData dbName,
+    const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests);
@@ -307,7 +308,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
  */
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
@@ -325,7 +325,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
  */
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
@@ -346,7 +345,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardsToSkip,

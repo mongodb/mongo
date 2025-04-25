@@ -367,6 +367,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
     OperationContext* opCtx,
     const DatabaseName& dbName,
+    const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests,
@@ -439,21 +440,32 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,
+    const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests) {
-    return gatherResponsesImpl(
-        opCtx, dbName, readPref, retryPolicy, requests, true /* throwOnStaleShardVersionErrors */);
+    return gatherResponsesImpl(opCtx,
+                               dbName,
+                               nss,
+                               readPref,
+                               retryPolicy,
+                               requests,
+                               true /* throwOnStaleShardVersionErrors */);
 }
 
 std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
+    const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests) {
-    return gatherResponsesImpl(
-        opCtx, dbName, readPref, retryPolicy, requests, false /* throwOnStaleShardVersionErrors */);
+    return gatherResponsesImpl(opCtx,
+                               nss.dbName(),
+                               nss,
+                               readPref,
+                               retryPolicy,
+                               requests,
+                               false /* throwOnStaleShardVersionErrors */);
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
@@ -571,7 +583,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
         requests.emplace_back(std::move(shardId), cmdObj);
     }
 
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+    return gatherResponses(opCtx, dbName, NamespaceString(dbName), readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigServerAndShards(
@@ -589,12 +601,11 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
     for (auto&& shardId : shardIds)
         requests.emplace_back(std::move(shardId), cmdObj);
 
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+    return gatherResponses(opCtx, dbName, NamespaceString(dbName), readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
@@ -612,21 +623,12 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                                                boost::none /*explainVerbosity*/,
                                                                letParameters,
                                                                runtimeConstants);
-    return scatterGatherVersionedTargetByRoutingTable(expCtx,
-                                                      dbName,
-                                                      nss,
-                                                      cri,
-                                                      cmdObj,
-                                                      readPref,
-                                                      retryPolicy,
-                                                      query,
-                                                      collation,
-                                                      eligibleForSampling);
+    return scatterGatherVersionedTargetByRoutingTable(
+        expCtx, nss, cri, cmdObj, readPref, retryPolicy, query, collation, eligibleForSampling);
 }
 
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
@@ -637,13 +639,13 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     bool eligibleForSampling) {
     const auto requests = buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
-    return gatherResponses(expCtx->getOperationContext(), dbName, readPref, retryPolicy, requests);
+    return gatherResponses(
+        expCtx->getOperationContext(), nss.dbName(), nss, readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardsToSkip,
@@ -665,7 +667,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
         expCtx, nss, cri, shardsToSkip, cmdObj, query, collation);
 
     return gatherResponsesNoThrowOnStaleShardVersionErrors(
-        opCtx, dbName, readPref, retryPolicy, requests);
+        opCtx, nss, readPref, retryPolicy, requests);
 }
 
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
@@ -681,6 +683,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingD
     auto responses =
         gatherResponses(opCtx,
                         dbName,
+                        NamespaceString(dbName),
                         readPref,
                         retryPolicy,
                         std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
@@ -710,6 +713,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     auto responses = gatherResponses(
         opCtx,
         nss.dbName(),
+        nss,
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(

@@ -1056,6 +1056,7 @@ void TransactionRouter::Router::_clearPendingParticipants(OperationContext* opCt
         }
         auto responses = gatherResponses(opCtx,
                                          DatabaseName::kAdmin,
+                                         NamespaceString(DatabaseName::kAdmin),
                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                          Shard::RetryPolicy::kIdempotent,
                                          abortRequests);
@@ -1738,6 +1739,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 
     const auto responses = gatherResponses(opCtx,
                                            DatabaseName::kAdmin,
+                                           NamespaceString(DatabaseName::kAdmin),
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                            Shard::RetryPolicy::kIdempotent,
                                            abortRequests);
@@ -1841,6 +1843,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
         // Ignore the responses.
         gatherResponses(opCtx,
                         DatabaseName::kAdmin,
+                        NamespaceString(DatabaseName::kAdmin),
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                         Shard::RetryPolicy::kIdempotent,
                         abortRequests);

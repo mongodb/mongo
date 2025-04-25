@@ -137,7 +137,6 @@ public:
         }();
         auto response =
             scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                       nss.dbName(),
                                                        nss,
                                                        cri,
                                                        filteredCmdObj,

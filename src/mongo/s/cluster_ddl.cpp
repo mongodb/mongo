@@ -89,6 +89,7 @@ std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
 // TODO (SERVER-100309): remove once 9.0 becomes last LTS.
 AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* opCtx,
                                                               const DatabaseName& dbName,
+                                                              const NamespaceString& nss,
                                                               const CachedDatabaseInfo& dbInfo,
                                                               const BSONObj& cmdObj,
                                                               const ReadPreferenceSetting& readPref,
@@ -101,6 +102,7 @@ AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* 
     auto responses =
         gatherResponses(opCtx,
                         dbName,
+                        nss,
                         readPref,
                         retryPolicy,
                         buildUnshardedRequestsForAllShards(
@@ -266,6 +268,7 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
             return executeCommandAgainstFirstShard(
                 opCtx,
                 nss.dbName(),
+                nss,
                 dbInfo,
                 cmdObjWithWc,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),

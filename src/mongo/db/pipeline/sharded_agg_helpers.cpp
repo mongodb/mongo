@@ -1118,6 +1118,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     if (explain) {
         shardResults = gatherResponses(opCtx,
                                        expCtx->getNamespaceString().dbName(),
+                                       expCtx->getNamespaceString(),
                                        readPref,
                                        Shard::RetryPolicy::kIdempotent,
                                        requests);

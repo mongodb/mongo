@@ -292,7 +292,6 @@ public:
 
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    _cmdRequest->getNamespaceOrUUID().nss().dbName(),
                     _cmdRequest->getNamespaceOrUUID().nss(),
                     cri,
                     explainCmd,

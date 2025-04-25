@@ -217,7 +217,6 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             auto shardResponses =
                 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                     opCtx,
-                    resolvedNs.dbName(),
                     resolvedNs,
                     cri,
                     retryState.shardsWithSuccessResponses,

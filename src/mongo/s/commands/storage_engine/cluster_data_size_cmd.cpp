@@ -104,7 +104,6 @@ public:
             setReadWriteConcern(opCtx, cmd, this);
             auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss.dbName(),
                 nss,
                 cri,
                 CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),

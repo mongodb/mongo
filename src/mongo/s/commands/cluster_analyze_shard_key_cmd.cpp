@@ -152,6 +152,7 @@ public:
                 try {
                     auto response = gatherResponses(opCtx,
                                                     DatabaseName::kAdmin,
+                                                    nss,
                                                     std::move(readPref),
                                                     Shard::RetryPolicy::kIdempotent,
                                                     requests)

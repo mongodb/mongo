@@ -311,7 +311,6 @@ public:
             try {
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    nss.dbName(),
                     nss,
                     cri,
                     ClusterExplain::wrapAsExplain(
@@ -408,7 +407,6 @@ public:
             try {
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    nss.dbName(),
                     nss,
                     cri,
                     applyReadWriteConcern(opCtx, this, distinctReadyForPassthrough),
