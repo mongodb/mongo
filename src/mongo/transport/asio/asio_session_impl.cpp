@@ -32,7 +32,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -514,12 +513,6 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                 _proxiedSrcRemoteAddr = results->endpoints->sourceAddress;
                 _proxiedSrcEndpoint =
                     HostAndPort(_proxiedSrcRemoteAddr->getAddr(), _proxiedSrcRemoteAddr->getPort());
-
-                // Update _restrictionEnvironment if it should be tracking the origin address.
-                if (clientSourceAuthenticationRestrictionMode == "origin") {
-                    _restrictionEnvironment =
-                        RestrictionEnvironment(_proxiedSrcRemoteAddr.value(), _localAddr);
-                }
 
                 const auto& dstEndpointAddr = results->endpoints->destinationAddress;
                 _proxiedDstEndpoint =
