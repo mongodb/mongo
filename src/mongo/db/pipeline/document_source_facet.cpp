@@ -205,8 +205,8 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
         allPipelinesEOF = true;  // Set this to false if any pipeline isn't EOF.
         for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
             const auto& pipeline = _facets[facetId].pipeline;
-            auto next = pipeline->getSources().back()->getNext();
-            for (; next.isAdvanced(); next = pipeline->getSources().back()->getNext()) {
+            auto next = pipeline->getNextResult();
+            for (; next.isAdvanced(); next = pipeline->getNextResult()) {
                 ensureUnderMemoryLimit(next.getDocument().getApproximateSize());
                 results[facetId].emplace_back(next.releaseDocument());
             }

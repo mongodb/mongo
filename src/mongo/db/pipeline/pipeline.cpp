@@ -675,6 +675,11 @@ boost::optional<Document> Pipeline::getNext() {
     return boost::none;
 }
 
+exec::agg::GetNextResult Pipeline::getNextResult() {
+    tassert(10394800, "cannon execute an empty aggregation pipeline", _sources.size());
+    return _sources.back()->getNext();
+}
+
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
     std::vector<Value> array;
     for (auto&& stage : _sources) {
