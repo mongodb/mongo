@@ -355,6 +355,12 @@ common:windows --//bazel/config:linkstatic=True
 # The only Windows compiler we support is MSVC.
 common:windows --//bazel/config:compiler_type=msvc
 
+# Data dependencies don't work in bazel run or bazel test on windows without this
+startup --windows_enable_symlinks
+common:windows --enable_runfiles
+build:windows --action_env=MSYS=winsymlinks:nativestrict
+test:windows --action_env=MSYS=winsymlinks:nativestrict
+
 # Always use clang on macos
 common:macos --//bazel/config:compiler_type=clang
 

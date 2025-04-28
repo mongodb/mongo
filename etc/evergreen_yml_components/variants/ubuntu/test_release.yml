@@ -38,6 +38,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2204-large
+      - name: run_unit_tests_TG
+        distros:
+          - ubuntu2204-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -93,6 +96,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2404-large
+      - name: run_unit_tests_TG
+        distros:
+          - ubuntu2204-large
       - name: test_packages
         distros:
           - ubuntu2404-large
@@ -147,6 +153,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2004-large
+      - name: run_unit_tests_TG
+        distros:
+          - ubuntu2004-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -193,6 +202,10 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2004-large
+      # TODO(DEVPROD-17028): Re-enable when this distro has 750gb of space like the other larges
+      #- name: run_unit_tests_TG
+      #  distros:
+      #    - ubuntu2004-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -252,7 +265,7 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2204-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - ubuntu2204-large
       - name: test_packages
@@ -345,6 +358,10 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2004-arm64-large
+      # TODO(DEVPROD-17028): Re-enable when this distro has 750gb of space like the other larges
+      #- name: run_unit_tests_TG
+      #  distros:
+      #    - ubuntu2004-arm64-large
       - name: test_packages
         distros:
           - ubuntu2204-arm64-small
@@ -391,6 +408,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2004-arm64-large
+      - name: run_unit_tests_TG
+        distros:
+          - ubuntu2004-arm64-large
       - name: test_packages
         distros:
           - ubuntu2204-arm64-small
@@ -434,7 +454,7 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2204-arm64-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - ubuntu2204-arm64-large
       - name: test_packages
@@ -483,6 +503,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2204-arm64-large
+      - name: run_unit_tests_TG
+        distros:
+          - ubuntu2204-arm64-large
       - name: test_packages
         distros:
           - ubuntu2204-arm64-large
@@ -528,6 +551,10 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2404-large
+      # TODO(DEVPROD-17028): Re-enable when this distro has 750gb of space like the other larges
+      #- name: run_unit_tests_TG
+      #  distros:
+      #    - ubuntu2404-large
       - name: test_packages
         distros:
           - ubuntu2404-large
@@ -577,6 +604,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2404-arm64-large
+      - name: run_unit_tests_TG
+        distros:
+          - ubuntu2404-arm64-large
       - name: test_packages
         distros:
           - ubuntu2404-arm64-large
@@ -618,6 +648,10 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - ubuntu2404-arm64-large
+      # TODO(DEVPROD-17028): Re-enable when this distro has 750gb of space like the other larges
+      #- name: run_unit_tests_TG
+      #  distros:
+      #    - ubuntu2404-arm64-large
       - name: test_packages
         distros:
           - ubuntu2404-arm64-large

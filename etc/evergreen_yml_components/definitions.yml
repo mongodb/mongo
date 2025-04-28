@@ -1423,6 +1423,19 @@ functions:
       args:
         - "src/evergreen/bazel_compile.sh"
 
+  "bazel test sh": &bazel_test_sh
+    command: subprocess.exec
+    display_name: "bazel test sh"
+    type: test
+    params:
+      binary: bash
+      env:
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
+        author_email: ${author_email}
+      add_expansions_to_env: true
+      args:
+        - "src/evergreen/bazel_test.sh"
+
   "bazel compile (gcc)":
     - *get_version_expansions
     - *apply_version_expansions
@@ -1447,6 +1460,12 @@ functions:
     - *f_expansions_write
     - *bazel_compile_sh
 
+  "bazel test":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - *bazel_test_sh
+
   "generate clang-tidy report sh": &generate_clang_tidy_report_sh
     command: subprocess.exec
     display_name: "generate clang-tidy report"
@@ -1467,6 +1486,9 @@ functions:
     type: test
     params:
       binary: bash
+      env:
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
+        author_email: ${author_email}
       args:
         - "src/evergreen/bazel_run.sh"
 
@@ -1497,17 +1519,6 @@ functions:
     - *set_bazel_test_silent_fail # TODO SERVER-99431 Remove once bazel coverage timeouts are under control.
     - *f_expansions_write
     - *bazel_coverage_sh
-
-  "bazel test sh": &bazel_test_sh
-    command: subprocess.exec
-    display_name: "bazel test sh"
-    type: test
-    params:
-      binary: bash
-      continue_on_err: true
-      add_expansions_to_env: true
-      args:
-        - "src/evergreen/bazel_test.sh"
 
   "run resmoke suite with bazel":
     - *f_expansions_write
@@ -2413,7 +2424,10 @@ functions:
         optional: true
 
   ### Process & archive failed unittest artifacts ###
-  "gather failed unittests": &gather_failed_unittests
+  # This only works for unit tests executed under resmoke,
+  # see buildscripts/gather_failed_unittests.py for gathering failed unit test artifacts
+  # when running under bazel test
+  "gather failed unittests resmoke": &gather_failed_unittests_resmoke
     command: subprocess.exec
     params:
       binary: bash
@@ -2441,11 +2455,25 @@ functions:
       display_name: Unit tests - Execution ${execution}
       optional: true
 
+  "upload failed unittest repro": &upload_failed_unittest_repro
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/.failed_unittest_repro.txt
+      remote_file: ${project}/${build_variant}/${revision}/unittests/${build_id}-${task_name}-${execution}/run_failed_unit_tests_command.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Command To Run Failed Unit Tests on Workstation
+      optional: true
+
   "save failed unittests":
     - *f_expansions_write
-    - *gather_failed_unittests
+    - *gather_failed_unittests_resmoke
     - *tar_failed_unittests
     - *archive_failed_unittests
+    - *upload_failed_unittest_repro
 
   ### Process & archive artifacts from hung processes ###
   "run hang analyzer":

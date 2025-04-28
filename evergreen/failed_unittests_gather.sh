@@ -8,7 +8,7 @@ set -eou pipefail
 # Only run on unit test tasks so we don't target mongod binaries from cores.
 if [ "${task_name}" != "run_dbtest" ] \
   && [[ ${task_name} != integration_tests* ]] \
-  && [[ "${task_name}" != *run_unittests* ]]; then
+  && [[ "${task_name}" != unit_test_group*_no_sandbox ]]; then
   echo "Not gathering failed unittests binaries as this is not a unittest task: ${task_name}"
   exit 0
 fi

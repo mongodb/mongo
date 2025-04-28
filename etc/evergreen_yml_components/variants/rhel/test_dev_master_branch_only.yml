@@ -35,7 +35,7 @@ variables:
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -245,7 +245,7 @@ buildvariants:
         --mongodTlsCertificateKeyFile jstests/libs/server.pem
         --shellGRPC
     tasks:
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
@@ -436,7 +436,7 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
         distros:
           - rhel8.8-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel8.8-large
       - name: compile_test_parallel_dbtest_stream_TG
@@ -467,7 +467,7 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
         distros:
           - rhel8.8-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel8.8-large
       - name: compile_test_parallel_dbtest_stream_TG
@@ -551,7 +551,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel8.8-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel8.8-large
         patch_only: true

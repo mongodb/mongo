@@ -86,7 +86,7 @@ buildvariants:
         --config=local
       compile_variant: *amazon-linux2023-arm64-local-compile
     tasks:
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_TG
 
   # Note that this task is currently optional;

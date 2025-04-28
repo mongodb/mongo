@@ -107,6 +107,7 @@ set -o pipefail
 eval echo "Execution environment: Targets: ${targets}"
 
 source ./evergreen/bazel_utility_functions.sh
+source ./evergreen/bazel_RBE_supported.sh
 
 if [[ "${evergreen_remote_exec}" != "on" ]]; then
   LOCAL_ARG="$LOCAL_ARG --jobs=auto"

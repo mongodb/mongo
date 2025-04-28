@@ -16,7 +16,7 @@ variables:
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -212,7 +212,7 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: .clang_tidy
         distros:
@@ -246,7 +246,7 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG
@@ -385,7 +385,7 @@ buildvariants:
       compile_variant: rhel8-asan
     tasks:
       - name: compile_test_serial_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: .aggfuzzer .common !.feature_flag_guarded !.incompatible_system_allocator
       - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_system_allocator
       - name: generate_buildid_to_debug_symbols_mapping
@@ -436,7 +436,7 @@ buildvariants:
       <<: *enterprise-rhel8-debug-tsan-expansions-template
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG

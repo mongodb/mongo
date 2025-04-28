@@ -67,7 +67,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel81-power8-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel81-power8-large
 
@@ -133,7 +133,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel9-power-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel9-power-large
 
@@ -197,7 +197,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel83-zseries-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel83-zseries-large
 
@@ -261,6 +261,6 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - rhel9-zseries-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel9-zseries-large

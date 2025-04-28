@@ -95,7 +95,7 @@ buildvariants:
       evergreen_remote_exec: on
       skip_debug_link: true
     tasks:
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
         distros:
           - amazon2023-arm64-latest-large-localstorage
@@ -186,7 +186,7 @@ buildvariants:
       - name: compile_all_but_not_unittests_TG
         distros:
           - amazon2023-arm64-xlarge-commitqueue
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - amazon2023-arm64-xlarge-commitqueue
       - name: compile_test_parallel_dbtest_stream_TG
@@ -374,6 +374,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - amazon2023-arm64-latest-large-m8g
+      - name: run_unit_tests_TG
+        distros:
+          - amazon2023-arm64-latest-large-m8g
       - name: .development_critical !.requires_large_host !.incompatible_community
       - name: .development_critical .requires_large_host !.incompatible_community
         distros:
@@ -404,6 +407,9 @@ buildvariants:
       compile_variant: enterprise-amazon2023-arm64-grav4
     tasks:
       - name: compile_test_and_package_serial_TG
+        distros:
+          - amazon2023-arm64-latest-large-m8g
+      - name: run_unit_tests_TG
         distros:
           - amazon2023-arm64-latest-large-m8g
       - name: .development_critical !.requires_large_host

@@ -198,7 +198,7 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
         distros:
           - rhel8.8-xlarge
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel8.8-xlarge
       - name: compile_test_parallel_dbtest_stream_TG
@@ -271,7 +271,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - windows-2022-xxlarge
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - windows-2022-xxlarge
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
@@ -343,7 +343,7 @@ buildvariants:
         --developer_dir=/Applications/Xcode15.app
     tasks:
       - name: compile_test_serial_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
         distros:
@@ -371,7 +371,7 @@ buildvariants:
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: audit
       - name: auth_audit_gen
       - name: fle
@@ -566,7 +566,7 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
         distros:
           - rhel8.8-large
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - rhel8.8-large
       - name: compile_test_parallel_dbtest_stream_TG
@@ -604,7 +604,7 @@ buildvariants:
         --mongodTlsCertificateKeyFile jstests/libs/server.pem
         --shellGRPC
     tasks:
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping

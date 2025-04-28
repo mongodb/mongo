@@ -29,6 +29,7 @@ sh_binary(
     srcs = ["working_dir.sh"],
     data = ["%s/bin/gdb"],
     env = {"PYTHONPATH": "%s/lib/python3.10", "PYTHONHOME": "%s"},
+    visibility = ["//visibility:public"],
 )
 """ % (ctx.attr.version, pythonhome, pythonhome),
         )

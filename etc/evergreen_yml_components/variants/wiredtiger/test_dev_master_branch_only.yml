@@ -16,7 +16,7 @@ variables:
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     tasks:
       - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -149,7 +149,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - windows-2022-xxlarge
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
         distros:
           - windows-2022-xxlarge
       - name: burn_in_tests_gen

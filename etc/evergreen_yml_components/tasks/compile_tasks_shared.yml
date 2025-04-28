@@ -17,6 +17,7 @@ variables:
       - func: "fetch pgo profile"
     teardown_task:
       - func: "f_expansions_write"
+      - func: "create bazel test report"
       - func: "attach report"
       - func: "attach artifacts"
       - func: "attach local resmoke invocation"

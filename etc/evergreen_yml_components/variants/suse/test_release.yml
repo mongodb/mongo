@@ -37,6 +37,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - suse15sp5-large
+      - name: run_unit_tests_TG
+        distros:
+          - suse15sp5-large
       - name: test_packages
         distros:
           - ubuntu2204-large
@@ -81,6 +84,9 @@ buildvariants:
       core_analyzer_gdb_index_cache: off
     tasks:
       - name: compile_test_and_package_serial_TG
+        distros:
+          - suse15sp5-large
+      - name: run_unit_tests_TG
         distros:
           - suse15sp5-large
       - name: test_packages

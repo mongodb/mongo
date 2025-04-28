@@ -10,9 +10,14 @@ sys.path.append(REPO_ROOT)
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 
+def setup_auth_wrapper():
+    from buildscripts.bazel_rules_mongo.engflow_auth.engflow_auth import setup_auth
+
+    setup_auth(verbose=False)
+
+
 def engflow_auth(args):
     start = time.time()
-    from buildscripts.bazel_rules_mongo.engflow_auth.engflow_auth import setup_auth
 
     args_str = " ".join(args)
     if (
@@ -22,5 +27,5 @@ def engflow_auth(args):
         and "--config public-release" not in args_str
     ):
         if os.environ.get("CI") is None and platform.machine().lower() not in {"ppc64le", "s390x"}:
-            setup_auth(verbose=False)
+            setup_auth_wrapper()
     wrapper_debug(f"engflow auth time: {time.time() - start}")

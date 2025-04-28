@@ -17,7 +17,7 @@ buildvariants:
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: audit
       - name: auth_audit_gen
       - name: fle

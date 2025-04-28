@@ -55,7 +55,10 @@ mongo_cc_unit_test(
         "-Isrc/third_party/opentelemetry-cpp/exporters/otlp/include",
         "-Isrc/third_party/opentelemetry-cpp/sdk/include",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "mongo_unittest_second_group",
+        "tracing_test",
+    ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":tracing",

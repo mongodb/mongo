@@ -438,6 +438,7 @@ def macos_extraction(ctx, cc_toolchain, inputs):
         DefaultInfo(
             files = depset(outputs),
             executable = output_bin if ctx.attr.type == "program" else None,
+            runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles,
         ),
         create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),
     ]

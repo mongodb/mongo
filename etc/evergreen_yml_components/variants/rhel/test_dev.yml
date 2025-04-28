@@ -95,7 +95,7 @@ buildvariants:
       build_mongot: true
       download_mongot_release: true
     tasks:
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG

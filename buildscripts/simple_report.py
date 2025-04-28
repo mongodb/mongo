@@ -60,7 +60,8 @@ def try_combine_reports(out: Report):
         with open("report.json") as fh:
             report = json.load(fh)
             out["results"] += report["results"]
-            out["failures"] += report["failures"]
+            if "failures" in report:
+                out["failures"] += report["failures"]
     except NameError:
         pass
     except IOError:

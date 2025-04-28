@@ -35,6 +35,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - windows-2022-xxlarge
+      - name: run_unit_tests_no_sandbox_TG
+        distros:
+          - windows-2022-xxlarge
       - name: .development_critical !.requires_large_host !.incompatible_community !.incompatible_windows
       - name: .development_critical .requires_large_host !.incompatible_community !.incompatible_windows
         distros:
@@ -80,7 +83,7 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - windows-2022-xxlarge
-      - name: compile_test_parallel_unittest_stream_TG
+      - name: run_unit_tests_no_sandbox_TG
         distros:
           - windows-2022-xxlarge
       - name: .development_critical !.requires_large_host !.incompatible_windows
