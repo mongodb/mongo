@@ -1,0 +1,6 @@
+Import('env')
+
+env.CppUnitTest(
+    target="token_bucket_test",
+    source=[],
+)
