@@ -706,3 +706,17 @@ server_js = rule(
     implementation = lambda ctx: server_js_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# create_dwp
+# =========
+
+create_dwp_provider = provider(
+    doc = "Create dwp files when using install targets",
+    fields = ["enabled"],
+)
+
+create_dwp = rule(
+    implementation = lambda ctx: create_dwp_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

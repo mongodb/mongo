@@ -316,10 +316,10 @@ mongo_cc_library(
         "socket_exception.h",
         "socket_utils.cpp",
         "socket_utils.h",
-        ":hostandport_gen",
         "//src/mongo/util/concurrency:value.h",
     ],
     deps = [
+        ":hostandport_impl",
         "//src/mongo/db:server_base",
         "//src/mongo/util:winutil",
         "//src/mongo/util/concurrency:spin_lock",

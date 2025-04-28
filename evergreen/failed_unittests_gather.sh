@@ -69,6 +69,13 @@ while read -r core_file; do
       cp "$debug_file" "$unittest_bin_dir"
     fi
 
+    # Include any dwp symbol files to go with the .debug files
+    dwp_file=$binary_file_location.dwp
+    if [ -f "$dwp_file" ]; then
+      echo "dwp Copy $dwp_file to $unittest_bin_dir"
+      cp "$dwp_file" "$unittest_bin_dir"
+    fi
+
     # On macOS, these are called .dSYM and they are directories
     dsym_dir=$binary_file_location.dSYM
     if [ -d "$dsym_dir" ]; then

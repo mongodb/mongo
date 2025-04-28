@@ -65,7 +65,9 @@ common --strategy=StripDebuginfo=local
 common --strategy=ExtractDebuginfo=local
 common --strategy=TestRunner=local
 common --strategy=CoverageReport=local
-common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo)$=+no-remote-cache
+common --strategy=CcGenerateIntermediateDwp=local
+common --strategy=CcGenerateDwp=local
+common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=+no-remote-cache
 
 # Aliases for config flags
 common --flag_alias=linkstatic=//bazel/config:linkstatic
@@ -123,6 +125,7 @@ common --flag_alias=ubsan=//bazel/config:ubsan
 common --flag_alias=dbg_level=//bazel/config:dbg_level
 common --flag_alias=mongo_toolchain_version=//bazel/config:mongo_toolchain_version
 common --flag_alias=simple_build_id=//bazel/config:simple_build_id
+common --flag_alias=create_dwp=//bazel/config:create_dwp
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
@@ -267,6 +270,7 @@ common:evg --config=opt
 common:evg --//bazel/config:opt=auto
 common:evg --//bazel/config:separate_debug=True
 common:evg --fission=no
+common:evg --enable_platform_specific_config=true
 
 --config=evg_crypt
 common:evg_crypt --config=evg
@@ -339,8 +343,10 @@ common:windows --features=-dynamic_link_msvcrt
 
 # Only use fission and debug compression on Linux
 common:windows --fission=no
+common:windows --//bazel/config:create_dwp=False
 common:windows --//bazel/config:compress_debug_compile=False
 common:macos --fission=no
+common:macos --//bazel/config:create_dwp=False
 common:macos --//bazel/config:compress_debug_compile=False
 
 # Dynamic linking on Windows (DLL generation) is currently not supported.

@@ -37,6 +37,11 @@ os.makedirs(install_link, exist_ok=True)
 def install(src, install_type):
     install_dst = os.path.join(args.install_dir, install_type, os.path.basename(src))
     link_dst = os.path.join(install_link, install_type, os.path.basename(src))
+    if src.endswith(".dwp"):
+        # Due to us creating our binaries using the _with_debug name
+        # the dwp files also contain it. Strip the _with_debug from the name
+        install_dst = install_dst.replace("_with_debug.dwp", ".dwp")
+        link_dst = link_dst.replace("_with_debug.dwp", ".dwp")
 
     for dst in [install_dst, link_dst]:
         os.makedirs(os.path.dirname(dst), exist_ok=True)

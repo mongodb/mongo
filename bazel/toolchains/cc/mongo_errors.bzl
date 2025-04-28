@@ -62,3 +62,16 @@ Error:
 
   python buildscripts/install_bazel.py
 """
+
+DWP_ERROR_MESSAGE = """
+Error:
+  to create dwp files you must use one of these configurations:
+      --compiler_type=clang
+      --fission=yes
+      --create_dwp=True
+      [OR]
+      --compiler_type=gcc
+      --fission=yes
+      --dwarf_version=4
+      --create_dwp=True
+"""

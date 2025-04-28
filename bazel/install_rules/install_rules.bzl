@@ -10,6 +10,7 @@ load("//bazel:mongo_src_rules.bzl", "SANITIZER_DATA", "SANITIZER_ENV")
 load("//bazel:separate_debug.bzl", "TagInfo")
 load("//bazel/install_rules:pretty_printer_tests.bzl", "mongo_pretty_printer_test")
 load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
+load("//bazel/toolchains/cc:mongo_errors.bzl", "DWP_ERROR_MESSAGE")
 
 # Used to skip rules on certain OS architectures
 def _empty_rule_impl(ctx):
@@ -139,7 +140,7 @@ def is_debug_file(ctx, basename):
     """
     linux_constraint, macos_constraint, windows_constraint = get_constraints(ctx)
     if ctx.target_platform_has_constraint(linux_constraint):
-        return basename.endswith(".debug")
+        return basename.endswith(".debug") or basename.endswith(".dwp")
     elif ctx.target_platform_has_constraint(macos_constraint):
         return basename.endswith(".dSYM")
     elif ctx.target_platform_has_constraint(windows_constraint):
@@ -178,6 +179,11 @@ def sort_file(ctx, file, install_dir, file_map, is_directory):
     _, macos_constraint, _ = get_constraints(ctx)
     basename = paths.basename(file)
     bin_install = install_dir + "/bin/" + basename
+    if bin_install.endswith(".dwp"):
+        # Due to us creating our binaries using the _with_debug name
+        # the dwp files also contain it. Strip the _with_debug from the name
+        bin_install = bin_install.replace("_with_debug.dwp", ".dwp")
+
     lib_install = install_dir + "/lib/" + basename
 
     if is_binary_file(ctx, basename) or basename.endswith(".py"):
@@ -215,10 +221,15 @@ def mongo_install_rule_impl(ctx):
     }
     test_files = []
     outputs = []
+    dwps = []
     install_dir = ctx.label.name
 
     # sort direct sources
     for input_bin in ctx.attr.srcs:
+        if DebugPackageInfo in input_bin and ctx.attr.create_dwp and ctx.attr.debug != "stripped":
+            bin = input_bin[DebugPackageInfo].dwp_file
+            dwps.append(bin)
+            sort_file(ctx, bin.path, install_dir, file_map, bin.is_directory)
         test_files.extend(input_bin[TestBinaryInfo].test_binaries.to_list())
         for bin in input_bin.files.to_list():
             sort_file(ctx, bin.path, install_dir, file_map, bin.is_directory)
@@ -240,6 +251,10 @@ def mongo_install_rule_impl(ctx):
                 files.extend(src_map[key])
         for file in files:
             filename = file.split("/")[-1]
+
+            # Due to us creating our binaries using the _with_debug name
+            # the dwp files also contain it. Strip the _with_debug from the name
+            filename = filename.replace("_with_debug.dwp", ".dwp")
             sort_file(ctx, file, install_dir, file_map, file_directory_map[filename])
         for file, folder in src_map["roots"].items():
             filename = file.split("/")[-1]
@@ -337,7 +352,7 @@ def mongo_install_rule_impl(ctx):
     inputs = depset(direct = input_deps, transitive = [
         ctx.attr._install_script.files,
         python.files,
-    ] + [f.files for f in ctx.attr.srcs] + [r.files for r in ctx.attr.root_files.keys()] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps])
+    ] + [f.files for f in ctx.attr.srcs] + [r.files for r in ctx.attr.root_files.keys()] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps] + [depset(dwps)])
 
     if outputs:
         ctx.actions.run(
@@ -391,6 +406,7 @@ mongo_install_rule = rule(
         "debug": attr.string(),
         "root_files": attr.label_keyed_string_dict(allow_files = True),
         "publish_debug_in_stripped": attr.bool(),
+        "create_dwp": attr.bool(),
         "_install_script": attr.label(allow_single_file = True, default = "//bazel/install_rules:install_rules.py"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
@@ -498,6 +514,10 @@ def mongo_install(
             srcs = modified_srcs,
             root_files = root_files,
             debug = debug,
+            create_dwp = select({
+                "//bazel/config:dwp_supported": True,
+                "//bazel/config:create_dwp_disabled": False,
+            }, no_match_error = DWP_ERROR_MESSAGE),
             deps = select({
                 "//bazel/config:build_enterprise_enabled": dep_targets,
                 "//conditions:default": community_dep_targets,

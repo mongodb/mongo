@@ -8,6 +8,7 @@ load(
     "build_otel",
     "compiler_type",
     "compress_debug_compile",
+    "create_dwp",
     "dbg",
     "dbg_level",
     "debug_symbols",
@@ -2593,6 +2594,19 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "linux_clang_fission",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//bazel/config:compiler_type": "clang",
+    },
+    values = {
+        "fission": "yes",
+    },
+)
+
 selects.config_setting_group(
     name = "linux_gcc_fission_x86_64",
     match_all = [
@@ -2606,6 +2620,54 @@ selects.config_setting_group(
     match_all = [
         "@platforms//cpu:aarch64",
         ":linux_gcc_fission",
+    ],
+)
+
+# --------------------------------------
+# create_dwp
+# --------------------------------------
+
+bool_flag(
+    name = "create_dwp",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "create_dwp_enabled",
+    flag_values = {
+        "//bazel/config:create_dwp": "True",
+    },
+)
+
+config_setting(
+    name = "create_dwp_disabled",
+    flag_values = {
+        "//bazel/config:create_dwp": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "dwp_supported",
+    match_any = [
+        ":clang_dwp_supported",
+        ":gcc_dwp_supported",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gcc_dwp_supported",
+    match_all = [
+        ":linux_gcc_fission",
+        ":dwarf_version_4",
+        ":create_dwp_enabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "clang_dwp_supported",
+    match_all = [
+        ":linux_clang_fission",
+        ":create_dwp_enabled",
     ],
 )
 

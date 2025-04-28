@@ -365,6 +365,7 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                 inherited_environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].inherited_environment,
             ),
         ]
+        provided_info += [ctx.attr.binary_with_debug[DebugPackageInfo]]
 
     if ctx.attr.cc_shared_library != None:
         provided_info.append(
