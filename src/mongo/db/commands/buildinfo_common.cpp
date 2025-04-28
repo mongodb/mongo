@@ -90,13 +90,7 @@ BuildInfo CmdBuildInfoCommon::generateBuildInfo(OperationContext*) const {
 
 BuildInfo CmdBuildInfoCommon::Invocation::typedRun(OperationContext* opCtx) {
     const auto mode = gBuildInfoAuthMode.load();
-
-    if (mode == BuildInfoAuthModeEnum::kAllowedPreAuth) {
-        // Full buildinfo always allowed pre or post-auth.
-        return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
-    }
-
-    const bool isAuthenticated = [&] {
+    auto isAuthenticated = [&] {
         if (!AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
             // Authentication not enabled in this configuration.
             return true;
@@ -109,23 +103,17 @@ BuildInfo CmdBuildInfoCommon::Invocation::typedRun(OperationContext* opCtx) {
         }
 
         return as->isAuthenticated();
-    }();
+    };
 
-    if (isAuthenticated) {
-        return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
+    if (mode == BuildInfoAuthModeEnum::kVersionOnlyIfPreAuth && !isAuthenticated()) {
+        // Limited response required for certain legacy drivers.
+        return getBuildInfoVersionOnly();
     }
 
-    // In practice we should never actually trigger this uassert,
-    // since requiresAuth() would have returned true, and run() would not have executed.
-    uassert(ErrorCodes::Unauthorized,
-            "buildInfo command requires authorization",
-            mode != BuildInfoAuthModeEnum::kRequiresAuth);
-
-    // kAllowedPreAuth handled at top of function, and kRequiresAuth ruled out above.
-    invariant(mode == BuildInfoAuthModeEnum::kVersionOnlyIfPreAuth);
-
-    // Limited response required for certain legacy drivers.
-    return getBuildInfoVersionOnly();
+    invariant(mode == BuildInfoAuthModeEnum::kRequiresAuth ||
+              mode == BuildInfoAuthModeEnum::kAllowedPreAuth ||
+              mode == BuildInfoAuthModeEnum::kVersionOnlyIfPreAuth);
+    return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
 }
 
 Future<void> CmdBuildInfoCommon::Invocation::runAsync(
