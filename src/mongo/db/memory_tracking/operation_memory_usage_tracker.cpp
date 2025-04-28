@@ -30,13 +30,37 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/op_memory_use.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/query/exec/cluster_client_cursor.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
 namespace {
-const ClientCursor::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> getFromClientCursor =
+
+const ClientCursor::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> _getFromClientCursor =
     ClientCursor::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
+
+const ClusterClientCursor::Decoration<std::unique_ptr<OperationMemoryUsageTracker>>
+    _getFromClusterClientCursor =
+        ClusterClientCursor::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
+
+/**
+ * Return the memory tracker that is decorating the given cursor. The 'cursor' parameter may be
+ * either a ClientCursor or a ClusterClientCursor. Returns an empty unique pointer if the cursor is
+ * not decorated. Note that this returns a reference to a unique_ptr so that it may be modified.
+ */
+std::unique_ptr<OperationMemoryUsageTracker>& getFromClientCursor(auto* cursor) {
+    if constexpr (std::is_same_v<decltype(cursor), ClientCursor*>) {
+        return _getFromClientCursor(cursor);
+    } else {
+        static_assert(std::is_same_v<decltype(cursor), ClusterClientCursor*>);
+        return _getFromClusterClientCursor(cursor);
+    }
 }
+
+}  // namespace
 
 /**
  * Return the OperationMemoryUsageTracker for this operation. If we haven't yet created one, do it
@@ -64,8 +88,7 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
-    // TODO SERVER-102382 Remove router check.
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() || expCtx.getInRouter() ||
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
         expCtx.isIncompatibleWithMemoryTracking()) {
         return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
     }
@@ -77,8 +100,7 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, bool allowDiskUse, int64_t maxMemoryUsageBytes) {
-    // TODO SERVER-102382 Remove router check.
-    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() || expCtx.getInRouter() ||
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
         expCtx.isIncompatibleWithMemoryTracking()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
     }
@@ -89,6 +111,16 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage
 
 void OperationMemoryUsageTracker::moveToCursorIfAvailable(OperationContext* opCtx,
                                                           ClientCursor* cursor) {
+    OperationMemoryUsageTracker::_moveToCursorIfAvailable(opCtx, cursor);
+}
+
+void OperationMemoryUsageTracker::moveToCursorIfAvailable(OperationContext* opCtx,
+                                                          ClusterClientCursor* cursor) {
+    OperationMemoryUsageTracker::_moveToCursorIfAvailable(opCtx, cursor);
+}
+
+template <class C>
+void OperationMemoryUsageTracker::_moveToCursorIfAvailable(OperationContext* opCtx, C* cursor) {
     std::unique_ptr<OperationMemoryUsageTracker> opCtxTracker{
         std::move(OpMemoryUse::operationMemoryAggregator(opCtx))};
     if (opCtxTracker) {
@@ -103,6 +135,16 @@ void OperationMemoryUsageTracker::moveToCursorIfAvailable(OperationContext* opCt
 
 void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(ClientCursor* cursor,
                                                          OperationContext* opCtx) {
+    OperationMemoryUsageTracker::_moveToOpCtxIfAvailable(cursor, opCtx);
+}
+
+void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(ClusterClientCursor* cursor,
+                                                         OperationContext* opCtx) {
+    OperationMemoryUsageTracker::_moveToOpCtxIfAvailable(cursor, opCtx);
+}
+
+template <class C>
+void OperationMemoryUsageTracker::_moveToOpCtxIfAvailable(C* cursor, OperationContext* opCtx) {
     std::unique_ptr<OperationMemoryUsageTracker> cursorTracker{
         std::move(getFromClientCursor(cursor))};
     if (cursorTracker) {
@@ -122,6 +164,11 @@ void OperationMemoryUsageTracker::moveToOpCtxIfAvailable(ClientCursor* cursor,
 
 OperationMemoryUsageTracker* OperationMemoryUsageTracker::getFromClientCursor_forTest(
     ClientCursor* clientCursor) {
+    return getFromClientCursor(clientCursor).get();
+}
+
+OperationMemoryUsageTracker* OperationMemoryUsageTracker::getFromClientCursor_forTest(
+    ClusterClientCursor* clientCursor) {
     return getFromClientCursor(clientCursor).get();
 }
 

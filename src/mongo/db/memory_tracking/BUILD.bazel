@@ -25,6 +25,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
+        "//src/mongo/s/query/exec:cluster_cursor_manager",
     ],
 )
 

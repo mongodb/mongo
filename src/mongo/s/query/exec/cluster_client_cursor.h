@@ -38,6 +38,7 @@
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -57,9 +58,13 @@ class StatusWith;
  *
  * Does not throw exceptions.
  */
-class ClusterClientCursor {
+class ClusterClientCursor : public Decorable<ClusterClientCursor> {
+    ClusterClientCursor(const ClusterClientCursor&) = delete;
+    ClusterClientCursor& operator=(const ClusterClientCursor&) = delete;
+
 public:
-    virtual ~ClusterClientCursor() = default;
+    ClusterClientCursor() = default;
+    ~ClusterClientCursor() override = default;
 
     /**
      * Returns the next available result document (along with an ok status). May block waiting

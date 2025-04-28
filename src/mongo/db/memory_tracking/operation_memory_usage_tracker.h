@@ -35,11 +35,41 @@
 namespace mongo {
 
 class ClientCursor;
+class ClusterClientCursor;
 
 /**
- * A memory usage tracker class that aggregates memory statistics for the entire operation. Stages
- * that track memory will report to an instance of this class, which in turn will update statistics
- * in CurOp.
+ * A memory usage tracker class that aggregates memory statistics for the entire life of a query,
+ * including the initial request and subsequent getMore() invocations. Stages that track memory will
+ * report to an instance of this class, which in turn will update statistics in CurOp of the current
+ * operation.
+ *
+ * Between commands, the tracker is stashed on the cursor (ClientCursor on mongod, or
+ * ClusterClientCursor if we are on a router) if there is more data. Command classes call
+ * moveToCursorIfAvailable() or moveToOpCtxIfAvailable() to stash and unstash the tracker as needed.
+ * When the tracker is stashed, its OperationContext pointer is null.
+ *
+ * This class is instantiated on demand when building the stages, and its add() method is invoked as
+ * early as the constructor (accumulators call 'add(sizeof(*this))' at construction time) and as
+ * late as when destructors fire. We need a valid OperationContext whenever we do memory accounting,
+ *
+ * TODO SERVER-104309 Update this comment if we refactor how the tracker is managed
+ * Therefore, the lifetimes of the stages and when we stash need to be carefully managed:
+ * - If we forget to stash, the opCtx pointer could be stale, and an ASAN build will show
+ *   use-after-free. Example:
+ *     1. An aggregate() request comes in, and the memory trackers in the created pipeline report
+ *       upstream to the OperationMemoryUsageTracker, which contains a pointer to the current
+ *       opCtx.
+ *     2. The OperationMemoryUsageTracker is never transferred to the cursor, so when getMore() is
+ *       called, the OperationMemoryUsageTracker still points to the opCtx for the initial request,
+ *       which has been deleted.
+ *     3. When add() is called, OperationMemoryUsageTracker attempts to update CurOp through a
+ *       stale OpCtx pointer.
+ * - If we forget to unstash, the opCtx pointer will be null, because invoking
+ *     moveToOpCtxIfAvailable() sets the tracker's opCtx for the current operation. If add() is
+ *     called when the tracker is in this state, a tassert will fire.
+ * For examples of correct usage of this class, see the C++ unit tests:
+ * - RunAggregateTest: TransferOperationMemoryUsageTracker
+ * - ClusterAggregateMemoryTrackingTest: MemoryTrackingWorksOnRouter
  */
 class OperationMemoryUsageTracker : public SimpleMemoryUsageTracker {
     OperationMemoryUsageTracker() = delete;
@@ -65,21 +95,49 @@ public:
     /**
      * Look for an OperationMemoryUsageTracker on the given OperationContext. If there is one, move
      * it to the cursor.
+     *
+     * Note: this method is not threadsafe and should not be called concurrently on the same cursor.
      */
     static void moveToCursorIfAvailable(OperationContext* opCtx, ClientCursor* cursor);
 
     /**
+     * Look for an OperationMemoryUsageTracker on the given OperationContext. If there is one, move
+     * it to the cursor.
+     *
+     * Note: this method is not threadsafe and should not be called concurrently on the same cursor.
+     */
+    static void moveToCursorIfAvailable(OperationContext* opCtx, ClusterClientCursor* cursor);
+
+    /**
      * Look for an OperationMemoryUsageTracker on the given ClientCursor. If there is one, move it
      * to the OperationContext.
+     *
+     * Note: this method is not threadsafe and should not be called concurrently on the same cursor.
      */
     static void moveToOpCtxIfAvailable(ClientCursor* cursor, OperationContext* opCtx);
+
+    /**
+     * Look for an OperationMemoryUsageTracker on the given ClusterClientCursor. If there is one,
+     * move it to the OperationContext.
+     *
+     * Note: this method is not threadsafe and should not be called concurrently on the same cursor.
+     */
+    static void moveToOpCtxIfAvailable(ClusterClientCursor* cursor, OperationContext* opCtx);
 
     explicit OperationMemoryUsageTracker(OperationContext* opCtx) : _opCtx(opCtx) {}
 
     static OperationMemoryUsageTracker* getFromClientCursor_forTest(ClientCursor* clientCursor);
+    static OperationMemoryUsageTracker* getFromClientCursor_forTest(
+        ClusterClientCursor* clientCursor);
 
 private:
     friend class RunAggregateTest;
+
+    template <class C>
+    static void _moveToCursorIfAvailable(OperationContext* opCtx, C* cursor);
+
+    template <class C>
+    static void _moveToOpCtxIfAvailable(C* cursor, OperationContext* opCtx);
 
     static OperationMemoryUsageTracker* getOperationMemoryUsageTracker(OperationContext* opCtx);
 

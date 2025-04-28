@@ -62,6 +62,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
@@ -367,7 +368,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                Document serializedCommand,
                                long long batchSize,
                                const boost::optional<CollectionRoutingInfo>& cri,
-                               DispatchShardPipelineResults&& shardDispatchResults,
+                               DispatchShardPipelineResults shardDispatchResults,
                                BSONObjBuilder* result,
                                const PrivilegeVector& privileges,
                                bool hasChangeStream,
@@ -399,6 +400,10 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     if (mergePipeline->requiredToRunOnRouter() ||
         (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnRouter().isOK() &&
          !shardDispatchResults.mergeShardId)) {
+
+        // Dispose of the shard pipeline since we no longer need it.
+        (void)shardDispatchResults.splitPipeline->shardsPipeline.reset();
+
         return runPipelineOnMongoS(namespaces,
                                    batchSize,
                                    std::move(shardDispatchResults.splitPipeline->mergePipeline),
@@ -586,6 +591,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     CursorId clusterCursorId = 0;
     if (!exhausted) {
         auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
+        OperationMemoryUsageTracker::moveToCursorIfAvailable(opCtx, ccc.get());
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,
             ccc.releaseCursor(),

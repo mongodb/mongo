@@ -74,6 +74,13 @@ public:
     }
 
     /**
+     * Returns a pointer to the underlying cursor.
+     */
+    ClusterClientCursor* get() {
+        return _ccc.get();
+    }
+
+    /**
      * True if this ClusterClientCursorGuard owns a cursor.
      */
     explicit operator bool() const {

@@ -49,6 +49,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -362,6 +363,7 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
             const auto cursorManager = Grid::get(opCtx)->getCursorManager();
             auto pinnedCursor = uassertStatusOK(
                 cursorManager->checkOutCursor(cursor.getCursorId(), opCtx, authChecker));
+            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(pinnedCursor.get(), opCtx);
             while (true) {
                 auto next = pinnedCursor->next();
                 if (!next.isOK() || next.getValue().isEOF()) {

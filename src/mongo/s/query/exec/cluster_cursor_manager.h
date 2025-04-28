@@ -199,6 +199,15 @@ public:
         }
 
         /**
+         * Returns a pointer to the ClusterClientCursor that this PinnedCursor owns. A cursor must
+         * be owned.
+         */
+        ClusterClientCursor* get() const {
+            invariant(_cursor);
+            return _cursor.get();
+        }
+
+        /**
          * Transfers ownership of the underlying cursor back to the manager, and detaches it from
          * the current OperationContext. A cursor must be owned, and a cursor will no longer be
          * owned after this method completes.
