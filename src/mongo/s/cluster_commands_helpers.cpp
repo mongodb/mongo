@@ -82,16 +82,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-using mongo::repl::ReadConcernArgs;
-using mongo::repl::ReadConcernLevel;
-
 namespace mongo {
-
 namespace cluster::unsplittable {
+
 ShardsvrReshardCollection makeMoveCollectionOrUnshardCollectionRequest(
     const DatabaseName& dbName,
     const NamespaceString& nss,
@@ -148,6 +144,7 @@ ShardsvrReshardCollection makeUnshardCollectionRequest(
         performVerification,
         oplogBatchApplierTaskCount);
 }
+
 }  // namespace cluster::unsplittable
 
 void appendWriteConcernErrorDetailToCmdResponse(const ShardId& shardId,
@@ -297,6 +294,7 @@ AsyncRequestsSender::Request buildDatabaseVersionedRequest(
 
     return {shardId, std::move(versionedCmd)};
 }
+
 }  // namespace
 
 std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
@@ -451,21 +449,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
                                retryPolicy,
                                requests,
                                true /* throwOnStaleShardVersionErrors */);
-}
-
-std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVersionErrors(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const std::vector<AsyncRequestsSender::Request>& requests) {
-    return gatherResponsesImpl(opCtx,
-                               nss.dbName(),
-                               nss,
-                               readPref,
-                               retryPolicy,
-                               requests,
-                               false /* throwOnStaleShardVersionErrors */);
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
@@ -666,8 +649,13 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const auto requests = buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, shardsToSkip, cmdObj, query, collation);
 
-    return gatherResponsesNoThrowOnStaleShardVersionErrors(
-        opCtx, nss, readPref, retryPolicy, requests);
+    return gatherResponsesImpl(opCtx,
+                               nss.dbName(),
+                               nss,
+                               readPref,
+                               retryPolicy,
+                               requests,
+                               false /* throwOnStaleShardVersionErrors */);
 }
 
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
@@ -1024,10 +1012,10 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
     auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
-    BSONObjBuilder bob(cmd.removeField(ReadConcernArgs::kReadConcernFieldName));
+    BSONObjBuilder bob(cmd.removeField(repl::ReadConcernArgs::kReadConcernFieldName));
 
     repl::ReadConcernIdl newReadConcern;
-    newReadConcern.setLevel(ReadConcernLevel::kLocalReadConcern);
+    newReadConcern.setLevel(repl::ReadConcernLevel::kLocalReadConcern);
     // We should carry over the atClusterTime/afterClusterTime to keep causal consistency.
     if (atClusterTime) {
         // atClusterTime is only supported in snapshot readConcern, so we use afterClusterTime
@@ -1039,7 +1027,7 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
 
     {
         BSONObjBuilder newReadConcernBuilder(
-            bob.subobjStart(ReadConcernArgs::kReadConcernFieldName));
+            bob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName));
         newReadConcern.serialize(&newReadConcernBuilder);
     }
 

@@ -35,7 +35,6 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -55,7 +54,6 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -63,8 +61,8 @@
 #include "mongo/s/transaction_router.h"
 
 namespace mongo {
-
 namespace cluster::unsplittable {
+
 const auto kUnsplittableCollectionShardKey = BSON("_id" << 1);
 const auto kUnsplittableCollectionMinKey = BSON("_id" << MINKEY);
 const auto kUnsplittableCollectionMaxKey = BSON("_id" << MAXKEY);
@@ -83,6 +81,7 @@ ShardsvrReshardCollection makeUnshardCollectionRequest(
     const boost::optional<ShardId>& destinationShard,
     const boost::optional<bool>& performVerification,
     const boost::optional<std::int64_t>& oplogBatchApplierTaskCount = boost::none);
+
 }  // namespace cluster::unsplittable
 
 struct RawResponsesResult {
@@ -153,17 +152,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const NamespaceString& nss,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const std::vector<AsyncRequestsSender::Request>& requests);
-
-/**
- * Dispatches all the specified requests in parallel and waits until all complete, returning a
- * vector of the same size and positions as that of 'requests'.
- */
-std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVersionErrors(
-    OperationContext* opCtx,
     const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -485,4 +473,5 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
  */
 StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<int64_t> limit,
                                                               boost::optional<int64_t> skip);
+
 }  // namespace mongo
