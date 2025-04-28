@@ -117,7 +117,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - name: check_workstation_setup_script
-    tags: ["assigned_to_jira_team_devprod_correctness", "development_critical"]
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on: []
     commands:
       - func: "do pre workstation setup"
