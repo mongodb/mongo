@@ -43,6 +43,7 @@ selector:
     - jstests/core/query/partial_index_pbt.js
     - jstests/core/index/express_pbt.js
     - jstests/core/query/explain/is_cached_is_true_for_one_plan_pbt.js
+    - jstests/core/query/query_knob_correctness_pbt.js
 
     # TODO SERVER-100451: $elemMatch estimation using histograms
     - jstests/core/query/boolean_expression_simplification.js
