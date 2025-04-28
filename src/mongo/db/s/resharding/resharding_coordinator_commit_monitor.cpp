@@ -113,7 +113,6 @@ CoordinatorCommitMonitor::CoordinatorCommitMonitor(
       _recipientShards(std::move(recipientShards)),
       _executor(std::move(executor)),
       _cancelToken(std::move(cancelToken)),
-      _threshold(Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load())),
       _delayBeforeInitialQueryMillis(Milliseconds(delayBeforeInitialQueryMillis)),
       _maxDelayBetweenQueries(maxDelayBetweenQueries) {}
 
@@ -256,6 +255,8 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
             return RemainingOperationTimes{Milliseconds(-1), Milliseconds::max()};
         })
         .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) mutable {
+            auto threshold = Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load());
+
             // If remainingTimes.max (or remainingTimes.min) is Milliseconds::max, then use -1 so
             // that the scale of the y-axis is still useful when looking at FTDC metrics.
             auto clampIfMax = [](Milliseconds t) {
@@ -265,14 +266,14 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
             _metrics->setCoordinatorLowEstimateRemainingTimeMillis(clampIfMax(remainingTimes.min));
 
             // Check if all recipient shards are within the commit threshold.
-            if (remainingTimes.max <= _threshold)
+            if (remainingTimes.max <= threshold)
                 return ExecutorFuture<void>(_executor);
 
             // The following ensures that the monitor would never sleep for more than a predefined
             // maximum delay between querying recipient shards. Thus, it can handle very large,
             // and potentially inaccurate estimates of the remaining operation time.
             auto delayBetweenQueries =
-                std::min(remainingTimes.max - _threshold, _maxDelayBetweenQueries);
+                std::min(remainingTimes.max - threshold, _maxDelayBetweenQueries);
 
             return _makeFuture(delayBetweenQueries);
         });
