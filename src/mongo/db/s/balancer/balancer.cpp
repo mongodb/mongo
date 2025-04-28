@@ -415,7 +415,6 @@ void enqueueChunkMigrations(OperationContext* opCtx,
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);
         shardSvrRequest.setCollectionTimestamp(migrateInfo.version.getTimestamp());
-        shardSvrRequest.setEpoch(migrateInfo.version.epoch());
         shardSvrRequest.setForceJumbo(migrateInfo.forceJumbo);
         const auto [secondaryThrottle, wc] =
             getSecondaryThrottleAndWriteConcern(balancerConfig->getSecondaryThrottle());
@@ -778,7 +777,6 @@ Status Balancer::moveRange(OperationContext* opCtx,
     shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
     shardSvrRequest.setFromShard(fromShardId);
     shardSvrRequest.setCollectionTimestamp(coll.getTimestamp());
-    shardSvrRequest.setEpoch(coll.getEpoch());
     const auto [secondaryThrottle, wc] =
         getSecondaryThrottleAndWriteConcern(request.getSecondaryThrottle());
     shardSvrRequest.setSecondaryThrottle(secondaryThrottle);

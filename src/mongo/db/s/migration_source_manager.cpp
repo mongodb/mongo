@@ -199,8 +199,12 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-            const auto [metadata, _] = checkCollectionIdentity(
-                opCtx, nss, args.getEpoch(), args.getCollectionTimestamp(), *autoColl, *scopedCsr);
+            const auto [metadata, _] = checkCollectionIdentity(opCtx,
+                                                               nss,
+                                                               boost::none /* epoch */,
+                                                               args.getCollectionTimestamp(),
+                                                               *autoColl,
+                                                               *scopedCsr);
             return metadata;
         }();
 
@@ -259,7 +263,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                         _args.getMax(),
                         6,  // Total number of steps
                         _args.getToShard(),
-                        _args.getFromShard()) {
+                        _args.getFromShard()),
+      _collectionTimestamp(_args.getCollectionTimestamp()) {
     // Since the MigrationSourceManager is registered on the CSR from the constructor, another
     // thread can get it and abort the migration (and get a reference to the completion promise's
     // future). When this happens, since we throw an exception from the constructor, the destructor
@@ -279,8 +284,12 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
 
-        auto [metadata, indexInfo] = checkCollectionIdentity(
-            _opCtx, nss(), _args.getEpoch(), _args.getCollectionTimestamp(), *autoColl, *scopedCsr);
+        auto [metadata, indexInfo] = checkCollectionIdentity(_opCtx,
+                                                             nss(),
+                                                             boost::none /* epoch */,
+                                                             _args.getCollectionTimestamp(),
+                                                             *autoColl,
+                                                             *scopedCsr);
 
         UUID collectionUUID = autoColl.getCollection()->uuid();
 
@@ -350,9 +359,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           collectionIndexInfo,
                           ChunkRange(*_args.getMin(), *_args.getMax()));
 
-    _collectionEpoch = _args.getEpoch();
     _collectionUUID = collectionUUID;
-    _collectionTimestamp = _args.getCollectionTimestamp();
 
     _chunkVersion = collectionMetadata.getChunkManager()
                         ->findIntersectingChunkWithSimpleCollation(*_args.getMin())
@@ -776,27 +783,16 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflic
                 optMetadata);
         return *optMetadata;
     }();
-    if (_collectionTimestamp) {
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream()
-                    << "The collection's timestamp has changed since the migration began. Expected "
-                       "timestamp: "
-                    << _collectionTimestamp->toStringPretty() << ", but found: "
-                    << (metadata.isSharded()
-                            ? metadata.getCollPlacementVersion().getTimestamp().toStringPretty()
-                            : "unsharded collection"),
-                metadata.isSharded() &&
-                    *_collectionTimestamp == metadata.getCollPlacementVersion().getTimestamp());
-    } else {
-        uassert(
-            ErrorCodes::ConflictingOperationInProgress,
+    uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream()
-                << "The collection's epoch has changed since the migration began. Expected epoch: "
-                << _collectionEpoch->toString() << ", but found: "
-                << (metadata.isSharded() ? metadata.getCollPlacementVersion().toString()
-                                         : "unsharded collection"),
-            metadata.isSharded() && metadata.getCollPlacementVersion().epoch() == _collectionEpoch);
-    }
+                << "The collection's timestamp has changed since the migration began. Expected "
+                   "timestamp: "
+                << _collectionTimestamp.toStringPretty() << ", but found: "
+                << (metadata.isSharded()
+                        ? metadata.getCollPlacementVersion().getTimestamp().toStringPretty()
+                        : "unsharded collection"),
+            metadata.isSharded() &&
+                _collectionTimestamp == metadata.getCollPlacementVersion().getTimestamp());
 
     return metadata;
 }
