@@ -179,13 +179,6 @@ public:
         return *_planExplainer;
     }
 
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {
-        _isSaveRecoveryUnitAcrossCommandsEnabled = true;
-    }
-    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
-        return _isSaveRecoveryUnitAcrossCommandsEnabled;
-    }
-
     PlanExecutor::QueryFramework getQueryFramework() const final {
         return PlanExecutor::QueryFramework::kSBEOnly;
     }
@@ -272,8 +265,6 @@ private:
     std::unique_ptr<PlanExplainer> _planExplainer;
 
     bool _isDisposed{false};
-
-    bool _isSaveRecoveryUnitAcrossCommandsEnabled = false;
 
     /**
      * For commands that return multiple cursors, this value will contain the type of cursor.

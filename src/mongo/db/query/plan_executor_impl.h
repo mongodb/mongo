@@ -212,11 +212,6 @@ public:
 
     PlanStage* getRootStage() const;
 
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}
-    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
-        return false;
-    }
-
     void setReturnOwnedData(bool returnOwnedData) final {
         _mustReturnOwnedBson = returnOwnedData;
     }

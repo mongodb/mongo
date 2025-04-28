@@ -867,12 +867,6 @@ public:
                                                         std::move(cq),
                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO));
 
-            // If the executor supports it, find operations will maintain the storage engine state
-            // across commands.
-            if (gMaintainValidCursorsAcrossReadCommands && !opCtx->inMultiDocumentTransaction()) {
-                exec->enableSaveRecoveryUnitAcrossCommandsIfSupported();
-            }
-
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
@@ -939,8 +933,6 @@ public:
             // Set up the cursor for getMore.
             CursorId cursorId = 0;
             if (shouldSaveCursor(opCtx, collectionPtr, exec.get())) {
-                const bool stashResourcesForGetMore =
-                    exec->isSaveRecoveryUnitAcrossCommandsEnabled();
                 ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                     opCtx,
                     {std::move(exec),
@@ -985,20 +977,6 @@ public:
 
                 // Fill out curop based on the results.
                 endQueryOp(opCtx, collectionPtr, *cursorExec, numResults, pinnedCursor, cmdObj);
-
-                if (stashResourcesForGetMore) {
-                    // Collect storage stats now before we stash the recovery unit. These stats are
-                    // normally collected in the service entry point layer just before a command
-                    // ends, but they must be collected before stashing the RecoveryUnit. Otherwise,
-                    // the service entry point layer will collect the stats from the new
-                    // RecoveryUnit, which wasn't actually used for the query.
-                    //
-                    // The stats collected here will not get overwritten, as the service entry
-                    // point layer will only set these stats when they're not empty.
-                    CurOp::get(opCtx)->debug().storageStats =
-                        shard_role_details::getRecoveryUnit(opCtx)
-                            ->computeOperationStatisticsSinceLastCall();
-                }
 
                 stashTransactionResourcesFromOperationContext(opCtx, pinnedCursor.getCursor());
 

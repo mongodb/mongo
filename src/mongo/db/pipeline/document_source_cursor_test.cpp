@@ -223,13 +223,6 @@ public:
         return _mockExplainer;
     }
 
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {
-        MONGO_UNREACHABLE;
-    }
-    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
-        MONGO_UNREACHABLE;
-    }
-
     boost::optional<StringData> getExecutorType() const override {
         return boost::none;
     }

@@ -528,13 +528,6 @@ public:
      */
     virtual const PlanExplainer& getPlanExplainer() const = 0;
 
-    /*
-     * Virtual methods to enable using save/restore logic that stashes the RecoveryUnit on the
-     * ClientCursor for future getMore commands in order to retain valid and positioned cursors.
-     */
-    virtual void enableSaveRecoveryUnitAcrossCommandsIfSupported() = 0;
-    virtual bool isSaveRecoveryUnitAcrossCommandsEnabled() const = 0;
-
     /**
      * For queries that have multiple executors, this can be used to differentiate between them.
      */

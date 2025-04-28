@@ -111,22 +111,6 @@ server_parameters:
         default: true
         redact: false
 
-    maintainValidCursorsAcrossSBEReadCommands:
-        description: "Enable maintaining valid cursors across SBE read commands (find, agg, getMore)"
-        set_at: startup
-        cpp_varname: gMaintainValidCursorsAcrossReadCommands
-        cpp_vartype: bool
-        default: false
-        redact: false
-
-    maintainValidCursorsAcrossSBEYield:
-        description: "Enable retaining valid cursors across SBE query yield"
-        set_at: startup
-        cpp_varname: gYieldingSupportForSBE
-        cpp_vartype: bool
-        default: false
-        redact: false
-
     internalInsertMaxBatchSize:
         description: "Maximum number of documents that we will insert in a single batch."
         set_at: [startup, runtime]

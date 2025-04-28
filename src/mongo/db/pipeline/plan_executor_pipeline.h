@@ -187,11 +187,6 @@ public:
         return _pipeline->writeExplainOps(opts);
     }
 
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}
-    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
-        return false;
-    }
-
     boost::optional<StringData> getExecutorType() const override {
         tassert(6253504, "Can't get type string without pipeline", _pipeline);
         return _pipeline->getTypeString();

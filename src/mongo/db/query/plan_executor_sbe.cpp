@@ -177,15 +177,10 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 }
 
 void PlanExecutorSBE::saveState() {
-    if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
-        // TODO SERVER-103267 This is no longer supported and related code should be removed.
-        MONGO_UNREACHABLE_TASSERT(9858501);
-    } else {
-        // Discard the slots as we won't access them before subsequent PlanExecutorSBE::getNext()
-        // method call.
-        const bool discardSlotState = true;
-        _root->saveState(discardSlotState);
-    }
+    // Discard the slots as we won't access them before subsequent PlanExecutorSBE::getNext()
+    // method call.
+    const bool discardSlotState = true;
+    _root->saveState(discardSlotState);
 
     if (_yieldPolicy && !_yieldPolicy->usesCollectionAcquisitions()) {
         _yieldPolicy->setYieldable(nullptr);
@@ -204,12 +199,7 @@ void PlanExecutorSBE::restoreState(const RestoreContext& context) {
         }
     }
 
-    if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
-        // TODO SERVER-103267 This is no longer supported and related code should be removed.
-        MONGO_UNREACHABLE_TASSERT(9858502);
-    } else {
-        _root->restoreState();
-    }
+    _root->restoreState();
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {

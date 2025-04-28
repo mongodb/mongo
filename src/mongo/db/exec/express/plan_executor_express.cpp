@@ -288,12 +288,6 @@ public:
         return _planExplainer;
     }
 
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}
-
-    bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
-        return false;
-    }
-
     boost::optional<StringData> getExecutorType() const override {
         return CursorType_serializer(_cursorType);
     }

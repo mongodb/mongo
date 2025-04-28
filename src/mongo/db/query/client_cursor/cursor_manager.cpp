@@ -259,7 +259,6 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
 
     LOGV2_DEBUG(8928404, 2, "Pinning cursor", "cursorId"_attr = cursor->cursorid());
     auto pin = ClientCursorPin(opCtx, cursor, this);
-    pin.unstashResourcesOntoOperationContext();
     return StatusWith(std::move(pin));
 }
 

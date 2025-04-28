@@ -152,12 +152,6 @@ ClientCursor::~ClientCursor() {
     invariant(!_operationUsingCursor);
     invariant(_disposed);
 
-    if (_stashedRecoveryUnit) {
-        // Now that the associated PlanExecutor is being destroyed, the recovery unit no longer
-        // needs to keep data pinned.
-        _stashedRecoveryUnit->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
-    }
-
     // We manually dispose of the PlanExecutor here to release all acquisitions. This must be
     // deleted before the yielded acquisitions since the execution plan may maintain pointers to the
     // TransactionResources.
@@ -236,8 +230,6 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);
-    _shouldSaveRecoveryUnit = _cursor->getExecutor()->isSaveRecoveryUnitAcrossCommandsEnabled();
-
     // We keep track of the number of cursors currently pinned. The cursor can become unpinned
     // either by being released back to the cursor manager or by being deleted. A cursor may be
     // transferred to another pin object via move construction or move assignment, but in this case
@@ -249,8 +241,7 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
     : _opCtx(other._opCtx),
       _cursor(other._cursor),
       _cursorManager(other._cursorManager),
-      _interruptibleLockGuard(std::move(other._interruptibleLockGuard)),
-      _shouldSaveRecoveryUnit(other._shouldSaveRecoveryUnit) {
+      _interruptibleLockGuard(std::move(other._interruptibleLockGuard)) {
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
     invariant(other._cursor);
@@ -260,7 +251,6 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
     other._cursor = nullptr;
     other._opCtx = nullptr;
     other._cursorManager = nullptr;
-    other._shouldSaveRecoveryUnit = false;
 }
 
 ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
@@ -288,9 +278,6 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
 
     _interruptibleLockGuard = std::move(other._interruptibleLockGuard);
 
-    _shouldSaveRecoveryUnit = other._shouldSaveRecoveryUnit;
-    other._shouldSaveRecoveryUnit = false;
-
     return *this;
 }
 
@@ -300,17 +287,11 @@ ClientCursorPin::~ClientCursorPin() {
 
 void ClientCursorPin::release() {
     if (!_cursor) {
-        invariant(!_shouldSaveRecoveryUnit);
         return;
     }
 
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
-
-    if (_shouldSaveRecoveryUnit) {
-        stashResourcesFromOperationContext();
-        _shouldSaveRecoveryUnit = false;
-    }
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
@@ -330,32 +311,10 @@ void ClientCursorPin::deleteUnderlying() {
     _cursorManager->deregisterAndDestroyCursor(_opCtx, std::move(ownedCursor));
 
     cursorStats().openPinned.decrement();
-    _shouldSaveRecoveryUnit = false;
 }
 
 ClientCursor* ClientCursorPin::getCursor() const {
     return _cursor;
-}
-
-void ClientCursorPin::unstashResourcesOntoOperationContext() {
-    invariant(_cursor);
-    invariant(_cursor->_operationUsingCursor);
-    invariant(_opCtx == _cursor->_operationUsingCursor);
-
-    if (auto& ru = _cursor->_stashedRecoveryUnit) {
-        _shouldSaveRecoveryUnit = true;
-        invariant(!shard_role_details::getRecoveryUnit(_opCtx)->isActive());
-        shard_role_details::setRecoveryUnit(
-            _opCtx, std::move(ru), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    }
-}
-
-void ClientCursorPin::stashResourcesFromOperationContext() {
-    // Move the recovery unit from the operation context onto the cursor and create a new RU for
-    // the current OperationContext.
-    ClientLock clientLock(_opCtx->getClient());
-    _cursor->stashRecoveryUnit(
-        shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx, clientLock));
 }
 
 namespace {
