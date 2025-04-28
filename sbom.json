@@ -546,6 +546,49 @@
       "supplier": {
         "name": "Organization: github"
       },
+      "name": "folly",
+      "version": "v2025.04.21.00",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/folly/folly@v2025.04.21.00",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Workload Scheduling"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/facebook/folly"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/folly/scripts/import.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "b2fa8868-e134-4fcb-9641-6344ecfef39e",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/folly"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
       "name": "google-re2",
       "version": "2023-11-01",
       "licenses": [
