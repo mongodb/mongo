@@ -50,7 +50,11 @@
 namespace mongo::projection_executor_utils {
 bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor,
                                StringData field) {
-    const FieldPath fp{field};
+    // Skip field name validation if 'field' contains '$' or '.'.
+    bool skipValidation = field.find('\0') == std::string::npos &&
+        (field.find('$') != std::string::npos || field.find('.') != std::string::npos);
+    const FieldPath fp{
+        field, false /* precomputeHashes */, !skipValidation /* validateFieldNames */};
     MutableDocument md;
     md.setNestedField(fp, Value{1.0});
     auto output = executor->applyTransformation(md.freeze());

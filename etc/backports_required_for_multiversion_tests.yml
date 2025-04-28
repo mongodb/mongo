@@ -434,6 +434,8 @@ last-continuous:
       ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_index_builds_repl_lag.js
       ticket: SERVER-103566
+    - test_file: jstests/core/compound_wildcard_index_validation.js
+      ticket: SERVER-97229
   suites: null
 last-lts:
   all:
@@ -923,4 +925,6 @@ last-lts:
       ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_index_builds_repl_lag.js
       ticket: SERVER-103566
+    - test_file: jstests/core/compound_wildcard_index_validation.js
+      ticket: SERVER-97229
   suites: null

@@ -7,10 +7,12 @@
  *   does_not_support_stepdowns,
  *   requires_fcv_70,
  *   uses_full_validation,
+ *   multiversion_incompatible,
  * ]
  */
 
-const coll = db.compound_wildcard_index_validation;
+const collName = jsTestName();
+const coll = db.getCollection(collName);
 coll.drop();
 
 // Tests that a subtree-indexing compound wildcard index can be created.
@@ -82,3 +84,6 @@ for (let i = 0; i < 10; i++) {
 }
 
 assert.commandWorked(coll.validate({full: true}));
+
+// Test that a query on field name with dots and '$' can succeed when a CWI is present.
+assert.commandWorked(db.runCommand({find: collName, filter: {"a.$b": 5}}));
