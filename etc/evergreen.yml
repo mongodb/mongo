@@ -113,9 +113,6 @@ commit_queue_aliases:
   - variant: "^(al2023-arm64-sep-benchmark)$"
     variant_tags: []
     task_tags: ["benchmarks_sep"]
-  # TODO SERVER-101932: Delete this
-  - variant: amazon-linux2-arm64-static-compile
-    task: lint_pylinters
 
 github_pr_aliases:
   - variant: "commit-queue"
@@ -130,9 +127,6 @@ github_pr_aliases:
   - variant: "^(al2023-arm64-sep-benchmark)$"
     variant_tags: []
     task_tags: ["benchmarks_sep"]
-  # TODO SERVER-101932: Delete this
-  - variant: amazon-linux2-arm64-static-compile
-    task: lint_pylinters
 
 patch_aliases:
   - alias: required

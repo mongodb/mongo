@@ -82,8 +82,7 @@ buildvariants:
       - name: .crypt
       - name: crypt_build_debug_and_test
 
-  - &amazon-linux2023-arm64-static-compile-variant
-    <<: *linux-arm64-dynamic-compile-params
+  - <<: *linux-arm64-dynamic-compile-params
     name: &amazon-linux2023-arm64-static-compile amazon-linux2023-arm64-static-compile
     display_name: "! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis"
     tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
@@ -126,18 +125,6 @@ buildvariants:
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant
         distros:
           - amazon2023-arm64-latest-xlarge
-
-  # TODO SERVER-101932: Delete this variant
-  - <<: *amazon-linux2023-arm64-static-compile-variant
-    name: amazon-linux2-arm64-static-compile
-    tags: []
-    display_name: "~ Temporary variant to make github happy (delete in SERVER-101932)"
-    activate: false
-    depends_on:
-      - name: run_bazel_clang_tidy
-        variant: *amazon-linux2023-arm64-static-compile
-    tasks:
-      - name: lint_pylinters
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
     name: enterprise-amazon-linux2023-arm64
