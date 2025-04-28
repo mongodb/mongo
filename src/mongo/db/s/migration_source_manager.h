@@ -288,11 +288,13 @@ private:
     };
     boost::optional<ScopedRegisterer> _scopedRegisterer;
 
-    // The UUID and timesetamp of the collection being migrated. The UUID values is boost::optional
-    // only up until the constructor runs, because UUID doesn't have a default constructor.
+    // The epoch of the collection being migrated and its UUID, as of the time the migration
+    // started. Values are boost::optional only up until the constructor runs, because UUID doesn't
+    // have a default constructor.
+    // TODO SERVER-80188: remove _collectionEpoch once 8.0 becomes last-lts.
+    boost::optional<OID> _collectionEpoch;
     boost::optional<UUID> _collectionUUID;
-
-    Timestamp _collectionTimestamp;
+    boost::optional<Timestamp> _collectionTimestamp;
 
     // The version of the chunk at the time the migration started.
     boost::optional<ChunkVersion> _chunkVersion;

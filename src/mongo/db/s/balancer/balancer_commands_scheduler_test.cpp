@@ -111,7 +111,7 @@ public:
         shardSvrRequest.setDbName(DatabaseName::kAdmin);
         shardSvrRequest.setMoveRangeRequestBase(base);
         shardSvrRequest.setFromShard(from);
-        shardSvrRequest.setCollectionTimestamp(Timestamp(10));
+        shardSvrRequest.setEpoch(OID::gen());
         shardSvrRequest.setMaxChunkSizeBytes(1024 * 1024);
 
         return shardSvrRequest;

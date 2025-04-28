@@ -759,7 +759,7 @@ protected:
      */
     static ShardsvrMoveRange createMoveRangeRequest(const ChunkRange& chunkRange) {
         ShardsvrMoveRange req(kNss);
-        req.setCollectionTimestamp(Timestamp(10));
+        req.setEpoch(OID::gen());
         req.setFromShard(ShardId(kDonorConnStr.getSetName()));
         req.setMaxChunkSizeBytes(1024);
         req.getMoveRangeRequestBase().setToShard(ShardId(kRecipientConnStr.getSetName()));
