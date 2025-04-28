@@ -367,7 +367,6 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor] {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kBlockingWrites) {
                            _tellAllDonorsToRefresh(executor);
-                           _tellAllRecipientsToRefresh(executor);
                        }
                    })
                    .then([this, executor] {

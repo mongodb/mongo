@@ -341,12 +341,6 @@ void ReshardingDataReplication::startOplogApplication() {
     ensureFulfilledPromise(_startOplogApplication);
 }
 
-void ReshardingDataReplication::onEnteringCriticalSection() {
-    for (auto& fetcher : _oplogFetchers) {
-        fetcher->onEnteringCriticalSection();
-    }
-}
-
 SharedSemiFuture<void> ReshardingDataReplication::awaitCloningDone() {
     return _cloningDone.getFuture();
 }
@@ -468,7 +462,7 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogFetchers
 
     for (const auto& fetcher : _oplogFetchers) {
         oplogFetcherFutures.emplace_back(
-            fetcher->schedule(_oplogFetcherExecutor, cancelToken).share());
+            fetcher->schedule(_oplogFetcherExecutor, cancelToken, opCtxFactory).share());
     }
 
     return oplogFetcherFutures;

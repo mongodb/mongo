@@ -110,7 +110,8 @@ public:
      * will be rescheduled in a way that resumes where it had left off from.
      */
     ExecutorFuture<void> schedule(std::shared_ptr<executor::TaskExecutor> executor,
-                                  const CancellationToken& cancelToken);
+                                  const CancellationToken& cancelToken,
+                                  CancelableOperationContextFactory factory);
 
     /**
      * Given a shard, fetches and copies oplog entries until
@@ -124,18 +125,6 @@ public:
     bool consume(Client* client, CancelableOperationContextFactory factory, Shard* shard);
 
     bool iterate(Client* client, CancelableOperationContextFactory factory);
-
-    /**
-     * Notifies the oplog fetcher that the critical section has started. Currently, this makes the
-     * fetcher start doing the following to reduce the likelihood of not finishing oplog fetching
-     * within the critical section timeout:
-     * - Start fetch oplog entries from the primary node instead of the "nearest" node which could
-     *   be a lagged secondary.
-     * - Sleep for reshardingOplogFetcherSleepMillisDuringCriticalSection instead of
-     *   reshardingOplogFetcherSleepMillisBeforeCriticalSection after exhausting the oplog entries
-     *   returned by the previous cursor.
-     */
-    void onEnteringCriticalSection();
 
     int getNumOplogEntriesCopied() const {
         return _numOplogEntriesCopied;
@@ -167,7 +156,8 @@ private:
     AggregateCommandRequest _makeAggregateCommandRequest(Client* client,
                                                          CancelableOperationContextFactory factory);
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
-                                     const CancellationToken& cancelToken);
+                                     const CancellationToken& cancelToken,
+                                     CancelableOperationContextFactory factory);
 
     ServiceContext* _service() const {
         return _env->service();
@@ -184,13 +174,10 @@ private:
     const bool _storeProgress;
 
     int _numOplogEntriesCopied = 0;
-    AtomicWord<bool> _inCriticalSection;
 
     stdx::mutex _mutex;
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
-    // The cancellation source for the current aggregation.
-    boost::optional<CancellationSource> _aggCancelSource;
 
     // For testing to control behavior.
 

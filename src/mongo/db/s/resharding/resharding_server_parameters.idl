@@ -150,32 +150,16 @@ server_parameters:
                 expr: 16 * 1024 * 1024
         redact: false
 
-    reshardingOplogFetcherSleepMillisBeforeCriticalSection:
+    reshardingOplogFetcherSleepMillis:
         description: >-
             The amount of time that the ReshardingOplogFetcher should wait for before running the
             next aggregate command after it has exhausted the oplog entries returned by the previous
-            one before the critical section. The default 1-second value was chosen to match the
-            default awaitData timeout that would have been used if the aggregation cursor was
-            TailableModeEnum::kTailableAndAwaitData.
+            one.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: gReshardingOplogFetcherSleepMillisBeforeCriticalSection
+        cpp_varname: gReshardingOplogFetcherSleepMillis
         default:
             expr: 1 * 1000
-        validator:
-            gte: 0
-        redact: false
-
-    reshardingOplogFetcherSleepMillisDuringCriticalSection:
-        description: >-
-            The amount of time that the ReshardingOplogFetcher should wait for before running the
-            next aggregate command after it has exhausted the oplog entries returned by the previous
-            one during the critical section.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: gReshardingOplogFetcherSleepMillisDuringCriticalSection
-        default:
-            expr: 5
         validator:
             gte: 0
         redact: false

@@ -430,8 +430,6 @@ last-continuous:
       ticket: SERVER-102693
     - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
       ticket: SERVER-103932
-    - test_file: jstests/sharding/resharding_oplog_fetcher_repl_lag.js
-      ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_index_builds_repl_lag.js
       ticket: SERVER-103566
     - test_file: jstests/core/compound_wildcard_index_validation.js
@@ -921,8 +919,6 @@ last-lts:
       ticket: SERVER-102693
     - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
       ticket: SERVER-103932
-    - test_file: jstests/sharding/resharding_oplog_fetcher_repl_lag.js
-      ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_index_builds_repl_lag.js
       ticket: SERVER-103566
     - test_file: jstests/core/compound_wildcard_index_validation.js
