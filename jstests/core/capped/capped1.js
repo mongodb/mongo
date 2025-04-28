@@ -1,17 +1,17 @@
 /**
  * @tags: [
  *   requires_capped,
- *   # capped collections connot be sharded
+ *   # capped collections cannot be sharded
  *   assumes_unsharded_collection,
  * ]
  */
 
 let t = db[jsTestName()];
-t.drop();
+assert(t.drop());
 
-db.createCollection(jsTestName(), {capped: true, size: 1024});
-let v = t.validate();
+assert.commandWorked(db.createCollection(jsTestName(), {capped: true, size: 1024}));
+let v = assert.commandWorked(t.validate());
 assert(v.valid, "A : " + tojson(v));  // SERVER-485
 
-t.save({x: 1});
-assert(t.validate().valid, "B");
+assert.commandWorked(t.save({x: 1}));
+assert(assert.commandWorked(t.validate()).valid, "B");
