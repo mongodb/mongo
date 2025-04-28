@@ -217,3 +217,11 @@ feature_flags:
         default: true
         version: 8.2
         shouldBeFCVGated: true
+    # TODO (SERVER-103458): remove feature once 9.0 becomes LTS.
+    featureFlagCheckInvalidDatabaseInGlobalCatalog:
+        description:
+            "When enabled, metadata consistency check will ensure that there aren't any unexpected databases
+            in the global catalog."
+        cpp_varname: feature_flags::gCheckInvalidDatabaseInGlobalCatalog
+        default: false
+        shouldBeFCVGated: true

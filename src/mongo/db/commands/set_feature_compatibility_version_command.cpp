@@ -570,6 +570,19 @@ public:
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
 
+                // TODO (SERVER-103458): Remove once 9.0 becomes last lts.
+                if (role && role->has(ClusterRole::ConfigServer) &&
+                    feature_flags::gCheckInvalidDatabaseInGlobalCatalog
+                        .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                      actualVersion)) {
+                    // Remove reference to the admin database from the config, it is leftover from
+                    // an old version.
+                    DBDirectClient client(opCtx);
+                    write_ops::checkWriteErrors(client.remove(write_ops::DeleteCommandRequest(
+                        NamespaceString::kConfigDatabasesNamespace,
+                        {{BSON(DatabaseType::kDbNameFieldName << "admin"), false /* multi */}})));
+                }
+
                 if (role && role->has(ClusterRole::ConfigServer)) {
                     uassert(
                         ErrorCodes::ConflictingOperationInProgress,
