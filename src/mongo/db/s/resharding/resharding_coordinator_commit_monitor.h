@@ -102,8 +102,6 @@ private:
     const TaskExecutorPtr _executor;
     const CancellationToken _cancelToken;
 
-    const Milliseconds _threshold;
-
     const Milliseconds _delayBeforeInitialQueryMillis;
     const Milliseconds _maxDelayBetweenQueries;
 

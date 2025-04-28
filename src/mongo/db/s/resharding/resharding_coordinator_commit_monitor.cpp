@@ -110,7 +110,6 @@ CoordinatorCommitMonitor::CoordinatorCommitMonitor(
       _recipientShards(std::move(recipientShards)),
       _executor(std::move(executor)),
       _cancelToken(std::move(cancelToken)),
-      _threshold(Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load())),
       _delayBeforeInitialQueryMillis(Milliseconds(delayBeforeInitialQueryMillis)),
       _maxDelayBetweenQueries(maxDelayBetweenQueries) {}
 
@@ -235,6 +234,8 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
            })
         .until([this, anchor = shared_from_this(), delay](
                    const StatusWith<RemainingOperationTimes> result) -> bool {
+            auto threshold = Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load());
+
             RemainingOperationTimes remainingTimes;
             if (!result.isOK()) {
                 if (_cancelToken.isCanceled()) {
@@ -264,13 +265,13 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
             _metrics->setCoordinatorLowEstimateRemainingTimeMillis(clampIfMax(remainingTimes.min));
 
             // Check if all recipient shards are within the commit threshold.
-            if (remainingTimes.max <= _threshold)
+            if (remainingTimes.max <= threshold)
                 return true;
 
             // The following ensures that the monitor would never sleep for more than a predefined
             // maximum delay between querying recipient shards. Thus, it can handle very large,
             // and potentially inaccurate estimates of the remaining operation time.
-            *delay = std::min(remainingTimes.max - _threshold, _maxDelayBetweenQueries);
+            *delay = std::min(remainingTimes.max - threshold, _maxDelayBetweenQueries);
 
             return false;
         })

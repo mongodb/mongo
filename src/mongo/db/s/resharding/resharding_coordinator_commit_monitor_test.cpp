@@ -499,6 +499,36 @@ TEST_F(CoordinatorCommitMonitorTest,
     future.get();
 }
 
+TEST_F(CoordinatorCommitMonitorTest, ReconfiguringThreshold) {
+    auto thresholdBefore = gRemainingReshardingOperationTimeThresholdMillis.load();
+
+    auto fp = globalFailPointRegistry().find("hangBeforeQueryingRecipients");
+    auto timesEnteredBefore = fp->setMode(FailPoint::alwaysOn);
+
+    auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
+
+    fp->waitForTimesEntered(timesEnteredBefore + 1);
+    auto timesEnteredAfter = fp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
+
+    std::vector<Milliseconds> remainingOpTimes{
+        Milliseconds{0},
+        Milliseconds{thresholdBefore + 1},
+    };
+    std::vector<boost::optional<Milliseconds>> replicationLags{
+        Milliseconds{0},
+        Milliseconds{0},
+    };
+    auto thresholdAfter = thresholdBefore + 2;
+
+    RAIIServerParameterControllerForTest threshold{
+        "remainingReshardingOperationTimeThresholdMillis", thresholdAfter};
+    mockRemaingOperationTimesCommandForRecipients(remainingOpTimes, replicationLags);
+
+    // If the commit monitor doesn't detect the new threshold, the wait below would hang.
+    future.get();
+}
+
 }  // namespace
 }  // namespace resharding
 }  // namespace mongo
