@@ -63,6 +63,9 @@ namespace mongo {
 
 // Fail point to mimic re-parsing errors during execution.
 MONGO_FAIL_POINT_DEFINE(queryStatsFailToReparseQueryShape);
+
+// Fail point to mimic getting a ErrorCodes::QueryFeatureNotAllowed exception during re-parsing.
+MONGO_FAIL_POINT_DEFINE(queryStatsGenerateQueryFeatureNotAllowedError);
 namespace {
 auto& queryStatsHmacApplicationErrors =
     *MetricBuilder<Counter64>{"queryStats.numHmacApplicationErrors"};
@@ -252,6 +255,11 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
                                                      SerializationContext::stateDefault())
                                   .toHexString();
 
+        if (MONGO_unlikely(queryStatsGenerateQueryFeatureNotAllowedError.shouldFail())) {
+            uasserted(ErrorCodes::QueryFeatureNotAllowed,
+                      "queryStatsGenerateQueryFeatureNotAllowedError fail point is enabled");
+        }
+
         if (MONGO_unlikely(queryStatsFailToReparseQueryShape.shouldFail())) {
             uasserted(ErrorCodes::FailPointEnabled,
                       "queryStatsFailToReparseQueryShape fail point is enabled");
@@ -280,7 +288,20 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
                     "hash"_attr = hash,
                     "debugQueryShape"_attr = queryShape);
 
-        if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
+        // Normally, when we encounter and error when trying to pull out a query shape key
+        // and compute its document to return as a stage result, we skip over the key and log.
+        // However, when running in debug mode
+        // (or the internalQueryStatsErrorsAreCommandFatal option is set) we want to fail the query
+        // instead so that we can catch potential errors in query stats during testing / fuzzing
+        // to investigate and resolve them.
+        // Within this case however, we want to avoid failing on errors that are because the query
+        // feature is disallowed, as these errors do not suggest that anything needs to be
+        // investigated / fixed. The QueryFeatureNotAllowed error occurs when a query was run
+        // (and the query stats were recorded) that needed a higher FCV, but later the cluster
+        // FCV was dropped, and then the query stats were requested and the server can no longer
+        // parse that query that needed the higher FCV.
+        if ((kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) &&
+            (ex.code() != ErrorCodes::QueryFeatureNotAllowed)) {
             auto keyString = std::to_string(hash);
             BSONObj cmdObj = serialize().getDocument().toBson();
             uasserted(Status{QueryStatsFailedToRecordInfo(
