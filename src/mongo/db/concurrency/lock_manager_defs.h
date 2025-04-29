@@ -101,7 +101,7 @@ bool isModeCovered(LockMode mode, LockMode coveringMode);
 /**
  * Returns whether the passed in mode is S or IS. Used for validation checks.
  */
-inline bool isSharedLockMode(LockMode mode) {
+constexpr bool isSharedLockMode(LockMode mode) {
     return (mode == MODE_IS || mode == MODE_S);
 }
 
@@ -197,20 +197,20 @@ enum class ResourceGlobalId : uint8_t {
 /**
  * Maps the resource id to a human-readable string.
  */
-static const char* ResourceTypeNames[] = {"Invalid",
-                                          "Global",
-                                          "Tenant",
-                                          "Database",
-                                          "Collection",
-                                          "Metadata",
-                                          "DDLDatabase",
-                                          "DDLCollection",
-                                          "Mutex"};
+inline constexpr const char* ResourceTypeNames[] = {"Invalid",
+                                                    "Global",
+                                                    "Tenant",
+                                                    "Database",
+                                                    "Collection",
+                                                    "Metadata",
+                                                    "DDLDatabase",
+                                                    "DDLCollection",
+                                                    "Mutex"};
 
 /**
  * Maps the global resource id to a human-readable string.
  */
-static const char* ResourceGlobalIdNames[] = {
+inline constexpr const char* ResourceGlobalIdNames[] = {
     "MultiDocumentTransactionsBarrier",
     "ReplicationStateTransition",
     "Global",
@@ -227,14 +227,14 @@ MONGO_STATIC_ASSERT((sizeof(ResourceGlobalIdNames) / sizeof(ResourceGlobalIdName
 /**
  * Returns a human-readable name for the specified resource type.
  */
-static const char* resourceTypeName(ResourceType resourceType) {
+constexpr const char* resourceTypeName(ResourceType resourceType) {
     return ResourceTypeNames[resourceType];
 }
 
 /**
  * Returns a human-readable name for the specified global resource.
  */
-static const char* resourceGlobalIdName(ResourceGlobalId id) {
+constexpr const char* resourceGlobalIdName(ResourceGlobalId id) {
     return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
@@ -244,7 +244,7 @@ static const char* resourceGlobalIdName(ResourceGlobalId id) {
 class ResourceId {
 public:
     // We only use 4 bits for the resource type in the ResourceId hash
-    enum { resourceTypeBits = 4 };
+    static constexpr size_t resourceTypeBits = 4;
     MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
     ResourceId(ResourceType type, const NamespaceString& nss)
