@@ -11,6 +11,8 @@
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
+ *   # This test has statements that do not support non-local read concern.
+ *   does_not_support_causal_consistency,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  * ]
