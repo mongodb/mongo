@@ -60,6 +60,13 @@ constraint_setting(name = "distro")
     ]
 ]
 
+constraint_setting(name = "mongo_windows_toolchain_config")
+
+constraint_value(
+    name = "use_mongo_windows_toolchain_config",
+    constraint_setting = ":mongo_windows_toolchain_config",
+)
+
 platform(
     name = "windows_amd64",
     constraint_values = [

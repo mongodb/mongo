@@ -70,6 +70,11 @@ def _setup_local_config_platform(ctx):
         constraints_str += ',\n        "@//bazel/platforms:%s"' % (distro)
         result = {"DISTRO": distro}
         exec_props = ""
+        #elif os == "windows":
+        #constraints_str += ',\n        "@//bazel/platforms:use_mongo_windows_toolchain_config"'
+        #result = {"USE_NATIVE_TOOLCHAIN": "1"}
+        #exec_props = ""
+
     else:
         result = {"USE_NATIVE_TOOLCHAIN": "1"}
         exec_props = ""
