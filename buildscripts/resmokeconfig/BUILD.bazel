@@ -131,3 +131,28 @@ resmoke_suite_test(
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
     ],
 )
+
+# This is an experimental test target for running running the jstestfuzz
+# suite as a bazel test. It runs in an experimental Evergreen task on an
+# infrequent build variant. You should not worry about this target being
+# perfectly up-to-date with the suite config, nor create similar bazel targets
+# for other suites. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "jstestfuzz",
+    srcs = [
+        "//:jstestfuzz_generated_tests",
+    ],
+    config = ":suites/jstestfuzz.yml",
+    data = [
+        "//jstests/hooks:all_javascript_files",
+    ],
+    needs_mongo = True,
+    needs_mongod = True,
+    resmoke_args = [
+        "--jobs=2",
+        "--storageEngineCacheSizeGB=1",
+    ],
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)

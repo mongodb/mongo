@@ -47,3 +47,4 @@ buildvariants:
       compile_variant: amazon-linux2023-arm64-static-compile
     tasks:
       - name: bazel_test_jscore
+      - name: bazel_test_jstestfuzz
