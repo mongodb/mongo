@@ -16,7 +16,7 @@ Vector search is implemented as an aggregation stage that behaves similarly to [
 
 #### Parameters
 
-[`$vectorSearch`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.h) takes several [parameters](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.idl) that are passed on to `mongot`. These include:
+[`$vectorSearch`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.h) takes several parameters that are passed on to `mongot`. These include:
 
 | Parameter     | Description                                                 |
 | ------------- | ----------------------------------------------------------- |
