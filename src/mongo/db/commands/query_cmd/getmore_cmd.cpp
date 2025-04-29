@@ -776,9 +776,7 @@ public:
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 
-            if (_cmd.getIncludeQueryStatsMetrics() &&
-                feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            if (_cmd.getIncludeQueryStatsMetrics()) {
                 curOp->debug().queryStatsInfo.metricsRequested = true;
             }
 

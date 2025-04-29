@@ -1560,21 +1560,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
     // Verify the serialization works correctly
     {
         auto qse = getMetrics(query1);
-
-        // Empty
-        ASSERT_BSONOBJ_EQ(qse.toBSON(false),
-                          BSONObjBuilder{}
-                              .append("lastExecutionMicros", 123456LL)
-                              .append("execCount", 1LL)
-                              .append("totalExecMicros", emptyIntMetric)
-                              .append("firstResponseExecMicros", emptyIntMetric)
-                              .append("docsReturned", emptyIntMetric)
-                              .append("firstSeenTimestamp", qse.firstSeenTimestamp)
-                              .append("latestSeenTimestamp", Date_t())
-                              .obj());
-
-        // With Disk Usage
-        ASSERT_BSONOBJ_EQ(qse.toBSON(true),
+        ASSERT_BSONOBJ_EQ(qse.toBSON(),
                           BSONObjBuilder{}
                               .append("lastExecutionMicros", 123456LL)
                               .append("execCount", 1LL)
@@ -1609,7 +1595,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
     {
         auto qse2 = getMetrics(query1);
 
-        ASSERT_BSONOBJ_EQ(qse2.toBSON(true),
+        ASSERT_BSONOBJ_EQ(qse2.toBSON(),
                           BSONObjBuilder{}
                               .append("lastExecutionMicros", 246912LL)
                               .append("execCount", 2LL)

@@ -265,14 +265,11 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
                       "queryStatsFailToReparseQueryShape fail point is enabled");
         }
 
-        return Document{
-            {"key", std::move(queryStatsKey)},
-            {"keyHash", keyHash},
-            {"queryShapeHash", queryShapeHash},
-            {"metrics",
-             queryStatsEntry.toBSON(feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))},
-            {"asOf", partitionReadTime}};
+        return Document{{"key", std::move(queryStatsKey)},
+                        {"keyHash", keyHash},
+                        {"queryShapeHash", queryShapeHash},
+                        {"metrics", queryStatsEntry.toBSON()},
+                        {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
         const auto& hash = absl::HashOf(key);

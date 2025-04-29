@@ -390,16 +390,12 @@ void registerRequest(OperationContext* opCtx,
 }
 
 bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
-    // metricsRequested should only be set to true when the feature flag is set; we don't need to
-    // re-check the feature flag in that case.
     // If the key is non-null, we expect that query stats should be collected at this level of
     // execution. If the keyHash is non-null, then we expect we should forward remote query stats
     // metrics to a higher level of execution, such as running an aggregation for a view, or there
     // are multiple cursors open in a single operation context, such as in $search.
-    return opDebug.queryStatsInfo.metricsRequested ||
-        (feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-         (opDebug.queryStatsInfo.key != nullptr || opDebug.queryStatsInfo.keyHash != boost::none));
+    return opDebug.queryStatsInfo.metricsRequested || opDebug.queryStatsInfo.key != nullptr ||
+        opDebug.queryStatsInfo.keyHash != boost::none;
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {

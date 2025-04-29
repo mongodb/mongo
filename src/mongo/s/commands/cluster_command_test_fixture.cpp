@@ -378,40 +378,24 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
     };
 
     {
-        RAIIServerParameterControllerForTest flag("featureFlagQueryStatsDataBearingNodes", true);
+        // No rate limit i.e., no requests are rate limited and each one is allowed to gather
+        // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
+        // to false.
+        RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
 
-        {
-            // No rate limit i.e., no requests are rate limited and each one is allowed to gather
-            // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
-            // to false.
-            RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
-
-            runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
-            runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
-            runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(true), isTargeted);
-        }
-
-        {
-            // Rate limit is 0 i.e., every request is rate-limited.
-            RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", 0);
-
-            // If the user doesn't give includeQueryStatsMetrics, we won't insert the field.
-            runCommandInspectRequests(cmd, expectNoField, isTargeted);
-
-            // If the user passed us includeQueryStatsMetrics, we'll pass it through.
-            runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
-            runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
-        }
+        runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
+        runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
+        runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(true), isTargeted);
     }
 
     {
-        RAIIServerParameterControllerForTest flag("featureFlagQueryStatsDataBearingNodes", false);
-        RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
+        // Rate limit is 0 i.e., every request is rate-limited.
+        RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", 0);
 
-        // Having the feature flag disabled means we won't set the field unrequested.
+        // If the user doesn't give includeQueryStatsMetrics, we won't insert the field.
         runCommandInspectRequests(cmd, expectNoField, isTargeted);
 
-        // We will still pass through the field when the feature flag is false.
+        // If the user passed us includeQueryStatsMetrics, we'll pass it through.
         runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
         runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
     }

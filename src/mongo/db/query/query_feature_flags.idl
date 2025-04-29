@@ -58,14 +58,6 @@ feature_flags:
         shouldBeFCVGated: true
         fcv_context_unaware: true
 
-    featureFlagQueryStatsDataBearingNodes:
-        description: "Feature flag for enabling aggregation of queryStats from data bearing nodes."
-        cpp_varname: gFeatureFlagQueryStatsDataBearingNodes
-        default: true
-        version: 8.0
-        shouldBeFCVGated: true
-        fcv_context_unaware: true
-
     featureFlagAggOutTimeseries:
         description: "Feature flag for enabling support for $out to write to time-series collections"
         cpp_varname: gFeatureFlagAggOutTimeseries

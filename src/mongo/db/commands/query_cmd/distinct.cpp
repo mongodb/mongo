@@ -186,9 +186,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                 collOrViewAcquisition.getCollectionType());
         });
 
-        if (parsedDistinct->distinctCommandRequest->getIncludeQueryStatsMetrics() &&
-            feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (parsedDistinct->distinctCommandRequest->getIncludeQueryStatsMetrics()) {
             CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
         }
     }

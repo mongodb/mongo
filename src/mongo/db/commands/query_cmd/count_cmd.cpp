@@ -524,9 +524,7 @@ public:
                         collectionOrView.getCollectionType());
                 });
 
-                if (req.getIncludeQueryStatsMetrics() &&
-                    feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                if (req.getIncludeQueryStatsMetrics()) {
                     curOp->debug().queryStatsInfo.metricsRequested = true;
                 }
             }

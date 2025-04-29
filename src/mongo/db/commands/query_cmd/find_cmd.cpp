@@ -226,9 +226,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
                 collOrViewAcquisition.getCollectionType());
         });
 
-        if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics() &&
-            feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics()) {
             CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested = true;
         }
     }

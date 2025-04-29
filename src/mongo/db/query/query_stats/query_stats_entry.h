@@ -51,7 +51,7 @@ struct QueryStatsEntry {
     QueryStatsEntry(std::unique_ptr<const Key> key_)
         : firstSeenTimestamp(Date_t::now()), key(std::move(key_)) {}
 
-    BSONObj toBSON(bool includeDiskUsageMetrics) const;
+    BSONObj toBSON() const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.

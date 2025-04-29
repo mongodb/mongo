@@ -35,7 +35,7 @@
 
 namespace mongo::query_stats {
 
-BSONObj QueryStatsEntry::toBSON(bool includeDiskUsageMetrics) const {
+BSONObj QueryStatsEntry::toBSON() const {
     BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
     builder.append("execCount", (long long)execCount);
@@ -43,18 +43,17 @@ BSONObj QueryStatsEntry::toBSON(bool includeDiskUsageMetrics) const {
     firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
     docsReturned.appendTo(builder, "docsReturned");
 
-    if (includeDiskUsageMetrics) {
-        keysExamined.appendTo(builder, "keysExamined");
-        docsExamined.appendTo(builder, "docsExamined");
-        bytesRead.appendTo(builder, "bytesRead");
-        readTimeMicros.appendTo(builder, "readTimeMicros");
-        workingTimeMillis.appendTo(builder, "workingTimeMillis");
-        cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
-        hasSortStage.appendTo(builder, "hasSortStage");
-        usedDisk.appendTo(builder, "usedDisk");
-        fromMultiPlanner.appendTo(builder, "fromMultiPlanner");
-        fromPlanCache.appendTo(builder, "fromPlanCache");
-    }
+    // Disk use metrics.
+    keysExamined.appendTo(builder, "keysExamined");
+    docsExamined.appendTo(builder, "docsExamined");
+    bytesRead.appendTo(builder, "bytesRead");
+    readTimeMicros.appendTo(builder, "readTimeMicros");
+    workingTimeMillis.appendTo(builder, "workingTimeMillis");
+    cpuNanos.appendToIfNonNegative(builder, "cpuNanos");
+    hasSortStage.appendTo(builder, "hasSortStage");
+    usedDisk.appendTo(builder, "usedDisk");
+    fromMultiPlanner.appendTo(builder, "fromMultiPlanner");
+    fromPlanCache.appendTo(builder, "fromPlanCache");
 
     builder.append("firstSeenTimestamp", firstSeenTimestamp);
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
