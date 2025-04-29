@@ -276,11 +276,18 @@ public:
         }
     }
 
-    void enable() {
+    /**
+     * Enables the parameter unless it has been permanently disabled. Returns whether the parameter
+     * is enabled after the operation completes.
+     */
+    bool enable() {
         stdx::lock_guard lk(_mutex);
-        if (_disableState == DisableState::TemporarilyDisabled) {
-            _disableState = DisableState::Enabled;
+        if (_disableState == DisableState::PermanentlyDisabled) {
+            return false;
         }
+
+        _disableState = DisableState::Enabled;
+        return true;
     }
 
     bool isEnabled() const;
@@ -288,11 +295,26 @@ public:
     // Return whether this server parameter would be enabled with the given FCV
     bool isEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
 
-    // Return whether this server parameter is compatible with the given FCV, regardless of if it is
-    // temporarily disabled
-    bool canBeEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
+    /**
+     * Returns a pair of
+     *   1) whether the flag is enabled with the `beforeFCV` value and
+     *   2) whether the flag should be enabled after an upgrade/downgrade to `afterFCV` is done.
+     */
+    std::pair<bool, bool> isEnabledBeforeAndAfterFCVChange(
+        const multiversion::FeatureCompatibilityVersion& before,
+        const multiversion::FeatureCompatibilityVersion& after) const;
 
-    void setFeatureFlag(CheckableFeatureFlagRef featureFlag) {
+    /**
+     * Returns a pair of
+     *   1) whether the flag would have been enabled with the `beforeFCV` value and
+     *   2) whether the flag could have remained enabled after a previous upgrade/downgrade to
+     *      `afterFCV` finished.
+     */
+    std::pair<bool, bool> canBeEnabledBeforeAndAfterFCVChange(
+        const multiversion::FeatureCompatibilityVersion& before,
+        const multiversion::FeatureCompatibilityVersion& after) const;
+
+    void setFeatureFlag(ParameterGatingFeatureFlag* featureFlag) {
         stdx::lock_guard lk(_mutex);
         _featureFlag = featureFlag;
     }
@@ -307,22 +329,17 @@ public:
     virtual void onRegistrationWithProcessGlobalParameterList() {}
 
 protected:
-    virtual bool _isEnabledOnVersion(
-        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
-
-    bool featureFlagIsDisabledOnVersion(
-        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
-
-    bool minFCVIsLessThanOrEqualToVersion(
-        const multiversion::FeatureCompatibilityVersion& fcv) const {
-        stdx::lock_guard lk(_mutex);
-        return !_minFCV || fcv >= *_minFCV;
-    }
-
     // Helper for translating setParameter values from BSON to string.
     StatusWith<std::string> _coerceToString(const BSONElement&);
 
 private:
+    /**
+     * Returns true unless there is a minimum FCV requirement that is not met by the `targetFCV`
+     * value or a feature flag condition on a flag that is disabled for the 'targetFCV' value.
+     */
+    bool _meetsFCVAndFlagRequirements_inLock(
+        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
+
     std::string _name;
     ServerParameterType _type;
 
@@ -331,7 +348,7 @@ private:
     bool _testOnly = false;
     bool _redact = false;
     bool _isOmittedInFTDC = false;
-    CheckableFeatureFlagRef _featureFlag = kDoesNotRequireFeatureFlag;
+    ParameterGatingFeatureFlag* _featureFlag = nullptr;
     boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV = boost::none;
 
     // Tracks whether a parameter is enabled, temporarily disabled, or permanently disabled. This is

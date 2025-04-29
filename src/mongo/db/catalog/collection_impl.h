@@ -198,9 +198,7 @@ public:
      */
     Validator parseValidator(OperationContext* opCtx,
                              const BSONObj& validator,
-                             MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-                             boost::optional<multiversion::FeatureCompatibilityVersion>
-                                 maxFeatureCompatibilityVersion = boost::none) const final;
+                             MatchExpressionParser::AllowedFeatureSet allowedFeatures) const final;
 
     /**
      * Sets the validator for this collection.

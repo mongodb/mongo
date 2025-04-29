@@ -1652,7 +1652,7 @@ class CommandConstructionPlan {
 public:
     struct Entry {
         std::function<std::unique_ptr<Command>()> construct;
-        CheckableFeatureFlagRef featureFlag = kDoesNotRequireFeatureFlag;
+        FeatureFlag* featureFlag = nullptr;
         bool testOnly = false;
         boost::optional<ClusterRole> roles;
         const std::type_info* typeInfo = nullptr;
@@ -1766,8 +1766,8 @@ public:
      * A command object will be created only if the featureFlag is enabled,
      * regardless of the current FCV.
      */
-    EntryBuilder requiresFeatureFlag(CheckableFeatureFlagRef featureFlag) && {
-        _entry->featureFlag = featureFlag;
+    EntryBuilder requiresFeatureFlag(FeatureFlag& featureFlag) && {
+        _entry->featureFlag = &featureFlag;
         return std::move(*this);
     }
 

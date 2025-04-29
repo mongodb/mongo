@@ -330,24 +330,33 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
         updatedParameters.reserve(tenantParamDocs.size());
         for (const auto& [name, sp] : clusterParameterCache->getMap()) {
             if (fcvChanged) {
-                // Use canBeEnabled because if we previously temporarily disabled the parameter,
-                // isEnabled will be false
-                if (sp->canBeEnabledOnVersion(_lastFcv) && !sp->canBeEnabledOnVersion(fcv)) {
+                // Determine whether the parameter should have been enabled before the FCV change
+                // and whether it should be enabled after the FCV change.
+                auto [enabledBefore, enabledAfter] =
+                    sp->canBeEnabledBeforeAndAfterFCVChange(_lastFcv, fcv);
+
+                // Execute any change in enabled/disabled status that should result from the FCV
+                // change and then move on to the next parameter if this one is disabled.
+                if (enabledBefore && !enabledAfter) {
                     // Parameter is newly disabled on cluster
                     LOGV2_DEBUG(
                         7410703, 3, "Disabling parameter during refresh", "name"_attr = name);
                     sp->disable(false /* permanent */);
                     continue;
-                } else if (sp->canBeEnabledOnVersion(fcv) && !sp->canBeEnabledOnVersion(_lastFcv)) {
+                } else if (!enabledBefore && enabledAfter) {
                     // Parameter is newly enabled on cluster
                     LOGV2_DEBUG(
                         7410704, 3, "Enabling parameter during refresh", "name"_attr = name);
-                    sp->enable();
+                    if (!sp->enable()) {
+                        // This parameter is permanently disabled.
+                        continue;
+                    }
                 }
-            }
-            if (!sp->isEnabled()) {
+            } else if (!sp->isEnabledOnVersion(fcv)) {
                 continue;
             }
+
+            // Continue refreshing any parameters that are enabled.
             BSONObjBuilder oldClusterParameterBob;
             sp->append(opCtx, &oldClusterParameterBob, name, tenantId);
 

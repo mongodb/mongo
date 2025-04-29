@@ -63,7 +63,7 @@ public:
                                            ExpressionUUID::parse,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            AllowedWithClientType::kAny,
-                                           kDoesNotRequireFeatureFlag);
+                                           nullptr /* featureFlag */);
         } catch (const DBException& e) {
             // Allow this exception, to allow multiple ExpressionUUIDTest instances
             // to be created in this process.

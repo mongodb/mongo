@@ -168,7 +168,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalBoundedSort,
                                        ::mongo::getTestCommandsEnabled()
                                            ? AllowedWithClientType::kAny
                                            : AllowedWithClientType::kInternal,
-                                       kDoesNotRequireFeatureFlag,
+                                       nullptr,  // featureFlag
                                        true);
 
 DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek() {

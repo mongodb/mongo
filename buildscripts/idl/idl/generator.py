@@ -3384,7 +3384,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     if param.condition:
                         if param.condition.feature_flag:
                             self._writer.write_line(
-                                "scp_%d->setFeatureFlag(%s);"
+                                "scp_%d->setFeatureFlag(&%s);"
                                 % (param_no, param.condition.feature_flag)
                             )
                         if param.condition.min_fcv:

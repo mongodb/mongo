@@ -244,13 +244,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Validator parseValidator(OperationContext* opCtx,
-                             const BSONObj& validator,
-                             MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-                             boost::optional<multiversion::FeatureCompatibilityVersion>
-                                 maxFeatureCompatibilityVersion) const override {
-        return _coll->parseValidator(
-            opCtx, validator, allowedFeatures, maxFeatureCompatibilityVersion);
+    Validator parseValidator(
+        OperationContext* opCtx,
+        const BSONObj& validator,
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures) const override {
+        return _coll->parseValidator(opCtx, validator, allowedFeatures);
     }
 
     void setValidator(OperationContext* opCtx, Validator validator) override {

@@ -100,17 +100,22 @@ class BSONElement;
  *
  * This is the most general REGISTER_EXPRESSION* macro, which all others should delegate to.
  */
-#define REGISTER_EXPRESSION_CONDITIONALLY(                                                   \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag, ...)                  \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                \
-                              ("BeginExpressionRegistration"),                               \
-                              ("EndExpressionRegistration"))                                 \
-    (InitializerContext*) {                                                                  \
-        if (!(__VA_ARGS__)) {                                                                \
-            return;                                                                          \
-        }                                                                                    \
-        Expression::registerExpression(                                                      \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag)); \
+#define REGISTER_EXPRESSION_CONDITIONALLY(                                                      \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag, ...)                     \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                   \
+                              ("BeginExpressionRegistration"),                                  \
+                              ("EndExpressionRegistration"))                                    \
+    (InitializerContext*) {                                                                     \
+        /* Require 'featureFlag' to be a constexpr. */                                          \
+        constexpr FeatureFlag* constFeatureFlag{featureFlag};                                   \
+        /* This non-constexpr variable works around a bug in GCC when 'featureFlag' is null. */ \
+        FeatureFlag* featureFlagValue{constFeatureFlag};                                        \
+        bool evaluatedCondition{__VA_ARGS__};                                                   \
+        if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {   \
+            return;                                                                             \
+        }                                                                                       \
+        Expression::registerExpression(                                                         \
+            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag));    \
     }
 
 /**
@@ -127,7 +132,7 @@ class BSONElement;
                                       parser,                        \
                                       AllowedWithApiStrict::kAlways, \
                                       AllowedWithClientType::kAny,   \
-                                      kDoesNotRequireFeatureFlag,    \
+                                      nullptr, /* featureFlag */     \
                                       true)
 
 /**
@@ -151,18 +156,10 @@ class BSONElement;
  * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
  * done here.
  */
-#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                                    \
-    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)                            \
-    REGISTER_EXPRESSION_CONDITIONALLY(                                                            \
-        key,                                                                                      \
-        parser,                                                                                   \
-        allowedWithApiStrict,                                                                     \
-        allowedClientType,                                                                        \
-        featureFlag,                                                                              \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                   \
-            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                           \
-                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()); \
-        }))
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                         \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag) \
+    REGISTER_EXPRESSION_CONDITIONALLY(                                 \
+        key, parser, allowedWithApiStrict, allowedClientType, featureFlag, true)
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
@@ -173,7 +170,7 @@ class BSONElement;
                                       parser,                                          \
                                       allowedWithApiStrict,                            \
                                       allowedClientType,                               \
-                                      kDoesNotRequireFeatureFlag,                      \
+                                      nullptr /* featureFlag */,                       \
                                       getTestCommandsEnabled())
 
 class Expression : public RefCountable {
@@ -328,7 +325,7 @@ public:
                                    Parser parser,
                                    AllowedWithApiStrict allowedWithApiStrict,
                                    AllowedWithClientType allowedWithClientType,
-                                   CheckableFeatureFlagRef featureFlag);
+                                   FeatureFlag* featureFlag);
 
     const ExpressionVector& getChildren() const {
         return _children;

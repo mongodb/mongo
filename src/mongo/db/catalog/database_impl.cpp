@@ -902,16 +902,6 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                           // expression for a validator to apply some additional checks.
                           .isParsingCollectionValidator(true)
                           .build();
-        // If the feature compatibility version is not kLatest, and we are validating features as
-        // primary, ban the use of new agg features introduced in kLatest to prevent them from being
-        // persisted in the catalog.
-        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        multiversion::FeatureCompatibilityVersion fcv;
-        if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
-                multiversion::GenericFCV::kLatest, &fcv)) {
-            expCtx->setMaxFeatureCompatibilityVersion(fcv);
-        }
 
         // If the validation action is printing logs or the level is "moderate", or if the user has
         // defined some encrypted fields in the collection options, then disallow any encryption

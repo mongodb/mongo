@@ -263,14 +263,9 @@ extern MatchTypeToRewriteMap matchPredicateRewriteMap;
 /**
  * Register an agg rewrite behind a feature flag.
  */
-#define REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag)  \
-    REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_GUARDED(                                             \
-        matchType,                                                                                \
-        rewriteClass,                                                                             \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                   \
-            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                           \
-                kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()); \
-        }))
+#define REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag) \
+    REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_GUARDED(                                            \
+        matchType, rewriteClass, (featureFlag).canBeEnabled())
 
 /**
  * Register a MatchExpression rewrite if a condition is true at startup time.
@@ -303,11 +298,6 @@ extern MatchTypeToRewriteMap matchPredicateRewriteMap;
  */
 #define REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag) \
     REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_GUARDED(                                            \
-        matchType,                                                                                 \
-        rewriteClass,                                                                              \
-        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {                    \
-            return fcvGatedFlag.isEnabled(                                                         \
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());                     \
-        }))
+        matchType, rewriteClass, (featureFlag).canBeEnabled())
 }  // namespace fle
 }  // namespace mongo

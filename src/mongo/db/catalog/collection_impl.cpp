@@ -701,9 +701,7 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
 Collection::Validator CollectionImpl::parseValidator(
     OperationContext* opCtx,
     const BSONObj& validator,
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-    boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion)
-    const {
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
     if (MONGO_unlikely(allowSettingMalformedCollectionValidators.shouldFail())) {
         return {validator, nullptr, nullptr};
     }
@@ -727,8 +725,6 @@ Collection::Validator CollectionImpl::parseValidator(
                       // The match expression parser needs to know that we're parsing an expression
                       // for a validator to apply some additional checks.
                       .isParsingCollectionValidator(true)
-                      // Enforce a maximum feature version if requested.
-                      .maxFeatureCompatibilityVersion(maxFeatureCompatibilityVersion)
                       .build();
 
     expCtx->variables.setDefaultRuntimeConstants(opCtx);

@@ -62,6 +62,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -141,7 +142,7 @@ struct ParserRegistration {
     Parser parser;
     AllowedWithApiStrict allowedWithApiStrict;
     AllowedWithClientType allowedWithClientType;
-    CheckableFeatureFlagRef featureFlag;
+    FeatureFlag* featureFlag;
 };
 
 StringMap<ParserRegistration> parserMap;
@@ -151,7 +152,7 @@ void Expression::registerExpression(string key,
                                     Parser parser,
                                     AllowedWithApiStrict allowedWithApiStrict,
                                     AllowedWithClientType allowedWithClientType,
-                                    CheckableFeatureFlagRef featureFlag) {
+                                    FeatureFlag* featureFlag) {
     auto op = parserMap.find(key);
     massert(17064,
             str::stream() << "Duplicate expression (" << key << ") registered.",
@@ -180,7 +181,9 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
             it != parserMap.end());
 
     auto& entry = it->second;
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(opName, entry.featureFlag);
+    if (entry.featureFlag) {
+        expCtx->throwIfParserShouldRejectFeature(opName, *entry.featureFlag);
+    }
 
     if (expCtx->getOperationContext()) {
         assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
@@ -1987,7 +1990,7 @@ REGISTER_EXPRESSION_CONDITIONALLY(meta,
                                   ExpressionMeta::parse,
                                   AllowedWithApiStrict::kConditionally,
                                   AllowedWithClientType::kAny,
-                                  kDoesNotRequireFeatureFlag,
+                                  nullptr, /* featureFlag */
                                   true);
 
 void ExpressionMeta::_assertMetaFieldCompatibleWithStrictAPI(ExpressionContext* const expCtx,
@@ -2123,8 +2126,8 @@ REGISTER_EXPRESSION_CONDITIONALLY(
     ExpressionInternalRawSortKey::parse,
     AllowedWithApiStrict::kInternal,
     AllowedWithClientType::kInternal,
-    kDoesNotRequireFeatureFlag,
-    true);  // The 'condition' is always true - we just wanted to restrict to internal.
+    nullptr, /* nullptr */
+    true);   // The 'condition' is always true - we just wanted to restrict to internal.
 
 intrusive_ptr<Expression> ExpressionInternalRawSortKey::parse(ExpressionContext* const expCtx,
                                                               BSONElement expr,
@@ -3108,7 +3111,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
                                       ExpressionSigmoid::parseExpressionSigmoid,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagRankFusionBasic);
+                                      &feature_flags::gFeatureFlagRankFusionBasic);
 
 /* ----------------------- ExpressionSize ---------------------------- */
 
@@ -3674,7 +3677,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toUUID,
                                                           BinDataType::newUUID),
                                       AllowedWithApiStrict::kAlways,
                                       AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagBinDataConvert);
+                                      &feature_flags::gFeatureFlagBinDataConvert);
 
 boost::intrusive_ptr<Expression> ExpressionConvert::create(
     ExpressionContext* const expCtx,
@@ -4139,7 +4142,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(currentDate,
                                       ExpressionCurrentDate::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagCurrentDate);
+                                      &feature_flags::gFeatureFlagCurrentDate);
 
 ExpressionCurrentDate::ExpressionCurrentDate(ExpressionContext* const expCtx)
     : Expression(expCtx) {}
@@ -4785,7 +4788,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(uuid,
                                       ExpressionUUID::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagUUIDExpression);
+                                      &feature_flags::gFeatureFlagUUIDExpression);
 
 ExpressionUUID::ExpressionUUID(ExpressionContext* const expCtx) : Expression(expCtx) {
     expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
@@ -4880,7 +4883,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrStartsWith,
                                       ExpressionEncStrStartsWith::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      gFeatureFlagQETextSearchPreview);
+                                      &gFeatureFlagQETextSearchPreview);
 
 ExpressionEncStrStartsWith::ExpressionEncStrStartsWith(ExpressionContext* const expCtx,
                                                        boost::intrusive_ptr<Expression> input,
@@ -4926,7 +4929,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrEndsWith,
                                       ExpressionEncStrEndsWith::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      gFeatureFlagQETextSearchPreview);
+                                      &gFeatureFlagQETextSearchPreview);
 
 ExpressionEncStrEndsWith::ExpressionEncStrEndsWith(ExpressionContext* const expCtx,
                                                    boost::intrusive_ptr<Expression> input,
@@ -4971,7 +4974,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrContains,
                                       ExpressionEncStrContains::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      gFeatureFlagQETextSearchPreview);
+                                      &gFeatureFlagQETextSearchPreview);
 
 ExpressionEncStrContains::ExpressionEncStrContains(ExpressionContext* const expCtx,
                                                    boost::intrusive_ptr<Expression> input,
@@ -5018,7 +5021,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(encStrNormalizedEq,
                                       ExpressionEncStrNormalizedEq::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
-                                      gFeatureFlagQETextSearchPreview);
+                                      &gFeatureFlagQETextSearchPreview);
 
 ExpressionEncStrNormalizedEq::ExpressionEncStrNormalizedEq(
     ExpressionContext* const expCtx,

@@ -35,6 +35,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -57,7 +58,7 @@ void AccumulationStatement::registerAccumulator(std::string name,
                                                 AccumulationStatement::Parser parser,
                                                 AllowedWithApiStrict allowedWithApiStrict,
                                                 AllowedWithClientType allowedWithClientType,
-                                                CheckableFeatureFlagRef featureFlag) {
+                                                FeatureFlag* featureFlag) {
     auto it = parserMap.find(name);
     massert(28722,
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
@@ -107,7 +108,9 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     auto&& [parser, allowedWithApiStrict, allowedWithClientType, featureFlag] =
         AccumulationStatement::getParser(accName);
 
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(accName, featureFlag);
+    if (featureFlag) {
+        expCtx->throwIfParserShouldRejectFeature(accName, *featureFlag);
+    }
 
     tassert(5837900,
             "Accumulators should only appear in a user operation",

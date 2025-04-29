@@ -29,11 +29,9 @@
 
 #include "mongo/db/server_parameter.h"
 
-#include <fmt/format.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <utility>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/feature_flag.h"
@@ -108,37 +106,36 @@ bool ServerParameter::isEnabled() const {
 
 bool ServerParameter::isEnabledOnVersion(
     const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    {
-        stdx::lock_guard lk(_mutex);
-        if (_disableState != DisableState::Enabled) {
-            return false;
-        }
-    }
-    return _isEnabledOnVersion(targetFCV);
-}
-
-bool ServerParameter::canBeEnabledOnVersion(
-    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    {
-        stdx::lock_guard lk(_mutex);
-        if (_disableState == DisableState::PermanentlyDisabled) {
-            return false;
-        }
-    }
-    return _isEnabledOnVersion(targetFCV);
-}
-
-bool ServerParameter::_isEnabledOnVersion(
-    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    return minFCVIsLessThanOrEqualToVersion(targetFCV) &&
-        !featureFlagIsDisabledOnVersion(targetFCV);
-}
-
-bool ServerParameter::featureFlagIsDisabledOnVersion(
-    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
     stdx::lock_guard lk(_mutex);
-    return !_featureFlag.isEnabled(
-        [&](auto& fcvGatedFlag) { return fcvGatedFlag.isEnabledOnVersion(targetFCV); });
+    if (_disableState != DisableState::Enabled) {
+        return false;
+    }
+
+    return _meetsFCVAndFlagRequirements_inLock(targetFCV);
+}
+
+std::pair<bool, bool> ServerParameter::isEnabledBeforeAndAfterFCVChange(
+    const multiversion::FeatureCompatibilityVersion& before,
+    const multiversion::FeatureCompatibilityVersion& after) const {
+    stdx::lock_guard lk(_mutex);
+    if (_disableState != DisableState::Enabled) {
+        return {false, false};
+    }
+
+    return {_meetsFCVAndFlagRequirements_inLock(before),
+            _meetsFCVAndFlagRequirements_inLock(after)};
+}
+
+std::pair<bool, bool> ServerParameter::canBeEnabledBeforeAndAfterFCVChange(
+    const multiversion::FeatureCompatibilityVersion& before,
+    const multiversion::FeatureCompatibilityVersion& after) const {
+    stdx::lock_guard lk(_mutex);
+    if (_disableState == DisableState::PermanentlyDisabled) {
+        return {false, false};
+    }
+
+    return {_meetsFCVAndFlagRequirements_inLock(before),
+            _meetsFCVAndFlagRequirements_inLock(after)};
 }
 
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {
@@ -193,6 +190,12 @@ StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& elem
 
 void ServerParameterSet::remove(const std::string& name) {
     invariant(1 == _map.erase(name), fmt::format("Failed to erase key \"{}\"", name));
+}
+
+bool ServerParameter::_meetsFCVAndFlagRequirements_inLock(
+    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+    return (!_minFCV || targetFCV >= *_minFCV) &&
+        (!_featureFlag || _featureFlag->isServerParameterEnabled(targetFCV));
 }
 
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,

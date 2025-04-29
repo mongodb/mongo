@@ -35,6 +35,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -61,9 +62,7 @@ StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
 DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<ExpressionContext>& pCtx)
     : Stage(stageName, pCtx) {}
 
-void DocumentSource::registerParser(std::string name,
-                                    Parser parser,
-                                    CheckableFeatureFlagRef featureFlag) {
+void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
     auto it = parserMap.find(name);
     massert(28707,
             str::stream() << "Duplicate document source (" << name << ") registered.",
@@ -73,7 +72,7 @@ void DocumentSource::registerParser(std::string name,
 
 void DocumentSource::registerParser(std::string name,
                                     SimpleParser simpleParser,
-                                    CheckableFeatureFlagRef featureFlag) {
+                                    FeatureFlag* featureFlag) {
 
     Parser parser = [simpleParser = std::move(simpleParser)](
                         BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
@@ -114,7 +113,9 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             it != parserMap.end());
 
     auto& entry = it->second;
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(stageName, entry.featureFlag);
+    if (entry.featureFlag) {
+        expCtx->throwIfParserShouldRejectFeature(stageName, *entry.featureFlag);
+    }
 
     return it->second.parser(stageSpec, expCtx);
 }

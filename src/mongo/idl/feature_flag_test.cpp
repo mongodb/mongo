@@ -46,6 +46,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
@@ -363,35 +364,6 @@ static constexpr auto fcvGatedFlagCheckMustNotBeCalled = [](FCVGatedFeatureFlag&
     MONGO_UNREACHABLE;
 };
 
-// Test none and default-constructed values of a checkable feature flag reference.
-// As they mean that a feature is not conditional on a feature flag, they always return true.
-TEST_F(FeatureFlagTest, NoneAsCheckableFeatureFlagRef) {
-    ASSERT_TRUE(CheckableFeatureFlagRef().isEnabled(fcvGatedFlagCheckMustNotBeCalled));
-    ASSERT_TRUE(kDoesNotRequireFeatureFlag.isEnabled(fcvGatedFlagCheckMustNotBeCalled));
-}
-
-// Tests wrapping a binary-compatible feature flag inside a checkable feature flag reference.
-// It should return whether the feature flag is enabled without invoking the callback.
-TEST_F(FeatureFlagTest, BinaryCompatibleAsCheckableFeatureFlagRef) {
-    CheckableFeatureFlagRef checkableFeatureFlagRefFork(feature_flags::gFeatureFlagFork);
-    ASSERT_OK(_featureFlagFork->setFromString("false", boost::none));
-    ASSERT_FALSE(checkableFeatureFlagRefFork.isEnabled(fcvGatedFlagCheckMustNotBeCalled));
-    ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
-    ASSERT_TRUE(checkableFeatureFlagRefFork.isEnabled(fcvGatedFlagCheckMustNotBeCalled));
-}
-
-// Tests wrapping an FCV-gated feature flag inside a checkable feature flag reference.
-// It should invoke the callback to check whether the feature flag is enabled and forward its value.
-TEST_F(FeatureFlagTest, FCVGatedAsCheckableFeatureFlagRef) {
-    CheckableFeatureFlagRef checkableFeatureFlagRefBlender(feature_flags::gFeatureFlagBlender);
-    checkableFeatureFlagRefBlender.isEnabled([](auto& fcvGatedFlag) -> bool {
-        ASSERT_EQUALS(&fcvGatedFlag, &feature_flags::gFeatureFlagBlender);
-        return true;
-    });
-    ASSERT_FALSE(checkableFeatureFlagRefBlender.isEnabled([](auto&) { return false; }));
-    ASSERT_TRUE(checkableFeatureFlagRefBlender.isEnabled([](auto&) { return true; }));
-}
-
 TEST_F(FeatureFlagTest, TestFCVGatedWithTransitionOnTransitionalFCV) {
     // (Generic FCV reference): feature flag test
     mongo::FCVGatedFeatureFlag featureFlagLatest{
@@ -527,6 +499,42 @@ TEST(IDLFeatureFlag, ReleasedIncrementalRolloutFeatureFlag) {
     // (I.e, 'appendFlagStats()' should not change the 'falseChecks' and 'trueChecks' values.)
     auto secondFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleasedForTest);
     ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats, secondFlagStats);
+}
+
+TEST(IDLFeatureFlag, IncrementalFeatureRolloutContext) {
+    // Initialize flags.
+    feature_flags::gFeatureFlagInDevelopmentForTest.setForServerParameter(false);
+    feature_flags::gFeatureFlagReleasedForTest.setForServerParameter(true);
+
+    // Query an IFR flag using an IFR context.
+    IncrementalFeatureRolloutContext ifrContext;
+    ASSERT(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleasedForTest));
+
+    // Querying the flag via the same IFR context should produce the same result, even if the flag
+    // changed its value.
+    feature_flags::gFeatureFlagReleasedForTest.setForServerParameter(false);
+    ASSERT(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleasedForTest));
+
+    // Query a second flag in order to save its value to the context as well.
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagInDevelopmentForTest));
+
+    // Write the IFR context as a BSON array and validate the result.
+    BSONArrayBuilder savedFlagsBuilder;
+    ifrContext.appendSavedFlagValues(savedFlagsBuilder);
+    BSONArray savedFlagsArray(savedFlagsBuilder.done());
+
+    StringMap<bool> observedValues;
+    for (auto&& element : savedFlagsArray) {
+        ASSERT(element.isABSONObj()) << savedFlagsArray;
+
+        auto valueField = element["value"];
+        ASSERT(valueField.isBoolean()) << savedFlagsArray;
+        observedValues.insert({element["name"].str(), valueField.boolean()});
+    }
+
+    StringMap<bool> expectedValues = {{"featureFlagInDevelopmentForTest", false},
+                                      {"featureFlagReleasedForTest", true}};
+    ASSERT_EQ(observedValues, expectedValues) << savedFlagsArray;
 }
 }  // namespace
 }  // namespace mongo

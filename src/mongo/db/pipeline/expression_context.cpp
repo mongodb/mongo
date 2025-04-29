@@ -35,18 +35,48 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/version_context.h"
 
 namespace mongo {
 
-ExpressionContextBuilder& ExpressionContextBuilder::opCtx(OperationContext* optCtx) {
-    params.opCtx = optCtx;
+ExpressionContextBuilder& ExpressionContextBuilder::opCtx(OperationContext* opCtx) {
+    params.opCtx = opCtx;
+
+    VersionContext vCtx = VersionContext::getDecoration(opCtx);
+    if (vCtx.isInitialized()) {
+        params.vCtx = vCtx;
+    } else if (auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+               fcvSnapshot.isVersionInitialized()) {
+        params.vCtx.setOperationFCV(fcvSnapshot);
+    } else {
+        // Leave 'vCtx' in its uninitialized state.
+    }
+
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::opCtx(OperationContext* opCtx,
+                                                          VersionContext vCtx) {
+    params.opCtx = opCtx;
+    params.vCtx = vCtx;
+
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::ifrContext(
+    const IncrementalFeatureRolloutContext& ifrContext) {
+    params.ifrContext = ifrContext;
+
     return *this;
 }
 
@@ -343,12 +373,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNames
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::maxFeatureCompatibilityVersion(
-    boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion) {
-    params.maxFeatureCompatibilityVersion = std::move(maxFeatureCompatibilityVersion);
-    return *this;
-}
-
 ExpressionContextBuilder& ExpressionContextBuilder::subPipelineDepth(long long subPipelineDepth) {
     params.subPipelineDepth = subPipelineDepth;
     return *this;
@@ -570,7 +594,8 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     // letParameters, view). In case new fields need to be cloned, they will need to be added in the
     // builder and the proper setter called here.
     auto expCtx = ExpressionContextBuilder()
-                      .opCtx(_params.opCtx)
+                      .opCtx(_params.opCtx, _params.vCtx)
+                      .ifrContext(_params.ifrContext)
                       .collator(std::move(collator))
                       .mongoProcessInterface(_params.mongoProcessInterface)
                       .ns(ns)
@@ -594,7 +619,6 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                       .changeStreamTokenVersion(_params.changeStreamTokenVersion)
                       .changeStreamSpec(_params.changeStreamSpec)
                       .originalAggregateCommand(_params.originalAggregateCommand)
-                      .maxFeatureCompatibilityVersion(_params.maxFeatureCompatibilityVersion)
                       .subPipelineDepth(_params.subPipelineDepth)
                       .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
                       .build();
@@ -671,38 +695,16 @@ void ExpressionContext::initializeReferencedSystemVariables() {
     }
 }
 
-void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(StringData name,
-                                                            CheckableFeatureFlagRef flag) {
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            // We would like to include the current version and the required minimum version in this
-            // error message, but using FeatureCompatibilityVersion::toString() would introduce a
-            // dependency cycle (see SERVER-31968).
-            str::stream() << name
-                          << " is not allowed in the current feature compatibility version. See "
-                          << feature_compatibility_version_documentation::compatibilityLink()
-                          << " for more information.",
-            flag.isEnabled([&](auto& fcvGatedFlag) {
-                invariant(getOperationContext());
-
-                // maxFeatureCompatibilityVersion is set when parsing collection options that can
-                // contain query operations and which are persisted in the catalog: validators and
-                // view pipelines. When it is set, features are checked against that single FCV,
-                // instead of the server's FCV, which is not guaranteed to be stable across checks.
-                // If the operation has a VersionContext / Operation FCV, it will take precedence
-                // over the maxFeatureCompatibilityVersion in feature flag checks. This is correct,
-                // because Operation FCV provides feature flag stability for the entire operation,
-                // and therefore is is a superset of maxFeatureCompatibilityVersion, which only
-                // provides FCV stability for the feature flag checks of a single ExpressionContext.
-                if (_params.maxFeatureCompatibilityVersion) {
-                    return fcvGatedFlag.isEnabled(
-                        VersionContext::getDecoration(getOperationContext()),
-                        ServerGlobalParams::FCVSnapshot{*_params.maxFeatureCompatibilityVersion});
-                }
-
-                return fcvGatedFlag.isEnabledUseLastLTSFCVWhenUninitialized(
-                    VersionContext::getDecoration(getOperationContext()),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-            }));
+void ExpressionContext::throwIfParserShouldRejectFeature(StringData name, FeatureFlag& flag) {
+    // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
+    uassert(
+        ErrorCodes::QueryFeatureNotAllowed,
+        str::stream() << name
+                      << " is not allowed in the current feature compatibility version. See "
+                      << feature_compatibility_version_documentation::compatibilityLink()
+                      << " for more information.",
+        flag.checkWithContext(_params.vCtx,
+                              _params.ifrContext,
+                              ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}));
 }
-
 }  // namespace mongo

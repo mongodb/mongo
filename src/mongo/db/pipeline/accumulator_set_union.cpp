@@ -34,13 +34,13 @@ namespace mongo {
 
 REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(setUnion,
                                        genericParseSingleExpressionAccumulator<AccumulatorSetUnion>,
-                                       feature_flags::gFeatureFlagArrayAccumulators);
+                                       &feature_flags::gFeatureFlagArrayAccumulators);
 
 REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
     setUnion,
     (mongo::window_function::ExpressionRemovable<AccumulatorSetUnion,
                                                  WindowFunctionSetUnion>::parse),
-    feature_flags::gFeatureFlagArrayAccumulators,
+    &feature_flags::gFeatureFlagArrayAccumulators,
     AllowedWithApiStrict::kAlways);
 
 AccumulatorSetUnion::AccumulatorSetUnion(ExpressionContext* const expCtx,

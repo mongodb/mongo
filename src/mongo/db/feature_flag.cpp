@@ -260,6 +260,12 @@ void IncrementalRolloutFeatureFlag::appendFlagDetails(BSONObjBuilder& detailsBui
     detailsBuilder.append("incrementalFeatureRolloutPhase", phaseName);
 }
 
+bool IncrementalRolloutFeatureFlag::checkWithContext(const VersionContext& vCtx,
+                                                     IncrementalFeatureRolloutContext& ifrContext,
+                                                     ServerGlobalParams::FCVSnapshot fcv) {
+    return ifrContext.getSavedFlagValue(*this);
+}
+
 void IncrementalRolloutFeatureFlag::setForServerParameter(bool value) {
     auto previousValue = _value.swap(value);
 
@@ -270,5 +276,23 @@ void IncrementalRolloutFeatureFlag::setForServerParameter(bool value) {
 
 void IncrementalRolloutFeatureFlag::registerFlag(IncrementalRolloutFeatureFlag* flag) {
     getMutableAllIncrementalRolloutFeatureFlags().push_back(flag);
+}
+
+bool IncrementalFeatureRolloutContext::getSavedFlagValue(IncrementalRolloutFeatureFlag& flag) {
+    if (auto flagIt = _savedFlagValues.find(&flag); flagIt != _savedFlagValues.end()) {
+        return flagIt->second;
+    } else {
+        bool value = flag.checkEnabled();
+        _savedFlagValues.emplace(&flag, value);
+        return value;
+    }
+}
+
+void IncrementalFeatureRolloutContext::appendSavedFlagValues(BSONArrayBuilder& builder) const {
+    for (auto&& [flag, savedValue] : _savedFlagValues) {
+        BSONObjBuilder flagBuilder(builder.subobjStart());
+        flagBuilder.append("name", flag->getName());
+        flagBuilder.appendBool("value", savedValue);
+    }
 }
 }  // namespace mongo

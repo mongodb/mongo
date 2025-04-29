@@ -103,7 +103,7 @@ namespace mongo {
                                            fullParser,                              \
                                            allowedWithApiStrict,                    \
                                            AllowedWithClientType::kAny,             \
-                                           kDoesNotRequireFeatureFlag,              \
+                                           nullptr, /* featureFlag */               \
                                            true)
 
 /**
@@ -130,7 +130,7 @@ namespace mongo {
                                            fullParser,                            \
                                            AllowedWithApiStrict::kInternal,       \
                                            AllowedWithClientType::kInternal,      \
-                                           kDoesNotRequireFeatureFlag,            \
+                                           nullptr, /* featureFlag*/              \
                                            condition)
 
 /**
@@ -151,12 +151,12 @@ namespace mongo {
                               ("BeginDocumentSourceRegistration"),                                \
                               ("EndDocumentSourceRegistration"))                                  \
     (InitializerContext*) {                                                                       \
-        if (!__VA_ARGS__ ||                                                                       \
-            !CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {              \
-                return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                       \
-                    kNoVersionContext,                                                            \
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());                \
-            })) {                                                                                 \
+        /* Require 'featureFlag' to be a constexpr. */                                            \
+        constexpr FeatureFlag* constFeatureFlag{featureFlag};                                     \
+        /* This non-constexpr variable works around a bug in GCC when 'featureFlag' is null. */   \
+        FeatureFlag* featureFlagValue{constFeatureFlag};                                          \
+        bool evaluatedCondition{__VA_ARGS__};                                                     \
+        if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {     \
             DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, featureFlag); \
             LiteParsedDocumentSource::registerParser("$" #key,                                    \
                                                      LiteParsedDocumentSource::parseDisabled,     \
@@ -178,7 +178,7 @@ namespace mongo {
                                            fullParser,                             \
                                            AllowedWithApiStrict::kNeverInVersion1, \
                                            AllowedWithClientType::kAny,            \
-                                           kDoesNotRequireFeatureFlag,             \
+                                           nullptr, /* featureFlag */              \
                                            ::mongo::getTestCommandsEnabled())
 
 /**
@@ -229,7 +229,7 @@ public:
 
     struct ParserRegistration {
         DocumentSource::Parser parser;
-        CheckableFeatureFlagRef featureFlag;
+        FeatureFlag* featureFlag;
     };
 
     /**
@@ -398,9 +398,7 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(std::string name,
-                               Parser parser,
-                               CheckableFeatureFlagRef featureFlag);
+    static void registerParser(std::string name, Parser parser, FeatureFlag* featureFlag);
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -410,7 +408,7 @@ public:
      */
     static void registerParser(std::string name,
                                SimpleParser simpleParser,
-                               CheckableFeatureFlagRef featureFlag);
+                               FeatureFlag* featureFlag);
 
     /**
      * Allocate and return a new, unique DocumentSource::Id value.

@@ -1206,15 +1206,15 @@ private:
 
     // Remove cluster parameters from the clusterParameters collections which are not enabled on
     // requestedVersion.
-    void _cleanUpClusterParameters(OperationContext* opCtx, const FCV requestedVersion) {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        invariant(fcvSnapshot.isUpgradingOrDowngrading());
-        const auto fromVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
-
+    void _cleanUpClusterParameters(OperationContext* opCtx,
+                                   const FCV originalVersion,
+                                   const FCV requestedVersion) {
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
         std::vector<write_ops::DeleteOpEntry> deletes;
         for (const auto& [name, sp] : clusterParameters->getMap()) {
-            if (sp->isEnabledOnVersion(fromVersion) && !sp->isEnabledOnVersion(requestedVersion)) {
+            auto [enabledBefore, enabledAfter] =
+                sp->isEnabledBeforeAndAfterFCVChange(originalVersion, requestedVersion);
+            if (enabledBefore && !enabledAfter) {
                 deletes.emplace_back(
                     write_ops::DeleteOpEntry(BSON("_id" << name), false /*multi*/));
             }
@@ -1288,12 +1288,10 @@ private:
     // (indicating a server bug and that the data is corrupted). ManualInterventionRequired
     // and fasserts are errors that are not expected to occur in practice, but if they did,
     // they would turn into a Support case.
-    void _internalServerCleanupForDowngrade(OperationContext* opCtx, const FCV requestedVersion) {
+    void _internalServerCleanupForDowngrade(OperationContext* opCtx,
+                                            const FCV originalVersion,
+                                            const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        invariant(fcvSnapshot.isUpgradingOrDowngrading());
-        const auto originalVersion = getTransitionFCVInfo(fcvSnapshot.getVersion()).from;
-
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
             if (feature_flags::gTSBucketingParametersUnchanged
                     .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
@@ -1331,7 +1329,7 @@ private:
             maybeModifyDataOnDowngradeForTest(opCtx, requestedVersion, originalVersion);
         }
 
-        _cleanUpClusterParameters(opCtx, requestedVersion);
+        _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);
         _createAuthzSchemaVersionDocIfNeeded(opCtx);
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1420,9 +1418,10 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+
         const auto requestedVersion = request.getCommandParameter();
-        const auto actualVersion =
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
         auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         hangDowngradingBeforeIsCleaningServerMetadata.pauseWhileSet(opCtx);
@@ -1433,7 +1432,7 @@ private:
             const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx,
-                actualVersion,
+                fcvSnapshot.getVersion(),
                 requestedVersion,
                 isFromConfigServer,
                 changeTimestamp,
@@ -1464,7 +1463,8 @@ private:
         // (indicating a server bug and that the data is corrupted). ManualInterventionRequired
         // and fasserts are errors that are not expected to occur in practice, but if they did,
         // they would turn into a Support case.
-        _internalServerCleanupForDowngrade(opCtx, requestedVersion);
+        _internalServerCleanupForDowngrade(
+            opCtx, getTransitionFCVInfo(fcvSnapshot.getVersion()).from, requestedVersion);
 
         if (role && role->has(ClusterRole::ConfigServer)) {
             // Tell the shards to complete setFCV (transition to fully downgraded).

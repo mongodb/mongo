@@ -794,33 +794,6 @@ MONGO_REGISTER_COMMAND(CommandOnlyEnabledWithToaster)
     .requiresFeatureFlag(mongo::gFeatureFlagToaster);
 ```
 
-To build generic infrastructure which can accept both binary-compatible and FCV-gated feature flags, such as the command registration above, the `CheckableFeatureFlagRef` class can wrap and check either type of feature flag. A simple usage example is:
-
-```c++
-CheckableFeatureFlagRef CheckableFeatureFlagRef(feature_flags::gFeatureFlagToaster);
-if (CheckableFeatureFlagRef.isEnabled([](auto& fcvGatedFlag) {
-        return fcvGatedFlag.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    })) {
-    // Feature is enabled
-}
-```
-
-A more complex usage example checking multiple feature flags and with handling for uninitialized FCV:
-
-```c++
-CheckableFeatureFlagRef CheckableFeatureFlagRef(feature_flags::gFeatureFlagToaster);
-auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-if (feature_flags::gFeatureFlagFryer.isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot) &&
-    CheckableFeatureFlagRef.isEnabled([&](auto& fcvGatedFlag) {
-        return fcvGatedFlag.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx), fcvSnapshot);
-    })) {
-    // Both features are enabled
-}
-```
-
 ### FCV-gated Feature Flag Behavior During Initial Sync
 
 **_IMPORTANT NOTE ABOUT INITIAL SYNC_**:

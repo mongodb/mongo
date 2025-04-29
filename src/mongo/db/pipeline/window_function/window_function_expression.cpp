@@ -37,6 +37,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
@@ -58,7 +59,7 @@ REGISTER_STABLE_WINDOW_FUNCTION(last, ExpressionLast::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(linearFill, ExpressionLinearFill::parse);
 REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(minMaxScaler,
                                            ExpressionMinMaxScaler::parse,
-                                           feature_flags::gFeatureFlagSearchHybridScoringFull,
+                                           &feature_flags::gFeatureFlagSearchHybridScoringFull,
                                            AllowedWithApiStrict::kNeverInVersion1);
 REGISTER_STABLE_WINDOW_FUNCTION(minN, (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse));
 REGISTER_STABLE_WINDOW_FUNCTION(maxN, (ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>::parse));
@@ -103,7 +104,9 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                 const auto& parser = parserRegistration.parser;
                 const auto& featureFlag = parserRegistration.featureFlag;
 
-                expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(exprName, featureFlag);
+                if (featureFlag) {
+                    expCtx->throwIfParserShouldRejectFeature(exprName, *featureFlag);
+                }
 
                 auto allowedWithApi = parserRegistration.allowedWithApi;
 
@@ -149,7 +152,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
 
 void Expression::registerParser(std::string functionName,
                                 Parser parser,
-                                CheckableFeatureFlagRef featureFlag,
+                                FeatureFlag* featureFlag,
                                 AllowedWithApiStrict allowedWithApi) {
     invariant(parserMap.find(functionName) == parserMap.end());
     ExpressionParserRegistration r{parser, featureFlag, allowedWithApi};

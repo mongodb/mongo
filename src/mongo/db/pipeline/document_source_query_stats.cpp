@@ -75,7 +75,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
                                            DocumentSourceQueryStats::LiteParsed::parse,
                                            DocumentSourceQueryStats::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagQueryStats);
+                                           &feature_flags::gFeatureFlagQueryStats);
 ALLOCATE_DOCUMENT_SOURCE_ID(queryStats, DocumentSourceQueryStats::id)
 
 namespace {

@@ -474,22 +474,9 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             return getNotSupportedOnTimeseriesError(CollMod::kValidatorFieldName);
         }
         parsed.numModifications++;
-        // If the feature compatibility version is not kLatest, and we are validating features as
-        // primary, ban the use of new agg features introduced in kLatest to prevent them from being
-        // persisted in the catalog.
-        boost::optional<multiversion::FeatureCompatibilityVersion> maxFeatureCompatibilityVersion;
-        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        multiversion::FeatureCompatibilityVersion fcv;
-        if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
-                multiversion::GenericFCV::kLatest, &fcv)) {
-            maxFeatureCompatibilityVersion = fcv;
-        }
         auto validatorObj = *validator;
-        parsed.collValidator = coll->parseValidator(opCtx,
-                                                    validatorObj.getOwned(),
-                                                    MatchExpressionParser::kDefaultSpecialFeatures,
-                                                    maxFeatureCompatibilityVersion);
+        parsed.collValidator = coll->parseValidator(
+            opCtx, validatorObj.getOwned(), MatchExpressionParser::kDefaultSpecialFeatures);
 
         // Increment counters to track the usage of schema validators.
         validatorCounters.incrementCounters(
