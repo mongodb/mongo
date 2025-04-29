@@ -474,15 +474,15 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
 name = "codeowners"
-version = "0.7.0"
+version = "0.8.0"
 description = "Codeowners parser for Python"
 optional = false
-python-versions = ">=3.7,<4.0"
+python-versions = "<4.0,>=3.7"
 groups = ["modules_poc"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
 files = [
-    {file = "codeowners-0.7.0-py3-none-any.whl", hash = "sha256:0df5cd47299f984ba2e120dc4a0a7be68b528d53016ff39d06e86f85e33c7fc2"},
-    {file = "codeowners-0.7.0.tar.gz", hash = "sha256:a842647b20968c14da6066e4de4fffac4fd7c1c30de9cfa8b2fc8f534b3d9f48"},
+    {file = "codeowners-0.8.0-py3-none-any.whl", hash = "sha256:b92ce6f6c36dd9de5295c4dc285b2a3b14c81cae8b5eb3b05f0cfdbc4d93995a"},
+    {file = "codeowners-0.8.0.tar.gz", hash = "sha256:6505727574b67db4832a3d0d5e41c0f7eb80f8858ee27996e85b1e046f9266f8"},
 ]
 
 [package.dependencies]
@@ -5377,4 +5377,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "6a229234b161f0731b4eb689cc18116538310e4ec0b977f3e816d4bae5a888ef"
+content-hash = "30b34500b9366915bce3c0565417ae0d16818b23ea5fc80b93e8941f209d7a54"

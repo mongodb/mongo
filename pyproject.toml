@@ -119,7 +119,7 @@ evergreen-lint = "^0.1.9"
 ruff = "^0.6.7"
 
 [tool.poetry.group.modules_poc.dependencies]
-codeowners = { version = "^0.7.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+codeowners = { version = "^0.8.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 progressbar2 = { version = "^4.4.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 textual = {extras = ["syntax"], version = "^1.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 tree-sitter = { version = "^0.24.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
