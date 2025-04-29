@@ -156,6 +156,59 @@ DocumentSource::GetNextResult DocumentSourceSearchMeta::getNextAfterSetup() {
     return GetNextResult::makeEOF();
 }
 
+namespace {
+InternalSearchMongotRemoteSpec prepareInternalSearchMetaMongotSpec(
+    const BSONObj& spec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    if (spec.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)) {
+        // The existence of this field name indicates that this spec was already serialized from a
+        // mongos process. Parse out of the IDL spec format, rather than just expecting only the
+        // mongot query (as a user would provide).
+        auto params = InternalSearchMongotRemoteSpec::parseOwned(
+            IDLParserContext(DocumentSourceSearchMeta::kStageName), spec.getOwned());
+        LOGV2_DEBUG(8569405,
+                    4,
+                    "Parsing as $internalSearchMongotRemote",
+                    "params"_attr = redact(params.toBSON()));
+        return params;
+    }
+
+    // See note in DocumentSourceSearch::createFromBson() about making sure mongotQuery is owned
+    // within the mongot remote spec.
+    InternalSearchMongotRemoteSpec internalSpec(spec.getOwned());
+
+    if (expCtx->getIsParsingViewDefinition()) {
+        // $searchMeta is possible to be parsed from the user visible stage.  In this case, just
+        // return the mongot query itself parsed into IDL.
+        return internalSpec;
+    }
+
+    uassert(6600901,
+            "Running $searchMeta command in non-allowed context (update pipeline)",
+            !expCtx->getIsParsingPipelineUpdate());
+
+    // If 'searchReturnEofImmediately' is set, we return this stage as is because we don't expect to
+    // return any results. More precisely, we wish to avoid calling 'planShardedSearch' when no
+    // mongot is set up.
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries() &&
+        expCtx->getMongoProcessInterface()->inShardedEnvironment(expCtx->getOperationContext()) &&
+        !MONGO_unlikely(searchReturnEofImmediately.shouldFail())) {
+        // This query is executing in a sharded environment. We need to consult a mongot to
+        // construct such a merging pipeline for us to use later. Send a planShardedSearch command
+        // to mongot to get the relevant planning information, including the metadata merging
+        // pipeline and the optional merge sort spec.
+        search_helpers::planShardedSearch(expCtx, &internalSpec);
+    } else {
+        // This is an unsharded environment or there is no mongot. If the case is the former, this
+        // is only called from user pipelines during desugaring of $search/$searchMeta, so the
+        // `specObj` should be the search query itself. If 'searchReturnEofImmediately' is set, we
+        // return this stage as is because we don't expect to return any results. More precisely, we
+        // wish to avoid calling 'planShardedSearch' when no mongot is set up.
+    }
+
+    return internalSpec;
+}
+}  // namespace
+
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     mongot_cursor::throwIfNotRunningWithMongotHostConfigured(expCtx);
@@ -167,40 +220,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
 
     auto specObj = elem.embeddedObject();
     auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);
+    auto executor =
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto internalRemoteSpec = prepareInternalSearchMetaMongotSpec(specObj, expCtx);
 
-    // Note that the $searchMeta stage has two parsing options: one for the user visible stage and
-    // the second (longer) form which is serialized from mongos to the shards and includes more
-    // information such as merging pipeline.
-
-    // See note in DocumentSourceSearch::createFromBson() about making sure mongotQuery is owned
-    // within the mongot remote spec.
-
-    // Avoid any calls to mongot during desugaring.
-    if (expCtx->getIsParsingViewDefinition()) {
-        auto executor =
-            executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
-        return {
-            make_intrusive<DocumentSourceSearchMeta>(specObj.getOwned(), expCtx, executor, view)};
-    }
-
-    // If we have this field it suggests we were serialized from a mongos process. We should parse
-    // out of the IDL spec format, rather than just expecting only the mongot query (as a user would
-    // provide).
-    if (specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)) {
-        auto params = InternalSearchMongotRemoteSpec::parse(IDLParserContext(kStageName), specObj);
-        LOGV2_DEBUG(8569405,
-                    4,
-                    "Parsing as $internalSearchMongotRemote",
-                    "params"_attr = redact(params.toBSON()));
-        auto executor =
-            executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
-        return {
-            make_intrusive<DocumentSourceSearchMeta>(std::move(params), expCtx, executor, view)};
-    }
-
-    // Otherwise, we need to call this helper to determine if this is a sharded environment. If so,
-    // we need to consult a mongot to construct such a merging pipeline for us to use later.
-    return search_helpers::createInitialSearchPipeline<DocumentSourceSearchMeta>(specObj, expCtx);
+    return {make_intrusive<DocumentSourceSearchMeta>(
+        std::move(internalRemoteSpec), expCtx, executor, view)};
 }
 
 }  // namespace mongo
