@@ -65,6 +65,16 @@ echo ${ALL_FLAGS} > .bazel_build_flags
 set +o errexit
 
 for i in {1..3}; do
+  eval ${TIMEOUT_CMD} ${BAZEL_BINARY} fetch ${ALL_FLAGS} ${targets} && RET=0 && break || RET=$? && sleep 60
+  if [ $RET -eq 124 ]; then
+    echo "Bazel fetch timed out after ${build_timeout_seconds} seconds, retrying..."
+  else
+    echo "Bazel fetch failed, retrying..."
+  fi
+  $BAZEL_BINARY shutdown
+done
+
+for i in {1..3}; do
   eval ${TIMEOUT_CMD} ${BAZEL_BINARY} test ${ALL_FLAGS} ${targets} 2>&1 | tee bazel_stdout.log \
     && RET=0 && break || RET=$? && sleep 1
   if [ $RET -eq 124 ]; then
@@ -73,6 +83,7 @@ for i in {1..3}; do
     echo "Errors were found during the bazel test, failing the execution"
     break
   fi
+  $BAZEL_BINARY shutdown
 done
 
 # For a target //path:test, the undeclared test outputs are in

@@ -147,7 +147,7 @@ fi
 for i in {1..3}; do
   eval ${TIMEOUT_CMD} $BAZEL_BINARY build --verbose_failures $LOCAL_ARG ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} \
     --define=MONGO_VERSION=${version} ${patch_compile_flags} ${targets} 2>&1 | tee bazel_stdout.log \
-    && RET=0 && break || RET=$? && sleep 1
+    && RET=0 && break || RET=$? && sleep 60
   if [ $RET -eq 124 ]; then
     echo "Bazel timed out after ${build_timeout_seconds} seconds, retrying..."
   else
@@ -155,6 +155,7 @@ for i in {1..3}; do
     grep "ERROR:" bazel_stdout.log 1>&2
     echo "Bazel failed to execute, retrying..."
   fi
+  $BAZEL_BINARY shutdown
 done
 
 exit $RET
