@@ -23,6 +23,11 @@ struct __wt_ckpt_session {
 
     /* Checkpoint crash. */
     u_int crash_point; /* Crash point in the middle of checkpoint process */
+    enum {
+        CKPT_CRASH_BEFORE_METADATA_SYNC = 0,
+        CKPT_CRASH_BEFORE_METADATA_UPDATE,
+        CKPT_CRASH_ENUM_END
+    } ckpt_crash_state;
 
     /* Named checkpoint drop list, during a checkpoint */
     WT_ITEM *drop_list;
