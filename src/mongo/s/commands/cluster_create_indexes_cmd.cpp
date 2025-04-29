@@ -63,6 +63,7 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/collection_uuid_mismatch.h"
+#include "mongo/s/router_role.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/string_map.h"
 
@@ -143,10 +144,12 @@ public:
                 cmdToBeSent, nss, getName(), CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
         }
 
+        RoutingContext routingCtx(opCtx, {{targeter.getNS(), routingInfo}});
+
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             targeter.getNS(),
-            routingInfo,
+            routingCtx,
             CommandHelpers::filterCommandRequestForPassthrough(
                 applyReadWriteConcern(opCtx, this, cmdToBeSent)),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),

@@ -52,6 +52,13 @@ public:
                        nssList,  // list of required namespaces for the routing operation
                    bool allowLocks = false);
 
+    // TODO SERVER-102931: Integrate the RouterAcquisitionSnapshot
+    /**
+     * Constructs a RoutingContext from pre-acquired routing tables.
+     */
+    RoutingContext(OperationContext* opCtx,
+                   const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& nssToCriMap);
+
     // Non-copyable, non-movable
     RoutingContext(const RoutingContext&) = delete;
     RoutingContext& operator=(const RoutingContext&) = delete;

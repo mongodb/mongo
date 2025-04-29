@@ -92,16 +92,15 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -290,8 +289,8 @@ public:
         std::vector<AsyncRequestsSender::Response> shardResponses;
         auto bodyBuilder = result->getBodyBuilder();
 
-        const auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        RoutingContext routingCtx(opCtx, {nss});
+        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.
@@ -301,6 +300,11 @@ public:
                 cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
         if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
+            // TODO SERVER-102925 remove this once the RoutingContext is integrated into
+            // Cluster::runAggregate() isEligibleForViewlessTimeseriesRewritesInRouter,
+            // runDistinctAsAgg
+            routingCtx.onResponseReceivedForNss(nss, Status::OK());
+
             runDistinctAsAgg(opCtx,
                              std::move(canonicalQuery),
                              boost::none /* resolvedView */,
@@ -312,7 +316,7 @@ public:
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     nss,
-                    cri,
+                    routingCtx,
                     ClusterExplain::wrapAsExplain(
                         cmdObj,
                         verbosity,
@@ -367,8 +371,13 @@ public:
             "ExpCtxDiagnostics",
             diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
-        auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
-        if (swCri == ErrorCodes::NamespaceNotFound) {
+        boost::optional<RoutingContext> routingCtx;
+        try {
+            const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
+                shard_role_details::getLocker(opCtx)->isLocked();
+            auto nssList = std::vector<NamespaceString>{nss};
+            routingCtx.emplace(opCtx, nssList, allowLocks);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             // If the database doesn't exist, we successfully return an empty result set.
             result.appendArray("values", BSONObj());
             CurOp::get(opCtx)->setEndOfOpMetrics(0);
@@ -385,7 +394,8 @@ public:
         BSONObj distinctReadyForPassthrough = prepareDistinctForPassthrough(
             cmdObj, canonicalQuery->getExpCtx()->getQuerySettings(), requestQueryStats);
 
-        const auto cri = uassertStatusOK(std::move(swCri));
+        invariant(routingCtx, "Expected RoutingContext to be constructed successfully");
+        const auto& cri = routingCtx->getCollectionRoutingInfo(nss);
         const auto& cm = cri.getChunkManager();
 
         // Create an RAII object that prints the collection's shard key in the case of a tassert
@@ -393,10 +403,13 @@ public:
         ScopedDebugInfo shardKeyDiagnostics(
             "ShardKeyDiagnostics",
             diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
+                cri.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
+            // TODO SERVER-102925 remove this once the RoutingContext is integrated into
+            // Cluster::runAggregate()
+            routingCtx->onResponseReceivedForNss(nss, Status::OK());
             runDistinctAsAgg(opCtx,
                              std::move(canonicalQuery),
                              boost::none /* resolvedView */,
@@ -408,7 +421,7 @@ public:
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     nss,
-                    cri,
+                    routingCtx.value(),
                     applyReadWriteConcern(opCtx, this, distinctReadyForPassthrough),
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kIdempotent,
@@ -419,6 +432,7 @@ public:
                     true /* eligibleForSampling */);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 const auto& resolvedView = *ex.extraInfo<ResolvedView>();
+                routingCtx->onResponseReceivedForNss(nss, Status::OK());
                 runDistinctAsAgg(opCtx,
                                  std::move(canonicalQuery),
                                  resolvedView,
@@ -439,7 +453,7 @@ public:
                                   BSONObjComparator::FieldNamesMode::kConsider,
                                   !collation.isEmpty()
                                       ? canonicalQuery->getCollator()
-                                      : (cm.isSharded() ? cm.getDefaultCollator() : nullptr));
+                                      : (cri.isSharded() ? cm.getDefaultCollator() : nullptr));
         BSONObjSet all = bsonCmp.makeBSONObjSet();
 
         for (const auto& response : shardResponses) {

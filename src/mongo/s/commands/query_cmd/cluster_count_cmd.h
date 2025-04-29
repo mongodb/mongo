@@ -50,15 +50,14 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/router_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
 
@@ -179,8 +178,8 @@ public:
             auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
 
-            const auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            RoutingContext routingCtx(opCtx, {nss});
+            const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
             // Create an RAII object that prints the collection's shard key in the case of a tassert
             // or crash.
@@ -192,13 +191,22 @@ public:
 
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
 
-            auto aggResult = BSONObjBuilder{};
-            if (convertAndRunAggregateIfViewlessTimeseries(
-                    opCtx, aggResult, countRequest, cri, nss)) {
-                ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
-                    &result, boost::none /*tenantId*/);
-                // We've delegated execution to agg.
-                return true;
+            {
+                // This scope is used to end the use of the builder
+                // whether or not we convert to a view-less timeseries
+                // aggregate request.
+                auto aggResult = BSONObjBuilder{};
+
+                if (convertAndRunAggregateIfViewlessTimeseries(
+                        opCtx, aggResult, countRequest, cri, nss)) {
+                    ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
+                        &result, boost::none /*tenantId*/);
+                    // TODO SERVER-102925 remove this once the RoutingContext is integrated into
+                    // Cluster::runAggregate()
+                    routingCtx.onResponseReceivedForNss(nss, Status::OK());
+                    // We've delegated execution to agg.
+                    return true;
+                }
             }
 
             if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
@@ -263,7 +271,7 @@ public:
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 expCtx,
                 nss,
-                cri,
+                routingCtx,
                 applyReadWriteConcern(
                     opCtx,
                     this,
@@ -374,8 +382,8 @@ public:
             return exceptionToStatus();
         }
 
-        const auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        RoutingContext routingCtx(opCtx, {nss});
+        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.
@@ -391,6 +399,9 @@ public:
             auto bodyBuilder = result->getBodyBuilder();
             if (convertAndRunAggregateIfViewlessTimeseries(
                     opCtx, bodyBuilder, countRequest, cri, nss, verbosity)) {
+                // TODO SERVER-102925 remove this once the RoutingContext is integrated into
+                // Cluster::runAggregate()
+                routingCtx.onResponseReceivedForNss(nss, Status::OK());
                 // We've delegated execution to agg.
                 return Status::OK();
             }
@@ -430,7 +441,7 @@ public:
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss,
-                                                           cri,
+                                                           routingCtx,
                                                            explainCmd,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,

@@ -75,6 +75,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
@@ -369,7 +370,8 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests,
-    bool throwOnStaleShardVersionErrors) {
+    bool throwOnStaleShardVersionErrors,
+    RoutingContext* routingCtx = nullptr) {
 
     // Send the requests.
     MultiStatementTransactionRequestsSender ars(
@@ -394,6 +396,10 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
             // Check for special errors that require throwing out any accumulated results.
             auto& responseObj = response.swResponse.getValue().data;
             status = getStatusFromCommandResult(responseObj);
+
+            if (routingCtx) {
+                routingCtx->onResponseReceivedForNss(nss, status);
+            }
 
             // If we specify to throw on stale shard version errors, then we will early exit
             // from examining results. Otherwise, we will allow stale shard version errors to
@@ -441,14 +447,16 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
-    const std::vector<AsyncRequestsSender::Request>& requests) {
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    RoutingContext* routingCtx) {
     return gatherResponsesImpl(opCtx,
                                dbName,
                                nss,
                                readPref,
                                retryPolicy,
                                requests,
-                               true /* throwOnStaleShardVersionErrors */);
+                               true /* throwOnStaleShardVersionErrors */,
+                               routingCtx);
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
@@ -590,7 +598,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -599,38 +607,58 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     bool eligibleForSampling) {
-    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
-                                                               nss,
-                                                               cri,
-                                                               collation,
-                                                               boost::none /*explainVerbosity*/,
-                                                               letParameters,
-                                                               runtimeConstants);
-    return scatterGatherVersionedTargetByRoutingTable(
-        expCtx, nss, cri, cmdObj, readPref, retryPolicy, query, collation, eligibleForSampling);
+    auto expCtx =
+        makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                     nss,
+                                                     routingCtx.getCollectionRoutingInfo(nss),
+                                                     collation,
+                                                     boost::none /*explainVerbosity*/,
+                                                     letParameters,
+                                                     runtimeConstants);
+    return scatterGatherVersionedTargetByRoutingTable(expCtx,
+                                                      nss,
+                                                      routingCtx,
+                                                      cmdObj,
+                                                      readPref,
+                                                      retryPolicy,
+                                                      query,
+                                                      collation,
+                                                      eligibleForSampling);
 }
 
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
     const BSONObj& collation,
     bool eligibleForSampling) {
-    const auto requests = buildVersionedRequestsForTargetedShards(
-        expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
-    return gatherResponses(
-        expCtx->getOperationContext(), nss.dbName(), nss, readPref, retryPolicy, requests);
+    const auto requests =
+        buildVersionedRequestsForTargetedShards(expCtx,
+                                                nss,
+                                                routingCtx.getCollectionRoutingInfo(nss),
+                                                {} /* shardsToSkip */,
+                                                cmdObj,
+                                                query,
+                                                collation,
+                                                eligibleForSampling);
+    return gatherResponses(expCtx->getOperationContext(),
+                           nss.dbName(),
+                           nss,
+                           readPref,
+                           retryPolicy,
+                           requests,
+                           &routingCtx);
 }
 
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
@@ -639,6 +667,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
                                                                cri,
@@ -655,7 +684,8 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                                readPref,
                                retryPolicy,
                                requests,
-                               false /* throwOnStaleShardVersionErrors */);
+                               false /* throwOnStaleShardVersionErrors */,
+                               &routingCtx);
 }
 
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(

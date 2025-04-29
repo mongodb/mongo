@@ -55,13 +55,12 @@
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/query/planner/cluster_find.h"
+#include "mongo/s/router_role.h"
 
 namespace mongo {
 /**
@@ -251,6 +250,8 @@ public:
 
             try {
                 // Handle requests against a viewless timeseries collection.
+                // TODO SERVER-102925 remove this once the RoutingContext is integrated into
+                // Cluster::runAggregate()
                 if (convertAndRunAggregateIfViewlessTimeseries(
                         opCtx, result, cq.getFindCommandRequest(), querySettings, verbosity)) {
                     return;
@@ -261,9 +262,9 @@ public:
 
                 // We will time how long it takes to run the commands on the shards.
                 Timer timer;
-                const auto cri =
-                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-                        opCtx, cq.getFindCommandRequest().getNamespaceOrUUID().nss()));
+                const auto& nss = cq.getFindCommandRequest().getNamespaceOrUUID().nss();
+                RoutingContext routingCtx(opCtx, {nss});
+                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
                 // Create an RAII object that prints the collection's shard key in the case of a
                 // tassert or crash.
@@ -293,7 +294,7 @@ public:
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     _cmdRequest->getNamespaceOrUUID().nss(),
-                    cri,
+                    routingCtx,
                     explainCmd,
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kIdempotent,

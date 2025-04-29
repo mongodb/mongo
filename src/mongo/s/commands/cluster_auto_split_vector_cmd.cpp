@@ -37,7 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/router_role.h"
 
@@ -67,8 +66,7 @@ public:
             const auto nss = ns();
             const auto& req = request();
 
-            auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            RoutingContext routingCtx(opCtx, {nss});
 
             BSONObj filteredCmdObj =
                 CommandHelpers::filterCommandRequestForPassthrough(req.toBSON());
@@ -80,7 +78,7 @@ public:
             auto response =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss,
-                                                           cri,
+                                                           routingCtx,
                                                            filteredCmdObj,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,

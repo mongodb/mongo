@@ -138,11 +138,31 @@ public:
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
+        return _routeImpl(opCtx, comment, [&] {
+            auto cri = _getRoutingInfo(opCtx, _targetedNamespaces.front());
+            return callbackFn(opCtx, cri);
+        });
+    }
+
+    template <typename F>
+    auto routeWithRoutingContext(OperationContext* opCtx, StringData comment, F&& callbackFn) {
+        return _routeImpl(opCtx, comment, [&] {
+            // When in a multi-document transaction, allow getting routing info from the
+            // CatalogCache even though locks may be held. The CatalogCache will throw
+            // CannotRefreshDueToLocksHeld if the entry is not already cached.
+            const auto allowLocks = opCtx->inMultiDocumentTransaction();
+            RoutingContext routingCtx(opCtx, {_targetedNamespaces.front()}, allowLocks);
+            return callbackFn(opCtx, routingCtx);
+        });
+    }
+
+private:
+    template <typename F>
+    auto _routeImpl(OperationContext* opCtx, StringData comment, F&& work) {
         RouteContext context{comment.toString()};
         while (true) {
-            auto cri = _getRoutingInfo(opCtx, _targetedNamespaces.front());
             try {
-                return callbackFn(opCtx, cri);
+                return std::forward<F>(work)();
             } catch (const DBException& ex) {
                 _onException(opCtx, &context, ex.toStatus());
             }

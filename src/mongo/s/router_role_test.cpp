@@ -229,6 +229,67 @@ TEST_F(RouterRoleTest, CollectionRouterRetriesOnStaleConfigForNonSubRouter) {
     ASSERT_EQ(firstTry, false);
 }
 
+TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextDoesNotRetryForSubRouter) {
+    actAsSubRouter();
+
+    // The CollectionRouter should not retry if the shard acted as a sub-router.
+    int tries = 0;
+    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    ASSERT_THROWS_CODE(
+        router.routeWithRoutingContext(
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                tries++;
+                OID epoch{OID::gen()};
+                Timestamp timestamp{1, 0};
+                routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+                uasserted(StaleConfigInfo(_nss,
+                                          ShardVersionFactory::make(
+                                              ChunkVersion({epoch, timestamp}, {2, 0}),
+                                              boost::optional<CollectionIndexes>(boost::none)),
+                                          boost::none,
+                                          ShardId{"0"}),
+                          "StaleConfig error");
+            }),
+        DBException,
+        ErrorCodes::StaleConfig);
+
+    ASSERT_EQ(tries, 1);
+}
+
+TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetriesOnStaleConfigForNonSubRouter) {
+    const OID epoch{OID::gen()};
+    const Timestamp timestamp{1, 0};
+
+    // The CollectionRouter is expected to retry on StaleConfig error if the shard did not act as
+    // a sub-router.
+    bool firstTry = true;
+    sharding::router::CollectionRouter router(getServiceContext(), _nss);
+    auto future = launchAsync([&] {
+        router.routeWithRoutingContext(
+            operationContext(), "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                if (firstTry) {
+                    firstTry = false;
+                    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+                    uasserted(StaleConfigInfo(_nss,
+                                              ShardVersionFactory::make(
+                                                  ChunkVersion({epoch, timestamp}, {2, 0}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                                              boost::none,
+                                              ShardId{"0"}),
+                              "StaleConfig error");
+                } else {
+                    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+                    return BSONObj();
+                }
+            });
+    });
+
+    mockConfigServerQueries(_nss, epoch, timestamp);
+    future.default_timed_get();
+    ASSERT_EQ(firstTry, false);
+}
 
 TEST_F(RouterRoleTest, MultiCollectionRouterDoesNotRetryForSubRouter) {
     actAsSubRouter();
@@ -350,21 +411,6 @@ TEST_F(RouterRoleTest, CannotAccessUndeclaredNssOnRoutingContext) {
         10292301);
 }
 
-DEATH_TEST_F(RouterRoleTest,
-             DuplicateNssValidationErrorsOnRoutingContext,
-             "Duplicate validation recorded for namespace") {
-    const auto opCtx = operationContext();
-
-    ASSERT_THROWS_CODE(
-        [&] {
-            RoutingContext routingCtx(opCtx, std::vector{_nss});
-            routingCtx.onResponseReceivedForNss(_nss, Status::OK());
-            routingCtx.onResponseReceivedForNss(_nss, Status::OK());
-        }(),
-        AssertionException,
-        10292800);
-}
-
 TEST_F(RouterRoleTest, RoutingContextPropagatesCatalogCacheErrors) {
     auto opCtx = operationContext();
 
@@ -403,6 +449,21 @@ TEST_F(RouterRoleTest, RoutingContextRoutingTablesAreImmutable) {
     ASSERT_NE(versionA, versionB);
     ASSERT_EQ(routingCtx.getCollectionRoutingInfo(_nss).getCollectionVersion().placementVersion(),
               versionA);
+
+    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+}
+
+TEST_F(RouterRoleTest, RoutingContextCreationWithCRI) {
+    auto opCtx = operationContext();
+    auto cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _nss));
+
+    RoutingContext routingCtx(opCtx, {{_nss, cri}});
+    const auto& actualCri = routingCtx.getCollectionRoutingInfo(_nss);
+
+    ASSERT_TRUE(actualCri.hasRoutingTable());
+    ASSERT_TRUE(actualCri.isSharded());
+    ASSERT_EQ(actualCri.getCollectionVersion(), cri.getCollectionVersion());
 
     routingCtx.onResponseReceivedForNss(_nss, Status::OK());
 }

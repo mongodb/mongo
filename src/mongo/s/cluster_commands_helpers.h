@@ -57,6 +57,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/transaction_router.h"
 
@@ -155,7 +156,8 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const NamespaceString& nss,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
-    const std::vector<AsyncRequestsSender::Request>& requests);
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    RoutingContext* routingCtx = nullptr);
 
 /**
  * Returns a copy of 'cmdObj' with dbVersion appended if it exists in 'dbInfo'
@@ -297,7 +299,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -314,7 +316,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -334,7 +336,7 @@ std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,

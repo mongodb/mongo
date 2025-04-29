@@ -57,11 +57,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -126,14 +125,13 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        RoutingContext routingCtx(opCtx, {nss});
 
         const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
             auto shardResults =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss,
-                                                           cri,
+                                                           routingCtx,
                                                            cmdObj,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
@@ -154,7 +152,7 @@ public:
         // If the collection is not sharded, or is sharded only on the 'files_id' field, we only
         // need to target a single shard, because the files' chunks can only be contained in a
         // single sharded chunk
-        const auto& cm = cri.getChunkManager();
+        const auto& cm = routingCtx.getCollectionRoutingInfo(nss).getChunkManager();
         if (!cm.isSharded() ||
             SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
                                                         BSON("files_id" << 1))) {

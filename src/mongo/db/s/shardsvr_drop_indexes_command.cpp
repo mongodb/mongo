@@ -211,14 +211,13 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         opCtx, Grid::get(opCtx)->catalogCache(), resolvedNs, "dropIndexes", [&] {
             // If the collection is sharded, we target only the primary shard and the shards that
             // own chunks for the collection.
-            const auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, resolvedNs));
+            RoutingContext routingCtx(opCtx, {resolvedNs});
 
             auto shardResponses =
                 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                     opCtx,
                     resolvedNs,
-                    cri,
+                    routingCtx,
                     retryState.shardsWithSuccessResponses,
                     CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON),
                     ReadPreferenceSetting::get(opCtx),
@@ -236,7 +235,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
 
             std::string errmsg;
             BSONObjBuilder output, rawResBuilder;
-            bool isShardedCollection = cri.isSharded();
+            bool isShardedCollection = routingCtx.getCollectionRoutingInfo(resolvedNs).isSharded();
             const auto aggregateResponse = appendRawResponses(
                 opCtx, &errmsg, &rawResBuilder, shardResponses, isShardedCollection);
 

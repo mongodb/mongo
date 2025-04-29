@@ -80,6 +80,20 @@ RoutingContext::RoutingContext(OperationContext* opCtx,
     }
 }
 
+RoutingContext::RoutingContext(
+    OperationContext* opCtx,
+    const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& nssToCriMap)
+    : _catalogCache(Grid::get(opCtx)->catalogCache()) {
+    for (auto& [nss, cri] : nssToCriMap) {
+        auto [it, inserted] =
+            _nssToCriMap.try_emplace(nss, std::make_pair(std::move(cri), boost::none));
+        tassert(10402001,
+                str::stream() << "Namespace " << nss.toStringForErrorMsg()
+                              << " declared multiple times in RoutingContext",
+                inserted);
+    }
+}
+
 RoutingContext RoutingContext::createForTest(
     stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap) {
     return RoutingContext(nssMap);
@@ -113,13 +127,9 @@ StatusWith<CollectionRoutingInfo> RoutingContext::_getCollectionRoutingInfo(
 }
 
 void RoutingContext::onResponseReceivedForNss(const NamespaceString& nss, const Status& status) {
-    auto& criPair = _nssToCriMap.at(nss);
-    tassert(10292800,
-            str::stream() << "Duplicate validation recorded for namespace "
-                          << nss.toStringForErrorMsg(),
-            !criPair.second);
-
-    criPair.second = status;
+    if (auto& maybeStatus = _nssToCriMap.at(nss).second; !maybeStatus) {
+        maybeStatus = status;
+    }
 }
 
 bool RoutingContext::onStaleError(const NamespaceString& nss, const Status& status) {

@@ -45,13 +45,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -115,8 +114,7 @@ public:
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.dbName() == dbName);
 
-        auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        RoutingContext routingCtx(opCtx, {nss});
 
         BSONObj min = cmdObj.getObjectField("min");
         BSONObj max = cmdObj.getObjectField("max");
@@ -138,7 +136,7 @@ public:
         auto response =
             scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                        nss,
-                                                       cri,
+                                                       routingCtx,
                                                        filteredCmdObj,
                                                        ReadPreferenceSetting::get(opCtx),
                                                        Shard::RetryPolicy::kIdempotent,

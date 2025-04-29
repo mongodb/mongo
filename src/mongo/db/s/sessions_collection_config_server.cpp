@@ -68,6 +68,7 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -157,10 +158,14 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 }
             }();
 
+            // TODO SERVER-104347 Acquire CollectionRoutingInfo through RoutingContext only and
+            // remove direct CatalogCache access in the check above.
+            RoutingContext routingCtx(opCtx, {{nss, cri}});
+
             return scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss,
-                cri,
+                routingCtx,
                 SessionsCollection::generateCreateIndexesCmd(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry,

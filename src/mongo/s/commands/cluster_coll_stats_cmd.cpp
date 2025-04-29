@@ -65,6 +65,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/s/router_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/decorable.h"
@@ -274,13 +275,15 @@ public:
                 timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName(), boost::none);
         }
 
+        RoutingContext routingCtx(opCtx, {{targeter.getNS(), cri}});
+
         // Unscaled individual shard results. This is required to apply scaling after summing the
         // statistics from individual shards as opposed to adding the summation of the scaled
         // statistics.
         auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             targeter.getNS(),
-            cri,
+            routingCtx,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
             ReadPreferenceSetting::get(opCtx),

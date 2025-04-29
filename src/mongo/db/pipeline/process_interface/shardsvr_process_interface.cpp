@@ -486,11 +486,11 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
 void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), ns);
-    router.route(
+    router.routeWithRoutingContext(
         opCtx,
         fmt::format("copying index for empty collection {}",
                     NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())),
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             BSONObjBuilder cmdBuilder;
             cmdBuilder.append("createIndexes", ns.coll());
             cmdBuilder.append("indexes", indexSpecs);
@@ -500,7 +500,7 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
             auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 ns,
-                cri,
+                routingCtx,
                 cmdObj,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry,
