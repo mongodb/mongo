@@ -97,7 +97,7 @@ public:
     virtual void markKillOnClientDisconnect() = 0;
 
 
-    NetworkingBaton* networking() noexcept final {
+    NetworkingBaton* networking() final {
         return this;
     }
 

@@ -96,7 +96,7 @@ class AsioReactor : public transport::Reactor {
 public:
     AsioReactor() : _ioContext() {}
 
-    void run() noexcept final {
+    void run() final {
         MONGO_UNREACHABLE;
     }
 

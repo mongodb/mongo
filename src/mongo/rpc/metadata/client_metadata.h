@@ -108,7 +108,7 @@ public:
      * - You hold the Client lock.
      * - You are on the Client's thread.
      */
-    static const ClientMetadata* getForClient(Client* client) noexcept;
+    static const ClientMetadata* getForClient(Client* client);
 
     /**
      * Get the ClientMetadata for the OperationContext.
@@ -120,7 +120,7 @@ public:
      * - You hold the Client lock.
      * - You are on the Client's thread.
      */
-    static const ClientMetadata* getForOperation(OperationContext* opCtx) noexcept;
+    static const ClientMetadata* getForOperation(OperationContext* opCtx);
 
     /**
      * Get the prioritized ClientMetadata for the Client.
@@ -132,7 +132,7 @@ public:
      * - You hold the Client lock.
      * - You are on the Client's thread.
      */
-    static const ClientMetadata* get(Client* client) noexcept;
+    static const ClientMetadata* get(Client* client);
 
     /**
      * Set the ClientMetadata for the Client directly.

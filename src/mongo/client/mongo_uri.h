@@ -128,7 +128,7 @@ public:
             return lhs._lowercase == rhs._lowercase;
         }
 
-        const std::string& original() const noexcept {
+        const std::string& original() const {
             return _original;
         }
 

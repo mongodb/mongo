@@ -448,7 +448,7 @@ bool ClientMetadata::tryFinalize(Client* client) {
     return true;
 }
 
-const ClientMetadata* ClientMetadata::getForClient(Client* client) noexcept {
+const ClientMetadata* ClientMetadata::getForClient(Client* client) {
     auto& state = getClientState(client);
     if (!state.meta) {
         // If we haven't finalized, it's still okay to return our existing value.
@@ -457,7 +457,7 @@ const ClientMetadata* ClientMetadata::getForClient(Client* client) noexcept {
     return &state.meta.value();
 }
 
-const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) noexcept {
+const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) {
     auto& state = getOperationState(opCtx);
     if (!state.isFinalized) {
         return nullptr;
@@ -466,7 +466,7 @@ const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) n
     return &state.meta.value();
 }
 
-const ClientMetadata* ClientMetadata::get(Client* client) noexcept {
+const ClientMetadata* ClientMetadata::get(Client* client) {
     if (auto opCtx = client->getOperationContext()) {
         if (auto meta = getForOperation(opCtx)) {
             return meta;

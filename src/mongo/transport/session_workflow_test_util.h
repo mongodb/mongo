@@ -71,27 +71,27 @@ public:
         return isConnectedCb();
     }
 
-    Status waitForData() noexcept override {
+    Status waitForData() override {
         return waitForDataCb();
     }
 
-    StatusWith<Message> sourceMessage() noexcept override {
+    StatusWith<Message> sourceMessage() override {
         return sourceMessageCb();
     }
 
-    Status sinkMessage(Message message) noexcept override {
+    Status sinkMessage(Message message) override {
         return sinkMessageCb(std::move(message));
     }
 
-    Future<void> asyncWaitForData() noexcept override {
+    Future<void> asyncWaitForData() override {
         return asyncWaitForDataCb();
     }
 
-    Future<Message> asyncSourceMessage(const BatonHandle& handle) noexcept override {
+    Future<Message> asyncSourceMessage(const BatonHandle& handle) override {
         return asyncSourceMessageCb(handle);
     }
 
-    Future<void> asyncSinkMessage(Message message, const BatonHandle& handle) noexcept override {
+    Future<void> asyncSinkMessage(Message message, const BatonHandle& handle) override {
         return asyncSinkMessageCb(std::move(message), handle);
     }
 
@@ -108,8 +108,7 @@ public:
 
 class MockServiceEntryPoint : public ServiceEntryPoint {
 public:
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) override {
         return handleRequestCb(opCtx, request);
     }
 

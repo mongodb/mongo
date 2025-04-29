@@ -119,7 +119,7 @@ private:
 
 class InlineReactor : public Reactor {
 public:
-    void run() noexcept override {}
+    void run() override {}
     void stop() override {}
 
     void drain() override {
@@ -145,7 +145,7 @@ public:
 
 class NoopReactor : public Reactor {
 public:
-    void run() noexcept override {}
+    void run() override {}
     void stop() override {}
 
     void drain() override {
@@ -236,8 +236,7 @@ class ServiceEntryPointUnimplemented : public ServiceEntryPoint {
 public:
     ServiceEntryPointUnimplemented() = default;
 
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override {
+    Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) override {
         MONGO_UNREACHABLE;
     }
 };

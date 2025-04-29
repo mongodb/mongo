@@ -160,7 +160,7 @@ public:
         _tl->_sessions[id()].ended = true;
     }
 
-    StatusWith<Message> sourceMessage() noexcept override {
+    StatusWith<Message> sourceMessage() override {
         if (!_tl || _tl->inShutdown()) {
             return TransportLayer::ShutdownStatus;
         } else if (!_tl->owns(id())) {
@@ -172,15 +172,15 @@ public:
         return Message();  // Subclasses can do something different.
     }
 
-    Future<Message> asyncSourceMessage(const BatonHandle& handle = nullptr) noexcept override {
+    Future<Message> asyncSourceMessage(const BatonHandle& handle = nullptr) override {
         return Future<Message>::makeReady(sourceMessage());
     }
 
-    Status waitForData() noexcept override {
+    Status waitForData() override {
         return asyncWaitForData().getNoThrow();
     }
 
-    Future<void> asyncWaitForData() noexcept override {
+    Future<void> asyncWaitForData() override {
         auto fp = makePromiseFuture<void>();
         stdx::lock_guard<stdx::mutex> lk(_waitForDataMutex);
         _waitForDataQueue.emplace_back(std::move(fp.promise));
@@ -196,7 +196,7 @@ public:
         promise.emplaceValue();
     }
 
-    Status sinkMessage(Message message) noexcept override {
+    Status sinkMessage(Message message) override {
         if (!_tl || _tl->inShutdown()) {
             return TransportLayer::ShutdownStatus;
         } else if (!_tl->owns(id())) {
@@ -208,8 +208,7 @@ public:
         return Status::OK();
     }
 
-    Future<void> asyncSinkMessage(Message message,
-                                  const BatonHandle& handle = nullptr) noexcept override {
+    Future<void> asyncSinkMessage(Message message, const BatonHandle& handle = nullptr) override {
         return Future<void>::makeReady(sinkMessage(message));
     }
 

@@ -362,23 +362,23 @@ public:
 
     WrappedEndpoint() = default;
 
-    Endpoint* operator->() noexcept {
+    Endpoint* operator->() {
         return &_endpoint;
     }
 
-    const Endpoint* operator->() const noexcept {
+    const Endpoint* operator->() const {
         return &_endpoint;
     }
 
-    Endpoint& operator*() noexcept {
+    Endpoint& operator*() {
         return _endpoint;
     }
 
-    const Endpoint& operator*() const noexcept {
+    const Endpoint& operator*() const {
         return _endpoint;
     }
 
-    bool operator<(const WrappedEndpoint& rhs) const noexcept {
+    bool operator<(const WrappedEndpoint& rhs) const {
         return _endpoint < rhs._endpoint;
     }
 

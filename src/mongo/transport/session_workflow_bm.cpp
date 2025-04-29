@@ -116,16 +116,16 @@ public:
         void end() override {
             _observeEnd.promise.emplaceValue();
         }
-        Status waitForData() noexcept override {
+        Status waitForData() override {
             return Status::OK();
         }
-        Status sinkMessage(Message) noexcept override {
+        Status sinkMessage(Message) override {
             return Status::OK();
         }
-        Future<void> asyncWaitForData() noexcept override {
+        Future<void> asyncWaitForData() override {
             return {};
         }
-        StatusWith<Message> sourceMessage() noexcept override {
+        StatusWith<Message> sourceMessage() override {
             LOGV2_DEBUG(7015132, 3, "sourceMessage", "rounds"_attr = _rounds);
             if (!_rounds)
                 return makeClosedSessionError();
@@ -162,8 +162,7 @@ public:
     public:
         explicit Sep(MockCoordinator* mc) : MockServiceEntryPoint(), _mc{mc} {}
 
-        Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                         const Message& request) noexcept override {
+        Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) override {
             DbResponse response;
             response.response = request;
 
