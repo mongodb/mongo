@@ -460,7 +460,7 @@ function ensureNoResponses() {
     assert.commandFailedWithCode(testDB.runCommand(resultDocCommand), 31086);
 
     // Reset the mock.
-    assert.commandWorked(testDB.runCommand({"clearQueuedResponses": {}}));
+    mongotMock.clearQueuedResponses();
     ensureNoResponses();
     // Disable order checking.
     assert.commandWorked(testDB.runCommand({setOrderCheck: false}));
@@ -617,7 +617,7 @@ function ensureNoResponses() {
     assert.commandFailedWithCode(testDB.runCommand(multiCursorCommandB), 31086);
 
     // Reset the mock.
-    assert.commandWorked(testDB.runCommand({"clearQueuedResponses": {}}));
+    mongotMock.clearQueuedResponses();
     ensureNoResponses();
     // Disable order checking.
     assert.commandWorked(testDB.runCommand({setOrderCheck: false}));

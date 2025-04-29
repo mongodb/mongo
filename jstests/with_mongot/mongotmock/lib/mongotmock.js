@@ -497,6 +497,12 @@ export class MongotMock {
         this.setOrderCheck(false);
     }
 
+    clearQueuedResponses() {
+        const connection = this.getConnection();
+        assert.commandWorked(connection.getDB("mongotmock").runCommand({clearQueuedResponses: {}}));
+        this.assertEmpty();
+    }
+
     /**
      * Verify that no responses remain enqueued in the mock. Call this in between consecutive tests.
      */
