@@ -3107,7 +3107,7 @@ Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, co
 }
 
 WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
-    bool usingTemporaryKVEngine) {
+    bool usingSpillKVEngine) {
     // TODO(SERVER-103279): Optimally configure SpillKVEngine.
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig;
     wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
@@ -3119,12 +3119,18 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.liveRestoreReadSizeMB = wiredTigerGlobalOptions.liveRestoreReadSizeMB;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
     wtConfig.zstdCompressorLevel = wiredTigerGlobalOptions.zstdCompressorLevel;
-    wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
+    if (!usingSpillKVEngine) {
+        // Config fuzzer tests fail for SpillKVEngine due to eviction thresholds being higher than
+        // the cache size.
+        // TODO(SERVER-103279): Fix this issue by appropriately configuring these thresholds for
+        // SpillKVEngine.
+        wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
+    }
     return wtConfig;
 }
 
 WiredTigerRecordStoreBase::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
-    bool usingTemporaryKVEngine) {
+    bool usingSpillKVEngine) {
     // TODO(SERVER-103279): Optimally configure SpillRecordStore.
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;

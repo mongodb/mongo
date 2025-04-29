@@ -40,6 +40,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/transaction_resources.h"
@@ -98,6 +99,10 @@ public:
         CollectionOptions options;
         options.temp = true;
         return createCollection(opCtx, ns, options);
+    }
+
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx) {
+        return _storageEngine->makeSpillTable(opCtx, KeyFormat::String);
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {

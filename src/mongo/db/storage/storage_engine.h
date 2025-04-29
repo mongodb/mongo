@@ -42,6 +42,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
+#include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
@@ -490,6 +491,15 @@ public:
     virtual Status repairRecordStore(OperationContext* opCtx,
                                      RecordId catalogId,
                                      const NamespaceString& nss) = 0;
+
+    /**
+     * Creates a temporary table that can be used for spilling in-memory state to disk. A table
+     * created using this API uses a separate SpillKVEngine instance and thus does not interfere
+     * with the reads/writes happening on the main KVEngine instance. This table is automatically
+     * dropped when the returned handle is destructed.
+     */
+    virtual std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
+                                                       KeyFormat keyFormat) = 0;
 
     /**
      * Creates a temporary RecordStore on the storage engine. On startup after an unclean shutdown,

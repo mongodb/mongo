@@ -741,6 +741,7 @@ filegroup(
         "//src/mongo/db/storage:recovery_unit_hdrs",
         "//src/mongo/db/storage:snapshot.h",
         "//src/mongo/db/storage:sorted_data_interface.h",
+        "//src/mongo/db/storage:spill_table.h",
         "//src/mongo/db/storage:storage_engine.h",
         "//src/mongo/db/storage:storage_engine_init.h",
         "//src/mongo/db/storage:storage_metrics.h",

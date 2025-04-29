@@ -867,8 +867,11 @@ public:
                                      /*directoryForIndexes=*/false,
                                      /*forRepair=*/false,
                                      /*lockFileCreatedByUncleanShutdown=*/false};
-        _storageEngine = std::make_unique<StorageEngineImpl>(
-            opCtx.get(), std::make_unique<TimestampMockKVEngine>(), options);
+        _storageEngine =
+            std::make_unique<StorageEngineImpl>(opCtx.get(),
+                                                std::make_unique<TimestampMockKVEngine>(),
+                                                std::unique_ptr<KVEngine>(),
+                                                options);
         _storageEngine->startTimestampMonitor(
             {&catalog_helper::kCollectionCatalogCleanupTimestampListener});
     }

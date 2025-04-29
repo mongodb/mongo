@@ -377,11 +377,15 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
         }
     }
 
+    size_t numFilesRemaining{0};
     auto dirItr = boost::filesystem::directory_iterator(tempDir);
     auto dirEnd = boost::filesystem::directory_iterator();
     for (; dirItr != dirEnd; ++dirItr) {
         auto curFilename = dirItr->path().filename().string();
-        if (!resumableIndexFiles.contains(curFilename)) {
+        // Skip deleting files specified by 'resumableIndexFiles' and any directories. Specifically,
+        // ensure that the StorageGlobalParams::getSpillDbPath() directory is not deleted.
+        if (!resumableIndexFiles.contains(curFilename) &&
+            !boost::filesystem::is_directory(dirItr->path())) {
             boost::system::error_code ec;
             boost::filesystem::remove(dirItr->path(), ec);
             if (ec) {
@@ -390,6 +394,16 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
                       "filename"_attr = curFilename,
                       "error"_attr = ec.message());
             }
+        } else {
+            ++numFilesRemaining;
+        }
+    }
+
+    if (numFilesRemaining == 0) {
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(tempDir, ec);
+        if (ec) {
+            LOGV2(5071101, "Failed to clear temp directory", "error"_attr = ec.message());
         }
     }
 }
@@ -576,14 +590,12 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
     if (reconcileResult.indexBuildsToResume.empty() ||
         lastShutdownState == StorageEngine::LastShutdownState::kUnclean) {
         // If we did not find any index builds to resume or we are starting up after an unclean
-        // shutdown, nothing in the temp directory will be used. Thus, we can clear it completely.
+        // shutdown, nothing in the temp directory will be used. Thus, we can clear it
+        // completely.
         LOGV2(5071100, "Clearing temp directory");
 
-        boost::system::error_code ec;
-        boost::filesystem::remove_all(tempDir, ec);
-
-        if (ec) {
-            LOGV2(5071101, "Failed to clear temp directory", "error"_attr = ec.message());
+        if (boost::filesystem::exists(tempDir)) {
+            clearTempFilesExceptForResumableBuilds({}, tempDir);
         }
     } else if (boost::filesystem::exists(tempDir)) {
         // Clears the contents of the temp directory except for files for resumable builds.

@@ -46,7 +46,7 @@ class SpillRecordStoreTest : public ServiceContextTest {
 protected:
     SpillRecordStoreTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
-            getWiredTigerConfigFromStartupOptions(true /* usingTemporaryKVEngine */);
+            getWiredTigerConfigFromStartupOptions(true /* usingSpillKVEngine */);
         wtConfig.cacheSizeMB = 1;
         wtConfig.inMemory = true;
         wtConfig.logEnabled = false;

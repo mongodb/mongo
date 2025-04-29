@@ -484,11 +484,13 @@ mongo_cc_library(
     name = "storage_engine_impl",
     srcs = [
         "deferred_drop_record_store.cpp",
+        "spill_table.cpp",
         "storage_engine_impl.cpp",
     ],
     hdrs = [
         "deferred_drop_record_store.h",
         "journal_listener.h",
+        "spill_table.h",
         "storage_engine_impl.h",
     ],
     deps = [

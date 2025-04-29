@@ -47,6 +47,9 @@ struct StorageGlobalParams {
     StorageGlobalParams();
     void reset();
 
+    // Returns directory path where the SpillKVEngine instance stores its data.
+    std::string getSpillDbPath() const;
+
     // Default data directory for mongod when running in non-config server mode.
     static const char* kDefaultDbPath;
 

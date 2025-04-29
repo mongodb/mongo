@@ -250,3 +250,8 @@ feature_flags:
         cpp_varname: feature_flags::gStorageEngineInterruptibility
         default: false
         shouldBeFCVGated: false
+    featureFlagCreateSpillKVEngine:
+        description: "Create SpillKVEngine instance that is used for creating SpillTables."
+        cpp_varname: feature_flags::gFeatureFlagCreateSpillKVEngine
+        default: false
+        shouldBeFCVGated: false

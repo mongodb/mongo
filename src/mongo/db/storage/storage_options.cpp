@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
@@ -63,6 +65,10 @@ void StorageGlobalParams::reset() {
     oplogMinRetentionHours.store(0.0);
     allowOplogTruncation = true;
     forceDisableTableLogging = false;
+}
+
+std::string StorageGlobalParams::getSpillDbPath() const {
+    return (boost::filesystem::path(dbpath) / "_tmp" / "spilldb").string();
 }
 
 StorageGlobalParams storageGlobalParams;

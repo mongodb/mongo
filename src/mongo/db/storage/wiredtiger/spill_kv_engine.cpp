@@ -34,6 +34,9 @@
 
 #include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
 
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
@@ -69,7 +72,19 @@ SpillKVEngine::SpillKVEngine(const std::string& canonicalName,
                              ClockSource* clockSource,
                              WiredTigerConfig wtConfig)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)) {
-    invariant(_wtConfig.inMemory);
+    if (!_wtConfig.inMemory) {
+        if (!boost::filesystem::exists(path)) {
+            try {
+                boost::filesystem::create_directories(path);
+            } catch (std::exception& e) {
+                LOGV2_ERROR(10380302,
+                            "Error creating data directory",
+                            "directory"_attr = path,
+                            "error"_attr = e.what());
+                throw;
+            }
+        }
+    }
 
     std::string config = generateWTOpenConfigString(_wtConfig, true /* ephemeral */);
     LOGV2(10158000, "Opening spill WiredTiger", "config"_attr = config);
@@ -122,7 +137,7 @@ std::unique_ptr<RecordStore> SpillKVEngine::makeTemporaryRecordStore(OperationCo
     WiredTigerSession session(_connection.get());
 
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions(true /* usingTemporaryKVEngine */);
+        getWiredTigerTableConfigFromStartupOptions(true /* usingSpillKVEngine */);
     wtTableConfig.keyFormat = keyFormat;
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;

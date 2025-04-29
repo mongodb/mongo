@@ -924,7 +924,7 @@ export const ResumableIndexBuildTest = class {
             return;
 
         // Ensure that the persisted Sorter data was cleaned up after failing to resume.
-        const files = listFiles(tempDir);
+        const files = listFiles(tempDir).filter((e) => !e.isDirectory);
         assert.eq(files.length, 0, files);
     }
 

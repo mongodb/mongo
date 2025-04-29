@@ -132,7 +132,8 @@ private:
         auto client = _svcCtx->getService()->makeClient("opCtx");
         auto opCtx = client->makeOperationContext();
         StorageEngineOptions options;
-        return std::make_unique<StorageEngineImpl>(opCtx.get(), std::move(kv), options);
+        return std::make_unique<StorageEngineImpl>(
+            opCtx.get(), std::move(kv), std::unique_ptr<KVEngine>(), options);
     }
 
     ServiceContext* _svcCtx;

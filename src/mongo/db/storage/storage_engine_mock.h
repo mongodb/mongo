@@ -80,6 +80,10 @@ public:
                              const NamespaceString& ns) final {
         return Status::OK();
     }
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx, KeyFormat keyFormat) final {
+
+        return {};
+    }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                    KeyFormat keyFormat) final {
         return {};

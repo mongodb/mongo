@@ -29,7 +29,7 @@ assert.throwsWithCode(() => testDb.largeColl.aggregate(pipeline, {allowDiskUse: 
                       ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
 testDb.largeColl.aggregate(pipeline).itcount();
-assert.eq(listFiles(conn.dbpath + "/_tmp").length, 0);
+assert.eq(listFiles(conn.dbpath + "/_tmp").filter((e) => !e.isDirectory).length, 0);
 
 // Run the pipeline without $_internalInhibitOptimization so that $group runs in the sbe engine.
 pipeline = [{$group: {_id: '$largeStr', minId: {$min: '$_id'}}}];
@@ -38,6 +38,6 @@ pipeline = [{$group: {_id: '$largeStr', minId: {$min: '$_id'}}}];
 assert.throwsWithCode(() => testDb.largeColl.aggregate(pipeline, {allowDiskUse: false}),
                       ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 testDb.largeColl.aggregate(pipeline).itcount();
-assert.eq(listFiles(conn.dbpath + "/_tmp").length, 0);
+assert.eq(listFiles(conn.dbpath + "/_tmp").filter((e) => !e.isDirectory).length, 0);
 
 MongoRunner.stopMongod(conn);

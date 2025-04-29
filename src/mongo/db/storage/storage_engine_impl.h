@@ -83,6 +83,7 @@ class StorageEngineImpl final : public StorageEngine {
 public:
     StorageEngineImpl(OperationContext* opCtx,
                       std::unique_ptr<KVEngine> engine,
+                      std::unique_ptr<KVEngine> spillKVEngine,
                       StorageEngineOptions options = StorageEngineOptions());
 
     ~StorageEngineImpl() override;
@@ -121,6 +122,9 @@ public:
     Status repairRecordStore(OperationContext* opCtx,
                              RecordId catalogId,
                              const NamespaceString& nss) override;
+
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
+                                               KeyFormat keyFormat) override;
 
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                    KeyFormat keyFormat) override;
@@ -325,8 +329,12 @@ private:
 
     class RemoveDBChange;
 
+    // Main KVEngine instance used for all user tables.
     // This must be the first member so it is destroyed last.
     std::unique_ptr<KVEngine> _engine;
+
+    // KVEngine instance that is used for creating SpillTables.
+    std::unique_ptr<KVEngine> _spillKVEngine;
 
     const StorageEngineOptions _options;
 

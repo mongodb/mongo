@@ -57,7 +57,7 @@ public:
         options.forRestore = params.restore;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(
-            opCtx, std::make_unique<DevNullKVEngine>(), options);
+            opCtx, std::make_unique<DevNullKVEngine>(), std::unique_ptr<KVEngine>(), options);
     }
 
     StringData getCanonicalName() const override {
