@@ -305,11 +305,10 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  *     Write the operations of a transaction to the log at commit time.
  */
 int
-__wti_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
+__wti_txn_log_commit(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
 
-    WT_UNUSED(cfg);
     txn = session->txn;
     /*
      * If there are no log records there is nothing to do.

@@ -1759,7 +1759,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
          */
         __wt_readlock(session, &txn_global->visibility_rwlock);
         locked = true;
-        WT_ERR(__wti_txn_log_commit(session, cfg));
+        WT_ERR(__wti_txn_log_commit(session));
     }
 
     /* Process updates. */

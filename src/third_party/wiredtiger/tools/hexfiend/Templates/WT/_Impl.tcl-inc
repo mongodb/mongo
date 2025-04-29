@@ -17,6 +17,7 @@ proc getAllocSize {} {
       }
     }
   }
+  goto $p
   puts "Can't determine the allocsize: empty file?"
   return [len]
 }
