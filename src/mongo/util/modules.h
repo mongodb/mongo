@@ -80,20 +80,6 @@
 /** Stronger form of private, restricts usage to the same family of h, cpp, and test.cpp files. */
 #define MONGO_MOD_FILE_PRIVATE MONGO_MOD_ATTR_(file_private)
 
-/**
- * Marks a declaration as public but not the insides,
- * eg to allow fine-grained control over a class.
- */
-#define MONGO_MOD_SHALLOW_PUB MONGO_MOD_ATTR_(shallow::public)
-
-/**
- * Marks a declaration as unfortunately public but not the insides,
- * eg to allow fine-grained control over a class.
- */
-#define MONGO_MOD_SHALLOW_NEEDS_REPLACEMENT MONGO_MOD_ATTR_(shallow::needs_replacement)
-#define MONGO_MOD_SHALLOW_USE_REPLACEMENT(replacement) \
-    MONGO_MOD_ATTR_(shallow::use_replacement::replacement)
-
 //
 // Implementation details for MONGO_MOD macros
 //
