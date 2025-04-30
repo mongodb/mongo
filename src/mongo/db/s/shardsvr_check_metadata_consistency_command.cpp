@@ -228,12 +228,18 @@ public:
                                                       Callback&& cb) {
             const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
             const auto deadline = now + timeout;
-            const auto guard = opCtx->makeDeadlineGuard(deadline, ErrorCodes::ExceededTimeLimit);
+            const auto guard = opCtx->makeDeadlineGuard(deadline, ErrorCodes::MaxTimeMSExpired);
             try {
                 return std::forward<Callback>(cb)();
-            } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+            } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+                // TODO (SERVER-104462): remove the comment below, and restore the catch statement
+                // above to use ExceptionFor.
+                // Need to catch the entire category of errors because there are parts across the
+                // code base where we throw a specific error, ignoring the one set on the opCtx.
                 const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
                 if (now >= deadline) {
+                    // Convert the error code to a specific one, indicating that the
+                    // specific deadline related to DbMetadataLockMaxTimeMS has been exceeded
                     uasserted(9944001,
                               str::stream()
                                   << "Exceeded maximum time " << timeout
