@@ -615,8 +615,7 @@ tasks:
           target: >-
             //:format -- --check
 
-  # TODO(SERVER-97804): rename if display_name appears on the evergreen UI
-  - name: bazel_run_//:codeowners
+  - name: bazel_run_codeowners
     tags:
       [
         "assigned_to_jira_team_devprod_build",
@@ -644,7 +643,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            //:codeowners -- --check
+            //:codeowners -- --check --expansions-file ../expansions.yml
 
   # TODO(SERVER-97804): rename if display_name appears on the evergreen UI
   - name: bazel_run_//buildscripts:resmoke

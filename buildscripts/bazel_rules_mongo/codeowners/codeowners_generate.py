@@ -5,10 +5,12 @@ import os
 import pathlib
 import subprocess
 import sys
+import tempfile
 from functools import cache, lru_cache
 
 import yaml
 from codeowners.validate_codeowners import run_validator
+from utils import evergreen_git
 
 OWNERS_FILE_NAME = "OWNERS"
 OWNERS_FILE_EXTENSIONS = (".yml", ".yaml")
@@ -207,6 +209,65 @@ def validate_generated_codeowners(validator_path: str) -> int:
         return 1
 
 
+def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: str) -> int:
+    new_files = evergreen_git.get_new_files(expansions_file, branch)
+    if not new_files:
+        print("No new files were detected.")
+        return 0
+    print(f"The following new files were detected: {new_files}")
+    temp_output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
+    temp_output_file.close()
+    # This file can be bigger than the allowed subprocess buffer so we redirect output into a file
+    command = f"{codeowners_binary_path} --unowned > {temp_output_file.name}"
+    process = subprocess.run(command, shell=True, stderr=subprocess.PIPE, text=True)
+
+    if process.returncode != 0:
+        print(process.stderr)
+        print("Error while trying to find unowned files")
+        return process.returncode
+
+    unowned_files = set()
+    with open(temp_output_file.name, "r") as file:
+        for line in file.read().split("\n"):
+            if not line:
+                continue
+            parts = line.split()
+            file_name = parts[0].strip()
+            unowned_files.add(file_name)
+
+    unowned_new_files = []
+    for file in new_files:
+        if file in unowned_files:
+            unowned_new_files.append(file)
+
+    if unowned_new_files:
+        print("The following new files are unowned:")
+        for file in unowned_new_files:
+            print(f"- {file}")
+        print("New files are required to have code owners. See http://go/codeowners-ug")
+        return 1
+
+    print("There are no new files added that are unowned.")
+    return 0
+
+
+def post_generation_checks(
+    validator_path: str,
+    should_run_validation: bool,
+    codeowners_binary_path: str,
+    should_check_new_files: bool,
+    expansions_file: str,
+    branch: str,
+) -> int:
+    status = 0
+    if should_run_validation:
+        status |= validate_generated_codeowners(validator_path)
+    if should_check_new_files:
+        status |= check_new_files(codeowners_binary_path, expansions_file, branch)
+
+    return status
+
+
 def main():
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
@@ -221,6 +282,13 @@ def main():
         raise RuntimeError("no CODEOWNERS_VALIDATOR_PATH env var found")
 
     codeowners_validator_path = os.path.abspath(codeowners_validator_path)
+
+    codeowners_binary_path = os.environ.get("CODEOWNERS_BINARY_PATH")
+    if not codeowners_binary_path:
+        raise RuntimeError("no CODEOWNERS_BINARY_PATH env var found")
+
+    codeowners_binary_path = os.path.abspath(codeowners_binary_path)
+
     parser = argparse.ArgumentParser(
         prog="GenerateCodeowners",
         description="This generates a CODEOWNERS file based off of our OWNERS.yml files. "
@@ -241,6 +309,30 @@ def main():
         help="When set, program exits 1 when the CODEOWNERS content changes. This will skip generation",
         default=False,
         action="store_true",
+    )
+    parser.add_argument(
+        "--run-validation",
+        help="When set, validation will be run against the resulting CODEOWNERS file.",
+        default=True,
+        action="store_false",
+    )
+    parser.add_argument(
+        "--check-new-files",
+        help="When set, this script will check new files to ensure they are owned.",
+        default=True,
+        action="store_false",
+    )
+    parser.add_argument(
+        "--expansions-file",
+        help="When set, implements CI specific logic around getting new files in a specific patch.",
+        default=None,
+        action="store",
+    )
+    parser.add_argument(
+        "--branch",
+        help="Helps the script understand what branch to compare against to see what new files are added when run locally. Defaults to master or main.",
+        default=None,
+        action="store",
     )
 
     args = parser.parse_args()
@@ -285,14 +377,28 @@ def main():
             return 1
 
         print("CODEOWNERS file is up to date")
-        return validate_generated_codeowners(codeowners_validator_path)
+        return post_generation_checks(
+            codeowners_validator_path,
+            args.run_validation,
+            codeowners_binary_path,
+            args.check_new_files,
+            args.expansions_file,
+            args.branch,
+        )
 
     with open(output_file, "w") as file:
         file.write(new_contents)
         print(f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}")
 
     # Add validation after generating CODEOWNERS file
-    return validate_generated_codeowners(codeowners_validator_path)
+    return post_generation_checks(
+        codeowners_validator_path,
+        args.run_validation,
+        codeowners_binary_path,
+        args.check_new_files,
+        args.expansions_file,
+        args.branch,
+    )
 
 
 if __name__ == "__main__":

@@ -39,6 +39,10 @@ load("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_vali
 
 codeowners_validator()
 
+load("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary")
+
+codeowners_binary()
+
 poetry(
     name = "poetry_bazel_rules_mongo",
     lockfile = "@bazel_rules_mongo//:poetry.lock",

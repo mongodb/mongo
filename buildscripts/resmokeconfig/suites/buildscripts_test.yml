@@ -4,6 +4,7 @@ selector:
   roots:
     - buildscripts/tests/**/test_*.py
     - buildscripts/idl/tests/**/test_*.py
+    - buildscripts/bazel_rules_mongo/tests/test_*.py
   exclude_files:
     # These tests are also @unittest.skip'ed. SERVER-48969 tracks re-enabling them.
     - buildscripts/tests/resmokelib/test_selector.py # Test assumes POSIX path.

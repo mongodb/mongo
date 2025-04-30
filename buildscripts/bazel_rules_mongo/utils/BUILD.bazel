@@ -1,1 +1,1 @@
-# This file intentionally left blank
+exports_files(["evergreen_git.py"])

@@ -5,18 +5,24 @@ py_binary(
     srcs = [
         "codeowners_generate.py",
         "validate_codeowners.py",
+        "//utils:evergreen_git.py",
     ],
     data = [
+        "@codeowners_binary//:codeowners-binary",
         "@codeowners_validator//:codeowners-validator",
     ],
     env = {
         "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
+        "CODEOWNERS_BINARY_PATH": "$(execpath @codeowners_binary//:codeowners-binary)",
     },
     main = "codeowners_generate.py",
     visibility = ["//visibility:public"],
     deps = [
         dependency(
             "pyyaml",
+        ),
+        dependency(
+            "gitpython",
         ),
     ],
 )
@@ -26,12 +32,15 @@ py_binary(
     srcs = [
         "codeowners_generate.py",
         "validate_codeowners.py",
+        "//utils:evergreen_git.py",
     ],
     data = [
+        "@codeowners_binary//:codeowners",
         "@codeowners_validator//:codeowners-validator",
     ],
     env = {
         "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
+        "CODEOWNERS_BINARY_PATH": "$(execpath @codeowners_binary//:codeowners)",
         "ADD_AUTO_APPROVE_USER": "true",
     },
     main = "codeowners_generate.py",
@@ -39,6 +48,9 @@ py_binary(
     deps = [
         dependency(
             "pyyaml",
+        ),
+        dependency(
+            "gitpython",
         ),
     ],
 )

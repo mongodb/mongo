@@ -330,3 +330,8 @@ etc/evaluated_evergreen.yml
 etc/evaluated_evergreen_nightly.yml
 etc/evaluated_system_perf.yml
 etc/trimmed_system_perf.yml
+
+# evergreen files to ignore when detecting patch changes
+/version_expansions.yml
+/engflow.*
+/.bazelrc.evergreen

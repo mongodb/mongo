@@ -29,3 +29,7 @@ poetry(
 load("//codeowners:codeowners_validator.bzl", "codeowners_validator")
 
 codeowners_validator()
+
+load("//codeowners:codeowners_binary.bzl", "codeowners_binary")
+
+codeowners_binary()
