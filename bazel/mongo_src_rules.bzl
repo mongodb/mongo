@@ -848,9 +848,11 @@ def _mongo_cc_binary_and_test(
         "env": env | SANITIZER_ENV,
     } | kwargs
 
+    # we dont want the intermediate build targets to be picked up by tags
+    # so we empty it out
     original_tags = list(args["tags"])
+    args["tags"] = ["intermediate_debug"] + [tag + "_debug" for tag in original_tags]
     if _program_type == "binary":
-        args["tags"] += ["intermediate_target"]
         cc_binary(**args)
         extract_debuginfo_binary(
             name = name,
@@ -863,7 +865,6 @@ def _mongo_cc_binary_and_test(
             visibility = visibility,
         )
     else:
-        args["tags"] += ["intermediate_target"]
         native.cc_test(**args)
         extract_debuginfo_test(
             name = name,

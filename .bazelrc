@@ -407,7 +407,7 @@ common --remote_upload_local_results=False
 # Settings specific for clang-tidy
 --config=clang-tidy
 common:clang-tidy --config=dbg
-common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests
+common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests,-third_party_debug,-mongo-tidy-tests_debug
 common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --keep_going
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
@@ -420,7 +420,7 @@ common:clang-tidy --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools
 
 --config=mod-scanner
 common:mod-scanner --config=dbg
-common:mod-scanner --build_tag_filters=-third_party,-mongo-tidy-tests
+common:mod-scanner --build_tag_filters=-third_party,-mongo-tidy-tests,-third_party_debug,-mongo-tidy-tests_debug
 common:mod-scanner --//bazel/config:compiler_type=clang
 common:mod-scanner --//bazel/config:mongo_toolchain_version=v5
 common:mod-scanner --output_groups=report
