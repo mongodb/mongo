@@ -49,31 +49,68 @@ namespace {
 using GenericFCV = multiversion::GenericFCV;
 using FCV = multiversion::FeatureCompatibilityVersion;
 
-constexpr std::array validOfcvVersions{GenericFCV::kLatest,
-                                       GenericFCV::kLastContinuous,
-                                       GenericFCV::kLastLTS,
-                                       GenericFCV::kUpgradingFromLastLTSToLatest,
-                                       GenericFCV::kDowngradingFromLatestToLastLTS,
-                                       GenericFCV::kUpgradingFromLastContinuousToLatest,
-                                       GenericFCV::kDowngradingFromLatestToLastContinuous,
-                                       GenericFCV::kUpgradingFromLastLTSToLastContinuous};
+template <typename T, std::size_t N>
+class UniqueArray {
+public:
+    using const_iterator = typename std::array<T, N>::const_iterator;
 
-constexpr std::array validFcvVersions{
-    GenericFCV::kLatest, GenericFCV::kLastContinuous, GenericFCV::kLastLTS};
+    constexpr const_iterator begin() const {
+        return array.cbegin();
+    }
+
+    constexpr const_iterator end() const {
+        return array.cbegin() + size;
+    }
+
+    constexpr bool contains(const T& value) const {
+        return std::find(this->begin(), this->end(), value) != this->end();
+    }
+
+    constexpr void insertIfUnique(const T& value) {
+        if (!this->contains(value)) {
+            array[size++] = value;
+        }
+    }
+
+private:
+    std::array<T, N> array{};
+    std::size_t size = 0;
+};
 
 template <typename T, std::size_t N>
-constexpr bool isValueInArray(const std::array<T, N>& arr, const T& value) {
-    return std::find(arr.begin(), arr.end(), value) != arr.end();
+constexpr UniqueArray<T, N> makeValidVersions(const std::array<T, N>& arr) {
+    UniqueArray<T, N> result;
+    for (const auto& item : arr) {
+        // When kLastContinuous == kLastLTS some values can be aliases,
+        // and others like kUpgradingFromLastLTSToLastContinuous become invalid.
+        if (item != FCV::kInvalid) {
+            result.insertIfUnique(item);
+        }
+    }
+    return result;
 }
+
+constexpr UniqueArray validOfcvVersions =
+    makeValidVersions(std::array{GenericFCV::kLatest,
+                                 GenericFCV::kLastContinuous,
+                                 GenericFCV::kLastLTS,
+                                 GenericFCV::kUpgradingFromLastLTSToLatest,
+                                 GenericFCV::kDowngradingFromLatestToLastLTS,
+                                 GenericFCV::kUpgradingFromLastContinuousToLatest,
+                                 GenericFCV::kDowngradingFromLatestToLastContinuous,
+                                 GenericFCV::kUpgradingFromLastLTSToLastContinuous});
+
+constexpr UniqueArray validFcvVersions = makeValidVersions(
+    std::array{GenericFCV::kLatest, GenericFCV::kLastContinuous, GenericFCV::kLastLTS});
 
 /*
  * Helper used to parse the `versionString` against the `validVersions`
  */
 template <std::size_t N>
-StatusWith<FCV> parseVersion(const std::array<FCV, N>& validVersions, StringData versionString) {
+StatusWith<FCV> parseVersion(const UniqueArray<FCV, N>& validVersions, StringData versionString) {
     try {
         const auto version = multiversion::parseVersion(versionString);
-        if (isValueInArray(validVersions, version)) {
+        if (validVersions.contains(version)) {
             return version;
         }
     } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
@@ -82,7 +119,7 @@ StatusWith<FCV> parseVersion(const std::array<FCV, N>& validVersions, StringData
     // Create a comma-separated list of valid versions
     std::ostringstream validVersionsStream;
     StringData sep;
-    for (auto&& ver : validVersions) {
+    for (const auto& ver : validVersions) {
         validVersionsStream << sep << "'" << toString(ver) << "'";
         sep = ", ";
     }
@@ -115,14 +152,14 @@ FCV FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(StringData ve
 }
 
 StringData FeatureCompatibilityVersionParser::serializeVersionForOfcvString(FCV version) {
-    invariant(isValueInArray(validOfcvVersions, version),
+    invariant(validOfcvVersions.contains(version),
               str::stream() << "Invalid feature compatibility version value: "
                             << multiversion::toString(version));
     return multiversion::toString(version);
 }
 
 StringData FeatureCompatibilityVersionParser::serializeVersionForFcvString(FCV version) {
-    invariant(isValueInArray(validFcvVersions, version),
+    invariant(validFcvVersions.contains(version),
               str::stream() << "Invalid feature compatibility version value: "
                             << multiversion::toString(version));
     return multiversion::toString(version);
