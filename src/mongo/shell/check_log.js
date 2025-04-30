@@ -143,7 +143,7 @@ checkLog = (function() {
 
     /*
      * Calls the 'getLog' function on the provided connection 'conn' to see if a log with the
-     * provided id is found in the logs. If the id is found it looks up the specified attrribute by
+     * provided id is found in the logs. If the id is found it looks up the specified attribute by
      * attrName and checks if the msg is found in its value. Note: this function does not throw an
      * exception, so the return value should not be ignored.
      */
