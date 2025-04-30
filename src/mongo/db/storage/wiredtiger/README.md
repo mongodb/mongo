@@ -43,7 +43,7 @@ the following scenarios:
   initial sync.
 
 Not only does checkpointing provide us with durability for the database, but it also enables us to
-take [backups of the data](../../catalog/README.md#file-system-backups).
+take [backups of the data](../../storage/README.md#file-system-backups).
 
 When WiredTiger takes a checkpoint, it uses the
 [`stable_timestamp`](https://github.com/mongodb/mongo/blob/87de9a0cb1/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L2011 "Github") (effectively a `read_timestamp`) for what data should be persisted in the checkpoint.
