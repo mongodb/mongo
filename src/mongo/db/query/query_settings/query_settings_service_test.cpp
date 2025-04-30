@@ -238,13 +238,13 @@ public:
                                    const query_shape::DeferredQueryShape& deferredShape,
                                    const NamespaceString& nss) {
         {
-            initializeForRouter(getServiceContext());
+            initializeForRouter(getServiceContext(), nullptr /* setClusterParameterImplFn */);
             assertQuerySettingsLookupWithoutRejectionCheckForRouter(cmdBSON, deferredShape, nss);
             assertQuerySettingsLookupWithRejectionCheckForRouter(cmdBSON, deferredShape, nss);
         }
 
         {
-            initializeForShard(getServiceContext());
+            initializeForShard(getServiceContext(), nullptr /* setClusterParameterImplFn */);
             assertQuerySettingsLookupWithoutRejectionCheckForShard(cmdBSON, deferredShape, nss);
             assertQuerySettingsLookupWithRejectionCheckForShard(cmdBSON, deferredShape, nss);
         }

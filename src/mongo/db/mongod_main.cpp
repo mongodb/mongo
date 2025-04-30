@@ -97,6 +97,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/set_cluster_parameter_command_impl.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -252,6 +253,7 @@
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/service_entry_point_router_role.h"
+#include "mongo/s/set_cluster_server_parameter_router_impl.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -2121,7 +2123,13 @@ int mongod_main(int argc, char* argv[]) {
         ChangeStreamChangeCollectionManager::create(service);
     }
 
-    query_settings::initializeForShard(service);
+    auto setClusterParameterImpl = [&]() {
+        if (routerService) {
+            return setClusterParameterImplRouter;
+        }
+        return getSetClusterParameterImpl(shardService);
+    }();
+    query_settings::initializeForShard(service, std::move(setClusterParameterImpl));
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {
