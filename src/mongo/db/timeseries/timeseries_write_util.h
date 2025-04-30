@@ -76,7 +76,6 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const TimeseriesOptions& options,
                            const StringDataComparator* comparator);
 
-using TimeseriesWriteBatches = std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>;
 using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
 
 /**
@@ -89,13 +88,13 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
 /**
  * Sorts batches by bucket so that preparing the commit for each batch cannot deadlock.
  */
-void sortBatchesToCommit(TimeseriesWriteBatches& batches);
+void sortBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches);
 
 /**
  * Prepares the final write batches needed for performing the writes to storage.
  */
 std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-determineBatchesToCommit(TimeseriesWriteBatches& batches);
+determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches);
 /**
  * Performs modifications atomically for a user command on a time-series collection.
  *

@@ -153,20 +153,20 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithMetaField
     AutoGetCollection bucketsColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     auto tsOptions = _getTimeseriesOptions(_ns1);
 
-    auto batchedInsertContextVector =
-        buildBatchedInsertContextsWithMetaField(*_bucketCatalog,
-                                                bucketsColl->uuid(),
-                                                tsOptions,
-                                                userMeasurementsBatch,
-                                                /*startIndex=*/0,
-                                                /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                                /*docsToRetry=*/{},
-                                                stats,
-                                                trackingContext,
-                                                errorsAndIndices);
+    auto batchedInsertContextVector = bucket_catalog::buildBatchedInsertContextsWithMetaField(
+        *_bucketCatalog,
+        bucketsColl->uuid(),
+        tsOptions,
+        userMeasurementsBatch,
+        /*startIndex=*/0,
+        /*numDocsToStage=*/userMeasurementsBatch.size(),
+        /*docsToRetry=*/{},
+        stats,
+        trackingContext,
+        errorsAndIndices);
 
     ASSERT_EQ(batchedInsertContextVector.size(), metaFieldMetadataToCorrectIndexOrderMap.size());
 
@@ -270,7 +270,7 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
     const auto& bucketsColl = autoColl.getCollection();
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     auto batchedInsertContextVector =
         buildBatchedInsertContextsNoMetaField(*_bucketCatalog,
@@ -448,17 +448,17 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
     auto timeseriesOptions = _getTimeseriesOptions(ns);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
-    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog,
-        collectionUUID,
-        timeseriesOptions,
-        batchOfMeasurements,
-        /*startIndex=*/0,
-        /*numDocsToStage=*/batchOfMeasurements.size(),
-        /*docsToRetry=*/{},
-        errorsAndIndices);
+    auto batchedInsertContexts =
+        bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                   collectionUUID,
+                                                   timeseriesOptions,
+                                                   batchOfMeasurements,
+                                                   /*startIndex=*/0,
+                                                   /*numDocsToStage=*/batchOfMeasurements.size(),
+                                                   /*docsToRetry=*/{},
+                                                   errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     ASSERT_EQ(batchedInsertContexts.size(), numWriteBatches.size());
@@ -469,15 +469,14 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
     ASSERT_EQ(numMeasurements, batchOfMeasurements.size());
 
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
-        auto writeBatches =
-            write_ops::internal::stageInsertBatch(_opCtx,
-                                                  *_bucketCatalog,
-                                                  bucketsColl.get(),
-                                                  _opCtx->getOpID(),
-                                                  nullptr /*comparator*/,
-                                                  _storageCacheSizeBytes,
-                                                  nullptr /*compressAndWriteBucketFunc*/,
-                                                  batchedInsertContexts[i]);
+        auto writeBatches = bucket_catalog::stageInsertBatch(_opCtx,
+                                                             *_bucketCatalog,
+                                                             bucketsColl.get(),
+                                                             _opCtx->getOpID(),
+                                                             nullptr /*comparator*/,
+                                                             _storageCacheSizeBytes,
+                                                             nullptr /*compressAndWriteBucketFunc*/,
+                                                             batchedInsertContexts[i]);
         ASSERT_EQ(writeBatches.size(), numWriteBatches[i]);
     }
 }
@@ -1335,7 +1334,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucke
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
     }
 
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
@@ -1374,7 +1373,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOne
     for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
     }
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
@@ -1416,7 +1415,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMul
     for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << "m"));
     }
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
@@ -1457,7 +1456,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField
                                                << (i % 2 == 0 ? _metaValue : _metaValue2)));
     }
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
@@ -1492,7 +1491,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1522,7 +1521,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1561,7 +1560,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
 
 TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1616,7 +1615,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
     _opCtx->setTxnNumber(TxnNumber());
 
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1672,7 +1671,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
     _opCtx->setTxnNumber(TxnNumber());
 
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1723,7 +1722,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
 
 TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErrors) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1768,7 +1767,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1813,7 +1812,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsStartIndex
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1861,7 +1860,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsStartIndex
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 
@@ -1909,7 +1908,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsDocsToRetr
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
-    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
 

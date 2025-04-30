@@ -31,7 +31,6 @@
 
 #include <absl/container/node_hash_map.h>
 
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 

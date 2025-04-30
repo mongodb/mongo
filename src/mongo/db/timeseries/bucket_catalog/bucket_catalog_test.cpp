@@ -293,16 +293,15 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     const UUID& uuid,
     const mongo::BSONObj& doc) {
     auto timeseriesOptions = _getTimeseriesOptions(nss);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(catalog,
-                                                        uuid,
-                                                        timeseriesOptions,
-                                                        {doc},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(catalog,
+                                                                            uuid,
+                                                                            timeseriesOptions,
+                                                                            {doc},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<Date_t>(batchedInsertCtx.measurementsTimesAndIndices[0]);
@@ -596,16 +595,16 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     const auto& bucketsColl = autoColl.getCollection();
 
     auto timeseriesOptions = _getTimeseriesOptions(ns);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        collectionUUID,
-                                                        timeseriesOptions,
-                                                        measurements,
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/measurements.size(),
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+        bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                   collectionUUID,
+                                                   timeseriesOptions,
+                                                   measurements,
+                                                   /*startIndex=*/0,
+                                                   /*numDocsToStage=*/measurements.size(),
+                                                   /*docsToRetry=*/{},
+                                                   errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     ASSERT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
     size_t numMeasurements = 0;
@@ -875,8 +874,8 @@ TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -888,7 +887,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto batchedInsertContexts2 = write_ops::internal::buildBatchedInsertContexts(
+    auto batchedInsertContexts2 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -906,8 +905,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -921,7 +920,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto batchedInsertContexts2 = write_ops::internal::buildBatchedInsertContexts(
+    auto batchedInsertContexts2 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -942,8 +941,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -957,7 +956,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
-    auto batchedInsertContexts2 = write_ops::internal::buildBatchedInsertContexts(
+    auto batchedInsertContexts2 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -977,8 +976,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts1 = write_ops::internal::buildBatchedInsertContexts(
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts1 = bucket_catalog::buildBatchedInsertContexts(
         *_bucketCatalog,
         _uuid1,
         timeseriesOptions,
@@ -991,14 +990,14 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
 
     auto batchedInsertContexts2 =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {BSON(_timeField << Date_t::now())},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+        bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                   _uuid1,
+                                                   timeseriesOptions,
+                                                   {BSON(_timeField << Date_t::now())},
+                                                   /*startIndex=*/0,
+                                                   /*numDocsToStage=*/1,
+                                                   /*docsToRetry=*/{},
+                                                   errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
@@ -2111,16 +2110,15 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     // to trigger a collision of our frozen bucketID with the bucketID of the bucket we will
     // allocate.
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {doc},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {doc},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
 
@@ -2217,16 +2215,15 @@ TEST_F(BucketCatalogTest, FindOpenBucketsEmptyCatalog) {
 
 TEST_F(BucketCatalogTest, FindOpenBucketsReturnsBucket) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
@@ -2250,16 +2247,15 @@ TEST_F(BucketCatalogTest, FindOpenBucketsReturnsBucket) {
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
@@ -2287,16 +2283,15 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithClearedBucket) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
@@ -2324,16 +2319,15 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithClearedBucket) {
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithFrozenBucket) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
     auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
@@ -2361,16 +2355,15 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithFrozenBucket) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2402,16 +2395,15 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2445,16 +2437,15 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2489,16 +2480,15 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2531,16 +2521,15 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2574,16 +2563,15 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2617,21 +2605,20 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
     auto measurementSchema1 =
         BSON(_timeField << Date_t::now() << _metaField << _metaValue << "metricField"
                         << "a");
     auto measurementSchema2 =
         BSON(_timeField << Date_t::now() << _metaField << _metaValue << "metricField" << 1);
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {measurementSchema1},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {measurementSchema1},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2666,16 +2653,15 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2710,16 +2696,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2755,16 +2740,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2799,16 +2783,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2844,16 +2827,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2895,16 +2877,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2951,16 +2932,15 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -3010,16 +2990,15 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
     const auto& bucketsColl = autoColl.getCollection();
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -3063,16 +3042,15 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
     const auto& bucketsColl = autoColl.getCollection();
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];

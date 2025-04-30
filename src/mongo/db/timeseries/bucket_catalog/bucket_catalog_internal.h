@@ -488,22 +488,23 @@ bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
                                         std::shared_ptr<WriteBatch>& writeBatch);
 
 /**
- * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, we return
- * the reason for why attempting to insert the measurement into the bucket would result in the
- * bucket being rolled over.
+ * Given an already-selected 'bucket', inserts the measurement in 'batchedInsertTuple' to the bucket
+ * if possible.
+ * Returns true if successfully inserted.
+ * Returns false if 'bucket' needs to be rolled over. Marks its 'rolloverReason' accordingly.
  */
-std::variant<std::shared_ptr<WriteBatch>, RolloverReason> tryToInsertIntoBucketWithoutRollover(
-    BucketCatalog& catalog,
-    Stripe& stripe,
-    WithLock stripeLock,
-    const BatchedInsertTuple& batchedInsertTuple,
-    OperationId opId,
-    const TimeseriesOptions& timeseriesOptions,
-    const StripeNumber& stripeNumber,
-    ExecutionStatsController& stats,
-    uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator,
-    Bucket& bucket);
+bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
+                                          Stripe& stripe,
+                                          WithLock stripeLock,
+                                          const BatchedInsertTuple& batchedInsertTuple,
+                                          OperationId opId,
+                                          const TimeseriesOptions& timeseriesOptions,
+                                          const StripeNumber& stripeNumber,
+                                          ExecutionStatsController& stats,
+                                          uint64_t storageCacheSizeBytes,
+                                          const StringDataComparator* comparator,
+                                          Bucket& bucket,
+                                          std::shared_ptr<WriteBatch>& writeBatch);
 
 /**
  * Given a bucket 'bucket' and a measurement 'doc', updates the WriteBatch corresponding to the

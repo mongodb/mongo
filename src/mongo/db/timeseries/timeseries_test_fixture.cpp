@@ -603,16 +603,16 @@ TimeseriesTestFixture::_generateBucketsWithMeasurements(
         // bucket's rollover reason as it is staging/committing writes to the bucket.
         ASSERT(measurementsAndRolloverReasons.size() == 1 ||
                reason != bucket_catalog::RolloverReason::kNone);
-        std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+        std::vector<timeseries::bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
         auto batchedInsertContexts =
-            write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                            collectionUUID,
-                                                            options,
-                                                            measurements,
-                                                            /*startIndex=*/0,
-                                                            /*numDocsToStage=*/measurements.size(),
-                                                            /*docsToRetry=*/{},
-                                                            errorsAndIndices);
+            bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                       collectionUUID,
+                                                       options,
+                                                       measurements,
+                                                       /*startIndex=*/0,
+                                                       /*numDocsToStage=*/measurements.size(),
+                                                       /*docsToRetry=*/{},
+                                                       errorsAndIndices);
         ASSERT(errorsAndIndices.empty());
         // We should only be creating one batch and it should be able to fit in one bucket.
         ASSERT_EQ(batchedInsertContexts.size(), 1);

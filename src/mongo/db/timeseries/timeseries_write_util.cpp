@@ -163,7 +163,7 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
 }
 
 std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
-determineBatchesToCommit(TimeseriesWriteBatches& batches) {
+determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
     stdx::unordered_set<bucket_catalog::WriteBatch*> processedBatches;
     std::vector<std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
         batchesToCommit;
@@ -183,7 +183,7 @@ determineBatchesToCommit(TimeseriesWriteBatches& batches) {
     return batchesToCommit;
 }
 
-void sortBatchesToCommit(TimeseriesWriteBatches& batches) {
+void sortBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
     std::sort(batches.begin(), batches.end(), [](auto left, auto right) {
         return left.get()->bucketId.oid < right.get()->bucketId.oid;
     });
@@ -252,14 +252,14 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
         getStorageCacheSizeBytes(opCtx));
 }
 
-TimeseriesWriteBatches insertIntoBucketCatalogForUpdate(
+bucket_catalog::TimeseriesWriteBatches insertIntoBucketCatalogForUpdate(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
     const CollectionPtr& bucketsColl,
     const std::vector<BSONObj>& measurements,
     const NamespaceString& bucketsNs,
     TimeseriesOptions& timeSeriesOptions) {
-    TimeseriesWriteBatches batches;
+    bucket_catalog::TimeseriesWriteBatches batches;
 
     for (const auto& measurement : measurements) {
         auto result = uassertStatusOK(attemptInsertIntoBucket(
@@ -353,7 +353,7 @@ void commitTimeseriesBucketsAtomically(
     const RecordId& recordId,
     const boost::optional<std::variant<write_ops::UpdateCommandRequest,
                                        write_ops::DeleteCommandRequest>>& modificationOp,
-    TimeseriesWriteBatches* batches,
+    bucket_catalog::TimeseriesWriteBatches* batches,
     const NamespaceString& bucketsNs,
     bool fromMigrate,
     StmtId stmtId,

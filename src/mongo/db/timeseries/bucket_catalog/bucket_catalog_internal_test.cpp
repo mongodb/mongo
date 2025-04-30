@@ -57,16 +57,15 @@ protected:
 
 void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reason) {
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
-    std::vector<write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
-    auto batchedInsertContexts =
-        write_ops::internal::buildBatchedInsertContexts(*_bucketCatalog,
-                                                        _uuid1,
-                                                        timeseriesOptions,
-                                                        {_measurement},
-                                                        /*startIndex=*/0,
-                                                        /*numDocsToStage=*/1,
-                                                        /*docsToRetry=*/{},
-                                                        errorsAndIndices);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = bucket_catalog::buildBatchedInsertContexts(*_bucketCatalog,
+                                                                            _uuid1,
+                                                                            timeseriesOptions,
+                                                                            {_measurement},
+                                                                            /*startIndex=*/0,
+                                                                            /*numDocsToStage=*/1,
+                                                                            /*docsToRetry=*/{},
+                                                                            errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
     auto batchedInsertCtx = batchedInsertContexts[0];

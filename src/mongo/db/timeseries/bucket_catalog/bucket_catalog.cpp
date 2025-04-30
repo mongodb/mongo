@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
@@ -924,7 +925,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
         // Release the stripe lock to wait for the conflicting operation.
         ScopedUnlock unlockGuard(stripeLock);
 
-        bucket_catalog::waitToInsert(&reopeningConflict.get());
+        waitToInsert(&reopeningConflict.get());
         return Status{ErrorCodes::WriteConflict, "waited to retry"};
     }
 
@@ -980,4 +981,281 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     return &swBucket.getValue().get();
 }
 
+std::vector<BatchedInsertContext> buildBatchedInsertContextsNoMetaField(
+    const BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
+    ExecutionStatsController& stats,
+    tracking::Context& trackingContext,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+
+    std::vector<BatchedInsertTuple> batchedInsertTupleVector;
+
+    auto processMeasurement = [&](size_t index) {
+        invariant(index < userMeasurementsBatch.size());
+        auto swTime = extractTime(userMeasurementsBatch[index], timeseriesOptions.getTimeField());
+        if (!swTime.isOK()) {
+            errorsAndIndices.push_back(
+                WriteStageErrorAndIndex{std::move(swTime.getStatus()), index});
+            return;
+        }
+        batchedInsertTupleVector.emplace_back(
+            userMeasurementsBatch[index], swTime.getValue(), index);
+    };
+
+    // As part of the InsertBatchTuple struct we store the index of the measurement in the original
+    // user batch for error reporting and retryability purposes.
+    if (!indices.empty()) {
+        std::for_each(indices.begin(), indices.end(), processMeasurement);
+    } else {
+        for (size_t i = startIndex; i < startIndex + numDocsToStage; i++) {
+            processMeasurement(i);
+        }
+    }
+
+    // Empty metadata.
+    BSONElement metadata;
+    auto bucketKey =
+        BucketKey{collectionUUID, BucketMetadata{trackingContext, metadata, boost::none}};
+    auto stripeNumber = internal::getStripeNumber(bucketCatalog, bucketKey);
+
+    std::sort(
+        batchedInsertTupleVector.begin(), batchedInsertTupleVector.end(), [](auto& lhs, auto& rhs) {
+            // Sort measurements on their timeField.
+            return std::get<Date_t>(lhs) < std::get<Date_t>(rhs);
+        });
+
+    std::vector<BatchedInsertContext> batchedInsertContexts;
+
+    // Only create a BatchedInsertContext if at least one measurement got processed successfully.
+    if (!batchedInsertTupleVector.empty()) {
+        batchedInsertContexts.emplace_back(
+            bucketKey, stripeNumber, timeseriesOptions, stats, batchedInsertTupleVector);
+    };
+
+    return batchedInsertContexts;
+};
+
+std::vector<BatchedInsertContext> buildBatchedInsertContextsWithMetaField(
+    const BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
+    ExecutionStatsController& stats,
+    tracking::Context& trackingContext,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField().get();
+
+    // Maps distinct metaField values using the BucketMetadata as the key to a vector of
+    // BatchedInsertTuples whose measurements have that same metaField value.
+    stdx::unordered_map<BucketMetadata, std::vector<BatchedInsertTuple>>
+        metaFieldToBatchedInsertTuples;
+
+    auto processMeasurement = [&](size_t index) {
+        invariant(index < userMeasurementsBatch.size());
+        auto swTimeAndMeta = extractTimeAndMeta(userMeasurementsBatch[index], timeField, metaField);
+        if (!swTimeAndMeta.isOK()) {
+            errorsAndIndices.push_back(
+                WriteStageErrorAndIndex{std::move(swTimeAndMeta.getStatus()), index});
+            return;
+        }
+        auto time = std::get<Date_t>(swTimeAndMeta.getValue());
+        auto meta = std::get<BSONElement>(swTimeAndMeta.getValue());
+
+        BucketMetadata metadata = BucketMetadata{trackingContext, meta, metaField};
+        metaFieldToBatchedInsertTuples.try_emplace(metadata, std::vector<BatchedInsertTuple>{});
+
+        metaFieldToBatchedInsertTuples[metadata].emplace_back(
+            userMeasurementsBatch[index], time, index);
+    };
+    // Go through the vector of user measurements and create a map from each distinct metaField
+    // value using BucketMetadata to a vector of InsertBatchTuples for that metaField. As part of
+    // the InsertBatchTuple struct we store the index of the measurement in the original user batch
+    // for error reporting and retryability purposes.
+    if (!indices.empty()) {
+        std::for_each(indices.begin(), indices.end(), processMeasurement);
+    } else {
+        for (size_t i = startIndex; i < startIndex + numDocsToStage; i++) {
+            processMeasurement(i);
+        }
+    }
+
+    std::vector<BatchedInsertContext> batchedInsertContexts;
+
+    // Go through all unique meta batches, sort by time, and fill result
+    for (auto& [metadata, batchedInsertTupleVector] : metaFieldToBatchedInsertTuples) {
+        std::sort(batchedInsertTupleVector.begin(),
+                  batchedInsertTupleVector.end(),
+                  [](auto& lhs, auto& rhs) {
+                      // Sort measurements on their timeField.
+                      return std::get<Date_t>(lhs) < std::get<Date_t>(rhs);
+                  });
+        auto bucketKey = BucketKey{collectionUUID, metadata};
+        auto stripeNumber = internal::getStripeNumber(bucketCatalog, bucketKey);
+        batchedInsertContexts.emplace_back(
+            bucketKey, stripeNumber, timeseriesOptions, stats, batchedInsertTupleVector);
+    }
+
+    return batchedInsertContexts;
+}
+
+std::vector<BatchedInsertContext> buildBatchedInsertContexts(
+    BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+
+    invariant(indices.size() <= userMeasurementsBatch.size());
+
+    auto metaFieldName = timeseriesOptions.getMetaField();
+    auto& trackingContext =
+        getTrackingContext(bucketCatalog.trackingContexts, TrackingScope::kMeasurementBatching);
+    auto stats = internal::getOrInitializeExecutionStats(bucketCatalog, collectionUUID);
+
+    return (metaFieldName) ? buildBatchedInsertContextsWithMetaField(bucketCatalog,
+                                                                     collectionUUID,
+                                                                     timeseriesOptions,
+                                                                     userMeasurementsBatch,
+                                                                     startIndex,
+                                                                     numDocsToStage,
+                                                                     indices,
+                                                                     stats,
+                                                                     trackingContext,
+                                                                     errorsAndIndices)
+                           : buildBatchedInsertContextsNoMetaField(bucketCatalog,
+                                                                   collectionUUID,
+                                                                   timeseriesOptions,
+                                                                   userMeasurementsBatch,
+                                                                   startIndex,
+                                                                   numDocsToStage,
+                                                                   indices,
+                                                                   stats,
+                                                                   trackingContext,
+                                                                   errorsAndIndices);
+}
+
+TimeseriesWriteBatches stageInsertBatch(
+    OperationContext* opCtx,
+    BucketCatalog& bucketCatalog,
+    const Collection* bucketsColl,
+    const OperationId& opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    BatchedInsertContext& batch) {
+    // Save the catalog era value from before we make any further checks. This guarantees that we
+    // don't miss a direct write that happens sometime in between our decision to potentially reopen
+    // a bucket below, and actually reopening it in a subsequent reentrant call. Any direct write
+    // will increment the era, so the reentrant call can check the current value and return a write
+    // conflict if it sees a newer era.
+    const auto catalogEra = getCurrentEra(bucketCatalog.bucketStateRegistry);
+    auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
+    stdx::unique_lock<stdx::mutex> stripeLock{stripe.mutex};
+    TimeseriesWriteBatches writeBatches;
+    size_t currentPosition = 0;
+    bool needsAnotherBucket = true;
+
+    while (needsAnotherBucket) {
+        bool bucketOpenedDueToMetadata = true;
+        auto [measurement, measurementTimestamp, _] =
+            batch.measurementsTimesAndIndices[currentPosition];
+        auto& eligibleBucket = getEligibleBucket(opCtx,
+                                                 bucketCatalog,
+                                                 stripe,
+                                                 stripeLock,
+                                                 bucketsColl,
+                                                 measurement,
+                                                 batch.key,
+                                                 measurementTimestamp,
+                                                 batch.options,
+                                                 comparator,
+                                                 catalogEra,
+                                                 storageCacheSizeBytes,
+                                                 compressAndWriteBucketFunc,
+                                                 batch.stats,
+                                                 bucketOpenedDueToMetadata);
+
+        // getEligibleBucket guarantees that we will successfully insert at least one measurement
+        // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without
+        // rolling it over, which allows us to unconditionally initialize the writeBatch.
+        std::shared_ptr<WriteBatch> writeBatch = activeBatch(
+            bucketCatalog.trackingContexts, eligibleBucket, opId, batch.stripeNumber, batch.stats);
+        writeBatch->openedDueToMetadata = bucketOpenedDueToMetadata;
+        needsAnotherBucket = !internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
+                                                                           opId,
+                                                                           comparator,
+                                                                           batch,
+                                                                           stripe,
+                                                                           stripeLock,
+                                                                           storageCacheSizeBytes,
+                                                                           eligibleBucket,
+                                                                           currentPosition,
+                                                                           writeBatch);
+        writeBatches.emplace_back(writeBatch);
+    }
+
+    invariant(currentPosition == batch.measurementsTimesAndIndices.size());
+    return writeBatches;
+}
+
+StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
+    OperationContext* opCtx,
+    BucketCatalog& bucketCatalog,
+    const Collection* bucketsColl,
+    const TimeseriesOptions& timeseriesOptions,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    bool earlyReturnOnError,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    size_t startIndex,
+    size_t numDocsToStage,
+    const std::vector<size_t>& indices,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+    auto batchedInsertContexts = buildBatchedInsertContexts(bucketCatalog,
+                                                            bucketsColl->uuid(),
+                                                            timeseriesOptions,
+                                                            userMeasurementsBatch,
+                                                            startIndex,
+                                                            numDocsToStage,
+                                                            indices,
+                                                            errorsAndIndices);
+
+    if (earlyReturnOnError && !errorsAndIndices.empty()) {
+        // Any errors in the user batch will early-exit and be attempted one-at-a-time.
+        return errorsAndIndices.front().error;
+    }
+
+    TimeseriesWriteBatches results;
+
+    for (auto& batchedInsertContext : batchedInsertContexts) {
+        auto writeBatches = stageInsertBatch(opCtx,
+                                             bucketCatalog,
+                                             bucketsColl,
+                                             opId,
+                                             comparator,
+                                             storageCacheSizeBytes,
+                                             compressAndWriteBucketFunc,
+                                             batchedInsertContext);
+
+        // Append all returned write batches to results, since multiple buckets may have been
+        // targeted.
+        results.insert(results.end(), writeBatches.begin(), writeBatches.end());
+    }
+
+    return results;
+}
 }  // namespace mongo::timeseries::bucket_catalog
