@@ -1,9 +1,21 @@
 # Modules POC
 
 This folder contains a POC implementation of a module metrics tracker and enforcement. This documentation includes
-commands which will run the scanner across the entire first-party codebase, and merge the results. All
+basic information about modules, and commands which will run the scanner across the entire first-party codebase and merge the results. All
 commands are assumed to run at the root of the checkout, inside of a correctly activated python
 virtual env.
+
+## What is a module
+
+A module:
+
+- Provides a coherent public API
+- Has internal details that are not intended to be directly accessed from outside the module
+- Is a set of files covering the API (headers), implementations (headers and cpp files), and tests
+
+### Submodules
+
+TODO
 
 ## Assigning files to modules
 
@@ -35,10 +47,15 @@ Github will nicely format the diff if you put it in a block like this:
 ```
 ````
 
+<!--
+  if you are reading the markdown source, ignore the lines with 4 backticks (````),
+  and only use a single wrapping with ```diff
+-->
+
 ### Showing assigned and unassigned files
 
-Run `modules_poc/mod_scanner.py --dump-modules` to produce a `modules.yaml` file
-in the current directory. This file is a multi-level map from
+Run `modules_poc/mod_scanner.py --dump-modules` to produce a `modules_dump.yaml`
+file in current directory. This file is a multi-level map from
 module name to team name to directory path to list of file names.
 For unassigned files it uses `__NONE__` as the module name, and for unowned
 files it uses `__NO_OWNER__` as the team, both of which conveniently sort first.
@@ -53,19 +70,19 @@ examples using it, some of which produce enough output to be worth opening in vs
 
 ```bash
 # list of teams
-yq '[.[] | keys] | add | sort | unique[]' -r modules.yaml
+yq '[.[] | keys] | add | sort | unique[]' -r modules_dump.yaml
 # unassigned files owned by server-programmability
-yq '.__NONE__.server_programmability' modules.yaml
+yq '.__NONE__.server_programmability' modules_dump.yaml
 # files owned by server-programmability across all modules (or lack thereof)
-yq '.[] |= (.server_programmability | values)' modules.yaml
+yq '.[] |= (.server_programmability | values)' modules_dump.yaml
 # assigned files owned by server-programmability outside of the core module
-yq '.[] |= (.server_programmability | values) | del(.core) | del(.__NONE__)' modules.yaml
+yq '.[] |= (.server_programmability | values) | del(.core) | del(.__NONE__)' modules_dump.yaml
 # assigned files owned by server-programmability in modules that don't start with core
-yq '.[] |= (.server_programmability | values) |  with_entries(select(.key | startswith("core") | not)) | del(.__NONE__)' modules.yaml
+yq '.[] |= (.server_programmability | values) |  with_entries(select(.key | startswith("core") | not)) | del(.__NONE__)' modules_dump.yaml
 # unowned files as a flat list
-yq '.[].__NO_OWNER__ | values | to_entries | map("\(.key)/\(.value[])") | .[] ' modules.yaml -r | sort
+yq '.[].__NO_OWNER__ | values | to_entries | map("\(.key)/\(.value[])") | .[] ' modules_dump.yaml -r | sort
 # unowned files grouped by directory
-yq '[.[].__NO_OWNER__ | to_entries? | .[]] | group_by(.key) | map({key: .[0].key, value: ([.[].value] | add | sort)}) | from_entries' modules.yaml
+yq '[.[].__NO_OWNER__ | to_entries? | .[]] | group_by(.key) | map({key: .[0].key, value: ([.[].value] | add | sort)}) | from_entries' modules_dump.yaml
 ```
 
 ## Specifying public and private module APIs

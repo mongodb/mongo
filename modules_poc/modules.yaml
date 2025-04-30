@@ -19,12 +19,17 @@
 #   to send questions/tickets to initially, understanding that we can always send them
 #   somewhere else if needed.
 
+__NONE__:
+  files:
+    - src/mongo/idl/cluster_server_parameter*
+    - src/mongo/idl/cluster_parameter_synchronization_helpers*
+
 core:
+  description: TODO
   meta:
     slack: server-programmability
     jira: Server Programmability
   files:
-    - src/mongo/bson/
     - src/mongo/base/
     - src/mongo/platform/
     - src/mongo/stdx/
@@ -32,6 +37,44 @@ core:
     - src/mongo/db/json.h
     # Unsure about this but putting here for now:
     - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
+    - src/mongo/db/field_parser[._]*
+    - src/mongo/db/generic_argument_util.*
+    - src/mongo/db/mongod.cpp
+    - src/mongo/db/mongod_initializers.cpp
+    - src/mongo/db/mongod_main.*
+    - src/mongo/db/mongod_options.*
+    - src/mongo/db/mongod_options_general.*
+    - src/mongo/db/mongod_options_init.cpp
+    - src/mongo/db/mongod_options_legacy.idl
+    - src/mongo/db/mongod_options_test.cpp
+    - src/mongo/db/nesting_depth_test.cpp
+    - src/mongo/db/operation_killer.*
+    - src/mongo/db/operation_time_tracker[._]*
+    - src/mongo/db/request_execution_context.h
+    - src/mongo/db/server_lifecycle_monitor[._]*
+    - src/mongo/db/service_entry_point_bm_fixture.h
+    - src/mongo/db/service_entry_point_rs_endpoint.*
+    - src/mongo/db/startup_warnings_common.*
+    - src/mongo/db/startup_warnings_mongod.*
+    - src/mongo/db/thread_client_test.cpp
+    - src/mongo/db/throw_hook_impl[._]*
+    - src/mongo/db/throw_hook_options.idl
+    - src/mongo/dbtests/threadedtests.cpp
+    - src/mongo/executor/cancelable_executor[._]*
+    - src/mongo/executor/inline_executor[._]*
+    - src/mongo/executor/scoped_task_executor[._]*
+    - src/mongo/executor/task_executor[._]*
+    - src/mongo/executor/thread_pool[._]*
+
+core.bson:
+  files:
+    - src/mongo/bson/
+    - src/mongo/dbtests/jsobjtests.cpp
+
+core.idl:
+  files:
+    - src/mongo/idl/
+    - src/mongo/db/basic_types.*
 
 core.service:
   files:
@@ -39,10 +82,35 @@ core.service:
     - src/mongo/db/*operation_context*
     - src/mongo/db/client*
     - src/mongo/db/service_context*
+    - src/mongo/db/dbdirectclient[._]*
+    - src/mongo/dbtests/directclienttests.cpp
+
+core.commands:
+  files:
+    - src/mongo/db/commands/async_command_execution_test.cpp
+    - src/mongo/db/commands/buildinfo_common.*
+    - src/mongo/db/commands/cpuload.cpp
+    - src/mongo/db/commands/db_command_test_fixture.h
+    - src/mongo/db/commands/fail_point_cmd.cpp
+    - src/mongo/db/commands/kill_op.cpp
+    - src/mongo/db/commands/kill_op_cmd_base.*
+    - src/mongo/db/commands/kill_operations.idl
+    - src/mongo/db/commands/killoperations_cmd.cpp
+    - src/mongo/db/commands/killoperations_common.h
+    - src/mongo/db/commands/sessions_commands.idl
+    - src/mongo/db/commands/shutdown.*
+    - src/mongo/db/commands/shutdown_d.cpp
+    - src/mongo/db/commands/sleep_command.cpp
+    - src/mongo/db/commands/test_commands[._]*
 
 core.unittest:
   files:
     - src/mongo/unittest/
+    - src/mongo/dbtests/framework[._]*
+
+clang_tidy_checks:
+  files:
+    - src/mongo/tools/mongo_tidy_checks/
 
 query:
   meta:
@@ -136,6 +204,7 @@ shard_role:
     jira: TODO
   files:
     - src/mongo/db/s/
+    - src/mongo/db/service_entry_point_shard_role[._]*
 
 data_movement:
   meta:

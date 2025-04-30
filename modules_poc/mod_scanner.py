@@ -806,7 +806,7 @@ def dump_modules() -> None:
         for dirs in teams.values():
             for files in dirs.values():
                 files.sort()
-    yaml.dump(out, open("modules.yaml", "w"))
+    yaml.dump(out, open("modules_dump.yaml", "w"))
 
 
 def dump_list() -> None:
