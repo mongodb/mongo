@@ -115,6 +115,7 @@ mongo_cc_unit_test(
     tags = [
         "mongo_unittest_second_group",
         "server-programmability",
+        "server-storage-engine-integration",
     ],
     deps = [
         ":exception_util",

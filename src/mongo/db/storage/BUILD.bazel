@@ -537,7 +537,10 @@ mongo_cc_unit_test(
     srcs = [
         "ident_test.cpp",
     ],
-    tags = ["mongo_unittest_fifth_group"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-storage-engine-integration",
+    ],
     deps = [
         ":ident",
         "//src/mongo/unittest",
@@ -563,7 +566,10 @@ mongo_cc_unit_test(
     srcs = [
         "prepare_conflict_tracker_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-storage-engine-integration",
+    ],
     deps = [
         ":execution_context",
         ":prepare_conflict_tracker",
@@ -699,7 +705,10 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper_test.cpp",
         "//src/mongo/db/storage/kv:storage_engine_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-storage-engine-integration",
+    ],
     deps = [
         ":disk_space_monitor",
         ":record_store_base",

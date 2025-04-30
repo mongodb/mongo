@@ -333,10 +333,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_op_observer_test",
     srcs = [
-        "batched_write_context_test.cpp",
-        "batched_write_policy_test.cpp",
         "op_observer_impl_test.cpp",
-        "op_observer_registry_test.cpp",
         "user_write_block_mode_op_observer_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
@@ -373,6 +370,37 @@ mongo_cc_unit_test(
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
         "//src/mongo/idl:server_parameter_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_batched_write_test",
+    srcs = [
+        "batched_write_context_test.cpp",
+        "batched_write_policy_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_seventh_group",
+        "server-storage-engine-integration",
+    ],
+    deps = [
+        ":op_observer",
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "op_observer_registry_test",
+    srcs = [
+        "op_observer_registry_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-storage-engine-integration",
+    ],
+    deps = [
+        ":op_observer",
+        "//src/mongo/db:service_context_d_test_fixture",
     ],
 )
 

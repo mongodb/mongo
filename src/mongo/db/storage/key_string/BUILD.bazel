@@ -29,7 +29,10 @@ mongo_cc_unit_test(
         "key_string_test.cpp",
         "//src/mongo/bson:bsonobj_comparator.h",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-key-string",
+    ],
     deps = [
         "key_string",
     ],

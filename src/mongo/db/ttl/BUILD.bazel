@@ -62,7 +62,10 @@ mongo_cc_unit_test(
         "ttl_collection_cache_test.cpp",
         "ttl_test.cpp",
     ],
-    tags = ["mongo_unittest_fifth_group"],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-ttl",
+    ],
     deps = [
         ":ttl_collection_cache",
         ":ttl_d",

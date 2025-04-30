@@ -37,7 +37,10 @@ mongo_cc_unit_test(
     srcs = [
         "timeseries_write_ops_internal_test.cpp",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-timeseries-bucket-catalog",
+    ],
     deps = [
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",

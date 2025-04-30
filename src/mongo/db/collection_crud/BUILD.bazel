@@ -57,7 +57,10 @@ mongo_cc_unit_test(
         "capped_utils_test.cpp",
         "capped_visibility_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-collection-write-path",
+    ],
     deps = [
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/catalog:catalog_control",

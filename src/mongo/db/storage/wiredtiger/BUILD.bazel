@@ -205,7 +205,10 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
         "//src/mongo/util:future_test_utils.h",
     ],
-    tags = ["mongo_unittest_eighth_group"],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-storage-engine-integration",
+    ],
     deps = [
         ":storage_wiredtiger",
         ":storage_wiredtiger_core",
@@ -234,7 +237,10 @@ mongo_cc_unit_test(
         "wiredtiger_standard_index_test.cpp",
         "wiredtiger_standard_record_store_test.cpp",
     ],
-    tags = ["mongo_unittest_sixth_group"],
+    tags = [
+        "mongo_unittest_sixth_group",
+        "server-storage-engine-integration",
+    ],
     deps = [
         ":storage_wiredtiger_core",
         ":wiredtiger_index_test_harness",

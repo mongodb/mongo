@@ -1711,7 +1711,6 @@ mongo_cc_unit_test(
     name = "db_commands_test",
     srcs = [
         "create_command_test.cpp",
-        "create_indexes_test.cpp",
         "list_collections_filter_test.cpp",
         "parse_log_component_settings_test.cpp",
         "profile_cmd_test.cpp",
@@ -1778,6 +1777,22 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "create_indexes_command_test",
+    srcs = [
+        "create_indexes_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-index-builds",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/repl:storage_interface_impl",
     ],
 )
 

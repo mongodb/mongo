@@ -63,7 +63,10 @@ mongo_cc_unit_test(
         "sorter_stats_test.cpp",
         "sorter_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-external-sorter",
+    ],
     deps = [
         ":sorter_base",
         ":sorter_stats",

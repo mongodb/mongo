@@ -690,9 +690,7 @@ mongo_cc_unit_test(
         "historical_catalogid_tracker_test.cpp",
         "index_catalog_entry_impl_test.cpp",
         "index_catalog_impl_test.cpp",
-        "index_key_validate_test.cpp",
         "index_signature_test.cpp",
-        "index_spec_validate_test.cpp",
         "rename_collection_test.cpp",
         "storage_engine_collection_options_flags_parser_test.cpp",
     ],
@@ -737,8 +735,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/op_observer:operation_logger_mock",
-        "//src/mongo/db/query/collation:collator_factory_mock",
-        "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/datetime:date_time_support",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:oplog_application",
@@ -756,6 +752,26 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_validate_test",
+    srcs = [
+        "index_key_validate_test.cpp",
+        "index_spec_validate_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-index-builds",
+    ],
+    deps = [
+        ":index_key_validate",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/query/collation:collator_factory_mock",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest",
     ],
 )
 
