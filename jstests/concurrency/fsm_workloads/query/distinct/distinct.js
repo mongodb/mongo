@@ -5,10 +5,6 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  *
- * @tags: [
- *   # TODO SERVER-13116: distinct isn't sharding aware
- *   assumes_balancer_off,
- * ]
  */
 export const $config = (function() {
     var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};
@@ -27,7 +23,16 @@ export const $config = (function() {
         }
 
         function distinct(db, collName) {
-            assert.eq(this.numDocs, db[this.threadCollName].distinct('i').length);
+            try {
+                assert.eq(this.numDocs, db[this.threadCollName].distinct('i').length);
+            } catch (e) {
+                // Range deletion completing may (correctly) cause this query plan to be killed.
+                // TODO SERVER-97712: On transaction passthroughs this may fail with
+                // ExceededTimeLimit.
+                assert([ErrorCodes.QueryPlanKilled, ErrorCodes.ExceededTimeLimit].includes(e.code),
+                       "Expected a QueryPlanKilled or ExceededTimeLimit error, but encountered: " +
+                           e.message);
+            }
         }
 
         return {init: init, distinct: distinct};

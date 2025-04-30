@@ -26,9 +26,10 @@ results.sort();
 const formatResultsFn = () => tojson(results);
 
 if (FixtureHelpers.isMongos(db)) {
-    // TODO: SERVER-13116 DISTINCT_SCAN will return orphaned documents. We assert that each
-    // result returned has a matching value, but we do not enforce how many are returned (we allow
-    // duplicates).
+    // TODO SERVER-92983: On multiversion suites with a version < 8.2, DISTINCT_SCAN will return
+    // orphaned documents. We assert that each result returned has a matching value, but we do not
+    // enforce how many are returned (we allow duplicates). Once the version is high enough, we
+    // should always shard filter here.
     assert.lte(2, results.length, formatResultsFn);
     for (let res of results) {
         assert(res == "abc" || res == "abd", formatResultsFn);

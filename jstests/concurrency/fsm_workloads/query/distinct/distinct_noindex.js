@@ -5,10 +5,6 @@
  * The field contains non-unique values.
  * Each thread operates on the same collection.
  *
- * @tags: [
- *   # TODO SERVER-13116: distinct isn't sharding aware
- *   assumes_balancer_off,
- * ]
  */
 export const $config = (function() {
     var data = {

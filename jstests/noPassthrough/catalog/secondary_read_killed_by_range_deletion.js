@@ -329,7 +329,7 @@ const commandsToTest = [
             },
             // Can't run with 'snapshot' read concern because: Cannot run 'distinct' on a sharded
             // collection with readConcern level 'snapshot'
-            // TODO (SERVER-13116): Add a case with 'snapshot' read concern.
+            // TODO (SERVER-97712): Add a case with 'snapshot' read concern.
         ]
     },
 ];
