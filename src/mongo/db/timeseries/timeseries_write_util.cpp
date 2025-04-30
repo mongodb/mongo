@@ -437,9 +437,28 @@ void performAtomicWritesForUpdate(
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds,
     const boost::optional<Date_t> currentMinTime) {
-    auto timeSeriesOptions = *coll->getTimeseriesOptions();
-    auto batches = insertIntoBucketCatalogForUpdate(
-        opCtx, sideBucketCatalog, coll, modifiedMeasurements, coll->ns(), timeSeriesOptions);
+    auto timeseriesOptions = *coll->getTimeseriesOptions();
+    auto storageCacheSizeBytes = getStorageCacheSizeBytes(opCtx);
+    std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
+
+    auto swWriteBatches =
+        bucket_catalog::prepareInsertsToBuckets(opCtx,
+                                                sideBucketCatalog,
+                                                coll.get(),
+                                                timeseriesOptions,
+                                                opCtx->getOpID(),
+                                                coll->getDefaultCollator(),
+                                                storageCacheSizeBytes,
+                                                /*earlyReturnOnError=*/true,
+                                                /*compressAndWriteBucketFunc=*/nullptr,
+                                                modifiedMeasurements,
+                                                0,
+                                                modifiedMeasurements.size(),
+                                                {},
+                                                errorsAndIndices);
+    uassertStatusOK(swWriteBatches);
+
+    auto& batches = swWriteBatches.getValue();
 
     auto modificationRequest = unchangedMeasurements
         ? boost::make_optional(write_ops_utils::makeModificationOp(

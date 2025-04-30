@@ -45,6 +45,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -824,6 +825,18 @@ Bucket& getEligibleBucket(OperationContext* opCtx,
                                                                stats,
                                                                bucketOpenedDueToMetadata)) {
             return *eligibleBucket;
+        }
+
+        // Do not reopen existing buckets if not using the main bucket catalog.
+        if (MONGO_unlikely(&catalog != &GlobalBucketCatalog::get(opCtx->getServiceContext()))) {
+            return internal::allocateBucket(catalog,
+                                            stripe,
+                                            stripeLock,
+                                            bucketKey,
+                                            options,
+                                            measurementTimestamp,
+                                            comparator,
+                                            stats);
         }
 
         // 2. Attempt to reopen a bucket.
