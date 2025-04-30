@@ -34,7 +34,7 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
+#include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -42,7 +42,8 @@
 namespace mongo {
 namespace unified_write_executor {
 namespace {
-struct UnifiedWriteExecutorAnalyzeTest : public ShardingTestFixture {
+struct WriteOpAnalyzerTest : public ShardingTestFixture {
+    WriteOpAnalyzer analyzer;
     const ShardId kShard1Name = ShardId("shard1");
     const ShardId kShard2Name = ShardId("shard2");
     const NamespaceString kUntrackedNss =
@@ -118,7 +119,7 @@ struct UnifiedWriteExecutorAnalyzeTest : public ShardingTestFixture {
 };
 
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleInserts) {
+TEST_F(WriteOpAnalyzerTest, SingleInserts) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -131,13 +132,13 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleInserts) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -145,7 +146,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleInserts) {
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, MultiNSSingleInserts) {
+TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");
@@ -161,14 +162,14 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, MultiNSSingleInserts) {
 
     WriteOp op1(request, 0);
     ASSERT_EQ(nss, op1.getNss());
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
     ASSERT_EQ(nss2, op2.getNss());
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -177,7 +178,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, MultiNSSingleInserts) {
     rtx.onResponseReceivedForNss(nss2, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, EqUpdateOnes) {
+TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -194,13 +195,13 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, EqUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -208,7 +209,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, EqUpdateOnes) {
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, RangeUpdateOnes) {
+TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -225,19 +226,19 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, RangeUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, RangeUpdateManys) {
+TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -264,19 +265,19 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, RangeUpdateManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeUpdateOnes) {
+TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -293,14 +294,14 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
@@ -309,7 +310,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeUpdateOnes) {
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeUpdateManys) {
+TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -336,13 +337,13 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeUpdateManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
@@ -350,7 +351,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeUpdateManys) {
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, EqDeletes) {
+TEST_F(WriteOpAnalyzerTest, EqDeletes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -363,13 +364,13 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, EqDeletes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
@@ -378,7 +379,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, EqDeletes) {
 }
 
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, RangeDeleteOnes) {
+TEST_F(WriteOpAnalyzerTest, RangeDeleteOnes) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -391,19 +392,19 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, RangeDeleteOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeDeleteManys) {
+TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextSharded({{uuid, nss}});
@@ -426,13 +427,13 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeDeleteManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
@@ -441,7 +442,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, SingleShardRangeDeleteManys) {
     rtx.onResponseReceivedForNss(nss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, UnshardedUntracked) {
+TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
     auto rtx = createRoutingContextUnsharded();
 
     BulkWriteCommandRequest request(
@@ -471,7 +472,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, UnshardedUntracked) {
     for (size_t i = 0; i < request.getOps().size(); i++) {
         LOGV2(10346501, "request index", "i"_attr = i);
         WriteOp op(request, i);
-        auto analysis = analyze(operationContext(), rtx, op);
+        auto analysis = analyzer.analyze(operationContext(), rtx, op);
         ASSERT_EQ(1, analysis.shardsAffected.size());
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }
@@ -480,7 +481,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, UnshardedUntracked) {
     rtx.onResponseReceivedForNss(kUnsplittableNss, Status::OK());
 }
 
-TEST_F(UnifiedWriteExecutorAnalyzeTest, Unsplittable) {
+TEST_F(WriteOpAnalyzerTest, Unsplittable) {
     auto rtx = createRoutingContextUnsharded();
 
     BulkWriteCommandRequest request(
@@ -510,7 +511,7 @@ TEST_F(UnifiedWriteExecutorAnalyzeTest, Unsplittable) {
     for (size_t i = 0; i < request.getOps().size(); i++) {
         LOGV2(10346502, "request index", "i"_attr = i);
         WriteOp op(request, i);
-        auto analysis = analyze(operationContext(), rtx, op);
+        auto analysis = analyzer.analyze(operationContext(), rtx, op);
         ASSERT_EQ(1, analysis.shardsAffected.size());
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }

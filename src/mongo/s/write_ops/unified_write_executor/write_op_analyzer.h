@@ -37,6 +37,7 @@
 
 namespace mongo {
 namespace unified_write_executor {
+
 enum BatchType { kSingleShard, kMultiShard };
 
 struct Analysis {
@@ -44,11 +45,16 @@ struct Analysis {
     std::vector<ShardEndpoint> shardsAffected;
 };
 
-/**
- * Analyzes the given write op to determine which shards it would affect, and if it could be
- * combined into a batch with other writes.
- */
-Analysis analyze(OperationContext* opCtx, const RoutingContext& routingCtx, const WriteOp& op);
+class WriteOpAnalyzer {
+public:
+    /**
+     * Analyzes the given write op to determine which shards it would affect, and if it could be
+     * combined into a batch with other writes.
+     */
+    virtual Analysis analyze(OperationContext* opCtx,
+                             const RoutingContext& routingCtx,
+                             const WriteOp& op);
+};
 
 }  // namespace unified_write_executor
 }  // namespace mongo

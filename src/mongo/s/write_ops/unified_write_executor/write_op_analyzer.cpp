@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
+#include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 
 namespace mongo {
 namespace unified_write_executor {
 
-Analysis analyze(OperationContext* opCtx, const RoutingContext& routingCtx, const WriteOp& op) {
+Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
+                                  const RoutingContext& routingCtx,
+                                  const WriteOp& op) {
     auto cri = routingCtx.getCollectionRoutingInfo(op.getNss());
     // TODO SERVER-103782 Don't use CRITargeter.
     CollectionRoutingInfoTargeter targeter(op.getNss(), cri);

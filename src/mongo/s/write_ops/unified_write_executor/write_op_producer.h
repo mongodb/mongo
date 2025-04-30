@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <absl/container/btree_set.h>
 #include <boost/optional.hpp>
 
@@ -42,6 +44,7 @@ namespace unified_write_executor {
  * time.
  */
 class WriteOpProducer {
+public:
     /**
      * Peek the current active write op without advancing the internal pointer. Repeated calls
      * return the same write op. When no active write op is left, return empty.

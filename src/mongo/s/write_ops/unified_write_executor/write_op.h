@@ -44,11 +44,13 @@ enum WriteType {
     kFindAndMod,  // TODO SERVER-103949 will use this type or remove it.
 };
 
+using WriteOpId = size_t;
+
 class WriteOp {
 public:
     WriteOp(const BulkWriteCommandRequest& request, int index) : _op(&request, index) {}
 
-    int getId() const {
+    WriteOpId getId() const {
         return _op.getItemIndex();
     }
 
