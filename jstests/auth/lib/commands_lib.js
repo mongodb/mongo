@@ -5840,7 +5840,7 @@ export const authCommandsLib = {
         },
         {
           testname: "d_moveRange",
-          command: {_shardsvrMoveRange: "test.x", fromShard: "a", toShard: "b", min: {}, max: {}, maxChunkSizeBytes: 1024},
+          command: {_shardsvrMoveRange: "test.x", fromShard: "a", toShard: "b", min: {}, max: {}, maxChunkSizeBytes: 1024, collectionTimestamp: Timestamp(1, 0)},
           skipSharded: true,
           testcases: [
               {

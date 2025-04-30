@@ -130,15 +130,9 @@ commands:
         chained_structs:
             MoveRangeRequestBase: MoveRangeRequestBase
         fields:
-            # TODO SERVER-80188: remove _collectionEpoch once 8.0 becomes last-lts.
-            epoch:
-                type: objectid
-                description: "Epoch of the collection"
-                optional: true
             collectionTimestamp:
                 type: timestamp
                 description: "Timestamp of the collection"
-                optional: true
             fromShard:
                 type: shard_id
                 description: "ID of the donor shard"

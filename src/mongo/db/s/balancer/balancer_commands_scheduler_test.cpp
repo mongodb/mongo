@@ -111,7 +111,7 @@ public:
         shardSvrRequest.setDbName(DatabaseName::kAdmin);
         shardSvrRequest.setMoveRangeRequestBase(base);
         shardSvrRequest.setFromShard(from);
-        shardSvrRequest.setEpoch(OID::gen());
+        shardSvrRequest.setCollectionTimestamp(Timestamp(10));
         shardSvrRequest.setMaxChunkSizeBytes(1024 * 1024);
 
         return shardSvrRequest;
@@ -178,6 +178,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
         }});
     _scheduler.start(operationContext());
     ShardsvrMoveRange shardsvrRequest(kNss);
+    shardsvrRequest.setCollectionTimestamp(Timestamp(10));
     shardsvrRequest.setDbName(DatabaseName::kAdmin);
     shardsvrRequest.setFromShard(kShardId0);
     shardsvrRequest.setMaxChunkSizeBytes(1024);

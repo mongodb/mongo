@@ -67,8 +67,7 @@ ShardsvrMoveRange createMoveRangeRequest(const NamespaceString& nss,
                                          const OID& epoch = OID::gen()) {
     const ShardId fromShard = ShardId("shard0001");
     const long long maxChunkSizeBytes = 1024;
-    ShardsvrMoveRange req(nss, fromShard, maxChunkSizeBytes);
-    req.setEpoch(epoch);
+    ShardsvrMoveRange req(nss, Timestamp(10), fromShard, maxChunkSizeBytes);
     req.getMoveRangeRequestBase().setToShard(ShardId("shard0002"));
     req.setMaxChunkSizeBytes(1024);
     req.getMoveRangeRequestBase().setMin(BSON("Key" << -100));

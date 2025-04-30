@@ -653,6 +653,7 @@ const internalCommandsMap = {
         testname: "_shardsvrMoveRange",
         command: {
             _shardsvrMoveRange: "test.view",
+            collectionTimestamp: Timestamp(1, 0),
             fromShard: shard0name,
             toShard: "shard0001",
             maxChunkSizeBytes: NumberInt(100)
