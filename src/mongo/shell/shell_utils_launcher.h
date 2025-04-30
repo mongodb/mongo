@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem.hpp>
 #include <map>
 #include <sstream>
 #include <string>

@@ -39,9 +39,7 @@
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/path_traits.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
 

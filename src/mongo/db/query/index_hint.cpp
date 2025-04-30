@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/index_hint.h"
 
-#include <boost/container_hash/extensions.hpp>
+#include <boost/functional/hash.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"

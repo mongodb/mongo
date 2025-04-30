@@ -28,10 +28,8 @@
  */
 
 #include <boost/core/addressof.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/path_traits.hpp>
 #include <boost/function/function_base.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -114,7 +112,7 @@ GoldenTestEnvironment::GoldenTestEnvironment() : _goldenDataRoot(".") {
     fs::path outputRoot;
     if (opts.outputRootPattern) {
         fs::path pattern(*opts.outputRootPattern);
-        outputRoot = pattern.parent_path() / fs::unique_path(pattern.leaf());
+        outputRoot = pattern.parent_path() / fs::unique_path(pattern.filename());
     } else {
         outputRoot = fs::temp_directory_path() / fs::unique_path("out-%%%%-%%%%-%%%%-%%%%");
     }

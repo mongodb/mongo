@@ -31,7 +31,7 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include <boost/container_hash/extensions.hpp>
+#include <boost/functional/hash.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>

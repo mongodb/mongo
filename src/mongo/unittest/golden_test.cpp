@@ -32,8 +32,7 @@
 #include <fmt/format.h>
 #include <iostream>
 
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/path_traits.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep

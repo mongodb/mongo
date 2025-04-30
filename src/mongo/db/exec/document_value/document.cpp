@@ -30,7 +30,7 @@
 #include "mongo/db/exec/document_value/document.h"
 
 #include <absl/container/node_hash_map.h>
-#include <boost/container_hash/extensions.hpp>
+#include <boost/functional/hash.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <cstdint>

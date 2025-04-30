@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/container_hash/extensions.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>

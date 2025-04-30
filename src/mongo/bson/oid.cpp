@@ -28,7 +28,7 @@
  */
 
 #include <algorithm>
-#include <boost/container_hash/extensions.hpp>
+#include <boost/functional/hash.hpp>
 #include <ctime>
 #include <limits>
 #include <memory>

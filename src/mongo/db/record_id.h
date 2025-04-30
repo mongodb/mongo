@@ -30,7 +30,6 @@
 #pragma once
 
 #include <array>
-#include <boost/container_hash/extensions.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/optional.hpp>
 #include <climits>

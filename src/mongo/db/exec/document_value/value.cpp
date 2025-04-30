@@ -28,8 +28,8 @@
  */
 
 #include <absl/hash/hash.h>
-#include <boost/container_hash/extensions.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/functional/hash.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional/optional.hpp>

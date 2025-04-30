@@ -329,7 +329,7 @@ bool checkAndMoveLogFile(const std::string& absoluteLogpath) {
                                     << "\" should name a file, not a directory.");
         }
 
-        if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
+        if (!serverGlobalParams.logAppend && boost::filesystem::is_regular_file(absoluteLogpath)) {
             std::string renameTarget = absoluteLogpath + "." + terseCurrentTimeForFilename();
             boost::system::error_code ec;
             boost::filesystem::rename(absoluteLogpath, renameTarget, ec);

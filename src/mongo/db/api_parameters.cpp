@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-
-#include <boost/container_hash/extensions.hpp>
+#include <boost/functional/hash.hpp>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

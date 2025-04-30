@@ -40,9 +40,8 @@
 
 #include <absl/container/node_hash_map.h>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
 #include <boost/optional.hpp>
@@ -194,7 +193,7 @@ std::string extractIdentFromPath(const boost::filesystem::path& dbpath,
 
     // Remove the file extension and convert to generic form (i.e. replace "\" with "/"
     // on windows, no-op on unix).
-    return boost::filesystem::change_extension(identWithExtension, "").generic_string();
+    return identWithExtension.replace_extension("").generic_string();
 }
 
 bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {

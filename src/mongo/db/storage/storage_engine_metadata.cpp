@@ -228,7 +228,7 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     // if called without a fully qualified path it asserts; that makes mongoperf fail.
     // so make a warning. need a better solution longer term.
     // massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
-    if (!file.has_branch_path()) {
+    if (!file.has_parent_path()) {
         LOGV2(22283,
               "flushMyDirectory couldn't find parent dir for file",
               "file"_attr = file.generic_string());
@@ -236,7 +236,7 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     }
 
 
-    boost::filesystem::path dir = file.branch_path();  // parent_path in new boosts
+    boost::filesystem::path dir = file.parent_path();
 
     LOGV2_DEBUG(22284, 1, "flushing directory {dir_string}", "dir_string"_attr = dir.string());
 

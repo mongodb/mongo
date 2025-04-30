@@ -34,8 +34,7 @@
 #include <boost/any.hpp>
 #include <boost/any/bad_any_cast.hpp>
 #include <boost/core/typeinfo.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path_traits.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/iostreams/categories.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/imbue.hpp>

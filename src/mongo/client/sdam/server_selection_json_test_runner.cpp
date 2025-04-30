@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/path_traits.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
