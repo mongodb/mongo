@@ -105,11 +105,16 @@ class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):
                             f"Internal error while trying to validate node: {node.get_driver_connection_url()}"
                         )
 
-                if not all(
-                    future.result() is True for future in concurrent.futures.as_completed(futures)
-                ):
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    raise RuntimeError("collection validation failed")
+                for future in concurrent.futures.as_completed(futures):
+                    exception = future.exception()
+                    if exception is not None:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise RuntimeError(
+                            "Collection validation raised an exception."
+                        ) from exception
+                    result = future.result()
+                    if result is not True:
+                        raise RuntimeError("Collection validation failed.")
         except:
             self.logger.exception("Uncaught exception while validating collections")
             raise
