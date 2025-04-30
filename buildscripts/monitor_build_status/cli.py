@@ -165,7 +165,7 @@ class MonitorBuildStatusOrchestrator:
             overall_slack_tags,
         )
 
-        for group_name in code_lockdown_config.get_all_group_names():
+        for group_name in sorted(code_lockdown_config.get_all_group_names()):
             group_teams = code_lockdown_config.get_group_teams(group_name)
             group_thresholds = code_lockdown_config.get_group_thresholds(group_name)
             group_slack_tags = code_lockdown_config.get_group_slack_tags(group_name)

@@ -85,16 +85,16 @@ groups:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
   - name: "Developer Productivity"
     teams:
-      - "Evergreen UI"
-      - "Evergreen App"
-      - "Services & Integrations"
-      - "Runtime Environments"
+      - "DevProd Evergreen UI"
+      - "DevProd Evergreen App"
+      - "DevProd Services & Integrations"
+      - "DevProd Runtime Environments"
       - "DevProd Infrastructure"
-      - "Release Infrastructure"
-      - "Performance Infrastructure"
-      - "Performance Analysis"
-      - "Build"
-      - "Correctness"
+      - "DevProd Release Infrastructure"
+      - "DevProd Performance Infrastructure"
+      - "DevProd Performance Analysis"
+      - "DevProd Build"
+      - "DevProd Correctness"
     slack_tags:
       - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com - VP
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
@@ -182,33 +182,33 @@ teams:
       - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
 
   # R&D Productivity Teams as described on https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=88587938
-  - name: "Evergreen UI"
+  - name: "DevProd Evergreen UI"
     slack_tags:
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
-  - name: "Evergreen App"
+  - name: "DevProd Evergreen App"
     slack_tags:
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
-  - name: "Services & Integrations"
+  - name: "DevProd Services & Integrations"
     slack_tags:
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
-  - name: "Runtime Environments"
+  - name: "DevProd Runtime Environments"
     slack_tags:
       - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
   - name: "DevProd Infrastructure"
     slack_tags:
       - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
-  - name: "Release Infrastructure"
+  - name: "DevProd Release Infrastructure"
     slack_tags:
       - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
-  - name: "Performance Infrastructure"
+  - name: "DevProd Performance Infrastructure"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
-  - name: "Performance Analysis"
+  - name: "DevProd Performance Analysis"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
-  - name: "Build"
+  - name: "DevProd Build"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
-  - name: "Correctness"
+  - name: "DevProd Correctness"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
