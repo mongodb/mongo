@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -617,19 +618,29 @@ unsigned long long curTimeMicros64() {
 }
 
 #else
-unsigned long long curTimeMillis64() {
+
+namespace {
+
+Microseconds curTimeDuration() {
     timeval tv;
-    int ret = gettimeofday(&tv, nullptr);
-    if (ret == -1) {
-        uasserted(1125408, str::stream() << "gettimeofday failed with errno " << errno);
+    if (MONGO_unlikely(gettimeofday(&tv, nullptr) < 0)) {
+        // only possible error is EFAULT, we're passing a pointer to stack memory
+        auto e = lastSystemError();
+        fasserted(1125408,
+                  {ErrorCodes::InternalError, fmt::format("gettimeofday: {}", errorMessage(e))});
     }
-    return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
+
+    return Seconds(tv.tv_sec) + Microseconds(tv.tv_usec);
+}
+
+}  // namespace
+
+unsigned long long curTimeMillis64() {
+    return static_cast<unsigned long long>(durationCount<Milliseconds>(curTimeDuration()));
 }
 
 unsigned long long curTimeMicros64() {
-    timeval tv;
-    gettimeofday(&tv, nullptr);
-    return (((unsigned long long)tv.tv_sec) * 1000 * 1000) + tv.tv_usec;
+    return static_cast<unsigned long long>(durationCount<Microseconds>(curTimeDuration()));
 }
 #endif
 
