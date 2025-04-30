@@ -15,6 +15,7 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 st.stopBalancer();
 
 const dbName = st.s.defaultDB;
+const buildInfo = assert.commandWorked(st.s.getDB(dbName).adminCommand({"buildInfo": 1}));
 const coll = st.s.getDB(dbName).getCollection('profile_remote_op_wait');
 
 coll.drop();
@@ -125,8 +126,13 @@ assert(!csCursor.hasNext());
     assert(line, "Failed to find a log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
     const workingMillis = getWorkingMillis(line);
-    assert.lte(workingMillis, 100);
     assert.gte(remoteOpWait, 900);
+    // An upper bound for the execution time (workingMillis) is hard to determine, because it
+    // depends on the build configuration (debug vs. non-debug, sanitizers) and the overall CPU
+    // utilization of the system. Set the limit high enough so we don't get many false positives
+    // during testing.
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+    assert.lte(workingMillis, isSanitizerEnabled ? 1000 : 30000);
 }
 
 // A query that merges on a shard logs remoteOpWaitMillis on the shard.
