@@ -198,10 +198,6 @@ selector:
     - jstests/core/query/push/push2.js
     - jstests/core/query/update/update_addToSet2.js
 
-    # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
-    # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
-    - jstests/core/query/top/top.js
-
     # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
     - jstests/core/shell/bench_test1.js
 

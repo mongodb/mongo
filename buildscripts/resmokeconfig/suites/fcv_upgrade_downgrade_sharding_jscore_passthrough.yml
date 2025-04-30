@@ -84,10 +84,6 @@ selector:
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
     - jstests/aggregation/exec/spill_to_disk.js
 
-    # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
-    # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
-    - jstests/core/query/top/top.js
-
     # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
     - jstests/core/shell/bench_test1.js
 
