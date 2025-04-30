@@ -218,6 +218,8 @@ function verifyTotals(stats, success) {
     }
     assert.gt(totals.maxDonorIndexes, 0, "maxDonorIndexes");
     assert.gt(totals.maxRecipientIndexes, 0, "maxRecipientIndexes");
+
+    assert.eq(totals.numberOfIndexesDelta, totals.maxRecipientIndexes - totals.maxDonorIndexes);
 }
 
 function verifyCriticalSection(stats, success) {

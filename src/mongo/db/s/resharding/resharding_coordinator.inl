@@ -1974,6 +1974,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     totalsBuilder.append("totalOplogsApplied", totalOplogsApplied);
     totalsBuilder.append("maxDonorIndexes", maxDonorIndexes);
     totalsBuilder.append("maxRecipientIndexes", maxRecipientIndexes);
+    totalsBuilder.append("numberOfIndexesDelta", maxRecipientIndexes - maxDonorIndexes);
     statsBuilder.append("totals", totalsBuilder.obj());
 
     bool hadCriticalSection = false;
