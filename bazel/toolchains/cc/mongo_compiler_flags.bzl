@@ -11,10 +11,6 @@ load(
     "MONGO_WIN_CC_LINKFLAGS",
     "WINDOWS_MULTITHREAD_RUNTIME_COPTS",
 )
-load(
-    "//bazel/toolchains/cc/mongo_apple:mongo_compiler_flags.bzl",
-    "MONGO_MAC_CC_LINKFLAGS",
-)
 
 # Only visible in the build system.
 visibility([
@@ -91,7 +87,7 @@ def get_copts(name, package_name, copts = [], skip_windows_crt_flags = False):
         copts = copts + WINDOWS_MULTITHREAD_RUNTIME_COPTS
     return copts
 
-MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS + MONGO_WIN_CC_LINKFLAGS + MONGO_MAC_CC_LINKFLAGS
+MONGO_GLOBAL_LINKFLAGS = MONGO_LINUX_CC_LINKFLAGS + MONGO_WIN_CC_LINKFLAGS
 
 def get_linkopts(package_name, linkopts = []):
     return MONGO_GLOBAL_LINKFLAGS + package_specific_linkflag(package_name) + linkopts

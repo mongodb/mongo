@@ -147,10 +147,28 @@ def get_apple_features(ctx):
         ],
     )
 
+    mongo_no_deduplicate_feature = feature(
+        name = "macos_no_deduplicate",
+        enabled = ctx.attr.optimization_level == "O0",
+        flag_sets = [
+            flag_set(
+                actions = _DYNAMIC_LINK_ACTIONS,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-Wl,-no_deduplicate",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     return [
         mongo_preprocessor_defines_feature,
         mongo_general_warnings_feature,
         mongo_fsized_deallocation_feature,
         mongo_general_linkflags_feature,
         mongo_frameworks_feature,
+        mongo_no_deduplicate_feature,
     ] + get_common_features(ctx)

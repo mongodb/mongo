@@ -444,14 +444,6 @@ selects.config_setting_group(
     ],
 )
 
-selects.config_setting_group(
-    name = "macos_opt_off",
-    match_all = [
-        "@platforms//os:macos",
-        ":opt_off",
-    ],
-)
-
 # ==========
 # dbg
 # ==========
