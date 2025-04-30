@@ -50,6 +50,10 @@ common --cache_test_results=no
 # Stream the test output so users can see the test progression.
 common --test_output=streamed
 
+# Build only what is necessary to run the *_test and test_suite rules that were
+# not filtered due to their size, timeout, tag, or language.
+test --build_tests_only
+
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
 common:windows --features=-compiler_param_file
