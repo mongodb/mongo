@@ -2,6 +2,8 @@ import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
 import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
 import {SpecificSecondaryReaderMongo} from "jstests/libs/specific_secondary_reader_mongo.js";
 
+const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
+
 export const workerThread = (function() {
     // workloads = list of workload filenames
     // args.tid = the thread identifier
@@ -38,8 +40,14 @@ export const workerThread = (function() {
             //     await import("jstests/libs/override_methods/network_error_and_txn_override.js");
             //     ...
             // '
-            if (typeof TestData.fsmPreOverridesLoadedCallback !== 'undefined') {
-                new Function(`${TestData.fsmPreOverridesLoadedCallback}`)();
+            if (TestData.fsmPreOverridesLoadedCallback) {
+                if (typeof TestData.fsmPreOverridesLoadedCallback !== 'string') {
+                    throw new Error(`TestData.fsmPreOverridesLoadedCallback must be a string, not ${
+                        typeof TestData.fsmPreOverridesLoadedCallback}`);
+                }
+
+                const fn = new AsyncFunction(TestData.fsmPreOverridesLoadedCallback);
+                await fn();
             }
 
             if (typeof db !== 'undefined') {

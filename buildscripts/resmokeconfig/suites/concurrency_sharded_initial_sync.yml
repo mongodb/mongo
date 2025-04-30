@@ -124,7 +124,7 @@ executor:
           runningWithShardStepdowns: true
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousInitialSync]
-          fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
 
   hooks:
     - class: ContinuousInitialSync

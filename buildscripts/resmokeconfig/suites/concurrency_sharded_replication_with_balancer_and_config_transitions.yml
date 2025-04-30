@@ -100,7 +100,7 @@ executor:
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
-          fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true

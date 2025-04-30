@@ -67,7 +67,7 @@ executor:
         TestData:
           runningWithBalancer: true
           implicitlyShardOnCreateCollectionOnly: true
-          fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
 
   hooks:
     - class: CheckShardFilteringMetadata

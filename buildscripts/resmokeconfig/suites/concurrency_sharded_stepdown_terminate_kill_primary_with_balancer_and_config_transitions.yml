@@ -120,7 +120,7 @@ executor:
           shardsAddedRemoved: true
           implicitlyShardOnCreateCollectionOnly: true
           shardCollectionProbability: 0.5
-          fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousStepdown
       config_stepdown: true
