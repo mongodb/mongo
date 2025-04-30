@@ -47,7 +47,7 @@ namespace mongo {
 namespace {
 
 // Verify that a nonempty collection maybe takes up some space on disk.
-TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
+TEST(RecordStoreTest, StorageSizeNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 

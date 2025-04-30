@@ -50,7 +50,7 @@ using std::stringstream;
 using std::unique_ptr;
 
 // Insert a record and verify the number of entries in the collection is 1.
-TEST(RecordStoreTestHarness, InsertRecord) {
+TEST(RecordStoreTest, InsertRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -79,7 +79,7 @@ TEST(RecordStoreTestHarness, InsertRecord) {
 
 // Insert multiple records and verify the number of entries in the collection
 // equals the number that were inserted.
-TEST(RecordStoreTestHarness, InsertMultipleRecords) {
+TEST(RecordStoreTest, InsertMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 

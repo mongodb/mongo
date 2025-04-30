@@ -86,7 +86,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     return res.getValue();
 }
 
-TEST(RecordStoreTestHarness, SeekOplog) {
+TEST(RecordStoreTest, SeekOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
@@ -209,7 +209,7 @@ TEST(RecordStoreTestHarness, SeekOplog) {
     }
 }
 
-TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
+TEST(RecordStoreTest, OplogInsertOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
@@ -263,7 +263,7 @@ std::string stringifyForDebug(OperationContext* opCtx,
     return output;
 }
 
-TEST(RecordStoreTestHarness, OplogOrder) {
+TEST(RecordStoreTest, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
@@ -518,7 +518,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     }
 }
 
-TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
+TEST(RecordStoreTest, OplogVisibilityStandalone) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(
         newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options::Standalone));
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());

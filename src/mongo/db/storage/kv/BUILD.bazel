@@ -33,7 +33,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "kv_engine_test_harness.h",
-        "//src/mongo/db/storage:sorted_data_interface_test_assert.h",
     ],
     deps = [
         "//src/mongo/db:multitenancy",
@@ -44,6 +43,7 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:durable_catalog",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:sorted_data_interface_test_assert",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/unittest",

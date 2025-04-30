@@ -48,7 +48,7 @@ namespace {
 
 // Insert a record and verify its contents by calling dataFor()
 // on the returned RecordId.
-TEST(RecordStoreTestHarness, DataFor) {
+TEST(RecordStoreTest, DataFor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -83,7 +83,7 @@ TEST(RecordStoreTestHarness, DataFor) {
 
 // Insert multiple records and verify their contents by calling dataFor()
 // on each of the returned RecordIds.
-TEST(RecordStoreTestHarness, DataForMultiple) {
+TEST(RecordStoreTest, DataForMultiple) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 

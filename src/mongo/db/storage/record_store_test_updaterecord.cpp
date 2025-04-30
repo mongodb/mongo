@@ -48,7 +48,7 @@ namespace mongo {
 namespace {
 
 // Insert a record and try to update it.
-TEST(RecordStoreTestHarness, UpdateRecord) {
+TEST(RecordStoreTest, UpdateRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -95,7 +95,7 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
 }
 
 // Insert multiple records and try to update them.
-TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
+TEST(RecordStoreTest, UpdateMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 

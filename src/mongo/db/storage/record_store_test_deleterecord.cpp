@@ -51,7 +51,7 @@ using std::stringstream;
 using std::unique_ptr;
 
 // Insert a record and try to delete it.
-TEST(RecordStoreTestHarness, DeleteRecord) {
+TEST(RecordStoreTest, DeleteRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -89,7 +89,7 @@ TEST(RecordStoreTestHarness, DeleteRecord) {
 }
 
 // Insert multiple records and try to delete them.
-TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
+TEST(RecordStoreTest, DeleteMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -130,9 +130,7 @@ TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
 }
 
 // Delete a non-existent record and expect it to crash with a log message.
-DEATH_TEST_REGEX(RecordStoreTestHarness,
-                 DeleteNonExistentRecord,
-                 "Record to be deleted not found") {
+DEATH_TEST_REGEX(RecordStoreTest, DeleteNonExistentRecord, "Record to be deleted not found") {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 

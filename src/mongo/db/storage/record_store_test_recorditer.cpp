@@ -50,7 +50,7 @@ namespace {
 // Insert multiple records and iterate through them in the forward direction.
 // When curr() or getNext() is called on an iterator positioned at EOF,
 // the iterator returns RecordId() and stays at EOF.
-TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
+TEST(RecordStoreTest, IterateOverMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -95,7 +95,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
 // Insert multiple records and iterate through them in the reverse direction.
 // When curr() or getNext() is called on an iterator positioned at EOF,
 // the iterator returns RecordId() and stays at EOF.
-TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
+TEST(RecordStoreTest, IterateOverMultipleRecordsReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -140,7 +140,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
 
 // Insert multiple records and try to create a forward iterator
 // starting at an interior position.
-TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
+TEST(RecordStoreTest, IterateStartFromMiddle) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -186,7 +186,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
 
 // Insert multiple records and try to create a reverse iterator
 // starting at an interior position.
-TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
+TEST(RecordStoreTest, IterateStartFromMiddleReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -233,7 +233,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
 // Insert several records, and iterate to the end. Ensure that the record iterator
 // is EOF. Add an additional record, saving and restoring the iterator state, and check
 // that the iterator remains EOF.
-TEST(RecordStoreTestHarness, RecordIteratorEOF) {
+TEST(RecordStoreTest, RecordIteratorEOF) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -300,7 +300,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 }
 
 // Test calling save and restore after each call to next
-TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
+TEST(RecordStoreTest, RecordIteratorSaveRestore) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -357,7 +357,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
 
 // Insert two records, and iterate a cursor to EOF. Seek the same cursor to the first and ensure
 // that next() returns the second record.
-TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
+TEST(RecordStoreTest, SeekAfterEofAndContinue) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -412,7 +412,7 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
 }
 
 // seekExact() must return boost::none if the RecordId does not exist.
-TEST(RecordStoreTestHarness, SeekExactForMissingRecordReturnsNone) {
+TEST(RecordStoreTest, SeekExactForMissingRecordReturnsNone) {
     const auto harnessHelper{newRecordStoreHarnessHelper()};
     auto recordStore = harnessHelper->newRecordStore();
     ServiceContext::UniqueOperationContext opCtx{harnessHelper->newOperationContext()};

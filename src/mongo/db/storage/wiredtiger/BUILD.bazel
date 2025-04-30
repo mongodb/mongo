@@ -240,6 +240,7 @@ mongo_cc_unit_test(
         ":wiredtiger_index_test_harness",
         ":wiredtiger_record_store_test_harness",
         "//src/mongo/db/storage:oplog_truncation",
+        "//src/mongo/db/storage:record_store_tests",
         "//src/mongo/db/storage:sorted_data_interface_tests",
     ],
 )

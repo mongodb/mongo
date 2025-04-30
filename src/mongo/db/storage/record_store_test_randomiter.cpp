@@ -52,7 +52,7 @@ using std::stringstream;
 using std::unique_ptr;
 
 // Create a random iterator for empty record store.
-TEST(RecordStoreTestHarness, GetRandomIteratorEmpty) {
+TEST(RecordStoreTest, GetRandomIteratorEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -70,7 +70,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorEmpty) {
 }
 
 // Insert multiple records and create a random iterator for the record store
-TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
+TEST(RecordStoreTest, GetRandomIteratorNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
@@ -126,7 +126,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
 
 // Insert a single record. Create a random iterator pointing to that single record.
 // Then check we'll retrieve the record.
-TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
+TEST(RecordStoreTest, GetRandomIteratorSingleton) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
