@@ -82,54 +82,65 @@ protected:
 
     const CollatorInterface* _getCollator(const NamespaceString& ns) const;
 
-    //_generateMeasurementWithMetaFieldType enables us to generate a simple measurement with
-    // metaValue and timeValue.
+    // _generateMeasurement enables us to generate measurements with
+    // a string-component meta field type, where string-component meta field types are defined in
+    // '_stringComponentBSONTypes'.
     //
-    // There are  simplifications with the Array, Object, RegEx, DBRef, and CodeWScope
-    // BSONTypes (we use the metaValue in a String component of the BSONElement rather than
+    // There are simplifications with the Array, Object, RegEx, DBRef, and CodeWScope
+    // BSONTypes (we use the 'metaValue' in a String component of the BSONElement rather than
     // configuring the entire BSONType output).
     //
+    // We invariant if type is not a member of '_stringComponentBSONTypes'.
+    // This function is used as a helper to in _generateMeasurement.
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        StringData metaValue) const;
+
+    // _generateMeasurement enables the user to generate a BSONObjBuilder with the input type and
+    // timeValue. It is the caller's responsibility to use .obj() from the returned BSONObjBuilder
+    // to use the BSONObj measurement.
+    //
     // Set timeValue to boost::none to generate a malformed measurement.
-    BSONObj _generateMeasurementWithMetaFieldType(
-        BSONType type, boost::optional<Date_t> timeValue = Date_t::now()) const;
+    BSONObjBuilder _generateMeasurement(boost::optional<BSONType> type,
+                                        boost::optional<Date_t> timeValue = Date_t::now()) const;
 
     // We don't supply defaults for these type-specific function declarations because we provide the
-    // defaults in the generic _generateMeasurementWithMetaFieldType above.
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  Timestamp metaValue) const;
+    // defaults in the generic _generateMeasurement above.
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        Date_t metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  int metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        Timestamp metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  long long metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        int metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  Decimal128 metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        long long metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  double metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        Decimal128 metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  OID metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        double metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  bool metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        OID metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  BSONBinData metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        bool metaValue) const;
 
-    BSONObj _generateMeasurementWithMetaFieldType(BSONType type,
-                                                  boost::optional<Date_t> timeValue,
-                                                  StringData metaValue) const;
+    BSONObjBuilder _generateMeasurement(BSONType type,
+                                        boost::optional<Date_t> timeValue,
+                                        const BSONBinData& binData) const;
 
     bucket_catalog::Bucket* _generateBucketWithBatch(const NamespaceString& ns,
                                                      const UUID& collectionUUID,
@@ -234,16 +245,22 @@ protected:
     static constexpr StringData _metaValue3 = "c";
     uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
 
-    const std::vector<BSONType> _nonStringComponentVariableBSONTypes = {
-        bsonTimestamp, NumberInt, NumberLong, NumberDecimal, NumberDouble, jstOID, Bool, BinData};
+    const std::vector<BSONType> _nonStringComponentVariableBSONTypes = {bsonTimestamp,
+                                                                        Date,
+                                                                        NumberInt,
+                                                                        NumberLong,
+                                                                        NumberDecimal,
+                                                                        NumberDouble,
+                                                                        jstOID,
+                                                                        Bool,
+                                                                        BinData};
 
     const std::vector<BSONType> _stringComponentBSONTypes = {
         Object, Array, RegEx, DBRef, Code, Symbol, CodeWScope, String};
 
     // These BSONTypes will always return the same meta value when passed in as the BSONType in
-    // _generateMeasurementWithMetaFieldType.
-    const std::vector<BSONType> _constantBSONTypes = {
-        Undefined, Date, MinKey, MaxKey, jstNULL, EOO};
+    // _generateMeasurement.
+    const std::vector<BSONType> _constantBSONTypes = {Undefined, MinKey, MaxKey, jstNULL, EOO};
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
     std::string _bigStr = std::string(1000, 'a');

@@ -3913,8 +3913,6 @@ TEST_F(
                                                  .numMeasurements = 1,
                                                  .metaValue = _metaValue,
                                                  .timeValue = timeValue});
-    // TODO(SERVER-103984): Change this to a call to _generateMeasurementsWithRolloverReason when we
-    // can pass in more fields when creating measurements.
     std::vector<BSONObj> schemaChangeVec;
     for (size_t i = 0; i < static_cast<size_t>(gTimeseriesBucketMaxCount - 2); i++) {
         schemaChangeVec.emplace_back(
@@ -3961,8 +3959,6 @@ TEST_F(
                                                  .numMeasurements = 50,
                                                  .metaValue = boost::none,
                                                  .timeValue = timeValue});
-    // TODO(SERVER-103984): Change this to a call to _generateMeasurementsWithRolloverReason when we
-    // can pass in more fields when creating measurements.
     std::vector<BSONObj> schemaChangeVec{BSON(_timeField << timeValue << "deathGrips" << 100)};
     std::vector<std::pair<std::vector<BSONObj>, RolloverReason>> measurementsAndRolloverReason;
 
@@ -3989,8 +3985,6 @@ TEST_F(
                                                  .idxWithDiffMeasurement = 25,
                                                  .metaValue = boost::none});
 
-    // TODO(SERVER-103984): Change this to a call to _generateMeasurementsWithRolloverReason when
-    // we can pass in more fields when creating measurements.
     schemaChangeVec.clear();
     for (size_t i = 0; i < static_cast<size_t>(gTimeseriesBucketMaxCount - 25); i++) {
         schemaChangeVec.emplace_back(BSON(_timeField << timeValue << "deathGrips" << 100));
