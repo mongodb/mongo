@@ -81,7 +81,7 @@ let explain = bestActressView.explain().aggregate(pipeline);
  * stages.
  */
 assertUnionWithSearchPipelinesApplyViews(
-    explain, bestActressViewPipeline, bestPicturesViewPipeline);
+    explain, bestActressViewPipeline, bestPictureView, bestPicturesViewPipeline);
 
 let expectedResults = [
     {

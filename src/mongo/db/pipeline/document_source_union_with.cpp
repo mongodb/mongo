@@ -311,7 +311,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                 pExpCtx,
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipe),
-                e->getNamespace());
+                _userNss);
             logShardedViewFound(e);
             return doGetNext();
         }
@@ -442,7 +442,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                         pExpCtx,
                         ResolvedNamespace{_resolvedNsForView->ns, _resolvedNsForView->pipeline},
                         std::move(recoveredPipeline),
-                        _resolvedNsForView->ns)
+                        _userNss)
                         .release();
             } else {
                 pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
@@ -490,7 +490,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                     pExpCtx,
                     ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                     std::move(serializedPipe),
-                    e->getNamespace());
+                    _userNss);
                 return preparePipelineAndExplain(resolvedPipeline.release());
             }
         }();

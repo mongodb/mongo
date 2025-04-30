@@ -137,13 +137,20 @@ export function extractUnionWithSubPipelineExplainOutput(explainStages) {
  * asserts that the $unionWith $search subpipeline contains the innerView pipeline in its idLookup.
  */
 export function assertUnionWithSearchPipelinesApplyViews(
-    explain, outerViewPipeline, innerViewPipeline) {
+    explain, outerViewPipeline, innerViewName, innerViewPipeline) {
     // This will assert that the top-level search has the view correctly pushed down to idLookup.
     assertIdLookupContainsViewPipeline(explain, outerViewPipeline);
 
     // Make sure the $unionWith.search subpipeline has the view correctly pushed down to idLookup.
     let unionWithStage = getUnionWithStage(explain);
     let unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
+
+    // In sharded environments, check for the correct viewNss.
+    if (unionWithExplain.hasOwnProperty("splitPipeline") &&
+        unionWithExplain["splitPipeline"] !== null) {
+        assert.eq(unionWithExplain.splitPipeline.shardsPart[0].$search.view.nss, innerViewName);
+    }
+
     assertIdLookupContainsViewPipeline(unionWithExplain, innerViewPipeline);
 }
 
