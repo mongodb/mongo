@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+/**
+ * Returns whether the supplied BSON type is supported for FLE2 equality indexed encryption.
+ */
 inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
     switch (type) {
         case BinData:
@@ -78,7 +81,9 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
     }
 }
 
-
+/**
+ * Returns whether the supplied BSON type is supported for FLE2 range indexed encryption.
+ */
 inline bool isFLE2RangeIndexedSupportedType(BSONType type) {
     switch (type) {
         case NumberInt:
@@ -115,6 +120,9 @@ inline bool isFLE2RangeIndexedSupportedType(BSONType type) {
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Returns whether the supplied BSON type is supported for FLE2 unindexed encryption.
+ */
 inline bool isFLE2UnindexedSupportedType(BSONType type) {
     switch (type) {
         case BinData:
@@ -152,11 +160,18 @@ inline bool isFLE2UnindexedSupportedType(BSONType type) {
     }
 }
 
+/**
+ * Returns whether the supplied BSON type is supported for FLE2 substring/suffix/prefix indexed
+ * encryption.
+ */
 inline bool isFLE2TextIndexedSupportedType(BSONType type) {
     return type == BSONType::String;
 }
 
-// Wrapper of the three helper functions above. Should be used on FLE type 6, 7, and 9, 14, and 15.
+/**
+ * Returns whether the supplied BSON type is supported for the encryption algorithm
+ * that corresponds to the given FLE2 blob type.
+ */
 inline bool isFLE2SupportedType(EncryptedBinDataType fleType, BSONType bsonType) {
     switch (fleType) {
         case EncryptedBinDataType::kFLE2UnindexedEncryptedValue:
@@ -175,11 +190,24 @@ inline bool isFLE2SupportedType(EncryptedBinDataType fleType, BSONType bsonType)
     }
 }
 
+/**
+ * Returns whether the query type is for substring, suffix, or prefix indexed encryption.
+ */
+inline bool isFLE2TextQueryType(QueryTypeEnum qt) {
+    return qt == QueryTypeEnum::SubstringPreview || qt == QueryTypeEnum::SuffixPreview ||
+        qt == QueryTypeEnum::PrefixPreview;
+}
+
 struct EncryptedFieldMatchResult {
     FieldRef encryptedField;
     bool keyIsPrefixOrEqual;
 };
 
+/**
+ * If key is an exact match or a prefix of a path in encryptedFields, returns the matching
+ * FieldRef and true. If there exists a path in encryptedFields that is a prefix of key, returns
+ * the FieldRef for that path and false. Otherwise, returns none.
+ */
 boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
     const FieldRef& key, const std::vector<FieldRef>& encryptedFields);
 

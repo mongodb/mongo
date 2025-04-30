@@ -2720,6 +2720,111 @@ TEST_F(ServiceContextTest, EncryptionInformation_MissingStateCollection) {
     }
 }
 
+TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
+    auto makeTextQueryTypeConfig =
+        [](QueryTypeEnum qtype, int32_t lb, int32_t ub, boost::optional<int32_t> mlen) {
+            QueryTypeConfig qtc{qtype};
+            qtc.setStrMinQueryLength(lb);
+            qtc.setStrMaxQueryLength(ub);
+            qtc.setStrMaxLength(std::move(mlen));
+            return qtc;
+        };
+    auto assertExpectedMaxTags = [](const std::vector<QueryTypeConfig>& qtc, uint32_t expected) {
+        uint32_t actual = 1;
+        for (auto& qt : qtc) {
+            auto lb = qt.getStrMinQueryLength().get();
+            auto ub = qt.getStrMaxQueryLength().get();
+            actual += ((qt.getQueryType() == QueryTypeEnum::SubstringPreview)
+                           ? maxTagsForSubstring(lb, ub, qt.getStrMaxLength().get())
+                           : maxTagsForSuffixOrPrefix(lb, ub));
+        }
+        ASSERT_EQ(actual, expected);
+    };
+    auto doOneTest = [](const std::vector<QueryTypeConfig>& qtc, boost::optional<int> error) {
+        EncryptedFieldConfig efc;
+        EncryptedField field{UUID::gen(), "field"};
+        field.setBsonType("string"_sd);
+        field.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{qtc});
+        efc.setFields({field});
+        if (error) {
+            ASSERT_THROWS_CODE(EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(efc),
+                               DBException,
+                               *error);
+        } else {
+            ASSERT_DOES_NOT_THROW(
+                EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(efc));
+        }
+    };
+
+    // unindexed fields are not checked
+    doOneTest({}, {});
+
+    // equality fields are not checked
+    doOneTest({QueryTypeConfig(QueryTypeEnum::Equality)}, {});
+
+    // range fields are not checked
+    doOneTest({QueryTypeConfig(QueryTypeEnum::Range)}, {});
+
+    // substring field under limit
+    std::vector<QueryTypeConfig> qtc = {
+        makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 900)};
+    assertExpectedMaxTags(qtc, 76987);
+    doOneTest(qtc, {});
+
+    // substring field at limit
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 1, 83'999);
+    assertExpectedMaxTags(qtc, 84'000);
+    doOneTest(qtc, {});
+
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 2, 42'000);
+    assertExpectedMaxTags(qtc, 84'000);
+    doOneTest(qtc, {});
+
+    // substring field over limit
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 1000);
+    assertExpectedMaxTags(qtc, 86'087);
+    doOneTest(qtc, 10384602);
+
+    // overflow uint32_t
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, INT32_MAX, INT32_MAX);
+    doOneTest(qtc, 10384601);
+
+    for (auto qtype : {QueryTypeEnum::SuffixPreview, QueryTypeEnum::PrefixPreview}) {
+        // suffix/prefix field under limit
+        qtc.front() = makeTextQueryTypeConfig(qtype, 9, 109, {});
+        assertExpectedMaxTags(qtc, 102);
+        doOneTest(qtc, {});
+
+        // suffix/prefix field at limit
+        qtc.front() = makeTextQueryTypeConfig(qtype, 21, 84'019, {});
+        assertExpectedMaxTags(qtc, 84'000);
+        doOneTest(qtc, {});
+
+        // suffix/prefix field over limit
+        qtc.front() = makeTextQueryTypeConfig(qtype, 1, 84'001, {});
+        assertExpectedMaxTags(qtc, 84'002);
+        doOneTest(qtc, 10384602);
+    }
+
+    // suffix+prefix field under limit
+    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {}),
+           makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 90, 900, {})};
+    assertExpectedMaxTags(qtc, 101 + 811 + 1);
+    doOneTest(qtc, {});
+
+    // suffix+prefix field at limit
+    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 101, 42100, {}),
+           makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 1001, 42999, {})};
+    assertExpectedMaxTags(qtc, 84'000);
+    doOneTest(qtc, {});
+
+    // suffix+prefix field over limit
+    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 101, 42100, {}),
+           makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 1001, 43000, {})};
+    assertExpectedMaxTags(qtc, 84'001);
+    doOneTest(qtc, 10384602);
+}
+
 TEST_F(ServiceContextTest, IndexedFields_FetchTwoLevels) {
     TestKeyVault keyVault;
 
@@ -3398,6 +3503,39 @@ TEST_F(ServiceContextTest, MinCoverCalcTest_MinCoverConstraints) {
                .empty());
 }
 
+TEST_F(ServiceContextTest, EdgeCalcTest_SubstringTagCalculators) {
+    // Expected values were calculated from OST paper's msize formula from the SubTree function.
+    ASSERT_EQ(0, msizeForSubstring(10, 48, 100, 200));         // (padlen=11) < lb
+    ASSERT_EQ(1, msizeForSubstring(30, 43, 100, 200));         // lb == (padlen=43) < ub
+    ASSERT_EQ(595, msizeForSubstring(30, 10, 100, 200));       // lb < (padlen=43) < ub
+    ASSERT_EQ(9316, msizeForSubstring(150, 20, 155, 200));     // ub == (padlen=155) < mlen
+    ASSERT_EQ(9301, msizeForSubstring(150, 20, 150, 200));     // ub < (padlen=155) < mlen
+    ASSERT_EQ(87815, msizeForSubstring(1004, 10, 100, 1019));  // ub < mlen == (padlen=1019)
+    ASSERT_EQ(87815, msizeForSubstring(1030, 10, 100, 1019));  // ub < mlen < (padlen=1043)
+    ASSERT_THROWS_CODE(
+        msizeForSubstring(INT32_MAX, 1, INT32_MAX, INT32_MAX), DBException, 10384600);
+    ASSERT_THROWS_CODE(
+        msizeForSubstring(INT32_MAX - 128, 1, INT32_MAX, INT32_MAX), DBException, 10384601);
+
+    ASSERT_EQ(87815, maxTagsForSubstring(10, 100, 1019));    // lb < ub < mlen
+    ASSERT_EQ(510555, maxTagsForSubstring(10, 1019, 1019));  // lb < ub == mlen
+    ASSERT_EQ(1003, maxTagsForSubstring(17, 17, 1019));      // lb == ub < mlen
+    ASSERT_EQ(1, maxTagsForSubstring(1019, 1019, 1019));     // lb == ub == mlen
+}
+
+TEST_F(ServiceContextTest, EdgeCalcTest_SuffixPrefixTagCalculators) {
+    // Expected values were calculated from OST paper's msize formulas from the SuffTree and
+    // PrefTree functions.
+    ASSERT_EQ(0, msizeForSuffixOrPrefix(10, 48, 100));     // (padlen=11) < lb
+    ASSERT_EQ(1, msizeForSuffixOrPrefix(30, 43, 100));     // lb == (padlen=43) < ub
+    ASSERT_EQ(34, msizeForSuffixOrPrefix(30, 10, 100));    // lb < (padlen=43) < ub
+    ASSERT_EQ(136, msizeForSuffixOrPrefix(150, 20, 155));  // ub == (padlen=155)
+    ASSERT_EQ(131, msizeForSuffixOrPrefix(150, 20, 150));  // ub < (padlen=155)
+    ASSERT_THROWS_CODE(msizeForSuffixOrPrefix(INT32_MAX, 1, INT32_MAX), DBException, 10384600);
+
+    ASSERT_EQ(91, maxTagsForSuffixOrPrefix(10, 100));  // lb < ub
+    ASSERT_EQ(1, maxTagsForSuffixOrPrefix(100, 100));  // lb == ub
+}
 
 // Tests to make sure that the getMinCover() interface properly calculates the mincover when given a
 // FLE2FindRangeSpec. Does not test correctness for the mincover algorithm. That testing is covered

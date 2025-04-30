@@ -397,6 +397,8 @@ public:
                             "featureFlagQETextSearchPreview is enabled",
                             !cmd.getEncryptedFields()->getStrEncodeVersion());
                 }
+                EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(
+                    cmd.getEncryptedFields().get());
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

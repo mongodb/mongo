@@ -4097,6 +4097,49 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     return efc;
 }
 
+void EncryptionInformationHelpers::checkPerFieldTagLimitNotExceeded(
+    const EncryptedFieldConfig& ef) {
+
+    auto calculateMaxTags = [](const QueryTypeConfig qtc) -> uint32_t {
+        if (!isFLE2TextQueryType(qtc.getQueryType())) {
+            return 0;
+        }
+        int32_t ub = qtc.getStrMaxQueryLength().get();
+        int32_t lb = qtc.getStrMinQueryLength().get();
+        if (qtc.getQueryType() == QueryTypeEnum::SubstringPreview) {
+            int32_t mlen = static_cast<uint32_t>(qtc.getStrMaxLength().get());
+            return maxTagsForSubstring(lb, ub, mlen);
+        }
+        return maxTagsForSuffixOrPrefix(lb, ub);
+    };
+
+    for (const auto& field : ef.getFields()) {
+        if (!field.getQueries()) {
+            continue;
+        }
+
+        auto tagCount =
+            visit(OverloadedVisitor{[&](QueryTypeConfig qtc) { return calculateMaxTags(qtc); },
+                                    [&](std::vector<QueryTypeConfig> queries) {
+                                        uint32_t maxTags = 0;
+                                        for (auto& qtc : queries) {
+                                            maxTags += calculateMaxTags(qtc);
+                                        }
+                                        return maxTags;
+                                    }},
+                  field.getQueries().get());
+        if (hasQueryTypeMatching(field, isFLE2TextQueryType)) {
+            tagCount++;  // substring/suffix/prefix types get an extra tag for exact string match
+            uassert(
+                10384602,
+                fmt::format("Queryable Encryption tag limit exceeded for field '{}'. Worst case "
+                            "tag count is {}",
+                            field.getPath(),
+                            tagCount),
+                tagCount <= kFLE2PerFieldTagLimit);
+        }
+    }
+}
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
     ConstDataRangeCursor cdrc(cdr);
@@ -4703,6 +4746,105 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
         return {};
     }
     return minCover(a.value, b.value, a.min, a.max, sparsity, trimFactor);
+}
+
+namespace {
+int32_t calculatePaddedLengthForString(int32_t strLen) {
+    // See
+    // https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/docs/fle/fle_string_search.md#strencode-substring
+    // for an explanation of the padlen calculation below.
+    dassert(strLen >= 0);
+    static constexpr int32_t kBSONStringOverheadBytes = 5;  // 4-byte size + null terminator byte
+
+    uassert(10384600,
+            fmt::format(
+                "String length {} is too long for substring/suffix/prefix indexed encrypted field",
+                strLen),
+            strLen <= std::numeric_limits<int32_t>::max() - kBSONStringOverheadBytes - 15);
+
+    // round strLen + overhead to the nearest 16-byte boundary
+    int32_t padLen = ((strLen + kBSONStringOverheadBytes + 15) / 16) * 16;
+
+    // readjust for BSON overhead
+    padLen -= kBSONStringOverheadBytes;
+    return padLen;
+}
+
+uint32_t calculateMsize(int32_t strLen, int32_t lb, int32_t ub) {
+    // OST calculates the substring tag count (msize) generally as:
+    //
+    //    msize = Summation(j=[lb...ub], (strLen-j+1))
+    //
+    // where lb and ub are the shortest and longest substring lengths to index,
+    // respectively, and strLen is the length of the string to index.
+    //
+    // For each j, the value of (strLen-j+1) is just one less than the previous value.
+    // So, this can be rewritten as:
+    //
+    //    msize = Summation(j=[(strLen-ub+1)...(strLen-lb+1)], j)
+    //
+    // i.e. sum of the arithmetic sequence [(strLen-ub+1) ... (strLen-lb+1)],
+    // which can be simply calculated using the formula sum = (a1 + a2) * n/2
+    dassert(lb > 0);
+    dassert(ub >= lb);
+    dassert(strLen >= lb);
+
+    // # of substrings of length ub from a string of length strLen
+    int32_t largestSubstrCount = strLen - ub + 1;
+    // # of substrings of length lb from a string of length strLen
+    int32_t smallestSubstrCount = strLen - lb + 1;
+
+    // Do the arithmetic as uint64_t to avoid overflows.
+    // (a1 + a2) * n will not exceed UINT64_MAX even if all variables are INT32_MAX.
+    uint64_t a1 = static_cast<uint64_t>(largestSubstrCount);
+    uint64_t a2 = static_cast<uint64_t>(smallestSubstrCount);
+    uint64_t n = smallestSubstrCount - largestSubstrCount + 1;
+    uint64_t sum = (a1 + a2) * n / 2;  // always evenly divisible
+    uassert(10384601,
+            fmt::format(
+                "Calculated tag count {} is too large for substring indexed encrypted field", sum),
+            sum <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()));
+    return static_cast<uint32_t>(sum);
+}
+}  // namespace
+
+uint32_t msizeForSubstring(int32_t strLen, int32_t lb, int32_t ub, int32_t mlen) {
+    dassert(lb > 0);
+    dassert(ub >= lb);
+    dassert(mlen >= ub);
+
+    auto padLen = calculatePaddedLengthForString(strLen);
+    if (lb > padLen) {
+        return 0;
+    }
+
+    padLen = std::min(mlen, padLen);  // cap padLen to mlen
+    ub = std::min(padLen, ub);        // cap ub to padLen (i.e. if padLen < ub)
+    return calculateMsize(padLen, lb, ub);
+}
+
+uint32_t msizeForSuffixOrPrefix(int32_t strLen, int32_t lb, int32_t ub) {
+    dassert(lb > 0);
+    dassert(ub >= lb);
+
+    auto padLen = calculatePaddedLengthForString(strLen);
+    if (lb > padLen) {
+        return 0;
+    }
+    return static_cast<uint32_t>(std::min(padLen, ub) - lb + 1);
+}
+
+uint32_t maxTagsForSubstring(int32_t lb, int32_t ub, int32_t mlen) {
+    dassert(mlen >= ub);
+    // Worst case tag count for substring is calculated in OST as:
+    //     max = Summation(j=[lb...ub], (mlen-j+1))
+    return calculateMsize(mlen, lb, ub);
+}
+
+uint32_t maxTagsForSuffixOrPrefix(int32_t lb, int32_t ub) {
+    dassert(lb > 0);
+    dassert(ub >= lb);
+    return static_cast<uint32_t>(ub - lb + 1);
 }
 
 PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {

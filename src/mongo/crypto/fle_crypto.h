@@ -1091,6 +1091,13 @@ public:
      */
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
+
+    /**
+     * Throws if there exists an indexed-encrypted field in the EncryptedFieldConfig, whose
+     * worst case tag count exceeds the per-field tag limit.
+     */
+    static constexpr uint32_t kFLE2PerFieldTagLimit = 84000;
+    static void checkPerFieldTagLimitNotExceeded(const EncryptedFieldConfig& ef);
 };
 
 /**
@@ -1278,6 +1285,18 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             boost::optional<uint32_t> precision,
                                             int sparsity,
                                             const boost::optional<int>& trimFactor);
+
+/**
+ * msize (i.e. tag count) calculators for substring/suffix/prefix
+ */
+uint32_t msizeForSubstring(int32_t strLen, int32_t lb, int32_t ub, int32_t mlen);
+uint32_t msizeForSuffixOrPrefix(int32_t strLen, int32_t lb, int32_t ub);
+/**
+ * Max tags calculators for substring/suffix/prefix.
+ * Note that the returned count does not include the tag for exact string match.
+ */
+uint32_t maxTagsForSubstring(int32_t lb, int32_t ub, int32_t mlen);
+uint32_t maxTagsForSuffixOrPrefix(int32_t lb, int32_t ub);
 
 class FLEUtil {
 public:
