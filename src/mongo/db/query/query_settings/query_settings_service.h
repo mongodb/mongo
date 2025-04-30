@@ -35,16 +35,8 @@
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/util/deferred.h"
 
-namespace mongo {
-class SetClusterParameter;
-
-namespace query_settings {
+namespace mongo::query_settings {
 using QueryInstance = BSONObj;
-
-using SetClusterParameterImplFn = std::function<void(OperationContext*,
-                                                     const SetClusterParameter&,
-                                                     boost::optional<Timestamp>,
-                                                     boost::optional<LogicalTime>)>;
 
 /**
  * All query shape configurations and an associated timestamp.
@@ -158,13 +150,6 @@ public:
     virtual void refreshQueryShapeConfigurations(OperationContext* opCtx) = 0;
 
     /**
-     * Creates the corresponding 'querySettings' cluster parameter value out of the 'config' and
-     * issues the setClusterParameter command.
-     */
-    virtual void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) = 0;
-
-    /**
      * Validates that 'querySettings' do not have:
      * - empty settings or settings with default values
      * - index hints specified without namespace information
@@ -205,8 +190,8 @@ public:
         std::vector<QueryShapeConfiguration>& queryShapeConfigurations) const;
 };
 
-void initializeForRouter(ServiceContext* serviceContext, SetClusterParameterImplFn fn);
-void initializeForShard(ServiceContext* serviceContext, SetClusterParameterImplFn fn);
+void initializeForRouter(ServiceContext* serviceContext);
+void initializeForShard(ServiceContext* serviceContext);
 void initializeForTest(ServiceContext* serviceContext);
 
 /**
@@ -274,5 +259,4 @@ bool allowQuerySettingsFromClient(Client* client);
  * Returns true if given QuerySettings instance contains only default values.
  */
 bool isDefault(const QuerySettings& querySettings);
-}  // namespace query_settings
-}  // namespace mongo
+}  // namespace mongo::query_settings

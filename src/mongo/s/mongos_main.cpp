@@ -128,7 +128,6 @@
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sessions_collection_sharded.h"
-#include "mongo/s/set_cluster_server_parameter_router_impl.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/transaction_router.h"
@@ -811,7 +810,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ReadWriteConcernDefaults::create(serviceContext->getService(ClusterRole::RouterServer),
                                      readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
-    query_settings::initializeForRouter(serviceContext, setClusterParameterImplRouter);
+    query_settings::initializeForRouter(serviceContext);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();

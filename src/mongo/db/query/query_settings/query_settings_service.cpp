@@ -32,11 +32,9 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
@@ -389,8 +387,7 @@ void sanitizeKeyPatternIndexHints(QueryShapeConfiguration& queryShapeItem) {
 
 class QuerySettingsRouterService : public QuerySettingsService {
 public:
-    QuerySettingsRouterService(SetClusterParameterImplFn fn)
-        : QuerySettingsService(), _setClusterParameterFn(fn) {}
+    QuerySettingsRouterService() : QuerySettingsService() {}
 
     QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
         const boost::optional<TenantId>& tenantId) const final {
@@ -478,37 +475,13 @@ public:
         }
     }
 
-    void setQuerySettingsClusterParameter(
-        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) final {
-        try {
-            BSONObjBuilder bob;
-            BSONArrayBuilder arrayBuilder(
-                bob.subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
-            for (const auto& item : config.queryShapeConfigurations) {
-                arrayBuilder.append(item.toBSON());
-            }
-            arrayBuilder.done();
-            SetClusterParameter request(BSON(getQuerySettingsClusterParameterName() << bob.done()));
-            request.setDbName(DatabaseName::kConfig);
-
-            tassert(
-                10397800, "setClusterParameter() function must be present", _setClusterParameterFn);
-            _setClusterParameterFn(opCtx, request, boost::none, config.clusterParameterTime);
-        } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-            uasserted(ErrorCodes::BSONObjectTooLarge,
-                      str::stream() << "cannot modify query settings: the total size exceeds "
-                                    << BSONObjMaxInternalSize << " bytes");
-        }
-    }
-
 private:
     QuerySettingsManager _manager;
-    SetClusterParameterImplFn _setClusterParameterFn;
 };
 
 class QuerySettingsShardService : public QuerySettingsRouterService {
 public:
-    QuerySettingsShardService(SetClusterParameterImplFn fn) : QuerySettingsRouterService(fn) {}
+    QuerySettingsShardService() : QuerySettingsRouterService() {}
 
     QuerySettings lookupQuerySettingsWithRejectionCheck(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -571,16 +544,16 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
 
-void initializeForRouter(ServiceContext* serviceContext, SetClusterParameterImplFn fn) {
-    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>(fn);
+void initializeForRouter(ServiceContext* serviceContext) {
+    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
 }
 
-void initializeForShard(ServiceContext* serviceContext, SetClusterParameterImplFn fn) {
-    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsShardService>(fn);
+void initializeForShard(ServiceContext* serviceContext) {
+    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsShardService>();
 }
 
 void initializeForTest(ServiceContext* serviceContext) {
-    initializeForShard(serviceContext, nullptr);
+    initializeForShard(serviceContext);
 }
 
 QuerySettings lookupQuerySettingsWithRejectionCheckOnRouter(

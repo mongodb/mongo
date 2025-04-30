@@ -97,7 +97,6 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/set_cluster_parameter_command_impl.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -2122,7 +2121,7 @@ int mongod_main(int argc, char* argv[]) {
         ChangeStreamChangeCollectionManager::create(service);
     }
 
-    query_settings::initializeForShard(service, getSetClusterParameterImpl(shardService));
+    query_settings::initializeForShard(service);
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

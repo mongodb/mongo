@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/base/shim.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/query_cmd/query_settings_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_command_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
+#include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -47,6 +51,38 @@ using namespace query_settings;
 
 MONGO_FAIL_POINT_DEFINE(querySettingsPlanCacheInvalidation);
 MONGO_FAIL_POINT_DEFINE(pauseAfterReadingQuerySettingsConfigurationParameter);
+
+SetClusterParameter makeSetClusterParameterRequest(
+    const std::vector<QueryShapeConfiguration>& settingsArray,
+    const mongo::DatabaseName& dbName) try {
+    BSONObjBuilder bob;
+    BSONArrayBuilder arrayBuilder(
+        bob.subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
+    for (const auto& item : settingsArray) {
+        arrayBuilder.append(item.toBSON());
+    }
+    arrayBuilder.done();
+    SetClusterParameter setClusterParameterRequest(
+        BSON(getQuerySettingsClusterParameterName() << bob.done()));
+    setClusterParameterRequest.setDbName(dbName);
+    return setClusterParameterRequest;
+} catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+    uasserted(ErrorCodes::BSONObjectTooLarge,
+              str::stream() << "cannot modify query settings: the total size exceeds "
+                            << BSONObjMaxInternalSize << " bytes");
+}
+
+/**
+ * Invokes the setClusterParameter() weak function, which is an abstraction over the corresponding
+ * command implementation in the router-role vs. the shard-role/the replica-set or standalone impl.
+ */
+void setClusterParameter(OperationContext* opCtx,
+                         const SetClusterParameter& request,
+                         boost::optional<Timestamp> clusterParameterTime,
+                         boost::optional<LogicalTime> previousTime) {
+    auto w = getSetClusterParameterImpl(opCtx);
+    w(opCtx, request, clusterParameterTime, previousTime);
+}
 
 /**
  * Returns an iterator pointing to QueryShapeConfiguration in 'queryShapeConfigurations' that has
@@ -106,17 +142,14 @@ void readModifyWriteQuerySettingsConfigOption(
     const mongo::DatabaseName& dbName,
     const boost::optional<QueryInstance>& representativeQuery,
     std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
-    auto& querySettingsService = QuerySettingsService::get(opCtx);
-
     // The local copy of the query settings cluster-wide configuration option might not have the
     // latest value on mongos, therefore we trigger the update of the local copy before reading from
     // it in order to reduce the probability of update conflicts.
-    querySettingsService.refreshQueryShapeConfigurations(opCtx);
+    refreshQueryShapeConfigurations(opCtx);
 
     // Read the query shape configurations for the tenant from the local copy of the query settings
     // cluster-wide configuration option.
-    auto queryShapeConfigurations =
-        querySettingsService.getAllQueryShapeConfigurations(dbName.tenantId());
+    auto queryShapeConfigurations = getAllQueryShapeConfigurations(opCtx, dbName.tenantId());
 
     // Block if the operation is on the 'representativeQuery' that matches the
     // "representativeQueryToBlock" field of the fail-point configuration.
@@ -142,11 +175,15 @@ void readModifyWriteQuerySettingsConfigOption(
 
     // Run "setClusterParameter" command with the new value of the 'querySettings' cluster-wide
     // parameter.
-    querySettingsService.setQuerySettingsClusterParameter(opCtx, queryShapeConfigurations);
+    setClusterParameter(
+        opCtx,
+        makeSetClusterParameterRequest(queryShapeConfigurations.queryShapeConfigurations, dbName),
+        boost::none,
+        queryShapeConfigurations.clusterParameterTime);
 
     // Refresh the local copy of the query settings cluster-wide configuration option so the results
     // of the update step above are visible.
-    querySettingsService.refreshQueryShapeConfigurations(opCtx);
+    refreshQueryShapeConfigurations(opCtx);
 
     // Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' fail-point is set. Used in
     // tests when setting index filters via query settings interface.
