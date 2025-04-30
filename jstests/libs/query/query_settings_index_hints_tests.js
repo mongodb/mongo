@@ -38,12 +38,31 @@ export class QuerySettingsIndexHintsTests {
         this.allIndexes = [this.indexA, this.indexB, this.indexAB];
     }
 
-    static shouldCheckPlanCache(db, command) {
-        const explainCmd = getExplainCommand(command);
-        const explain = assert.commandWorked(
-            db.runCommand(explainCmd),
-            `Failed running explain command ${
-                toJsonForLog(explainCmd)} for checking the query settings plan cache check.`);
+    static shouldCheckPlanCache(db, command, explain = null) {
+        if (!explain) {
+            // if the explain is not provided, we do need to retrieve it.
+            const explainCmd = getExplainCommand(command);
+            explain = assert.commandWorked(
+                db.runCommand(explainCmd),
+                `Failed running explain command ${
+                    toJsonForLog(explainCmd)} for checking the query settings plan cache check.`);
+        }
+
+        // We want to bail out immediately if the engine is not SBE.
+        // Single solution plans are not cached in classic, therefore do not perform plan cache
+        // checks for when the classic cache is used. Note that the classic cache is used
+        // by default for SBE, except when featureFlagSbeFull is on.
+        // TODO SERVER-90880: We can relax this check when we cache single-solution plans in the
+        // classic cache with SBE.
+        // TODO SERVER-13341: Relax this check to include the case where classic is being used.
+        if (getEngine(explain) !== "sbe") {
+            return false;
+        }
+
+        if (!checkSbeFullFeatureFlagEnabled(db)) {
+            return false;
+        }
+
         const isIdhackQuery =
             everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
         const isMinMaxQuery = "min" in command || "max" in command;
@@ -65,15 +84,8 @@ export class QuerySettingsIndexHintsTests {
         const isTimeSeriesColl = isTimeSeriesCollection(db, collName);
 
         const res =
-            // Single solution plans are not cached in classic, therefore do not perform plan cache
-            // checks for when the classic cache is used. Note that the classic cache is used
-            // by default for SBE, except when featureFlagSbeFull is on.
-            // TODO SERVER-90880: We can relax this check when we cache single-solution plans in the
-            // classic cache with SBE.
-            // TODO SERVER-13341: Relax this check to include the case where classic is being used.
             // TODO SERVER-94392: Relax this check when SBE plan cache supports partial indexes.
-            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(db) &&
-             !collHasPartialIndexes) &&
+            !collHasPartialIndexes &&
             // Express or IDHACK optimized queries are not cached.
             !isIdhackQuery &&
             // Min/max queries are not cached.
@@ -111,8 +123,9 @@ export class QuerySettingsIndexHintsTests {
      */
     assertQuerySettingsInCacheForCommand(command,
                                          querySettings,
-                                         collOrViewName = this._qsutils._collName) {
-        if (!QuerySettingsIndexHintsTests.shouldCheckPlanCache(this._db, command)) {
+                                         collOrViewName = this._qsutils._collName,
+                                         explainRes = null) {
+        if (!QuerySettingsIndexHintsTests.shouldCheckPlanCache(this._db, command, explainRes)) {
             return;
         }
 
@@ -446,21 +459,26 @@ export class QuerySettingsIndexHintsTests {
      * any viable plans have the same generated plans as the queries that have no query settings
      * attached to them.
      */
-    assertQuerySettingsFallback(querySettingsQuery, ns) {
+    assertQuerySettingsFallback(querySettingsQuery, ns, explainWithoutQuerySettings = null) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
         const explainCmd = getExplainCommand(query);
 
         const explainWithQuerySettings =
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
-                this.assertQuerySettingsInCacheForCommand(query, settings);
-                return assert.commandWorked(
+                const explain = assert.commandWorked(
                     this._db.runCommand(explainCmd),
                     `Failed running ${tojson(explainCmd)} after setting query settings`);
+                this.assertQuerySettingsInCacheForCommand(
+                    query, explainCmd, settings, this._qsutils._collName, explain);
+                return explain;
             });
-        const explainWithoutQuerySettings = assert.commandWorked(
-            this._db.runCommand(explainCmd),
-            `Failed running ${tojson(explainCmd)} before setting query settings`);
+
+        if (!explainWithoutQuerySettings) {
+            explainWithoutQuerySettings = assert.commandWorked(
+                this._db.runCommand(explainCmd),
+                `Failed running ${tojson(explainCmd)} before setting query settings`);
+        }
 
         // It's not guaranteed for all the queries to preserve the order of the stages when
         // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree
@@ -468,23 +486,43 @@ export class QuerySettingsIndexHintsTests {
         // behavior and avoid potential failures.
         const getAllQueryPlans = (explain) => getQueryPlanners(explain).flatMap(queryPlanner => {
             const {winningPlan, rejectedPlans} = formatQueryPlanner(queryPlanner);
-            return rejectedPlans.concat([winningPlan]);
+            return {winningPlan, rejectedPlans};
         });
-        const queryPlansWithoutQuerySettings = getAllQueryPlans(explainWithoutQuerySettings);
-        const queryPlansWithQuerySettings = getAllQueryPlans(explainWithQuerySettings);
+
+        // First try to only compare the winning plan.
         const changeStreamIgnoreFields = ["t", "ts", "minRecord"];
-        assert(anyEq(queryPlansWithoutQuerySettings,
-                     queryPlansWithQuerySettings,
-                     false /* verbose */,
-                     undefined /* valueComparator - will use bsonWoCompare */,
-                     changeStreamIgnoreFields),
-               "Expected the query without query settings and the one with query settings to " +
-                   "have identical plans: " + tojson(queryPlansWithoutQuerySettings) +
-                   " != " + tojson(queryPlansWithQuerySettings));
+        const {winningPlanWithoutQuerySettings, rejectedPlansWithoutQuerySettings} =
+            getAllQueryPlans(explainWithoutQuerySettings);
+        const {winningPlanWithQuerySettings, rejectedPlansWithQuerySettings} =
+            getAllQueryPlans(explainWithQuerySettings);
+
         assert.eq(explainWithQuerySettings.pipeline,
                   explainWithoutQuerySettings.pipeline,
                   "Expected the query without query settings and the one with settings to have " +
                       "identical pipelines.");
+
+        if (anyEq(winningPlanWithoutQuerySettings,
+                  winningPlanWithQuerySettings,
+                  false /* verbose */,
+                  undefined /* valueComparator - will use bsonWoCompare() */,
+                  changeStreamIgnoreFields)) {
+            return;
+        }
+
+        // Fall back to compare all the plans.
+        const queryPlansWithoutQuerySettings =
+            rejectedPlansWithoutQuerySettings.concat([winningPlanWithoutQuerySettings]);
+        const queryPlansWithQuerySettings =
+            rejectedPlansWithQuerySettings.concat([winningPlanWithQuerySettings]);
+        const allQueryPlansEq = anyEq(queryPlansWithoutQuerySettings,
+                                      queryPlansWithQuerySettings,
+                                      false /* verbose */,
+                                      undefined /* valueComparator - will use bsonWoCompare() */,
+                                      changeStreamIgnoreFields);
+        assert(allQueryPlansEq,
+               "Expected the query without query settings and the one with query settings to " +
+                   "have identical plans: " + tojson(queryPlansWithoutQuerySettings) +
+                   " != " + tojson(queryPlansWithQuerySettings));
     }
 
     /**

@@ -87,9 +87,8 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
         qsutils.onSetQuerySettings(computeAndStoreResult);
         const qstests = new QuerySettingsIndexHintsTests(qsutils);
         const representativeQuery = qsutils.makeQueryInstance(innerCmd);
-        qstests.assertQuerySettingsFallback(representativeQuery, ns);
+        qstests.assertQuerySettingsFallback(representativeQuery, ns, explain);
     };
-
     OverrideHelpers.withPreOverrideRunCommand(assertFallbackPlanMatchesOriginalPlan);
     return resultWithQuerySettings || clientFunction.apply(conn, makeFuncArgs(cmdObj));
 }
