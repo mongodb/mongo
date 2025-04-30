@@ -9,3 +9,6 @@ filters:
   - "rss_sydney.yml":
     approvers:
       - 10gen/server-rss-sydney
+  - "storage_execution.yml":
+    approvers:
+      - 10gen/server-storage-execution
