@@ -49,11 +49,6 @@ selector:
     - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
     - jstests/core/**/startup_log.js # Checks pid, which is different on each server.
 
-    # TODO (SERVER-102765): Remove once create no longer return a false ok.
-    - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
-    - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
-    - jstests/core/catalog/agg_list_cluster_catalog.js
-
   exclude_with_any_tags:
     - assumes_standalone_mongod
     ##
