@@ -416,3 +416,11 @@ filegroup(
         "jstestfuzz/out/*.js",
     ]),
 )
+
+# This sets up targets for install-mongor and archive-mongor
+mongo_install(
+    name = "mongor",
+    srcs = [
+        "//src/mongo/replay:mongor",
+    ],
+)

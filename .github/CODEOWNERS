@@ -2455,6 +2455,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/platform/OWNERS.yml
 /src/mongo/platform/**/* @10gen/server-programmability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/replay/OWNERS.yml
+/src/mongo/replay/**/* @10gen/query-optimization @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/rpc/OWNERS.yml
 /src/mongo/rpc/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
