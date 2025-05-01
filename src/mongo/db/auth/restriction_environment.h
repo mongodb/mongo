@@ -32,9 +32,21 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
+
+inline Status validateClientSourceAuthenticationRestrictionMode(StringData mode,
+                                                                const boost::optional<TenantId>&) {
+    if (mode != "origin" && mode != "peer") {
+        return Status(ErrorCodes::BadValue,
+                      "Unable to set value for clientSourceAuthenticationRestrictionMode. Valid "
+                      "options are  \"origin\" or \"peer\".");
+    }
+    return Status::OK();
+}
 
 // A RestrictionEnvironment stores all information about an incoming client which could be used to
 // verify whether it should be able to authenticate as a user, or be granted a role.

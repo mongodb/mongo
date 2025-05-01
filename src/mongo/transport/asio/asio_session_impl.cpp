@@ -32,6 +32,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -517,6 +518,15 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                 const auto& dstEndpointAddr = results->endpoints->destinationAddress;
                 _proxiedDstEndpoint =
                     HostAndPort(dstEndpointAddr.getAddr(), dstEndpointAddr.getPort());
+
+                // If the server has been configured to apply authentication restrictions against
+                // origin client IP addresses, then the session's auth restriction environment
+                // should be reset to apply against the source address advertised in the proxy
+                // protocol header.
+                if (clientSourceAuthenticationRestrictionMode == "origin"_sd) {
+                    _restrictionEnvironment =
+                        RestrictionEnvironment(_proxiedSrcRemoteAddr.value(), _localAddr);
+                }
             } else {
                 _proxiedSrcRemoteAddr = {};
                 _proxiedSrcEndpoint = {};
