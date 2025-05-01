@@ -29,7 +29,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
 #include "mongo/unittest/unittest.h"
 

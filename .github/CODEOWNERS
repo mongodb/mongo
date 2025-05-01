@@ -1989,18 +1989,63 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/process_health/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/OWNERS.yml
-/src/mongo/db/query/**/* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/**/* @10gen/query-execution @10gen/query-integration @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/**/all_indices_required_checker* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/allowed_contexts* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/analyze* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/bson_typemask.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_index_usage_tracker* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_query_info* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/complex_query_bm.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/count_command_test.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/count_request* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/dbref.h @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/distinct_access* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/eof_node_type* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/explain* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/expression_walker* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/find_command.h @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/find_common* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/find.* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/framework_control.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/get_executor* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/getmore_request_test.cpp @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/index_bounds.* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/index_bounds_test.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/index_entry* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/index_hint* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/indexability* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/index_multikey_helpers.h @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/internal_plans.* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/lru_key_value* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/map_reduce_output_format* @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/query/**/multiple_collection_accessor* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_summary_stats* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/point_query_bm.cpp @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/query_bm_* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/query_knob_* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/query_request* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/query_test_service_context.* @10gen/query-execution @10gen/query-integration @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/query_utils* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/*query_settings* @10gen/query-execution-query-settings @svc-auto-approve-bot
+/src/mongo/db/query/**/random_utils* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/README_explain.md @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/README_logical_models.md @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/README_QO.md @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/README.md @10gen/query-execution @10gen/query-integration @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/record_id_* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/restore_context* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/sampling_ce_method.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/sampling_confidence_interval.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/shard_filterer_factor* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/shard_key_diagnostic_printer.h @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/stage_types* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/tailable_mode* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/tree_walker.h @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/view_response_formatter* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/wildcard_multikey_path* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/wildcard_test_utils.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/mock_yield_policies.h @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/query/**/*yield_policy* @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/query/**/*plan_executor* @10gen/query-execution-classic @svc-auto-approve-bot
@@ -2015,7 +2060,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/canonical_query_encoder* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_rank* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/*.idl @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/**/query_feature_flags.idl @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/**/query_feature_flags.idl @10gen/query-execution @10gen/query-integration @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/projection_parser* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/hint_parser* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/parsed* @10gen/query-optimization @svc-auto-approve-bot
@@ -2033,12 +2078,19 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/index_tag* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/index_bounds_builder* @10gen/query-optimization @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/algebra/OWNERS.yml
+/src/mongo/db/query/algebra/**/* @10gen/query-execution-sbe @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/algebra/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/boolean_simplification/OWNERS.yml
 /src/mongo/db/query/boolean_simplification/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/boolean_simplification/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/bson/OWNERS.yml
-/src/mongo/db/query/bson/**/* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/bson/**/* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/bson/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/bson/**/bson_helper* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/bson/**/multikey_dotted_path_support* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/ce/OWNERS.yml
 /src/mongo/db/query/ce/**/* @10gen/query-optimization @svc-auto-approve-bot
@@ -2122,6 +2174,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/timeseries/**/* @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/query/timeseries/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/util/OWNERS.yml
+/src/mongo/db/query/util/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/util/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/src/mongo/db/query/util/**/spill_util* @10gen/query-execution-classic @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/virtual_collection/OWNERS.yml
 /src/mongo/db/query/virtual_collection/**/* @10gen/query-integration-staff-leads @svc-auto-approve-bot
 /src/mongo/db/query/virtual_collection/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
@@ -2130,8 +2187,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/write_ops/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/write_ops/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 /src/mongo/db/query/write_ops/**/write_ops_exec* @10gen/query-execution-write-exec @svc-auto-approve-bot
-/src/mongo/db/query/write_ops/**/delete.* @10gen/query @svc-auto-approve-bot
-/src/mongo/db/query/write_ops/**/update.* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/write_ops/**/delete.* @10gen/query-execution-write-exec @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/write_ops/**/update.* @10gen/query-execution-write-exec @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/repl/OWNERS.yml
 /src/mongo/db/repl/**/* @10gen/server-replication @svc-auto-approve-bot

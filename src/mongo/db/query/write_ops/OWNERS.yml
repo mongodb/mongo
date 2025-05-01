@@ -17,7 +17,9 @@ filters:
   # by a particular query subteam.
   - "delete.*":
     approvers:
-      - 10gen/query
+      - 10gen/query-optimization
+      - 10gen/query-execution-write-exec
   - "update.*":
     approvers:
-      - 10gen/query
+      - 10gen/query-optimization
+      - 10gen/query-execution-write-exec

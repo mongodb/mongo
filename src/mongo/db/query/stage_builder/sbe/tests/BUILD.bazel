@@ -34,6 +34,8 @@ mongo_cc_unit_test(
         "and_hash_test.cpp",
         "and_sorted_test.cpp",
         "expression_const_eval_test.cpp",
+        "field_effects_test.cpp",
+        "field_set_test.cpp",
         "gen_accumulator_test.cpp",
         "gen_expression_test.cpp",
         "gen_filter_test.cpp",

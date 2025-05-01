@@ -822,8 +822,6 @@ mongo_cc_unit_test(
         "canonical_query_encoder_test.cpp",
         "canonical_query_test.cpp",
         "count_command_test.cpp",
-        "field_effects_test.cpp",
-        "field_set_test.cpp",
         "find_common_test.cpp",
         "getmore_request_test.cpp",
         "hint_parser_test.cpp",

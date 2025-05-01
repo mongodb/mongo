@@ -5,19 +5,45 @@ filters:
   # subdirectories owned by a particular subteam such as QO, QE, or QI.
   - "*":
     approvers:
-      - 10gen/query
+      - 10gen/query-optimization
+      - 10gen/query-execution
+      - 10gen/query-integration
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads
       - 10gen/query-optimization-staff-leads
       - 10gen/query-integration-staff-leads
+  - "all_indices_required_checker*":
+    approvers:
+      - 10gen/query-execution
+  - "allowed_contexts*":
+    approvers:
+      - 10gen/query-optimization
   - "analyze*":
+    approvers:
+      - 10gen/query-optimization
+  - "bson_typemask.h":
     approvers:
       - 10gen/query-optimization
   - "collection_index_usage_tracker*":
     approvers:
       - 10gen/query-execution-write-exec
   - "collection_query_info*":
+    approvers:
+      - 10gen/query-optimization
+  - "complex_query_bm.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "count_command_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "count_request*":
+    approvers:
+      - 10gen/query-optimization
+  - "dbref.h":
+    approvers:
+      - 10gen/query-optimization
+  - "distinct_access*":
     approvers:
       - 10gen/query-optimization
   - "eof_node_type*":
@@ -29,18 +55,136 @@ filters:
   - "expression_walker*":
     approvers:
       - 10gen/query-optimization
+  - "find_command.h":
+    approvers:
+      - 10gen/query-optimization
+  - "find_common*":
+    approvers:
+      - 10gen/query-optimization
+  - "find.*":
+    approvers:
+      - 10gen/query-optimization
+  - "framework_control.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "get_executor*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "getmore_request_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
   - "index_bounds.*":
+    approvers:
+      - 10gen/query-optimization
+  - "index_bounds_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "index_entry*":
+    approvers:
+      - 10gen/query-optimization
+  - "index_hint*":
     approvers:
       - 10gen/query-optimization
   - "indexability*":
     approvers:
       - 10gen/query-optimization
+  - "index_multikey_helpers.h":
+    approvers:
+      - 10gen/query-optimization
+  - "internal_plans.*":
+    approvers:
+      - 10gen/query-optimization
+  - "lru_key_value*":
+    approvers:
+      - 10gen/query-optimization
+  - "map_reduce_output_format*":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "multiple_collection_accessor*":
+    approvers:
+      - 10gen/query-optimization
   - "plan_summary_stats*":
     approvers:
       - 10gen/query-execution
+  - "point_query_bm.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "query_bm_*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "query_knob_*":
+    approvers:
+      - 10gen/query-optimization
+  - "query_request*":
+    approvers:
+      - 10gen/query-optimization
+  - "query_test_service_context.*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+      - 10gen/query-integration
+  - "query_utils*":
+    approvers:
+      - 10gen/query-optimization
   - "*query_settings*":
     approvers:
       - 10gen/query-execution-query-settings
+  - "random_utils*":
+    approvers:
+      - 10gen/query-execution
+  - "README_explain.md":
+    approvers:
+      - 10gen/query-optimization
+  - "README_logical_models.md":
+    approvers:
+      - 10gen/query-optimization
+  - "README_QO.md":
+    approvers:
+      - 10gen/query-optimization
+  - "README.md":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+      - 10gen/query-integration
+  - "record_id_*":
+    approvers:
+      - 10gen/query-optimization
+  - "restore_context*":
+    approvers:
+      - 10gen/query-optimization
+  - "sampling_ce_method.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "sampling_confidence_interval.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "shard_filterer_factor*":
+    approvers:
+      - 10gen/query-execution
+  - "shard_key_diagnostic_printer.h":
+    approvers:
+      - 10gen/query-optimization
+  - "stage_types*":
+    approvers:
+      - 10gen/query-execution
+  - "tailable_mode*":
+    approvers:
+      - 10gen/query-optimization
+  - "tree_walker.h":
+    approvers:
+      - 10gen/query-optimization
+  - "view_response_formatter*":
+    approvers:
+      - 10gen/query-optimization
+  - "wildcard_multikey_path*":
+    approvers:
+      - 10gen/query-optimization
+  - "wildcard_test_utils.h":
+    approvers:
+      - 10gen/query-optimization
   - "mock_yield_policies.h":
     approvers:
       - 10gen/query-execution-yielding
@@ -89,7 +233,9 @@ filters:
       # These changes are typically straightforward so they don't need
       # an extra review from query-optimization-parsers; anyone on query
       # can approve these changes.
-      - 10gen/query
+      - 10gen/query-optimization
+      - 10gen/query-execution
+      - 10gen/query-integration
   - "projection_parser*":
     approvers:
       - 10gen/query-optimization
