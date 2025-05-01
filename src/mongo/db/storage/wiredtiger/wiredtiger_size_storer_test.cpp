@@ -49,7 +49,8 @@ WT_CONNECTION* openConnection(const unittest::TempDir& tempDir) {
 
 class WiredTigerSizeStorerTest : public ServiceContextTest {
 protected:
-    WiredTigerSizeStorerTest() : _conn(openConnection(_tempDir), &_clockSource) {}
+    WiredTigerSizeStorerTest()
+        : _conn(openConnection(_tempDir), &_clockSource, /*sessionCacheMax=*/33000) {}
 
     WiredTigerSizeStorer makeSizeStorer() {
         return {&_conn, "table:sizeStorer"};

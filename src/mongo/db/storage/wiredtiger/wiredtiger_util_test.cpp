@@ -94,7 +94,9 @@ public:
         : _connectionTest(_dbpath.path(),
                           extraStrings,
                           eventHandler == nullptr ? nullptr : eventHandler->getWtEventHandler()),
-          _connection(_connectionTest.getConnection(), _connectionTest.getClockSource()) {}
+          _connection(_connectionTest.getConnection(),
+                      _connectionTest.getClockSource(),
+                      /*sessionCacheMax=*/33000) {}
 
     WiredTigerConnection* getConnection() {
         return &_connection;

@@ -623,7 +623,15 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    _connection = std::make_unique<WiredTigerConnection>(_conn, _clockSource, this);
+    int32_t sessionCacheMax =
+        ((gWiredTigerSessionCacheMaxPercentage * wiredTigerGlobalOptions.sessionMax) / 100);
+
+    LOGV2(9086700,
+          "WiredTiger session cache max value has been set",
+          "sessionCacheMax"_attr = sessionCacheMax);
+
+    _connection =
+        std::make_unique<WiredTigerConnection>(_conn, _clockSource, sessionCacheMax, this);
 
     _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_connection.get());
     _sessionSweeper->go();
@@ -3125,13 +3133,23 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.liveRestoreReadSizeMB = wiredTigerGlobalOptions.liveRestoreReadSizeMB;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
     wtConfig.zstdCompressorLevel = wiredTigerGlobalOptions.zstdCompressorLevel;
+
     if (!usingSpillKVEngine) {
         // Config fuzzer tests fail for SpillKVEngine due to eviction thresholds being higher than
         // the cache size.
         // TODO(SERVER-103279): Fix this issue by appropriately configuring these thresholds for
         // SpillKVEngine.
         wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
+
+        if (wtConfig.extraOpenOptions.find("session_max=") != std::string::npos) {
+            LOGV2_WARNING(
+                9086701,
+                "The session cache max is derived from the session_max value "
+                "provided as a server parameter. Please use the wiredTigerSessionMax server "
+                "parameter to set this value.");
+        }
     }
+
     return wtConfig;
 }
 

@@ -63,6 +63,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
@@ -996,6 +997,19 @@ TEST_F(WiredTigerKVEngineDirectoryTest, HandlesNestedDirectories) {
     // lots
     ASSERT_FALSE(boost::filesystem::exists(
         path.getValue().parent_path().parent_path().parent_path().parent_path()));
+}
+
+TEST_F(WiredTigerKVEngineTest, CheckSessionCacheMax) {
+
+    RAIIServerParameterControllerForTest sessionCacheMax{"wiredTigerSessionCacheMaxPercentage", 20};
+    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", 150};
+    _helper.restartEngine();
+
+    auto* engine = _helper.getWiredTigerKVEngine();
+    auto& connection = engine->getConnection();
+
+    // Check that the configured session cache max is derived correctly.
+    ASSERT_EQ(connection.getSessionCacheMax(), 30);
 }
 
 }  // namespace

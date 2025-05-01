@@ -96,7 +96,8 @@ SpillKVEngine::SpillKVEngine(const std::string& canonicalName,
     _wtOpenConfig = config;
 
     // TODO(SERVER-103355): Disable session caching.
-    _connection = std::make_unique<WiredTigerConnection>(_conn, clockSource, this);
+    _connection =
+        std::make_unique<WiredTigerConnection>(_conn, clockSource, /*sessionCacheMax=*/33000, this);
 
     // TODO(SERVER-103209): Add support for configuring the spill WiredTiger instance at runtime.
 }

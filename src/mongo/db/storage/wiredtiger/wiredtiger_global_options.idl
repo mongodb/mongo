@@ -113,6 +113,19 @@ server_parameters:
             gte: 1
         redact: false
 
+    wiredTigerSessionCacheMaxPercentage:
+        description: >-
+            This value is a percentage calculated against wiredTigerSessionMax
+            representing the maximum number of sessions in the cache
+        set_at: startup
+        cpp_vartype: "std::int32_t"
+        cpp_varname: "gWiredTigerSessionCacheMaxPercentage"
+        default: 50
+        validator:
+            gte: 0
+            lte: 100
+        redact: false
+
     wiredTigerEvictionDirtyTargetGB:
         description: >-
             Absolute dirty cache eviction target. Once eviction begins,
