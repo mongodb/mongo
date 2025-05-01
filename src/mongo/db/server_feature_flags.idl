@@ -92,3 +92,7 @@ feature_flags:
         cpp_varname: gFeatureFlagOIDCInternalAuthorization
         default: true
         version: 7.0
+    featureFlagExposeClientIpInAuditLogs:
+        description: "Expose client IP in audit logs for load-balanced connections"
+        cpp_varname: gFeatureFlagExposeClientIpInAuditLogs
+        default: false
