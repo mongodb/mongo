@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import cache, cached_property
 from glob import glob
 from pathlib import Path  # if you haven't already done so
-from typing import NoReturn
+from typing import Literal, NoReturn
 
 import codeowners
 import pyzstd
@@ -112,7 +112,7 @@ class DecoratedCursor(Cursor):
 
     # CursorKinds that represent types. For these we prefer definition locations.
     # This was decided by manually examining the unique kinds from the output.
-    _TYPE_KINDS = {
+    TYPE_KINDS = {
         CursorKind.ENUM_DECL,
         CursorKind.STRUCT_DECL,
         CursorKind.UNION_DECL,
@@ -152,7 +152,7 @@ class DecoratedCursor(Cursor):
             # child declarations of functions, so that isn't a problem there.
             # This still chokes on explicit and extern template instantiations, but
             # it isn't clear how to fix that.
-            if c.kind in DecoratedCursor._TYPE_KINDS:
+            if c.kind in DecoratedCursor.TYPE_KINDS:
                 if templ.location != c.location and templ.extent != c.extent:
                     templ_def = templ.get_definition()
                     if not templ_def or templ_def.location != c.location:
@@ -174,7 +174,7 @@ class DecoratedCursor(Cursor):
 
         # For types, prefer the definition if it is in a header, otherwise use the canonical decl.
         c = canonical
-        if c.kind in DecoratedCursor._TYPE_KINDS:
+        if c.kind in DecoratedCursor.TYPE_KINDS:
             if definition and definition.location.file.name.endswith(".h"):
                 c = definition
 
@@ -253,6 +253,13 @@ class DecoratedCursor(Cursor):
     @property  # no need to cache
     def has_definition(self):
         return self.definition is not None
+
+    @cached_property
+    def string_for_context(self):
+        if self.kind == CursorKind.STATIC_ASSERT:
+            return self.kind.name
+        else:
+            return f"{self.kind.name} {fully_qualified(self, 'spelling')}"
 
 
 DETAIL_REGEX = re.compile(r"(detail|internal)s?$")
@@ -463,10 +470,10 @@ def pretty_location(loc: clang.SourceLocation | clang.Cursor):
 decls = dict[str, Decl]()
 
 
-def fully_qualified(c: DecoratedCursor):
+def fully_qualified(c: DecoratedCursor, kind: Literal["displayname", "spelling"] = "displayname"):
     parts = []
     for c in itertools.chain((c,), c.normalized_parents):
-        spelling = c.displayname
+        spelling = getattr(c, kind)
         if spelling:
             if c.is_const_method():
                 spelling += " const"
@@ -589,13 +596,39 @@ def is_local_decl(c: Cursor):
     return False
 
 
-def find_usages(mod: str, c: Cursor):
+context_kinds = (
+    function_kinds
+    | DecoratedCursor.TYPE_KINDS
+    | {  # Type Aliases
+        CursorKind.TYPE_ALIAS_DECL,
+        CursorKind.TYPEDEF_DECL,
+        CursorKind.TYPE_ALIAS_TEMPLATE_DECL,
+    }
+    | {  # Misc
+        CursorKind.FIELD_DECL,  # Member variables
+        CursorKind.UNEXPOSED_DECL,  # template variables
+        CursorKind.CONCEPT_DECL,
+    }
+)
+
+# These are only considered for context at namespace scope (when context is None)
+namespace_scope_context_kinds = {
+    CursorKind.VAR_DECL,
+    CursorKind.STATIC_ASSERT,
+}
+
+
+def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
     if c.kind == CursorKind.ANNOTATE_ATTR and c.spelling.startswith("mongo::mod::"):
         if not any(normpath_for_file(c) in s for s in (complete_headers, incomplete_headers)):
             perr_exit(
                 f"{pretty_location(c)}:ERROR: usage of MONGO_MOD macro without directly including "
                 + '"mongo/util/modules.h" or modules_incompletely_marked_header.h'
             )
+
+    if c.kind in context_kinds or (context is None and c.kind in namespace_scope_context_kinds):
+        context = DecoratedCursor(c)
+
     ref = c.referenced
     # Handle children first. This makes it possible to use early returns below
     for child in c.get_children():
@@ -607,7 +640,7 @@ def find_usages(mod: str, c: Cursor):
 
         assert child != c
         assert ref is None or child != ref or ref.kind == CursorKind.OVERLOADED_DECL_REF
-        find_usages(mod, child)
+        find_usages(mod, child, context)
 
     if ref is None or ref == c:
         return
@@ -666,7 +699,7 @@ def find_usages(mod: str, c: Cursor):
     if is_local_decl(ref):
         return
 
-    # Unfortuntely libclang's c api doesn't handle implicitly declared methods
+    # Unfortunately libclang's c api doesn't handle implicitly declared methods
     # well. In particular it often points at a location of a forward decl of the
     # class rather than the definition, even if both are visible. And then the
     # rest of our handling doesn't work correctly. And it also doesn't have a
@@ -711,7 +744,11 @@ def find_usages(mod: str, c: Cursor):
     # if d.mod == mod or mod.startswith(d.mod):
     #     return
 
-    d.used_from.setdefault(mod, set()).add(pretty_location(c))
+    # if this fails, something is missing in context_kinds or namespace_scope_context_kinds
+    assert context
+
+    usage = f"{pretty_location(c.location)}\t{context.string_for_context}"
+    d.used_from.setdefault(mod, set()).add(usage)
 
 
 seen = set[Cursor]()
@@ -937,7 +974,7 @@ def main():
     for top_level in tu.cursor.get_children():
         if "src/mongo/" not in top_level.location.file.name:
             continue
-        find_usages(mod_for_file(top_level.location.file), top_level)
+        find_usages(mod_for_file(top_level.location.file), top_level, None)
     timer.mark("found usages")
 
     out_file_name = out_from_env if out_from_env else "decls.yaml"
@@ -979,3 +1016,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# cspell: words perr decled displayname cindex templ defn

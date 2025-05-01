@@ -5,7 +5,7 @@ import os
 import shutil
 import sys
 from dataclasses import dataclass
-from functools import partial
+from functools import cached_property, partial
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
@@ -13,7 +13,7 @@ import tree_sitter
 import tree_sitter_cpp
 from rich.text import Text
 from textual.app import App, ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingType
 from textual.containers import Horizontal
 from textual.reactive import reactive
 from textual.widgets import Footer, TextArea, Tree
@@ -34,21 +34,89 @@ class Loc(NamedTuple):
         p, l, c = loc.split(":")
         return cls(sys.intern(p), int(l), int(c))
 
+    @property
+    def loc(self):
+        """for compatibility with LocAndContext.loc"""
+        return self
+
     def __str__(self):
         return f"{self.file}:{self.line}:{self.col}"
 
 
+class LocAndContext(NamedTuple):
+    loc: Loc
+    ctx: str
+
+    @classmethod
+    def parse(cls, usage: str):
+        loc, ctx = usage.split("\t")
+        return cls(Loc.parse(loc), sys.intern(ctx))
+
+
 class HasUnknownCount(Protocol):
+    @property
     def unknown_count(self) -> int: ...
 
 
 def unknown_count(arg: HasUnknownCount | list[HasUnknownCount]):
     if isinstance(arg, list):
         return sum(map(unknown_count, arg))
-    return arg.unknown_count()
+    return arg.unknown_count
 
 
-Usages = dict[str, set[Loc]]
+Usages = dict[str, set[LocAndContext | Loc]]
+
+
+def fancy_kind(kind: str):
+    def style(name):
+        return TextAreaTheme.get_builtin_theme("css").get_highlight(name)
+
+    match kind:
+        case "CLASS_DECL":
+            return Text.assemble(("class", style("class")))
+        case "CLASS_TEMPLATE":
+            return Text.assemble(("template", style("keyword")), " ", ("class", style("class")))
+        case "CLASS_TEMPLATE_PARTIAL_SPECIALIZATION":
+            return Text.assemble(("template<>", style("keyword")), " ", ("class", style("class")))
+        case "CONCEPT_DECL":
+            return Text.assemble(("concept", style("class")))
+        case "CONSTRUCTOR":
+            return Text.assemble(("ctor", style("type")))
+        case "CONVERSION_FUNCTION":
+            return Text.assemble(("conversion", style("type")))
+        case "CXX_METHOD":
+            return Text.assemble(("meth", style("type")))
+        case "DESTRUCTOR":
+            return Text.assemble(("dtor", style("type")))
+        case "ENUM_CONSTANT_DECL":
+            return Text.assemble(("enumerator", style("number")))
+        case "ENUM_DECL":
+            return Text.assemble(("enum", style("class")))
+        case "FIELD_DECL":
+            return Text.assemble(("mem", style("css.property")))
+        case "FUNCTION_DECL":
+            return Text.assemble(("func", style("type")))
+        case "FUNCTION_TEMPLATE":
+            return Text.assemble(("template", style("keyword")), " ", ("func", style("type")))
+        case "STATIC_ASSERT":
+            return Text.assemble(("static_assert", style("keyword")))
+        case "STRUCT_DECL":
+            return Text.assemble(("struct", style("class")))
+        case "TYPEDEF_DECL":
+            return Text.assemble(("typedef", style("class")))
+        case "TYPE_ALIAS_DECL":
+            return Text.assemble(("typedef", style("class")))
+        case "TYPE_ALIAS_TEMPLATE_DECL":
+            return Text.assemble(("template", style("keyword")), " ", ("typedef", style("class")))
+        case "UNEXPOSED_DECL":
+            # This seems to be what these show up as in libclang :(
+            return Text.assemble(
+                ("template", style("keyword")), " ", ("var", style("css.property"))
+            )
+        case "VAR_DECL":
+            return Text.assemble(("var", style("css.property")))
+        case _:
+            return Text.assemble((kind, style("info_string")))
 
 
 @dataclass
@@ -65,80 +133,32 @@ class Decl:
     alt: str
     sem_par: str
     lex_par: str
-    used_from: Usages
+    _raw_used_from: Any  # use direct_usages instead
     sem_children: list["Decl"] = dataclasses.field(default_factory=list, compare=False, repr=False)
     lex_children: list["Decl"] = dataclasses.field(default_factory=list, compare=False, repr=False)
-    other_mods: Any = None
+    other_mods: Usages = None
 
+    @cached_property
     def unknown_count(self):
-        if count := getattr(self, "_unknown_count", None):
-            return count
+        return (1 if self.visibility == "UNKNOWN" else 0) + unknown_count(self.sem_children)
 
-        count = (1 if self.visibility == "UNKNOWN" else 0) + unknown_count(self.sem_children)
-        setattr(self, "_unknown_count", count)
-        return count
+    @cached_property
+    def direct_usages(self) -> Usages:
+        return {u["mod"]: set(map(LocAndContext.parse, u["locs"])) for u in self._raw_used_from}
 
-    def transitive_usages(self):
-        if out := getattr(self, "_transitive_usages", None):
-            return out
-
-        out = Usages()
-        for mod, locs in self.used_from.items():
+    @cached_property
+    def transitive_usages(self) -> Usages:
+        out: Usages = Usages()
+        for mod, locs in self.direct_usages.items():
             out.setdefault(mod, set()).update(locs)
         for child in self.sem_children:
-            for mod, locs in child.used_from.items():
+            for mod, locs in child.transitive_usages.items():
                 out.setdefault(mod, set()).update(locs)
-        setattr(self, "_transitive_usages", out)
         return out
 
     @property
     def fancy_kind(self):
-        def style(name):
-            return TextAreaTheme.get_builtin_theme("css").get_highlight(name)
-
-        match self.kind:
-            case "CLASS_DECL":
-                return Text.assemble(("class", style("class")))
-            case "CLASS_TEMPLATE":
-                return Text.assemble(("template", style("keyword")), " ", ("class", style("class")))
-            case "CLASS_TEMPLATE_PARTIAL_SPECIALIZATION":
-                return Text.assemble(
-                    ("template<>", style("keyword")), " ", ("class", style("class"))
-                )
-            case "CONSTRUCTOR":
-                return Text.assemble(("ctor", style("type")))
-            case "CONVERSION_FUNCTION":
-                return Text.assemble(("conversion", style("type")))
-            case "CXX_METHOD":
-                return Text.assemble(("meth", style("type")))
-            case "DESTRUCTOR":
-                return Text.assemble(("dtor", style("type")))
-            case "ENUM_CONSTANT_DECL":
-                return Text.assemble(("enumerator", style("number")))
-            case "ENUM_DECL":
-                return Text.assemble(("enum", style("class")))
-            case "FIELD_DECL":
-                return Text.assemble(("mem", style("css.property")))
-            case "FUNCTION_DECL":
-                return Text.assemble(("func", style("type")))
-            case "FUNCTION_TEMPLATE":
-                return Text.assemble(("template", style("keyword")), " ", ("func", style("type")))
-            case "STRUCT_DECL":
-                return Text.assemble(("struct", style("class")))
-            case "TYPEDEF_DECL":
-                return Text.assemble(("typedef", style("class")))
-            case "TYPE_ALIAS_DECL":
-                return Text.assemble(("typedef", style("class")))
-            case "TYPE_ALIAS_TEMPLATE_DECL":
-                return Text.assemble(
-                    ("template", style("keyword")), " ", ("typedef", style("class"))
-                )
-            case "UNEXPOSED_DECL":
-                return Text.assemble(("libclang bug?", style("info_string")))
-            case "VAR_DECL":
-                return Text.assemble(("var", style("css.property")))
-            case _:
-                return Text.assemble((self.kind, style("info_string")))
+        return fancy_kind(self.kind)
 
     @property
     def fancy_visibility(self):
@@ -168,6 +188,7 @@ class File:
     detached_decls: list[Decl] = dataclasses.field(default_factory=list, compare=False)
     all_decls: list[Decl] = dataclasses.field(default_factory=list, compare=False)
 
+    @cached_property
     def unknown_count(self):
         return unknown_count(self.top_level_decls) + unknown_count(self.detached_decls)
 
@@ -178,7 +199,7 @@ def add_decl_node(node: TreeNode, d: Decl):
     # TODO: if this is slow, consider moving to a render_label() override
     label = f"[bold bright_white]{d.spelling}[/]".join(d.display_name.rsplit(d.spelling, 1))
     label += f" [i]unknowns:[/]{unknown_count(d)}"
-    label += f" [i]usages:[/]{sum(len(u) for u in d.transitive_usages().values())}"
+    label += f" [i]usages:[/]{sum(len(u) for u in d.transitive_usages.values())}"
     if d.sem_children:
         label += f" [i]children:[/]{len(d.sem_children)}"
     if d.lex_children:
@@ -198,11 +219,24 @@ def add_mod_loc_mapping_nodes(node: TreeNode, usages: Usages, kind: str, expand=
         tot += len(locs)
         mod_node = node.add(f"{mod}: {len(locs)}", expand=expand)
         for loc in sorted(locs):
-            mod_node.add_leaf(str(loc), loc)
+            if isinstance(loc, Loc):
+                mod_node.add_leaf(Text(str(loc.loc)), loc.loc)
+                continue
+
+            # Currently only STATIC_ASSERT doesn't have a name.
+            [kind, *name] = loc.ctx.split(" ", 1)
+            mod_node.add_leaf(
+                Text.assemble(
+                    fancy_kind(kind),
+                    Text(" " + name[0], style="bold bright_white") if name else "",
+                    f" {loc.loc}",
+                ),
+                loc.loc,
+            )
     node.label += str(tot)
 
 
-VIM_BINDINGS: list[Binding | tuple[str, str] | tuple[str, str, str]] = [
+VIM_BINDINGS: list[BindingType] = [
     Binding("down,j", "cursor_down", "Down", show=False),
     Binding("up,k", "cursor_up", "Up", show=False),
     Binding("left,h", "cursor_left", "Left", show=False),
@@ -314,7 +348,7 @@ class FilesTree(Tree):
             if type(node.data) == Loc:
                 self.loc = node.data
                 return
-            if type(node.data) == Decl:
+            if type(node.data) == Decl or type(node.data) == LocAndContext:
                 self.loc = node.data.loc
                 return
             node = node.parent
@@ -402,10 +436,10 @@ class FilesTree(Tree):
         if d.other_mods:
             add_mod_loc_mapping_nodes(node, d.other_mods, "declared in other_mods", expand=True)
 
-        add_mod_loc_mapping_nodes(node, d.used_from, "direct usages")
+        add_mod_loc_mapping_nodes(node, d.direct_usages, "direct usages")
 
         if d.sem_children:
-            add_mod_loc_mapping_nodes(node, d.transitive_usages(), "direct and transitive usages")
+            add_mod_loc_mapping_nodes(node, d.transitive_usages, "direct and transitive usages")
             add_decl_nodes(
                 node.add("semantic children"),
                 d.sem_children,
@@ -476,7 +510,8 @@ with open(input, "rb") as file:
 
 for d in raw_decls:
     d["loc"] = Loc.parse(d["loc"])
-    d["used_from"] = {u["mod"]: set(map(Loc.parse, u["locs"])) for u in d["used_from"]}
+    d["_raw_used_from"] = d["used_from"]
+    del d["used_from"]
     if "other_mods" in d:
         for mod, locs in d["other_mods"].items():
             locs.sort()
@@ -527,11 +562,14 @@ for f in files.values():
     f.top_level_decls.sort(key=lambda d: d.loc)
     f.detached_decls.sort(key=lambda d: d.loc)
 
-files = {k: v for k, v in sorted(files.items(), key=lambda kv: kv[1].unknown_count(), reverse=True)}
+files = {k: v for k, v in sorted(files.items(), key=lambda kv: kv[1].unknown_count, reverse=True)}
 modules = {d.mod for d in decls}
 
 if __name__ == "__main__":
     app = ModularityApp()
     app.run()
+
+    # Don't waste time running GC on exit
+    os._exit(0)
 
 # cSpell:words usrs

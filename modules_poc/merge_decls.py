@@ -161,7 +161,7 @@ def main(
 
     else:
         for path in progressbar(paths):
-            with open(path) as f:
+            with pyzstd.ZstdFile(path, read_size=2 * 1024 * 1024) as f:
                 merge_decls(json.loads(f.read()))
         timer.mark("processed input")
 
