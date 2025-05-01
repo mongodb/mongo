@@ -38,10 +38,8 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -316,11 +314,11 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
 }
 
 /**
- * Test that makeTimeseriesCompressedDiffUpdateOp returns the expected diff object when
+ * Test that makeTimeseriesCompressedDiffUpdateOpFromBatch returns the expected diff object when
  * inserting measurements into a compressed bucket, and that out-of-order
  * measurements cause a bucket to upgraded to a v3 bucket.
  */
-TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
+TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatch) {
     // Builds a write batch for an update and sets the decompressed field of the batch.
     auto batch = generateBatch(UUID::gen());
     const std::vector<BSONObj> measurements = {
@@ -364,7 +362,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
                  "b":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}}}}
         })");
 
-    auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
+    auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(
         _opCtx, batch, _nsNoMeta.makeTimeseriesBucketsNamespace());
     auto& updates = request.getUpdates();
 
@@ -376,11 +374,11 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
 }
 
 /**
- * Test that makeTimeseriesCompressedDiffUpdateOp returns the expected diff object when
+ * Test that makeTimeseriesCompressedDiffUpdateOpFromBatch returns the expected diff object when
  * inserting measurements with meta fields into a compressed bucket, and that out-of-order
  * measurements cause a bucket to upgraded to a v3 bucket.
  */
-TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
+TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatchWithMeta) {
     const BSONObj uncompressedPreImage = fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:31.000Z"},"a":1,"b":1},
@@ -431,7 +429,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
                  "b":{"o":6,"d":{"$binary":"gCsAEAAUABAAAA==","$type":"00"}}}}
         })");
 
-    auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOp(
+    auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(
         _opCtx, batch, _nsNoMeta.makeTimeseriesBucketsNamespace());
     auto& updates = request.getUpdates();
 

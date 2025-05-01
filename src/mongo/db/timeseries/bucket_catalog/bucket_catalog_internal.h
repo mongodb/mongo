@@ -127,17 +127,6 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
                                         BucketPrepareAction prepare);
 
 /**
- * Retrieve the open bucket for write use if one exists. If none exists then we will create a new
- * bucket.
- */
-Bucket* useBucket(BucketCatalog& catalog,
-                  Stripe& stripe,
-                  WithLock stripeLock,
-                  InsertContext& info,
-                  const Date_t& time,
-                  const StringDataComparator* comparator);
-
-/**
  * Retrieve all open buckets from 'stripe' given a bucket key.
  */
 std::vector<Bucket*> findOpenBuckets(Stripe& stripe,
@@ -220,22 +209,6 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
     const BucketKey& key,
     tracking::unique_ptr<Bucket>&& bucket,
     std::uint64_t targetEra);
-
-/**
- * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, we will
- * create a new bucket and insert into that bucket.
- */
-std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
-    BucketCatalog& catalog,
-    Stripe& stripe,
-    WithLock stripeLock,
-    const BSONObj& doc,
-    OperationId opId,
-    InsertContext& insertContext,
-    Bucket& existingBucket,
-    const Date_t& time,
-    uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -379,21 +352,6 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                        ExecutionStatsController& stats);
 
 /**
- * Closes the existing, full bucket and open a new one for the same metadata.
- * Writes information about the closed bucket to the 'info' parameter.
- */
-Bucket& rolloverAndAllocateBucket(BucketCatalog& catalog,
-                                  Stripe& stripe,
-                                  WithLock stripeLock,
-                                  Bucket& bucket,
-                                  const BucketKey& key,
-                                  const TimeseriesOptions& timeseriesOptions,
-                                  RolloverReason reason,
-                                  const Date_t& time,
-                                  const StringDataComparator* comparator,
-                                  ExecutionStatsController& stats);
-
-/**
  * Determines if and why 'bucket' needs to be rolled over to accommodate 'doc'.
  * Will also update the bucket catalog stats incNumBucketsKeptOpenDueToLargeMeasurements as
  * appropriate.
@@ -505,27 +463,6 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
                                           const StringDataComparator* comparator,
                                           Bucket& bucket,
                                           std::shared_ptr<WriteBatch>& writeBatch);
-
-/**
- * Given a bucket 'bucket' and a measurement 'doc', updates the WriteBatch corresponding to the
- * inputted bucket as well as the bucket itself to reflect the addition of the measurement. This
- * includes updating the batch/bucket estimated sizes and the bucket's schema.
- * Returns the WriteBatch for the bucket.
- */
-std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
-    BucketCatalog& catalog,
-    const BSONObj& measurement,
-    OperationId opId,
-    const TimeseriesOptions& timeseriesOptions,
-    const StripeNumber& stripeNumber,
-    ExecutionStatsController& stats,
-    const StringDataComparator* comparator,
-    Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    const Sizes& sizesToBeAdded,
-    bool isNewlyOpenedBucket,
-    bool openedDueToMetadata,
-    Bucket& bucket);
-
 
 /**
  * Given a bucket 'bucket', a measurement 'doc', and the 'writeBatch', updates the 'writeBatch'

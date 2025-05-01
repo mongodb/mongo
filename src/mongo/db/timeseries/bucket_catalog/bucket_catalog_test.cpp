@@ -53,8 +53,6 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
-#include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
@@ -273,16 +271,14 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
     ASSERT_EQ(batch->measurements.size(), expectedBatchSize) << batch->toBSON();
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, numPreviouslyCommittedMeasurements)
         << batch->toBSON();
-    TimeseriesStmtIds stmtIds;
     std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
     std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
-    write_ops_utils::makeWriteRequest(_opCtx,
-                                      batch,
-                                      getMetadata(*_bucketCatalog, batch->bucketId),
-                                      stmtIds,
-                                      ns.makeTimeseriesBucketsNamespace(),
-                                      &insertOps,
-                                      &updateOps);
+    write_ops_utils::makeWriteRequestFromBatch(_opCtx,
+                                               batch,
+                                               getMetadata(*_bucketCatalog, batch->bucketId),
+                                               ns.makeTimeseriesBucketsNamespace(),
+                                               &insertOps,
+                                               &updateOps);
     finish(*_bucketCatalog, batch);
 }
 
@@ -1022,9 +1018,10 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
-    (void)write_ops_utils::makeTimeseriesInsertOp(batch1,
-                                                  _ns1.makeTimeseriesBucketsNamespace(),
-                                                  getMetadata(*_bucketCatalog, batch1->bucketId));
+    (void)write_ops_utils::makeTimeseriesInsertOpFromBatch(
+        batch1,
+        _ns1.makeTimeseriesBucketsNamespace(),
+        getMetadata(*_bucketCatalog, batch1->bucketId));
     finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
 
@@ -1335,9 +1332,10 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT_EQ(batch2->newFieldNamesToBeInserted.size(), 1) << batch2->toBSON();
     ASSERT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField) << batch2->toBSON();
-    (void)write_ops_utils::makeTimeseriesInsertOp(batch2,
-                                                  _ns1.makeTimeseriesBucketsNamespace(),
-                                                  getMetadata(*_bucketCatalog, batch2->bucketId));
+    (void)write_ops_utils::makeTimeseriesInsertOpFromBatch(
+        batch2,
+        _ns1.makeTimeseriesBucketsNamespace(),
+        getMetadata(*_bucketCatalog, batch2->bucketId));
     finish(*_bucketCatalog, batch2);
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already

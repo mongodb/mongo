@@ -257,36 +257,6 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
 #endif
 }
 
-InsertResult insert(BucketCatalog& catalog,
-                    const StringDataComparator* comparator,
-                    const BSONObj& doc,
-                    OperationId opId,
-                    InsertContext& insertContext,
-                    const Date_t& time,
-                    uint64_t storageCacheSizeBytes) {
-    auto& stripe = *catalog.stripes[insertContext.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
-
-    Bucket* bucket =
-        internal::useBucket(catalog, stripe, stripeLock, insertContext, time, comparator);
-    invariant(bucket);
-
-    auto insertionResult = internal::insertIntoBucket(catalog,
-                                                      stripe,
-                                                      stripeLock,
-                                                      doc,
-                                                      opId,
-                                                      insertContext,
-                                                      *bucket,
-                                                      time,
-                                                      storageCacheSizeBytes,
-                                                      comparator);
-
-    auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
-    invariant(batch);
-    return SuccessfulInsertion{std::move(*batch)};
-}
-
 void waitToInsert(InsertWaiter* waiter) {
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(waiter)) {
         getWriteBatchStatus(**batch).ignore();

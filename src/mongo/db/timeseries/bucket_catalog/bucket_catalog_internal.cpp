@@ -310,59 +310,6 @@ BucketStateForInsertAndCleanup isBucketStateEligibleForInsertsAndCleanup(BucketC
     return BucketStateForInsertAndCleanup::kEligibleForInsert;
 }
 
-Bucket* useBucket(BucketCatalog& catalog,
-                  Stripe& stripe,
-                  WithLock stripeLock,
-                  InsertContext& info,
-                  const Date_t& time,
-                  const StringDataComparator* comparator) {
-    auto it = stripe.openBucketsByKey.find(info.key);
-    if (it == stripe.openBucketsByKey.end()) {
-        // No open bucket for this metadata.
-        return &allocateBucket(
-            catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats);
-    }
-
-    absl::InlinedVector<Bucket*, 4> bucketsToCleanUp;
-    auto cleanupFn = [&]() {
-        ExecutionStatsController statsStorage;
-        for (Bucket* bucket : bucketsToCleanUp) {
-            statsStorage = getExecutionStats(catalog, bucket->bucketId.collectionUUID);
-            abort(catalog,
-                  stripe,
-                  stripeLock,
-                  *bucket,
-                  statsStorage,
-                  /*batch=*/nullptr,
-                  getTimeseriesBucketClearedError(bucket->bucketId.oid));
-        }
-    };
-    ScopeGuard cleanup{cleanupFn};
-
-    auto& openSet = it->second;
-    for (Bucket* potentialBucket : openSet) {
-        if (potentialBucket->rolloverReason == RolloverReason::kNone) {
-            auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, potentialBucket);
-            if (state && !conflictsWithInsertions(state.value())) {
-                markBucketNotIdle(stripe, stripeLock, *potentialBucket);
-                return potentialBucket;
-            } else if (state) {
-                bucketsToCleanUp.push_back(potentialBucket);
-            } else {
-                // If state is missing, it was already aborted and is just waiting to be cleaned up
-                // after the prepared batch is resolved.
-                invariant(potentialBucket->preparedBatch);
-            }
-        }
-    }
-
-    cleanup.dismiss();
-    cleanupFn();
-
-    return &allocateBucket(
-        catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats);
-}
-
 Status compressAndWriteBucket(OperationContext* opCtx,
                               BucketCatalog& catalog,
                               const Collection* bucketsColl,
@@ -667,78 +614,6 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
     stats.incNumActiveBuckets();
 
     return *unownedBucket;
-}
-
-std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
-    BucketCatalog& catalog,
-    Stripe& stripe,
-    WithLock stripeLock,
-    const BSONObj& doc,
-    const OperationId opId,
-    InsertContext& insertContext,
-    Bucket& existingBucket,
-    const Date_t& time,
-    uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator) {
-    Bucket::NewFieldNames newFieldNamesToBeInserted;
-    Sizes sizesToBeAdded;
-
-    bool isNewlyOpenedBucket = (existingBucket.size == 0);
-    std::reference_wrapper<Bucket> bucketToUse{existingBucket};
-    bool openedDueToMetadata = true;
-    calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                       bucketToUse.get(),
-                                       doc,
-                                       insertContext.options.getMetaField(),
-                                       newFieldNamesToBeInserted,
-                                       sizesToBeAdded);
-    if (!isNewlyOpenedBucket) {
-        auto reason =
-            determineRolloverReason(doc,
-                                    insertContext.options,
-                                    existingBucket,
-                                    catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
-                                    sizesToBeAdded,
-                                    time,
-                                    storageCacheSizeBytes,
-                                    comparator,
-                                    insertContext.stats);
-        auto action = getRolloverAction(reason);
-        if (action != RolloverAction::kNone) {
-            openedDueToMetadata = false;
-            bucketToUse = rolloverAndAllocateBucket(catalog,
-                                                    stripe,
-                                                    stripeLock,
-                                                    existingBucket,
-                                                    insertContext.key,
-                                                    insertContext.options,
-                                                    reason,
-                                                    time,
-                                                    comparator,
-                                                    insertContext.stats);
-            isNewlyOpenedBucket = true;
-            // Recalculate the fields and size change for the newly opened bucket we got from
-            // rolling over our original one.
-            calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                               bucketToUse.get(),
-                                               doc,
-                                               insertContext.options.getMetaField(),
-                                               newFieldNamesToBeInserted,
-                                               sizesToBeAdded);
-        }
-    }
-    return addMeasurementToBatchAndBucket(catalog,
-                                          doc,
-                                          opId,
-                                          insertContext.options,
-                                          insertContext.stripeNumber,
-                                          insertContext.stats,
-                                          comparator,
-                                          newFieldNamesToBeInserted,
-                                          sizesToBeAdded,
-                                          isNewlyOpenedBucket,
-                                          openedDueToMetadata,
-                                          bucketToUse.get());
 }
 
 bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
@@ -1281,22 +1156,6 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     return *bucket;
 }
 
-Bucket& rolloverAndAllocateBucket(BucketCatalog& catalog,
-                                  Stripe& stripe,
-                                  WithLock stripeLock,
-                                  Bucket& bucket,
-                                  const BucketKey& key,
-                                  const TimeseriesOptions& timeseriesOptions,
-                                  RolloverReason reason,
-                                  const Date_t& time,
-                                  const StringDataComparator* comparator,
-                                  ExecutionStatsController& stats) {
-    rollover(catalog, stripe, stripeLock, bucket, reason);
-
-    return allocateBucket(
-        catalog, stripe, stripeLock, key, timeseriesOptions, time, comparator, stats);
-}
-
 void rollover(BucketCatalog& catalog,
               Stripe& stripe,
               WithLock stripeLock,
@@ -1562,45 +1421,6 @@ void addMeasurementToBatchAndBucket(BucketCatalog& catalog,
             bucket.schema.update(measurement, timeseriesOptions.getMetaField(), comparator);
         invariant(updateStatus == Schema::UpdateStatus::Updated);
     }
-}
-
-std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
-    BucketCatalog& catalog,
-    const BSONObj& measurement,
-    const OperationId opId,
-    const TimeseriesOptions& timeseriesOptions,
-    const StripeNumber& stripeNumber,
-    ExecutionStatsController& stats,
-    const StringDataComparator* comparator,
-    Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    const Sizes& sizesToBeAdded,
-    bool isNewlyOpenedBucket,
-    bool openedDueToMetadata,
-    Bucket& bucket) {
-    auto batch = activeBatch(catalog.trackingContexts, bucket, opId, stripeNumber, stats);
-    batch->measurements.push_back(measurement);
-    for (auto&& field : newFieldNamesToBeInserted) {
-        batch->newFieldNamesToBeInserted[field] = field.hash();
-        bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{
-            getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
-            field.key(),
-            field.hash()});
-    }
-
-    bucket.numMeasurements++;
-    batch->sizes.uncommittedMeasurementEstimate += sizesToBeAdded.uncommittedMeasurementEstimate;
-    bucket.size +=
-        sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
-    if (isNewlyOpenedBucket) {
-        if (openedDueToMetadata) {
-            batch->openedDueToMetadata = true;
-        }
-        auto updateStatus =
-            bucket.schema.update(measurement, timeseriesOptions.getMetaField(), comparator);
-        invariant(updateStatus == Schema::UpdateStatus::Updated);
-    }
-
-    return batch;
 }
 
 }  // namespace mongo::timeseries::bucket_catalog::internal

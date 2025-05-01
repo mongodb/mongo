@@ -249,18 +249,6 @@ uint64_t getMemoryUsage(const BucketCatalog& catalog);
 void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builder);
 
 /**
- * Returns the WriteBatch into which the document was inserted.
- * We will attempt to find a suitable open bucket, or open a new bucket if none exists.
- */
-InsertResult insert(BucketCatalog& catalog,
-                    const StringDataComparator* comparator,
-                    const BSONObj& doc,
-                    OperationId,
-                    InsertContext& insertContext,
-                    const Date_t& time,
-                    uint64_t storageCacheSizeBytes);
-
-/**
  * If a 'tryInsert' call returns a 'InsertWaiter' object, the caller should use this function to
  * wait before repeating their attempt.
  */

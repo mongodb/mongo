@@ -39,6 +39,7 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/logv2/log.h"
@@ -422,22 +423,6 @@ mongo::write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<
     return base;
 }
 
-void makeWriteRequest(OperationContext* opCtx,
-                      std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                      const BSONObj& metadata,
-                      TimeseriesStmtIds& stmtIds,
-                      const NamespaceString& bucketsNs,
-                      std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
-                      std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps) {
-    if (batch->numPreviouslyCommittedMeasurements == 0) {
-        insertOps->push_back(
-            makeTimeseriesInsertOp(batch, bucketsNs, metadata, std::move(stmtIds[batch.get()])));
-        return;
-    }
-    updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
-        opCtx, batch, bucketsNs, std::move(stmtIds[batch.get()])));
-}
-
 void makeWriteRequestFromBatch(OperationContext* opCtx,
                                std::shared_ptr<bucket_catalog::WriteBatch> batch,
                                const BSONObj& metadata,
@@ -449,39 +434,6 @@ void makeWriteRequestFromBatch(OperationContext* opCtx,
         return;
     }
     updateOps->push_back(makeTimeseriesCompressedDiffUpdateOpFromBatch(opCtx, batch, bucketsNs));
-}
-
-mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOp(
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const NamespaceString& bucketsNs,
-    const BSONObj& metadata,
-    std::vector<StmtId>&& stmtIds) {
-    invariant(!batch->isReopened);
-
-    BSONObj bucketToInsert;
-    BucketDocument bucketDoc;
-    std::vector<details::Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
-
-    // Insert measurements, and appropriate skips, into all column builders.
-    for (const auto& measurement : sortedMeasurements) {
-        batch->measurementMap.insertOne(measurement.dataFields);
-    }
-    int32_t compressedSizeDelta;
-    auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
-    batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
-    bucketToInsert = makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
-
-    // Extra verification that the insert op decompresses to the same values put in.
-    if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
-        auto verifierFunction =
-            makeVerifierFunction(sortedMeasurements, batch, OperationSource::kTimeseriesInsert);
-        verifierFunction(bucketToInsert, BSONObj());
-    }
-
-    mongo::write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
-    op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
-    op.setCollectionUUID(batch->bucketId.collectionUUID);
-    return op;
 }
 
 mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
@@ -512,19 +464,6 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
 
     mongo::write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(batch->stmtIds)));
-    op.setCollectionUUID(batch->bucketId.collectionUUID);
-    return op;
-}
-
-mongo::write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
-    OperationContext* opCtx,
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const NamespaceString& bucketsNs,
-    const BSONObj& metadata,
-    std::vector<StmtId>&& stmtIds) {
-    mongo::write_ops::UpdateCommandRequest op(
-        bucketsNs, {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
-    op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
@@ -632,39 +571,6 @@ makeModificationOp(const OID& bucketId,
     mongo::write_ops::UpdateModification u(bucketToReplace);
     mongo::write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
     mongo::write_ops::UpdateCommandRequest op(coll->ns(), {updateEntry});
-    return op;
-}
-
-mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
-    OperationContext* opCtx,
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const NamespaceString& bucketsNs,
-    std::vector<StmtId>&& stmtIds) {
-    using namespace details;
-
-    bool changedToUnsorted = false;
-    std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
-    if (batch->bucketIsSortedByTime &&
-        sortedMeasurements.begin()->timeField.timestamp() <
-            batch->measurementMap.timeOfLastMeasurement(batch->timeField)) {
-        batch->bucketIsSortedByTime = false;
-        changedToUnsorted = true;
-        batch->stats.incNumCompressedBucketsConvertedToUnsorted();
-    }
-
-    // Insert new measurements, and appropriate skips, into all column builders.
-    for (const auto& measurement : sortedMeasurements) {
-        batch->measurementMap.insertOne(measurement.dataFields);
-    }
-
-    // Generates a delta update request using the before and after compressed bucket documents' data
-    // fields. The only other items that will be different are the min, max, and count fields in the
-    // control block, and the version field if it was promoted to a v3 bucket.
-    const auto updateEntry =
-        makeTimeseriesCompressedDiffEntry(opCtx, batch, changedToUnsorted, sortedMeasurements);
-    mongo::write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
-    op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
-    op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
 }
 

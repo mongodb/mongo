@@ -44,6 +44,7 @@
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"

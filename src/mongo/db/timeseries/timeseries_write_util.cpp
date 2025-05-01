@@ -225,53 +225,6 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
     *electionId = isReplSet ? boost::make_optional(replCoord->getElectionId()) : boost::none;
 }
 
-/**
- * Attempts to insert a measurement doc into a bucket in the bucket catalog.
- * Returns the write batch of the insert and other information if succeeded.
- */
-StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
-    OperationContext* opCtx,
-    bucket_catalog::BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
-    TimeseriesOptions& timeSeriesOptions,
-    const BSONObj& measurementDoc) {
-    auto insertContextAndDate = bucket_catalog::prepareInsert(
-        bucketCatalog, bucketsColl->uuid(), timeSeriesOptions, measurementDoc);
-
-    if (!insertContextAndDate.isOK()) {
-        return insertContextAndDate.getStatus();
-    }
-
-    return bucket_catalog::insert(
-        bucketCatalog,
-        bucketsColl->getDefaultCollator(),
-        measurementDoc,
-        opCtx->getOpID(),
-        std::get<bucket_catalog::InsertContext>(insertContextAndDate.getValue()),
-        std::get<Date_t>(insertContextAndDate.getValue()),
-        getStorageCacheSizeBytes(opCtx));
-}
-
-bucket_catalog::TimeseriesWriteBatches insertIntoBucketCatalogForUpdate(
-    OperationContext* opCtx,
-    bucket_catalog::BucketCatalog& bucketCatalog,
-    const CollectionPtr& bucketsColl,
-    const std::vector<BSONObj>& measurements,
-    const NamespaceString& bucketsNs,
-    TimeseriesOptions& timeSeriesOptions) {
-    bucket_catalog::TimeseriesWriteBatches batches;
-
-    for (const auto& measurement : measurements) {
-        auto result = uassertStatusOK(attemptInsertIntoBucket(
-            opCtx, bucketCatalog, bucketsColl.get(), timeSeriesOptions, measurement));
-        auto* insertResult = get_if<bucket_catalog::SuccessfulInsertion>(&result);
-        invariant(insertResult);
-        batches.emplace_back(std::move(insertResult->batch));
-    }
-
-    return batches;
-}
-
 void performAtomicWrites(
     OperationContext* opCtx,
     const CollectionPtr& coll,
@@ -386,9 +339,8 @@ void commitTimeseriesBucketsAtomically(
                 return;
             }
 
-            TimeseriesStmtIds emptyStmtIds = {};
-            write_ops_utils::makeWriteRequest(
-                opCtx, batch, metadata, emptyStmtIds, bucketsNs, &insertOps, &updateOps);
+            write_ops_utils::makeWriteRequestFromBatch(
+                opCtx, batch, metadata, bucketsNs, &insertOps, &updateOps);
 
             // Starts tracking the newly inserted bucket in the main bucket catalog as a direct
             // write to prevent other writers from modifying it.
