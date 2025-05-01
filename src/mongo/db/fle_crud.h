@@ -495,7 +495,8 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest,
                                             GetTxnCallback getTxns);
 
-void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
+void validateInsertUpdatePayloads(OperationContext* opCtx,
+                                  const std::vector<EncryptedField>& fields,
                                   const std::vector<EDCServerPayloadInfo>& payload);
 
 /**

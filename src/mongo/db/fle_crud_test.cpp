@@ -1459,7 +1459,7 @@ TEST_F(FleCrudTest, validateIndexKeyValid) {
 
     auto validInsert = makeInsertUpdatePayload(field.getPath(), field.getKeyId());
     auto validPayload = EDCServerCollection::getEncryptedFieldInfo(validInsert);
-    validateInsertUpdatePayloads(fields, validPayload);
+    validateInsertUpdatePayloads(_opCtx.get(), fields, validPayload);
 }
 
 TEST_F(FleCrudTest, validateIndexKeyInvalid) {
@@ -1470,7 +1470,7 @@ TEST_F(FleCrudTest, validateIndexKeyInvalid) {
 
     auto invalidInsert = makeInsertUpdatePayload(field.getPath(), UUID::gen());
     auto invalidPayload = EDCServerCollection::getEncryptedFieldInfo(invalidInsert);
-    ASSERT_THROWS_WITH_CHECK(validateInsertUpdatePayloads(fields, invalidPayload),
+    ASSERT_THROWS_WITH_CHECK(validateInsertUpdatePayloads(_opCtx.get(), fields, invalidPayload),
                              DBException,
                              [&](const DBException& ex) {
                                  ASSERT_STRING_CONTAINS(ex.what(),

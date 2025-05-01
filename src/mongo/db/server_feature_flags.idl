@@ -135,7 +135,6 @@ feature_flags:
         cpp_varname: gFeatureFlagQETextSearchPreview
         default: false
         shouldBeFCVGated: true
-        fcv_context_unaware: true
     featureFlagExposeClientIpInAuditLogs:
         description: "Expose client IP in audit logs for load-balanced connections"
         cpp_varname: gFeatureFlagExposeClientIpInAuditLogs
