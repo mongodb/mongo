@@ -64,10 +64,7 @@ const secondaryDb = secondary.getDB(db.getName());
 const primaryColl = getTimeseriesCollForRawOps(primaryDb, primaryDb[coll.getName()]);
 const secondaryColl = getTimeseriesCollForRawOps(secondaryDb, secondaryDb[coll.getName()]);
 
-// TODO (SERVER-103429): Remove the rawData from TimeseriesTest.bucketsMayHaveMixedSchemaData.
-assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(
-    primaryColl, getRawOperationSpec(primary.getDB(db.getName()))));
-assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(
-    secondaryColl, getRawOperationSpec(secondary.getDB(db.getName()))));
+assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(primaryColl));
+assert(TimeseriesTest.bucketsMayHaveMixedSchemaData(secondaryColl));
 
 replTest.stopSet();

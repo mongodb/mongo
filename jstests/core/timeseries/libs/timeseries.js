@@ -3,6 +3,7 @@
 import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {
     getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps,
     isShardedTimeseries,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -107,9 +108,10 @@ export var TimeseriesTest = class {
         }
     }
 
-    // TODO (SERVER-103429): Remove the aggregateOptions parameter.
-    static bucketsMayHaveMixedSchemaData(coll, aggregateOptions = {}) {
-        const catalog = coll.aggregate([{$listCatalog: {}}], aggregateOptions).toArray()[0];
+    static bucketsMayHaveMixedSchemaData(coll) {
+        const catalog = getTimeseriesCollForDDLOps(coll.getDB(), coll)
+                            .aggregate([{$listCatalog: {}}])
+                            .toArray()[0];
         const tsMixedSchemaOptionNewFormat = catalog.md.options.storageEngine &&
             catalog.md.options.storageEngine.wiredTiger &&
             catalog.md.options.storageEngine.wiredTiger.configString;

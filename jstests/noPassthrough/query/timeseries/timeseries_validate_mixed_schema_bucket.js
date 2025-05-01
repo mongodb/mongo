@@ -50,10 +50,7 @@ const bucket = {
 
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-// TODO (SERVER-103429): Remove the rawData from TimeseriesTest.bucketsMayHaveMixedSchemaData.
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(testDB, coll),
-                                                       getRawOperationSpec(testDB)),
-          true);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(coll), true);
 
 // There should be no reason to have validation errors in the empty collection.
 let res = assert.commandWorked(coll.validate());

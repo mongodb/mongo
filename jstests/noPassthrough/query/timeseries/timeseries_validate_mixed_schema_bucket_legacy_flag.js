@@ -10,6 +10,7 @@
  * as its value may be lost, direct manipulation of mixed-schema buckets is prevented, and
  * validation will flag the collection as needing manual intervention for SERVER-91194.
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
@@ -70,10 +71,8 @@ assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
 fpsimulateLegacyTimeseriesMixedSchemaFlag.off();
 
-// TODO (SERVER-103429): Remove the rawData from $listCatalog.
-const bucketsCatalogEntry = getTimeseriesCollForRawOps(testDB, coll)
-                                .aggregate([{$listCatalog: {}}], getRawOperationSpec(testDB))
-                                .toArray()[0];
+const bucketsCatalogEntry =
+    getTimeseriesCollForDDLOps(testDB, coll).aggregate([{$listCatalog: {}}]).toArray()[0];
 const wtConfigStr = bucketsCatalogEntry.md.options.storageEngine?.wiredTiger?.configString ?? '';
 assert.eq(true, bucketsCatalogEntry.md.timeseriesBucketsMayHaveMixedSchemaData);
 assert(!wtConfigStr.includes("timeseriesBucketsMayHaveMixedSchemaData"));

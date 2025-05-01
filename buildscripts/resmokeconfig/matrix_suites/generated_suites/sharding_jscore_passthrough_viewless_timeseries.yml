@@ -43,6 +43,7 @@ selector:
   roots:
     - jstests/core/timeseries/ddl/timeseries_compact.js
     - jstests/core/timeseries/ddl/timeseries_create_collection.js
+    - jstests/core/timeseries/ddl/timeseries_list_catalog.js
     - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
     - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
     - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js

@@ -2,7 +2,7 @@
  * Tests the returnOnStart option of the createIndexes command.
  */
 
-import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
@@ -93,10 +93,9 @@ const runTest = function(db, replSets, timeseries, setUp) {
     const _assertReady = function(indexName, expected) {
         for (const replSet of replSets) {
             const replSetDb = replSet.getPrimary().getDB(db.getName());
-            assert.eq((timeseries ? getTimeseriesCollForRawOps(replSetDb, replSetDb[coll.getName()])
+            assert.eq((timeseries ? getTimeseriesCollForDDLOps(replSetDb, replSetDb[coll.getName()])
                                   : replSetDb[coll.getName()])
-                          // TODO (SERVER-103429): Remove the rawData from $listCatalog.
-                          .aggregate([{$listCatalog: {}}], getRawOperationSpec(replSetDb))
+                          .aggregate([{$listCatalog: {}}])
                           .toArray()[0]
                           .md.indexes.find(index => index.spec.name === indexName)
                           .ready,
