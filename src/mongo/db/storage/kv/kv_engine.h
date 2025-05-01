@@ -577,5 +577,12 @@ public:
      * cleanShutdown() hasn't been called.
      */
     virtual ~KVEngine() {}
+
+    /**
+     * Returns whether the kv-engine is currently trying to live-restore its database.
+     */
+    virtual bool hasOngoingLiveRestore() {
+        return false;
+    }
 };
 }  // namespace mongo

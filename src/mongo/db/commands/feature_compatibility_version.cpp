@@ -332,6 +332,13 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
             !(newVersion > fromVersion &&
               (isCleaningServerMetadata.is_initialized() && *isCleaningServerMetadata)));
 
+    bool hasOngoingLiveRestore =
+        opCtx->getServiceContext()->getStorageEngine()->hasOngoingLiveRestore();
+    uassert(9901800,
+            "Cannot change featureCompatibilityVersion while the storage engine is performing a "
+            "live-restore. Retry when the restore process finishes.",
+            !hasOngoingLiveRestore);
+
     auto setFCVPhase = setFCVRequest.getPhase();
     if (!isFromConfigServer || !setFCVPhase) {
         return;

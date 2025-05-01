@@ -942,6 +942,11 @@ public:
     virtual size_t getCacheSizeMB() {
         return 0;
     }
+
+    /**
+     * Returns whether the storage engine is currently trying to live-restore its database.
+     */
+    virtual bool hasOngoingLiveRestore() = 0;
 };
 
 }  // namespace mongo

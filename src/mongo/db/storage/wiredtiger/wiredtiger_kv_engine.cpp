@@ -3071,6 +3071,13 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
     return status;
 }
 
+bool WiredTigerKVEngine::hasOngoingLiveRestore() {
+    auto session = getConnection().getUninterruptibleSession();
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:", "statistics=(fast)", WT_STAT_CONN_LIVE_RESTORE_STATE);
+    return uassertStatusOK(result) == WT_LIVE_RESTORE_IN_PROGRESS;
+}
+
 Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, const char* config) {
     int ret = session.drop(uri, config);
 

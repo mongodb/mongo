@@ -245,6 +245,10 @@ public:
     Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) final {
         return Status::OK();
     }
+
+    bool hasOngoingLiveRestore() final {
+        return false;
+    }
 };
 
 }  // namespace mongo

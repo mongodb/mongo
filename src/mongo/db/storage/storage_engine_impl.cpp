@@ -1371,4 +1371,8 @@ size_t StorageEngineImpl::getCacheSizeMB() {
     return _engine->getCacheSizeMB();
 }
 
+bool StorageEngineImpl::hasOngoingLiveRestore() {
+    return _engine->hasOngoingLiveRestore();
+}
+
 }  // namespace mongo
