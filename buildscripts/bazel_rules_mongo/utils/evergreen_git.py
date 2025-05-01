@@ -1,6 +1,6 @@
 import os
 from functools import cache
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import yaml
 from git import Remote, Repo
@@ -75,19 +75,15 @@ def get_new_files(expansions_file: str = None, branch: str = None) -> List[str]:
     return get_changed_files(expansions_file, branch, diff_filter="ARC")
 
 
-def get_changed_files(
-    expansions_file: str = None, branch: str = None, diff_filter: str = "d"
-) -> List[str]:
-    expansions = get_expansions(expansions_file)
+@cache
+def get_diff_revision(expansions_file: str = None, branch: str = None) -> str:
     in_ci = expansions_file is not None
-
-    diff_commit = None
-
     repo = Repo()
 
     if not in_ci:
         diff_commit = get_remote_branch_ref(repo, branch)
     else:
+        expansions = get_expansions(expansions_file)
         if expansions.get("is_patch", None):
             # patches from the cli have the changes uncommited, we need to add them to git for git diff to work
             # we add the files in github patches as well to make it fail consistently if new files
@@ -98,8 +94,29 @@ def get_changed_files(
             # in waterfall runs we just want to compare to the previous commit
             diff_commit = repo.git.execute(["git", "rev-parse", "HEAD^1"])
 
+    assert diff_commit, "ERROR: not able to obtain diff commit"
+    return diff_commit
+
+
+def get_changed_files(
+    expansions_file: str = None, branch: str = None, diff_filter: str = "d"
+) -> List[str]:
+    diff_commit = get_diff_revision(expansions_file, branch)
+    repo = Repo()
+
     output = repo.git.execute(
         ["git", "diff", "--name-only", f"--diff-filter={diff_filter}", diff_commit]
     )
     files = output.split("\n")
     return [file for file in files if file]
+
+
+def get_file_at_revision(file: str, revision: str) -> Optional[str]:
+    repo = Repo()
+    try:
+        return repo.git.execute(["git", "show", f"{revision}:{file}"])
+    except Exception as ex:
+        # If the file did not exist in the previous revision return None
+        if f"path '{file}' does not exist in '{revision}'" in str(ex):
+            return None
+        raise ex

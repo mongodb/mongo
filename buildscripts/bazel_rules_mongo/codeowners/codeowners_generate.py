@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 from functools import cache, lru_cache
+from typing import Set
 
 import yaml
 from codeowners.validate_codeowners import run_validator
@@ -209,22 +210,20 @@ def validate_generated_codeowners(validator_path: str) -> int:
         return 1
 
 
-def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: str) -> int:
-    new_files = evergreen_git.get_new_files(expansions_file, branch)
-    if not new_files:
-        print("No new files were detected.")
-        return 0
-    print(f"The following new files were detected: {new_files}")
+@cache
+def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) -> Set[str]:
     temp_output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
     temp_output_file.close()
+    codeowners_file_arg = ""
+    if codeowners_file:
+        codeowners_file_arg = f"--file {codeowners_file}"
     # This file can be bigger than the allowed subprocess buffer so we redirect output into a file
-    command = f"{codeowners_binary_path} --unowned > {temp_output_file.name}"
+    command = f"{codeowners_binary_path} --unowned {codeowners_file_arg} > {temp_output_file.name}"
     process = subprocess.run(command, shell=True, stderr=subprocess.PIPE, text=True)
 
     if process.returncode != 0:
         print(process.stderr)
-        print("Error while trying to find unowned files")
-        return process.returncode
+        raise RuntimeError("Error while trying to find unowned files")
 
     unowned_files = set()
     with open(temp_output_file.name, "r") as file:
@@ -235,20 +234,64 @@ def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: s
             file_name = parts[0].strip()
             unowned_files.add(file_name)
 
+    return unowned_files
+
+
+def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: str) -> int:
+    new_files = evergreen_git.get_new_files(expansions_file, branch)
+    if not new_files:
+        print("No new files were detected.")
+        return 0
+    print(f"The following new files were detected: {new_files}")
+
+    unowned_files = get_unowned_files(codeowners_binary_path)
+
     unowned_new_files = []
     for file in new_files:
         if file in unowned_files:
             unowned_new_files.append(file)
 
     if unowned_new_files:
-        print("The following new files are unowned:")
+        print("The following new files are unowned:", file=sys.stderr)
         for file in unowned_new_files:
-            print(f"- {file}")
-        print("New files are required to have code owners. See http://go/codeowners-ug")
+            print(f"- {file}", file=sys.stderr)
+        print(
+            "New files are required to have code owners. See http://go/codeowners-ug",
+            file=sys.stderr,
+        )
         return 1
 
     print("There are no new files added that are unowned.")
     return 0
+
+
+def check_orphaned_files(
+    codeowners_binary_path: str, expansions_file: str, branch: str, codeowners_file: str
+) -> int:
+    # This compares the new codeowners file with the old codeowners file on the same working tree
+    # This tells us which coverage is lost between codeowners file changes
+    current_unowned_files = get_unowned_files(codeowners_binary_path)
+    base_revision = evergreen_git.get_diff_revision(expansions_file, branch)
+    previous_codeowners_file_contents = evergreen_git.get_file_at_revision(
+        codeowners_file, base_revision
+    )
+    if previous_codeowners_file_contents is None:
+        return 0
+    temp_codeowners_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt")
+    temp_codeowners_file.write(previous_codeowners_file_contents)
+    temp_codeowners_file.close()
+    old_unowned_files = get_unowned_files(codeowners_binary_path, temp_codeowners_file.name)
+
+    unowned_files_difference = current_unowned_files - old_unowned_files
+    if not unowned_files_difference:
+        print("No files have lost ownership with these changes.")
+        return 0
+
+    print("The following files lost ownership with CODEOWNERS changes:", file=sys.stderr)
+    for file in unowned_files_difference:
+        print(f"- {file}", file=sys.stderr)
+
+    return 1
 
 
 def post_generation_checks(
@@ -258,12 +301,16 @@ def post_generation_checks(
     should_check_new_files: bool,
     expansions_file: str,
     branch: str,
+    codeowners_file_path: str,
 ) -> int:
     status = 0
     if should_run_validation:
         status |= validate_generated_codeowners(validator_path)
     if should_check_new_files:
         status |= check_new_files(codeowners_binary_path, expansions_file, branch)
+        status |= check_orphaned_files(
+            codeowners_binary_path, expansions_file, branch, codeowners_file_path
+        )
 
     return status
 
@@ -384,6 +431,7 @@ def main():
             args.check_new_files,
             args.expansions_file,
             args.branch,
+            output_file,
         )
 
     with open(output_file, "w") as file:
@@ -398,6 +446,7 @@ def main():
         args.check_new_files,
         args.expansions_file,
         args.branch,
+        output_file,
     )
 
 

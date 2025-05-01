@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 
@@ -18,6 +19,9 @@ def write_file(repo: Repo, file_name: str) -> None:
         file.write("change\n")
 
 
+@unittest.skipIf(
+    sys.platform == "win32", reason="This test breaks on windows and only needs to work on linux"
+)
 class TestChangedFiles(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -27,7 +31,7 @@ class TestChangedFiles(unittest.TestCase):
         # commit of HEAD
         commit = root_repo.head.commit.hexsha
 
-        files_to_copy = []
+        files_to_copy = set()
 
         # copy the current repo into a temp dir to do testing on
         root_repo.git.execute(["git", "worktree", "add", cls.tmp_dir, commit])
@@ -36,14 +40,14 @@ class TestChangedFiles(unittest.TestCase):
         diff_output = root_repo.git.execute(
             ["git", "diff", "--name-only", "--diff-filter=d", commit]
         )
-        files_to_copy.extend(diff_output.split("\n"))
+        files_to_copy.update(diff_output.split("\n"))
 
         # gets all the untracked changes in the current repo
         untracked_changes = root_repo.git.execute(["git", "add", ".", "-n"])
         for line in untracked_changes.split("\n"):
             if not line:
                 continue
-            files_to_copy.append(line.strip()[5:-1])
+            files_to_copy.add(line.strip()[5:-1])
 
         # copy all changed files from the current repo to the new worktree for testing.
         for file in files_to_copy:
@@ -52,6 +56,11 @@ class TestChangedFiles(unittest.TestCase):
 
             if not os.path.exists(file):
                 raise RuntimeError(f"Changed file was found and does not exist: {file}")
+
+            # This means the file is an embeded git repo, this happens when other evergreen modules
+            # are present, we can just ignore them
+            if os.path.isdir(file):
+                continue
 
             new_dest = os.path.join(cls.tmp_dir, file)
             os.makedirs(os.path.dirname(new_dest), exist_ok=True)
@@ -65,12 +74,13 @@ class TestChangedFiles(unittest.TestCase):
         cls.repo.git.execute(["git", "commit", "-m", "Commit changed files"])
         # this new commit is out base revision to compare changes against
         cls.base_revision = cls.repo.head.commit.hexsha
+        cls.original_dir = os.path.abspath(os.curdir)
         os.chdir(cls.tmp_dir)
 
     @classmethod
     def tearDownClass(cls):
+        os.chdir(cls.original_dir)
         shutil.rmtree(cls.tmp_dir)
-        pass
 
     def setUp(self):
         # change the file already commited to the repo
@@ -78,10 +88,14 @@ class TestChangedFiles(unittest.TestCase):
         # make a new file that has not been commited yet
         write_file(self.repo, new_file_name)
 
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as tmp:
+            tmp.write("fake_expansion: true\n")
+            self.expansions_file = tmp.name
+
     def tearDown(self):
         # reset to the original state between tests
         self.repo.git.execute(["git", "reset", "--hard", self.base_revision])
-        pass
+        os.unlink(self.expansions_file)
 
     def test_local_unchanged_files(self):
         evergreen_git.get_remote_branch_ref = MagicMock(return_value=self.base_revision)
@@ -117,40 +131,36 @@ class TestChangedFiles(unittest.TestCase):
     def test_evergreen_patch(self):
         # the files in evergreen patches just live untracked normally so we don't have to do
         # anything to the git state
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp:
+        with open(self.expansions_file, "a") as tmp:
             tmp.write("is_patch: true\n")
             tmp.write(f"revision: {self.base_revision}\n")
-            tmp.flush()
-            new_files = evergreen_git.get_new_files(expansions_file=tmp.name)
-            self.assertEqual(
-                new_files, [new_file_name], msg="New file list did not contain the new file."
-            )
+        new_files = evergreen_git.get_new_files(expansions_file=self.expansions_file)
+        self.assertEqual(
+            new_files, [new_file_name], msg="New file list did not contain the new file."
+        )
 
-            changed_files = evergreen_git.get_changed_files(expansions_file=tmp.name)
-            self.assertEqual(
-                changed_files,
-                [changed_file_name, new_file_name],
-                msg="Changed file list was not as expected.",
-            )
+        changed_files = evergreen_git.get_changed_files(expansions_file=self.expansions_file)
+        self.assertEqual(
+            changed_files,
+            [changed_file_name, new_file_name],
+            msg="Changed file list was not as expected.",
+        )
 
     def test_evergreen_waterfall(self):
         # Evergreen waterfall runs just check against the last commit so we need to commit the changes
         self.repo.git.execute(["git", "add", "."])
         self.repo.git.execute(["git", "commit", "-m", "Fake waterfall changes"])
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as tmp:
-            tmp.write("fake_expansion: true")
-            tmp.flush()
-            new_files = evergreen_git.get_new_files(expansions_file=tmp.name)
-            self.assertEqual(
-                new_files, [new_file_name], msg="New file list did not contain the new file."
-            )
+        new_files = evergreen_git.get_new_files(expansions_file=self.expansions_file)
+        self.assertEqual(
+            new_files, [new_file_name], msg="New file list did not contain the new file."
+        )
 
-            changed_files = evergreen_git.get_changed_files(expansions_file=tmp.name)
-            self.assertEqual(
-                changed_files,
-                [changed_file_name, new_file_name],
-                msg="Changed file list was not as expected.",
-            )
+        changed_files = evergreen_git.get_changed_files(expansions_file=self.expansions_file)
+        self.assertEqual(
+            changed_files,
+            [changed_file_name, new_file_name],
+            msg="Changed file list was not as expected.",
+        )
 
     def test_remote_picker(self):
         remote = evergreen_git.get_mongodb_remote(self.repo)
