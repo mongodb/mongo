@@ -36,6 +36,7 @@ mongo_windows_cc_toolchain_config(
         "strip": "wrapper/bin/msvc_nop.bat",
     },
     toolchain_identifier = "msvc_x64",
+    supports_parse_showincludes = True,
 )
 
 cc_toolchain(
