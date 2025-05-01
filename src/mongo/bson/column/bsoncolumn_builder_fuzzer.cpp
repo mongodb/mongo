@@ -55,15 +55,26 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // Generate elements from input data
     const char* ptr = Data;
     const char* end = Data + Size;
+    size_t numElements = 0;
     while (ptr < end) {
         BSONElement element;
         int repetition;
         if (!mongo::bsoncolumn::createFuzzedElement(ptr, end, elementMemory, repetition, element))
             return 0;  // Bad input string to element generation
+        if (numElements + repetition > 3 << 20) {
+            // Due to rle generation, we can conceivably produce runs of up to ~490k
+            // elements at a time, a modest-sized fuzzer input is thus capable of overflowing
+            // the 5000Mb libFuzzer memory limit.
+            // Limiting the total elements to about 3 million is enough to exceed the maximum
+            // BSONObj size given (non-null) elements which are at least 6 bytes in size, but
+            // low enough to avoid going OOM in the fuzzer.
+            return 0;
+        }
         if (!bsoncolumn::addFuzzedElements(
                 ptr, end, elementMemory, element, repetition, generatedElements)) {
             return 0;  // Bad input string to run generation
         }
+        numElements += repetition;
     }
 
     // Exercise the builder
