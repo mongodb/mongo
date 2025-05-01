@@ -433,7 +433,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         // and if none is found, will then check for the view using the expCtx. As such, it's
         // necessary to add the resolved namespace to the expCtx prior to any call to
         // Pipeline::parse().
-        search_helpers::checkAndAddResolvedNamespaceForSearch(
+        search_helpers::checkAndSetViewOnExpCtx(
             expCtx, request.getPipeline(), *resolvedView, nsStruct.requestedNss);
     }
 

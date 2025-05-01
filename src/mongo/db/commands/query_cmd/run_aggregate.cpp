@@ -153,33 +153,6 @@ Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
 
-std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
-    const AggExState& aggExState,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    boost::optional<UUID> uuid) {
-    if (aggExState.getResolvedView()->timeseries()) {
-        // For timeseries, there may have been rewrites done on the raw BSON pipeline
-        // during view resolution. We must parse the request's full resolved pipeline
-        // which will account for those rewrites.
-        // TODO SERVER-82101 Re-organize timeseries rewrites so timeseries can follow the
-        // same pattern here as other views
-        return Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
-    } else if (search_helpers::isMongotPipeline(pipeline.get()) &&
-               expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
-        // For search queries on views don't do any of the pipeline stitching that is done for
-        // normal views.
-        return pipeline;
-    }
-
-    // Parse the view pipeline, then stitch the user pipeline and view pipeline together
-    // to build the total aggregation pipeline.
-    auto userPipeline = std::move(pipeline);
-    pipeline = Pipeline::parse(aggExState.getResolvedView()->getPipeline(), expCtx);
-    pipeline->appendPipeline(std::move(userPipeline));
-    return pipeline;
-}
-
 bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
                                        rpc::ReplyBuilderInterface* result) {
     // The isRetryableWrite() check here is to check that the client executed write was
@@ -806,69 +779,46 @@ void executeExplain(const AggExState& aggExState,
  */
 Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result);
 
-// TODO SERVER-93539 take a ResolvedViewAggExState instead of a AggExState that gets set as a view.
 /**
  * Resolve the view by finding the underlying collection and stitching the view pipelines and this
  * request's pipeline together. We then release our locks before recursively calling runAggregate(),
  * which will re-acquire locks on the underlying collection. (The lock must be released because
  * recursively acquiring locks on the database will prohibit yielding.)
  */
-Status runAggregateOnView(AggExState& aggExState,
+Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
                           std::unique_ptr<AggCatalogState> aggCatalogState,
                           rpc::ReplyBuilderInterface* result) {
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
-            !aggExState.getRequest().getIsMapReduceCommand());
+            !resolvedViewAggExState.getRequest().getIsMapReduceCommand());
 
-    // TODO SERVER-101661 Enable $rankFusion run on views.
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            "$rankFusion is currently unsupported on views",
-            !aggExState.isRankFusionStage());
-
-    // Resolve the request's collation and check that the default collation of 'view' is compatible
-    // with the operation's collation. The collation resolution and check are both skipped if the
-    // request did not specify a collation.
-    tassert(10240800, "Expected a view", aggCatalogState->getMainCollectionOrView().isView());
-    const auto& view = aggCatalogState->getMainCollectionOrView().getView();
-    const auto& viewDefinition = view.getViewDefinition();
-
-    if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
-        auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
-        if (!CollatorInterface::collatorsMatch(viewDefinition.defaultCollator(),
-                                               collatorToUse.get()) &&
-            !viewDefinition.timeseries()) {
-            return {ErrorCodes::OptionNotSupportedOnView,
-                    "Cannot override a view's default collation"};
-        }
-    }
-
-    aggExState.setView(aggCatalogState, viewDefinition);
     // Resolved view will be available after view has been set on AggregationExecutionState
-    auto resolvedView = aggExState.getResolvedView().value();
+    auto resolvedView = resolvedViewAggExState.getResolvedView();
 
     // With the view & collation resolved, we can relinquish locks.
     aggCatalogState->relinquishResources();
 
     auto status{Status::OK()};
-    if (!OperationShardingState::get(aggExState.getOpCtx())
-             .shouldBeTreatedAsFromRouter(aggExState.getOpCtx())) {
+    if (!OperationShardingState::get(resolvedViewAggExState.getOpCtx())
+             .shouldBeTreatedAsFromRouter(resolvedViewAggExState.getOpCtx())) {
         // Non sharding-aware operation.
         // Run the translated query on the view on this node.
-        status = _runAggregate(aggExState, result);
+        status = _runAggregate(resolvedViewAggExState, result);
     } else {
         // Sharding-aware operation.
 
         // Stash the shard role for the resolved view nss, in case it was set, as we are about to
         // transition into the router role for it.
-        const ScopedStashShardRole scopedUnsetShardRole{aggExState.getOpCtx(),
+        const ScopedStashShardRole scopedUnsetShardRole{resolvedViewAggExState.getOpCtx(),
                                                         resolvedView.getNamespace()};
 
-        sharding::router::CollectionRouter router(aggExState.getOpCtx()->getServiceContext(),
-                                                  resolvedView.getNamespace(),
-                                                  false  // retryOnStaleShard=false
+        sharding::router::CollectionRouter router(
+            resolvedViewAggExState.getOpCtx()->getServiceContext(),
+            resolvedView.getNamespace(),
+            false  // retryOnStaleShard=false
         );
         status = router.route(
-            aggExState.getOpCtx(),
+            resolvedViewAggExState.getOpCtx(),
             "runAggregateOnView",
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                 // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
@@ -877,12 +827,12 @@ Status runAggregateOnView(AggExState& aggExState,
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
                 // request, if present.
-                const auto scopedShardRole = aggExState.setShardRole(cri);
+                const auto scopedShardRole = resolvedViewAggExState.setShardRole(cri);
 
                 // If the underlying collection is unsharded and is located on this shard, then we
                 // can execute the view aggregation locally. Otherwise, we need to kick-back to the
                 // router.
-                if (!aggExState.canReadUnderlyingCollectionLocally(cri)) {
+                if (!resolvedViewAggExState.canReadUnderlyingCollectionLocally(cri)) {
                     // Cannot execute the resolved aggregation locally. The router must do it.
                     //
                     // Before throwing the kick-back exception, validate the routing table
@@ -902,15 +852,16 @@ Status runAggregateOnView(AggExState& aggExState,
                 }
 
                 // Run the resolved aggregation locally.
-                return _runAggregate(aggExState, result);
+                return _runAggregate(resolvedViewAggExState, result);
             });
     }
 
     {
         // Set the namespace of the curop back to the view namespace so ctx records
         // stats on this view namespace on destruction.
-        stdx::lock_guard<Client> lk(*aggExState.getOpCtx()->getClient());
-        CurOp::get(aggExState.getOpCtx())->setNS(lk, aggExState.getOriginalNss());
+        stdx::lock_guard<Client> lk(*resolvedViewAggExState.getOpCtx()->getClient());
+        CurOp::get(resolvedViewAggExState.getOpCtx())
+            ->setNS(lk, resolvedViewAggExState.getOriginalNss());
     }
 
     return status;
@@ -925,12 +876,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Pipeline::parse() will first check if a view exists directly on the stage specification and
     // if none is found, will then check for the view using the expCtx. As such, it's necessary to
     // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
-    if (aggExState.getResolvedView()) {
-        search_helpers::checkAndAddResolvedNamespaceForSearch(
-            expCtx,
-            aggExState.getOriginalRequest().getPipeline(),
-            *aggExState.getResolvedView(),
-            aggExState.getOriginalNss());
+    if (aggExState.isView()) {
+        search_helpers::checkAndSetViewOnExpCtx(expCtx,
+                                                aggExState.getOriginalRequest().getPipeline(),
+                                                aggExState.getResolvedView(),
+                                                aggExState.getOriginalNss());
     }
 
     // If we're operating over a view, we first parse just the original user-given request
@@ -991,10 +941,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         }
     }
 
-    if (aggExState.getResolvedView().has_value()) {
+    if (aggExState.isView()) {
         expCtx->startExpressionCounters();
+        // Knowing that the aggregation is a view, overwrite the pipeline.
         pipeline =
-            handleViewHelper(aggExState, expCtx, std::move(pipeline), aggCatalogState.getUUID());
+            aggExState.handleViewHelper(expCtx, std::move(pipeline), aggCatalogState.getUUID());
         expCtx->stopExpressionCounters();
     }
 
@@ -1159,19 +1110,35 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         // the view is abstracted out for the users, so we needed to resolve the namespace to
         // get the underlying bucket collection.
         const auto& view = aggCatalogState->getMainCollectionOrView().getView();
+
         bool shouldViewBeExpanded =
             !aggExState.startsWithCollStats() || view.getViewDefinition().timeseries();
         if (shouldViewBeExpanded) {
-            return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
+            // TODO SERVER-101661 Enable $rankFusion run on views.
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    "$rankFusion is currently unsupported on views",
+                    !aggExState.isRankFusionStage());
+
+            // "Convert" aggExState into resolvedViewAggExState. Note that this will make the
+            // initial aggExState object unusable.
+            auto resolvedViewAggExState =
+                ResolvedViewAggExState::create(std::move(aggExState), aggCatalogState);
+            if (!resolvedViewAggExState.isOK()) {
+                return resolvedViewAggExState.getStatus();
+            }
+
+            return runAggregateOnView(
+                *resolvedViewAggExState.getValue(), std::move(aggCatalogState), result);
         }
     }
+
 
     rewritePipelineIfTimeseries(aggExState, *aggCatalogState);
 
     boost::intrusive_ptr<ExpressionContext> expCtx = aggCatalogState->createExpressionContext();
 
-    // Create an RAII object that prints useful information about the ExpressionContext in the case
-    // of a tassert or crash.
+    // Create an RAII object that prints useful information about the ExpressionContext in the
+    // case of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
                                       diagnostic_printers::ExpressionContextPrinter{expCtx});
 
