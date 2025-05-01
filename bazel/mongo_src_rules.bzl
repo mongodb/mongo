@@ -419,8 +419,6 @@ def mongo_cc_library(
         hdrs = hdrs + ["//src/mongo:mongo_config_header"]
         if name != "boost_assert_shim" and name != "mongoca" and name != "cyrus_sasl_windows_test_plugin":
             deps += MONGO_GLOBAL_SRC_DEPS
-            if name != "_global_header_bypass":
-                deps += ["//src/mongo:_global_header_bypass"]
         features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
@@ -701,7 +699,6 @@ def _mongo_cc_binary_and_test(
     if native.package_name().startswith("src/mongo"):
         srcs = srcs + ["//src/mongo:mongo_config_header"]
         deps += MONGO_GLOBAL_SRC_DEPS
-        deps += ["//src/mongo:_global_header_bypass"]
         features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():

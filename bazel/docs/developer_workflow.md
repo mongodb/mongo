@@ -111,6 +111,6 @@ Follow this loop to figure out where the header needs to be added
 
 ### The header I want to add is referenced in dozens or more locations, and adding it to the proper location requires a large refactor that is blocking critical work, what should I do?
 
-If you've put in a significant amount of work to try to get a header added and have found to get it added to the right place (usually alongside the associated .cpp file, having all dependents add that library as a dep) will take a significant refactor, create a SERVER ticket explaining the problem, solution, and complexity required to resolve it. Then, open up src/mongo/BUILD.bazel and add the header to "\_global_header_bypass" referencing your ticket in a TODO comment.
+If you've put in a significant amount of work to try to get a header added and have found to get it added to the right place (usually alongside the associated .cpp file, having all dependents add that library as a dep) will take a significant refactor, create a SERVER ticket explaining the problem, solution, and complexity required to resolve it. Then, open up src/mongo/BUILD.bazel and add the header to "core_headers" file group referencing your ticket in a TODO comment.
 
 This is very much a last resort and should only be done if the refactor will take a very significant amount of time and is blocking other work.
