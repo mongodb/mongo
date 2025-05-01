@@ -2,10 +2,11 @@
  * Utility functions for explain() results of search + non-search queries run on a view.
  */
 
-import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {
-    checkSbeRestrictedOrFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+    getAggPlanStages,
+    getLookupStage,
+    getUnionWithStage
+} from "jstests/libs/query/analyze_plan.js";
 import {
     prepareUnionWithExplain,
     validateMongotStageExplainExecutionStats,
@@ -13,22 +14,23 @@ import {
 } from "jstests/with_mongot/common_utils.js";
 
 function assertIdLookupContainsViewPipeline(explain, viewPipeline) {
-    let stages = getAggPlanStages(explain, "$_internalSearchIdLookup");
+    const stages = getAggPlanStages(explain, "$_internalSearchIdLookup");
     assert(
         stages.length > 0,
         "There should be at least one stage corresponding to $_internalSearchIdLookup in the explain output. " +
             tojson(explain));
 
     for (let stage of stages) {
-        let idLookupFullSubPipe = stage["$_internalSearchIdLookup"]["subPipeline"];
+        const idLookupFullSubPipe = stage["$_internalSearchIdLookup"]["subPipeline"];
         // The _idLookup subPipeline should be a $match on _id followed by the view stages.
-        let idLookupStage = {"$match": {"_id": {"$eq": "_id placeholder"}}};
+        const idLookupStage = {"$match": {"_id": {"$eq": "_id placeholder"}}};
         assert.eq(idLookupFullSubPipe[0], idLookupStage);
         // Make sure that idLookup subpipeline contains all of the view stages.
-        let idLookupViewStages = idLookupFullSubPipe.slice(-(idLookupFullSubPipe.length - 1));
+        const idLookupViewStages =
+            idLookupFullSubPipe.length > 1 ? idLookupFullSubPipe.slice(1) : [];
         assert.eq(idLookupViewStages.length, viewPipeline.length);
         for (let i = 0; i < idLookupViewStages.length; i++) {
-            let stageName = Object.keys(viewPipeline[i])[0];
+            const stageName = Object.keys(viewPipeline[i])[0];
             assert(idLookupViewStages[i].hasOwnProperty(stageName));
         }
     }
@@ -50,8 +52,9 @@ export function assertToplevelAggContainsView(explainStages, viewPipeline) {
  * @param {Object} viewPipeline The pipeline used to define the view.
  */
 function assertViewAppliedCorrectlyInExplainStages(explainOutput, userPipeline, viewPipeline) {
-    if (userPipeline[0].hasOwnProperty("$search") ||
-        userPipeline[0].hasOwnProperty("$vectorSearch")) {
+    if (userPipeline.length > 0 &&
+        (userPipeline[0].hasOwnProperty("$search") ||
+         userPipeline[0].hasOwnProperty("$vectorSearch"))) {
         // The view pipeline is pushed down to a desugared stage, $_internalSearchdLookup. Therefore
         // we inspect the stages (which represent the fully desugared pipeline from the user) to
         // ensure the view was successfully pushed down.
@@ -137,21 +140,104 @@ export function extractUnionWithSubPipelineExplainOutput(explainStages) {
  * asserts that the $unionWith $search subpipeline contains the innerView pipeline in its idLookup.
  */
 export function assertUnionWithSearchPipelinesApplyViews(
-    explain, outerViewPipeline, innerViewName, innerViewPipeline) {
+    explain, outerViewPipeline, innerCollName, innerViewName, innerViewPipeline) {
     // This will assert that the top-level search has the view correctly pushed down to idLookup.
     assertIdLookupContainsViewPipeline(explain, outerViewPipeline);
 
     // Make sure the $unionWith.search subpipeline has the view correctly pushed down to idLookup.
-    let unionWithStage = getUnionWithStage(explain);
-    let unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
+    assertUnionWithSearchSubPipelineAppliedViews(
+        explain, innerCollName, innerViewName, innerViewPipeline);
+}
 
-    // In sharded environments, check for the correct viewNss.
+/**
+ * This function is used to assert that the view definition from the search stage *inside* of
+ * the $unionWith is applied as intended to $_internalSearchIdLookup.
+ *
+ * @param {*} explain The explain output from the whole aggregation.
+ * @param {*} viewPipeline The view pipeline referenced by the search query inside of the
+ *     $unionWith.
+ */
+export function assertUnionWithSearchSubPipelineAppliedViews(
+    explain, collNss, viewNss, viewPipeline) {
+    const unionWithStage = getUnionWithStage(explain);
+    const unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
+
+    // In fully-sharded environments, check for the correct viewNss on the view object and
+    // $unionWith stage. For single node and single shard environments, there is no view object that
+    // will exist on the $unionWith explain output. We can still assert that the $unionWith.coll is
+    // "resolved" to its collNss. Note that the viewNss is not resolved to its collNss in
+    // full-sharded environments, and this is intended behavior.
     if (unionWithExplain.hasOwnProperty("splitPipeline") &&
         unionWithExplain["splitPipeline"] !== null) {
-        assert.eq(unionWithExplain.splitPipeline.shardsPart[0].$search.view.nss, innerViewName);
+        assert.eq(unionWithExplain.splitPipeline.shardsPart[0].$search.view.nss, viewNss);
+        assert.eq(unionWithStage.$unionWith.coll, viewNss.getName());
+    } else {
+        assert.eq(unionWithStage.$unionWith.coll, collNss.getName());
     }
 
-    assertIdLookupContainsViewPipeline(unionWithExplain, innerViewPipeline);
+    assertIdLookupContainsViewPipeline(unionWithExplain, viewPipeline);
+}
+
+/**
+ * This function is used to assert that the $lookup stage exists as expected in the explain output.
+ * Note that $lookup doesn't apply the view definition in explain like $unionWith does.
+ *
+ * @param {*} explain The explain output from the whole aggregation.
+ * @param {*} lookupStage The lookup stage to be searched for in the explain output.
+ */
+export function assertLookupInExplain(explain, lookupStage) {
+    // Find the lookup stage in the explain output and assert that it matches the lookup passed
+    // to the function.
+    const stage = getLookupStage(explain);
+    assert(stage, "There should be one $lookup stage in the explain output. " + tojson(explain));
+
+    // The explain might add extra stages to the $lookup in its output which is why we can't
+    // simply assert that the two BSON objects match each other.
+    Object.keys(lookupStage["$lookup"]).forEach((lookupKey) => {
+        assert(stage["$lookup"].hasOwnProperty(lookupKey),
+               "There should be a key \"" + lookupKey +
+                   "\" in the lookup stage from the explain output." + tojson(stage));
+
+        // On the "pipeline" key, simply make sure that the two pipelines have the same length.
+        // There are some optimizations in various environment configurations that will make the
+        // actual content of the pipeline different, but the length should stay the same.
+        if (lookupKey == "pipeline") {
+            assert.eq(stage["$lookup"][lookupKey].length,
+                      lookupStage["$lookup"][lookupKey].length,
+                      "The $lookup stage in the explain output should have the same number of " +
+                          "stages as the lookup stage passed to the function." + tojson(stage));
+        }
+    });
+}
+
+/**
+ * This function assumes that the user ran a search stage inside of a $lookup pipeline and the
+ * $lookup is ran on a view. Given the explain output from such an aggregation, we must make sure
+ * that the view is applied before the $lookup and that the $lookup contains the search stage
+ * specified.
+ */
+export function assertLookupWithSearchPipelineAppliedViews(
+    explain, lookupStage, viewPipeline, isSbeEnabled = false) {
+    // $lookup does not include explain info about its subpipeline, so when there is a search
+    // stage inside of the lookup's pipeline we don't expect to see the desugared stages in the
+    // explain output.
+    if (isSbeEnabled) {
+        assertViewAppliedCorrectly(explain.command.pipeline, lookupStage, viewPipeline);
+    } else {
+        // Make sure that the view definition is applied before $lookup. The stages array always
+        // begins with $cursor so we must shift the array before asserting the view.
+        if (explain.hasOwnProperty("shards")) {
+            Object.keys(explain.shards).forEach((shardKey) => {
+                explain.shards[shardKey].stages.shift();
+                assertToplevelAggContainsView(explain.shards[shardKey].stages, viewPipeline);
+            });
+        } else {
+            explain.stages.shift();
+            assertToplevelAggContainsView(explain.stages, viewPipeline);
+        }
+    }
+
+    assertLookupInExplain(explain, lookupStage);
 }
 
 /**
@@ -213,8 +299,8 @@ export function verifyE2ESearchMetaExplainOutput(
     if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {
         // We check metadata and protocol version for sharded $search.
         verifyShardsPartExplainOutput({result: explainOutput, searchType: "$searchMeta"});
-        // In the sharded scenario, $searchMeta returns one document per facet bucket + count, as it
-        // needs to be merged in the merging pipeline.
+        // In the sharded scenario, $searchMeta returns one document per facet bucket + count,
+        // as it needs to be merged in the merging pipeline.
         nReturned = numFacetBucketsAndCount;
     }
     let stages = getAggPlanStages(explainOutput, "$searchMeta");
@@ -260,9 +346,9 @@ export function generateRandomVectorEmbedding(n) {
  */
 export function verifyE2EVectorSearchExplainOutput({explainOutput, stageType, limit, verbosity}) {
     let stages = getAggPlanStages(explainOutput, stageType);
-    // For $vectorSearch, the limit in the query is applied per shard. This means that nReturned for
-    // each shard should match the limit. We don't need to differentiate between the sharded and
-    // unsharded scenario.
+    // For $vectorSearch, the limit in the query is applied per shard. This means that nReturned
+    // for each shard should match the limit. We don't need to differentiate between the sharded
+    // and unsharded scenario.
     for (let stage of stages) {
         validateMongotStageExplainExecutionStats({
             stage: stage,

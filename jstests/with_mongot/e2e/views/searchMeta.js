@@ -5,8 +5,11 @@
  * (which performs view transforms for other mongot operators).
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {
+    assertLookupInExplain,
+    assertViewNotApplied
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.hotelAccounting;
@@ -20,10 +23,10 @@ assert.commandWorked(coll.insertMany([
     {_id: 4, room: "twin room", roomFee: 309, cleaningFee: 66},        // 375
 ]));
 
-let viewName = "totalPrice";
-let viewPipeline = [{"$addFields": {totalPrice: {$add: ['$cleaningFee', "$roomFee"]}}}];
+const viewName = "totalPrice";
+const viewPipeline = [{"$addFields": {totalPrice: {$add: ['$cleaningFee', "$roomFee"]}}}];
 assert.commandWorked(testDb.createView(viewName, 'hotelAccounting', viewPipeline));
-let totalPriceView = testDb[viewName];
+const totalPriceView = testDb[viewName];
 
 createSearchIndex(totalPriceView, {
     name: "totalPriceIndex",
@@ -43,24 +46,8 @@ const facetQuery = [{
 }];
 
 // Verify that the explain output doesn't contain the view pipeline.
-let explain = totalPriceView.explain().aggregate(facetQuery);
-if (FixtureHelpers.isMongos(db)) {
-    for (const [_, shardExplain] of Object.entries(explain.shards)) {
-        assert(Object.keys(shardExplain.stages[0])[0], "$searchMeta");
-
-        if (FixtureHelpers.isSharded(coll)) {
-            // Sharded clusters require a $project stage for guaranteeing only the metadata, and not
-            // actual documents, are returned to mongos.
-            assert.eq(shardExplain.stages.length, 2);
-            assert(Object.keys(shardExplain.stages[0])[0], "$project");
-        } else {
-            assert.eq(shardExplain.stages.length, 1);
-        }
-    }
-} else {
-    assert(explain.stages.length == 1);
-    assert(Object.keys(explain.stages[0])[0], "$searchMeta");
-}
+let explain = assert.commandWorked(totalPriceView.explain().aggregate(facetQuery));
+assertViewNotApplied(explain, viewPipeline);
 
 let expectedResults = [{
     count: {lowerBound: NumberLong(5)},
@@ -85,35 +72,15 @@ assert.commandWorked(collBase.insert({_id: 0}));
 assert.commandWorked(collBase.insert({_id: 1}));
 
 /**
- * $lookup doesn't include any details about its subpipeline in the explain output. Therefore
- there
+ * $lookup doesn't include any details about its subpipeline in the explain output. Therefore there
  * isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
  * output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
  */
-explain = collBase.explain().aggregate(
-    [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}]);
 
-/**
- * The first stage is a $cursor, which represents the intermediate results of the outer coll
- * that will be streamed through the rest of the pipeline. But we don't need it to validate how
- * the view was applied.
- */
-if (explain.stages) {
-    // Single node.
-    explain.stages.shift();
-    assert(explain.stages.length == 1);
-    assert(Object.keys(explain.stages[0])[0], "$lookup");
-} else if (explain.splitPipeline) {
-    // Multi-shard.
-    explain.splitPipeline.mergerPart.shift();
-    assert(explain.splitPipeline.mergerPart.length == 1);
-    assert(Object.keys(explain.splitPipeline.mergerPart[0])[0], "$lookup");
-} else {
-    // Single shard.
-    explain.shards["shard-rs0"].stages.shift();
-    assert(explain.shards["shard-rs0"].stages.length == 1);
-    assert(Object.keys(explain.shards["shard-rs0"].stages[0])[0], "$lookup");
-}
+const lookupPipeline = [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}];
+explain = collBase.explain().aggregate(lookupPipeline);
+assertViewNotApplied(explain, viewPipeline);
+assertLookupInExplain(explain, lookupPipeline[0]);
 
 expectedResults = [
     {

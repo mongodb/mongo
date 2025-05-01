@@ -3,9 +3,10 @@
  * $lookup.$search query on an identity view returns correct results.
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
-import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {
+    assertLookupInExplain,
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const localColl = testDb.localColl;
@@ -42,30 +43,28 @@ assert.commandWorked(foreignColl.insertMany([
     {city: "Harrison", state: "New Jersey", sportsTeam: "NJ/NY Gotham FC", pop: 5}
 ]));
 
-let viewName = "identityView";
+const viewName = "identityView";
 assert.commandWorked(testDb.createView(viewName, foreignColl.getName(), []));
-let identityView = testDb[viewName];
+const identityView = testDb[viewName];
 
 createSearchIndex(identityView,
                   {name: "identityViewIx", definition: {"mappings": {"dynamic": true}}});
 
-let searchQuery = {
-    $search: {
-        index: "identityViewIx",
-        exists: {
-            path: "state",
-        }
+const searchQuery = {
+    index: "identityViewIx",
+    exists: {
+        path: "state",
     }
 };
 
-let lookupPipeline = [{
+const lookupPipeline = [{
         $lookup: {
             from: identityView.getName(),
             localField: "_id",
             foreignField: "state",
             pipeline: [
-                searchQuery,
-                {$sort : {city: 1}},
+                {$search: searchQuery},
+                {$sort: {city: 1}},
                 {$project: {_id: 0}}],
                 as: "stateFacts"
             }
@@ -89,17 +88,20 @@ let expectedResults = [
     {_id: "New York", stateFacts: [{city: "New York", sportsTeam: "NY Liberty", pop: 7}]}
 ];
 
+const explain = assert.commandWorked(localColl.explain().aggregate(lookupPipeline));
+assertLookupInExplain(explain, lookupPipeline[0]);
+
 let results = localColl.aggregate(lookupPipeline).toArray();
 assert.eq(results, expectedResults);
 
-let unionWithPipeline = [
+const unionWithPipeline = [
     {$sort: {_id: 1}},
     {$limit: 1},
     {
         $unionWith: {
             coll: identityView.getName(),
             pipeline: [
-                searchQuery,
+                {$search: searchQuery},
                 {$sort: {city: 1}},
                 {$project: {_id: 0, "stateFacts.state": 0}},
                 {$limit: 1}

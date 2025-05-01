@@ -786,27 +786,49 @@ export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
         return planStageList[0];
     }
 }
+
 /**
- * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns
- * the $unionWith stage of the plan.
+ * Given the root stage of an explain's JSON representation of a query plan ('root'), returns the
+ * specified stage of the plan.
  *
- * The normal getAggPlanStages() doesn't find the $unionWith stage in the sharded scenario since it
- * exists in the splitPipeline.
+ * The normal getAggPlanStages() doesn't find certain stages in the sharded scenario since they
+ * exist in the splitPipeline.
  **/
-export function getUnionWithStage(root) {
-    if (root.splitPipeline != null) {
-        // If there is only one shard, the whole pipeline will run on that shard.
-        const subAggPipe = root.splitPipeline === null ? root.shards["shard-rs0"].stages
-                                                       : root.splitPipeline.mergerPart;
+export function getStageFromSplitPipeline(root, stage) {
+    function checkForStageInSubAggPipe(subAggPipe, stage) {
         for (let i = 0; i < subAggPipe.length; i++) {
-            const stage = subAggPipe[i];
-            if (stage.hasOwnProperty("$unionWith")) {
-                return stage;
+            const subAggStage = subAggPipe[i];
+            if (subAggStage.hasOwnProperty(stage)) {
+                return subAggStage;
             }
         }
-    } else {
-        return getAggPlanStage(root, "$unionWith");
     }
+
+    if (root.splitPipeline != null) {
+        // If there is only one shard, the whole pipeline will run on that shard.
+        let subAggPipe = root.splitPipeline === null ? root.shards["shard-rs0"].stages
+                                                     : root.splitPipeline.mergerPart;
+
+        // Check if the requested stage exists in the merger part.
+        const stageInMergerPart = checkForStageInSubAggPipe(subAggPipe, stage);
+        if (stageInMergerPart) {
+            return stageInMergerPart;
+        }
+
+        // If the requested stage isn't in the merger part, it might be in the shards part.
+        subAggPipe = root.splitPipeline.shardsPart;
+        return checkForStageInSubAggPipe(subAggPipe, stage);
+    } else {
+        return getAggPlanStage(root, stage);
+    }
+}
+
+export function getUnionWithStage(root) {
+    return getStageFromSplitPipeline(root, "$unionWith");
+}
+
+export function getLookupStage(root) {
+    return getStageFromSplitPipeline(root, "$lookup");
 }
 
 /**

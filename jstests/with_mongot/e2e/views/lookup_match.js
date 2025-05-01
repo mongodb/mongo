@@ -14,6 +14,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const localColl = testDb.localColl;
@@ -29,12 +30,12 @@ assert.commandWorked(foreignColl.insertMany([
     {x: 5, debugMsg: "should match _id 5 in localColl", foobarRepeatedXTimes: null},
 ]));
 
-let viewName = "addFields";
+const viewName = "addFields";
 /**
  * This view enriches the foobarRepeatedXTimes field. If foobarRepeatedXTimes is null, the view
  * concatenates the string foobar x (the field in the doc) number of times.
  */
-let viewPipeline = [{
+const viewPipeline = [{
     "$addFields": {
         "foobarRepeatedXTimes": {
             "$cond": {
@@ -52,12 +53,12 @@ let viewPipeline = [{
     }
 }];
 assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
-let addFieldsView = testDb[viewName];
+const addFieldsView = testDb[viewName];
 
 createSearchIndex(addFieldsView,
                   {name: "populationAddFieldsIndex", definition: {"mappings": {"dynamic": true}}});
 
-let searchQuery = {
+const searchQuery = {
     $search: {
         index: "populationAddFieldsIndex",
         exists: {
@@ -72,7 +73,7 @@ let searchQuery = {
  * in foreignColl happens after $search and but before the rest of the user pipeline (eg before that
  * $set stage). In other words, the check happens at _id === x and not _id === (x + 1)
  */
-let lookupPipeline = 
+const lookupPipeline = 
 [
     {
         $lookup: {
@@ -90,7 +91,7 @@ let lookupPipeline =
     {$sort: {_id: 1}}
 ];
 
-let expectedResults = [
+const expectedResults = [
     {_id: 1, anything: []},
     {
         _id: 2,
@@ -117,8 +118,10 @@ let expectedResults = [
         }]
     }
 ];
+const explain = assert.commandWorked(localColl.explain().aggregate(lookupPipeline));
+assertLookupInExplain(explain, lookupPipeline[0]);
 
-let results = localColl.aggregate(lookupPipeline).toArray();
+const results = localColl.aggregate(lookupPipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});
 
 dropSearchIndex(addFieldsView, {name: "populationAddFieldsIndex"});

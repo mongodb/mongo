@@ -5,6 +5,7 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const localColl = testDb.localColl;
@@ -40,17 +41,17 @@ assert.commandWorked(holidaysColl.insertMany([
 ]));
 
 // Filter for holidays in Jan, Feb or March
-let viewPipeline = [{"$match": {"$expr": {"$in": [{"$month": "$date"}, [1, 2, 3]]}}}];
-let viewName = "firstThreeMonths";
+const viewPipeline = [{"$match": {"$expr": {"$in": [{"$month": "$date"}, [1, 2, 3]]}}}];
+const viewName = "firstThreeMonths";
 assert.commandWorked(testDb.createView(viewName, holidaysColl.getName(), viewPipeline));
-let firstThreeMonthsView = testDb[viewName];
+const firstThreeMonthsView = testDb[viewName];
 
 createSearchIndex(
     firstThreeMonthsView,
     {name: "sillyHolidaysInFirstThreeMonthsIx", definition: {"mappings": {"dynamic": true}}});
 
 // Return all documents that have "National" in their name value.
-let searchQuery = {
+const searchQuery = {
     $search: {index: "sillyHolidaysInFirstThreeMonthsIx", text: {query: "National", path: "name"}}
 };
 /*
@@ -96,6 +97,9 @@ let expectedResults = [
     }
 ];
 
+let explain = assert.commandWorked(localColl.explain().aggregate(lookupPipeline));
+assertLookupInExplain(explain, lookupPipeline[0]);
+
 let results = localColl.aggregate(lookupPipeline).toArray();
 assert.eq(expectedResults, results);
 
@@ -139,6 +143,9 @@ expectedResults = [
         holidays: []
     }
 ];
+
+explain = assert.commandWorked(localColl.explain().aggregate(lookupPipeline));
+assertLookupInExplain(explain, lookupPipeline[0]);
 
 results = localColl.aggregate(lookupPipeline).toArray();
 assert.eq(expectedResults, results);

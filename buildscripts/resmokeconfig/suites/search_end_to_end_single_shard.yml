@@ -23,10 +23,6 @@ selector:
     - jstests/with_mongot/e2e_lib/*_test.js
   exclude_files:
     - jstests/with_mongot/e2e_infrastructure_tests/verify_coll_is_sharded.js
-    # TODO SERVER-103691: Remove these excluded files.
-    - jstests/with_mongot/e2e/views/searchMeta.js
-    - jstests/with_mongot/e2e/views/unionWith.js
-    - jstests/with_mongot/e2e/views/lookup.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
 

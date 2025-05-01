@@ -4,17 +4,19 @@
  * index interface correctly catches and returns such errors.
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
 coll.drop();
 
-let bulk = coll.initializeUnorderedBulkOp();
+const bulk = coll.initializeUnorderedBulkOp();
 bulk.insert({_id: "foo", category: "test"});
 assert.commandWorked(bulk.execute());
 
-let parentName = "underlyingSourceCollection";
+const parentName = "underlyingSourceCollection";
 
 // 15.9 MB target size for the pipeline (just under 16 MB BSON limit).
 const targetSize = 15 * 1024 * 1024 + 1024 * 200;
@@ -74,7 +76,16 @@ const normalSearchQuery = {
     $search: {index: "viewNameIndex", text: {query: "test", path: "category"}}
 };
 
-let results = view.aggregate([normalSearchQuery]).toArray();
+// We can only assert that the view is applied correctly for the single_node suite and single_shard
+// suite (numberOfShardsForCollection() will return 1 in a single node environment). This is because
+// the sharded_cluster suite will omit the explain output for each shard in this test because the
+// view definition is too large (but still small enough to run queries on).
+if (FixtureHelpers.numberOfShardsForCollection(coll) == 1) {
+    const explain = assert.commandWorked(view.explain().aggregate([normalSearchQuery]));
+    assertViewAppliedCorrectly(explain, [normalSearchQuery], pipeline);
+}
+
+const results = view.aggregate([normalSearchQuery]).toArray();
 assert(results.length == 1);
 
 dropSearchIndex(view, {name: "viewNameIndex"});

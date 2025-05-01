@@ -1,21 +1,23 @@
 /**
  * This file tests lookup with search subpipeline on a combination of collections + views:
  * 1. the outer collection is a collection and the inner collection is a view.
- * 		a. does not include explain() validation, see code comment below
+ *      a. does not include explain() validation, see code comment below
  * 2. the outer collection is a view and the inner collection is a collection.
- *		a. includes explain() validation
+ *      a. includes explain() validation
  * 3. the outer collection is a view and the inner collection is a view.
- * 		a. includes explain() validation
+ *      a. includes explain() validation
  *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkSbeFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {
+    assertLookupInExplain,
+    assertLookupWithSearchPipelineAppliedViews
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 // Setup for all three use cases.
 const productColl = db[`${jsTest.name()}`];
@@ -83,12 +85,11 @@ assert.commandWorked(reviewColl.insertMany([
  * Create a view on the reviewColl that adds a verified_review field if null in the underlying
  * source collection.
  */
-let viewName = "verifiedReview";
-let verifiedReviewViewPipeline =
+const viewName = "verifiedReview";
+const verifiedReviewViewPipeline =
     [{"$addFields": {verified_review: {$ifNull: ['$verified_review', 'unverified']}}}];
-assert.commandWorked(
-    db.createView("verifiedReview", reviewColl.getName(), verifiedReviewViewPipeline));
-let verifiedReviewView = db["verifiedReview"];
+assert.commandWorked(db.createView(viewName, reviewColl.getName(), verifiedReviewViewPipeline));
+const verifiedReviewView = db[viewName];
 
 createSearchIndex(verifiedReviewView,
                   {name: "verifiedReviewSearchIndex", definition: {"mappings": {"dynamic": true}}});
@@ -98,7 +99,7 @@ let searchQuery = {index: "verifiedReviewSearchIndex", text: {query: "battery", 
 let lookupPipeline = [
     {
         $lookup: {
-            from: "verifiedReview",
+            from: viewName,
             localField: "_id",
             foreignField: "productId",
             pipeline: [
@@ -124,6 +125,8 @@ let lookupPipeline = [
  * the explain output for the view transforms for $lookup.$search when the inner coll is a view -
  * because again, the view transforms will not be present.
  */
+let explain = assert.commandWorked(productColl.explain().aggregate(lookupPipeline));
+assertLookupInExplain(explain, lookupPipeline[0]);
 
 let results = productColl.aggregate(lookupPipeline).toArray();
 let expectedResults = [
@@ -163,11 +166,11 @@ assertArrayEq({actual: results, expected: expectedResults});
 // Second use case: outer coll is a view, inner coll is a regular collection.
 // ==========================================================================
 createSearchIndex(reviewColl, {name: "default", definition: {"mappings": {"dynamic": true}}});
-let batteryTypeViewPipeline =
+const batteryTypeViewPipeline =
     [{"$addFields": {battery_type: {$ifNull: ['$battery_type', 'unknown']}}}];
 assert.commandWorked(
     db.createView("batteryTypeView", productColl.getName(), batteryTypeViewPipeline));
-let batteryTypeViewOnProductColl = db["batteryTypeView"];
+const batteryTypeViewOnProductColl = db["batteryTypeView"];
 
 searchQuery = {
     index: "default",
@@ -190,28 +193,10 @@ lookupPipeline = [
  * Since only the outer collection is a view, we are able to validate that the user pipeline was
  * appended to end of the view pipeline.
  */
-let explain =
-    assert.commandWorked(batteryTypeViewOnProductColl.explain().aggregate(lookupPipeline));
+explain = assert.commandWorked(batteryTypeViewOnProductColl.explain().aggregate(lookupPipeline));
 
-if (isSbeEnabled) {
-    assertViewAppliedCorrectly(explain.command.pipeline, lookupPipeline, batteryTypeViewPipeline);
-} else {
-    /**
-     * The first stage is a $cursor, which represents the intermediate results of the outer coll
-     * that will be streamed through the rest of the pipeline. But we don't need it to validate how
-     * the view was applied.
-     */
-    if (FixtureHelpers.isSharded(productColl)) {
-        explain.splitPipeline.shardsPart.shift();
-        assert(explain.splitPipeline.shardsPart.length == 1);
-        assert(Object.keys(explain.splitPipeline.shardsPart[0])[0], "$lookup");
-    } else {
-        explain.stages.shift();
-        explain.stages.shift();
-        assert(explain.stages.length == 1);
-        assert(Object.keys(explain.stages[0])[0], "$lookup");
-    }
-}
+assertLookupWithSearchPipelineAppliedViews(
+    explain, lookupPipeline[0], batteryTypeViewPipeline, isSbeEnabled);
 
 results = batteryTypeViewOnProductColl.aggregate(lookupPipeline).toArray();
 /**
@@ -291,7 +276,7 @@ lookupPipeline = [
 }, 
 {$project: {
     instructions: 0, 
-	battery_type: 0,
+    battery_type: 0,
     _id: 0
 }}
 ];
@@ -303,26 +288,8 @@ lookupPipeline = [
  */
 explain = assert.commandWorked(verifiedReviewView.explain().aggregate(lookupPipeline));
 
-if (isSbeEnabled) {
-    assertViewAppliedCorrectly(
-        explain.command.pipeline, lookupPipeline, verifiedReviewViewPipeline);
-} else {
-    /**
-     * The first stage is a $cursor, which represents the intermediate results of the outer coll
-     * that will be streamed through the rest of the pipeline. But we don't need it to validate how
-     * the view was applied.
-     */
-    if (FixtureHelpers.isSharded(reviewColl)) {
-        explain.splitPipeline.mergerPart.shift();
-        assert(explain.splitPipeline.mergerPart.length == 2);
-        assert(Object.keys(explain.splitPipeline.mergerPart[0])[0], "$lookup");
-    } else {
-        explain.stages.shift();
-        explain.stages.shift();
-        assert(explain.stages.length == 2);
-        assert(Object.keys(explain.stages[0])[0], "$lookup");
-    }
-}
+assertLookupWithSearchPipelineAppliedViews(
+    explain, lookupPipeline[0], verifiedReviewView, isSbeEnabled);
 
 /**
  * There should be a verified_review field (for the outer view) and battery_type field (for the

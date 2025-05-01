@@ -68,17 +68,16 @@ const char* DocumentSourceSearch::getSourceName() const {
 }
 
 Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
-    if (!opts.isSerializingForExplain() || pExpCtx->getInRouter()) {
-        // When serializing $search, we only need to serialize the full mongot remote spec when
-        // in a sharded scenario (i.e., when we have a metadata merge protocol verison), regardless
-        // of whether we're on a router or a data-bearing node. Otherwise, we only need the mongot
-        if (_spec.getMetadataMergeProtocolVersion().has_value()) {
-            MutableDocument spec{Document(_spec.toBSON())};
-            if (_view) {
-                spec["view"] = Value(_view->toBSON());
-            }
-            return Value(Document{{getSourceName(), spec.freezeToValue()}});
+    // If we aren't serializing for query stats or explain, serialize the full spec.
+    // If we are in a router, serialize the full spec.
+    // Otherwise, just serialize the mongotQuery.
+    if ((!opts.isSerializingForQueryStats() && !opts.isSerializingForExplain()) ||
+        pExpCtx->getInRouter()) {
+        MutableDocument spec{Document(_spec.toBSON())};
+        if (_view) {
+            spec["view"] = Value(_view->toBSON());
         }
+        return Value(Document{{getSourceName(), spec.freezeToValue()}});
     }
     return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
 }

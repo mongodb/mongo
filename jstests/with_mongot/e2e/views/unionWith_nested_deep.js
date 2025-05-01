@@ -6,6 +6,10 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {
+    assertUnionWithSearchSubPipelineAppliedViews,
+    assertViewAppliedCorrectly
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const bestPictureColl = db["best_picture"];
 const bestActressColl = db["best_actress"];
@@ -188,6 +192,11 @@ const expectedResults = [
         source: "bestDirectorAwardsWithBestOriginalScreenplay_inner"
     }
 ];
+
+const explain = assert.commandWorked(bestActressView.explain().aggregate(pipeline));
+assertViewAppliedCorrectly(explain, pipeline, bestActressViewPipeline[0]);
+assertUnionWithSearchSubPipelineAppliedViews(
+    explain, bestPictureColl, bestPictureView, bestPicturesViewPipeline);
 
 const results = bestActressView.aggregate(pipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});

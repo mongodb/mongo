@@ -6,12 +6,13 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
 coll.drop();
 
-let bulk = coll.initializeUnorderedBulkOp();
+const bulk = coll.initializeUnorderedBulkOp();
 bulk.insert({_id: "New York", state: "NY", tags: ["east", "finance"], category: "large"});
 bulk.insert({_id: "Oakland", state: "CA", tags: ["west", "bay"], category: "medium"});
 bulk.insert({_id: "Palo Alto", state: "CA", tags: ["west", "tech", "bay"], category: "medium"});
@@ -21,7 +22,7 @@ assert.commandWorked(bulk.execute());
 
 let parentName = "underlyingSourceCollection";
 
-let officePotentialPipeline = [{
+const officePotentialPipeline = [{
     "$addFields": {
         // Add a new field office_potential.
         office_potential: {
@@ -57,9 +58,14 @@ let officePotentialPipeline = [{
     }
 }];
 
+// These pipelines will be populated in the loop and then used at the end to assert that the
+// views are applied correctly in the explain output.
+let maxNestedViewFullDefinition = [];
+let officePotentialViewFullDefinition = [];
+
 // Create a max depth view (19 nested views + 1 source collection).
 for (let i = 0; i < 19; ++i) {
-    let childName = `nestedView${i}`;
+    const childName = `nestedView${i}`;
     // Transformation summary:
     //  1. Adds a new numeric field "transformation_{i}": i
     //  2. Adds a new field "nested_tags" which appends a value "level_{i}" to the existing tags
@@ -79,20 +85,23 @@ for (let i = 0; i < 19; ++i) {
         }
     }];
 
-    assert.commandWorked(testDb.createView(childName, parentName, viewPipeline));
-
     // On the final iteration, create a separate view for office potential.
     if (i == 18) {
+        officePotentialViewFullDefinition =
+            maxNestedViewFullDefinition.concat(officePotentialPipeline);
         assert.commandWorked(
             testDb.createView("officePotentialView", parentName, officePotentialPipeline));
     }
+
+    maxNestedViewFullDefinition = maxNestedViewFullDefinition.concat(viewPipeline);
+    assert.commandWorked(testDb.createView(childName, parentName, viewPipeline));
 
     parentName = childName;
 }
 
 // Get the deepest view.
-let maxNestedView = testDb[parentName];
-let officePotentialView = testDb["officePotentialView"];
+const maxNestedView = testDb[parentName];
+const officePotentialView = testDb["officePotentialView"];
 
 createSearchIndex(maxNestedView, {
     name: "maxNestedViewIndex",
@@ -108,7 +117,7 @@ createSearchIndex(officePotentialView, {
 });
 
 // Queries to be ran on the maxNestedViewIndex.
-let maxNestedViewTestQueries = [
+const maxNestedViewTestQueries = [
     // Basic existence query on tags.
     {
         searchQuery: {$search: {index: "maxNestedViewIndex", exists: {path: "nested_tags"}}},
@@ -177,7 +186,7 @@ let maxNestedViewTestQueries = [
 ];
 
 // Queries to be ran on the officePotentialViewIndex.
-let officePotentialViewTestQueries = [
+const officePotentialViewTestQueries = [
     {
         searchQuery: {
             $search:
@@ -254,12 +263,18 @@ let officePotentialViewTestQueries = [
 
 // Run and validate each test query for both views.
 maxNestedViewTestQueries.forEach(({searchQuery, validateFn}) => {
-    let results = maxNestedView.aggregate([searchQuery]).toArray();
+    const explain = assert.commandWorked(maxNestedView.explain().aggregate([searchQuery]));
+    assertViewAppliedCorrectly(explain, [searchQuery], maxNestedViewFullDefinition);
+
+    const results = maxNestedView.aggregate([searchQuery]).toArray();
     validateFn(results);
 });
 
 officePotentialViewTestQueries.forEach(({searchQuery, validateFn}) => {
-    let results = officePotentialView.aggregate([searchQuery]).toArray();
+    const explain = assert.commandWorked(officePotentialView.explain().aggregate([searchQuery]));
+    assertViewAppliedCorrectly(explain, [searchQuery], officePotentialViewFullDefinition);
+
+    const results = officePotentialView.aggregate([searchQuery]).toArray();
     validateFn(results);
 });
 

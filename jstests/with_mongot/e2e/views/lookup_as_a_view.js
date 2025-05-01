@@ -6,6 +6,7 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const userColl = testDb.users;
@@ -32,15 +33,18 @@ assert.commandWorked(socialMediaPostsColl.insertMany([
 ]));
 
 // Create an initial view that will be the inner collection for the subsequent $lookup view.
-let viewName = "totalSocialMediaReactions";
-let viewPipeline = [{"$addFields": {totalReactions: {$add: ["$likes", "$comments"]}}}];
+const viewName = "totalSocialMediaReactions";
+const viewPipeline = [{"$addFields": {totalReactions: {$add: ["$likes", "$comments"]}}}];
 assert.commandWorked(testDb.createView(viewName, socialMediaPostsColl.getName(), viewPipeline));
-let totalSocialMediaReactionsView = testDb[viewName];
+const totalSocialMediaReactionsView = testDb[viewName];
 createSearchIndex(totalSocialMediaReactionsView,
                   {name: "totalReactionsIndex", definition: {"mappings": {"dynamic": true}}});
 
 // This mongot query will retrieve all documents where the content field contains the word idol.
-let searchQuery = {index: "totalReactionsIndex", text: {query: "idol", path: "content"}};
+const searchQuery = {
+    index: "totalReactionsIndex",
+    text: {query: "idol", path: "content"}
+};
 
 /**
  * This will view returns each user and their array of posts that meet the $search criteria. More
@@ -48,7 +52,7 @@ let searchQuery = {index: "totalReactionsIndex", text: {query: "idol", path: "co
  * in its content field and disaply a totalReaction field from the $addFields view created on the
  * socialMediaPostsColl collection. collection.
  */
-assert.commandWorked(testDb.createView("usersTotalPostsView", "users", [
+const viewDefinitionWithLookup = [
     {
         $lookup: {
             from: totalSocialMediaReactionsView.getName(),
@@ -60,8 +64,11 @@ assert.commandWorked(testDb.createView("usersTotalPostsView", "users", [
             ],
         }
     },
-]));
-let usersTotalPostsViewWithMetrics = testDb["usersTotalPostsView"];
+];
+
+assert.commandWorked(testDb.createView("usersTotalPostsView", "users", viewDefinitionWithLookup));
+
+const usersTotalPostsViewWithMetrics = testDb["usersTotalPostsView"];
 let expectedResults = [
     {
         "_id": 1,
@@ -101,6 +108,11 @@ let expectedResults = [
     }
 ];
 
+// Lookup stages don't expand their view definitions so we only need to make sure that the
+// lookup-as-a-view is applied, not the view that it references.
+let explain = assert.commandWorked(usersTotalPostsViewWithMetrics.explain().aggregate());
+assertViewAppliedCorrectly(explain, [], viewDefinitionWithLookup[0]);
+
 let results = usersTotalPostsViewWithMetrics.aggregate().toArray();
 assert.sameMembers(expectedResults, results);
 
@@ -122,19 +134,16 @@ expectedResults = [{
     }]
 }];
 
-let pipeline = [{
+const userPipeline = [{
     $match: {
         username: "john_doe"  // Match a specific username
     }
 }];
 
-results = usersTotalPostsViewWithMetrics
-              .aggregate([{
-                  $match: {
-                      username: "john_doe"  // Match a specific username
-                  }
-              }])
-              .toArray();
+explain = assert.commandWorked(usersTotalPostsViewWithMetrics.explain().aggregate(userPipeline));
+assertViewAppliedCorrectly(explain, userPipeline, viewDefinitionWithLookup[0]);
+
+results = usersTotalPostsViewWithMetrics.aggregate(userPipeline).toArray();
 assert.sameMembers(expectedResults, results);
 
 dropSearchIndex(totalSocialMediaReactionsView, {name: "totalReactionsIndex"});

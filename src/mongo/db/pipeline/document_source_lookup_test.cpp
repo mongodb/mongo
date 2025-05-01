@@ -908,7 +908,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithSearchPipelineS
     // needs to be updated to include the desugared $search for sharded queries to work properly.
     ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
     ASSERT_EQ(serializedStage["pipeline"][0]["$search"].getType(), BSONType::Object);
-    ASSERT_DOCUMENT_EQ(serializedStage["pipeline"][0]["$search"].getDocument(),
+    ASSERT_DOCUMENT_EQ(serializedStage["pipeline"][0]["$search"]["mongotQuery"].getDocument(),
                        Document(fromjson("{term: 'asdf'}")));
 
     auto roundTripped =

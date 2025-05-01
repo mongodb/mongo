@@ -6,12 +6,23 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    checkSbeFullyEnabled,
+} from "jstests/libs/query/sbe_util.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {
+    assertLookupInExplain,
+    assertUnionWithSearchSubPipelineAppliedViews,
+    assertViewAppliedCorrectly
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const bestPictureColl = db["best_picture"];
 const bestActressColl = db["best_actress"];
 bestPictureColl.drop();
 bestActressColl.drop();
+
+const isSbeFullyEnabled = checkSbeFullyEnabled(db);
 
 assert.commandWorked(bestActressColl.insertMany([
     {title: "Klute", year: 1971, recipient: "Jane Fonda"},
@@ -24,10 +35,10 @@ assert.commandWorked(bestActressColl.insertMany([
     {title: "As Good as It Gets", year: 1997, recipient: "Helen Hunt"}
 ]));
 let viewName = "bestActressAwardsAfter1979";
-let bestActressViewPipeline =
+const bestActressViewPipeline =
     [{"$match": {"$expr": {'$and': [{'$gt': ['$year', 1979]}, {'$lt': ['$year', 1997]}]}}}];
 assert.commandWorked(db.createView(viewName, bestActressColl.getName(), bestActressViewPipeline));
-let bestActressView = db[viewName];
+const bestActressView = db[viewName];
 createSearchIndex(bestActressView, {name: "default", definition: {"mappings": {"dynamic": true}}});
 
 assert.commandWorked(bestPictureColl.insertMany([
@@ -42,10 +53,10 @@ assert.commandWorked(bestPictureColl.insertMany([
 ]));
 
 viewName = "bestPictureAwardsWithRottenTomatoScore";
-let bestPicturesViewPipeline =
+const bestPicturesViewPipeline =
     [{"$addFields": {rotten_tomatoes_score: {$ifNull: ['$rotten_tomatoes_score', '62%']}}}];
 assert.commandWorked(db.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline));
-let bestPictureView = db[viewName];
+const bestPictureView = db[viewName];
 createSearchIndex(bestPictureView, {name: "default", definition: {"mappings": {"dynamic": true}}});
 
 // $lookup and $unionWith.
@@ -58,15 +69,18 @@ assert.commandWorked(nominationsColl.insertMany([
     {title: "Moonstruck", year: 1987, category: "Best Picture"}
 ]));
 
-let pipeline = [
+const lookupStage = {
+    $lookup: {
+        from: nominationsColl.getName(),
+        localField: "title",
+        foreignField: "title",
+        as: "nominations"
+    }
+};
+
+const pipeline = [
     // Join with the nomination's collection based on title.
-    {$lookup: {
-            from: nominationsColl.getName(),
-            localField: "title",
-            foreignField: "title",
-            as: "nominations"
-        }
-    },
+    lookupStage,
     // Flatten results.
     {$unwind: "$nominations"},
     {$project: {_id: 0, "nominations.category": 1, title: 1, year: 1}},
@@ -83,7 +97,7 @@ let pipeline = [
     }
 ];
 
-let expectedResults = [
+const expectedResults = [
     {
         title: "Terms of Endearment",
         year: 1983,
@@ -98,7 +112,19 @@ let expectedResults = [
     }
 ];
 
-let results = bestActressView.aggregate(pipeline).toArray();
+// Assert that the outer view definition is applied correctly, the $unionWith view defintion is
+// applied correctly, and the lookup stage exists in the explain output.
+const explain = assert.commandWorked(bestActressView.explain().aggregate(pipeline));
+assertViewAppliedCorrectly(explain, pipeline, bestActressViewPipeline[0]);
+assertUnionWithSearchSubPipelineAppliedViews(
+    explain, bestPictureColl, bestPictureView, bestPicturesViewPipeline);
+
+// $lookup won't exist in the explain output if SBE is fully enabled.
+if (!isSbeFullyEnabled || FixtureHelpers.numberOfShardsForCollection(bestActressColl) > 1) {
+    assertLookupInExplain(explain, lookupStage);
+}
+
+const results = bestActressView.aggregate(pipeline).toArray();
 assertArrayEq({actual: results, expected: expectedResults});
 
 dropSearchIndex(bestActressView, {name: "default"});
