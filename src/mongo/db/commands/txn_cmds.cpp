@@ -288,7 +288,9 @@ public:
                         opCtx, *opCtx->getLogicalSessionId(), txnNumberAndRetryCounter);
                 }
             }
-
+            // Instruct the storage engine to not do any extra eviction while aborting transactions
+            // so that resources will not get stuck.
+            shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
             txnParticipant.abortTransaction(opCtx);
 
             if (MONGO_unlikely(

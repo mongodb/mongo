@@ -125,6 +125,10 @@ public:
                 "abortTransaction can only be run within a session",
                 txnRouter);
 
+        // Instruct the storage engine to not do any extra eviction while aborting transactions so
+        // that resources will not get stuck.
+        shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
+
         auto abortRes = txnRouter.abortTransaction(opCtx);
         CommandHelpers::filterCommandReplyForPassthrough(abortRes, &result);
         return true;
