@@ -2212,6 +2212,7 @@ ucurr_countCurrencies(const char* locale,
         UErrorCode localStatus = U_ZERO_ERROR;
         char id[ULOC_FULLNAME_CAPACITY];
         uloc_getKeywordValue(locale, "currency", id, ULOC_FULLNAME_CAPACITY, &localStatus);
+
         // get country or country_variant in `id'
         /*uint32_t variantType =*/ idForLocale(locale, id, sizeof(id), ec);
 

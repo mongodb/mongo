@@ -681,7 +681,7 @@ ZoneMeta::createMetazoneMappings(const UnicodeString &tzid) {
                     mzMappings = new UVector(deleteOlsonToMetaMappingEntry, NULL, status);
                     if (U_FAILURE(status)) {
                         delete mzMappings;
-                        deleteOlsonToMetaMappingEntry(entry);
+						mzMappings = NULL;
                         uprv_free(entry);
                         break;
                     }

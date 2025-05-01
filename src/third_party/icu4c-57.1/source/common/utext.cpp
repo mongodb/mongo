@@ -845,9 +845,15 @@ U_CDECL_END
 //------------------------------------------------------------------------------
 
 // Chunk size.
-//     Must be less than 85, because of byte mapping from UChar indexes to native indexes.
-//     Worst case is three native bytes to one UChar.  (Supplemenaries are 4 native bytes
-//     to two UChars.)
+//     Must be less than 42  (256/6), because of byte mapping from UChar indexes to native indexes.
+//     Worst case there are six UTF-8 bytes per UChar.
+//         obsolete 6 byte form fd + 5 trails maps to fffd
+//         obsolete 5 byte form fc + 4 trails maps to fffd
+//         non-shortest 4 byte forms maps to fffd
+//         normal supplementaries map to a pair of utf-16, two utf8 bytes per utf-16 unit
+//     mapToUChars array size must allow for the worst case, 6.
+//     This could be brought down to 4, by treating fd and fc as pure illegal,
+//     rather than obsolete lead bytes. But that is not compatible with the utf-8 access macros.
 //
 enum { UTF8_TEXT_CHUNK_SIZE=32 };
 
@@ -887,7 +893,7 @@ struct UTF8Buf {
                                                      //  Requires two extra slots,
                                                      //    one for a supplementary starting in the last normal position,
                                                      //    and one for an entry for the buffer limit position.
-    uint8_t   mapToUChars[UTF8_TEXT_CHUNK_SIZE*3+6]; // Map native offset from bufNativeStart to
+    uint8_t   mapToUChars[UTF8_TEXT_CHUNK_SIZE*6+6]; // Map native offset from bufNativeStart to
                                                      //   correspoding offset in filled part of buf.
     int32_t   align;
 };
@@ -1030,6 +1036,7 @@ utf8TextAccess(UText *ut, int64_t index, UBool forward) {
             // Requested index is in this buffer.
             u8b = (UTF8Buf *)ut->p;   // the current buffer
             mapIndex = ix - u8b->toUCharsMapStart;
+            U_ASSERT(mapIndex < (int32_t)sizeof(UTF8Buf::mapToUChars));
             ut->chunkOffset = u8b->mapToUChars[mapIndex] - u8b->bufStartIdx;
             return TRUE;
 
@@ -1296,6 +1303,10 @@ fillReverse:
         // Can only do this if the incoming index is somewhere in the interior of the string.
         //   If index is at the end, there is no character there to look at.
         if (ix != ut->b) {
+            // Note: this function will only move the index back if it is on a trail byte
+            //       and there is a preceding lead byte and the sequence from the lead 
+            //       through this trail could be part of a valid UTF-8 sequence
+            //       Otherwise the index remains unchanged.
             U8_SET_CP_START(s8, 0, ix);
         }
 
@@ -1309,7 +1320,10 @@ fillReverse:
         UChar   *buf = u8b->buf;
         uint8_t *mapToNative = u8b->mapToNative;
         uint8_t *mapToUChars = u8b->mapToUChars;
-        int32_t  toUCharsMapStart = ix - (UTF8_TEXT_CHUNK_SIZE*3 + 1);
+        int32_t  toUCharsMapStart = ix - sizeof(UTF8Buf::mapToUChars) + 1;
+        // Note that toUCharsMapStart can be negative. Happens when the remaining
+        // text from current position to the beginning is less than the buffer size.
+        // + 1 because mapToUChars must have a slot at the end for the bufNativeLimit entry.
         int32_t  destIx = UTF8_TEXT_CHUNK_SIZE+2;   // Start in the overflow region
                                                     //   at end of buffer to leave room
                                                     //   for a surrogate pair at the
@@ -1336,6 +1350,7 @@ fillReverse:
             if (c<0x80) {
                 // Special case ASCII range for speed.
                 buf[destIx] = (UChar)c;
+                U_ASSERT(toUCharsMapStart <= srcIx);
                 mapToUChars[srcIx - toUCharsMapStart] = (uint8_t)destIx;
                 mapToNative[destIx] = (uint8_t)(srcIx - toUCharsMapStart);
             } else {
@@ -1365,6 +1380,7 @@ fillReverse:
                 do {
                     mapToUChars[sIx-- - toUCharsMapStart] = (uint8_t)destIx;
                 } while (sIx >= srcIx);
+                U_ASSERT(toUCharsMapStart <= (srcIx+1));
 
                 // Set native indexing limit to be the current position.
                 //   We are processing a non-ascii, non-native-indexing char now;
@@ -1539,6 +1555,7 @@ utf8TextMapIndexToUTF16(const UText *ut, int64_t index64) {
     U_ASSERT(index>=ut->chunkNativeStart+ut->nativeIndexingLimit);
     U_ASSERT(index<=ut->chunkNativeLimit);
     int32_t mapIndex = index - u8b->toUCharsMapStart;
+    U_ASSERT(mapIndex < (int32_t)sizeof(UTF8Buf::mapToUChars));
     int32_t offset = u8b->mapToUChars[mapIndex] - u8b->bufStartIdx;
     U_ASSERT(offset>=0 && offset<=ut->chunkLength);
     return offset;

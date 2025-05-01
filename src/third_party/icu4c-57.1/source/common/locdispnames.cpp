@@ -819,6 +819,8 @@ uloc_getDisplayKeywordValue(   const char* locale,
     /* get the keyword value */
     keywordValue[0]=0;
     keywordValueLen = uloc_getKeywordValue(locale, keyword, keywordValue, capacity, status);
+    if (*status == U_STRING_NOT_TERMINATED_WARNING)
+      *status = U_BUFFER_OVERFLOW_ERROR;
 
     /* 
      * if the keyword is equal to currency .. then to get the display name 
