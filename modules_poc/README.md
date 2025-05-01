@@ -31,10 +31,9 @@ When submitting a review, you are strongly encouraged to include
 a generated diff of the changes to the modules list. This can be done by running:
 
 ```bash
-python modules_poc/mod_scanner.py --dump-modules-list > modules.old
+modules_poc/mod_scanner.py --dump-modules-list > modules.old
 # make your changes
-python modules_poc/mod_scanner.py --dump-modules-list > modules.new
-diff -u0 modules.old modules.new > modules.diff
+diff -u0 modules.old <(modules_poc/mod_scanner.py --dump-modules-list)
 ```
 
 Github will nicely format the diff if you put it in a block like this:

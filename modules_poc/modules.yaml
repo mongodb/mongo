@@ -109,8 +109,19 @@ core.unittest:
     - src/mongo/dbtests/framework[._]*
 
 clang_tidy_checks:
+  meta:
+    slack: server-programmability
+    jira: Server Programmability
   files:
     - src/mongo/tools/mongo_tidy_checks/
+
+shell:
+  meta:
+    slack: ask-devprod-correctness
+    jira: DevProd Correctness
+  files:
+    - src/mongo/shell/
+    - src/mongo/db/modules/enterprise/src/fle/shell
 
 query:
   meta:
