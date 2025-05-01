@@ -31,6 +31,7 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 // IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include <boost/move/utility_core.hpp>
+#include <memory>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -40,6 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/idhack.h"
@@ -297,17 +299,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto root = _collectionScan(expCtx, ws.get(), &collectionPtr, collScanParams, filter);
 
-    if (batchedDeleteParams) {
-        root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
-                                                    std::move(params),
-                                                    std::move(batchedDeleteParams),
-                                                    ws.get(),
-                                                    coll,
-                                                    root.release());
-    } else {
-        root = std::make_unique<DeleteStage>(
-            expCtx.get(), std::move(params), ws.get(), coll, root.release());
-    }
+    root = _createAppropriateDeleteStage(
+        expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
+
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
@@ -382,17 +376,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                  direction,
                                                  InternalPlanner::IXSCAN_FETCH);
 
-    if (batchedDeleteParams) {
-        root = std::make_unique<BatchedDeleteStage>(expCtx.get(),
-                                                    std::move(params),
-                                                    std::move(batchedDeleteParams),
-                                                    ws.get(),
-                                                    coll,
-                                                    root.release());
-    } else {
-        root = std::make_unique<DeleteStage>(
-            expCtx.get(), std::move(params), ws.get(), coll, root.release());
-    }
+    root = _createAppropriateDeleteStage(
+        expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
+
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
@@ -441,6 +427,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
+    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
     Direction direction) {
     if (shardKeyIdx.descriptor()) {
         return deleteWithIndexScan(opCtx,
@@ -451,7 +438,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                    endKey,
                                    boundInclusion,
                                    yieldPolicy,
-                                   direction);
+                                   direction,
+                                   std::move(batchedDeleteParams));
     }
     auto collectionScanParams = convertIndexScanParamsToCollScanParams(opCtx,
                                                                        &coll.getCollectionPtr(),
@@ -469,8 +457,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
 
     auto root = _collectionScan(expCtx, ws.get(), &collectionPtr, collectionScanParams);
-    root = std::make_unique<DeleteStage>(
-        expCtx.get(), std::move(params), ws.get(), coll, root.release());
+
+    root = _createAppropriateDeleteStage(
+        expCtx, coll, std::move(params), std::move(batchedDeleteParams), ws.get(), root.release());
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
@@ -560,6 +549,21 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     }
 
     return root;
+}
+
+std::unique_ptr<PlanStage> InternalPlanner::_createAppropriateDeleteStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    CollectionAcquisition coll,
+    std::unique_ptr<DeleteStageParams> params,
+    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
+    WorkingSet* ws,
+    PlanStage* child) {
+    if (batchedDeleteParams) {
+        return std::make_unique<BatchedDeleteStage>(
+            expCtx.get(), std::move(params), std::move(batchedDeleteParams), ws, coll, child);
+    } else {
+        return std::make_unique<DeleteStage>(expCtx.get(), std::move(params), ws, coll, child);
+    }
 }
 
 }  // namespace mongo

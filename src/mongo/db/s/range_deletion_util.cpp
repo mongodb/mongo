@@ -31,6 +31,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -43,6 +44,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
@@ -142,17 +144,32 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
     const auto min = extend(range.getMin());
     const auto max = extend(range.getMax());
 
+    auto usingBatchedDeletes = useBatchedDeletesForRangeDeletion.load();
+
     LOGV2_DEBUG(6180601,
                 1,
                 "Begin removal of range",
                 logAttrs(nss),
                 "collectionUUID"_attr = uuid,
-                "range"_attr = redact(range.toString()));
+                "range"_attr = redact(range.toString()),
+                "usingBatchedDeletes"_attr = usingBatchedDeletes);
 
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
     deleteStageParams->fromMigrate = true;
     deleteStageParams->isMulti = true;
     deleteStageParams->returnDeleted = true;
+
+    auto batchedDeleteStageParams = std::make_unique<BatchedDeleteStageParams>();
+
+    // If batchedDeleteStageParams is null, we will use a DeleteStage which deletes documents
+    // one-by-one, if it is not null we will use a BatchedDeleteStage which deletes documents in
+    // batches.
+    if (usingBatchedDeletes) {
+        batchedDeleteStageParams->targetBatchDocs = numDocsToRemovePerBatch;
+        batchedDeleteStageParams->targetPassDocs = numDocsToRemovePerBatch;
+    } else {
+        batchedDeleteStageParams = nullptr;
+    }
 
     auto exec =
         InternalPlanner::deleteWithShardKeyIndexScan(opCtx,
@@ -163,6 +180,7 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
                                                      max,
                                                      BoundInclusion::kIncludeStartKeyOnly,
                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                     std::move(batchedDeleteStageParams),
                                                      InternalPlanner::FORWARD);
 
     if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
@@ -172,6 +190,7 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
 
     long long bytesDeleted = 0;
     int numDocsDeleted = 0;
+
     do {
         BSONObj deletedObj;
 
@@ -202,13 +221,21 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
             throw;
         }
 
+        if (!usingBatchedDeletes) {
+            if (state != PlanExecutor::IS_EOF) {
+                bytesDeleted += deletedObj.objsize();
+                numDocsDeleted++;
+            }
+        } else {
+            auto batchedDeleteStats = exec->getBatchedDeleteStats();
+            bytesDeleted += batchedDeleteStats.bytesDeleted;
+            numDocsDeleted += batchedDeleteStats.docsDeleted;
+        }
         if (state == PlanExecutor::IS_EOF) {
             break;
         }
-
-        bytesDeleted += deletedObj.objsize();
         invariant(PlanExecutor::ADVANCED == state);
-    } while (++numDocsDeleted < numDocsToRemovePerBatch);
+    } while (numDocsDeleted < numDocsToRemovePerBatch);
 
     ShardingStatistics::get(opCtx).countDocsDeletedByRangeDeleter.addAndFetch(numDocsDeleted);
     ShardingStatistics::get(opCtx).countBytesDeletedByRangeDeleter.addAndFetch(bytesDeleted);

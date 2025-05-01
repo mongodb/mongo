@@ -29,6 +29,7 @@ executor:
         internalQueryExecYieldIterations: 1000000
         internalQueryExecYieldPeriodMS: 6000
         reshardingMinimumOperationDurationMillis: 0
+        useBatchedDeletesForRangeDeletion: true
     num_rs_nodes_per_shard: 1
     num_shards: 2
     random_migrations: true

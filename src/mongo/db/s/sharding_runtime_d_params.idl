@@ -166,6 +166,16 @@ server_parameters:
         default: false
         redact: false
 
+    useBatchedDeletesForRangeDeletion:
+        description: >-
+            When enabled, it changes the range deletion stage plan from DeleteStage to BatchedDeleteStage.
+            The BatchedDeleteStage will attempt to delete documents as a batch instead of one-by-one.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: useBatchedDeletesForRangeDeletion
+        default: false
+        redact: false
+
     persistedChunkCacheUpdateMaxBatchSize:
         description: >-
             Maximum batch size used for updating shard persisted chunk cache.

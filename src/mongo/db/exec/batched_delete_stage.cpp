@@ -167,14 +167,8 @@ BatchedDeleteStage::BatchedDeleteStage(
     tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
             _params->isMulti);
-    tassert(6303802,
-            "batched deletions do not support the 'returnDelete' parameter",
-            !_params->returnDeleted);
     tassert(
         6303803, "batched deletions do not support the 'sort' parameter", _params->sort.isEmpty());
-    tassert(6303804,
-            "batched deletions do not support the 'removeSaver' parameter",
-            _params->sort.isEmpty());
     tassert(6303805,
             "batched deletions do not support the 'numStatsForDoc' parameter",
             !_params->numStatsForDoc);

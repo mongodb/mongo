@@ -203,6 +203,7 @@ public:
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
+        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
         Direction direction = FORWARD);
 
     /**
@@ -253,6 +254,19 @@ private:
         BoundInclusion boundInclusion,
         Direction direction = FORWARD,
         int options = IXSCAN_DEFAULT);
+
+    /**
+     * Returns a plan stage that is either a DeleteStage or a BatchedDeleteStage.
+     *
+     * Used as a helper when it is necessary to create a delete stage.
+     */
+    static std::unique_ptr<PlanStage> _createAppropriateDeleteStage(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        CollectionAcquisition coll,
+        std::unique_ptr<DeleteStageParams> params,
+        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
+        WorkingSet* ws,
+        PlanStage* child);
 };
 
 }  // namespace mongo

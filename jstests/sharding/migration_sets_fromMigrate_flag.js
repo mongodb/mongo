@@ -148,6 +148,17 @@ function assertEqAndDumpOpLog(expected, actual, msg) {
 }
 
 var donorOplogRes = donorLocal.oplog.rs.find({op: 'd', fromMigrate: true, 'o._id': 2}).count();
+// This delete oplog entry could be wrapped in a applyOps entry if the delete was done in a batch.
+if (!donorOplogRes) {
+    // Validate this is a batched delete, which generates one applyOps entry instead of a 'd' entry.
+    donorOplogRes = donorLocal.oplog.rs
+                        .find({
+                            ns: 'admin.$cmd',
+                            op: 'c',
+                            'o.applyOps': {$elemMatch: {op: 'd', 'o._id': 2, fromMigrate: true}}
+                        })
+                        .count();
+}
 assertEqAndDumpOpLog(1,
                      donorOplogRes,
                      "fromMigrate flag wasn't set on the donor shard's oplog for " +
