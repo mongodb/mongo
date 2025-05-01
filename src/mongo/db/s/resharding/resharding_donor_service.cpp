@@ -1038,13 +1038,14 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
             return ExecutorFuture<void>(**executor, Status::OK());
         })
         .then([this, executor, abortToken] {
-            auto batchCallback = [this, anchor = shared_from_this()](const auto& batch) {
+            auto batchCallback = [this,
+                                  factory = _cancelableOpCtxFactory,
+                                  anchor = shared_from_this()](const auto& batch) {
                 LOGV2(9858404,
                       "Persisting change streams monitor's progress",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                       "documentsDelta"_attr = batch.getDocumentsDelta(),
                       "completed"_attr = batch.containsFinalEvent());
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
                 auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
                 changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
@@ -1052,6 +1053,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                     changeStreamsMonitorCtx.getDocumentsDelta() + batch.getDocumentsDelta());
                 changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
 
+                auto opCtx = factory->makeOperationContext(&cc());
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
             };
 
