@@ -184,12 +184,6 @@ def generate(
         )
         return
 
-    # The expansions do not unclude information for the parent display task
-    # We have to query the evergreen api to get this information
-    display_task_name = None
-    if task_info.parent_task_id:
-        display_task_name = evg_api.task_by_id(task_info.parent_task_id).display_name
-
     # Make the evergreen variant that will be generated
     build_variant = BuildVariant(name=build_variant_name, activate=True)
     commands = get_core_analyzer_commands(
@@ -200,12 +194,8 @@ def generate(
     # TODO SERVER-92571 add archive_jstestshell_debug dep for variants that have it.
     sub_tasks = set([Task(get_generated_task_name(current_task_name, execution), commands, deps)])
 
-    if display_task_name:
-        # If the task is already in a display task add the new task to the current display task
-        build_variant.display_task(display_task_name, sub_tasks, distros=[distro])
-    else:
-        # If the task is not in a display task, just generate a new task
-        build_variant.add_tasks(sub_tasks, distros=[distro])
+    build_variant.add_tasks(sub_tasks, distros=[distro], activate=True)
+
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
 
