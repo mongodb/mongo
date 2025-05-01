@@ -49,6 +49,27 @@ namespace consensus {
  * Implementation of the Intent Registration system, used by operations to declare intents which are
  * required for access into the Storage layer.
  */
+
+class ReplicationStateTransitionGuard {
+    friend class IntentRegistry;
+    std::function<void()> _releaseCallback;
+    ReplicationStateTransitionGuard(std::function<void()> cb) : _releaseCallback(cb) {}
+
+public:
+    ReplicationStateTransitionGuard(const ReplicationStateTransitionGuard&) = delete;
+    ReplicationStateTransitionGuard(ReplicationStateTransitionGuard&&) noexcept = default;
+
+    void release() {
+        if (_releaseCallback) {
+            _releaseCallback();
+            _releaseCallback = nullptr;
+        }
+    }
+    ~ReplicationStateTransitionGuard() {
+        release();
+    }
+};
+
 class IntentRegistry {
     friend class IntentRegistryTest;
 
@@ -115,7 +136,8 @@ public:
      * that conflict with the ongoing state transtion from registering their
      * intent.
      */
-    stdx::future<bool> killConflictingOperations(InterruptionType interruption);
+    stdx::future<ReplicationStateTransitionGuard> killConflictingOperations(
+        InterruptionType interruption);
 
     /**
      * Marks the IntentRegistry enabled and resets the active and last interruption.
@@ -138,8 +160,8 @@ private:
     };
 
     bool _validIntent(Intent intent) const;
-    bool _killOperationsByIntent(Intent intent);
-    bool _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
+    void _killOperationsByIntent(Intent intent);
+    void _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
     static std::string _intentToString(Intent intent);
 
     bool _enabled = true;
