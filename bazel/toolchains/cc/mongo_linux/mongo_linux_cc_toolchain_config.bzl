@@ -883,10 +883,6 @@ def _impl(ctx):
                     # search path but can't be used.
                     "-Winvalid-pch",
 
-                    # Clang likes to warn about unused functions, which seems a tad
-                    # aggressive and breaks -Werror, which we want to be able to use.
-                    "-Wno-unused-function",
-
                     # This warning was added in g++-4.8.
                     "-Wno-unused-local-typedefs",
 

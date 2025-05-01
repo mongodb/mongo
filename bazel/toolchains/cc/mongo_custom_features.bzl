@@ -164,9 +164,29 @@ def get_common_features(ctx):
         ],
     )
 
+    no_unused_function_feature = feature(
+        name = "no_unused_function",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            # Clang likes to warn about unused functions, which seems a tad
+                            # aggressive and breaks -Werror, which we want to be able to use.
+                            "-Wno-unused-function",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     return [
         optimization_level_g_feature,
         optimization_level_0_feature,
         optimization_level_2_feature,
         optimization_level_size_feature,
+        no_unused_function_feature,
     ]
