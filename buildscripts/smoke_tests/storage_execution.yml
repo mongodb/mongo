@@ -137,7 +137,7 @@ suites:
     - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
     - jstests/noPassthrough/index_builds/serverstatus_indexbulkbuilder.js
     - jstests/noPassthrough/index_builds/rolling_index_builds.js
-    - jstests/noPassthrough/txns_too_large_for_cache/transaction_aborted_under_cache_pressure.js
+    - jstests/noPassthrough/txns_cache_errors/transaction_aborted_under_cache_pressure.js
     - jstests/noPassthrough/index_builds/hybrid_index_with_updates.js
     - jstests/noPassthrough/index_builds/timestamp_index_builds.js
     - jstests/noPassthrough/index_builds/index_build_operation_metrics.js

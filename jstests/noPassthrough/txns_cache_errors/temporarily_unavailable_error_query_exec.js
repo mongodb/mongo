@@ -22,6 +22,10 @@ const replSet = new ReplSetTest({
         setParameter: {
             logComponentVerbosity: tojson({control: 1, write: 1}),
             enableTemporarilyUnavailableExceptions: true,
+            // Disable the transaction too large for cache check.
+            transactionTooLargeForCacheThreshold: 1.0,
+            // Disable the periodic cache pressure rollback runner.
+            cachePressureQueryPeriodMilliseconds: 0,
             // Lower these values from the defaults to speed up the test.
             temporarilyUnavailableMaxRetries: maxRetries,
             temporarilyUnavailableBackoffBaseMs: 10,

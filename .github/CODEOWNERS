@@ -1072,12 +1072,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/ttl/OWNERS.yml
 /jstests/noPassthrough/ttl/**/* @10gen/server-ttl @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/txns_cache_errors/OWNERS.yml
+/jstests/noPassthrough/txns_cache_errors/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/txns_retryable_writes_sessions/OWNERS.yml
 /jstests/noPassthrough/txns_retryable_writes_sessions/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/noPassthrough/txns_retryable_writes_sessions/**/skip_write_conflict_retries_failpoint.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/noPassthrough/txns_too_large_for_cache/OWNERS.yml
-/jstests/noPassthrough/txns_too_large_for_cache/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/validate/OWNERS.yml
 /jstests/noPassthrough/validate/**/* @10gen/server-validate @svc-auto-approve-bot
