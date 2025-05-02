@@ -225,3 +225,12 @@ feature_flags:
         cpp_varname: feature_flags::gCheckInvalidDatabaseInGlobalCatalog
         default: false
         shouldBeFCVGated: true
+    # TODO (SERVER-104298): remove feature flag once 9.0 becomes last LTS.
+    featureFlagUseTwoStepRSToShardPromotion:
+        description:
+            "When enabled, promoting a replica set to a sharded cluster will take the new, two-step
+            path passing through a transitional phase where both direct and mongoS connections can
+            be used correctly."
+        cpp_varname: feature_flags::gUseTwoStepRSToShardPromotion
+        default: false
+        shouldBeFCVGated: true
