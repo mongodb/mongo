@@ -1161,9 +1161,9 @@ bool MWasmTernarySimd128::specializeBitselectConstantMaskAsShuffle(
   const SimdConstant::I8x16& bytes = constant.asInt8x16();
   for (int8_t i = 0; i < 16; i++) {
     if (bytes[i] == -1) {
-      shuffle[i] = i + 16;
-    } else if (bytes[i] == 0) {
       shuffle[i] = i;
+    } else if (bytes[i] == 0) {
+      shuffle[i] = i + 16;
     } else {
       return false;
     }
