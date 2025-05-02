@@ -84,10 +84,9 @@ buildvariants:
       - name: compile_test_and_package_serial_TG
         distros:
           - debian12-large
-      # TODO(DEVPROD-17028): Re-enable when this distro has 750gb of space like the other larges
-      #- name: run_unit_tests_TG
-      #  distros:
-      #    - debian12-large
+      - name: run_unit_tests_TG
+        distros:
+          - debian12-large
       - name: test_packages
         distros:
           - ubuntu2204-large
