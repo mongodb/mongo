@@ -24,11 +24,15 @@ def get_mongodb_remote(repo: Repo) -> Remote:
     for remote in remotes:
         url = remote.url
         # local repository pointing to a local dir
-        if not url.endswith(".git"):
+        remote_prefixes = ("http://", "https://", "ssh://", "git@")
+        if not any(url.startswith(prefix) for prefix in remote_prefixes):
             continue
+        # get rid of .git suffix if it exists
+        if url.endswith(".git"):
+            url = url[:-4]
 
-        # all other remote urls should end with owner/project.git
-        parts = url[:-4].split("/")
+        # all other remote urls should end with owner/project
+        parts = url.split("/")
         assert len(parts) >= 2, f"Unexpected git remote url: {url}"
         owner = parts[-2].split(":")[-1]
 

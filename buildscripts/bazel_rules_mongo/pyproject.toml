@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bazel_rules_mongo"
-version = "0.1.4"
+version = "0.1.5"
 description = "Bazel rule we use to ship common code between bazel repos"
 authors = ["Trevor Guidry <trevor.guidry@mongodb.com>"]
 readme = "README.md"
