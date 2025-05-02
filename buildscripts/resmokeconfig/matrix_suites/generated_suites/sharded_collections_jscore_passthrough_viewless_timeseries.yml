@@ -48,9 +48,11 @@ selector:
     - requires_capped
     - viewless_timeseries_incompatible
   roots:
+    - jstests/core/timeseries/ddl/timeseries_collation.js
     - jstests/core/timeseries/ddl/timeseries_compact.js
     - jstests/core/timeseries/ddl/timeseries_create_collection.js
     - jstests/core/timeseries/ddl/timeseries_list_catalog.js
+    - jstests/core/timeseries/ddl/timeseries_nondefault_collation.js
     - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
     - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
     - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js
@@ -62,6 +64,7 @@ selector:
     - jstests/core/timeseries/libs/timeseries_writes_util.js
     - jstests/core/timeseries/libs/viewless_timeseries_util.js
     - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
+    - jstests/core/timeseries/query/timeseries_block_explain.js
     - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
     - jstests/core/timeseries/query/timeseries_cursor_batches.js
     - jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
