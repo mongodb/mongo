@@ -59,12 +59,6 @@ GCC_OPT_DEFINES = select({
     "//conditions:default": [],
 })
 
-# TODO(SERVER-54659): ASIO depends on std::result_of which was removed in C++ 20
-LIBCXX_DEFINES = select({
-    "//bazel/config:use_libcxx_required_settings": ["ASIO_HAS_STD_INVOKE_RESULT"],
-    "//bazel/config:use_libcxx_disabled": [],
-}, no_match_error = LIBCXX_ERROR_MESSAGE)
-
 DEBUG_DEFINES = select({
     "//bazel/config:dbg_enabled": [],
     "//conditions:default": ["NDEBUG"],
@@ -106,7 +100,6 @@ TCMALLOC_DEFINES = select({
 MONGO_GLOBAL_DEFINES = (
     WINDOWS_DEFINES +
     DEBUG_DEFINES +
-    LIBCXX_DEFINES +
     ADDRESS_SANITIZER_DEFINES +
     THREAD_SANITIZER_DEFINES +
     UNDEFINED_SANITIZER_DEFINES +

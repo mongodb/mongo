@@ -243,20 +243,6 @@ use_glibcxx_debug = rule(
 )
 
 # =========
-# libc++
-# =========
-
-use_libcxx_provider = provider(
-    doc = """use libc++ (experimental, requires clang)""",
-    fields = ["enabled"],
-)
-
-use_libcxx = rule(
-    implementation = lambda ctx: use_libcxx_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)
-
-# =========
 # otel
 # =========
 

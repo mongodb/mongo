@@ -32,13 +32,6 @@ IMPLICIT_FALLTHROUGH_COPTS = select({
     "//conditions:default": [],
 })
 
-LIBCXX_COPTS = select({
-    "//bazel/config:use_libcxx_required_settings": ["-stdlib=libc++"],
-    "//bazel/config:use_libcxx_disabled": [],
-}, no_match_error = LIBCXX_ERROR_MESSAGE)
-
-LIBCXX_LINKFLAGS = LIBCXX_COPTS
-
 # -fno-omit-frame-pointer should be added if any sanitizer flag is used by user
 ANY_SANITIZER_AVAILABLE_COPTS = select({
     "//bazel/config:any_sanitizer_required_setting": [
@@ -351,7 +344,6 @@ MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
 
 MONGO_LINUX_CC_COPTS = (
     MONGO_GLOBAL_INCLUDE_DIRECTORIES +
-    LIBCXX_COPTS +
     ADDRESS_SANITIZER_COPTS +
     MEMORY_SANITIZER_COPTS +
     FUZZER_SANITIZER_COPTS +
@@ -377,7 +369,6 @@ MONGO_LINUX_CC_LINKFLAGS = (
     FUZZER_SANITIZER_LINKFLAGS +
     UNDEFINED_SANITIZER_LINKFLAGS +
     THREAD_SANITIZER_LINKFLAGS +
-    LIBCXX_LINKFLAGS +
     DETECT_ODR_VIOLATIONS_LINKFLAGS +
     BIND_AT_LOAD_LINKFLAGS +
     ANY_SANITIZER_AVAILABLE_LINKFLAGS +

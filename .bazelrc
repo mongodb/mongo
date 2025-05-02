@@ -94,7 +94,6 @@ common --flag_alias=use_wiredtiger=//bazel/config:use_wiredtiger
 common --flag_alias=use_glibcxx_debug=//bazel/config:use_glibcxx_debug
 common --flag_alias=use_tracing_profiler=//bazel/config:use_tracing_profiler
 common --flag_alias=build_otel=//bazel/config:build_otel
-common --flag_alias=use_libcxx=//bazel/config:use_libcxx
 common --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
 common --flag_alias=shared_archive=//bazel/config:shared_archive
 common --flag_alias=skip_archive=//bazel/config:skip_archive
@@ -369,7 +368,6 @@ test:windows --action_env=MSYS=winsymlinks:nativestrict
 common:macos --//bazel/config:compiler_type=clang
 
 common:macos --macos_minimum_os=11.0
-common:macos --use_libcxx=True
 # TODO(SERVER-102959): Find out why tests fail when mac is not in compilation mode dbg
 common:macos -c dbg
 

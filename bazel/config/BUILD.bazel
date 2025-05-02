@@ -47,7 +47,6 @@ load(
     "use_disable_ref_track",
     "use_gdbserver",
     "use_glibcxx_debug",
-    "use_libcxx",
     "use_lldbserver",
     "use_ocsp_stapling",
     "use_wait_for_debugger",
@@ -1218,44 +1217,6 @@ selects.config_setting_group(
     match_all = [
         ":use_glibcxx_debug_enabled",
         ":dbg_enabled",
-        ":use_libcxx_disabled",
-    ],
-)
-
-# --------------------------------------
-# libc++ options
-# --------------------------------------
-
-use_libcxx(
-    name = "use_libcxx",
-    build_setting_default = False,
-)
-
-# TODO SERVER-85340 when libc++ is readded remove the macos constraint
-config_setting(
-    name = "use_libcxx_enabled",
-    constraint_values = [
-        "@platforms//os:macos",
-    ],
-    flag_values = {
-        "//bazel/config:use_libcxx": "True",
-    },
-)
-
-config_setting(
-    name = "use_libcxx_disabled",
-    flag_values = {
-        "//bazel/config:use_libcxx": "False",
-    },
-)
-
-# --------------------------------------------
-# ----------- computed libc++ flags ----------
-selects.config_setting_group(
-    name = "use_libcxx_required_settings",
-    match_all = [
-        ":use_libcxx_enabled",
-        ":compiler_type_clang",
     ],
 )
 
