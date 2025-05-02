@@ -1061,6 +1061,45 @@ tasks:
             - "--evg-project-name=${project}"
             - "--evg-auth-config=.evergreen.yml"
 
+  - name: lint_modules
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "lint",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          # 60 mins
+          exec_timeout_secs: 3600
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "bazel compile"
+        vars:
+          targets: //src/mongo/...
+          bazel_args: >-
+            --config=mod-scanner
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "validate-module-calls"
+            - "modules_poc/merge_decls.py"
+
   - name: bazel_coverage
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on:

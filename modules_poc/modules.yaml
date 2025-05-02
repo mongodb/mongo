@@ -35,8 +35,6 @@ core:
     - src/mongo/stdx/
     - src/mongo/util/
     - src/mongo/db/json.h
-    # Unsure about this but putting here for now:
-    - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
     - src/mongo/db/field_parser[._]*
     - src/mongo/db/generic_argument_util.*
     - src/mongo/db/mongod.cpp
@@ -70,6 +68,8 @@ core.bson:
   files:
     - src/mongo/bson/
     - src/mongo/dbtests/jsobjtests.cpp
+    # Unsure about this but putting here for now:
+    - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
 
 core.idl:
   files:
