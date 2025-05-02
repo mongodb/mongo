@@ -929,15 +929,40 @@ Status WiredTigerUtil::setTableLogging(WiredTigerSession& session,
     return Status::OK();
 }
 
+static int mdb_handle_error_for_statistics(WT_EVENT_HANDLER* handler,
+                                           WT_SESSION* session,
+                                           int errorCode,
+                                           const char* message) {
+    if (errorCode == EINVAL) {
+        // suppressing error "cannot open a non-statistics cursor before connection is opened" error
+        try {
+            // Parse the WT JSON message string.
+            if (BSONObj obj = fromjson(message); obj.getStringField("msg").ends_with(
+                    "cannot open a non-statistics cursor before connection is opened")) {
+                return 0;
+            }
+        } catch (...) {
+            // Fall back to default behaviour.
+        }
+    }
+    // If it is not the error above we delegate to the normal error handling.
+    return mdb_handle_error(handler, session, errorCode, message);
+}
+
 bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob) {
     boost::optional<StatsCollectionPermit> permit = engine->tryGetStatsCollectionPermit();
     if (!permit) {
         return false;
     }
 
+    // Silence some errors when trying to get statistics during startup
+    WiredTigerEventHandler eventHandler;
+    auto handler = eventHandler.getWtEventHandler();
+    handler->handle_error = mdb_handle_error_for_statistics;
+
     // Obtain a session that can be used during shut down,
     // potentially before the storage engine itself shuts down.
-    WiredTigerSession session(&engine->getConnection(), *permit);
+    WiredTigerSession session(&engine->getConnection(), handler, *permit);
 
     // Filter out irrelevant statistic fields.
     std::vector<std::string> fieldsToIgnore = {"LSM"};
@@ -963,9 +988,14 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine* engine, BSONObjB
         return false;
     }
 
+    // Silence some errors when trying to get statistics during startup
+    WiredTigerEventHandler eventHandler;
+    auto handler = eventHandler.getWtEventHandler();
+    handler->handle_error = mdb_handle_error_for_statistics;
+
     // Obtain a session that can be used during shut down, potentially before the storage engine
     // itself shuts down.
-    WiredTigerSession session(&engine->getConnection(), *permit);
+    WiredTigerSession session(&engine->getConnection(), handler, *permit);
 
     const auto historyStorageStatUri = "statistics:file:WiredTigerHS.wt";
 

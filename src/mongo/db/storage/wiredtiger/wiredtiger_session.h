@@ -97,6 +97,18 @@ public:
      */
     WiredTigerSession(WiredTigerConnection* connection, StatsCollectionPermit& permit);
 
+    /**
+     * Creates a new WT session for collecting statistics possibly during shutdown (but before
+     * wiredtiger itself shuts down).
+     *
+     * @param handler Callback handler that will be invoked by wiredtiger.
+     * @param connection WT connection
+     * @param permit Token showing that you asked the engine for permission to open this session.
+     */
+    WiredTigerSession(WiredTigerConnection* connection,
+                      WT_EVENT_HANDLER* handler,
+                      StatsCollectionPermit& permit);
+
     ~WiredTigerSession();
 
     WiredTigerConnection& getConnection() {

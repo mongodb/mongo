@@ -68,6 +68,16 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
       _connection(connection),
       _idleExpireTime(Date_t::min()) {}
 
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
+                                     WT_EVENT_HANDLER* handler,
+                                     StatsCollectionPermit& permit)
+    : _epoch(0),
+      _session(connection->_openSession(this, handler, permit, "isolation=snapshot")),
+      _cursorGen(0),
+      _cursorsOut(0),
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
+
 WiredTigerSession::~WiredTigerSession() {
     detachOperationContext();
     if (_session) {

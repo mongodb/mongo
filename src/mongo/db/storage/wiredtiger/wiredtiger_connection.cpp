@@ -265,6 +265,15 @@ WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,
 }
 
 WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,
+                                               WT_EVENT_HANDLER* handler,
+                                               StatsCollectionPermit& permit,
+                                               const char* config) {
+    invariant(permit.conn());
+    invariant(handler);
+    return _openSessionInternal(session, handler, config, permit.conn());
+}
+
+WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,
                                                StatsCollectionPermit& permit,
                                                const char* config) {
     invariant(permit.conn());

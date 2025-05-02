@@ -192,6 +192,12 @@ private:
                              StatsCollectionPermit& permit,
                              const char* config);
 
+    // Similar to the above but accepts an event handler.
+    WT_SESSION* _openSession(WiredTigerSession* session,
+                             WT_EVENT_HANDLER* handler,
+                             StatsCollectionPermit& permit,
+                             const char* config);
+
     // Similar to the above, but opens a session using the provided connection.
     WT_SESSION* _openSessionInternal(WiredTigerSession* session,
                                      WT_EVENT_HANDLER* handler,
