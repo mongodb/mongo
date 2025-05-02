@@ -65,8 +65,12 @@ function stressShardedLookup(dbName, collNameNotSampled, collNameSampled) {
     let i = 0;
     const startTimeMs = Date.now();
     while (Date.now() - startTimeMs < durationMs) {
-        assert.commandWorked(
-            st.s1.adminCommand({moveChunk: sampledNsSharded, find: {x: 0}, to: shardNames[i % 2]}));
+        assert.commandWorked(st.s1.adminCommand({
+            moveChunk: sampledNsSharded,
+            find: {x: 0},
+            to: shardNames[i % 2],
+            _waitForDelete: true
+        }));
         i++;
     }
     aggThread.join();
