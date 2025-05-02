@@ -696,6 +696,7 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
+      - func: "get engflow creds"
       - command: subprocess.exec
         type: test
         params:
@@ -903,6 +904,7 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
+      - func: "get engflow creds"
       - command: subprocess.exec
         params:
           binary: bash

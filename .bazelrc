@@ -50,6 +50,9 @@ common --cache_test_results=no
 # Stream the test output so users can see the test progression.
 common --test_output=streamed
 
+# when using remote asset api, fallback to the direct urls to download
+common --experimental_remote_downloader_local_fallback
+
 # Build only what is necessary to run the *_test and test_suite rules that were
 # not filtered due to their size, timeout, tag, or language.
 test --build_tests_only
@@ -393,6 +396,7 @@ common:windows --remote_executor=
 common:macos --remote_executor=
 
 # Enable remote cache (also necessary for remote build execution):
+common --experimental_remote_downloader=grpcs://sodalite.cluster.engflow.com
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
 common --bes_backend=grpcs://sodalite.cluster.engflow.com
 common --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
@@ -429,6 +433,7 @@ common:mod-scanner --remote_download_regex=.*\.mod_scanner_decls.json$
 # by passing "--config=local" on the bazel command line
 --config=local
 common:local --remote_executor=
+common:local --experimental_remote_downloader=
 common:local --remote_cache=
 common:local --bes_backend=
 common:local --bes_results_url=

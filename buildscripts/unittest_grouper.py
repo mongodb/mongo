@@ -155,8 +155,6 @@ def validate_bazel_groups(generate_report, fix):
         "--implicit_deps=False",
         "--tool_deps=False",
         "--include_aspects=False",
-        "--remote_executor=",
-        "--remote_cache=",
         "--bes_backend=",
         "--bes_results_url=",
     ]

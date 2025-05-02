@@ -137,7 +137,7 @@ fi
 
 if [ "$skip_python" == "0" ]; then
   # known list of commands to skip
-  skip_commands=("clean" "version" "shutdown")
+  skip_commands=("clean" "version" "shutdown" "info")
 
   for command in "${skip_commands[@]}"
   do
@@ -167,7 +167,7 @@ fi
 # if no python use bazel to install one
 if [[ "$python" = "" ]] || [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
-  >&2 $bazel_real build --config=local @py_${os}_${ARCH}//:all
+  >&2 $bazel_real build --bes_backend= --bes_results_url= @py_${os}_${ARCH}//:all
   if [[ $? != 0 ]]; then
     if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
       >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."

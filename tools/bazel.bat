@@ -36,6 +36,7 @@ if !current_bazel_command!=="" set skip_python="1"
 if !skip_python!=="0" if !current_bazel_command!=="clean" set skip_python="1"
 if !skip_python!=="0" if !current_bazel_command!=="version" set skip_python="1"
 if !skip_python!=="0" if !current_bazel_command!=="shutdown" set skip_python="1"
+if !skip_python!=="0" if !current_bazel_command!=="info" set skip_python="1"
 
 if !skip_python!=="1" (
     "%BAZEL_REAL%" %*
@@ -48,7 +49,7 @@ if exist %REPO_ROOT%\bazel-%cur_dir% (
 )
 if not exist "!python!" (
     echo python prereq missing, using bazel to install python... 1>&2
-    "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all 1>&2
+    "%BAZEL_REAL%" build --bes_backend= --bes_results_url= @py_windows_x86_64//:all 1>&2
     
     if %ERRORLEVEL% NEQ 0 (
         if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%

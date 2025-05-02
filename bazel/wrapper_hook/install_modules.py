@@ -120,7 +120,14 @@ def install_modules(bazel):
 
     if need_to_install:
         subprocess.run(
-            [bazel, "build", "--config=local"] + ["@poetry//:library_" + dep for dep in deps_needed]
+            [
+                bazel,
+                "build",
+                "--remote_download_all",
+                "--bes_backend=",
+                "--bes_results_url=",
+            ]
+            + ["@poetry//:library_" + dep for dep in deps_needed]
         )
         deps_missing = search_for_modules(deps_needed, deps_installed)
         if deps_missing:
