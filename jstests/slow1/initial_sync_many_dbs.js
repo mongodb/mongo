@@ -1,5 +1,7 @@
 /**
  * Runs initial sync on a node with many databases.
+ *
+ * @tags: [incompatible_with_macos]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
