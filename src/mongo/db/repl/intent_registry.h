@@ -155,12 +155,27 @@ public:
 
     void setDrainTimeout(uint32_t sec);
 
+    /**
+     * Returns the Intent held by an opCtx (boost::none if it is not holding any).
+     */
+    boost::optional<Intent> getHeldIntent(OperationContext* opCtx) const;
+
+    /**
+     * Checks if the opCtx is holding an Intent.
+     */
+    bool isIntentHeld(OperationContext* opCtx) const;
+
 
 private:
     struct tokenMap {
         stdx::mutex lock;
         stdx::condition_variable cv;
         stdx::unordered_map<IntentToken::idType, OperationContext*> map;
+    };
+
+    struct opCtxIntentMap {
+        stdx::mutex lock;
+        stdx::unordered_map<OperationContext*, Intent> map;
     };
 
     bool _validIntent(Intent intent) const;
@@ -174,6 +189,7 @@ private:
     bool _activeInterruption = false;
     InterruptionType _lastInterruption = InterruptionType::None;
     std::vector<tokenMap> _tokenMaps;
+    mutable opCtxIntentMap _opCtxIntentMap;
     std::chrono::seconds _drainTimeoutSec =
         std::chrono::seconds(repl::fassertOnLockTimeoutForStepUpDown.load());
 };

@@ -97,14 +97,29 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
     IntentToken token(intent);
     LOGV2(9945004, "Register Intent", "token"_attr = token.id(), "intent"_attr = intent);
     {
-        stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
+        stdx::unique_lock<stdx::mutex> lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(), opCtx});
+    }
+    {
+        stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
+        auto ins = _opCtxIntentMap.map.insert({opCtx, token.intent()});
+        uassert(1026190, "Operation context already has a registered intent.", ins.second);
     }
     return token;
 }
 void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     auto& tokenMap = _tokenMaps[(size_t)token.intent()];
     stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
+    {
+        stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
+        // Find IntentToken:opCtx pair in tokenMap.
+        auto tokenMapIter = tokenMap.map.find(token.id());
+        if (tokenMapIter != tokenMap.map.end()) {
+            auto opCtx = tokenMapIter->second;
+            _opCtxIntentMap.map.erase(opCtx);
+        }
+    }
+
     (void)tokenMap.map.erase(token.id());
     if (tokenMap.map.empty()) {
         tokenMap.cv.notify_all();
@@ -185,6 +200,21 @@ void IntentRegistry::disable() {
 
 void IntentRegistry::setDrainTimeout(uint32_t sec) {
     _drainTimeoutSec = std::chrono::seconds(sec);
+}
+
+boost::optional<IntentRegistry::Intent> IntentRegistry::getHeldIntent(
+    OperationContext* opCtx) const {
+    stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
+    auto iter = _opCtxIntentMap.map.find(opCtx);
+    if (iter != _opCtxIntentMap.map.end()) {
+        return iter->second;
+    } else {
+        return boost::none;
+    }
+}
+
+bool IntentRegistry::isIntentHeld(OperationContext* opCtx) const {
+    return (getHeldIntent(opCtx) != boost::none);
 }
 
 bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {

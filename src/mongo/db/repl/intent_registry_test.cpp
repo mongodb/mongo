@@ -50,9 +50,18 @@ auto executePerIntent = [](const std::function<void(IntentRegistry::Intent)>& f,
 TEST_F(IntentRegistryTest, RegisterDeregisterIntent) {
     _intentRegistry.enable();
     std::vector<IntentRegistry::IntentToken> tokens;
+    auto serviceContext = getServiceContext();
+    size_t client_i = 0;
+    std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
+        contexts;
+
     auto createTokens = [&](IntentRegistry::Intent intent) {
-        auto opCtx = makeOperationContext();
-        auto registerResult = _intentRegistry.registerIntent(intent, opCtx.get());
+        contexts.emplace_back();
+        contexts.back().first =
+            serviceContext->getService()->makeClient(std::to_string(client_i++));
+        contexts.back().second = contexts.back().first->makeOperationContext();
+        auto opCtx = contexts.back().second.get();
+        auto registerResult = _intentRegistry.registerIntent(intent, opCtx);
         tokens.push_back(registerResult);
         ASSERT_TRUE(containsToken(registerResult));
     };
@@ -480,11 +489,11 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
         _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::StepDown);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     {
-        auto client = serviceContext->getService()->makeClient("testClient");
-        auto opCtx = client->makeOperationContext();
+        auto clientWrite = serviceContext->getService()->makeClient("testClientWrite");
+        auto opCtxWrite = clientWrite->makeOperationContext();
 
         try {
-            IntentGuard writeGuard(IntentRegistry::Intent::Write, opCtx.get());
+            IntentGuard writeGuard(IntentRegistry::Intent::Write, opCtxWrite.get());
             // Fail the test if constructing the intentGuard succeeds, as it means it incorrectly
             // registered the intent and did not throw an exception.
             ASSERT_TRUE(false);
@@ -493,10 +502,16 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
         }
 
         // Read and Local Write intents are compatible with ongoing StepDown interruption.
-        IntentGuard readGuard(IntentRegistry::Intent::Read, opCtx.get());
+        auto clientRead = serviceContext->getService()->makeClient("testClientRead");
+        auto opCtxRead = clientRead->makeOperationContext();
+        IntentGuard readGuard(IntentRegistry::Intent::Read, opCtxRead.get());
         ASSERT_TRUE(readGuard.intent() != boost::none);
-        IntentGuard localWriteGuard(IntentRegistry::Intent::LocalWrite, opCtx.get());
+
+        auto clientLocalWrite = serviceContext->getService()->makeClient("testClientLocalWrite");
+        auto opCtxLocalWrite = clientLocalWrite->makeOperationContext();
+        IntentGuard localWriteGuard(IntentRegistry::Intent::LocalWrite, opCtxLocalWrite.get());
         ASSERT_TRUE(localWriteGuard.intent() != boost::none);
+
         ASSERT_EQUALS(10, getMapSize(IntentRegistry::Intent::Write));
         ASSERT_EQUALS(11, getMapSize(IntentRegistry::Intent::Read));
         ASSERT_EQUALS(11, getMapSize(IntentRegistry::Intent::LocalWrite));
