@@ -26,7 +26,6 @@
 #include <algorithm>
 #include <stdexcept>
 #include <boost/assert.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/atomic/ipc_atomic.hpp>

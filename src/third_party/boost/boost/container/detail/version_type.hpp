@@ -57,20 +57,20 @@ struct has_version
    template <class U> static two test(...);
    template <class U> static char test(const typename U::version*);
    public:
-   static const bool value = sizeof(test<T>(0)) == 1;
+   BOOST_STATIC_CONSTEXPR bool value = sizeof(test<T>(0)) == 1;
    void dummy(){}
 };
 
 template <class T, bool = has_version<T>::value>
 struct version
 {
-   static const unsigned value = 1;
+   BOOST_STATIC_CONSTEXPR unsigned value = 1;
 };
 
 template <class T>
 struct version<T, true>
 {
-   static const unsigned value = extract_version<T>::type::value;
+   BOOST_STATIC_CONSTEXPR unsigned value = extract_version<T>::type::value;
 };
 
 }  //namespace impl
@@ -83,7 +83,7 @@ struct version
 template<class T, unsigned N>
 struct is_version
 {
-   static const bool value =
+   BOOST_STATIC_CONSTEXPR bool value =
       is_same< typename version<T>::type, integral_constant<unsigned, N> >::value;
 };
 

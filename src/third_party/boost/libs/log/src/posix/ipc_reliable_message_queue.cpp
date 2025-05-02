@@ -35,7 +35,6 @@
 #include <time.h>
 #endif
 #include <boost/assert.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/atomic/atomic.hpp>

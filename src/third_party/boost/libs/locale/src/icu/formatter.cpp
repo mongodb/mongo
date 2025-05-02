@@ -1,254 +1,229 @@
 //
-//  Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2021-2024 Alexander Grund
 //
-//  Distributed under the Boost Software License, Version 1.0. (See
-//  accompanying file LICENSE_1_0.txt or copy at
-//  http://www.boost.org/LICENSE_1_0.txt)
-//
-#define BOOST_LOCALE_SOURCE
-#include <boost/locale/formatting.hpp>
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
+
 #include "formatter.hpp"
+#include <boost/locale/formatting.hpp>
 #include <boost/locale/info.hpp>
+#include "../util/foreach_char.hpp"
+#include "../util/numeric_conversion.hpp"
+#include "formatters_cache.hpp"
+#include "icu_util.hpp"
+#include "time_zone.hpp"
 #include "uconv.hpp"
-
-
+#include <boost/assert.hpp>
+#include <boost/charconv/limits.hpp>
+#include <boost/charconv/to_chars.hpp>
+#include <limits>
+#include <memory>
+#ifdef BOOST_MSVC
+#    pragma warning(push)
+#    pragma warning(disable : 4251) // "identifier" : class "type" needs to have dll-interface...
+#endif
+#include <unicode/datefmt.h>
 #include <unicode/numfmt.h>
 #include <unicode/rbnf.h>
-#include <unicode/datefmt.h>
 #include <unicode/smpdtfmt.h>
-#include <unicode/decimfmt.h>
-
-#include <limits>
-
-#include <iostream>
-
-#include "predefined_formatters.hpp"
-#include "time_zone.hpp"
 
 #ifdef BOOST_MSVC
-#  pragma warning(disable : 4244) // lose data 
+#    pragma warning(pop)
+#    pragma warning(disable : 4244) // lose data
 #endif
 
+namespace boost { namespace locale { namespace impl_icu {
 
-namespace boost {
-namespace locale {
-    namespace impl_icu {
-        
-        
-        std::locale::id icu_formatters_cache::id;
-
-        namespace {
-            struct init { init() { std::has_facet<icu_formatters_cache>(std::locale::classic()); } } instance;
-        }
-
-        
-        template<typename CharType>
-        class number_format : public formatter<CharType> {
-        public:
-            typedef CharType char_type;
-            typedef std::basic_string<CharType> string_type;
-            
-            virtual string_type format(double value,size_t &code_points) const
-            {
-                icu::UnicodeString tmp;
-                icu_fmt_->format(value,tmp);
-                code_points=tmp.countChar32();
-                return cvt_.std(tmp);
-            }
-            virtual string_type format(int64_t value,size_t &code_points) const
-            {
-                icu::UnicodeString tmp;
-                icu_fmt_->format(static_cast< ::int64_t>(value),tmp);
-                code_points=tmp.countChar32();
-                return cvt_.std(tmp);
-            }
-
-            virtual string_type format(int32_t value,size_t &code_points) const
-            {
-                icu::UnicodeString tmp;
-                #ifdef __SUNPRO_CC 
-                icu_fmt_->format(static_cast<int>(value),tmp);
-                #else
-                icu_fmt_->format(::int32_t(value),tmp);
-                #endif
-                code_points=tmp.countChar32();
-                return cvt_.std(tmp);
-            }
-
-            virtual size_t parse(string_type const &str,double &value) const 
-            {
-                return do_parse(str,value);
-            }
-
-            virtual size_t parse(string_type const &str,int64_t &value) const 
-            {
-                return do_parse(str,value);
-            }
-            virtual size_t parse(string_type const &str,int32_t &value) const
-            {
-                return do_parse(str,value);
-            }
-
-            number_format(icu::NumberFormat *fmt,std::string codepage) :
-                cvt_(codepage),
-                icu_fmt_(fmt)
-            {
-            }
- 
-        private:
-            
-            bool get_value(double &v,icu::Formattable &fmt) const
-            {
-                UErrorCode err=U_ZERO_ERROR;
-                v=fmt.getDouble(err);
-                if(U_FAILURE(err))
-                    return false;
-                return true;
-            }
-
-            bool get_value(int64_t &v,icu::Formattable &fmt) const
-            {
-                UErrorCode err=U_ZERO_ERROR;
-                v=fmt.getInt64(err);
-                if(U_FAILURE(err))
-                    return false;
-                return true;
-            }
-
-            bool get_value(int32_t &v,icu::Formattable &fmt) const
-            {
-                UErrorCode err=U_ZERO_ERROR;
-                v=fmt.getLong(err);
-                if(U_FAILURE(err))
-                    return false;
-                return true;
-            }
-
-            template<typename ValueType>
-            size_t do_parse(string_type const &str,ValueType &v) const
-            {
-                icu::Formattable val;
-                icu::ParsePosition pp;
-                icu::UnicodeString tmp = cvt_.icu(str.data(),str.data()+str.size());
-
-                icu_fmt_->parse(tmp,val,pp);
-
-                ValueType tmp_v;
-
-                if(pp.getIndex() == 0 || !get_value(tmp_v,val))
-                    return 0;
-                size_t cut = cvt_.cut(tmp,str.data(),str.data()+str.size(),pp.getIndex());
-                if(cut==0)
-                    return 0;
-                v=tmp_v;
-                return cut;
-            }
-
-            icu_std_converter<CharType> cvt_;
-            icu::NumberFormat *icu_fmt_;
-        };
-        
-        
-        template<typename CharType>
-        class date_format : public formatter<CharType> {
-        public:
-            typedef CharType char_type;
-            typedef std::basic_string<CharType> string_type;
-            
-            virtual string_type format(double value,size_t &code_points) const
-            {
-                return do_format(value,code_points);
-            }
-            virtual string_type format(int64_t value,size_t &code_points) const
-            {
-                return do_format(value,code_points);
-            }
-
-            virtual string_type format(int32_t value,size_t &code_points) const
-            {
-                return do_format(value,code_points);
-            }
-
-            virtual size_t parse(string_type const &str,double &value) const 
-            {
-                return do_parse(str,value);
-            }
-            virtual size_t parse(string_type const &str,int64_t &value) const 
-            {
-                return do_parse(str,value);
-            }
-            virtual size_t parse(string_type const &str,int32_t &value) const
-            {
-                return do_parse(str,value);
-            }
-
-            date_format(icu::DateFormat *fmt,bool transfer_owneship,std::string codepage) :
-                cvt_(codepage)
-            {
-                if(transfer_owneship) {
-                    aicu_fmt_.reset(fmt);
-                    icu_fmt_ = aicu_fmt_.get();
-                }
-                else {
-                    icu_fmt_ = fmt;
-                }
-            }
- 
-        private:
-
-            template<typename ValueType>
-            size_t do_parse(string_type const &str,ValueType &value) const
-            {
-                icu::ParsePosition pp;
-                icu::UnicodeString tmp = cvt_.icu(str.data(),str.data() + str.size());
-
-                UDate udate = icu_fmt_->parse(tmp,pp);
-                if(pp.getIndex() == 0)
-                    return 0;
-                double date = udate / 1000.0;
-                typedef std::numeric_limits<ValueType> limits_type;
-                if(date > limits_type::max() || date < limits_type::min())
-                    return 0;
-                size_t cut = cvt_.cut(tmp,str.data(),str.data()+str.size(),pp.getIndex());
-                if(cut==0)
-                    return 0;
-                value=static_cast<ValueType>(date);
-                return cut;
-
-            }
-            
-            string_type do_format(double value,size_t &codepoints) const 
-            {
-                UDate date = value * 1000.0; /// UDate is time_t in miliseconds
-                icu::UnicodeString tmp;
-                icu_fmt_->format(date,tmp);
-                codepoints=tmp.countChar32();
-                return cvt_.std(tmp);
-            }
-
-            icu_std_converter<CharType> cvt_;
-            hold_ptr<icu::DateFormat> aicu_fmt_;
-            icu::DateFormat *icu_fmt_;
-        };
-
-        icu::UnicodeString strftime_to_icu_full(icu::DateFormat *dfin,char const *alt)
+    namespace {
+        // Set the min/max fraction digits for the NumberFormat
+        void set_fraction_digits(icu::NumberFormat& nf, const std::ios_base::fmtflags how, std::streamsize precision)
         {
-            hold_ptr<icu::DateFormat> df(dfin);
-            icu::SimpleDateFormat *sdf=dynamic_cast<icu::SimpleDateFormat *>(df.get());
+#if BOOST_LOCALE_ICU_VERSION >= 5601
+            // Since ICU 56.1 the integer part counts to the fraction part
+            if(how == std::ios_base::scientific)
+                precision += nf.getMaximumIntegerDigits();
+#endif
+            nf.setMaximumFractionDigits(precision);
+            if(how == std::ios_base::scientific || how == std::ios_base::fixed)
+                nf.setMinimumFractionDigits(precision);
+            else
+                nf.setMinimumFractionDigits(0);
+        }
+    } // namespace
+
+    template<typename CharType>
+    class number_format : public formatter<CharType> {
+    public:
+        typedef std::basic_string<CharType> string_type;
+
+        number_format(icu::NumberFormat& fmt, const std::string& codepage, bool isNumberOnly = false) :
+            cvt_(codepage), icu_fmt_(fmt), isNumberOnly_(isNumberOnly)
+        {}
+
+        string_type format(double value, size_t& code_points) const override { return do_format(value, code_points); }
+        string_type format(int64_t value, size_t& code_points) const override { return do_format(value, code_points); }
+        string_type format(int32_t value, size_t& code_points) const override { return do_format(value, code_points); }
+        size_t parse(const string_type& str, double& value) const override { return do_parse(str, value); }
+        size_t parse(const string_type& str, uint64_t& value) const override { return do_parse(str, value); }
+        size_t parse(const string_type& str, int64_t& value) const override { return do_parse(str, value); }
+        size_t parse(const string_type& str, int32_t& value) const override { return do_parse(str, value); }
+
+        string_type format(const uint64_t value, size_t& code_points) const override
+        {
+            // ICU only supports int64_t as the largest integer type
+            if(value <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
+                return format(static_cast<int64_t>(value), code_points);
+
+            // Fallback to using a StringPiece (decimal number) as input
+            char buffer[boost::charconv::limits<uint64_t>::max_chars10 + 1];
+            auto res = boost::charconv::to_chars(buffer, std::end(buffer), value);
+            BOOST_ASSERT(res);
+            BOOST_ASSERT(res.ptr < std::end(buffer));
+            *res.ptr = '\0'; // ICU expects a NULL-terminated string even for the StringPiece
             icu::UnicodeString tmp;
-            if(sdf) {
-                sdf->toPattern(tmp);
-            }
-            else {
-                tmp=alt;
-            }
-            return tmp;
-
+            UErrorCode err = U_ZERO_ERROR;
+            icu_fmt_.format(icu::StringPiece(buffer, res.ptr - buffer), tmp, nullptr, err);
+            check_and_throw_icu_error(err);
+            code_points = tmp.countChar32();
+            return cvt_.std(tmp);
         }
 
-        icu::UnicodeString strftime_to_icu_symbol(char c,icu::Locale const &locale,icu_formatters_cache const *cache=0)
+    private:
+        bool get_value(double& v, icu::Formattable& fmt) const
         {
-            switch(c) {
+            UErrorCode err = U_ZERO_ERROR;
+            v = fmt.getDouble(err);
+            return U_SUCCESS(err);
+        }
+
+        bool get_value(int64_t& v, icu::Formattable& fmt) const
+        {
+            UErrorCode err = U_ZERO_ERROR;
+            v = fmt.getInt64(err);
+            return U_SUCCESS(err);
+        }
+
+        bool get_value(uint64_t& v, icu::Formattable& fmt) const
+        {
+            UErrorCode err = U_ZERO_ERROR;
+            // ICU only supports int64_t as the largest integer type
+            const int64_t tmp = fmt.getInt64(err);
+            if(U_SUCCESS(err)) {
+                if(tmp < 0)
+                    return false;
+                v = static_cast<uint64_t>(tmp);
+                return true;
+            }
+            return util::try_parse_icu(fmt, v);
+        }
+
+        bool get_value(int32_t& v, icu::Formattable& fmt) const
+        {
+            UErrorCode err = U_ZERO_ERROR;
+            v = fmt.getLong(err);
+            return U_SUCCESS(err);
+        }
+
+        template<typename ValueType>
+        string_type do_format(ValueType value, size_t& code_points) const
+        {
+            icu::UnicodeString tmp;
+            icu_fmt_.format(value, tmp);
+            code_points = tmp.countChar32();
+            return cvt_.std(tmp);
+        }
+
+        template<typename ValueType>
+        size_t do_parse(const string_type& str, ValueType& v) const
+        {
+            icu::Formattable val;
+            icu::ParsePosition pp;
+            icu::UnicodeString tmp = cvt_.icu(str.data(), str.data() + str.size());
+
+            // For the plain number parsing (no currency etc) parse "123.456" as 2 ints
+            // not a float later converted to int
+            icu_fmt_.setParseIntegerOnly(std::is_integral<ValueType>::value && isNumberOnly_);
+            icu_fmt_.parse(tmp, val, pp);
+
+            if(pp.getIndex() == 0 || !get_value(v, val))
+                return 0;
+            size_t cut = cvt_.cut(tmp, str.data(), str.data() + str.size(), pp.getIndex());
+            if(cut == 0)
+                return 0;
+            return cut;
+        }
+
+        icu_std_converter<CharType> cvt_;
+        icu::NumberFormat& icu_fmt_;
+        const bool isNumberOnly_;
+    };
+
+    template<typename CharType>
+    class date_format : public formatter<CharType> {
+    public:
+        typedef std::basic_string<CharType> string_type;
+
+        string_type format(double value, size_t& code_points) const override { return do_format(value, code_points); }
+        string_type format(uint64_t value, size_t& code_points) const override { return do_format(value, code_points); }
+        string_type format(int64_t value, size_t& code_points) const override { return do_format(value, code_points); }
+        string_type format(int32_t value, size_t& code_points) const override { return do_format(value, code_points); }
+        size_t parse(const string_type& str, double& value) const override { return do_parse(str, value); }
+        size_t parse(const string_type& str, uint64_t& value) const override { return do_parse(str, value); }
+        size_t parse(const string_type& str, int64_t& value) const override { return do_parse(str, value); }
+        size_t parse(const string_type& str, int32_t& value) const override { return do_parse(str, value); }
+
+        date_format(icu::DateFormat& fmt, const std::string& encoding) : cvt_(encoding), icu_fmt_(fmt) {}
+        date_format(std::unique_ptr<icu::DateFormat> fmt, const std::string& encoding) :
+            cvt_(encoding), icu_fmt_holder_(std::move(fmt)), icu_fmt_(*icu_fmt_holder_)
+        {}
+
+    private:
+        template<typename ValueType>
+        size_t do_parse(const string_type& str, ValueType& value) const
+        {
+            icu::ParsePosition pp;
+            icu::UnicodeString tmp = cvt_.icu(str.data(), str.data() + str.size());
+
+            UDate udate = icu_fmt_.parse(tmp, pp);
+            if(pp.getIndex() == 0)
+                return 0;
+            double date = udate / 1000.0;
+            typedef std::numeric_limits<ValueType> limits_type;
+            // Explicit cast to double to avoid warnings changing value (e.g. for INT64_MAX -> double)
+            if(date > static_cast<double>(limits_type::max()) || date < static_cast<double>(limits_type::min()))
+                return 0;
+            size_t cut = cvt_.cut(tmp, str.data(), str.data() + str.size(), pp.getIndex());
+            if(cut == 0)
+                return 0;
+            // Handle the edge case where the double is slightly out of range and hence the cast would be UB
+            // by rounding to the min/max values
+            if(date == static_cast<double>(limits_type::max()))
+                value = limits_type::max();
+            else if(date == static_cast<double>(limits_type::min()))
+                value = limits_type::min();
+            else
+                value = static_cast<ValueType>(date);
+            return cut;
+        }
+
+        string_type do_format(double value, size_t& codepoints) const
+        {
+            UDate date = value * 1000.0; // UDate is time_t in milliseconds
+            icu::UnicodeString tmp;
+            icu_fmt_.format(date, tmp);
+            codepoints = tmp.countChar32();
+            return cvt_.std(tmp);
+        }
+
+        icu_std_converter<CharType> cvt_;
+        std::unique_ptr<icu::DateFormat> icu_fmt_holder_;
+        icu::DateFormat& icu_fmt_;
+    };
+
+    icu::UnicodeString strftime_symbol_to_icu(const char c, const formatters_cache& cache)
+    {
+        switch(c) {
             case 'a': // Abbr Weekday
                 return "EE";
             case 'A': // Full Weekday
@@ -257,18 +232,10 @@ namespace locale {
                 return "MMM";
             case 'B': // Full Month
                 return "MMMM";
-            case 'c': // DateTile Full
-                {
-                    if(cache)
-                        return cache->date_time_format_[1][1];
-                    return strftime_to_icu_full(
-                        icu::DateFormat::createDateTimeInstance(icu::DateFormat::kFull,icu::DateFormat::kFull,locale),
-                        "yyyy-MM-dd HH:mm:ss"
-                    );
-                }
+            case 'c': // DateTime
+                return cache.default_date_time_format();
             // not supported by ICU ;(
             //  case 'C': // Century -> 1980 -> 19
-            //  retur
             case 'd': // Day of Month [01,31]
                 return "dd";
             case 'D': // %m/%d/%y
@@ -301,29 +268,15 @@ namespace locale {
                 return "\t";
             case 'T': // %H:%M:%S
                 return "HH:mm:ss";
-/*          case 'u': // weekday 1,7 1=Monday
-            case 'U': // week number of year [00,53] Sunday first
-            case 'V': // week number of year [01,53] Moday first
-            case 'w': // weekday 0,7 0=Sunday
-            case 'W': // week number of year [00,53] Moday first, */
+                /*          case 'u': // weekday 1,7 1=Monday
+                            case 'U': // week number of year [00,53] Sunday first
+                            case 'V': // week number of year [01,53] Monday first
+                            case 'w': // weekday 0,7 0=Sunday
+                            case 'W': // week number of year [00,53] Monday first, */
             case 'x': // Date
-                {
-                    if(cache)
-                        return cache->date_format_[1];
-                    return strftime_to_icu_full(
-                        icu::DateFormat::createDateInstance(icu::DateFormat::kMedium,locale),
-                        "yyyy-MM-dd"
-                    );
-                }
+                return cache.default_date_format();
             case 'X': // Time
-                {
-                    if(cache)
-                        return cache->time_format_[1];
-                    return strftime_to_icu_full(
-                        icu::DateFormat::createTimeInstance(icu::DateFormat::kMedium,locale),
-                        "HH:mm:ss"
-                    );
-                }
+                return cache.default_time_format();
             case 'y': // Year [00-99]
                 return "yy";
             case 'Y': // Year 1998
@@ -332,287 +285,206 @@ namespace locale {
                 return "vvvv";
             case '%': // %
                 return "%";
-            default:
-                return "";
-            }
+            default: return "";
         }
+    }
 
-        icu::UnicodeString strftime_to_icu(icu::UnicodeString const &ftime,icu::Locale const &locale)
-        {
-            unsigned len=ftime.length();
-            icu::UnicodeString result;
-            bool escaped=false;
-            for(unsigned i=0;i<len;i++) {
-                UChar c=ftime[i];
-                if(c=='%') {
+    icu::UnicodeString strftime_to_icu(const icu::UnicodeString& ftime, const formatters_cache& cache)
+    {
+        const unsigned len = ftime.length();
+        icu::UnicodeString result;
+        bool escaped = false;
+        for(unsigned i = 0; i < len; i++) {
+            UChar c = ftime[i];
+            if(c == '%') {
+                i++;
+                c = ftime[i];
+                if(c == 'E' || c == 'O') {
                     i++;
-                    c=ftime[i];
-                    if(c=='E' || c=='O') {
-                        i++;
-                        c=ftime[i];
-                    }
-                    if(escaped) {
-                        result+="'";
-                        escaped=false;
-                    }
-                    result+=strftime_to_icu_symbol(c,locale);
+                    c = ftime[i];
                 }
-                else if(c=='\'') {
-                        result+="''";
+                if(escaped) {
+                    result += "'";
+                    escaped = false;
                 }
-                else {
-                    if(!escaped) {
-                        result+="'";
-                        escaped=true;
-                    }
-                    result+=c;
+                result += strftime_symbol_to_icu(c, cache);
+            } else if(c == '\'')
+                result += "''";
+            else {
+                if(!escaped) {
+                    result += "'";
+                    escaped = true;
                 }
+                result += c;
             }
-            if(escaped)
-                result+="'";
-            return result;
         }
-        
-        template<typename CharType>
-        formatter<CharType> *generate_formatter(
-                    std::ios_base &ios,
-                    icu::Locale const &locale,
-                    std::string const &encoding)
-        {
+        if(escaped)
+            result += "'";
+        return result;
+    }
+
+    format_len time_flags_to_len(const uint64_t time_flags)
+    {
+        switch(time_flags) {
             using namespace boost::locale::flags;
+            case time_short: return format_len::Short;
+            case time_medium: return format_len::Medium;
+            case time_long: return format_len::Long;
+            case time_full: return format_len::Full;
+            default: return format_len::Medium;
+        }
+    }
+    format_len date_flags_to_len(const uint64_t date_flags)
+    {
+        switch(date_flags) {
+            using namespace boost::locale::flags;
+            case date_short: return format_len::Short;
+            case date_medium: return format_len::Medium;
+            case date_long: return format_len::Long;
+            case date_full: return format_len::Full;
+            default: return format_len::Medium;
+        }
+    }
+    icu::DateFormat::EStyle time_flags_to_icu_len(const uint64_t time_flags)
+    {
+        switch(time_flags) {
+            using namespace boost::locale::flags;
+            case time_short: return icu::DateFormat::kShort;
+            case time_medium: return icu::DateFormat::kMedium;
+            case time_long: return icu::DateFormat::kLong;
+            case time_full: return icu::DateFormat::kFull;
+            case time_default:
+            default: return icu::DateFormat::kDefault;
+        }
+    }
+    icu::DateFormat::EStyle date_flags_to_icu_len(const uint64_t date_flags)
+    {
+        switch(date_flags) {
+            using namespace boost::locale::flags;
+            case date_short: return icu::DateFormat::kShort;
+            case date_medium: return icu::DateFormat::kMedium;
+            case date_long: return icu::DateFormat::kLong;
+            case date_full: return icu::DateFormat::kFull;
+            case date_default:
+            default: return icu::DateFormat::kDefault;
+        }
+    }
 
-            hold_ptr<formatter<CharType> > fmt;
-            ios_info &info=ios_info::get(ios);
-            uint64_t disp = info.display_flags();
+    template<typename CharType>
+    std::unique_ptr<formatter<CharType>>
+    formatter<CharType>::create(std::ios_base& ios, const icu::Locale& locale, const std::string& encoding)
+    {
+        using ptr_type = std::unique_ptr<formatter<CharType>>;
 
-            icu_formatters_cache const &cache = std::use_facet<icu_formatters_cache>(ios.getloc());
+        const ios_info& info = ios_info::get(ios);
+        const formatters_cache& cache = std::use_facet<formatters_cache>(ios.getloc());
 
-
-            if(disp == posix)
-                return fmt.release();
-           
-            UErrorCode err=U_ZERO_ERROR;
-            
-            switch(disp) {
-            case number:
-                {
-                    std::ios_base::fmtflags how = (ios.flags() & std::ios_base::floatfield);
-                    icu::NumberFormat *nf = 0;
-
-                    if(how == std::ios_base::scientific)
-                        nf = cache.number_format(icu_formatters_cache::fmt_sci);
-                    else
-                        nf = cache.number_format(icu_formatters_cache::fmt_number);
-                    
-                    nf->setMaximumFractionDigits(ios.precision());
-                    if(how == std::ios_base::scientific || how == std::ios_base::fixed ) {
-                        nf->setMinimumFractionDigits(ios.precision());
-                    }
-                    else {
-                        nf->setMinimumFractionDigits(0);
-                    }
-                    fmt.reset(new number_format<CharType>(nf,encoding));
-                }
-                break;
-            case currency:
-                {
-                    icu::NumberFormat *nf;
-                    
-                    uint64_t curr = info.currency_flags();
-
-                    if(curr == currency_default || curr == currency_national)
-                        nf = cache.number_format(icu_formatters_cache::fmt_curr_nat);
-                    else
-                        nf = cache.number_format(icu_formatters_cache::fmt_curr_iso);
-
-                    fmt.reset(new number_format<CharType>(nf,encoding));
-                }
-                break;
-            case percent:
-                {
-                    icu::NumberFormat *nf = cache.number_format(icu_formatters_cache::fmt_per);
-                    nf->setMaximumFractionDigits(ios.precision());
-                    std::ios_base::fmtflags how = (ios.flags() & std::ios_base::floatfield);
-                    if(how == std::ios_base::scientific || how == std::ios_base::fixed ) {
-                        nf->setMinimumFractionDigits(ios.precision());
-                    }
-                    else {
-                        nf->setMinimumFractionDigits(0);
-                    }
-                    fmt.reset(new number_format<CharType>(nf,encoding));
-                    
-                }
-                break;
+        const uint64_t disp = info.display_flags();
+        switch(disp) {
+            using namespace boost::locale::flags;
+            case posix:
+                BOOST_ASSERT_MSG(false, "Shouldn't try to create a posix formatter"); // LCOV_EXCL_LINE
+                break;                                                                // LCOV_EXCL_LINE
+            case number: {
+                const std::ios_base::fmtflags how = (ios.flags() & std::ios_base::floatfield);
+                icu::NumberFormat& nf =
+                  cache.number_format((how == std::ios_base::scientific) ? num_fmt_type::sci : num_fmt_type::number);
+                set_fraction_digits(nf, how, ios.precision());
+                return ptr_type(new number_format<CharType>(nf, encoding, true));
+            }
+            case currency: {
+                icu::NumberFormat& nf = cache.number_format(
+                  (info.currency_flags() == currency_iso) ? num_fmt_type::curr_iso : num_fmt_type::curr_nat);
+                return ptr_type(new number_format<CharType>(nf, encoding));
+            }
+            case percent: {
+                icu::NumberFormat& nf = cache.number_format(num_fmt_type::percent);
+                set_fraction_digits(nf, ios.flags() & std::ios_base::floatfield, ios.precision());
+                return ptr_type(new number_format<CharType>(nf, encoding));
+            }
             case spellout:
-                fmt.reset(new number_format<CharType>(cache.number_format(icu_formatters_cache::fmt_spell),encoding));
-                break;
+                return ptr_type(new number_format<CharType>(cache.number_format(num_fmt_type::spell), encoding));
             case ordinal:
-                fmt.reset(new number_format<CharType>(cache.number_format(icu_formatters_cache::fmt_ord),encoding));
-                break;
+                return ptr_type(new number_format<CharType>(cache.number_format(num_fmt_type::ordinal), encoding));
             case date:
             case time:
             case datetime:
-            case strftime:
+            case strftime: {
+                using namespace flags;
+                std::unique_ptr<icu::DateFormat> new_df;
+                icu::DateFormat* df = nullptr;
+                // try to use cached first
                 {
-                    using namespace flags;
-                    hold_ptr<icu::DateFormat> adf;
-                    icu::DateFormat *df = 0;
-                    icu::SimpleDateFormat *sdf = cache.date_formatter();
-                    // try to use cached first
+                    icu::SimpleDateFormat* sdf = cache.date_formatter();
                     if(sdf) {
-                        int tmf=info.time_flags();
-                        switch(tmf) {
-                        case time_short:
-                            tmf=0;
-                            break;
-                        case time_long:
-                            tmf=2;
-                            break;
-                        case time_full:
-                            tmf=3;
-                            break;
-                        case time_default:
-                        case time_medium:
-                        default:
-                            tmf=1;
-                        }
-                        int dtf=info.date_flags();
-                        switch(dtf) {
-                        case date_short:
-                            dtf=0;
-                            break;
-                        case date_long:
-                            dtf=2;
-                            break;
-                        case date_full:
-                            dtf=3;
-                            break;
-                        case date_default:
-                        case date_medium:
-                        default:
-                            dtf=1;
-                        }
-
                         icu::UnicodeString pattern;
                         switch(disp) {
-                        case date:
-                            pattern = cache.date_format_[dtf];
-                            break;
-                        case time:
-                            pattern = cache.time_format_[tmf];
-                            break;
-                        case datetime:
-                            pattern = cache.date_time_format_[dtf][tmf];
-                            break;
-                        case strftime:
-                            {
-                                if( !cache.date_format_[1].isEmpty() 
-                                    && !cache.time_format_[1].isEmpty()
-                                    && !cache.date_time_format_[1][1].isEmpty())
-                                {
-                                    icu_std_converter<CharType> cvt_(encoding);
-                                    std::basic_string<CharType> const &f=info.date_time_pattern<CharType>();
-                                    pattern = strftime_to_icu(cvt_.icu(f.c_str(),f.c_str()+f.size()),locale);
-                                }
-                            }
-                            break;
+                            case date: pattern = cache.date_format(date_flags_to_len(info.date_flags())); break;
+                            case time: pattern = cache.time_format(time_flags_to_len(info.time_flags())); break;
+                            case datetime:
+                                pattern = cache.date_time_format(date_flags_to_len(info.date_flags()),
+                                                                 time_flags_to_len(info.time_flags()));
+                                break;
+                            case strftime: {
+                                icu_std_converter<CharType> cvt_(encoding);
+                                const std::basic_string<CharType> f = info.date_time_pattern<CharType>();
+                                pattern = strftime_to_icu(cvt_.icu(f.c_str(), f.c_str() + f.size()), locale);
+                            } break;
                         }
                         if(!pattern.isEmpty()) {
                             sdf->applyPattern(pattern);
                             df = sdf;
-                            sdf = 0;
                         }
-                        sdf = 0;
                     }
-                    
-                    if(!df) {
-                        icu::DateFormat::EStyle dstyle = icu::DateFormat::kDefault;
-                        icu::DateFormat::EStyle tstyle = icu::DateFormat::kDefault;
-                        
-                        switch(info.time_flags()) {
-                        case time_short:    tstyle=icu::DateFormat::kShort; break;
-                        case time_medium:   tstyle=icu::DateFormat::kMedium; break;
-                        case time_long:     tstyle=icu::DateFormat::kLong; break;
-                        case time_full:     tstyle=icu::DateFormat::kFull; break;
-                        }
-                        switch(info.date_flags()) {
-                        case date_short:    dstyle=icu::DateFormat::kShort; break;
-                        case date_medium:   dstyle=icu::DateFormat::kMedium; break;
-                        case date_long:     dstyle=icu::DateFormat::kLong; break;
-                        case date_full:     dstyle=icu::DateFormat::kFull; break;
-                        }
-                        
-                        if(disp==date)
-                            adf.reset(icu::DateFormat::createDateInstance(dstyle,locale));
-                        else if(disp==time)
-                            adf.reset(icu::DateFormat::createTimeInstance(tstyle,locale));
-                        else if(disp==datetime)
-                            adf.reset(icu::DateFormat::createDateTimeInstance(dstyle,tstyle,locale));
-                        else {// strftime
-                            icu_std_converter<CharType> cvt_(encoding);
-                            std::basic_string<CharType> const &f=info.date_time_pattern<CharType>();
-                            icu::UnicodeString fmt = strftime_to_icu(cvt_.icu(f.data(),f.data()+f.size()),locale);
-                            adf.reset(new icu::SimpleDateFormat(fmt,locale,err));
-                        }
-                        if(U_FAILURE(err)) 
-                            return fmt.release();
-                        df = adf.get();
-                    }
-
-                    df->adoptTimeZone(get_time_zone(info.time_zone()));
-                        
-                    // Depending if we own formatter or not
-                    if(adf.get())
-                        fmt.reset(new date_format<CharType>(adf.release(),true,encoding));
-                    else
-                        fmt.reset(new date_format<CharType>(df,false,encoding));
                 }
-                break;
-            }
 
-            return fmt.release();
+                if(!df) {
+                    switch(disp) {
+                        case date:
+                            new_df.reset(
+                              icu::DateFormat::createDateInstance(date_flags_to_icu_len(info.date_flags()), locale));
+                            break;
+                        case time:
+                            new_df.reset(
+                              icu::DateFormat::createTimeInstance(time_flags_to_icu_len(info.time_flags()), locale));
+                            break;
+                        case datetime:
+                            new_df.reset(
+                              icu::DateFormat::createDateTimeInstance(date_flags_to_icu_len(info.date_flags()),
+                                                                      time_flags_to_icu_len(info.time_flags()),
+                                                                      locale));
+                            break;
+                        case strftime: {
+                            icu_std_converter<CharType> cvt_(encoding);
+                            const std::basic_string<CharType> f = info.date_time_pattern<CharType>();
+                            icu::UnicodeString pattern =
+                              strftime_to_icu(cvt_.icu(f.data(), f.data() + f.size()), locale);
+                            UErrorCode err = U_ZERO_ERROR;
+                            new_df.reset(new icu::SimpleDateFormat(pattern, locale, err));
+                            if(U_FAILURE(err))
+                                return nullptr;
+                        } break;
+                    }
+                    df = new_df.get();
+                    BOOST_ASSERT_MSG(df, "Failed to create date/time formatter");
+                }
+
+                df->adoptTimeZone(get_time_zone(info.time_zone()));
+
+                // Depending if we own formatter or not
+                if(new_df)
+                    return ptr_type(new date_format<CharType>(std::move(new_df), encoding));
+                else
+                    return ptr_type(new date_format<CharType>(*df, encoding));
+            } break;
         }
 
-
-
-    template<>
-    formatter<char> *formatter<char>::create(std::ios_base &ios,icu::Locale const &l,std::string const &e)
-    {
-        return generate_formatter<char>(ios,l,e);
+        return nullptr; // LCOV_EXCL_LINE
     }
 
-    template<>
-    formatter<wchar_t> *formatter<wchar_t>::create(std::ios_base &ios,icu::Locale const &l,std::string const &e)
-    {
-        return generate_formatter<wchar_t>(ios,l,e);
-    }
+#define BOOST_LOCALE_INSTANTIATE(CHAR) template class formatter<CHAR>;
+    BOOST_LOCALE_FOREACH_CHAR_STRING(BOOST_LOCALE_INSTANTIATE)
 
+}}} // namespace boost::locale::impl_icu
 
-    #ifdef BOOST_LOCALE_ENABLE_CHAR16_T
-    template<>
-    formatter<char16_t> *formatter<char16_t>::create(std::ios_base &ios,icu::Locale const &l,std::string const &e)
-    {
-        return generate_formatter<char16_t>(ios,l,e);
-    }
-
-    #endif
-
-    #ifdef BOOST_LOCALE_ENABLE_CHAR32_T
-    template<>
-    formatter<char32_t> *formatter<char32_t>::create(std::ios_base &ios,icu::Locale const &l,std::string const &e)
-    {
-        return generate_formatter<char32_t>(ios,l,e);
-    }
-
-    #endif
-    
-} // impl_icu
-
-} // locale
-} // boost
-
-
-// vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
-
-
-
+// boostinspect:nominmax

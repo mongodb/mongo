@@ -27,6 +27,7 @@
 #include <boost/atomic/detail/core_operations_emulated.hpp>
 #include <boost/atomic/detail/memory_order_utils.hpp>
 #include <boost/atomic/detail/type_traits/is_signed.hpp>
+#include <boost/atomic/detail/type_traits/remove_cv.hpp>
 #include <boost/atomic/detail/type_traits/alignment_of.hpp>
 #include <boost/atomic/detail/type_traits/conditional.hpp>
 #include <boost/atomic/detail/type_traits/integral_constant.hpp>
@@ -67,6 +68,7 @@ public:
     typedef T value_type;
 
 protected:
+    typedef typename atomics::detail::remove_cv< value_type >::type unqualified_value_type;
     typedef typename atomics::detail::conditional<
         atomics::detail::is_atomic_ref_lock_free< T, Signed, Interprocess >::value,
         atomics::detail::core_operations< sizeof(value_type), Signed, Interprocess >,
@@ -75,7 +77,7 @@ protected:
     typedef atomics::detail::wait_operations< core_operations > wait_operations;
     typedef typename atomics::detail::conditional< sizeof(value_type) <= sizeof(void*), value_type, value_type const& >::type value_arg_type;
     typedef typename core_operations::storage_type storage_type;
-    BOOST_STATIC_ASSERT_MSG(sizeof(storage_type) == sizeof(value_type), "Boost.Atomic internal error: atomic_ref storage size doesn't match the value size");
+    static_assert(sizeof(storage_type) == sizeof(value_type), "Boost.Atomic internal error: atomic_ref storage size doesn't match the value size");
 
 public:
     static BOOST_CONSTEXPR_OR_CONST std::size_t required_alignment = atomics::detail::alignment_of< value_type >::value <= core_operations::storage_alignment ? core_operations::storage_alignment : atomics::detail::alignment_of< value_type >::value;
@@ -88,7 +90,7 @@ protected:
 public:
     BOOST_FORCEINLINE explicit base_atomic_ref_common(value_type& v) BOOST_NOEXCEPT : m_value(atomics::detail::addressof(v))
     {
-        BOOST_ATOMIC_DETAIL_CLEAR_PADDING(this->m_value);
+        BOOST_ATOMIC_DETAIL_CLEAR_PADDING(const_cast< unqualified_value_type* >(m_value));
     }
 
     BOOST_FORCEINLINE value_type& value() const BOOST_NOEXCEPT { return *m_value; }
@@ -96,7 +98,7 @@ public:
 protected:
     BOOST_FORCEINLINE storage_type& storage() const BOOST_NOEXCEPT
     {
-        return *reinterpret_cast< storage_type* >(m_value);
+        return *reinterpret_cast< storage_type* >(const_cast< unqualified_value_type* >(m_value));
     }
 
 public:

@@ -22,7 +22,7 @@
 
 #include <boost/core/lightweight_test.hpp>
 #include <boost/core/type_name.hpp>
-#include <boost/core/is_same.hpp>
+#include <boost/core/detail/is_same.hpp>
 #include <boost/config.hpp>
 
 namespace boost
@@ -56,7 +56,7 @@ template<class T> inline bool test_trait_same_impl_( T )
 }
 
 template<class T1, class T2> inline void test_trait_same_impl( char const * types,
-  boost::core::is_same<T1, T2> same, char const * file, int line, char const * function )
+  boost::core::detail::is_same<T1, T2> same, char const * file, int line, char const * function )
 {
     if( test_trait_same_impl_( same ) )
     {
@@ -86,6 +86,6 @@ template<class T1, class T2> inline void test_trait_same_impl( char const * type
 # pragma GCC system_header
 #endif
 
-#define BOOST_TEST_TRAIT_SAME(...) ( ::boost::detail::test_trait_same_impl(#__VA_ARGS__, ::boost::core::is_same<__VA_ARGS__>(), __FILE__, __LINE__, BOOST_CURRENT_FUNCTION) )
+#define BOOST_TEST_TRAIT_SAME(...) ( ::boost::detail::test_trait_same_impl(#__VA_ARGS__, ::boost::core::detail::is_same< __VA_ARGS__ >(), __FILE__, __LINE__, BOOST_CURRENT_FUNCTION) )
 
 #endif // #ifndef BOOST_CORE_LIGHTWEIGHT_TEST_TRAIT_HPP

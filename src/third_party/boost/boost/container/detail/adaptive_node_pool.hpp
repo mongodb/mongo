@@ -76,7 +76,7 @@ class private_adaptive_node_pool
    private_adaptive_node_pool &operator=(const private_adaptive_node_pool &);
 
    public:
-   static const std::size_t nodes_per_block = NodesPerBlock;
+   BOOST_STATIC_CONSTEXPR std::size_t nodes_per_block = NodesPerBlock;
 
    //!Constructor. Never throws
    private_adaptive_node_pool()

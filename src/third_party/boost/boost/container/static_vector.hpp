@@ -22,6 +22,7 @@
 #include <boost/container/detail/config_begin.hpp>
 #include <boost/container/detail/workaround.hpp>
 #include <boost/container/detail/type_traits.hpp>
+#include <boost/move/detail/launder.hpp>
 #include <boost/container/vector.hpp>
 
 #include <cstddef>
@@ -40,12 +41,12 @@ class static_storage_allocator
 {
    typedef bool_<ThrowOnOverflow> throw_on_overflow_t;
 
-   static BOOST_NORETURN BOOST_CONTAINER_FORCEINLINE void on_capacity_overflow(true_type)
+   static BOOST_NORETURN inline void on_capacity_overflow(true_type)
    {
       (throw_bad_alloc)();
    }
 
-   static BOOST_CONTAINER_FORCEINLINE void on_capacity_overflow(false_type)
+   static inline void on_capacity_overflow(false_type)
    {
       BOOST_ASSERT_MSG(false, "ERROR: static vector capacity overflow");
    }
@@ -53,42 +54,39 @@ class static_storage_allocator
    public:
    typedef T value_type;
 
-   BOOST_CONTAINER_FORCEINLINE static_storage_allocator() BOOST_NOEXCEPT_OR_NOTHROW
+   inline static_storage_allocator() BOOST_NOEXCEPT_OR_NOTHROW
    {}
 
-   BOOST_CONTAINER_FORCEINLINE static_storage_allocator(const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static_storage_allocator(const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
    {}
 
-   BOOST_CONTAINER_FORCEINLINE static_storage_allocator & operator=(const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
+   inline static_storage_allocator & operator=(const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
    {  return *this;  }
 
-   BOOST_CONTAINER_FORCEINLINE T* internal_storage() const BOOST_NOEXCEPT_OR_NOTHROW
-   {  return const_cast<T*>(static_cast<const T*>(static_cast<const void*>(storage.data)));  }
+   inline T* internal_storage() const BOOST_NOEXCEPT_OR_NOTHROW
+   {  return move_detail::launder_cast<T*>(&storage);  }
 
-   BOOST_CONTAINER_FORCEINLINE T* internal_storage() BOOST_NOEXCEPT_OR_NOTHROW
-   {  return static_cast<T*>(static_cast<void*>(storage.data));  }
-
-   static const std::size_t internal_capacity = N;
+   BOOST_STATIC_CONSTEXPR std::size_t internal_capacity = N;
 
    std::size_t max_size() const
    {  return N;   }
 
-   static BOOST_CONTAINER_FORCEINLINE void on_capacity_overflow()
+   static inline void on_capacity_overflow()
    {
       (on_capacity_overflow)(throw_on_overflow_t());
    }
 
    typedef boost::container::dtl::version_type<static_storage_allocator, 0>   version;
 
-   BOOST_CONTAINER_FORCEINLINE friend bool operator==(const static_storage_allocator &, const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
+   inline friend bool operator==(const static_storage_allocator &, const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
    {  return false;  }
 
-   BOOST_CONTAINER_FORCEINLINE friend bool operator!=(const static_storage_allocator &, const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
+   inline friend bool operator!=(const static_storage_allocator &, const static_storage_allocator &) BOOST_NOEXCEPT_OR_NOTHROW
    {  return true;  }
 
    private:
-   BOOST_STATIC_ASSERT_MSG(!InplaceAlignment || (InplaceAlignment & (InplaceAlignment-1)) == 0, "Alignment option must be zero or power of two");
-   static const std::size_t final_alignment = InplaceAlignment ? InplaceAlignment : dtl::alignment_of<T>::value;
+   BOOST_CONTAINER_STATIC_ASSERT_MSG(!InplaceAlignment || (InplaceAlignment & (InplaceAlignment-1)) == 0, "Alignment option must be zero or power of two");
+   BOOST_STATIC_CONSTEXPR std::size_t final_alignment = InplaceAlignment ? InplaceAlignment : dtl::alignment_of<T>::value;
    typename dtl::aligned_storage<sizeof(T)*N, final_alignment>::type storage;
 };
 
@@ -104,6 +102,19 @@ struct get_static_vector_opt<void>
    typedef static_vector_null_opt type;
 };
 
+template<class Options>
+struct get_vector_opt_from_static_vector_opt
+{
+   typedef typename get_static_vector_opt<Options>::type options_t;
+   typedef vector_opt<void, typename options_t::stored_size_type> type;
+};
+
+template<>
+struct get_vector_opt_from_static_vector_opt<void>
+{
+   typedef void type;
+};
+
 template <typename T, std::size_t Capacity, class Options>
 struct get_static_vector_allocator
 {
@@ -115,7 +126,6 @@ struct get_static_vector_allocator
       , options_t::throw_on_overflow
       > type;
 };
-
 
 }  //namespace dtl {
 
@@ -137,8 +147,9 @@ struct get_static_vector_allocator
 //!possible.
 //!
 //!@par Error Handling
-//! Insertion beyond the capacity result in throwing bad_alloc() if exceptions are enabled or
-//! calling throw_bad_alloc() if not enabled.
+//! If `throw_on_overflow` option is true (default behaviour), insertion beyond the capacity result
+//! in throwing bad_alloc() if exceptions are enabled and or calling throw_bad_alloc() if not enabled.
+//! If `throw_on_overflow` option is false, insertion beyond capacity results in Undefined Behaviour.
 //!
 //! out_of_range is thrown if out of bounds access is performed in <code>at()</code> if exceptions are
 //! enabled, throw_out_of_range() if not enabled.
@@ -149,12 +160,18 @@ struct get_static_vector_allocator
 //! is specified, by default throw_on_overflow<true> option is set.
 template <typename T, std::size_t Capacity, class Options BOOST_CONTAINER_DOCONLY(= void) >
 class static_vector
-    : public vector<T, typename dtl::get_static_vector_allocator< T, Capacity, Options>::type>
+   #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
+    : public vector< T
+                   , typename dtl::get_static_vector_allocator< T, Capacity, Options>::type
+                   , typename dtl::get_vector_opt_from_static_vector_opt<Options>::type
+                   >
+   #endif
 {
    public:
    #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
    typedef typename dtl::get_static_vector_allocator< T, Capacity, Options>::type allocator_type;
-   typedef vector<T, allocator_type > base_t;
+   typedef typename dtl::get_vector_opt_from_static_vector_opt<Options>::type options_type;
+   typedef vector<T, allocator_type, options_type> base_t;
 
    BOOST_COPYABLE_AND_MOVABLE(static_vector)
 
@@ -189,7 +206,7 @@ public:
     typedef typename base_t::const_reverse_iterator const_reverse_iterator;
 
     //! @brief The capacity/max size of the container
-    static const size_type static_capacity = Capacity;
+    BOOST_STATIC_CONSTEXPR size_type static_capacity = Capacity;
 
     //! @brief Constructs an empty static_vector.
     //!
@@ -198,7 +215,7 @@ public:
     //!
     //! @par Complexity
     //!   Constant O(1).
-    BOOST_CONTAINER_FORCEINLINE static_vector() BOOST_NOEXCEPT_OR_NOTHROW
+    inline static_vector() BOOST_NOEXCEPT_OR_NOTHROW
         : base_t()
     {}
 
@@ -214,7 +231,7 @@ public:
     //!
     //! @par Complexity
     //!   Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE explicit static_vector(size_type count)
+    inline explicit static_vector(size_type count)
         : base_t(count)
     {}
 
@@ -233,7 +250,7 @@ public:
     //!
     //! @par Note
     //!   Non-standard extension
-    BOOST_CONTAINER_FORCEINLINE static_vector(size_type count, default_init_t)
+    inline static_vector(size_type count, default_init_t)
         : base_t(count, default_init_t())
     {}
 
@@ -250,7 +267,7 @@ public:
     //!
     //! @par Complexity
     //!   Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector(size_type count, value_type const& value)
+    inline static_vector(size_type count, value_type const& value)
         : base_t(count, value)
     {}
 
@@ -270,7 +287,7 @@ public:
     //! @par Complexity
     //!   Linear O(N).
     template <typename Iterator>
-    BOOST_CONTAINER_FORCEINLINE static_vector(Iterator first, Iterator last)
+    inline static_vector(Iterator first, Iterator last)
         : base_t(first, last)
     {}
 
@@ -288,7 +305,7 @@ public:
     //!
     //! @par Complexity
     //!   Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector(std::initializer_list<value_type> il)
+    inline static_vector(std::initializer_list<value_type> il)
         : base_t(il)
     {}
 #endif
@@ -302,20 +319,20 @@ public:
     //!
     //! @par Complexity
     //!   Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector(static_vector const& other)
+    inline static_vector(static_vector const& other)
         : base_t(other)
     {}
 
-    BOOST_CONTAINER_FORCEINLINE static_vector(static_vector const& other, const allocator_type &)
+    inline static_vector(static_vector const& other, const allocator_type &)
        : base_t(other)
     {}
 
-    BOOST_CONTAINER_FORCEINLINE static_vector(BOOST_RV_REF(static_vector) other,  const allocator_type &)
+    inline static_vector(BOOST_RV_REF(static_vector) other,  const allocator_type &)
        BOOST_NOEXCEPT_IF(boost::container::dtl::is_nothrow_move_constructible<value_type>::value)
        : base_t(BOOST_MOVE_BASE(base_t, other))
     {}
 
-    BOOST_CONTAINER_FORCEINLINE explicit static_vector(const allocator_type &)
+    inline explicit static_vector(const allocator_type &)
        : base_t()
     {}
 
@@ -332,7 +349,7 @@ public:
     //! @par Complexity
     //!   Linear O(N).
     template <std::size_t C, class O>
-    BOOST_CONTAINER_FORCEINLINE static_vector(static_vector<T, C, O> const& other)
+    inline static_vector(static_vector<T, C, O> const& other)
         : base_t(other)
     {}
 
@@ -346,7 +363,7 @@ public:
     //!
     //! @par Complexity
     //!   Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector(BOOST_RV_REF(static_vector) other)
+    inline static_vector(BOOST_RV_REF(static_vector) other)
       BOOST_NOEXCEPT_IF(boost::container::dtl::is_nothrow_move_constructible<value_type>::value)
         : base_t(BOOST_MOVE_BASE(base_t, other))
     {}
@@ -365,7 +382,7 @@ public:
     //! @par Complexity
     //!   Linear O(N).
     template <std::size_t C, class O>
-    BOOST_CONTAINER_FORCEINLINE static_vector(BOOST_RV_REF_BEG static_vector<T, C, O> BOOST_RV_REF_END other)
+    inline static_vector(BOOST_RV_REF_BEG static_vector<T, C, O> BOOST_RV_REF_END other)
         : base_t(BOOST_MOVE_BASE(typename static_vector<T BOOST_MOVE_I C>::base_t, other))
     {}
 
@@ -378,7 +395,7 @@ public:
     //!
     //! @par Complexity
     //! Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector & operator=(BOOST_COPY_ASSIGN_REF(static_vector) other)
+    inline static_vector & operator=(BOOST_COPY_ASSIGN_REF(static_vector) other)
     {
         return static_cast<static_vector&>(base_t::operator=(static_cast<base_t const&>(other)));
     }
@@ -394,7 +411,7 @@ public:
     //!
     //! @par Complexity
     //! Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector & operator=(std::initializer_list<value_type> il)
+    inline static_vector & operator=(std::initializer_list<value_type> il)
     { return static_cast<static_vector&>(base_t::operator=(il));  }
 #endif
 
@@ -411,7 +428,7 @@ public:
     //! @par Complexity
     //!   Linear O(N).
     template <std::size_t C, class O>
-    BOOST_CONTAINER_FORCEINLINE static_vector & operator=(static_vector<T, C, O> const& other)
+    inline static_vector & operator=(static_vector<T, C, O> const& other)
     {
         return static_cast<static_vector&>(base_t::operator=
             (static_cast<typename static_vector<T, C, O>::base_t const&>(other)));
@@ -427,7 +444,7 @@ public:
     //!
     //! @par Complexity
     //!   Linear O(N).
-    BOOST_CONTAINER_FORCEINLINE static_vector & operator=(BOOST_RV_REF(static_vector) other)
+    inline static_vector & operator=(BOOST_RV_REF(static_vector) other)
        BOOST_NOEXCEPT_IF(boost::container::dtl::is_nothrow_move_assignable<value_type>::value)
     {
         return static_cast<static_vector&>(base_t::operator=(BOOST_MOVE_BASE(base_t, other)));
@@ -447,7 +464,7 @@ public:
     //! @par Complexity
     //!   Linear O(N).
     template <std::size_t C, class O>
-    BOOST_CONTAINER_FORCEINLINE static_vector & operator=(BOOST_RV_REF_BEG static_vector<T, C, O> BOOST_RV_REF_END other)
+    inline static_vector & operator=(BOOST_RV_REF_BEG static_vector<T, C, O> BOOST_RV_REF_END other)
     {
         return static_cast<static_vector&>(base_t::operator=
          (BOOST_MOVE_BASE(typename static_vector<T BOOST_MOVE_I C>::base_t, other)));
@@ -1154,7 +1171,7 @@ public:
    //!
    //! @par Complexity
    //!   Constant O(1).
-   BOOST_CONTAINER_FORCEINLINE static size_type capacity() BOOST_NOEXCEPT_OR_NOTHROW
+   inline static size_type capacity() BOOST_NOEXCEPT_OR_NOTHROW
    { return static_capacity; }
 
    //! @brief Returns container's capacity.
@@ -1166,7 +1183,7 @@ public:
    //!
    //! @par Complexity
    //!   Constant O(1).
-   BOOST_CONTAINER_FORCEINLINE static size_type max_size() BOOST_NOEXCEPT_OR_NOTHROW
+   inline static size_type max_size() BOOST_NOEXCEPT_OR_NOTHROW
    { return static_capacity; }
 
    #ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
@@ -1195,7 +1212,7 @@ public:
     bool empty() const BOOST_NOEXCEPT_OR_NOTHROW;
 #else
 
-   BOOST_CONTAINER_FORCEINLINE friend void swap(static_vector &x, static_vector &y)
+   inline friend void swap(static_vector &x, static_vector &y)
        BOOST_NOEXCEPT_IF(BOOST_NOEXCEPT(x.swap(y)))
    {
       x.swap(y);

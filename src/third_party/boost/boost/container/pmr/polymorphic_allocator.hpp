@@ -22,6 +22,7 @@
 #include <boost/container/new_allocator.hpp>
 #include <boost/container/pmr/memory_resource.hpp>
 #include <boost/container/pmr/global_resource.hpp>
+#include <boost/assert.hpp>
 
 #include <cstddef>
 

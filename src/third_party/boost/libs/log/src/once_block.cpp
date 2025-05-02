@@ -108,12 +108,11 @@ BOOST_LOG_CLOSE_NAMESPACE // namespace log
 #else // BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN6
 
 #include <cstdlib> // atexit
+#include <mutex>
+#include <condition_variable>
 #include <boost/detail/interlocked.hpp>
 #include <boost/winapi/basic_types.hpp>
 #include <boost/winapi/dll.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/log/detail/header.hpp>
 
 namespace boost {
@@ -229,13 +228,13 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
         public once_block_impl_base
     {
     private:
-        mutex m_Mutex;
-        condition_variable m_Cond;
+        std::mutex m_Mutex;
+        std::condition_variable m_Cond;
 
     public:
         bool enter_once_block(once_block_flag volatile& flag)
         {
-            unique_lock< mutex > lock(m_Mutex);
+            std::unique_lock< std::mutex > lock(m_Mutex);
 
             while (flag.status != once_block_flag::initialized)
             {
@@ -261,7 +260,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
         void commit(once_block_flag& flag)
         {
             {
-                lock_guard< mutex > lock(m_Mutex);
+                std::lock_guard< std::mutex > lock(m_Mutex);
                 flag.status = once_block_flag::initialized;
             }
             m_Cond.notify_all();
@@ -270,7 +269,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
         void rollback(once_block_flag& flag)
         {
             {
-                lock_guard< mutex > lock(m_Mutex);
+                std::lock_guard< std::mutex > lock(m_Mutex);
                 flag.status = once_block_flag::uninitialized;
             }
             m_Cond.notify_all();

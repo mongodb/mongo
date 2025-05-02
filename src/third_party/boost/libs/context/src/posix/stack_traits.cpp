@@ -39,7 +39,7 @@ namespace {
 
 std::size_t pagesize() BOOST_NOEXCEPT_OR_NOTHROW {
     // conform to POSIX.1-2001
-    return ::sysconf( _SC_PAGESIZE);
+    return static_cast<std::size_t>(::sysconf( _SC_PAGESIZE));
 }
 
 rlim_t stacksize_limit_() BOOST_NOEXCEPT_OR_NOTHROW {
@@ -77,7 +77,7 @@ stack_traits::default_size() BOOST_NOEXCEPT_OR_NOTHROW {
 
 std::size_t
 stack_traits::minimum_size() BOOST_NOEXCEPT_OR_NOTHROW {
-    return MINSIGSTKSZ;
+    return static_cast<std::size_t>(MINSIGSTKSZ);
 }
 
 std::size_t

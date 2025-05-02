@@ -15,25 +15,16 @@
 //  See accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt
 
-#include <boost/config.hpp>
 
-// BOOST_SP_NOEXCEPT
+// BOOST_SP_NOEXCEPT (obsolete, only retained for compatibility)
 
-#if defined( BOOST_MSVC ) && BOOST_MSVC >= 1700 && BOOST_MSVC < 1900
+#define BOOST_SP_NOEXCEPT noexcept
 
-#  define BOOST_SP_NOEXCEPT BOOST_NOEXCEPT_OR_NOTHROW
-
-#else
-
-#  define BOOST_SP_NOEXCEPT BOOST_NOEXCEPT
-
-#endif
-
-// BOOST_SP_NOEXCEPT_WITH_ASSERT
+// BOOST_SP_NOEXCEPT_WITH_ASSERT (noexcept, unless a user assertion handler is present)
 
 #if defined(BOOST_DISABLE_ASSERTS) || ( defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && defined(NDEBUG) )
 
-#  define BOOST_SP_NOEXCEPT_WITH_ASSERT BOOST_SP_NOEXCEPT
+#  define BOOST_SP_NOEXCEPT_WITH_ASSERT noexcept
 
 #elif defined(BOOST_ENABLE_ASSERT_HANDLER) || ( defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG) )
 
@@ -41,7 +32,7 @@
 
 #else
 
-#  define BOOST_SP_NOEXCEPT_WITH_ASSERT BOOST_SP_NOEXCEPT
+#  define BOOST_SP_NOEXCEPT_WITH_ASSERT noexcept
 
 #endif
 

@@ -19,6 +19,8 @@
 
 #include <windows.h>
 
+#include <boost/filesystem/detail/header.hpp> // must be the last #include
+
 namespace boost {
 namespace filesystem {
 namespace detail {
@@ -64,5 +66,7 @@ std::codecvt_base::result windows_file_codecvt::do_out(
 } // namespace detail
 } // namespace filesystem
 } // namespace boost
+
+#include <boost/filesystem/detail/footer.hpp>
 
 #endif // BOOST_WINDOWS_API

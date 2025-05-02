@@ -15,6 +15,8 @@
 #  include <boost/config.hpp>
 #endif
 
+#include <boost/container/detail/workaround.hpp>
+
 #if defined(BOOST_HAS_PRAGMA_ONCE)
 #  pragma once
 #endif
@@ -277,10 +279,10 @@ class basic_string;
 typedef basic_string <char>   string;
 typedef basic_string<wchar_t> wstring;
 
-static const std::size_t ADP_nodes_per_block    = 256u;
-static const std::size_t ADP_max_free_blocks    = 2u;
-static const std::size_t ADP_overhead_percent   = 1u;
-static const std::size_t ADP_only_alignment     = 0u;
+BOOST_STATIC_CONSTEXPR std::size_t ADP_nodes_per_block    = 256u;
+BOOST_STATIC_CONSTEXPR std::size_t ADP_max_free_blocks    = 2u;
+BOOST_STATIC_CONSTEXPR std::size_t ADP_overhead_percent   = 1u;
+BOOST_STATIC_CONSTEXPR std::size_t ADP_only_alignment     = 0u;
 
 template < class T
          , std::size_t NodesPerBlock   = ADP_nodes_per_block
@@ -295,7 +297,7 @@ template < class T
          , unsigned int AllocationDisableMask = 0>
 class allocator;
 
-static const std::size_t NodeAlloc_nodes_per_block = 256u;
+BOOST_STATIC_CONSTEXPR std::size_t NodeAlloc_nodes_per_block = 256u;
 
 template
    < class T
@@ -332,7 +334,7 @@ struct ordered_range_t
 
 //! Value used to tag that the input range is
 //! guaranteed to be ordered
-static const ordered_range_t ordered_range = ordered_range_t();
+BOOST_CONTAINER_CONSTANT_VAR ordered_range_t ordered_range = ordered_range_t();
 
 //! Type used to tag that the input range is
 //! guaranteed to be ordered and unique
@@ -342,7 +344,7 @@ struct ordered_unique_range_t
 
 //! Value used to tag that the input range is
 //! guaranteed to be ordered and unique
-static const ordered_unique_range_t ordered_unique_range = ordered_unique_range_t();
+BOOST_CONTAINER_CONSTANT_VAR ordered_unique_range_t ordered_unique_range = ordered_unique_range_t();
 
 //! Type used to tag that the inserted values
 //! should be default initialized
@@ -351,7 +353,7 @@ struct default_init_t
 
 //! Value used to tag that the inserted values
 //! should be default initialized
-static const default_init_t default_init = default_init_t();
+BOOST_CONTAINER_CONSTANT_VAR default_init_t default_init = default_init_t();
 #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 //! Type used to tag that the inserted values
@@ -361,7 +363,7 @@ struct value_init_t
 
 //! Value used to tag that the inserted values
 //! should be value initialized
-static const value_init_t value_init = value_init_t();
+BOOST_CONTAINER_CONSTANT_VAR value_init_t value_init = value_init_t();
 
 namespace container_detail_really_deep_namespace {
 

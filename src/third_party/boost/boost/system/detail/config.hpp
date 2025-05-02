@@ -11,16 +11,16 @@
 #include <boost/config.hpp>
 #include <boost/config/workaround.hpp>
 
-// BOOST_SYSTEM_HAS_SYSTEM_ERROR
-
-#if !defined(BOOST_NO_CXX11_HDR_SYSTEM_ERROR) && !defined(BOOST_NO_CXX11_HDR_ATOMIC)
-# define BOOST_SYSTEM_HAS_SYSTEM_ERROR
-#endif
+// The macro BOOST_SYSTEM_DISABLE_THREADS can be defined on configurations
+// that provide <system_error> and <atomic>, but not <mutex>, such as the
+// single-threaded libstdc++.
+//
+// https://github.com/boostorg/system/issues/92
 
 // BOOST_SYSTEM_NOEXCEPT
 // Retained for backward compatibility
 
-#define BOOST_SYSTEM_NOEXCEPT BOOST_NOEXCEPT
+#define BOOST_SYSTEM_NOEXCEPT noexcept
 
 // BOOST_SYSTEM_HAS_CONSTEXPR
 
@@ -58,7 +58,9 @@
 
 // BOOST_SYSTEM_CLANG_6
 
-#if defined(__clang__) && (__clang_major__ < 7 || (defined(__APPLE__) && __clang_major__ < 11))
+// Android NDK r18b has Clang 7.0.2 that still needs the workaround
+// https://github.com/boostorg/system/issues/100
+#if defined(__clang__) && (__clang_major__ < 7 || (defined(__APPLE__) && __clang_major__ < 11) || (defined(__ANDROID__) && __clang_major__ == 7))
 # define BOOST_SYSTEM_CLANG_6
 #endif
 

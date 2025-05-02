@@ -1,6 +1,6 @@
 //  posix_tools.hpp  -------------------------------------------------------------------//
 
-//  Copyright 2021 Andrey Semashev
+//  Copyright 2021-2024 Andrey Semashev
 
 //  Distributed under the Boost Software License, Version 1.0.
 //  See http://www.boost.org/LICENSE_1_0.txt
@@ -13,52 +13,66 @@
 #define BOOST_FILESYSTEM_SRC_POSIX_TOOLS_HPP_
 
 #include "platform_config.hpp"
-#include <cerrno>
 #include <boost/filesystem/config.hpp>
-#ifdef BOOST_HAS_UNISTD_H
 #include <unistd.h>
-#endif
+#include <fcntl.h>
+
+#include <boost/scope/unique_fd.hpp>
+#include <boost/system/error_code.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/detail/header.hpp> // must be the last #include
 
 namespace boost {
 namespace filesystem {
 namespace detail {
 
-/*!
- * Closes a file descriptor and returns the result, similar to close(2). Unlike close(2), guarantees that the file descriptor is closed even if EINTR error happens.
- *
- * Some systems don't close the file descriptor in case if the thread is interrupted by a signal and close(2) returns EINTR.
- * Other (most) systems do close the file descriptor even when when close(2) returns EINTR, and attempting to close it
- * again could close a different file descriptor that was opened by a different thread. This function hides this difference in behavior.
- *
- * Future POSIX standards will likely fix this by introducing posix_close (see https://www.austingroupbugs.net/view.php?id=529)
- * and prohibiting returning EINTR from close(2), but we still have to support older systems where this new behavior is not available and close(2)
- * behaves differently between systems.
- */
-inline int close_fd(int fd)
+//! Platform-specific parameters for directory iterator construction
+struct directory_iterator_params
 {
-#if defined(hpux) || defined(_hpux) || defined(__hpux)
-    int res;
-    while (true)
-    {
-        res = ::close(fd);
-        if (BOOST_UNLIKELY(res < 0))
-        {
-            int err = errno;
-            if (err == EINTR)
-                continue;
-        }
-
-        break;
-    }
-
-    return res;
-#else
-    return ::close(fd);
+#if defined(BOOST_FILESYSTEM_HAS_FDOPENDIR_NOFOLLOW)
+    //! File descriptor of the directory to iterate over. If not a negative value, the directory path is only used to generate paths returned by the iterator.
+    boost::scope::unique_fd dir_fd;
 #endif
-}
+};
+
+//! status() implementation
+file_status status_impl
+(
+    path const& p,
+    system::error_code* ec
+#if defined(BOOST_FILESYSTEM_HAS_POSIX_AT_APIS) || defined(BOOST_FILESYSTEM_USE_STATX)
+    , int basedir_fd = AT_FDCWD
+#endif
+);
+
+//! symlink_status() implementation
+file_status symlink_status_impl
+(
+    path const& p,
+    system::error_code* ec
+#if defined(BOOST_FILESYSTEM_HAS_POSIX_AT_APIS) || defined(BOOST_FILESYSTEM_USE_STATX)
+    , int basedir_fd = AT_FDCWD
+#endif
+);
+
+#if defined(BOOST_POSIX_API)
+
+//! Opens a directory file and returns a file descriptor. Returns a negative value in case of error.
+boost::scope::unique_fd open_directory(path const& p, directory_options opts, system::error_code& ec);
+
+#if defined(BOOST_FILESYSTEM_HAS_POSIX_AT_APIS)
+//! Opens a directory file and returns a file descriptor. Returns a negative value in case of error.
+boost::scope::unique_fd openat_directory(int basedir_fd, path const& p, directory_options opts, system::error_code& ec);
+#endif // defined(BOOST_FILESYSTEM_HAS_POSIX_AT_APIS)
+
+#endif // defined(BOOST_POSIX_API)
 
 } // namespace detail
 } // namespace filesystem
 } // namespace boost
+
+#include <boost/filesystem/detail/footer.hpp>
 
 #endif // BOOST_FILESYSTEM_SRC_POSIX_TOOLS_HPP_

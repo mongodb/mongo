@@ -26,8 +26,6 @@
 // container/detail
 #include <boost/container/detail/min_max.hpp>
 
-#include <boost/static_assert.hpp>
-
 namespace boost {
 namespace container {
 namespace dtl {
@@ -35,10 +33,10 @@ namespace dtl {
 template<unsigned Minimum, unsigned Numerator, unsigned Denominator>
 struct grow_factor_ratio
 {
-   BOOST_STATIC_ASSERT(Numerator > Denominator);
-   BOOST_STATIC_ASSERT(Numerator   < 100);
-   BOOST_STATIC_ASSERT(Denominator < 100);
-   BOOST_STATIC_ASSERT(Denominator == 1 || (0 != Numerator % Denominator));
+   BOOST_CONTAINER_STATIC_ASSERT(Numerator > Denominator);
+   BOOST_CONTAINER_STATIC_ASSERT(Numerator   < 100);
+   BOOST_CONTAINER_STATIC_ASSERT(Denominator < 100);
+   BOOST_CONTAINER_STATIC_ASSERT(Denominator == 1 || (0 != Numerator % Denominator));
 
    template<class SizeType>
    SizeType operator()(const SizeType cur_cap, const SizeType add_min_cap, const SizeType max_cap) const
@@ -80,11 +78,11 @@ struct growth_factor_100
 {};
 
 template<class SizeType>
-BOOST_CONTAINER_FORCEINLINE void clamp_by_stored_size_type(SizeType &, SizeType)
+inline void clamp_by_stored_size_type(SizeType &, SizeType)
 {}
 
 template<class SizeType, class SomeStoredSizeType>
-BOOST_CONTAINER_FORCEINLINE void clamp_by_stored_size_type(SizeType &s, SomeStoredSizeType)
+inline void clamp_by_stored_size_type(SizeType &s, SomeStoredSizeType)
 {
    if (s >= SomeStoredSizeType(-1) ) 
       s = SomeStoredSizeType(-1);

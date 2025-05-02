@@ -98,12 +98,14 @@
    #define BOOST_CONTAINER_FORCEINLINE inline
 #elif defined(BOOST_CONTAINER_FORCEINLINE_IS_BOOST_FORCELINE)
    #define BOOST_CONTAINER_FORCEINLINE BOOST_FORCEINLINE
-#elif defined(BOOST_MSVC) && (_MSC_VER < 1900 || defined(_DEBUG))
+#elif defined(BOOST_MSVC) && (_MSC_VER <= 1900 || defined(_DEBUG))
    //"__forceinline" and MSVC seems to have some bugs in old versions and in debug mode
    #define BOOST_CONTAINER_FORCEINLINE inline
-//#elif defined(__GNUC__) && ((__GNUC__ < 4) || (__GNUC__ == 4 && (__GNUC_MINOR__ < 5)))
-#elif defined(__GNUC__) && (__GNUC__ <= 5)
-   //Older GCCs have problems with forceinline
+#elif defined(BOOST_CLANG) || (defined(BOOST_GCC) && ((__GNUC__ <= 5) || defined(__MINGW32__)))
+   //Older GCCs and MinGw have problems with forceinline
+   //Clang can have code bloat issues with forceinline, see
+   //https://lists.boost.org/boost-users/2023/04/91445.php and
+   //https://github.com/llvm/llvm-project/issues/62202
    #define BOOST_CONTAINER_FORCEINLINE inline
 #else
    #define BOOST_CONTAINER_FORCEINLINE BOOST_FORCEINLINE
@@ -153,6 +155,91 @@
 //#define BOOST_CONTAINER_USE_STD_EXCEPTIONS
 
 
+namespace boost {
+namespace container {
 
+template <typename T1>
+BOOST_FORCEINLINE BOOST_CXX14_CONSTEXPR void ignore(T1 const&)
+{}
+
+}} //namespace boost::container {
+
+#if !(defined BOOST_NO_EXCEPTIONS)
+#    define BOOST_CONTAINER_TRY { try
+#    define BOOST_CONTAINER_CATCH(x) catch(x)
+#    define BOOST_CONTAINER_RETHROW throw;
+#    define BOOST_CONTAINER_CATCH_END }
+#else
+#    if !defined(BOOST_MSVC) || BOOST_MSVC >= 1900
+#        define BOOST_CONTAINER_TRY { if (true)
+#        define BOOST_CONTAINER_CATCH(x) else if (false)
+#    else
+// warning C4127: conditional expression is constant
+#        define BOOST_CONTAINER_TRY { \
+             __pragma(warning(push)) \
+             __pragma(warning(disable: 4127)) \
+             if (true) \
+             __pragma(warning(pop))
+#        define BOOST_CONTAINER_CATCH(x) else \
+             __pragma(warning(push)) \
+             __pragma(warning(disable: 4127)) \
+             if (false) \
+             __pragma(warning(pop))
+#    endif
+#    define BOOST_CONTAINER_RETHROW
+#    define BOOST_CONTAINER_CATCH_END }
+#endif
+
+#ifndef BOOST_NO_CXX11_STATIC_ASSERT
+#  ifndef BOOST_NO_CXX11_VARIADIC_MACROS
+#     define BOOST_CONTAINER_STATIC_ASSERT( ... ) static_assert(__VA_ARGS__, #__VA_ARGS__)
+#  else
+#     define BOOST_CONTAINER_STATIC_ASSERT( B ) static_assert(B, #B)
+#  endif
+#else
+namespace boost {
+   namespace container {
+      namespace dtl {
+
+         template<bool B>
+         struct STATIC_ASSERTION_FAILURE;
+
+         template<>
+         struct STATIC_ASSERTION_FAILURE<true> {};
+
+         template<unsigned> struct static_assert_test {};
+
+      }
+   }
+}
+
+#define BOOST_CONTAINER_STATIC_ASSERT(B) \
+         typedef ::boost::container::dtl::static_assert_test<\
+            (unsigned)sizeof(::boost::container::dtl::STATIC_ASSERTION_FAILURE<bool(B)>)>\
+               BOOST_JOIN(boost_container_static_assert_typedef_, __LINE__) BOOST_ATTRIBUTE_UNUSED
+
+#endif
+
+#ifndef BOOST_NO_CXX11_STATIC_ASSERT
+#  ifndef BOOST_NO_CXX11_VARIADIC_MACROS
+#     define BOOST_CONTAINER_STATIC_ASSERT_MSG( ... ) static_assert(__VA_ARGS__)
+#  else
+#     define BOOST_CONTAINER_STATIC_ASSERT_MSG( B, Msg ) static_assert( B, Msg )
+#  endif
+#else
+#     define BOOST_CONTAINER_STATIC_ASSERT_MSG( B, Msg ) BOOST_CONTAINER_STATIC_ASSERT( B )
+#endif
+
+#if !defined(BOOST_NO_CXX17_INLINE_VARIABLES)
+#  define BOOST_CONTAINER_CONSTANT_VAR BOOST_INLINE_CONSTEXPR
+#else
+#  define BOOST_CONTAINER_CONSTANT_VAR static BOOST_CONSTEXPR_OR_CONST
+#endif
+
+#if defined(__GNUC__) && ((__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) >= 40600)
+#define BOOST_CONTAINER_GCC_COMPATIBLE_HAS_DIAGNOSTIC_IGNORED
+#elif defined(__clang__)
+#define BOOST_CONTAINER_GCC_COMPATIBLE_HAS_DIAGNOSTIC_IGNORED
+#endif
 
 #endif   //#ifndef BOOST_CONTAINER_DETAIL_WORKAROUND_HPP

@@ -17,6 +17,8 @@
 #include <cstring> // SGI MIPSpro compilers need this
 #include <string>
 
+#include <boost/filesystem/detail/header.hpp> // must be the last #include
+
 namespace boost {
 namespace filesystem {
 
@@ -77,3 +79,5 @@ BOOST_FILESYSTEM_DECL bool portable_file_name(std::string const& name)
 
 } // namespace filesystem
 } // namespace boost
+
+#include <boost/filesystem/detail/footer.hpp>

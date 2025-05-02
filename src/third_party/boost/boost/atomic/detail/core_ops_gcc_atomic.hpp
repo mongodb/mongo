@@ -79,9 +79,10 @@ struct core_operations_gcc_atomic
 
     static BOOST_FORCEINLINE storage_type load(storage_type const volatile& storage, memory_order order) BOOST_NOEXCEPT
     {
-#if defined(BOOST_ATOMIC_DETAIL_AARCH64_HAS_RCPC)
+#if defined(BOOST_ATOMIC_DETAIL_AARCH64_HAS_RCPC) && !((defined(BOOST_GCC) && BOOST_GCC >= 130100) || (defined(BOOST_CLANG) && BOOST_CLANG_VERSION >= 160000))
         // At least gcc 9.3 and clang 10 do not generate relaxed ldapr instructions that are available in ARMv8.3-RCPC extension.
         // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95751
+        // This was fixed in gcc 13.1 and clang 16.
         typedef atomics::detail::core_arch_operations< storage_size, is_signed, is_interprocess > core_arch_operations;
         return core_arch_operations::load(storage, order);
 #else

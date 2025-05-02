@@ -15,7 +15,6 @@
 #define BOOST_ATOMIC_ATOMIC_REF_HPP_INCLUDED_
 
 #include <boost/assert.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/atomic/capabilities.hpp>
 #include <boost/atomic/detail/config.hpp>
@@ -44,9 +43,9 @@ private:
 public:
     typedef typename base_type::value_type value_type;
 
-    BOOST_STATIC_ASSERT_MSG(sizeof(value_type) > 0u, "boost::atomic_ref<T> requires T to be a complete type");
+    static_assert(sizeof(value_type) > 0u, "boost::atomic_ref<T> requires T to be a complete type");
 #if !defined(BOOST_ATOMIC_DETAIL_NO_CXX11_IS_TRIVIALLY_COPYABLE)
-    BOOST_STATIC_ASSERT_MSG(atomics::detail::is_trivially_copyable< value_type >::value, "boost::atomic_ref<T> requires T to be a trivially copyable type");
+    static_assert(atomics::detail::is_trivially_copyable< value_type >::value, "boost::atomic_ref<T> requires T to be a trivially copyable type");
 #endif
 
 private:
@@ -74,10 +73,10 @@ public:
     BOOST_DELETED_FUNCTION(atomic_ref& operator= (atomic_ref const&))
 };
 
-#if !defined(BOOST_ATOMIC_DETAIL_NO_CXX17_DEDUCTION_GUIDES)
+#if !defined(BOOST_NO_CXX17_DEDUCTION_GUIDES)
 template< typename T >
 atomic_ref(T&) -> atomic_ref< T >;
-#endif // !defined(BOOST_ATOMIC_DETAIL_NO_CXX17_DEDUCTION_GUIDES)
+#endif // !defined(BOOST_NO_CXX17_DEDUCTION_GUIDES)
 
 //! Atomic reference factory function
 template< typename T >

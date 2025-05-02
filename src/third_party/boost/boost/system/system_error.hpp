@@ -43,7 +43,7 @@ public:
     system_error( int ev, error_category const & ecat, char const * prefix ):
         std::runtime_error( std::string( prefix ) + ": " + error_code( ev, ecat ).what() ), code_( ev, ecat ) {}
 
-    error_code code() const BOOST_NOEXCEPT
+    error_code code() const noexcept
     {
         return code_;
     }

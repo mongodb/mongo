@@ -23,7 +23,7 @@
 #pragma once
 #endif
 
-#if defined(__linux__) || defined(__OpenBSD__) || defined(__NETBSD__) || defined(__NetBSD__)
+#if defined(__linux__) || defined(__NETBSD__) || defined(__NetBSD__)
 
 #include <sys/syscall.h>
 
@@ -45,7 +45,21 @@
 #define BOOST_ATOMIC_DETAIL_NETBSD_FUTEX
 #endif
 
-#if defined(BOOST_ATOMIC_DETAIL_SYS_FUTEX)
+#elif defined(__OpenBSD__)
+
+// OpenBSD provides futex(2) function wrapper since OpenBSD 6.2 (https://man.openbsd.org/OpenBSD-6.2/futex.2).
+// It has also removed syscall(2) interface:
+// https://github.com/openbsd/src/commit/cafeb892b121ee89c39c2b940e8ccd6950f50009
+
+#include <sys/param.h>
+
+#if OpenBSD >= 201711
+#define BOOST_ATOMIC_DETAIL_OPENBSD_FUTEX
+#endif
+
+#endif
+
+#if defined(BOOST_ATOMIC_DETAIL_SYS_FUTEX) || defined(BOOST_ATOMIC_DETAIL_OPENBSD_FUTEX)
 
 #include <cstddef>
 #if defined(__linux__)
@@ -53,6 +67,7 @@
 #else
 #include <sys/futex.h>
 #endif
+#include <boost/cstdint.hpp>
 #include <boost/atomic/detail/intptr.hpp>
 #include <boost/atomic/detail/header.hpp>
 
@@ -74,22 +89,40 @@ namespace detail {
 //! Invokes an operation on the futex
 BOOST_FORCEINLINE int futex_invoke(void* addr1, int op, unsigned int val1, const void* timeout = NULL, void* addr2 = NULL, unsigned int val3 = 0) BOOST_NOEXCEPT
 {
-#if !defined(BOOST_ATOMIC_DETAIL_NETBSD_FUTEX)
-    return ::syscall(BOOST_ATOMIC_DETAIL_SYS_FUTEX, addr1, op, val1, timeout, addr2, val3);
-#else
+#if defined(BOOST_ATOMIC_DETAIL_OPENBSD_FUTEX)
+    return ::futex
+    (
+        static_cast< volatile uint32_t* >(addr1),
+        op,
+        static_cast< int >(val1),
+        static_cast< const struct timespec* >(timeout),
+        static_cast< volatile uint32_t* >(addr2)
+    );
+#elif defined(BOOST_ATOMIC_DETAIL_NETBSD_FUTEX)
     // Pass 0 in val2.
     return ::syscall(BOOST_ATOMIC_DETAIL_SYS_FUTEX, addr1, op, val1, timeout, addr2, 0u, val3);
+#else
+    return ::syscall(BOOST_ATOMIC_DETAIL_SYS_FUTEX, addr1, op, val1, timeout, addr2, val3);
 #endif
 }
 
 //! Invokes an operation on the futex
 BOOST_FORCEINLINE int futex_invoke(void* addr1, int op, unsigned int val1, unsigned int val2, void* addr2 = NULL, unsigned int val3 = 0) BOOST_NOEXCEPT
 {
-#if !defined(BOOST_ATOMIC_DETAIL_NETBSD_FUTEX)
-    return ::syscall(BOOST_ATOMIC_DETAIL_SYS_FUTEX, addr1, op, val1, static_cast< atomics::detail::uintptr_t >(val2), addr2, val3);
-#else
+#if defined(BOOST_ATOMIC_DETAIL_OPENBSD_FUTEX)
+    return ::futex
+    (
+        static_cast< volatile uint32_t* >(addr1),
+        op,
+        static_cast< int >(val1),
+        reinterpret_cast< const struct timespec* >(static_cast< atomics::detail::uintptr_t >(val2)),
+        static_cast< volatile uint32_t* >(addr2)
+    );
+#elif defined(BOOST_ATOMIC_DETAIL_NETBSD_FUTEX)
     // Pass NULL in timeout.
     return ::syscall(BOOST_ATOMIC_DETAIL_SYS_FUTEX, addr1, op, val1, static_cast< void* >(NULL), addr2, val2, val3);
+#else
+    return ::syscall(BOOST_ATOMIC_DETAIL_SYS_FUTEX, addr1, op, val1, static_cast< atomics::detail::uintptr_t >(val2), addr2, val3);
 #endif
 }
 
@@ -147,8 +180,6 @@ BOOST_FORCEINLINE int futex_requeue_private(void* pval1, void* pval2, unsigned i
 
 #include <boost/atomic/detail/footer.hpp>
 
-#endif // defined(BOOST_ATOMIC_DETAIL_SYS_FUTEX)
-
-#endif // defined(__linux__) || defined(__OpenBSD__) || defined(__NETBSD__) || defined(__NetBSD__)
+#endif // defined(BOOST_ATOMIC_DETAIL_SYS_FUTEX) || defined(BOOST_ATOMIC_DETAIL_OPENBSD_FUTEX)
 
 #endif // BOOST_ATOMIC_DETAIL_FUTEX_HPP_INCLUDED_

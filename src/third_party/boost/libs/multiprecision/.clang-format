@@ -1,0 +1,34 @@
+
+Language: Cpp
+
+UseTab: Never
+IndentWidth: 3
+BreakBeforeBraces: Allman
+IndentCaseLabels: false
+ColumnLimit: 0
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: true
+FixNamespaceComments: true
+NamespaceIndentation: None
+Standard: Cpp03
+CompactNamespaces: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterEnum: true
+  AfterStruct: true
+  SplitEmptyFunction: false
+  AfterClass: true
+  AfterControlStatement: true
+  AfterFunction: true
+  AfterNamespace: false
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+PointerAlignment: Left
+SortIncludes: false
+

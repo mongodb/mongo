@@ -47,21 +47,21 @@ public:
     BOOST_FILESYSTEM_DECL filesystem_error(filesystem_error const& that);
     BOOST_FILESYSTEM_DECL filesystem_error& operator=(filesystem_error const& that);
 
-    BOOST_FILESYSTEM_DECL ~filesystem_error() BOOST_NOEXCEPT_OR_NOTHROW;
+    BOOST_FILESYSTEM_DECL ~filesystem_error() noexcept;
 
-    path const& path1() const BOOST_NOEXCEPT
+    path const& path1() const noexcept
     {
         return m_imp_ptr.get() ? m_imp_ptr->m_path1 : get_empty_path();
     }
-    path const& path2() const BOOST_NOEXCEPT
+    path const& path2() const noexcept
     {
         return m_imp_ptr.get() ? m_imp_ptr->m_path2 : get_empty_path();
     }
 
-    BOOST_FILESYSTEM_DECL const char* what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE;
+    BOOST_FILESYSTEM_DECL const char* what() const noexcept override;
 
 private:
-    BOOST_FILESYSTEM_DECL static path const& get_empty_path() BOOST_NOEXCEPT;
+    BOOST_FILESYSTEM_DECL static path const& get_empty_path() noexcept;
 
 private:
     struct impl :
@@ -71,7 +71,7 @@ private:
         path m_path2;       // may be empty()
         std::string m_what; // not built until needed
 
-        BOOST_DEFAULTED_FUNCTION(impl(), {})
+        impl() = default;
         explicit impl(path const& path1) :
             m_path1(path1)
         {

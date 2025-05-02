@@ -1,0 +1,25 @@
+Version 1.1.0
+-------------
+
+2014-09-16: Nasos Iliopoulos <>
+	* feature: Merged matrix row and column facades ( matrix as a vector of rows/columns )
+	
+2014-05-03: David Bellot <david.bellot@gmail.com>
+	* removed doxygen documentation from main source
+	* changed the changelog file for GNU format
+	* changed doc extension to a more "standard" .html
+
+2014-04-08 Nasos Iliopoulos <>
+
+	* bugfix: introduced an additional swap implementation for index_pair_array and
+		index_triple_array to allow proper compilation of sparse containers
+		with g++>4.8 (4.7 also?) in C++11 mode.
+
+2014-04-02 Nasos Iliopoulos <>
+
+	* Added changelog
+	* bugfix: corrected a big number of warnings coming from stray typedefs. Other
+		similar issues may be present that are not triggered by the unit tests
+	* bugfix: Corrected the banded matrix bug (https://svn.boost.org/trac/boost/ticket/7549) 
+		and updated appropriate unit tests. To enable the old (incorrect though) 
+		behaviour one should define BOOST_UBLAS_LEGACY_BANDED.

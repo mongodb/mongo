@@ -192,7 +192,8 @@ namespace pdqsort_detail {
 
         // Put the pivot in the right place.
         Iter pivot_pos = first - 1;
-        *begin = boost::move(*pivot_pos);
+        if(begin != pivot_pos)   //Avoid potential self-move
+            *begin = boost::move(*pivot_pos);
         *pivot_pos = boost::move(pivot);
 
         return pdqsort_detail::pair<Iter, bool>(pivot_pos, already_partitioned);

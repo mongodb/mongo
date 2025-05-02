@@ -64,6 +64,7 @@ using ::boost::move_detail::aligned_storage;
 using ::boost::move_detail::nat;
 using ::boost::move_detail::nat2;
 using ::boost::move_detail::nat3;
+using ::boost::move_detail::natN;
 using ::boost::move_detail::max_align_t;
 using ::boost::move_detail::is_convertible;
 

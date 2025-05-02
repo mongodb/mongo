@@ -15,11 +15,12 @@
 #include <boost/move/detail/config_begin.hpp>
 
 #include <boost/move/algo/detail/adaptive_sort_merge.hpp>
-#include <boost/core/ignore_unused.hpp>
+#include <cassert>
 
 #if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
 #endif
 
 namespace boost {
@@ -93,8 +94,8 @@ typename iter_size<RandIt>::type
       , Compare comp)
 {
    typedef typename iter_size<RandIt>::type       size_type;
-   BOOST_ASSERT(l_build_buf <= len);
-   BOOST_ASSERT(0 == ((l_build_buf / l_base)&(l_build_buf/l_base-1)));
+   assert(l_build_buf <= len);
+   assert(0 == ((l_build_buf / l_base)&(l_build_buf/l_base-1)));
 
    //Place the start pointer after the buffer
    RandIt first_block = first + l_build_buf;
@@ -105,7 +106,7 @@ typename iter_size<RandIt>::type
    //////////////////////////////////
    size_type l_merged = 0u;
 
-   BOOST_ASSERT(l_build_buf);
+   assert(l_build_buf);
    //If there is no enough buffer for the insertion sort step, just avoid the external buffer
    size_type kbuf = min_value<size_type>(l_build_buf, size_type(xbuf.capacity()));
    kbuf = kbuf < l_base ? 0 : kbuf;
@@ -136,7 +137,7 @@ typename iter_size<RandIt>::type
    l_merged = op_merge_left_step_multiple
       (first_block-l_merged, elements_in_blocks, l_merged, l_build_buf, size_type(l_build_buf - l_merged), comp, swap_op());
 
-   BOOST_ASSERT(l_merged == l_build_buf);
+   assert(l_merged == l_build_buf);
 
    //////////////////////////////////
    // Start of merge to right step
@@ -172,7 +173,7 @@ void adaptive_sort_combine_blocks
    , Compare comp
    , bool merge_left)
 {
-   boost::ignore_unused(xbuf);
+   boost::movelib::ignore(xbuf);
    typedef typename iter_size<RandIt>::type         size_type;
 
    size_type const l_reg_combined   = size_type(2u*l_prev_merged);
@@ -181,8 +182,8 @@ void adaptive_sort_combine_blocks
    size_type const n_reg_combined = len/l_reg_combined;
    RandIt combined_first = first;
 
-   boost::ignore_unused(l_total_combined);
-   BOOST_ASSERT(l_total_combined <= len);
+   boost::movelib::ignore(l_total_combined);
+   assert(l_total_combined <= len);
 
    size_type const max_i = size_type(n_reg_combined + (l_irreg_combined != 0));
 
@@ -278,9 +279,9 @@ bool adaptive_sort_combine_all_blocks
       //Otherwise, just give up and and use all keys to merge using rotations (use_internal_buf = false)
       bool use_internal_buf = false;
       size_type const l_block = lblock_for_combine(l_intbuf, n_keys, size_type(2*l_merged), use_internal_buf);
-      BOOST_ASSERT(!l_intbuf || (l_block == l_intbuf));
-      BOOST_ASSERT(n == 0 || (!use_internal_buf || prev_use_internal_buf) );
-      BOOST_ASSERT(n == 0 || (!use_internal_buf || l_prev_block == l_block) );
+      assert(!l_intbuf || (l_block == l_intbuf));
+      assert(n == 0 || (!use_internal_buf || prev_use_internal_buf) );
+      assert(n == 0 || (!use_internal_buf || l_prev_block == l_block) );
       
       bool const is_merge_left = (n&1) == 0;
       size_type const l_total_combined = calculate_total_combined(l_data, l_merged);
@@ -332,7 +333,7 @@ bool adaptive_sort_combine_all_blocks
       l_prev_block = l_block;
       prev_use_internal_buf = use_internal_buf;
    }
-   BOOST_ASSERT(l_prev_total_combined == l_data);
+   assert(l_prev_total_combined == l_data);
    bool const buffer_right = prev_use_internal_buf && prev_merge_left;
 
    l_intbuf = prev_use_internal_buf ? l_prev_block : 0u;
@@ -359,7 +360,7 @@ void adaptive_sort_final_merge( bool buffer_right
                               , XBuf & xbuf
                               , Compare comp)
 {
-   //BOOST_ASSERT(n_keys || xbuf.size() == l_intbuf);
+   //assert(n_keys || xbuf.size() == l_intbuf);
    xbuf.clear();
 
    typedef typename iter_size<RandIt>::type         size_type;
@@ -423,7 +424,7 @@ bool adaptive_sort_build_params
       --n_min_ideal_keys;
    }
    ++n_min_ideal_keys;
-   BOOST_ASSERT(n_min_ideal_keys <= l_intbuf);
+   assert(n_min_ideal_keys <= l_intbuf);
 
    if(xbuf.template supports_aligned_trailing<size_type>
          (l_intbuf, size_type((size_type(len-l_intbuf)-1u)/l_intbuf+1u))){
@@ -460,7 +461,7 @@ bool adaptive_sort_build_params
       //If collected keys are not enough, try to fix n_keys and l_intbuf. If no fix
       //is possible (due to very low unique keys), then go to a slow sort based on rotations.
       else{
-         BOOST_ASSERT(collected < (n_min_ideal_keys+l_intbuf));
+         assert(collected < (n_min_ideal_keys+l_intbuf));
          if(collected < 4){  //No combination possible with less that 4 keys
             return false;
          }
@@ -476,7 +477,7 @@ bool adaptive_sort_build_params
          l_intbuf = 0;
          l_build_buf = n_keys;
       }
-      BOOST_ASSERT((n_keys+l_intbuf) >= l_build_buf);
+      assert((n_keys+l_intbuf) >= l_build_buf);
    }
 
    return true;
@@ -557,7 +558,7 @@ void adaptive_sort_impl
    }
    else{
       //Make sure it is at least four
-      BOOST_STATIC_ASSERT(AdaptiveSortInsertionSortThreshold >= 4);
+      BOOST_MOVE_STATIC_ASSERT(AdaptiveSortInsertionSortThreshold >= 4);
 
       size_type l_base = 0;
       size_type l_intbuf = 0;
@@ -570,12 +571,12 @@ void adaptive_sort_impl
          stable_sort(first, first+len, comp, xbuf);
       }
       else{
-         BOOST_ASSERT(l_build_buf);
+         assert(l_build_buf);
          //Otherwise, continue the adaptive_sort
          BOOST_MOVE_ADAPTIVE_SORT_PRINT_L1("\n   After collect_unique: ", len);
          size_type const n_key_plus_buf = size_type(l_intbuf+n_keys);
          //l_build_buf is always power of two if l_intbuf is zero
-         BOOST_ASSERT(l_intbuf || (0 == (l_build_buf & (l_build_buf-1))));
+         assert(l_intbuf || (0 == (l_build_buf & (l_build_buf-1))));
 
          //Classic merge sort until internal buffer and xbuf are exhausted
          size_type const l_merged = adaptive_sort_build_blocks

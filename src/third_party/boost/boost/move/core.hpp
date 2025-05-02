@@ -447,7 +447,7 @@
 
    #else //!defined(BOOST_MOVE_MSVC_AUTO_MOVE_RETURN_BUG) || defined(BOOST_MOVE_DOXYGEN_INVOKED)
 
-      #include <boost/move/detail/meta_utils.hpp>
+      #include <boost/move/detail/meta_utils_core.hpp>
 
       namespace boost {
       namespace move_detail {

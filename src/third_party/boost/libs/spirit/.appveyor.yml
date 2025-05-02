@@ -1,0 +1,77 @@
+#==============================================================================
+#   Copyright (c) 2016-2020 Nikita Kniazev
+#
+#   Use, modification and distribution is subject to the Boost Software
+#   License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+#   http://www.boost.org/LICENSE_1_0.txt)
+#==============================================================================
+
+clone_depth: 50
+
+environment:
+  global:
+    PROJECT: libs\spirit
+
+  matrix:
+    - { APPVEYOR_BUILD_WORKER_IMAGE: 'Visual Studio 2019', ADDRMDL: 64, TOOLSET: 'msvc-14.2' }
+    - { APPVEYOR_BUILD_WORKER_IMAGE: 'Visual Studio 2017', ADDRMDL: 64, TOOLSET: 'msvc-14.1' }
+    - { APPVEYOR_BUILD_WORKER_IMAGE: 'Visual Studio 2015', ADDRMDL: 64, TOOLSET: 'msvc-14.0' }
+
+init:
+  - set BOOST_ROOT=%APPVEYOR_BUILD_FOLDER%\..\boost
+  - set BOOST_BUILD_PATH=%BOOST_ROOT%\..\boost-build
+  - set B2_ARGS=link=shared threading=multi variant=release
+                address-model=%ADDRMDL% toolset=%TOOLSET%
+                define=BOOST_ALL_NO_LIB
+                define=BOOST_SPIRIT_X3_HIDE_CXX17_WARNING
+
+before_build:
+  - set PATH=%BOOST_ROOT%;C:\Python36-x64\Scripts;%PATH%
+  - ps: |
+      # Creating %USERPROFILE%/user-config.jam file
+      @'
+      
+      import feature os regex toolset pch ;
+      
+      
+      # A subfeature that tells Spirit tests to use PCH
+      feature.subfeature pch on : version : spirit : optional propagated incidental ;
+      
+      '@ | sc "$env:USERPROFILE/user-config.jam"
+
+  - set BRANCH=%APPVEYOR_REPO_BRANCH%
+  # TODO: Determine the root branch when PR targeted/build from not our main branches.
+  - if not "%BRANCH%" == "master"
+    if not "%BRANCH%" == "develop"
+       set BRANCH=develop
+  - echo Root branch is %BRANCH%
+
+  # Sadly git's --shallow-submodules has hardcoded depth of 1 commit
+  # Patch the git binary with a little more depth to deal with boost-commitbot's lag
+  - ps: |
+      $git = Get-Command git | Select-Object -ExpandProperty Definition
+      $git = Split-Path -Parent $git | Split-Path -Parent
+      Get-ChildItem -Path "$git\mingw64\*" -Include *.exe -Recurse |
+          ForEach-Object -Process {(Get-Content -Raw $_).Replace("--depth=1","--depth=9") | Set-Content $_}
+
+  # Checkout Boost
+  - git clone -j10 --branch=%BRANCH% --depth=1 --quiet
+      --recurse-submodules=":(exclude)%PROJECT%" --shallow-submodules
+      https://github.com/boostorg/boost.git %BOOST_ROOT%
+  - pushd %BOOST_ROOT%
+  # Remove empty folder
+  - rmdir /S /Q %PROJECT%
+  # Move the repository to boost/libs and make a link to previous place
+  - move %APPVEYOR_BUILD_FOLDER% %PROJECT%
+  - mklink /J %APPVEYOR_BUILD_FOLDER% %PROJECT%
+
+build_script:
+  - bootstrap.bat --with-toolset=msvc
+
+  # Let's have less noise (Appveyor cannot collapse command output)
+  - b2 headers 2>&1 >> deps_build.log
+    || ( echo === deps_build.log === && cat deps_build.log )
+
+test_script:
+  - b2 %B2_ARGS% %PROJECT%\classic\test %PROJECT%\repository\test %PROJECT%\test
+      warnings=extra warnings-as-errors=on pch=on-spirit 

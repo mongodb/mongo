@@ -16,5 +16,7 @@ int main()
 {
     int fd = open(".", O_DIRECTORY | O_RDONLY | O_NOFOLLOW);
     DIR* dir = fdopendir(fd);
-    return dir != 0;
+    // Note: dirfd is a macro on FreeBSD 9 and older
+    int internal_fd = dirfd(dir);
+    return dir != 0 && internal_fd >= 0;
 }

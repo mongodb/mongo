@@ -1,0 +1,151 @@
+From b77c0af6af8bc4797defc3627878acc3cf7a6f39 Mon Sep 17 00:00:00 2001
+From: Antony Polukhin <antoshkka@gmail.com>
+Date: Thu, 20 Feb 2014 17:57:24 +0400
+Subject: [PATCH] detail/sp_typeinfo.hpp now uses TypeIndex
+
+---
+ include/boost/detail/sp_typeinfo.hpp | 123 +++--------------------------------
+ 1 file changed, 8 insertions(+), 115 deletions(-)
+
+diff --git a/include/boost/detail/sp_typeinfo.hpp b/include/boost/detail/sp_typeinfo.hpp
+index 43fae78..fbdf86d 100644
+--- a/include/boost/detail/sp_typeinfo.hpp
++++ b/include/boost/detail/sp_typeinfo.hpp
+@@ -10,126 +10,19 @@
+ //  detail/sp_typeinfo.hpp
+ //
+ //  Copyright 2007 Peter Dimov
++//  Copyright 2014 Antony Polukhin
+ //
+ // Distributed under the Boost Software License, Version 1.0.
+ // See accompanying file LICENSE_1_0.txt or copy at
+ // http://www.boost.org/LICENSE_1_0.txt)
+ 
+-#include <boost/config.hpp>
++#include <boost/type_index.hpp>
++namespace boost { namespace detail {
++ 
++typedef boost::typeind::type_info sp_typeinfo;
++ 
++}} // namespace boost::detail
+ 
+-#if defined( BOOST_NO_TYPEID )
+-
+-#include <boost/current_function.hpp>
+-#include <functional>
+-
+-namespace boost
+-{
+-
+-namespace detail
+-{
+-
+-class sp_typeinfo
+-{
+-private:
+-
+-    sp_typeinfo( sp_typeinfo const& );
+-    sp_typeinfo& operator=( sp_typeinfo const& );
+-
+-    char const * name_;
+-
+-public:
+-
+-    explicit sp_typeinfo( char const * name ): name_( name )
+-    {
+-    }
+-
+-    bool operator==( sp_typeinfo const& rhs ) const
+-    {
+-        return this == &rhs;
+-    }
+-
+-    bool operator!=( sp_typeinfo const& rhs ) const
+-    {
+-        return this != &rhs;
+-    }
+-
+-    bool before( sp_typeinfo const& rhs ) const
+-    {
+-        return std::less< sp_typeinfo const* >()( this, &rhs );
+-    }
+-
+-    char const* name() const
+-    {
+-        return name_;
+-    }
+-};
+-
+-template<class T> struct sp_typeid_
+-{
+-    static sp_typeinfo ti_;
+-
+-    static char const * name()
+-    {
+-        return BOOST_CURRENT_FUNCTION;
+-    }
+-};
+-
+-#if defined(__SUNPRO_CC)
+-// see #4199, the Sun Studio compiler gets confused about static initialization 
+-// constructor arguments. But an assignment works just fine. 
+-template<class T> sp_typeinfo sp_typeid_< T >::ti_ = sp_typeid_< T >::name();
+-#else
+-template<class T> sp_typeinfo sp_typeid_< T >::ti_(sp_typeid_< T >::name());
+-#endif
+-
+-template<class T> struct sp_typeid_< T & >: sp_typeid_< T >
+-{
+-};
+-
+-template<class T> struct sp_typeid_< T const >: sp_typeid_< T >
+-{
+-};
+-
+-template<class T> struct sp_typeid_< T volatile >: sp_typeid_< T >
+-{
+-};
+-
+-template<class T> struct sp_typeid_< T const volatile >: sp_typeid_< T >
+-{
+-};
+-
+-} // namespace detail
+-
+-} // namespace boost
+-
+-#define BOOST_SP_TYPEID(T) (boost::detail::sp_typeid_<T>::ti_)
+-
+-#else
+-
+-#include <typeinfo>
+-
+-namespace boost
+-{
+-
+-namespace detail
+-{
+-
+-#if defined( BOOST_NO_STD_TYPEINFO )
+-
+-typedef ::type_info sp_typeinfo;
+-
+-#else
+-
+-typedef std::type_info sp_typeinfo;
+-
+-#endif
+-
+-} // namespace detail
+-
+-} // namespace boost
+-
+-#define BOOST_SP_TYPEID(T) typeid(T)
+-
+-#endif
++#define BOOST_SP_TYPEID(T) (boost::typeind::type_id<T>().type_info())
+ 
+ #endif  // #ifndef BOOST_DETAIL_SP_TYPEINFO_HPP_INCLUDED
+-- 
+1.8.5.3
+

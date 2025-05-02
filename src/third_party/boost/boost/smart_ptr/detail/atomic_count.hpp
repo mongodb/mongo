@@ -45,6 +45,7 @@
 
 #include <boost/smart_ptr/detail/sp_has_gcc_intrinsics.hpp>
 #include <boost/smart_ptr/detail/sp_has_sync_intrinsics.hpp>
+#include <boost/smart_ptr/detail/deprecated_macros.hpp>
 #include <boost/config.hpp>
 
 #if defined( BOOST_AC_DISABLE_THREADS )

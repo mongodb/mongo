@@ -1,411 +1,303 @@
 //
-//  Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2021-2023 Alexander Grund
 //
-//  Distributed under the Boost Software License, Version 1.0. (See
-//  accompanying file LICENSE_1_0.txt or copy at
-//  http://www.boost.org/LICENSE_1_0.txt)
-//
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
+
 #include "mo_lambda.hpp"
-#include <string.h>
-#include <stdlib.h>
+#include <boost/assert.hpp>
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
+#include <limits>
+#include <stdexcept>
 
-namespace boost {
-namespace locale {
-namespace gnu_gettext {
-namespace lambda {
+#ifdef BOOST_MSVC
+#    pragma warning(disable : 4512) // assignment operator could not be generated
+#endif
 
-namespace { // anon
-    struct identity : public plural {
-        virtual int operator()(int n) const 
+namespace boost { namespace locale { namespace gnu_gettext { namespace lambda {
+
+    namespace { // anon
+        template<class TExp, typename... Ts>
+        expr_ptr make_expr(Ts&&... ts)
         {
-            return n;
-        };
-        virtual identity *clone() const
-        {
-            return new identity();
-        }
-    };
-
-    struct unary : public plural 
-    {
-        unary(plural_ptr ptr) : 
-            op1(ptr)
-        {
-        }
-    protected:
-        plural_ptr op1;
-    };
-
-
-    struct binary : public plural 
-    {
-        binary(plural_ptr p1,plural_ptr p2) :
-            op1(p1),
-            op2(p2)
-        {
-        }
-    protected:
-        plural_ptr op1,op2;
-    };
-
-    struct number : public plural
-    {
-        number(int v) : 
-            val(v)
-        {
-        }
-        virtual int operator()(int /*n*/) const 
-        {
-            return val;
-        }
-        virtual number *clone() const
-        {
-            return new number(val);
+            return expr_ptr(new TExp(std::forward<Ts>(ts)...));
         }
 
-    private:
-        int val;
-    };
-
-    #define UNOP(name,oper)                         \
-    struct name: public unary {                     \
-        name(plural_ptr op) : unary(op)             \
-        {                                           \
-        };                                          \
-        virtual int operator()(int n) const         \
-        {                                           \
-            return oper (*op1)(n);                  \
-        }                                           \
-        virtual name *clone() const                 \
-        {                                           \
-            plural_ptr op1_copy(op1->clone());      \
-            return new name(op1_copy);              \
-        }                                           \
-    };
-
-    #define BINOP(name,oper)                        \
-    struct name : public binary                     \
-    {                                               \
-        name(plural_ptr p1,plural_ptr p2) :         \
-            binary(p1,p2)                           \
-        {                                           \
-        }                                           \
-                                                    \
-        virtual int operator()(int n) const         \
-        {                                           \
-            return (*op1)(n) oper (*op2)(n);        \
-        }                                           \
-        virtual name *clone() const                 \
-        {                                           \
-            plural_ptr op1_copy(op1->clone());      \
-            plural_ptr op2_copy(op2->clone());      \
-            return new name(op1_copy,op2_copy);     \
-        }                                           \
-    };
-
-    #define BINOPD(name,oper)                       \
-    struct name : public binary {                   \
-        name(plural_ptr p1,plural_ptr p2) :         \
-            binary(p1,p2)                           \
-        {                                           \
-        }                                           \
-        virtual int operator()(int n) const         \
-        {                                           \
-            int v1=(*op1)(n);                       \
-            int v2=(*op2)(n);                       \
-            return v2==0 ? 0 : v1 oper v2;          \
-        }                                           \
-        virtual name *clone() const                 \
-        {                                           \
-            plural_ptr op1_copy(op1->clone());      \
-            plural_ptr op2_copy(op2->clone());      \
-            return new name(op1_copy,op2_copy);     \
-        }                                           \
-    };
-
-    enum { END = 0 , SHL = 256,  SHR, GTE,LTE, EQ, NEQ, AND, OR, NUM, VARIABLE };
-
-    UNOP(l_not,!)
-    UNOP(minus,-)
-    UNOP(bin_not,~)
-
-    BINOP(mul,*)
-    BINOPD(div,/)
-    BINOPD(mod,%)
-    static int level10[]={3,'*','/','%'};
-
-    BINOP(add,+)
-    BINOP(sub,-)
-    static int level9[]={2,'+','-'};
-
-    BINOP(shl,<<)
-    BINOP(shr,>>)
-    static int level8[]={2,SHL,SHR};
-
-    BINOP(gt,>)
-    BINOP(lt,<)
-    BINOP(gte,>=)
-    BINOP(lte,<=)
-    static int level7[]={4,'<','>',GTE,LTE};
-
-    BINOP(eq,==)
-    BINOP(neq,!=)
-    static int level6[]={2,EQ,NEQ};
-
-    BINOP(bin_and,&)
-    static int level5[]={1,'&'};
-
-    BINOP(bin_xor,^)
-    static int level4[]={1,'^'};
-
-    BINOP(bin_or,|)
-    static int level3[]={1,'|'};
-
-    BINOP(l_and,&&)
-    static int level2[]={1,AND};
-
-    BINOP(l_or,||)
-    static int level1[]={1,OR};
-
-    struct conditional : public plural {
-        conditional(plural_ptr p1,plural_ptr p2,plural_ptr p3) :
-             op1(p1),
-             op2(p2),
-             op3(p3)
-        {
-        }
-        virtual int operator()(int n) const
-        {
-            return (*op1)(n) ? (*op2)(n) : (*op3)(n);
-        }
-        virtual conditional *clone() const                 
-        {                                           
-            plural_ptr op1_copy(op1->clone());      
-            plural_ptr op2_copy(op2->clone());      
-            plural_ptr op3_copy(op3->clone());      
-            return new conditional(op1_copy,op2_copy,op3_copy);     
-        }                                           
-    private:
-        plural_ptr op1,op2,op3;
-    };
-
-
-    plural_ptr bin_factory(int value,plural_ptr left,plural_ptr right)
-    {
-
-        switch(value) {
-        case '/':  return plural_ptr(new div(left,right));
-        case '*':  return plural_ptr(new mul(left,right));
-        case '%':  return plural_ptr(new mod(left,right));
-        case '+':  return plural_ptr(new add(left,right));
-        case '-':  return plural_ptr(new sub(left,right));
-        case SHL:  return plural_ptr(new shl(left,right));
-        case SHR:  return plural_ptr(new shr(left,right));
-        case '>':  return plural_ptr(new  gt(left,right));
-        case '<':  return plural_ptr(new  lt(left,right));
-        case GTE:  return plural_ptr(new gte(left,right));
-        case LTE:  return plural_ptr(new lte(left,right));
-        case  EQ:  return plural_ptr(new  eq(left,right));
-        case NEQ:  return plural_ptr(new neq(left,right));
-        case '&':  return plural_ptr(new bin_and(left,right));
-        case '^':  return plural_ptr(new bin_xor(left,right));
-        case '|':  return plural_ptr(new bin_or (left,right));
-        case AND:  return plural_ptr(new l_and(left,right));
-        case  OR:  return plural_ptr(new l_or(left,right));
-        default:
-            return plural_ptr();
-        }
-    }
-
-    static inline bool is_in(int v,int *p)
-    {
-        int len=*p;
-        p++;
-        while(len && *p!=v) { p++;len--; }
-        return len!=0;
-    }
-
-
-    class tokenizer {
-    public:
-        tokenizer(char const *s) { text=s; pos=0; step(); };
-        int get(int *val=NULL){
-            int iv=int_value;
-            int res=next_tocken;
-            step();
-            if(val && res==NUM){
-                *val=iv;
-            }
-            return res;
-        };
-        int next(int *val=NULL) {
-            if(val && next_tocken==NUM) {
-                *val=int_value;
-                return NUM;
-            }
-            return next_tocken;
-        }
-    private:
-        char const *text;
-        int pos;
-        int next_tocken;
-        int int_value;
-        bool is_blank(char c)
-        {
-            return c==' ' || c=='\r' || c=='\n' || c=='\t';
-        }
-        bool isdigit(char c) 
-        {
-            return '0'<=c && c<='9'; 
-        }
-        void step() 
-        {
-            while(text[pos] && is_blank(text[pos])) pos++;
-            char const *ptr=text+pos;
-            char *tmp_ptr;
-            if(strncmp(ptr,"<<",2)==0) { pos+=2; next_tocken=SHL; }
-            else if(strncmp(ptr,">>",2)==0) { pos+=2; next_tocken=SHR; }
-            else if(strncmp(ptr,"&&",2)==0) { pos+=2; next_tocken=AND; }
-            else if(strncmp(ptr,"||",2)==0) { pos+=2; next_tocken=OR; }
-            else if(strncmp(ptr,"<=",2)==0) { pos+=2; next_tocken=LTE; }
-            else if(strncmp(ptr,">=",2)==0) { pos+=2; next_tocken=GTE; }
-            else if(strncmp(ptr,"==",2)==0) { pos+=2; next_tocken=EQ; }
-            else if(strncmp(ptr,"!=",2)==0) { pos+=2; next_tocken=NEQ; }
-            else if(*ptr=='n') { pos++; next_tocken=VARIABLE; }
-            else if(isdigit(*ptr)) { int_value=strtol(text+pos,&tmp_ptr,0); pos=tmp_ptr-text; next_tocken=NUM; }
-            else if(*ptr=='\0') { next_tocken=0; }
-            else { next_tocken=*ptr; pos++; }
-        }
-    };
-
-
-    #define BINARY_EXPR(expr,hexpr,list)                            \
-        plural_ptr expr()                                           \
-        {                                                           \
-            plural_ptr op1,op2;                                     \
-            if((op1=hexpr()).get()==0)                              \
-                return plural_ptr();                                \
-            while(is_in(t.next(),list)) {                           \
-                int o=t.get();                                      \
-                if((op2=hexpr()).get()==0)                          \
-                    return plural_ptr();                            \
-                op1=bin_factory(o,op1,op2);                         \
-            }                                                       \
-            return op1;                                             \
-        }
-
-    class parser {
-    public:
-
-        parser(tokenizer &tin) : t(tin) {};
-
-        plural_ptr compile()
-        {
-            plural_ptr res=cond_expr();
-            if(res.get() && t.next()!=END) {
-                return plural_ptr();
-            };
-            return res;
-        }
-
-    private:
-
-        plural_ptr value_expr()
-        {
-            plural_ptr op;
-            if(t.next()=='(') {
-                t.get();
-                if((op=cond_expr()).get()==0)
-                    return plural_ptr();
-                if(t.get()!=')')
-                    return plural_ptr();
-                return op;
-            }
-            else if(t.next()==NUM) {
-                int value;
-                t.get(&value);
-                return plural_ptr(new number(value));
-            }
-            else if(t.next()==VARIABLE) {
-                t.get();
-                return plural_ptr(new identity());
-            }
-            return plural_ptr();
+        struct identity final : expr {
+            value_type operator()(value_type n) const override { return n; }
         };
 
-        plural_ptr un_expr()
+        using sub_expr_type = plural_expr;
+
+        template<class Functor>
+        struct unary final : expr, Functor {
+            unary(expr_ptr p) : op1(std::move(p)) {}
+            value_type operator()(value_type n) const override { return Functor::operator()(op1(n)); }
+
+        protected:
+            sub_expr_type op1;
+        };
+
+        template<class Functor, bool returnZeroOnZero2ndArg = false>
+        struct binary final : expr, Functor {
+            binary(expr_ptr p1, expr_ptr p2) : op1(std::move(p1)), op2(std::move(p2)) {}
+            value_type operator()(value_type n) const override
+            {
+                const auto v1 = op1(n);
+                const auto v2 = op2(n);
+                BOOST_LOCALE_START_CONST_CONDITION
+                if(returnZeroOnZero2ndArg && v2 == 0)
+                    return 0;
+                BOOST_LOCALE_END_CONST_CONDITION
+                return Functor::operator()(v1, v2);
+            }
+
+        protected:
+            sub_expr_type op1, op2;
+        };
+
+        struct number final : expr {
+            number(value_type v) : val(v) {}
+            value_type operator()(value_type /*n*/) const override { return val; }
+
+        private:
+            value_type val;
+        };
+
+        struct conditional final : public expr {
+            conditional(expr_ptr p1, expr_ptr p2, expr_ptr p3) :
+                op1(std::move(p1)), op2(std::move(p2)), op3(std::move(p3))
+            {}
+            value_type operator()(value_type n) const override { return op1(n) ? op2(n) : op3(n); }
+
+        private:
+            sub_expr_type op1, op2, op3;
+        };
+
+        using token_t = int;
+        enum : token_t { END = 0, GTE = 256, LTE, EQ, NEQ, AND, OR, NUM, VARIABLE };
+
+        expr_ptr bin_factory(const token_t value, expr_ptr left, expr_ptr right)
         {
-            plural_ptr op1;
-            static int level_unary[]={3,'-','!','~'};
-            if(is_in(t.next(),level_unary)) {
-                int op=t.get();
-                if((op1=un_expr()).get()==0) 
-                    return plural_ptr();
-                switch(op) {
-                case '-': 
-                    return plural_ptr(new minus(op1));
-                case '!': 
-                    return plural_ptr(new l_not(op1));
-                case '~': 
-                    return plural_ptr(new bin_not(op1));
-                default:
-                    return plural_ptr();
+#define BINOP_CASE(match, cls) \
+    case match: return make_expr<cls>(std::move(left), std::move(right))
+            // Special cases: Avoid division by zero
+            using divides = binary<std::divides<expr::value_type>, true>;
+            using modulus = binary<std::modulus<expr::value_type>, true>;
+            switch(value) {
+                BINOP_CASE('/', divides);
+                BINOP_CASE('*', binary<std::multiplies<expr::value_type>>);
+                BINOP_CASE('%', modulus);
+                BINOP_CASE('+', binary<std::plus<expr::value_type>>);
+                BINOP_CASE('-', binary<std::minus<expr::value_type>>);
+                BINOP_CASE('>', binary<std::greater<expr::value_type>>);
+                BINOP_CASE('<', binary<std::less<expr::value_type>>);
+                BINOP_CASE(GTE, binary<std::greater_equal<expr::value_type>>);
+                BINOP_CASE(LTE, binary<std::less_equal<expr::value_type>>);
+                BINOP_CASE(EQ, binary<std::equal_to<expr::value_type>>);
+                BINOP_CASE(NEQ, binary<std::not_equal_to<expr::value_type>>);
+                BINOP_CASE(AND, binary<std::logical_and<expr::value_type>>);
+                BINOP_CASE(OR, binary<std::logical_or<expr::value_type>>);
+                default: throw std::logic_error("Unexpected binary operator"); // LCOV_EXCL_LINE
+            }
+#undef BINOP_CASE
+        }
+
+        template<size_t size>
+        bool is_in(const token_t token, const token_t (&tokens)[size])
+        {
+            for(const auto el : tokens) {
+                if(token == el)
+                    return true;
+            }
+            return false;
+        }
+
+        class tokenizer {
+        public:
+            tokenizer(const char* s) : text_(s), next_tocken_(0), numeric_value_(0) { step(); }
+            token_t get(long long* val = nullptr)
+            {
+                const token_t res = next(val);
+                step();
+                return res;
+            }
+            token_t next(long long* val = nullptr) const
+            {
+                if(val && next_tocken_ == NUM)
+                    *val = numeric_value_;
+                return next_tocken_;
+            }
+
+        private:
+            const char* text_;
+            token_t next_tocken_;
+            long long numeric_value_;
+
+            static constexpr bool is_blank(char c) { return c == ' ' || c == '\r' || c == '\n' || c == '\t'; }
+            static constexpr bool is_digit(char c) { return '0' <= c && c <= '9'; }
+            template<size_t size>
+            static bool is(const char* s, const char (&search)[size])
+            {
+                return strncmp(s, search, size - 1) == 0;
+            }
+            void step()
+            {
+                while(is_blank(*text_))
+                    text_++;
+                const char* text = text_;
+                if(is(text, "&&")) {
+                    text_ += 2;
+                    next_tocken_ = AND;
+                } else if(is(text, "||")) {
+                    text_ += 2;
+                    next_tocken_ = OR;
+                } else if(is(text, "<=")) {
+                    text_ += 2;
+                    next_tocken_ = LTE;
+                } else if(is(text, ">=")) {
+                    text_ += 2;
+                    next_tocken_ = GTE;
+                } else if(is(text, "==")) {
+                    text_ += 2;
+                    next_tocken_ = EQ;
+                } else if(is(text, "!=")) {
+                    text_ += 2;
+                    next_tocken_ = NEQ;
+                } else if(*text == 'n') {
+                    text_++;
+                    next_tocken_ = VARIABLE;
+                } else if(is_digit(*text)) {
+                    char* tmp_ptr;
+                    // strtoll not always available -> parse as unsigned long
+                    const auto value = std::strtoul(text, &tmp_ptr, 10);
+                    // Saturate in case long=long long
+                    numeric_value_ = std::min<unsigned long long>(std::numeric_limits<long long>::max(), value);
+                    text_ = tmp_ptr;
+                    next_tocken_ = NUM;
+                } else if(*text == '\0')
+                    next_tocken_ = END;
+                else {
+                    next_tocken_ = *text;
+                    text_++;
                 }
             }
-            else {
-                return value_expr();
-            }
         };
 
-        BINARY_EXPR(l10,un_expr,level10);
-        BINARY_EXPR(l9,l10,level9);
-        BINARY_EXPR(l8,l9,level8);
-        BINARY_EXPR(l7,l8,level7);
-        BINARY_EXPR(l6,l7,level6);
-        BINARY_EXPR(l5,l6,level5);
-        BINARY_EXPR(l4,l5,level4);
-        BINARY_EXPR(l3,l4,level3);
-        BINARY_EXPR(l2,l3,level2);
-        BINARY_EXPR(l1,l2,level1);
+        constexpr token_t level6[] = {'*', '/', '%'};
+        constexpr token_t level5[] = {'+', '-'};
+        constexpr token_t level4[] = {'<', '>', GTE, LTE};
+        constexpr token_t level3[] = {EQ, NEQ};
+        constexpr token_t level2[] = {AND};
+        constexpr token_t level1[] = {OR};
 
-        plural_ptr cond_expr()
-        {
-            plural_ptr cond,case1,case2;
-            if((cond=l1()).get()==0)
-                return plural_ptr();
-            if(t.next()=='?') {
+        class parser {
+        public:
+            parser(const char* str) : t(str) {}
+
+            expr_ptr compile()
+            {
+                expr_ptr res = cond_expr();
+                if(res && t.next() != END)
+                    return expr_ptr();
+                return res;
+            }
+
+        private:
+            expr_ptr value_expr()
+            {
+                expr_ptr op;
+                if(t.next() == '(') {
+                    t.get();
+                    if(!(op = cond_expr()))
+                        return expr_ptr();
+                    if(t.get() != ')')
+                        return expr_ptr();
+                    return op;
+                } else if(t.next() == NUM) {
+                    expr::value_type value;
+                    t.get(&value);
+                    return make_expr<number>(value);
+                } else if(t.next() == VARIABLE) {
+                    t.get();
+                    return make_expr<identity>();
+                }
+                return expr_ptr();
+            }
+
+            expr_ptr unary_expr()
+            {
+                constexpr token_t level_unary[] = {'!', '-'};
+                if(is_in(t.next(), level_unary)) {
+                    const token_t op = t.get();
+                    expr_ptr op1 = unary_expr();
+                    if(!op1)
+                        return expr_ptr();
+                    if(BOOST_LIKELY(op == '!'))
+                        return make_expr<unary<std::logical_not<expr::value_type>>>(std::move(op1));
+                    else {
+                        BOOST_ASSERT(op == '-');
+                        return make_expr<unary<std::negate<expr::value_type>>>(std::move(op1));
+                    }
+                } else
+                    return value_expr();
+            }
+
+#define BINARY_EXPR(lvl, nextLvl, list)                           \
+    expr_ptr lvl()                                                \
+    {                                                             \
+        expr_ptr op1 = nextLvl();                                 \
+        if(!op1)                                                  \
+            return expr_ptr();                                    \
+        while(is_in(t.next(), list)) {                            \
+            const token_t o = t.get();                            \
+            expr_ptr op2 = nextLvl();                             \
+            if(!op2)                                              \
+                return expr_ptr();                                \
+            op1 = bin_factory(o, std::move(op1), std::move(op2)); \
+        }                                                         \
+        return op1;                                               \
+    }
+
+            BINARY_EXPR(l6, unary_expr, level6);
+            BINARY_EXPR(l5, l6, level5);
+            BINARY_EXPR(l4, l5, level4);
+            BINARY_EXPR(l3, l4, level3);
+            BINARY_EXPR(l2, l3, level2);
+            BINARY_EXPR(l1, l2, level1);
+#undef BINARY_EXPR
+
+            expr_ptr cond_expr()
+            {
+                expr_ptr cond;
+                if(!(cond = l1()))
+                    return expr_ptr();
+                if(t.next() != '?')
+                    return cond;
                 t.get();
-                if((case1=cond_expr()).get()==0)
-                    return plural_ptr();
-                if(t.get()!=':')
-                    return plural_ptr();
-                if((case2=cond_expr()).get()==0)
-                    return plural_ptr();
+                expr_ptr case1, case2;
+                if(!(case1 = cond_expr()))
+                    return expr_ptr();
+                if(t.get() != ':')
+                    return expr_ptr();
+                if(!(case2 = cond_expr()))
+                    return expr_ptr();
+                return make_expr<conditional>(std::move(cond), std::move(case1), std::move(case2));
             }
-            else {
-                return cond;
-            }
-            return plural_ptr(new conditional(cond,case1,case2));
-        }
 
-        tokenizer &t;
+            tokenizer t;
+        };
 
-    };
+    } // namespace
 
-} // namespace anon
+    plural_expr compile(const char* str)
+    {
+        parser p(str);
+        return plural_expr(p.compile());
+    }
 
-plural_ptr compile(char const *str)
-{
-    tokenizer t(str);
-    parser p(t);
-    return p.compile();
-}
-
-
-} // lambda
-} // gnu_gettext
-} // locale
-} // boost
-
-// vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 
-
+}}}} // namespace boost::locale::gnu_gettext::lambda

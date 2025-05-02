@@ -108,13 +108,19 @@
 #elif defined(WINVER)
 #define BOOST_USE_WINAPI_VERSION WINVER
 #else
-// By default use Windows 7 API on compilers that support it and Vista or XP on the others
+// By default use Windows 10 API on compilers that support it and latest versions on the others
 #if (defined(_MSC_VER) && _MSC_VER < 1500) || defined(BOOST_WINAPI_IS_MINGW)
 #define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WINXP
 #elif (defined(_MSC_VER) && _MSC_VER < 1600)
 #define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN6
-#else
+#elif (defined(_MSC_VER) && _MSC_VER < 1700)
 #define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN7
+#elif (defined(_MSC_VER) && _MSC_VER < 1800)
+#define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN8
+#elif (defined(_MSC_VER) && _MSC_VER < 1900)
+#define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WINBLUE
+#else
+#define BOOST_USE_WINAPI_VERSION BOOST_WINAPI_VERSION_WIN10
 #endif
 #endif
 #endif

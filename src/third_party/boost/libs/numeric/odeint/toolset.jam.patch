@@ -1,0 +1,61 @@
+diff --git a/src/build/toolset.jam b/src/build/toolset.jam
+index b5defd5..a942cd9 100644
+--- a/src/build/toolset.jam
++++ b/src/build/toolset.jam
+@@ -17,6 +17,8 @@ import regex ;
+ import sequence ;
+ import set ;
+ import property-set ;
++import order ;
++import "class" : new ;
+ 
+ 
+ .flag-no = 1 ;
+@@ -237,6 +239,7 @@ rule handle-flag-value ( value * : properties * )
+     if $(value:G)
+     {
+         local matches = [ property.select $(value) : $(properties) ] ;
++        local order ;
+         for local p in $(matches)
+         {
+             local att = [ feature.attributes $(p:G) ] ;
+@@ -263,11 +266,24 @@ rule handle-flag-value ( value * : properties * )
+                 }
+                 if path in $(att)
+                 {
+-                    result += [ sequence.transform path.native : $(values) ] ;
++                    values = [ sequence.transform path.native : $(values) ] ;
+                 }
+-                else
++                result += $(values) ;
++                if $(values[2])
+                 {
+-                    result += $(values) ;
++                    if ! $(order)
++                    {
++                        order = [ new order ] ;
++                    }
++                    local prev ;
++                    for local v in $(values)
++                    {
++                        if $(prev)
++                        {
++                            $(order).add-pair $(prev) $(v) ;
++                        }
++                        prev = $(v) ;
++                    }
+                 }
+             }
+             else
+@@ -275,6 +291,11 @@ rule handle-flag-value ( value * : properties * )
+                 result += $(p:G=) ;
+             }
+         }
++        if $(order)
++        {
++            result = [ $(order).order [ sequence.unique $(result) : stable ] ] ;
++            DELETE_MODULE $(order) ;
++        }
+     }
+     else
+     {

@@ -10,7 +10,9 @@
  *
  */
 
-#define BOOST_RANDOM_SOURCE
+#ifndef BOOST_RANDOM_SOURCE
+#  define BOOST_RANDOM_SOURCE
+#endif
 
 #include <boost/random/random_device.hpp>
 #include <boost/config.hpp>

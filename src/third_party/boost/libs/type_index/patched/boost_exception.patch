@@ -1,0 +1,156 @@
+From 8f57d59bfbc978673a2493a90b4f3e7e54ddbf18 Mon Sep 17 00:00:00 2001
+From: Antony Polukhin <antoshkka@gmail.com>
+Date: Thu, 20 Feb 2014 18:30:11 +0400
+Subject: [PATCH] Boost.Exception now uses TypeIndex to reduce duplicate code
+ and simplify name demanglings
+
+---
+ include/boost/exception/detail/type_info.hpp       | 43 +++-------------------
+ include/boost/exception/diagnostic_information.hpp |  2 +-
+ include/boost/exception/exception.hpp              |  3 +-
+ include/boost/exception/info.hpp                   |  2 +-
+ test/Jamfile.v2                                    |  2 +
+ 5 files changed, 12 insertions(+), 40 deletions(-)
+
+diff --git a/include/boost/exception/detail/type_info.hpp b/include/boost/exception/detail/type_info.hpp
+index 6e5942d..a247b71 100644
+--- a/include/boost/exception/detail/type_info.hpp
++++ b/include/boost/exception/detail/type_info.hpp
+@@ -12,13 +12,7 @@
+ #pragma warning(push,1)
+ #endif
+ 
+-#include <boost/detail/sp_typeinfo.hpp>
+-#include <boost/current_function.hpp>
+-#include <boost/config.hpp>
+-//#ifndef BOOST_NO_TYPEID
+-//#include <boost/units/detail/utility.hpp>
+-//#endif
+-#include <string>
++#include <boost/type_index.hpp>
+ 
+ namespace
+ boost
+@@ -28,11 +22,7 @@ boost
+     std::string
+     tag_type_name()
+         {
+-#ifdef BOOST_NO_TYPEID
+-        return BOOST_CURRENT_FUNCTION;
+-#else
+-        return /*units::detail::demangle*/(typeid(T*).name());
+-#endif
++        return boost::typeind::type_id<T*>().pretty_name();
+         }
+ 
+     template <class T>
+@@ -40,41 +30,20 @@ boost
+     std::string
+     type_name()
+         {
+-#ifdef BOOST_NO_TYPEID
+-        return BOOST_CURRENT_FUNCTION;
+-#else
+-        return /*units::detail::demangle*/(typeid(T).name());
+-#endif
++        return boost::typeind::type_id<T>().pretty_name();
+         }
+ 
+     namespace
+     exception_detail
+         {
+-        struct
+-        type_info_
+-            {
+-            detail::sp_typeinfo const * type_;
+-
+-            explicit
+-            type_info_( detail::sp_typeinfo const & type ):
+-                type_(&type)
+-                {
+-                }
+-
+-            friend
+-            bool
+-            operator<( type_info_ const & a, type_info_ const & b )
+-                {
+-                return 0!=(a.type_->before(*b.type_));
+-                }
+-            };
++        typedef boost::typeind::type_index type_info_;
+         }
+     }
+ 
+-#define BOOST_EXCEPTION_STATIC_TYPEID(T) ::boost::exception_detail::type_info_(BOOST_SP_TYPEID(T))
++#define BOOST_EXCEPTION_STATIC_TYPEID(T) ::boost::typeind::type_id<T>()
+ 
+ #ifndef BOOST_NO_RTTI
+-#define BOOST_EXCEPTION_DYNAMIC_TYPEID(x) ::boost::exception_detail::type_info_(typeid(x))
++#define BOOST_EXCEPTION_DYNAMIC_TYPEID(x) ::boost::typeind::type_id_runtime(x)
+ #endif
+ 
+ #if defined(_MSC_VER) && !defined(BOOST_EXCEPTION_ENABLE_WARNINGS)
+diff --git a/include/boost/exception/diagnostic_information.hpp b/include/boost/exception/diagnostic_information.hpp
+index 2f5cb88..0f8b5e8 100644
+--- a/include/boost/exception/diagnostic_information.hpp
++++ b/include/boost/exception/diagnostic_information.hpp
+@@ -151,7 +151,7 @@ boost
+ #ifndef BOOST_NO_RTTI
+             if ( verbose )
+                 tmp << std::string("Dynamic exception type: ") <<
+-                    /*units::detail::demangle*/((be?(BOOST_EXCEPTION_DYNAMIC_TYPEID(*be)):(BOOST_EXCEPTION_DYNAMIC_TYPEID(*se))).type_->name()) << '\n';
++                    /*units::detail::demangle*/((be?(BOOST_EXCEPTION_DYNAMIC_TYPEID(*be)):(BOOST_EXCEPTION_DYNAMIC_TYPEID(*se)))) << '\n';
+ #endif
+             if( with_what && se && verbose )
+                 tmp << "std::exception::what: " << wh << '\n';
+diff --git a/include/boost/exception/exception.hpp b/include/boost/exception/exception.hpp
+index 9f20a04..53c341f 100644
+--- a/include/boost/exception/exception.hpp
++++ b/include/boost/exception/exception.hpp
+@@ -12,6 +12,8 @@
+ #pragma warning(push,1)
+ #endif
+ 
++#include <boost/exception/detail/type_info.hpp>
++
+ namespace
+ boost
+     {
+@@ -151,7 +153,6 @@ boost
+     exception_detail
+         {
+         class error_info_base;
+-        struct type_info_;
+ 
+         struct
+         error_info_container
+diff --git a/include/boost/exception/info.hpp b/include/boost/exception/info.hpp
+index edbf058..e0f4950 100644
+--- a/include/boost/exception/info.hpp
++++ b/include/boost/exception/info.hpp
+@@ -96,7 +96,7 @@ boost
+                     {
+                     shared_ptr<error_info_base> const & p = i->second;
+ #ifndef BOOST_NO_RTTI
+-                    BOOST_ASSERT( *BOOST_EXCEPTION_DYNAMIC_TYPEID(*p).type_==*ti.type_ );
++                    BOOST_ASSERT(BOOST_EXCEPTION_DYNAMIC_TYPEID(*p)==ti );
+ #endif
+                     return p;
+                     }
+diff --git a/test/Jamfile.v2 b/test/Jamfile.v2
+index d2dfcd6..5bd076d 100644
+--- a/test/Jamfile.v2
++++ b/test/Jamfile.v2
+@@ -35,7 +35,9 @@ run enable_error_info_test.cpp helper1.cpp ;
+ run throw_exception_test.cpp helper2.cpp ;
+ run errno_test.cpp ;
+ run error_info_test.cpp ;
++run error_info_test.cpp : : : <rtti>off : error_info_test_rtti ;
+ run diagnostic_information_test.cpp ;
++run diagnostic_information_test.cpp : : : <rtti>off : diagnostic_information_test_rtti ;
+ run refcount_ptr_test.cpp ;
+ run current_exception_cast_test.cpp ;
+ run no_exceptions_test.cpp : : : <exception-handling>off ;
+-- 
+1.8.5.3
+

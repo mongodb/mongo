@@ -113,7 +113,7 @@ BOOST_LOG_CLOSE_NAMESPACE // namespace log
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
-#include <boost/lexical_cast.hpp>
+#include <string>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/detail/header.hpp>
 
@@ -137,7 +137,7 @@ BOOST_LOG_API std::string get_process_name()
     if (filesystem::exists("/proc/curproc/file"))
         return filesystem::read_symlink("/proc/curproc/file").filename().string();
 
-    return boost::lexical_cast< std::string >(getpid());
+    return std::to_string(getpid());
 }
 
 } // namespace aux
@@ -151,7 +151,7 @@ BOOST_LOG_CLOSE_NAMESPACE // namespace log
 #else
 
 #include <unistd.h>
-#include <boost/lexical_cast.hpp>
+#include <string>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/detail/header.hpp>
 
@@ -173,7 +173,7 @@ BOOST_LOG_API std::string get_process_name()
     if (filesystem::exists("/proc/curproc/exe"))
         return filesystem::read_symlink("/proc/curproc/exe").filename().string();
 
-    return boost::lexical_cast< std::string >(getpid());
+    return std::to_string(getpid());
 }
 
 } // namespace aux

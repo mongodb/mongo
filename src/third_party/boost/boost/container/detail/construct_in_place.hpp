@@ -24,6 +24,7 @@
 #include <boost/container/allocator_traits.hpp>
 #include <boost/container/detail/iterators.hpp>
 #include <boost/container/detail/value_init.hpp>
+#include <boost/container/detail/is_pair.hpp>
 
 namespace boost {
 namespace container {
@@ -62,9 +63,42 @@ BOOST_CONTAINER_FORCEINLINE void construct_in_place(Allocator &a, T *dest, empla
 
 //Assignment
 
+template<class T, class U>
+BOOST_CONTAINER_FORCEINLINE
+   typename dtl::disable_if_c
+      <  dtl::is_pair<typename dtl::remove_reference<T>::type>::value
+      && dtl::is_pair<typename dtl::remove_reference<U>::type>::value
+      , void>::type
+assign_in_place_ref(T &t, BOOST_FWD_REF(U) u)
+{  t = ::boost::forward<U>(u);  }
+
+template<class T, class U>
+BOOST_CONTAINER_FORCEINLINE
+   typename dtl::enable_if_c
+      <  dtl::is_pair<typename dtl::remove_reference<T>::type>::value
+      && dtl::is_pair<typename dtl::remove_reference<U>::type>::value
+      , void>::type
+assign_in_place_ref(T &t, const U &u)
+{
+   assign_in_place_ref(t.first, u.first);
+   assign_in_place_ref(t.second, u.second);
+}
+
+template<class T, class U>
+BOOST_CONTAINER_FORCEINLINE
+   typename dtl::enable_if_c
+      <  dtl::is_pair<typename dtl::remove_reference<T>::type>::value
+      && dtl::is_pair<typename dtl::remove_reference<U>::type>::value
+      , void>::type
+assign_in_place_ref(T &t, BOOST_RV_REF(U) u)
+{
+   assign_in_place_ref(t.first,  ::boost::move(u.first));
+   assign_in_place_ref(t.second, ::boost::move(u.second));
+}
+
 template<class DstIt, class InpIt>
 BOOST_CONTAINER_FORCEINLINE void assign_in_place(DstIt dest, InpIt source)
-{  *dest = *source;  }
+{  assign_in_place_ref(*dest, *source);  }
 
 template<class DstIt, class U>
 BOOST_CONTAINER_FORCEINLINE void assign_in_place(DstIt dest, value_init_construct_iterator<U>)

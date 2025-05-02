@@ -1,0 +1,81 @@
+# Copyright (c) 2024 Matt Borland
+# Copyright (c) 2025 Alexander Grund
+#
+# Distributed under the Boost Software License, Version 1.0.
+# https://www.boost.org/LICENSE_1_0.txt.
+
+
+import common ;
+import path ;
+import python ;
+import regex ;
+import toolset ;
+
+path-constant HERE : . ;
+
+local all_fuzzers = [ regex.replace-list
+    [ glob "fuzz_*.cpp" ] : ".cpp" : ""
+] ;
+
+if ! [ python.configured ]
+{
+    using python ;
+}
+
+.make-corpus-script = $(HERE)/make-corpus.py ;
+
+rule make-corpus ( target : sources + : properties * )
+{
+    RUNNER on $(target) = [ path.native $(.make-corpus-script) ] ;
+}
+actions make-corpus
+{
+    "$(PYTHON:E=python)" "$(RUNNER)" "$(<)" "$(>)"
+}
+toolset.flags $(__name__).make-corpus PYTHON <python.interpreter> ;
+
+for local fuzzer in $(all_fuzzers)
+{
+    local fuzz_time = 60 ;
+    local corpus = /tmp/corpus/$(fuzzer) ;
+    local min_corpus = /tmp/mincorpus/$(fuzzer) ;
+    local seed_corpus = $(HERE)/seedcorpus/$(fuzzer) ;
+    local seed_files = [ glob "$(seed_corpus)/*" ] ;
+
+    # Create the output corpus directories
+    make $(corpus) : $(seed_files) : make-corpus : <dependency>$(.make-corpus-script) ;
+    make $(min_corpus) : : common.MkDir ;
+
+    # Build the fuzzer
+    exe $(fuzzer)
+        :
+            $(fuzzer).cpp
+        : requirements
+            <debug-symbols>on
+            <optimization>speed
+            <address-sanitizer>on
+            <undefined-sanitizer>norecover
+            <cxxflags>-fsanitize=fuzzer
+            <linkflags>-fsanitize=fuzzer
+            <library>/boost/locale//boost_locale
+    ;
+
+    # Run the fuzzer for a short while
+    run $(fuzzer)
+        : <testing.arg>"$(corpus) -max_total_time=$(fuzz_time)"
+        : target-name $(fuzzer)-fuzzing
+        : requirements
+            <dependency>$(corpus)
+    ;
+
+    # Minimize the corpus
+    run $(fuzzer)
+        : <testing.arg>"$(min_corpus) $(corpus) -merge=1"
+        : target-name $(fuzzer)-minimize-corpus
+        : requirements
+            <dependency>$(fuzzer)-fuzzing
+            <dependency>$(corpus)
+            <dependency>$(min_corpus)
+    ;
+}
+

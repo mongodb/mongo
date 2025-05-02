@@ -85,15 +85,9 @@ IndexEntry buildMultikeyIndexEntry(const std::vector<std::string>& indexFields,
     MultikeyPaths mkp;
     for (auto&& field : indexFields) {
         if (field == multikeyField) {
-            MONGO_COMPILER_DIAGNOSTIC_PUSH
-            MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR
             mkp.push_back({0U});
-            MONGO_COMPILER_DIAGNOSTIC_POP
         } else {
-            MONGO_COMPILER_DIAGNOSTIC_PUSH
-            MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR
             mkp.push_back({});
-            MONGO_COMPILER_DIAGNOSTIC_POP
         }
     }
     return {kp,

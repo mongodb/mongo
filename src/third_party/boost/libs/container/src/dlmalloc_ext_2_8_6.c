@@ -1224,14 +1224,12 @@ size_t boost_cont_allocated_memory()
       if (is_initialized(m)) {
       size_t nfree = SIZE_T_ONE; /* top always free */
       size_t mfree = m->topsize + TOP_FOOT_SIZE;
-      size_t sum = mfree;
       msegmentptr s = &m->seg;
       while (s != 0) {
          mchunkptr q = align_as_chunk(s->base);
          while (segment_holds(s, q) &&
                q != m->top && q->head != FENCEPOST_HEAD) {
             size_t sz = chunksize(q);
-            sum += sz;
             if (!is_inuse(q)) {
             mfree += sz;
             ++nfree;

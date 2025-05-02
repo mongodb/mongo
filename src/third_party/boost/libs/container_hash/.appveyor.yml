@@ -1,0 +1,69 @@
+# Copyright 2017 Daniel James
+# Copyright 2016-2021 Peter Dimov
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://boost.org/LICENSE_1_0.txt)
+
+version: 1.0.{build}-{branch}
+
+shallow_clone: true
+
+branches:
+  only:
+    - master
+    - develop
+    - /feature\/.*/
+
+environment:
+  matrix:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      TOOLSET: msvc-14.0
+      ADDRMD: 32,64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      TOOLSET: msvc-14.1
+      CXXSTD: 14,17
+      ADDRMD: 32,64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      TOOLSET: clang-win
+      ADDRMD: 64
+      CXXSTD: 14,17
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      TOOLSET: clang-win
+      CXXSTD: 14,17,latest
+      ADDRMD: 64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      ADDPATH: C:\cygwin\bin;
+      TOOLSET: gcc
+      CXXSTD: 11,14,1z
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\cygwin64\bin;
+      TOOLSET: gcc
+      CXXSTD: 11,14,17
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;
+      TOOLSET: gcc
+      CXXSTD: 11,14,17
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      ADDPATH: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;
+      TOOLSET: gcc
+      CXXSTD: 11,14,17
+
+install:
+  - set BOOST_BRANCH=develop
+  - if "%APPVEYOR_REPO_BRANCH%" == "master" set BOOST_BRANCH=master
+  - cd ..
+  - git clone -b %BOOST_BRANCH% --depth 1 https://github.com/boostorg/boost.git boost-root
+  - cd boost-root
+  - git submodule update --init tools/boostdep
+  - xcopy /s /e /q %APPVEYOR_BUILD_FOLDER% libs\container_hash\
+  - python tools/boostdep/depinst/depinst.py -I examples container_hash
+  - cmd /c bootstrap
+  - b2 -d0 headers
+
+build: off
+
+test_script:
+  - PATH=%ADDPATH%%PATH%
+  - if not "%CXXSTD%" == "" set CXXSTD=cxxstd=%CXXSTD%
+  - if not "%ADDRMD%" == "" set ADDRMD=address-model=%ADDRMD%
+  - b2 -j3 --verbose-test libs/container_hash/test//hash_info toolset=%TOOLSET% %CXXSTD% %ADDRMD% variant=debug,release embed-manifest-via=linker
+  - b2 -j3 libs/container_hash/test toolset=%TOOLSET% %CXXSTD% %ADDRMD% variant=debug,release embed-manifest-via=linker

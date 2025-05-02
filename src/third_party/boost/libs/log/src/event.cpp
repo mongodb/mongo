@@ -45,7 +45,7 @@
 
 #else
 
-#include <boost/thread/locks.hpp>
+#include <mutex>
 
 #endif
 
@@ -222,7 +222,7 @@ BOOST_LOG_API generic_event::~generic_event()
 //! Waits for the object to become signalled
 BOOST_LOG_API void generic_event::wait()
 {
-    boost::unique_lock< boost::mutex > lock(m_mutex);
+    std::unique_lock< std::mutex > lock(m_mutex);
     while (!m_state)
     {
         m_cond.wait(lock);
@@ -233,7 +233,7 @@ BOOST_LOG_API void generic_event::wait()
 //! Sets the object to a signalled state
 BOOST_LOG_API void generic_event::set_signalled()
 {
-    boost::lock_guard< boost::mutex > lock(m_mutex);
+    std::lock_guard< std::mutex > lock(m_mutex);
     if (!m_state)
     {
         m_state = true;

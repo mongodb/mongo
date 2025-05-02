@@ -1,18 +1,23 @@
 // Copyright 2021 Peter Dimov.
+// Copyright 2023 Joaquin M Lopez Munoz.
 // Distributed under the Boost Software License, Version 1.0.
 // https://www.boost.org/LICENSE_1_0.txt
 
 #define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
+#define _SILENCE_CXX20_CISO646_REMOVED_WARNING
 
 #include <boost/unordered_map.hpp>
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/member.hpp>
+#include <boost/unordered/unordered_node_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/endian/conversion.hpp>
 #include <boost/core/detail/splitmix64.hpp>
 #include <boost/config.hpp>
 #ifdef HAVE_ABSEIL
 # include "absl/container/node_hash_map.h"
 # include "absl/container/flat_hash_map.h"
+#endif
+#ifdef HAVE_ANKERL_UNORDERED_DENSE
+# include "ankerl/unordered_dense.h"
 #endif
 #include <unordered_map>
 #include <vector>
@@ -62,7 +67,7 @@ static void init_indices()
 
     for( unsigned i = 1; i <= N*2; ++i )
     {
-        indices3.push_back( (std::uint64_t)i << 40 );
+        indices3.push_back( boost::endian::endian_reverse( static_cast<std::uint64_t>( i ) ) );
     }
 }
 
@@ -87,7 +92,7 @@ template<class Map> BOOST_NOINLINE void test_insert( Map& map, std::chrono::stea
         map.insert( { indices3[ i ], i } );
     }
 
-    print_time( t1, "Consecutive shifted insert",  0, map.size() );
+    print_time( t1, "Consecutive reversed insert",  0, map.size() );
 
     std::cout << std::endl;
 }
@@ -133,7 +138,7 @@ template<class Map> BOOST_NOINLINE void test_lookup( Map& map, std::chrono::stea
         }
     }
 
-    print_time( t1, "Consecutive shifted lookup",  s, map.size() );
+    print_time( t1, "Consecutive reversed lookup",  s, map.size() );
 
     std::cout << std::endl;
 }
@@ -146,7 +151,14 @@ template<class Map> BOOST_NOINLINE void test_iteration( Map& map, std::chrono::s
     {
         if( it->second & 1 )
         {
-            map.erase( it++ );
+            if constexpr( std::is_void_v< decltype( map.erase( it ) ) > )
+            {
+                map.erase( it++ );
+            }
+            else
+            {
+                it = map.erase( it );
+            }
         }
         else
         {
@@ -168,13 +180,9 @@ template<class Map> BOOST_NOINLINE void test_erase( Map& map, std::chrono::stead
 
     print_time( t1, "Consecutive erase",  0, map.size() );
 
+    for( unsigned i = 1; i <= N; ++i )
     {
-        boost::detail::splitmix64 rng;
-
-        for( unsigned i = 1; i <= N; ++i )
-        {
-            map.erase( indices2[ i ] );
-        }
+        map.erase( indices2[ i ] );
     }
 
     print_time( t1, "Random erase",  0, map.size() );
@@ -184,7 +192,7 @@ template<class Map> BOOST_NOINLINE void test_erase( Map& map, std::chrono::stead
         map.erase( indices3[ i ] );
     }
 
-    print_time( t1, "Consecutive shifted erase",  0, map.size() );
+    print_time( t1, "Consecutive reversed erase",  0, map.size() );
 
     std::cout << std::endl;
 }
@@ -273,24 +281,6 @@ template<template<class...> class Map> BOOST_NOINLINE void test( char const* lab
     times.push_back( rec );
 }
 
-// multi_index emulation of unordered_map
-
-template<class K, class V> struct pair
-{
-    K first;
-    mutable V second;
-};
-
-using namespace boost::multi_index;
-
-template<class K, class V> using multi_index_map = multi_index_container<
-  pair<K, V>,
-  indexed_by<
-    hashed_unique< member<pair<K, V>, K, &pair<K, V>::first> >
-  >,
-  ::allocator< pair<K, V> >
->;
-
 // aliases using the counting allocator
 
 template<class K, class V> using allocator_for = ::allocator< std::pair<K const, V> >;
@@ -300,6 +290,12 @@ template<class K, class V> using std_unordered_map =
 
 template<class K, class V> using boost_unordered_map =
     boost::unordered_map<K, V, boost::hash<K>, std::equal_to<K>, allocator_for<K, V>>;
+
+template<class K, class V> using boost_unordered_node_map =
+    boost::unordered_node_map<K, V, boost::hash<K>, std::equal_to<K>, allocator_for<K, V>>;
+
+template<class K, class V> using boost_unordered_flat_map =
+    boost::unordered_flat_map<K, V, boost::hash<K>, std::equal_to<K>, allocator_for<K, V>>;
 
 #ifdef HAVE_ABSEIL
 
@@ -311,13 +307,37 @@ template<class K, class V> using absl_flat_hash_map =
 
 #endif
 
+#ifdef HAVE_ANKERL_UNORDERED_DENSE
+
+template<class K, class V> using ankerl_unordered_dense_map =
+    ankerl::unordered_dense::map<K, V, ankerl::unordered_dense::hash<K>, std::equal_to<K>, ::allocator< std::pair<K, V> >>;
+
+#endif
+
 int main()
 {
     init_indices();
 
+#if defined(BOOST_LIBSTDCXX_VERSION) && __SIZE_WIDTH__ == 32
+
+    // Pathological behavior:
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104945
+
+#else
+
     test<std_unordered_map>( "std::unordered_map" );
+
+#endif
+
     test<boost_unordered_map>( "boost::unordered_map" );
-    test<multi_index_map>( "multi_index_map" );
+    test<boost_unordered_node_map>( "boost::unordered_node_map" );
+    test<boost_unordered_flat_map>( "boost::unordered_flat_map" );
+
+#ifdef HAVE_ANKERL_UNORDERED_DENSE
+
+    test<ankerl_unordered_dense_map>( "ankerl::unordered_dense::map" );
+
+#endif
 
 #ifdef HAVE_ABSEIL
 
@@ -330,7 +350,7 @@ int main()
 
     for( auto const& x: times )
     {
-        std::cout << std::setw( 25 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
+        std::cout << std::setw( 30 ) << ( x.label_ + ": " ) << std::setw( 5 ) << x.time_ << " ms, " << std::setw( 9 ) << x.bytes_ << " bytes in " << x.count_ << " allocations\n";
     }
 }
 

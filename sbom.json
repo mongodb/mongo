@@ -234,7 +234,7 @@
         "name": "Organization: github"
       },
       "name": "Boost C++ Libraries - boost",
-      "version": "1.79.0",
+      "version": "1.88.0",
       "licenses": [
         {
           "license": {
@@ -242,7 +242,7 @@
           }
         }
       ],
-      "purl": "pkg:github/boostorg/boost@boost-1.79.0",
+      "purl": "pkg:github/mongodb-forks/boost@boost-1.88.0",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -258,7 +258,7 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/scripts/boost_get_sources.sh"
+          "value": "src/third_party/boost/scripts/import.sh"
         }
       ],
       "type": "library",

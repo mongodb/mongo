@@ -1,7 +1,7 @@
 //  boost/filesystem/fstream.hpp  ------------------------------------------------------//
 
 //  Copyright Beman Dawes 2002
-//  Copyright Andrey Semashev 2021
+//  Copyright Andrey Semashev 2021-2023
 
 //  Distributed under the Boost Software License, Version 1.0.
 //  See http://www.boost.org/LICENSE_1_0.txt
@@ -48,7 +48,7 @@
 
 #if defined(BOOST_MSVC)
 #pragma warning(push)
-// 'boost::filesystem::basic_fstream<charT>' : inherits 'std::basic_istream<_Elem,_Traits>::std::basic_istream<_Elem,_Traits>::_Add_vtordisp1' via dominance
+// 'boost::filesystem::basic_fstream<Char>' : inherits 'std::basic_istream<_Elem,_Traits>::std::basic_istream<_Elem,_Traits>::_Add_vtordisp1' via dominance
 #pragma warning(disable : 4250)
 #endif
 
@@ -59,19 +59,28 @@ namespace filesystem {
 //                                  basic_filebuf                                       //
 //--------------------------------------------------------------------------------------//
 
-template< class charT, class traits = std::char_traits< charT > >
+template< class Char, class Traits = std::char_traits< Char > >
 class basic_filebuf :
-    public std::basic_filebuf< charT, traits >
+    public std::basic_filebuf< Char, Traits >
 {
-public:
-    BOOST_DEFAULTED_FUNCTION(basic_filebuf(), {})
-    BOOST_DELETED_FUNCTION(basic_filebuf(basic_filebuf const&))
-    BOOST_DELETED_FUNCTION(basic_filebuf const& operator=(basic_filebuf const&))
+private:
+    typedef std::basic_filebuf< Char, Traits > base_type;
 
 public:
-    basic_filebuf< charT, traits >* open(path const& p, std::ios_base::openmode mode)
+    basic_filebuf() = default;
+
+#if !defined(BOOST_FILESYSTEM_DETAIL_NO_CXX11_MOVABLE_FSTREAMS)
+    basic_filebuf(basic_filebuf&&) = default;
+    basic_filebuf& operator= (basic_filebuf&&) = default;
+#endif // !defined(BOOST_FILESYSTEM_DETAIL_NO_CXX11_MOVABLE_FSTREAMS)
+
+    basic_filebuf(basic_filebuf const&) = delete;
+    basic_filebuf const& operator= (basic_filebuf const&) = delete;
+
+public:
+    basic_filebuf* open(path const& p, std::ios_base::openmode mode)
     {
-        return std::basic_filebuf< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), mode) ? this : 0;
+        return base_type::open(BOOST_FILESYSTEM_C_STR(p), mode) ? this : nullptr;
     }
 };
 
@@ -79,34 +88,48 @@ public:
 //                                 basic_ifstream                                       //
 //--------------------------------------------------------------------------------------//
 
-template< class charT, class traits = std::char_traits< charT > >
+template< class Char, class Traits = std::char_traits< Char > >
 class basic_ifstream :
-    public std::basic_ifstream< charT, traits >
+    public std::basic_ifstream< Char, Traits >
 {
+private:
+    typedef std::basic_ifstream< Char, Traits > base_type;
+
 public:
-    BOOST_DEFAULTED_FUNCTION(basic_ifstream(), {})
+    basic_ifstream() = default;
 
     // use two signatures, rather than one signature with default second
     // argument, to workaround VC++ 7.1 bug (ID VSWhidbey 38416)
 
     explicit basic_ifstream(path const& p) :
-        std::basic_ifstream< charT, traits >(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in) {}
+        base_type(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in) {}
 
     basic_ifstream(path const& p, std::ios_base::openmode mode) :
-        std::basic_ifstream< charT, traits >(BOOST_FILESYSTEM_C_STR(p), mode) {}
+        base_type(BOOST_FILESYSTEM_C_STR(p), mode) {}
 
-    BOOST_DELETED_FUNCTION(basic_ifstream(basic_ifstream const&))
-    BOOST_DELETED_FUNCTION(basic_ifstream const& operator=(basic_ifstream const&))
+#if !defined(BOOST_FILESYSTEM_DETAIL_NO_CXX11_MOVABLE_FSTREAMS)
+    basic_ifstream(basic_ifstream&& that) :
+        base_type(static_cast< base_type&& >(that)) {}
+
+    basic_ifstream& operator= (basic_ifstream&& that)
+    {
+        *static_cast< base_type* >(this) = static_cast< base_type&& >(that);
+        return *this;
+    }
+#endif
+
+    basic_ifstream(basic_ifstream const&) = delete;
+    basic_ifstream const& operator= (basic_ifstream const&) = delete;
 
 public:
     void open(path const& p)
     {
-        std::basic_ifstream< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in);
+        base_type::open(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in);
     }
 
     void open(path const& p, std::ios_base::openmode mode)
     {
-        std::basic_ifstream< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), mode);
+        base_type::open(BOOST_FILESYSTEM_C_STR(p), mode);
     }
 };
 
@@ -114,34 +137,48 @@ public:
 //                                 basic_ofstream                                       //
 //--------------------------------------------------------------------------------------//
 
-template< class charT, class traits = std::char_traits< charT > >
+template< class Char, class Traits = std::char_traits< Char > >
 class basic_ofstream :
-    public std::basic_ofstream< charT, traits >
+    public std::basic_ofstream< Char, Traits >
 {
+private:
+    typedef std::basic_ofstream< Char, Traits > base_type;
+
 public:
-    BOOST_DEFAULTED_FUNCTION(basic_ofstream(), {})
+    basic_ofstream() = default;
 
     // use two signatures, rather than one signature with default second
     // argument, to workaround VC++ 7.1 bug (ID VSWhidbey 38416)
 
     explicit basic_ofstream(path const& p) :
-        std::basic_ofstream< charT, traits >(BOOST_FILESYSTEM_C_STR(p), std::ios_base::out) {}
+        base_type(BOOST_FILESYSTEM_C_STR(p), std::ios_base::out) {}
 
     basic_ofstream(path const& p, std::ios_base::openmode mode) :
-        std::basic_ofstream< charT, traits >(BOOST_FILESYSTEM_C_STR(p), mode) {}
+        base_type(BOOST_FILESYSTEM_C_STR(p), mode) {}
 
-    BOOST_DELETED_FUNCTION(basic_ofstream(basic_ofstream const&))
-    BOOST_DELETED_FUNCTION(basic_ofstream const& operator=(basic_ofstream const&))
+#if !defined(BOOST_FILESYSTEM_DETAIL_NO_CXX11_MOVABLE_FSTREAMS)
+    basic_ofstream(basic_ofstream&& that) :
+        base_type(static_cast< base_type&& >(that)) {}
+
+    basic_ofstream& operator= (basic_ofstream&& that)
+    {
+        *static_cast< base_type* >(this) = static_cast< base_type&& >(that);
+        return *this;
+    }
+#endif
+
+    basic_ofstream(basic_ofstream const&) = delete;
+    basic_ofstream const& operator= (basic_ofstream const&) = delete;
 
 public:
     void open(path const& p)
     {
-        std::basic_ofstream< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), std::ios_base::out);
+        base_type::open(BOOST_FILESYSTEM_C_STR(p), std::ios_base::out);
     }
 
     void open(path const& p, std::ios_base::openmode mode)
     {
-        std::basic_ofstream< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), mode);
+        base_type::open(BOOST_FILESYSTEM_C_STR(p), mode);
     }
 };
 
@@ -149,34 +186,48 @@ public:
 //                                  basic_fstream                                       //
 //--------------------------------------------------------------------------------------//
 
-template< class charT, class traits = std::char_traits< charT > >
+template< class Char, class Traits = std::char_traits< Char > >
 class basic_fstream :
-    public std::basic_fstream< charT, traits >
+    public std::basic_fstream< Char, Traits >
 {
+private:
+    typedef std::basic_fstream< Char, Traits > base_type;
+
 public:
-    BOOST_DEFAULTED_FUNCTION(basic_fstream(), {})
+    basic_fstream() = default;
 
     // use two signatures, rather than one signature with default second
     // argument, to workaround VC++ 7.1 bug (ID VSWhidbey 38416)
 
     explicit basic_fstream(path const& p) :
-        std::basic_fstream< charT, traits >(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in | std::ios_base::out) {}
+        base_type(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in | std::ios_base::out) {}
 
     basic_fstream(path const& p, std::ios_base::openmode mode) :
-        std::basic_fstream< charT, traits >(BOOST_FILESYSTEM_C_STR(p), mode) {}
+        base_type(BOOST_FILESYSTEM_C_STR(p), mode) {}
 
-    BOOST_DELETED_FUNCTION(basic_fstream(basic_fstream const&))
-    BOOST_DELETED_FUNCTION(basic_fstream const& operator=(basic_fstream const&))
+#if !defined(BOOST_FILESYSTEM_DETAIL_NO_CXX11_MOVABLE_FSTREAMS)
+    basic_fstream(basic_fstream&& that) :
+        base_type(static_cast< base_type&& >(that)) {}
+
+    basic_fstream& operator= (basic_fstream&& that)
+    {
+        *static_cast< base_type* >(this) = static_cast< base_type&& >(that);
+        return *this;
+    }
+#endif
+
+    basic_fstream(basic_fstream const&) = delete;
+    basic_fstream const& operator= (basic_fstream const&) = delete;
 
 public:
     void open(path const& p)
     {
-        std::basic_fstream< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in | std::ios_base::out);
+        base_type::open(BOOST_FILESYSTEM_C_STR(p), std::ios_base::in | std::ios_base::out);
     }
 
     void open(path const& p, std::ios_base::openmode mode)
     {
-        std::basic_fstream< charT, traits >::open(BOOST_FILESYSTEM_C_STR(p), mode);
+        base_type::open(BOOST_FILESYSTEM_C_STR(p), mode);
     }
 };
 

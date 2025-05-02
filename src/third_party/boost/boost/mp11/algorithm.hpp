@@ -26,6 +26,11 @@
 #include <type_traits>
 #include <utility>
 
+#if defined(_MSC_VER) || defined(__GNUC__)
+# pragma push_macro( "I" )
+# undef I
+#endif
+
 namespace boost
 {
 namespace mp11
@@ -83,6 +88,25 @@ template<template<class...> class F, template<class...> class L1, class... T1, t
 
 #endif
 };
+
+#if defined(BOOST_MP11_HAS_TEMPLATE_AUTO)
+
+template<template<class...> class F, template<auto...> class L, auto... A> struct mp_transform_impl<F, L<A...>>
+{
+    using type = L< F< mp_value<A> >::value... >;
+};
+
+template<template<class...> class F, template<auto...> class L1, auto... A1, template<auto...> class L2, auto... A2> struct mp_transform_impl<F, L1<A1...>, L2<A2...>>
+{
+    using type = L1< F< mp_value<A1>, mp_value<A2> >::value... >;
+};
+
+template<template<class...> class F, template<auto...> class L1, auto... A1, template<auto...> class L2, auto... A2, template<auto...> class L3, auto... A3> struct mp_transform_impl<F, L1<A1...>, L2<A2...>, L3<A3...>>
+{
+    using type = L1< F< mp_value<A1>, mp_value<A2>, mp_value<A3> >::value... >;
+};
+
+#endif
 
 #if BOOST_MP11_WORKAROUND( BOOST_MP11_MSVC, == 1900 ) || BOOST_MP11_WORKAROUND( BOOST_MP11_GCC, < 40800 )
 
@@ -199,7 +223,10 @@ template<class Q, class... L> using mp_filter_q = typename detail::mp_filter_imp
 namespace detail
 {
 
-template<class L, class V> struct mp_fill_impl;
+template<class L, class V> struct mp_fill_impl
+{
+// An error "no type named 'type'" here means that the L argument of mp_fill is not a list
+};
 
 template<template<class...> class L, class... T, class V> struct mp_fill_impl<L<T...>, V>
 {
@@ -215,6 +242,15 @@ template<template<class...> class L, class... T, class V> struct mp_fill_impl<L<
 
 #endif
 };
+
+#if defined(BOOST_MP11_HAS_TEMPLATE_AUTO)
+
+template<template<auto...> class L, auto... A, class V> struct mp_fill_impl<L<A...>, V>
+{
+    using type = L<((void)A, V::value)...>;
+};
+
+#endif
 
 } // namespace detail
 
@@ -291,41 +327,46 @@ template<class Q, class... L> using mp_product_q = typename detail::mp_product_i
 namespace detail
 {
 
-template<class L, class L2> struct mp_drop_impl;
+template<class L, class L2, class En> struct mp_drop_impl;
 
-template<template<class...> class L, class... T, template<class...> class L2, class... U> struct mp_drop_impl<L<T...>, L2<U...>>
+template<template<class...> class L, class... T, template<class...> class L2, class... U> struct mp_drop_impl<L<T...>, L2<U...>, mp_true>
 {
     template<class... W> static mp_identity<L<W...>> f( U*..., mp_identity<W>*... );
 
-    using R = decltype( f( (mp_identity<T>*)0 ... ) );
+    using R = decltype( f( static_cast<mp_identity<T>*>(0) ... ) );
 
     using type = typename R::type;
 };
 
 } // namespace detail
 
-template<class L, std::size_t N> using mp_drop_c = typename detail::mp_drop_impl<L, mp_repeat_c<mp_list<void>, N>>::type;
+template<class L, std::size_t N> using mp_drop_c = mp_assign<L, typename detail::mp_drop_impl<mp_rename<L, mp_list>, mp_repeat_c<mp_list<void>, N>, mp_bool<N <= mp_size<L>::value>>::type>;
 
-template<class L, class N> using mp_drop = typename detail::mp_drop_impl<L, mp_repeat<mp_list<void>, N>>::type;
+template<class L, class N> using mp_drop = mp_drop_c<L, std::size_t{ N::value }>;
 
-// mp_from_sequence<S>
+// mp_from_sequence<S, F>
 namespace detail
 {
 
-template<class S> struct mp_from_sequence_impl;
+template<class S, class F, bool Z> struct mp_from_sequence_impl;
 
-template<template<class T, T... I> class S, class U, U... J> struct mp_from_sequence_impl<S<U, J...>>
+template<template<class T, T... I> class S, class U, U... J, class F> struct mp_from_sequence_impl<S<U, J...>, F, false>
 {
-    using type = mp_list<std::integral_constant<U, J>...>;
+    using type = mp_list_c<U, (F::value + J)...>;
+};
+
+template<template<class T, T... I> class S, class U, U... J, class F> struct mp_from_sequence_impl<S<U, J...>, F, true>
+{
+    using type = mp_list_c<U, J...>;
 };
 
 } // namespace detail
 
-template<class S> using mp_from_sequence = typename detail::mp_from_sequence_impl<S>::type;
+template<class S, class F = mp_int<0>> using mp_from_sequence = typename detail::mp_from_sequence_impl<S, F, (F::value == 0)>::type;
 
-// mp_iota(_c)<N>
-template<std::size_t N> using mp_iota_c = mp_from_sequence<make_index_sequence<N>>;
-template<class N> using mp_iota = mp_from_sequence<make_integer_sequence<typename std::remove_const<decltype(N::value)>::type, N::value>>;
+// mp_iota(_c)<N, F>
+template<std::size_t N, std::size_t F = 0> using mp_iota_c = mp_from_sequence<make_index_sequence<N>, mp_size_t<F>>;
+template<class N, class F = mp_int<0>> using mp_iota = mp_from_sequence<make_integer_sequence<typename std::remove_const<decltype(N::value)>::type, N::value>, F>;
 
 // mp_at(_c)<L, I>
 namespace detail
@@ -340,11 +381,20 @@ template<template<class...> class L, class... T, std::size_t I> struct mp_at_c_i
     using type = __type_pack_element<I, T...>;
 };
 
+#if defined(BOOST_MP11_HAS_TEMPLATE_AUTO)
+
+template<template<auto...> class L, auto... A, std::size_t I> struct mp_at_c_impl<L<A...>, I>
+{
+    using type = __type_pack_element<I, mp_value<A>...>;
+};
+
+#endif
+
 #else
 
 template<class L, std::size_t I> struct mp_at_c_impl
 {
-    using _map = mp_transform<mp_list, mp_iota<mp_size<L> >, L>;
+    using _map = mp_transform<mp_list, mp_iota<mp_size<L> >, mp_rename<L, mp_list>>;
     using type = mp_second<mp_map_find<_map, mp_size_t<I> > >;
 };
 
@@ -449,8 +499,12 @@ struct mp_take_c_impl<N, L<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T...>, typen
 
 } // namespace detail
 
-template<class L, std::size_t N> using mp_take_c = typename detail::mp_take_c_impl<N, L>::type;
-template<class L, class N> using mp_take = typename detail::mp_take_c_impl<std::size_t{ N::value }, L>::type;
+template<class L, std::size_t N> using mp_take_c = mp_assign<L, typename detail::mp_take_c_impl<N, mp_rename<L, mp_list>>::type>;
+template<class L, class N> using mp_take = mp_take_c<L, std::size_t{ N::value }>;
+
+// mp_slice(_c)<L, I, J>
+template<class L, std::size_t I, std::size_t J> using mp_slice_c = mp_drop_c< mp_take_c<L, J>, I >;
+template<class L, class I, class J> using mp_slice = mp_drop< mp_take<L, J>, I >;
 
 // mp_back<L>
 template<class L> using mp_back = mp_at_c<L, mp_size<L>::value - 1>;
@@ -670,37 +724,7 @@ namespace detail
 
 template<class L, class V> struct mp_find_impl;
 
-#if BOOST_MP11_CLANG && defined( BOOST_MP11_HAS_FOLD_EXPRESSIONS )
-
-struct mp_index_holder
-{
-    std::size_t i_;
-    bool f_;
-};
-
-constexpr inline mp_index_holder operator+( mp_index_holder const & v, bool f )
-{
-    if( v.f_ )
-    {
-        return v;
-    }
-    else if( f )
-    {
-        return { v.i_, true };
-    }
-    else
-    {
-        return { v.i_ + 1, false };
-    }
-}
-
-template<template<class...> class L, class... T, class V> struct mp_find_impl<L<T...>, V>
-{
-    static constexpr mp_index_holder _v{ 0, false };
-    using type = mp_size_t< (_v + ... + std::is_same<T, V>::value).i_ >;
-};
-
-#elif !defined( BOOST_MP11_NO_CONSTEXPR )
+#if !defined( BOOST_MP11_NO_CONSTEXPR )
 
 template<template<class...> class L, class V> struct mp_find_impl<L<>, V>
 {
@@ -779,15 +803,7 @@ namespace detail
 
 template<class L, template<class...> class P> struct mp_find_if_impl;
 
-#if BOOST_MP11_CLANG && defined( BOOST_MP11_HAS_FOLD_EXPRESSIONS )
-
-template<template<class...> class L, class... T, template<class...> class P> struct mp_find_if_impl<L<T...>, P>
-{
-    static constexpr mp_index_holder _v{ 0, false };
-    using type = mp_size_t< (_v + ... + P<T>::value).i_ >;
-};
-
-#elif !defined( BOOST_MP11_NO_CONSTEXPR )
+#if !defined( BOOST_MP11_NO_CONSTEXPR )
 
 template<template<class...> class L, template<class...> class P> struct mp_find_if_impl<L<>, P>
 {
@@ -1240,6 +1256,33 @@ template<class L, class Q> using mp_pairwise_fold_impl = mp_transform_q<Q, mp_po
 template<class L, class Q> using mp_pairwise_fold_q = mp_eval_if<mp_empty<L>, mp_clear<L>, detail::mp_pairwise_fold_impl, L, Q>;
 template<class L, template<class...> class F> using mp_pairwise_fold = mp_pairwise_fold_q<L, mp_quote<F>>;
 
+// mp_sliding_fold<L, N, F>
+namespace detail
+{
+
+template<class C, class L, class Q, class S> struct mp_sliding_fold_impl;
+
+template<class L, class N, class Q> struct mp_sliding_fold_impl<mp_true, L, N, Q>
+{
+    static const std::size_t M = mp_size<L>::value - N::value + 1;
+
+    template<class I> using F = mp_slice_c<L, I::value, I::value + M>;
+
+    using J = mp_transform<F, mp_iota<N>>;
+
+    using type = mp_apply<mp_transform_q, mp_push_front<J, Q>>;
+};
+
+template<class L, class N, class Q> struct mp_sliding_fold_impl<mp_false, L, N, Q>
+{
+    using type = mp_clear<L>;
+};
+
+} // namespace detail
+
+template<class L, class N, class Q> using mp_sliding_fold_q = typename detail::mp_sliding_fold_impl<mp_bool<(mp_size<L>::value >= N::value)>, L, N, Q>::type;
+template<class L, class N, template<class...> class F> using mp_sliding_fold = mp_sliding_fold_q<L, N, mp_quote<F>>;
+
 // mp_intersperse<L, S>
 namespace detail
 {
@@ -1302,5 +1345,9 @@ template<class L, class S> using mp_join = mp_apply<mp_append, mp_intersperse<L,
 
 } // namespace mp11
 } // namespace boost
+
+#if defined(_MSC_VER) || defined(__GNUC__)
+# pragma pop_macro( "I" )
+#endif
 
 #endif // #ifndef BOOST_MP11_ALGORITHM_HPP_INCLUDED

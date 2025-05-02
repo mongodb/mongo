@@ -1853,8 +1853,8 @@ static FORCEINLINE void x86_clear_lock(int* sl) {
 #define CLEAR_LOCK(sl)   x86_clear_lock(sl)
 
 #else /* Win32 MSC */
-#define CAS_LOCK(sl)     interlockedexchange(sl, (LONG)1)
-#define CLEAR_LOCK(sl)   interlockedexchange (sl, (LONG)0)
+#define CAS_LOCK(sl)     interlockedexchange((volatile long*)sl, (LONG)1)
+#define CLEAR_LOCK(sl)   interlockedexchange ((volatile long*)sl, (LONG)0)
 
 #endif /* ... gcc spins locks ... */
 
@@ -4013,6 +4013,7 @@ static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
       break;
   }
   assert(nfences >= 2);
+  (void) nfences; //Added by iG to silence warning about unused nfences
 
   /* Insert the rest of old top into a bin as an ordinary free chunk */
   if (csp != old_top) {

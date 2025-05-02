@@ -30,8 +30,7 @@
 // move/detail
 #include <boost/move/detail/meta_utils.hpp>
 // other
-#include <boost/assert.hpp>
-#include <boost/static_assert.hpp>
+#include <cassert>
 // std
 #include <cstddef>
 
@@ -190,32 +189,36 @@
 #   endif
 
 //    BOOST_MOVE_HAS_TRIVIAL_MOVE_CONSTRUCTOR
-#   if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && BOOST_MOVE_HAS_TRAIT(is_constructible) && BOOST_MOVE_HAS_TRAIT(is_trivially_constructible)
+#   if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) 
+
+#   if BOOST_MOVE_HAS_TRAIT(is_constructible) && BOOST_MOVE_HAS_TRAIT(is_trivially_constructible)
 #     define BOOST_MOVE_HAS_TRIVIAL_MOVE_CONSTRUCTOR(T) (__is_constructible(T, T&&) && __is_trivially_constructible(T, T&&))
 #   elif BOOST_MOVE_HAS_TRAIT(has_trivial_move_constructor)
 #     define BOOST_MOVE_HAS_TRIVIAL_MOVE_CONSTRUCTOR(T) __has_trivial_move_constructor(T)
 #   endif
 
 //    BOOST_MOVE_HAS_TRIVIAL_MOVE_ASSIGN
-#   if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && BOOST_MOVE_HAS_TRAIT(is_assignable) && BOOST_MOVE_HAS_TRAIT(is_trivially_assignable)
+#   if BOOST_MOVE_HAS_TRAIT(is_assignable) && BOOST_MOVE_HAS_TRAIT(is_trivially_assignable)
 #     define BOOST_MOVE_HAS_TRIVIAL_MOVE_ASSIGN(T) (__is_assignable(T, T&&) && __is_trivially_assignable(T, T&&))
 #   elif BOOST_MOVE_HAS_TRAIT(has_trivial_move_assign)
 #     define BOOST_MOVE_HAS_TRIVIAL_MOVE_ASSIGN(T) __has_trivial_move_assign(T)
 #   endif
 
 //    BOOST_MOVE_HAS_NOTHROW_MOVE_CONSTRUCTOR
-#   if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && BOOST_MOVE_HAS_TRAIT(is_constructible) && BOOST_MOVE_HAS_TRAIT(is_nothrow_constructible)
+#   if BOOST_MOVE_HAS_TRAIT(is_constructible) && BOOST_MOVE_HAS_TRAIT(is_nothrow_constructible)
 #     define BOOST_MOVE_HAS_NOTHROW_MOVE_CONSTRUCTOR(T) (__is_constructible(T, T&&) && __is_nothrow_constructible(T, T&&))
 #   elif BOOST_MOVE_HAS_TRAIT(has_nothrow_move_constructor)
 #     define BOOST_MOVE_HAS_NOTHROW_MOVE_CONSTRUCTOR(T) __has_nothrow_move_constructor(T)
 #   endif
 
 //    BOOST_MOVE_HAS_NOTHROW_MOVE_ASSIGN
-#   if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES) && BOOST_MOVE_HAS_TRAIT(is_assignable) && BOOST_MOVE_HAS_TRAIT(is_nothrow_assignable)
+#   if BOOST_MOVE_HAS_TRAIT(is_assignable) && BOOST_MOVE_HAS_TRAIT(is_nothrow_assignable)
 #     define BOOST_MOVE_HAS_NOTHROW_MOVE_ASSIGN(T) (__is_assignable(T, T&&) && __is_nothrow_assignable(T, T&&))
 #   elif BOOST_MOVE_HAS_TRAIT(has_nothrow_move_assign)
 #     define BOOST_MOVE_HAS_NOTHROW_MOVE_ASSIGN(T) __has_nothrow_move_assign(T)
 #   endif
+
+#   endif   //BOOST_NO_CXX11_RVALUE_REFERENCES
 
 //    BOOST_MOVE_ALIGNMENT_OF
 #   define BOOST_MOVE_ALIGNMENT_OF(T) __alignof(T)
@@ -579,6 +582,28 @@ struct remove_cvref
 };
 
 //////////////////////////
+//    is_unsigned
+//////////////////////////
+template<class T> struct is_unsigned_cv               { static const bool value = true; };
+template <>       struct is_unsigned_cv<signed char>  { static const bool value = false; };
+template <>       struct is_unsigned_cv<signed short> { static const bool value = false; };
+template <>       struct is_unsigned_cv<signed int>   { static const bool value = false; };
+template <>       struct is_unsigned_cv<signed long>  { static const bool value = false; };
+#ifdef BOOST_HAS_LONG_LONG
+template <>       struct is_unsigned_cv< ::boost::long_long_type > { static const bool value = false; };
+#endif
+
+#ifdef BOOST_HAS_INT128
+template <>       struct is_unsigned_cv< ::boost::int128_type >    { static const bool value = false; };
+#endif
+
+template <class T>
+struct is_unsigned
+   : is_unsigned_cv<typename remove_cv<T>::type>
+{};
+
+
+//////////////////////////
 //    make_unsigned
 //////////////////////////
 template <class T>
@@ -590,6 +615,11 @@ template <> struct make_unsigned_impl<signed long>                {  typedef uns
 #ifdef BOOST_HAS_LONG_LONG
 template <> struct make_unsigned_impl< ::boost::long_long_type >  {  typedef ::boost::ulong_long_type type; };
 #endif
+
+#ifdef BOOST_HAS_INT128
+template <> struct make_unsigned_impl< ::boost::int128_type > { typedef ::boost::uint128_type type; };
+#endif
+
 
 template <class T>
 struct make_unsigned
@@ -636,6 +666,13 @@ template<> struct is_integral_cv<            unsigned long>{  static const bool 
 template<> struct is_integral_cv< ::boost:: long_long_type>{  static const bool value = true; };
 template<> struct is_integral_cv< ::boost::ulong_long_type>{  static const bool value = true; };
 #endif
+#ifdef BOOST_HAS_INT128
+template <> struct is_integral_cv< ::boost::int128_type >  {  static const bool value = true; };
+template <> struct is_integral_cv< ::boost::uint128_type > {  static const bool value = true; };
+#endif
+#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
+template<> struct is_integral_cv<char8_t>  { static const bool value = true; };
+#endif
 
 template<class T>
 struct is_integral
@@ -656,13 +693,6 @@ struct remove_all_extents<T[]>
 template <class T, std::size_t N>
 struct remove_all_extents<T[N]>
 {  typedef typename remove_all_extents<T>::type type;};
-
-//////////////////////////
-//    is_scalar
-//////////////////////////
-template<class T>
-struct is_scalar
-{  static const bool value = is_integral<T>::value || is_floating_point<T>::value; };
 
 //////////////////////////
 //       is_void
@@ -726,6 +756,11 @@ struct is_nullptr_t_cv
 
 template <class T>
 struct is_nullptr_t
+   : is_nullptr_t_cv<typename remove_cv<T>::type>
+{};
+
+template <class T>
+struct is_null_pointer
    : is_nullptr_t_cv<typename remove_cv<T>::type>
 {};
 
@@ -799,6 +834,7 @@ struct is_arithmetic
                              is_integral<T>::value;
 };
 
+
 //////////////////////////////////////
 //    is_member_function_pointer
 //////////////////////////////////////
@@ -826,21 +862,38 @@ struct is_member_function_pointer
 template <class T>
 struct is_enum_nonintrinsic
 {
-   static const bool value =  !is_arithmetic<T>::value     &&
-                              !is_reference<T>::value      &&
-                              !is_class_or_union<T>::value &&
-                              !is_array<T>::value          &&
-                              !is_void<T>::value           &&
-                              !is_nullptr_t<T>::value      &&
-                              !is_member_pointer<T>::value &&
-                              !is_pointer<T>::value        &&
-                              !is_function<T>::value;
+   static const bool value = !is_arithmetic<T>::value &&
+      !is_reference<T>::value &&
+      !is_class_or_union<T>::value &&
+      !is_array<T>::value &&
+      !is_void<T>::value &&
+      !is_nullptr_t<T>::value &&
+      !is_member_pointer<T>::value &&
+      !is_pointer<T>::value &&
+      !is_function<T>::value;
 };
 #endif
 
 template <class T>
 struct is_enum
-{  static const bool value = BOOST_MOVE_IS_ENUM_IMPL(T);  };
+{
+   static const bool value = BOOST_MOVE_IS_ENUM_IMPL(T);
+};
+
+
+//////////////////////////
+//    is_scalar
+//////////////////////////
+template<class T>
+struct is_scalar
+{
+   static const bool value = is_arithmetic<T>::value ||
+      is_enum<T>::value ||
+      is_pointer<T>::value ||
+      is_member_pointer<T>::value ||
+      is_null_pointer<T>::value;
+};
+
 
 //////////////////////////////////////
 //       is_pod
@@ -1144,12 +1197,20 @@ struct aligned_struct;
 template <> struct aligned_struct<1> { char data; };
 template <> struct aligned_struct<2> { short data; };
 template <> struct aligned_struct<4> { int data; };
-template <> struct aligned_struct<8> { double data; };
+//8 byte alignment does not propely work in x86 if attribute is not used.
+//If a user declares a variable with 8 byte alignment, such as a double
+//the compiler will not realign the stack.
+// 
+//If _declspec(align) is used MSVC will realign the stack.
+//
+//Disabled specialization
+//template <> struct aligned_struct<8> { double data; };
 
 #define BOOST_MOVE_ALIGNED_STRUCT(x) \
   template <> struct aligned_struct<x> { \
     __declspec(align(x)) char data; \
   }
+BOOST_MOVE_ALIGNED_STRUCT(8);
 BOOST_MOVE_ALIGNED_STRUCT(16);
 BOOST_MOVE_ALIGNED_STRUCT(32);
 BOOST_MOVE_ALIGNED_STRUCT(64);
@@ -1234,7 +1295,7 @@ struct aligned_next;
 template<std::size_t Len, std::size_t Align, class T>
 struct aligned_next<Len, Align, T, true>
 {
-   BOOST_STATIC_ASSERT((alignment_of<T>::value == Align));
+   BOOST_MOVE_STATIC_ASSERT((alignment_of<T>::value == Align));
    typedef aligned_union<T, Len> type;
 };
 
@@ -1274,13 +1335,13 @@ template<std::size_t Len, std::size_t Align = alignment_of<max_align_t>::value>
 struct aligned_storage
 {
    //Sanity checks for input parameters
-   BOOST_STATIC_ASSERT(Align > 0);
+   BOOST_MOVE_STATIC_ASSERT(Align > 0);
 
    //Sanity checks for output type
    typedef typename aligned_storage_impl<Len ? Len : 1, Align>::type type;
    static const std::size_t value = alignment_of<type>::value;
-   BOOST_STATIC_ASSERT(value >= Align);
-   BOOST_STATIC_ASSERT((value % Align) == 0);
+   BOOST_MOVE_STATIC_ASSERT(value >= Align);
+   BOOST_MOVE_STATIC_ASSERT((value % Align) == 0);
 
    //Just in case someone instantiates aligned_storage
    //instead of aligned_storage::type (typical error).

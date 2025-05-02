@@ -25,6 +25,16 @@
 #include <boost/regex.hpp>
 #include <boost/cregex.hpp>
 
+#ifndef BOOST_REGEX_STANDALONE
+#include <boost/core/snprintf.hpp>
+#else
+namespace boost { namespace core { using std::swprintf; } }
+#endif
+
+#ifndef BOOST_WORKAROUND
+#define BOOST_WORKAROUND(x, y) false
+#endif
+
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
@@ -32,15 +42,6 @@
 #ifdef BOOST_INTEL
 #pragma warning(disable:981)
 #endif
-
-#if defined(BOOST_NO_STDC_NAMESPACE) || defined(__NetBSD__)
-namespace std{
-#  ifndef BOOST_NO_SWPRINTF
-      using ::swprintf;
-#  endif
-}
-#endif
-
 
 namespace boost{
 
@@ -97,7 +98,7 @@ BOOST_REGEX_DECL int BOOST_REGEX_CCALL regcompW(regex_tW* expression, const wcha
       return REG_E_MEMORY;
 #endif
    // set default flags:
-   boost::uint_fast32_t flags = (f & REG_PERLEX) ? 0 : ((f & REG_EXTENDED) ? wregex::extended : wregex::basic);
+   unsigned flags = (f & REG_PERLEX) ? 0 : ((f & REG_EXTENDED) ? wregex::extended : wregex::basic);
    expression->eflags = (f & REG_NEWLINE) ? match_not_dot_newline : match_default;
 
    // and translate those that are actually set:
@@ -177,7 +178,6 @@ BOOST_REGEX_DECL regsize_t BOOST_REGEX_CCALL regerrorW(int code, const regex_tW*
       }
       return result;
    }
-#if !defined(BOOST_NO_SWPRINTF)
    if(code == REG_ATOI)
    {
       wchar_t localbuf[5];
@@ -190,7 +190,7 @@ BOOST_REGEX_DECL regsize_t BOOST_REGEX_CCALL regerrorW(int code, const regex_tW*
 #if defined(_WIN32_WCE) && !defined(UNDER_CE)
             (std::swprintf)(localbuf, L"%d", i);
 #else
-            (std::swprintf)(localbuf, 5, L"%d", i);
+            (boost::core::swprintf)(localbuf, 5, L"%d", i);
 #endif
             if(std::wcslen(localbuf) < buf_size)
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(_WIN32_WCE) && !defined(UNDER_CE)
@@ -204,7 +204,7 @@ BOOST_REGEX_DECL regsize_t BOOST_REGEX_CCALL regerrorW(int code, const regex_tW*
 #if defined(_WIN32_WCE) && !defined(UNDER_CE)
       (std::swprintf)(localbuf, L"%d", 0);
 #else
-      (std::swprintf)(localbuf, 5, L"%d", 0);
+      (boost::core::swprintf)(localbuf, 5, L"%d", 0);
 #endif
       if(std::wcslen(localbuf) < buf_size)
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400) && !defined(_WIN32_WCE) && !defined(UNDER_CE)
@@ -214,7 +214,6 @@ BOOST_REGEX_DECL regsize_t BOOST_REGEX_CCALL regerrorW(int code, const regex_tW*
 #endif
       return std::wcslen(localbuf) + 1;
    }
-#endif
    if(code <= (int)REG_E_UNKNOWN)
    {
       std::string p;

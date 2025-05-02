@@ -95,10 +95,10 @@ class pool_data_t
 //pool_resource
 
 //Detect overflow in ceil_pow2
-BOOST_STATIC_ASSERT(pool_options_default_max_blocks_per_chunk <= (std::size_t(-1)/2u+1u));
+BOOST_CONTAINER_STATIC_ASSERT(pool_options_default_max_blocks_per_chunk <= (std::size_t(-1)/2u+1u));
 //Sanity checks
-BOOST_STATIC_ASSERT(bi::detail::static_is_pow2<pool_options_default_max_blocks_per_chunk>::value);
-BOOST_STATIC_ASSERT(bi::detail::static_is_pow2<pool_options_minimum_largest_required_pool_block>::value);
+BOOST_CONTAINER_STATIC_ASSERT(bi::detail::static_is_pow2<pool_options_default_max_blocks_per_chunk>::value);
+BOOST_CONTAINER_STATIC_ASSERT(bi::detail::static_is_pow2<pool_options_minimum_largest_required_pool_block>::value);
 
 //unsynchronized_pool_resource
 

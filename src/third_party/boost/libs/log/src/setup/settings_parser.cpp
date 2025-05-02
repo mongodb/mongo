@@ -258,30 +258,4 @@ BOOST_LOG_CLOSE_NAMESPACE // namespace log
 
 #include <boost/log/detail/footer.hpp>
 
-#else // BOOST_LOG_WITHOUT_SETTINGS_PARSERS
-
-#include <boost/log/detail/header.hpp>
-
-namespace boost {
-
-BOOST_LOG_OPEN_NAMESPACE
-
-BOOST_LOG_SETUP_API void boost_log_setup_is_empty()
-{
-    // This dummy export exists to that boost_log_setup library is not empty and is created even if settings parsers are disabled.
-    // MSVC is known to not generate the library if it contains no exports (https://github.com/boostorg/log/issues/164), which breaks
-    // install targets as Boost.Build cannot find the library file to install.
-    // We use this dummy export instead of disabling building boost_log_setup in the first place because of this Boost.Build bug:
-    //
-    // https://github.com/bfgroup/b2/issues/104
-    //
-    // After this bug is fixed, we can consider removing this dummy export and disabling building the library proper.
-}
-
-BOOST_LOG_CLOSE_NAMESPACE // namespace log
-
-} // namespace boost
-
-#include <boost/log/detail/footer.hpp>
-
 #endif // BOOST_LOG_WITHOUT_SETTINGS_PARSERS

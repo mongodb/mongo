@@ -3,7 +3,9 @@
 // (See accompanying file LICENSE_1_0.txt
 // or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#define BOOST_PROGRAM_OPTIONS_SOURCE
+#ifndef BOOST_PROGRAM_OPTIONS_SOURCE
+# define BOOST_PROGRAM_OPTIONS_SOURCE
+#endif
 #include <boost/program_options/config.hpp>
 #include <boost/program_options/value_semantic.hpp>
 #include <boost/program_options/detail/convert.hpp>
@@ -258,7 +260,7 @@ namespace boost { namespace program_options {
     }
 
 
-    const char* error_with_option_name::what() const throw()
+    const char* error_with_option_name::what() const BOOST_NOEXCEPT_OR_NOTHROW
     {
         // will substitute tokens each time what is run()
         substitute_placeholders(m_error_template);

@@ -69,10 +69,6 @@
 #define BOOST_ATOMIC_DETAIL_NO_CXX11_CONSTEXPR_UNION_INIT
 #endif
 
-#if (defined(_MSC_VER) && (_MSC_VER < 1914 || _MSVC_LANG < 201703)) || (!defined(_MSC_VER) && (!defined(__cpp_deduction_guides) || __cpp_deduction_guides < 201606))
-#define BOOST_ATOMIC_DETAIL_NO_CXX17_DEDUCTION_GUIDES
-#endif
-
 #if !defined(BOOST_ATOMIC_DETAIL_NO_CXX11_CONSTEXPR_UNION_INIT)
 #define BOOST_ATOMIC_DETAIL_CONSTEXPR_UNION_INIT BOOST_CONSTEXPR
 #else
@@ -142,55 +138,6 @@
     defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
 // This macro indicates that integer and floating point endianness is the same
 #define BOOST_ATOMIC_DETAIL_INT_FP_ENDIAN_MATCH
-#endif
-
-// Deprecated symbols markup
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED) && defined(_MSC_VER)
-#if (_MSC_VER) >= 1400
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) __declspec(deprecated(msg))
-#else
-// MSVC 7.1 only supports the attribute without a message
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) __declspec(deprecated)
-#endif
-#endif
-
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED) && defined(__has_extension)
-#if __has_extension(attribute_deprecated_with_message)
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) __attribute__((deprecated(msg)))
-#endif
-#endif
-
-// gcc since 4.5 supports deprecated attribute with a message; older versions support the attribute without a message.
-// Oracle Studio 12.4 supports deprecated attribute with a message; this is the first release that supports the attribute.
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED) && (\
-    (defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__) >= 405) ||\
-    (defined(__SUNPRO_CC) && __SUNPRO_CC >= 0x5130))
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) __attribute__((deprecated(msg)))
-#endif
-
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED) && __cplusplus >= 201402
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) [[deprecated(msg)]]
-#endif
-
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED) && defined(__GNUC__)
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) __attribute__((deprecated))
-#endif
-
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED) && defined(__has_attribute)
-#if __has_attribute(deprecated)
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg) __attribute__((deprecated))
-#endif
-#endif
-
-#if !defined(BOOST_ATOMIC_DETAIL_DEPRECATED)
-#define BOOST_ATOMIC_DETAIL_DEPRECATED(msg)
-#endif
-
-// In Boost.Atomic 1.73 we deprecated atomic<>::storage() accessor in favor of atomic<>::value(). In future releases storage() will be removed.
-#if !defined(BOOST_ATOMIC_SILENCE_STORAGE_DEPRECATION)
-#define BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED BOOST_ATOMIC_DETAIL_DEPRECATED("Boost.Atomic 1.73 has deprecated atomic<>::storage() in favor of atomic<>::value() and atomic<>::storage_type in favor of atomic<>::value_type. You can define BOOST_ATOMIC_SILENCE_STORAGE_DEPRECATION to disable this warning.")
-#else
-#define BOOST_ATOMIC_DETAIL_STORAGE_DEPRECATED
 #endif
 
 #endif // BOOST_ATOMIC_DETAIL_CONFIG_HPP_INCLUDED_

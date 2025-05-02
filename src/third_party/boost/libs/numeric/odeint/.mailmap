@@ -1,0 +1,16 @@
+# git log --all --format='%an <%ae>' | sort -u
+# Proper Name <proper@email> <commit@email>
+Andreas Angelopoulos <andrewtlor@gmail.com> <andrewtlor@gmail.com>
+Christoph Koke <koke@kip.uni-heidelberg.de> <koke@kip.uni-heidelberg.de>
+Daniel James <dnljms@gmail.com> <dnljms@gmail.com>
+Denis Demidov <ddemidov@ksu.ru> <ddemidov@ksu.ru>
+Karsten Ahnert <karsten.ahnert@gmx.de> <karsten.ahnert@gmx.de>
+Karsten Ahnert <karsten.ahnert@gmx.de> <karsten@manta.(none)>
+Karsten Ahnert <karsten.ahnert@gmx.de> <karsten@b8fc166d-592f-0410-95f2-cb63ce0dd405>
+Kyle Lutz <kyle.r.lutz@gmail.com> <kyle.r.lutz@gmail.com>
+Mario Mulansky <mario.mulansky@gmx.net> <mariomulansky@b8fc166d-592f-0410-95f2-cb63ce0dd405>
+Mario Mulansky <mario.mulansky@gmx.net> <mario.mulansky@gmx.net>
+Mario Mulansky <mario.mulansky@gmx.net> <mario@neutrino.stat.physik.uni-potsdam.de>
+Mario Mulansky <mario.mulansky@gmx.net> <mario@.(none)>
+Pascal Germroth <pascal@ensieve.org> <pascal@ensieve.org>
+Sylwester Arabas <slayoo@igf.fuw.edu.pl> <slayoo@igf.fuw.edu.pl>

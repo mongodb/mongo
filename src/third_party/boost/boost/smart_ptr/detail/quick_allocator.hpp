@@ -21,21 +21,20 @@
 #include <boost/config.hpp>
 
 #include <boost/smart_ptr/detail/lightweight_mutex.hpp>
-#include <boost/type_traits/type_with_alignment.hpp>
-#include <boost/type_traits/alignment_of.hpp>
+#include <boost/smart_ptr/detail/sp_type_traits.hpp>
 
+#include <type_traits>
 #include <new>              // ::operator new, ::operator delete
 #include <cstddef>          // std::size_t
 
 namespace boost
 {
-
 namespace detail
 {
 
 template<unsigned size, unsigned align_> union freeblock
 {
-    typedef typename boost::type_with_alignment<align_>::type aligner_type;
+    typedef typename sp_type_with_alignment<align_>::type aligner_type;
     aligner_type aligner;
     char bytes[size];
     freeblock * next;
@@ -74,7 +73,7 @@ template<unsigned size, unsigned align_> struct allocator_impl
 
     static lightweight_mutex & mutex()
     {
-        static freeblock< sizeof( lightweight_mutex ), boost::alignment_of< lightweight_mutex >::value > fbm;
+        static freeblock< sizeof( lightweight_mutex ), std::alignment_of< lightweight_mutex >::value > fbm;
         static lightweight_mutex * pm = new( &fbm ) lightweight_mutex;
         return *pm;
     }
@@ -188,7 +187,7 @@ template<unsigned size, unsigned align_>
   unsigned allocator_impl<size, align_>::last = allocator_impl<size, align_>::items_per_page;
 
 template<class T>
-struct quick_allocator: public allocator_impl< sizeof(T), boost::alignment_of<T>::value >
+struct quick_allocator: public allocator_impl< sizeof(T), std::alignment_of<T>::value >
 {
 };
 

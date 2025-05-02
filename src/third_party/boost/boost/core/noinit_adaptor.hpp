@@ -15,6 +15,8 @@ namespace boost {
 template<class A>
 struct noinit_adaptor
     : A {
+    typedef void _default_construct_destroy;
+
     template<class U>
     struct rebind {
         typedef noinit_adaptor<typename allocator_rebind<A, U>::type> other;

@@ -8,7 +8,10 @@
 //  See accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt
 
+#include <boost/mp11/detail/mp_count.hpp>
+#include <boost/mp11/detail/mp_is_value_list.hpp>
 #include <boost/mp11/detail/mp_list.hpp>
+#include <boost/mp11/detail/mp_list_v.hpp>
 #include <boost/mp11/utility.hpp>
 #include <boost/mp11/detail/config.hpp>
 
@@ -21,6 +24,8 @@ namespace mp11
 
 namespace detail
 {
+
+// append_type_lists
 
 template<class... L> struct mp_append_impl;
 
@@ -167,17 +172,148 @@ template<class... L> struct mp_append_impl: mp_append_impl_cuda_workaround<L...>
 
 #else
 
-template<class... L> struct mp_append_impl: mp_if_c<(sizeof...(L) > 111), mp_quote<append_inf_impl>, mp_if_c<(sizeof...(L) > 11), mp_quote<append_111_impl>, mp_quote<append_11_impl> > >::template fn<L...>
+template<class... L> struct mp_append_impl:
+    mp_cond<
+        mp_bool<(sizeof...(L) > 111)>, mp_quote<append_inf_impl>,
+        mp_bool<(sizeof...(L) > 11)>, mp_quote<append_111_impl>,
+        mp_true, mp_quote<append_11_impl>
+    >::template fn<L...>
 {
 };
 
-#endif
+#endif // #if BOOST_MP11_WORKAROUND( BOOST_MP11_CUDA, >= 9000000 && BOOST_MP11_CUDA < 10000000 )
 
-#endif
+#endif // #if BOOST_MP11_WORKAROUND( BOOST_MP11_MSVC, <= 1800 )
+
+struct append_type_lists
+{
+    template<class... L> using fn = typename mp_append_impl<L...>::type;
+};
+
+// append_value_lists
+
+#if defined(BOOST_MP11_HAS_TEMPLATE_AUTO)
+
+template<class... L> struct append_value_impl;
+
+template<class L1 = mp_list_v<>, class L2 = mp_list_v<>, class L3 = mp_list_v<>, class L4 = mp_list_v<>, class L5 = mp_list_v<>, class L6 = mp_list_v<>, class L7 = mp_list_v<>, class L8 = mp_list_v<>, class L9 = mp_list_v<>, class L10 = mp_list_v<>, class L11 = mp_list_v<>> struct append_value_11_impl
+{
+};
+
+template<
+    template<auto...> class L1, auto... T1,
+    template<auto...> class L2, auto... T2,
+    template<auto...> class L3, auto... T3,
+    template<auto...> class L4, auto... T4,
+    template<auto...> class L5, auto... T5,
+    template<auto...> class L6, auto... T6,
+    template<auto...> class L7, auto... T7,
+    template<auto...> class L8, auto... T8,
+    template<auto...> class L9, auto... T9,
+    template<auto...> class L10, auto... T10,
+    template<auto...> class L11, auto... T11>
+
+struct append_value_11_impl<L1<T1...>, L2<T2...>, L3<T3...>, L4<T4...>, L5<T5...>, L6<T6...>, L7<T7...>, L8<T8...>, L9<T9...>, L10<T10...>, L11<T11...>>
+{
+    using type = L1<T1..., T2..., T3..., T4..., T5..., T6..., T7..., T8..., T9..., T10..., T11...>;
+};
+
+template<
+
+    class L00 = mp_list_v<>, class L01 = mp_list_v<>, class L02 = mp_list_v<>, class L03 = mp_list_v<>, class L04 = mp_list_v<>, class L05 = mp_list_v<>, class L06 = mp_list_v<>, class L07 = mp_list_v<>, class L08 = mp_list_v<>, class L09 = mp_list_v<>, class L0A = mp_list_v<>,
+    class L10 = mp_list_v<>, class L11 = mp_list_v<>, class L12 = mp_list_v<>, class L13 = mp_list_v<>, class L14 = mp_list_v<>, class L15 = mp_list_v<>, class L16 = mp_list_v<>, class L17 = mp_list_v<>, class L18 = mp_list_v<>, class L19 = mp_list_v<>,
+    class L20 = mp_list_v<>, class L21 = mp_list_v<>, class L22 = mp_list_v<>, class L23 = mp_list_v<>, class L24 = mp_list_v<>, class L25 = mp_list_v<>, class L26 = mp_list_v<>, class L27 = mp_list_v<>, class L28 = mp_list_v<>, class L29 = mp_list_v<>,
+    class L30 = mp_list_v<>, class L31 = mp_list_v<>, class L32 = mp_list_v<>, class L33 = mp_list_v<>, class L34 = mp_list_v<>, class L35 = mp_list_v<>, class L36 = mp_list_v<>, class L37 = mp_list_v<>, class L38 = mp_list_v<>, class L39 = mp_list_v<>,
+    class L40 = mp_list_v<>, class L41 = mp_list_v<>, class L42 = mp_list_v<>, class L43 = mp_list_v<>, class L44 = mp_list_v<>, class L45 = mp_list_v<>, class L46 = mp_list_v<>, class L47 = mp_list_v<>, class L48 = mp_list_v<>, class L49 = mp_list_v<>,
+    class L50 = mp_list_v<>, class L51 = mp_list_v<>, class L52 = mp_list_v<>, class L53 = mp_list_v<>, class L54 = mp_list_v<>, class L55 = mp_list_v<>, class L56 = mp_list_v<>, class L57 = mp_list_v<>, class L58 = mp_list_v<>, class L59 = mp_list_v<>,
+    class L60 = mp_list_v<>, class L61 = mp_list_v<>, class L62 = mp_list_v<>, class L63 = mp_list_v<>, class L64 = mp_list_v<>, class L65 = mp_list_v<>, class L66 = mp_list_v<>, class L67 = mp_list_v<>, class L68 = mp_list_v<>, class L69 = mp_list_v<>,
+    class L70 = mp_list_v<>, class L71 = mp_list_v<>, class L72 = mp_list_v<>, class L73 = mp_list_v<>, class L74 = mp_list_v<>, class L75 = mp_list_v<>, class L76 = mp_list_v<>, class L77 = mp_list_v<>, class L78 = mp_list_v<>, class L79 = mp_list_v<>,
+    class L80 = mp_list_v<>, class L81 = mp_list_v<>, class L82 = mp_list_v<>, class L83 = mp_list_v<>, class L84 = mp_list_v<>, class L85 = mp_list_v<>, class L86 = mp_list_v<>, class L87 = mp_list_v<>, class L88 = mp_list_v<>, class L89 = mp_list_v<>,
+    class L90 = mp_list_v<>, class L91 = mp_list_v<>, class L92 = mp_list_v<>, class L93 = mp_list_v<>, class L94 = mp_list_v<>, class L95 = mp_list_v<>, class L96 = mp_list_v<>, class L97 = mp_list_v<>, class L98 = mp_list_v<>, class L99 = mp_list_v<>,
+    class LA0 = mp_list_v<>, class LA1 = mp_list_v<>, class LA2 = mp_list_v<>, class LA3 = mp_list_v<>, class LA4 = mp_list_v<>, class LA5 = mp_list_v<>, class LA6 = mp_list_v<>, class LA7 = mp_list_v<>, class LA8 = mp_list_v<>, class LA9 = mp_list_v<>
+
+> struct append_value_111_impl
+{
+    using type = typename append_value_11_impl<
+
+        typename append_value_11_impl<L00, L01, L02, L03, L04, L05, L06, L07, L08, L09, L0A>::type,
+        typename append_value_11_impl<mp_list_v<>, L10, L11, L12, L13, L14, L15, L16, L17, L18, L19>::type,
+        typename append_value_11_impl<mp_list_v<>, L20, L21, L22, L23, L24, L25, L26, L27, L28, L29>::type,
+        typename append_value_11_impl<mp_list_v<>, L30, L31, L32, L33, L34, L35, L36, L37, L38, L39>::type,
+        typename append_value_11_impl<mp_list_v<>, L40, L41, L42, L43, L44, L45, L46, L47, L48, L49>::type,
+        typename append_value_11_impl<mp_list_v<>, L50, L51, L52, L53, L54, L55, L56, L57, L58, L59>::type,
+        typename append_value_11_impl<mp_list_v<>, L60, L61, L62, L63, L64, L65, L66, L67, L68, L69>::type,
+        typename append_value_11_impl<mp_list_v<>, L70, L71, L72, L73, L74, L75, L76, L77, L78, L79>::type,
+        typename append_value_11_impl<mp_list_v<>, L80, L81, L82, L83, L84, L85, L86, L87, L88, L89>::type,
+        typename append_value_11_impl<mp_list_v<>, L90, L91, L92, L93, L94, L95, L96, L97, L98, L99>::type,
+        typename append_value_11_impl<mp_list_v<>, LA0, LA1, LA2, LA3, LA4, LA5, LA6, LA7, LA8, LA9>::type
+
+    >::type;
+};
+
+template<
+
+    class L00, class L01, class L02, class L03, class L04, class L05, class L06, class L07, class L08, class L09, class L0A,
+    class L10, class L11, class L12, class L13, class L14, class L15, class L16, class L17, class L18, class L19,
+    class L20, class L21, class L22, class L23, class L24, class L25, class L26, class L27, class L28, class L29,
+    class L30, class L31, class L32, class L33, class L34, class L35, class L36, class L37, class L38, class L39,
+    class L40, class L41, class L42, class L43, class L44, class L45, class L46, class L47, class L48, class L49,
+    class L50, class L51, class L52, class L53, class L54, class L55, class L56, class L57, class L58, class L59,
+    class L60, class L61, class L62, class L63, class L64, class L65, class L66, class L67, class L68, class L69,
+    class L70, class L71, class L72, class L73, class L74, class L75, class L76, class L77, class L78, class L79,
+    class L80, class L81, class L82, class L83, class L84, class L85, class L86, class L87, class L88, class L89,
+    class L90, class L91, class L92, class L93, class L94, class L95, class L96, class L97, class L98, class L99,
+    class LA0, class LA1, class LA2, class LA3, class LA4, class LA5, class LA6, class LA7, class LA8, class LA9,
+    class... Lr
+
+> struct append_value_inf_impl
+{
+    using prefix = typename append_value_111_impl<
+
+        L00, L01, L02, L03, L04, L05, L06, L07, L08, L09, L0A,
+        L10, L11, L12, L13, L14, L15, L16, L17, L18, L19,
+        L20, L21, L22, L23, L24, L25, L26, L27, L28, L29,
+        L30, L31, L32, L33, L34, L35, L36, L37, L38, L39,
+        L40, L41, L42, L43, L44, L45, L46, L47, L48, L49,
+        L50, L51, L52, L53, L54, L55, L56, L57, L58, L59,
+        L60, L61, L62, L63, L64, L65, L66, L67, L68, L69,
+        L70, L71, L72, L73, L74, L75, L76, L77, L78, L79,
+        L80, L81, L82, L83, L84, L85, L86, L87, L88, L89,
+        L90, L91, L92, L93, L94, L95, L96, L97, L98, L99,
+        LA0, LA1, LA2, LA3, LA4, LA5, LA6, LA7, LA8, LA9
+
+    >::type;
+
+    using type = typename append_value_impl<prefix, Lr...>::type;
+};
+
+template<class... L> struct append_value_impl:
+    mp_cond<
+        mp_bool<(sizeof...(L) > 111)>, mp_quote<append_value_inf_impl>,
+        mp_bool<(sizeof...(L) > 11)>, mp_quote<append_value_111_impl>,
+        mp_true, mp_quote<append_value_11_impl>
+    >::template fn<L...>
+{
+};
+
+struct append_value_lists
+{
+    template<class... L> using fn = typename append_value_impl<L...>::type;
+};
+
+#endif // #if defined(BOOST_MP11_HAS_TEMPLATE_AUTO)
 
 } // namespace detail
 
-template<class... L> using mp_append = typename detail::mp_append_impl<L...>::type;
+#if defined(BOOST_MP11_HAS_TEMPLATE_AUTO)
+
+template<class... L> using mp_append = typename mp_if_c<(sizeof...(L) > 0 && sizeof...(L) == mp_count_if<mp_list<L...>, mp_is_value_list>::value), detail::append_value_lists, detail::append_type_lists>::template fn<L...>;
+
+#else
+
+template<class... L> using mp_append = detail::append_type_lists::fn<L...>;
+
+#endif
 
 } // namespace mp11
 } // namespace boost

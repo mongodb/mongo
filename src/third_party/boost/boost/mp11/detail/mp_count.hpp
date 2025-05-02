@@ -51,9 +51,9 @@ template<class V, class... T> constexpr std::size_t cx_count()
 
     std::size_t r = 0;
 
-    for( std::size_t i = 1; i < sizeof...(T) + 1; ++i )
+    for( std::size_t i = 0; i < sizeof...(T); ++i )
     {
-        r += a[ i ];
+        r += a[ i+1 ];
     }
 
     return r;
@@ -98,9 +98,9 @@ template<template<class...> class P, class... T> constexpr std::size_t cx_count_
 
     std::size_t r = 0;
 
-    for( std::size_t i = 1; i < sizeof...(T) + 1; ++i )
+    for( std::size_t i = 0; i < sizeof...(T); ++i )
     {
-        r += a[ i ];
+        r += a[ i+1 ];
     }
 
     return r;

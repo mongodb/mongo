@@ -14,10 +14,12 @@
 
 #include <boost/move/detail/config_begin.hpp>
 #include <boost/move/algo/detail/adaptive_sort_merge.hpp>
+#include <cassert>
 
 #if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
 #endif
 
 namespace boost {
@@ -53,7 +55,7 @@ inline void adaptive_merge_combine_blocks( RandIt first
          if(xbuf.size() < l_block){
             xbuf.initialize_until(l_block, *first);
          }
-         BOOST_ASSERT(xbuf.size() >= l_block);
+         assert(xbuf.size() >= l_block);
          size_type n_block_a, n_block_b, l_irreg1, l_irreg2;
          combine_params( keys, comp, l_combine
                            , l_combine1, l_block, xbuf
@@ -91,7 +93,7 @@ inline void adaptive_merge_combine_blocks( RandIt first
                      , l_combine1, l_block, xbuf
                      , n_block_a, n_block_b, l_irreg1, l_irreg2, true);   //Outputs
       BOOST_MOVE_ADAPTIVE_SORT_PRINT_L2("   A combine: ", len);
-      BOOST_ASSERT(xbuf.size() >= l_block);
+      assert(xbuf.size() >= l_block);
       op_merge_blocks_with_buf
          (uint_keys, less(), first, l_block, l_irreg1, n_block_a, n_block_b, l_irreg2, comp, move_op(), xbuf.data());
       xbuf.clear();
@@ -163,7 +165,7 @@ inline SizeType adaptive_merge_n_keys_intbuf(SizeType &rl_block, SizeType len1, 
 
    //This is the minimum number of keys to implement the ideal algorithm
    size_type n_keys = adaptive_merge_n_keys_without_external_keys(l_block, len1, len2, l_intbuf);
-   BOOST_ASSERT(n_keys >= ((len1-l_intbuf-n_keys)/l_block + len2/l_block));
+   assert(n_keys >= ((len1-l_intbuf-n_keys)/l_block + len2/l_block));
 
    if(xbuf.template supports_aligned_trailing<size_type>
       ( l_block

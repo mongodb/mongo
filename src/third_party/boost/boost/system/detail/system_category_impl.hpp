@@ -25,7 +25,7 @@
 
 #include <boost/system/detail/system_category_condition_win32.hpp>
 
-inline boost::system::error_condition boost::system::detail::system_error_category::default_error_condition( int ev ) const BOOST_NOEXCEPT
+inline boost::system::error_condition boost::system::detail::system_error_category::default_error_condition( int ev ) const noexcept
 {
     int e2 = system_category_condition_win32( ev );
 
@@ -41,7 +41,7 @@ inline boost::system::error_condition boost::system::detail::system_error_catego
 
 #else // #if defined(BOOST_WINDOWS_API)
 
-inline boost::system::error_condition boost::system::detail::system_error_category::default_error_condition( int ev ) const BOOST_NOEXCEPT
+inline boost::system::error_condition boost::system::detail::system_error_category::default_error_condition( int ev ) const noexcept
 {
     return error_condition( boost::system::detail::generic_value_tag( ev ) );
 }
@@ -53,7 +53,7 @@ inline std::string boost::system::detail::system_error_category::message( int ev
     return system_error_category_message( ev );
 }
 
-inline char const * boost::system::detail::system_error_category::message( int ev, char * buffer, std::size_t len ) const BOOST_NOEXCEPT
+inline char const * boost::system::detail::system_error_category::message( int ev, char * buffer, std::size_t len ) const noexcept
 {
     return system_error_category_message( ev, buffer, len );
 }

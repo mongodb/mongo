@@ -17,7 +17,7 @@
 #include <cstdio>
 #include <boost/optional/optional.hpp>
 #if !defined(BOOST_LOG_NO_THREADS)
-#include <boost/thread/locks.hpp>
+#include <mutex>
 #include <boost/log/detail/thread_id.hpp>
 #endif
 #include <boost/log/detail/default_attribute_names.hpp>
@@ -207,14 +207,14 @@ bool default_sink::will_consume(attribute_value_set const&)
 
 void default_sink::consume(record_view const& rec)
 {
-    BOOST_LOG_EXPR_IF_MT(lock_guard< mutex_type > lock(m_mutex);)
+    BOOST_LOG_EXPR_IF_MT(std::lock_guard< mutex_type > lock(m_mutex);)
     m_message_visitor(m_message_name, rec.attribute_values(), message_printer(m_severity_extractor(m_severity_name, rec).get()));
     std::fflush(stdout);
 }
 
 void default_sink::flush()
 {
-    BOOST_LOG_EXPR_IF_MT(lock_guard< mutex_type > lock(m_mutex);)
+    BOOST_LOG_EXPR_IF_MT(std::lock_guard< mutex_type > lock(m_mutex);)
     std::fflush(stdout);
 }
 

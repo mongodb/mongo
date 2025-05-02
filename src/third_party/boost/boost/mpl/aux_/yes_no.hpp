@@ -18,6 +18,7 @@
 #include <boost/mpl/aux_/config/arrays.hpp>
 #include <boost/mpl/aux_/config/msvc.hpp>
 #include <boost/mpl/aux_/config/workaround.hpp>
+#include <cstddef>
 
 
 namespace boost { namespace mpl { namespace aux {
@@ -36,7 +37,7 @@ template<> struct yes_no_tag<true>
 };
 
 
-template< BOOST_MPL_AUX_NTTP_DECL(long, n) > struct weighted_tag
+template< BOOST_MPL_AUX_NTTP_DECL(std::size_t, n) > struct weighted_tag
 {
 #if !BOOST_WORKAROUND(BOOST_MSVC, < 1300)
     typedef char (&type)[n];

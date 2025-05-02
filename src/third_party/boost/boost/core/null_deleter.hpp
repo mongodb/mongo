@@ -27,6 +27,9 @@
 
 namespace boost {
 
+// Block unintended ADL
+namespace null_deleter_ns {
+
 //! A function object that does nothing and can be used as an empty deleter for \c shared_ptr
 struct null_deleter
 {
@@ -38,6 +41,10 @@ struct null_deleter
     template< typename T >
     void operator() (T*) const BOOST_NOEXCEPT {}
 };
+
+} // namespace null_deleter_ns
+
+using null_deleter_ns::null_deleter;
 
 } // namespace boost
 

@@ -83,7 +83,7 @@ TEST(QuerySettingsHashTest, QuerySettingsHashStability) {
     settings.setReject(true);
     auto observedHash = mongo::query_settings::hash(settings);
 
-    static const size_t expectedHash = 0xf9c438f33d810af8;
+    static const size_t expectedHash = 0xd14b8e06bcb187b;
 
     ASSERT_EQ(observedHash, expectedHash)
         << fmt::format("{:#016x} != {:#016x}", observedHash, expectedHash);

@@ -52,7 +52,7 @@ class private_node_pool
 
    public:
    typedef typename base_t::multiallocation_chain multiallocation_chain;
-   static const std::size_t nodes_per_block = NodesPerBlock;
+   BOOST_STATIC_CONSTEXPR std::size_t nodes_per_block = NodesPerBlock;
 
    //!Constructor from a segment manager. Never throws
    private_node_pool()

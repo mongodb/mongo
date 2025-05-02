@@ -315,14 +315,6 @@
     MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED(w))
 
 /**
- * We selectively ignore `-Wstringop-overread` on GCC 14 due to a known bug
- * affecting `boost::container::small_vector`:
- * https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108197.
- */
-#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR \
-    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overread"))
-
-/**
  * We selectively ignore `-Wstringop-overflow` on GCC 14 due to strong suspicion
  * that they are false-positives. They involve an atomic read overflowing the
  * destination, likely due to the compiler incorrectly believing they might be
@@ -339,12 +331,3 @@
  */
 #define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_ATOMIC_WRITE \
     MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow"))
-
-/**
- * We selectively ignore `-Wuninitialized` on GCC 14 due to a known bug affecting
- * `boost::optional`. The fix is available upstream:
- * https://github.com/boostorg/optional/commit/e31cf6f2a8be437330f4547561df5ee8a62e4187.
- * TODO(SERVER-70000): Once we've upgraded boost to include the fix, remove this suppression.
- */
-#define MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_OPTIONAL_UNINITIALIZED \
-    MONGO_COMPILER_IF_GCC14(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wuninitialized"))

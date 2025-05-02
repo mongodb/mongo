@@ -25,6 +25,7 @@
  ****************************************************************************************/
 
 .text
+.private_extern _ontop_fcontext
 .globl _ontop_fcontext
 .align 8
 _ontop_fcontext:

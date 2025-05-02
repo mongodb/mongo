@@ -100,11 +100,19 @@ template<class T, class U, class = void>
 struct ptr_rebind
     : ptr_transform<T, U> { };
 
+#if !defined(BOOST_NO_CXX11_TEMPLATE_ALIASES)
 template<class T, class U>
 struct ptr_rebind<T, U,
     typename ptr_valid<typename T::template rebind<U> >::type> {
     typedef typename T::template rebind<U> type;
 };
+#else
+template<class T, class U>
+struct ptr_rebind<T, U,
+    typename ptr_valid<typename T::template rebind<U>::other>::type> {
+    typedef typename T::template rebind<U>::other type;
+};
+#endif
 
 #if !defined(BOOST_NO_CXX11_DECLTYPE_N3276)
 template<class T, class E>
@@ -219,7 +227,7 @@ struct pointer_traits<T*>
 
 #if !defined(BOOST_NO_CXX11_TEMPLATE_ALIASES)
     template<class U>
-    using rebind = typename rebind_to<U>::type*;
+    using rebind = typename rebind_to<U>::type;
 #endif
 };
 

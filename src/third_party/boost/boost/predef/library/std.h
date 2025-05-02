@@ -16,6 +16,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 #include <boost/predef/library/std/libcomo.h>
 #include <boost/predef/library/std/modena.h>
 #include <boost/predef/library/std/msl.h>
+#include <boost/predef/library/std/msvc.h>
 #include <boost/predef/library/std/roguewave.h>
 #include <boost/predef/library/std/sgi.h>
 #include <boost/predef/library/std/stdcpp3.h>

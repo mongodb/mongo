@@ -1,0 +1,9 @@
+odeint 2.1
+
+* versioning system
+* generation functions
+* bugfixing
+
+odeint 2.2 (still running)
+
+* removing same_size and resize from state_wrapper into separate functions

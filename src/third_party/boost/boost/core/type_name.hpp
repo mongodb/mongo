@@ -14,7 +14,6 @@
 // https://www.boost.org/LICENSE_1_0.txt
 
 #include <boost/core/demangle.hpp>
-#include <boost/core/is_same.hpp>
 #include <boost/config.hpp>
 #include <string>
 #include <functional>
@@ -103,9 +102,22 @@ inline std::string fix_typeid_name( char const* n )
     return r;
 }
 
-template<class T> std::string typeid_name()
+// class types can be incomplete
+// but also abstract (T[1] doesn't form)
+template<class T> std::string typeid_name_impl( int T::*, T(*)[1] )
+{
+    std::string r = fix_typeid_name( typeid(T[1]).name() );
+    return r.substr( 0, r.size() - 4 ); // remove ' [1]' suffix
+}
+
+template<class T> std::string typeid_name_impl( ... )
 {
     return fix_typeid_name( typeid(T).name() );
+}
+
+template<class T> std::string typeid_name()
+{
+    return typeid_name_impl<T>( 0, 0 );
 }
 
 // template names
@@ -185,13 +197,22 @@ template<class T> std::string array_template_name()
 # pragma warning( disable: 4996 )
 #endif
 
+// Use snprintf if available as some compilers (clang 14.0) issue deprecation warnings for sprintf
+#if ( defined(_MSC_VER) && _MSC_VER < 1900 ) || ( defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR) )
+# define BOOST_CORE_DETAIL_SNPRINTF(buffer, format, arg) std::sprintf(buffer, format, arg)
+#else
+# define BOOST_CORE_DETAIL_SNPRINTF(buffer, format, arg) std::snprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), format, arg)
+#endif
+
 inline std::string tn_to_string( std::size_t n )
 {
     char buffer[ 32 ];
-    std::sprintf( buffer, "%lu", static_cast< unsigned long >( n ) );
+    BOOST_CORE_DETAIL_SNPRINTF( buffer, "%lu", static_cast< unsigned long >( n ) );
 
     return buffer;
 }
+
+#undef BOOST_CORE_DETAIL_SNPRINTF
 
 #if defined(BOOST_MSVC)
 # pragma warning( pop )
@@ -305,6 +326,28 @@ template<> struct tn_holder<boost::ulong_long_type>
     }
 };
 
+#if defined(BOOST_HAS_INT128)
+
+template<> struct tn_holder<boost::int128_type>
+{
+    static std::string type_name( std::string const& suffix )
+    {
+        return "__int128" + suffix;
+    }
+};
+
+template<> struct tn_holder<boost::uint128_type>
+{
+    static std::string type_name( std::string const& suffix )
+    {
+        return "unsigned __int128" + suffix;
+    }
+};
+
+#endif
+
+#if !defined(BOOST_NO_INTRINSIC_WCHAR_T)
+
 template<> struct tn_holder<wchar_t>
 {
     static std::string type_name( std::string const& suffix )
@@ -312,6 +355,8 @@ template<> struct tn_holder<wchar_t>
         return "wchar_t" + suffix;
     }
 };
+
+#endif
 
 #if !defined(BOOST_NO_CXX11_CHAR16_T)
 
@@ -834,6 +879,8 @@ template<class T, std::size_t N> struct tn_holder<T const volatile[N]>
 
 // pointers to members
 
+#if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+
 template<class R, class T> struct tn_holder<R T::*>
 {
     static std::string type_name( std::string const& suffix )
@@ -842,7 +889,7 @@ template<class R, class T> struct tn_holder<R T::*>
     }
 };
 
-#if defined(BOOST_MSVC) && BOOST_MSVC < 1900 && !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+#if defined(BOOST_MSVC) && BOOST_MSVC < 1900
 
 template<class R, class T, class... A> struct tn_holder<R(T::*)(A...)>
 {
@@ -876,7 +923,9 @@ template<class R, class T, class... A> struct tn_holder<R(T::*)(A...) const vola
     }
 };
 
-#endif
+#endif // #if defined(BOOST_MSVC) && BOOST_MSVC < 1900
+
+#endif // #if !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 
 // strings
 

@@ -1,0 +1,19 @@
+#==============================================================================
+#   Copyright (c) 2001-2010 Joel de Guzman
+#   Copyright (c) 2001-2010 Hartmut Kaiser
+#
+#   Distributed under the Boost Software License, Version 1.0. (See accompanying
+#   file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+#==============================================================================
+project spirit-qi-benchmark 
+    : requirements
+        <include>.
+        <c++-template-depth>300
+    :
+    :
+    ;
+# performance tests
+exe int_parser : int_parser.cpp ;
+exe real_parser : real_parser.cpp ;
+exe attr_vs_actions : attr_vs_actions.cpp ;
+exe keywords : keywords.cpp ;

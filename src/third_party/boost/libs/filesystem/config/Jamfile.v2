@@ -29,11 +29,22 @@ obj has_stat_st_birthtimespec : has_stat_st_birthtimespec.cpp : <include>../src 
 explicit has_stat_st_birthtimespec ;
 obj has_fdopendir_nofollow : has_fdopendir_nofollow.cpp : <include>../src ;
 explicit has_fdopendir_nofollow ;
+obj has_dirent_d_type : has_dirent_d_type.cpp : <include>../src ;
+explicit has_dirent_d_type ;
+obj has_posix_at_apis : has_posix_at_apis.cpp : <include>../src ;
+explicit has_posix_at_apis ;
+obj has_fallocate : has_fallocate.cpp : <include>../src ;
+explicit has_fallocate ;
 
-lib bcrypt ;
+searched-lib bcrypt ;
 explicit bcrypt ;
 
 exe has_bcrypt : has_bcrypt.cpp : <include>../src <library>bcrypt ;
 explicit has_bcrypt ;
 obj is_windows_ce : is_windows_ce.cpp ;
 explicit is_windows_ce ;
+
+lib has_linkflag_no_undefined : has_linkflag_no_undefined.cpp : <link>shared <linkflags>"-Wl,--no-undefined" ;
+explicit has_linkflag_no_undefined ;
+lib has_linkflag_undefined_error : has_linkflag_no_undefined.cpp : <link>shared <linkflags>"-Wl,-undefined,error" ;
+explicit has_linkflag_undefined_error ;

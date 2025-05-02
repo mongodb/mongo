@@ -26,6 +26,7 @@
 
 #include <boost/config.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/move/detail/workaround.hpp>
 #include <cstdlib>
 
 
@@ -39,26 +40,73 @@
 
 #if defined(BOOST_MOVE_DETAIL_WINDOWS_API)
 
-#include <boost/winapi/time.hpp>
-#include <boost/winapi/timers.hpp>
-#include <boost/winapi/get_last_error.hpp>
-#include <boost/winapi/error_codes.hpp>
-#include <boost/assert.hpp>
-#include <boost/core/ignore_unused.hpp>
+#include <cassert>
+
+#if defined( BOOST_USE_WINDOWS_H )
+#include <windows.h>
+#else
+
+#if defined (WIN32_PLATFORM_PSPC)
+#define BOOST_MOVE_WINAPI_IMPORT BOOST_SYMBOL_IMPORT
+#define BOOST_MOVE_WINAPI_IMPORT_EXCEPT_WM
+#elif defined (_WIN32_WCE)
+#define BOOST_MOVE_WINAPI_IMPORT
+#define BOOST_MOVE_WINAPI_IMPORT_EXCEPT_WM
+#else
+#define BOOST_MOVE_WINAPI_IMPORT BOOST_SYMBOL_IMPORT
+#define BOOST_MOVE_WINAPI_IMPORT_EXCEPT_WM BOOST_SYMBOL_IMPORT
+#endif
+
+#if defined(WINAPI)
+#define BOOST_MOVE_WINAPI_CC WINAPI
+#else
+   #if defined(_M_IX86) || defined(__i386__)
+   #define BOOST_MOVE_WINAPI_CC __stdcall
+   #else
+   // On architectures other than 32-bit x86 __stdcall is ignored. Clang also issues a warning.
+   #define BOOST_MOVE_WINAPI_CC
+   #endif
+#endif
+
+
+extern "C" {
+
+union _LARGE_INTEGER;
+typedef long long QuadPart;
+
+BOOST_MOVE_WINAPI_IMPORT_EXCEPT_WM int BOOST_MOVE_WINAPI_CC
+QueryPerformanceCounter(::_LARGE_INTEGER* lpPerformanceCount);
+
+BOOST_MOVE_WINAPI_IMPORT_EXCEPT_WM int BOOST_MOVE_WINAPI_CC
+QueryPerformanceFrequency(::_LARGE_INTEGER* lpFrequency);
+
+} // extern "C"
+#endif
+
 
 namespace boost { namespace move_detail {
+
+BOOST_FORCEINLINE int QueryPerformanceCounter(long long* lpPerformanceCount)
+{
+    return ::QueryPerformanceCounter(reinterpret_cast< ::_LARGE_INTEGER* >(lpPerformanceCount));
+}
+
+BOOST_FORCEINLINE int QueryPerformanceFrequency(long long* lpFrequency)
+{
+    return ::QueryPerformanceFrequency(reinterpret_cast< ::_LARGE_INTEGER* >(lpFrequency));
+}
+
 
 template<int Dummy>
 struct QPFHolder
 {
    static inline double get_nsec_per_tic()
    {
-      boost::winapi::LARGE_INTEGER_ freq;
-      boost::winapi::BOOL_ r = boost::winapi::QueryPerformanceFrequency( &freq );
-      boost::ignore_unused(r);
-      BOOST_ASSERT(r != 0 && "Boost::Move - get_nanosecs_per_tic Internal Error");
-
-      return double(1000000000.0L / freq.QuadPart);
+      long long freq;
+      //According to MS documentation:
+      //"On systems that run Windows XP or later, the function will always succeed and will thus never return zero"
+      (void)boost::move_detail::QueryPerformanceFrequency(&freq);
+      return double(1000000000.0L / double(freq));
    }
 
    static const double nanosecs_per_tic;
@@ -71,18 +119,11 @@ inline boost::uint64_t nsec_clock() BOOST_NOEXCEPT
 {
    double nanosecs_per_tic = QPFHolder<0>::nanosecs_per_tic;
    
-   boost::winapi::LARGE_INTEGER_ pcount;
-   unsigned times=0;
-   while ( !boost::winapi::QueryPerformanceCounter( &pcount ) )
-   {
-      if ( ++times > 3 )
-      {
-         BOOST_ASSERT("Boost::Move - QueryPerformanceCounter Internal Error");
-         return 0u;
-      }
-   }
-
-   return static_cast<boost::uint64_t>(nanosecs_per_tic * double(pcount.QuadPart));
+   long long pcount;
+   //According to MS documentation:
+   //"On systems that run Windows XP or later, the function will always succeed and will thus never return zero"
+   (void)boost::move_detail::QueryPerformanceCounter( &pcount );
+   return static_cast<boost::uint64_t>(nanosecs_per_tic * double(pcount));
 }
 
 }}  //namespace boost { namespace move_detail {

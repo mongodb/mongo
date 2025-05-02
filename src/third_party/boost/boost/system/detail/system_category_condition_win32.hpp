@@ -25,7 +25,7 @@ namespace system
 namespace detail
 {
 
-inline int system_category_condition_win32( int ev ) BOOST_NOEXCEPT
+inline int system_category_condition_win32( int ev ) noexcept
 {
     // When using the Windows Runtime, most system errors are reported as HRESULTs.
     // We want to map the common Win32 errors to their equivalent error condition,
@@ -59,6 +59,7 @@ inline int system_category_condition_win32( int ev ) BOOST_NOEXCEPT
     case ERROR_ACCESS_DENIED_: return permission_denied;
     case ERROR_ALREADY_EXISTS_: return file_exists;
     case ERROR_BAD_NETPATH_: return no_such_file_or_directory;
+    case ERROR_BAD_NET_NAME_: return no_such_file_or_directory;
     case ERROR_BAD_UNIT_: return no_such_device;
     case ERROR_BROKEN_PIPE_: return broken_pipe;
     case ERROR_BUFFER_OVERFLOW_: return filename_too_long;
@@ -75,6 +76,7 @@ inline int system_category_condition_win32( int ev ) BOOST_NOEXCEPT
     case ERROR_DIR_NOT_EMPTY_: return directory_not_empty;
     case ERROR_DIRECTORY_: return invalid_argument; // WinError.h: "The directory name is invalid"
     case ERROR_DISK_FULL_: return no_space_on_device;
+    case ERROR_FILENAME_EXCED_RANGE_: return filename_too_long;
     case ERROR_FILE_EXISTS_: return file_exists;
     case ERROR_FILE_NOT_FOUND_: return no_such_file_or_directory;
     case ERROR_HANDLE_DISK_FULL_: return no_space_on_device;
@@ -100,11 +102,15 @@ inline int system_category_condition_win32( int ev ) BOOST_NOEXCEPT
     case ERROR_REPARSE_TAG_INVALID_: return invalid_argument;
     case ERROR_RETRY_: return resource_unavailable_try_again;
     case ERROR_SEEK_: return io_error;
+    case ERROR_SEM_TIMEOUT_: return timed_out;
     case ERROR_SHARING_VIOLATION_: return permission_denied;
     case ERROR_NOT_SUPPORTED_: return not_supported; // WinError.h: "The request is not supported."
+    case ERROR_TIMEOUT_: return timed_out;
     case ERROR_TOO_MANY_OPEN_FILES_: return too_many_files_open;
     case ERROR_WRITE_FAULT_: return io_error;
     case ERROR_WRITE_PROTECT_: return permission_denied;
+
+    case 258: return timed_out; // WAIT_TIMEOUT
 
     case WSAEACCES_: return permission_denied;
     case WSAEADDRINUSE_: return address_in_use;

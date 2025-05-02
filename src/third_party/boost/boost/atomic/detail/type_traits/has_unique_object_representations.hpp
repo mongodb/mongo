@@ -24,7 +24,7 @@
 #endif
 
 #if (defined(__cpp_lib_has_unique_object_representations) && __cpp_lib_has_unique_object_representations >= 201606) || \
-    (defined(_CPPLIB_VER) && _CPPLIB_VER >= 650 && defined(_HAS_CXX17) && _HAS_CXX17 != 0)
+    (defined(_CPPLIB_VER) && _CPPLIB_VER >= 650 && defined(_MSVC_STL_VERSION) && _MSVC_STL_VERSION >= 141 && defined(_HAS_CXX17) && _HAS_CXX17 != 0)
 
 namespace boost {
 namespace atomics {

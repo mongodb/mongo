@@ -28,6 +28,10 @@
 #pragma warning(disable: 4503)
 // 'X': This function or variable may be unsafe. Consider using Y instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
 #pragma warning(disable: 4996)
+// qualifier applied to function type has no meaning; ignored
+#pragma warning(disable: 4180)
+// qualifier applied to reference type; ignored
+#pragma warning(disable: 4181)
 
 #elif (defined(__GNUC__) && !(defined(__INTEL_COMPILER) || defined(__ICL) || defined(__ICC) || defined(__ECC)) \
     && (__GNUC__ * 100 + __GNUC_MINOR__) >= 406) || defined(__clang__)
@@ -37,6 +41,13 @@
 #pragma GCC diagnostic push
 // unused parameter 'arg'
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+// unused function 'foo'
+#pragma GCC diagnostic ignored "-Wunused-function"
+
+#if defined(__clang__)
+// template argument uses unnamed type
+#pragma clang diagnostic ignored "-Wunnamed-type-template-args"
+#endif // defined(__clang__)
 
 #endif
 

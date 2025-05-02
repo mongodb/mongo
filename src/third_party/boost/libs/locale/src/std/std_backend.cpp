@@ -1,70 +1,101 @@
 //
-//  Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2009-2011 Artyom Beilis (Tonkikh)
+// Copyright (c) 2022-2023 Alexander Grund
 //
-//  Distributed under the Boost Software License, Version 1.0. (See
-//  accompanying file LICENSE_1_0.txt or copy at
-//  http://www.boost.org/LICENSE_1_0.txt)
-//
-#define BOOST_LOCALE_SOURCE
-#include <boost/locale/localization_backend.hpp>
-#include <boost/locale/gnu_gettext.hpp>
-#include "all_generator.hpp"
-#include "../util/locale_data.hpp"
-#include "../util/gregorian.hpp"
-#include <boost/locale/util.hpp>
-#include <algorithm>
-#include <iterator>
-
-#if defined(BOOST_WINDOWS)
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
-#  include <windows.h>
-#  include "../encoding/conv.hpp"
-#  include "../win32/lcid.hpp"
-#endif
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
 
 #include "std_backend.hpp"
+#include <boost/locale/gnu_gettext.hpp>
+#include <boost/locale/localization_backend.hpp>
+#include <boost/locale/util.hpp>
+#include <boost/locale/util/locale_data.hpp>
+#include <boost/assert.hpp>
+#include <boost/core/ignore_unused.hpp>
+#include <algorithm>
+#include <iterator>
+#include <vector>
 
-namespace boost {
-namespace locale {
-namespace impl_std { 
-    
+#if BOOST_LOCALE_USE_WIN32_API
+#    ifndef NOMINMAX
+#        define NOMINMAX
+#    endif
+#    include "../win32/lcid.hpp"
+#    include <windows.h>
+#endif
+#include "../shared/message.hpp"
+#include "../util/encoding.hpp"
+#include "../util/gregorian.hpp"
+#include "../util/make_std_unique.hpp"
+#include "../util/numeric_conversion.hpp"
+#include "all_generator.hpp"
+
+namespace {
+struct windows_name {
+    std::string name, codepage;
+    explicit operator bool() const { return !name.empty() && !codepage.empty(); }
+};
+
+windows_name to_windows_name(const std::string& l)
+{
+#if BOOST_LOCALE_USE_WIN32_API
+    windows_name res;
+    const unsigned lcid = boost::locale::impl_win::locale_to_lcid(l);
+    char win_lang[256]{};
+    if(lcid == 0 || GetLocaleInfoA(lcid, LOCALE_SENGLANGUAGE, win_lang, sizeof(win_lang)) == 0)
+        return res;
+    res.name = win_lang;
+    char win_country[256]{};
+    if(GetLocaleInfoA(lcid, LOCALE_SENGCOUNTRY, win_country, sizeof(win_country)) != 0) {
+        res.name += "_";
+        res.name += win_country;
+    }
+
+    char win_codepage[10]{};
+    if(GetLocaleInfoA(lcid, LOCALE_IDEFAULTANSICODEPAGE, win_codepage, sizeof(win_codepage)) != 0)
+        res.codepage = win_codepage;
+    return res;
+#else
+    boost::ignore_unused(l);
+    return {};
+#endif
+}
+
+bool loadable(const std::string& name)
+{
+    try {
+        std::locale l(name);
+        return true;
+    } catch(const std::exception&) {
+        return false;
+    }
+}
+} // namespace
+
+namespace boost { namespace locale { namespace impl_std {
+
     class std_localization_backend : public localization_backend {
     public:
-        std_localization_backend() : 
-            invalid_(true),
-            use_ansi_encoding_(false)
-        {
-        }
-        std_localization_backend(std_localization_backend const &other) : 
-            localization_backend(),
-            paths_(other.paths_),
-            domains_(other.domains_),
-            locale_id_(other.locale_id_),
-            invalid_(true),
-            use_ansi_encoding_(other.use_ansi_encoding_)
-        {
-        }
-        virtual std_localization_backend *clone() const
-        {
-            return new std_localization_backend(*this);
-        }
+        std_localization_backend() : invalid_(true), use_ansi_encoding_(false) {}
+        std_localization_backend(const std_localization_backend& other) :
+            localization_backend(), paths_(other.paths_), domains_(other.domains_), locale_id_(other.locale_id_),
+            invalid_(true), use_ansi_encoding_(other.use_ansi_encoding_)
+        {}
+        std_localization_backend* clone() const override { return new std_localization_backend(*this); }
 
-        void set_option(std::string const &name,std::string const &value) 
+        void set_option(const std::string& name, const std::string& value) override
         {
             invalid_ = true;
-            if(name=="locale")
+            if(name == "locale")
                 locale_id_ = value;
-            else if(name=="message_path")
+            else if(name == "message_path")
                 paths_.push_back(value);
-            else if(name=="message_application")
+            else if(name == "message_application")
                 domains_.push_back(value);
-            else if(name=="use_ansi_encoding")
+            else if(name == "use_ansi_encoding")
                 use_ansi_encoding_ = value == "true";
-
         }
-        void clear_options()
+        void clear_options() override
         {
             invalid_ = true;
             use_ansi_encoding_ = false;
@@ -78,139 +109,83 @@ namespace impl_std {
             if(!invalid_)
                 return;
             invalid_ = false;
-            std::string lid=locale_id_;
+            std::string lid = locale_id_;
             if(lid.empty()) {
-                bool use_utf8 = ! use_ansi_encoding_;
+                bool use_utf8 = !use_ansi_encoding_;
                 lid = util::get_system_locale(use_utf8);
             }
             in_use_id_ = lid;
             data_.parse(lid);
-            name_ = "C";
-            utf_mode_ = utf8_none;
 
-            #if defined(BOOST_WINDOWS)
-            std::pair<std::string,int> wl_inf = to_windows_name(lid);
-            std::string win_name = wl_inf.first;
-            int win_codepage = wl_inf.second;
-            #endif
+            const auto l_win = to_windows_name(lid);
 
-            if(!data_.utf8) {
+            if(!data_.is_utf8()) {
+                utf_mode_ = utf8_support::none;
+                if(loadable(lid))
+                    name_ = lid;
+                else if(l_win && loadable(l_win.name)) {
+                    if(util::are_encodings_equal(l_win.codepage, data_.encoding()))
+                        name_ = l_win.name;
+                    else {
+                        int codepage_int;
+                        if(util::try_to_int(l_win.codepage, codepage_int)
+                           && codepage_int == util::encoding_to_windows_codepage(data_.encoding()))
+                        {
+                            name_ = l_win.name;
+                        } else
+                            name_ = "C";
+                    }
+                } else
+                    name_ = "C";
+            } else {
                 if(loadable(lid)) {
                     name_ = lid;
-                    utf_mode_ = utf8_none;
+                    utf_mode_ = utf8_support::native;
+                } else {
+                    std::vector<std::string> alt_names;
+                    if(l_win)
+                        alt_names.push_back(l_win.name);
+                    // Try different spellings
+                    alt_names.push_back(util::locale_data(data_).encoding("UTF-8").to_string());
+                    alt_names.push_back(util::locale_data(data_).encoding("utf8", false).to_string());
+                    // Without encoding, let from_wide classes handle it
+                    alt_names.push_back(util::locale_data(data_).encoding("").to_string());
+                    // Final try: Classic locale, but enable Unicode (if supported)
+                    alt_names.push_back("C.UTF-8");
+                    alt_names.push_back("C.utf8");
+                    // If everything fails rely on the classic locale
+                    alt_names.push_back("C");
+                    for(const std::string& name : alt_names) {
+                        if(loadable(name)) {
+                            name_ = name;
+                            break;
+                        }
+                    }
+                    BOOST_ASSERT(!name_.empty());
+                    utf_mode_ = utf8_support::from_wide;
                 }
-                #if defined(BOOST_WINDOWS)
-                else if(loadable(win_name) 
-                        && win_codepage == conv::impl::encoding_to_windows_codepage(data_.encoding.c_str())) 
-                {
-                    name_ = win_name;
-                    utf_mode_ = utf8_none;
-                }
-                #endif
-            }
-            else {
-                if(loadable(lid)) {
-                    name_ = lid;
-                    utf_mode_ = utf8_native_with_wide;
-                }
-                #if defined(BOOST_WINDOWS)
-                else if(loadable(win_name)) {
-                    name_ = win_name;
-                    utf_mode_ = utf8_from_wide;
-                }
-                #endif
             }
         }
-        
-        #if defined(BOOST_WINDOWS)
-        std::pair<std::string,int> to_windows_name(std::string const &l)
-        {
-            std::pair<std::string,int> res("C",0);
-            unsigned lcid = impl_win::locale_to_lcid(l);
-            char win_lang[256]  = {0};
-            char win_country[256]  = {0};
-            char win_codepage[10] = {0};
-            if(GetLocaleInfoA(lcid,LOCALE_SENGLANGUAGE,win_lang,sizeof(win_lang))==0)
-                return res;
-            std::string lc_name = win_lang;
-            if(GetLocaleInfoA(lcid,LOCALE_SENGCOUNTRY,win_country,sizeof(win_country))!=0) {
-                lc_name += "_";
-                lc_name += win_country;
-            }
-            
-            res.first = lc_name;
 
-            if(GetLocaleInfoA(lcid,LOCALE_IDEFAULTANSICODEPAGE,win_codepage,sizeof(win_codepage))!=0)
-                res.second = atoi(win_codepage);
-            return res;
-        }
-        #endif
-        
-        bool loadable(std::string name)
-        {
-            try {
-                std::locale l(name.c_str());
-                return true;
-            }
-            catch(std::exception const &/*e*/) {
-                return false;
-            }
-        }
-        
-        virtual std::locale install(std::locale const &base,
-                                    locale_category_type category,
-                                    character_facet_type type = nochar_facet)
+        std::locale install(const std::locale& base, category_t category, char_facet_t type) override
         {
             prepare_data();
 
             switch(category) {
-            case convert_facet:
-                return create_convert(base,name_,type,utf_mode_);
-            case collation_facet:
-                return create_collate(base,name_,type,utf_mode_);
-            case formatting_facet:
-                return create_formatting(base,name_,type,utf_mode_);
-            case parsing_facet:
-                return create_parsing(base,name_,type,utf_mode_);
-            case codepage_facet:
-                return create_codecvt(base,name_,type,utf_mode_);
-            case calendar_facet:
-                return util::install_gregorian_calendar(base,data_.country);
-            case message_facet:
-                {
-                    gnu_gettext::messages_info minf;
-                    minf.language = data_.language;
-                    minf.country = data_.country;
-                    minf.variant = data_.variant;
-                    minf.encoding = data_.encoding;
-                    std::copy(domains_.begin(),domains_.end(),std::back_inserter<gnu_gettext::messages_info::domains_type>(minf.domains));
-                    minf.paths = paths_;
-                    switch(type) {
-                    case char_facet:
-                        return std::locale(base,gnu_gettext::create_messages_facet<char>(minf));
-                    case wchar_t_facet:
-                        return std::locale(base,gnu_gettext::create_messages_facet<wchar_t>(minf));
-                    #ifdef BOOST_LOCALE_ENABLE_CHAR16_T
-                    case char16_t_facet:
-                        return std::locale(base,gnu_gettext::create_messages_facet<char16_t>(minf));
-                    #endif
-                    #ifdef BOOST_LOCALE_ENABLE_CHAR32_T
-                    case char32_t_facet:
-                        return std::locale(base,gnu_gettext::create_messages_facet<char32_t>(minf));
-                    #endif
-                    default:
-                        return base;
-                    }
-                }
-            case information_facet:
-                return util::create_info(base,in_use_id_);
-            default:
-                return base;
+                case category_t::convert: return create_convert(base, name_, type, utf_mode_);
+                case category_t::collation: return create_collate(base, name_, type, utf_mode_);
+                case category_t::formatting: return create_formatting(base, name_, type, utf_mode_);
+                case category_t::parsing: return create_parsing(base, name_, type, utf_mode_);
+                case category_t::codepage: return create_codecvt(base, name_, type, utf_mode_);
+                case category_t::calendar: return util::install_gregorian_calendar(base, data_.country());
+                case category_t::message: return detail::install_message_facet(base, type, data_, domains_, paths_);
+                case category_t::information: return util::create_info(base, in_use_id_);
+                case category_t::boundary: break; // Not implemented
             }
+            return base;
         }
 
     private:
-
         std::vector<std::string> paths_;
         std::vector<std::string> domains_;
         std::string locale_id_;
@@ -222,13 +197,10 @@ namespace impl_std {
         bool invalid_;
         bool use_ansi_encoding_;
     };
-    
-    localization_backend *create_localization_backend()
+
+    std::unique_ptr<localization_backend> create_localization_backend()
     {
-        return new std_localization_backend();
+        return make_std_unique<std_localization_backend>();
     }
 
-}  // impl icu
-}  // locale
-}  // boost
-// vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 
+}}} // namespace boost::locale::impl_std

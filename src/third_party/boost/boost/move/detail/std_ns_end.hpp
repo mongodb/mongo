@@ -14,3 +14,6 @@
 #elif defined(_MSC_VER) && (_MSC_VER >= 1915)
    #pragma warning (pop)
 #endif   //BOOST_MOVE_STD_NS_GCC_DIAGNOSTIC_PUSH
+
+#undef BOOST_MOVE_STD_NS_BEG
+#undef BOOST_MOVE_STD_NS_END

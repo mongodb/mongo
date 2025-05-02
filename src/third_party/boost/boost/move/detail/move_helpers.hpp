@@ -69,13 +69,13 @@
    {};
 
    #define BOOST_MOVE_CONVERSION_AWARE_CATCH_COMMON(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION)\
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_CONST(TYPE) x)\
+      inline RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_CONST(TYPE) x)\
       {  return FWD_FUNCTION(static_cast<const TYPE&>(x)); }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
+      inline RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
       {  return FWD_FUNCTION(::boost::move(x));  }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(TYPE &x)\
+      inline RETURN_VALUE PUB_FUNCTION(TYPE &x)\
       {  return FWD_FUNCTION(const_cast<const TYPE &>(x)); }\
    //
    #if defined(BOOST_MOVE_HELPERS_RETURN_SFINAE_BROKEN)
@@ -83,12 +83,12 @@
          BOOST_MOVE_CONVERSION_AWARE_CATCH_COMMON(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION)\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u,\
+         inline RETURN_VALUE PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u,\
             typename boost_move_conversion_aware_catch_1< ::boost::move_detail::nat, BOOST_MOVE_TEMPL_PARAM, TYPE>::type* = 0)\
          { return FWD_FUNCTION(u); }\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u,\
+         inline RETURN_VALUE PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u,\
             typename boost_move_conversion_aware_catch_2< ::boost::move_detail::nat, BOOST_MOVE_TEMPL_PARAM, TYPE>::type* = 0)\
          {\
             TYPE t((u));\
@@ -100,12 +100,12 @@
          BOOST_MOVE_CONVERSION_AWARE_CATCH_COMMON(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION)\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE typename boost_move_conversion_aware_catch_1<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, TYPE>::type\
+         inline typename boost_move_conversion_aware_catch_1<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, TYPE>::type\
             PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u)\
          { return FWD_FUNCTION(u); }\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE typename boost_move_conversion_aware_catch_2<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, TYPE>::type\
+         inline typename boost_move_conversion_aware_catch_2<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, TYPE>::type\
             PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u)\
          {\
             TYPE t((u));\
@@ -116,14 +116,14 @@
 #elif (defined(_MSC_VER) && (_MSC_VER == 1600))
 
    #define BOOST_MOVE_CONVERSION_AWARE_CATCH(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION)\
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_CONST(TYPE) x)\
+      inline RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_CONST(TYPE) x)\
       {  return FWD_FUNCTION(static_cast<const TYPE&>(x)); }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
+      inline RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
       {  return FWD_FUNCTION(::boost::move(x));  }\
       \
       template<class BOOST_MOVE_TEMPL_PARAM>\
-      BOOST_MOVE_FORCEINLINE typename ::boost::move_detail::enable_if_c\
+      inline typename ::boost::move_detail::enable_if_c\
                         < !::boost::move_detail::is_same<TYPE, BOOST_MOVE_TEMPL_PARAM>::value\
                         , RETURN_VALUE >::type\
       PUB_FUNCTION(const BOOST_MOVE_TEMPL_PARAM &u)\
@@ -136,10 +136,10 @@
 #else    //BOOST_NO_CXX11_RVALUE_REFERENCES
 
    #define BOOST_MOVE_CONVERSION_AWARE_CATCH(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION)\
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_CONST(TYPE) x)\
+      inline RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_CONST(TYPE) x)\
       {  return FWD_FUNCTION(x); }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
+      inline RETURN_VALUE PUB_FUNCTION(BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
       {  return FWD_FUNCTION(::boost::move(x));  }\
    //
 
@@ -174,13 +174,13 @@
    {};
 
    #define BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG_COMMON(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION, ARG1, UNLESS_CONVERTIBLE_TO)\
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_CONST(TYPE) x)\
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_CONST(TYPE) x)\
       {  return FWD_FUNCTION(arg1, static_cast<const TYPE&>(x)); }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
       {  return FWD_FUNCTION(arg1, ::boost::move(x));  }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, TYPE &x)\
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, TYPE &x)\
       {  return FWD_FUNCTION(arg1, const_cast<const TYPE &>(x)); }\
    //
    #if defined(BOOST_MOVE_HELPERS_RETURN_SFINAE_BROKEN)
@@ -188,12 +188,12 @@
          BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG_COMMON(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION, ARG1, UNLESS_CONVERTIBLE_TO)\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, const BOOST_MOVE_TEMPL_PARAM &u,\
+         inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, const BOOST_MOVE_TEMPL_PARAM &u,\
             typename boost_move_conversion_aware_catch_1arg_1<void, BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO, TYPE>::type* = 0)\
          { return FWD_FUNCTION(arg1, u); }\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, const BOOST_MOVE_TEMPL_PARAM &u,\
+         inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, const BOOST_MOVE_TEMPL_PARAM &u,\
             typename boost_move_conversion_aware_catch_1arg_2<void, BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO, TYPE>::type* = 0)\
          {\
             TYPE t((u));\
@@ -205,12 +205,12 @@
          BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG_COMMON(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION, ARG1, UNLESS_CONVERTIBLE_TO)\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE typename boost_move_conversion_aware_catch_1arg_1<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO, TYPE>::type\
+         inline typename boost_move_conversion_aware_catch_1arg_1<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO, TYPE>::type\
             PUB_FUNCTION(ARG1 arg1, const BOOST_MOVE_TEMPL_PARAM &u)\
          { return FWD_FUNCTION(arg1, u); }\
          \
          template<class BOOST_MOVE_TEMPL_PARAM>\
-         BOOST_MOVE_FORCEINLINE typename boost_move_conversion_aware_catch_1arg_2<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO, TYPE>::type\
+         inline typename boost_move_conversion_aware_catch_1arg_2<RETURN_VALUE, BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO, TYPE>::type\
             PUB_FUNCTION(ARG1 arg1, const BOOST_MOVE_TEMPL_PARAM &u)\
          {\
             TYPE t((u));\
@@ -222,14 +222,14 @@
 #elif (defined(_MSC_VER) && (_MSC_VER == 1600))
 
    #define BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION, ARG1, UNLESS_CONVERTIBLE_TO)\
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_CONST(TYPE) x)\
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_CONST(TYPE) x)\
       {  return FWD_FUNCTION(arg1, static_cast<const TYPE&>(x)); }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
       {  return FWD_FUNCTION(arg1, ::boost::move(x));  }\
       \
       template<class BOOST_MOVE_TEMPL_PARAM>\
-      BOOST_MOVE_FORCEINLINE typename ::boost::move_detail::disable_if_or\
+      inline typename ::boost::move_detail::disable_if_or\
                         < RETURN_VALUE \
                         , ::boost::move_detail::is_same<TYPE, BOOST_MOVE_TEMPL_PARAM> \
                         , ::boost::move_detail::is_same_or_convertible<BOOST_MOVE_TEMPL_PARAM, UNLESS_CONVERTIBLE_TO> \
@@ -244,10 +244,10 @@
 #else
 
    #define BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(PUB_FUNCTION, TYPE, RETURN_VALUE, FWD_FUNCTION, ARG1, UNLESS_CONVERTIBLE_TO)\
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_CONST(TYPE) x)\
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_CONST(TYPE) x)\
       {  return FWD_FUNCTION(arg1, static_cast<const TYPE&>(x)); }\
       \
-      BOOST_MOVE_FORCEINLINE RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
+      inline RETURN_VALUE PUB_FUNCTION(ARG1 arg1, BOOST_MOVE_CATCH_RVALUE(TYPE) x) \
       {  return FWD_FUNCTION(arg1, ::boost::move(x));  }\
    //
 

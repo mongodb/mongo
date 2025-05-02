@@ -26,6 +26,16 @@ namespace boost {
 namespace container {
 namespace dtl {
 
+   template<class V, class A, class U>
+   struct void_or_portable_rebind_alloc
+   {
+      typedef typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type type;
+   };
+
+   template<class V, class U>
+   struct void_or_portable_rebind_alloc<V, void, U>
+   {  typedef void type;  };
+
    template <class Cont, class U>
    struct container_rebind;
 
@@ -34,14 +44,14 @@ namespace dtl {
    template <template <class, class, class...> class Cont, typename V, typename A, class... An, class U>
    struct container_rebind<Cont<V, A, An...>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, An...> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, An...> type;
    };
 
    //Needed for non-conforming compilers like GCC 4.3
    template <template <class, class> class Cont, typename V, typename A, class U>
    struct container_rebind<Cont<V, A>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type> type;
    };
 
    template <template <class> class Cont, typename V, class U>
@@ -65,7 +75,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type> type;
    };
 
    template <template <class, class, class> class Cont  //1arg
@@ -73,7 +83,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0> type;
    };
 
    template <template <class, class, class, class> class Cont  //2arg
@@ -81,7 +91,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1> type;
    };
 
    template <template <class, class, class, class, class> class Cont  //3arg
@@ -89,7 +99,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2> type;
    };
 
    template <template <class, class, class, class, class, class> class Cont  //4arg
@@ -97,7 +107,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2, P3>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2, P3> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2, P3> type;
    };
 
    template <template <class, class, class, class, class, class, class> class Cont  //5arg
@@ -105,7 +115,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2, P3, P4>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2, P3, P4> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2, P3, P4> type;
    };
 
    template <template <class, class, class, class, class, class, class, class> class Cont  //6arg
@@ -113,7 +123,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2, P3, P4, P5>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2, P3, P4, P5> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2, P3, P4, P5> type;
    };
 
    template <template <class, class, class, class, class, class, class, class, class> class Cont  //7arg
@@ -121,7 +131,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2, P3, P4, P5, P6>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2, P3, P4, P5, P6> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2, P3, P4, P5, P6> type;
    };
 
    template <template <class, class, class, class, class, class, class, class, class, class> class Cont  //8arg
@@ -129,7 +139,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2, P3, P4, P5, P6, P7>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2, P3, P4, P5, P6, P7> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2, P3, P4, P5, P6, P7> type;
    };
 
    template <template <class, class, class, class, class, class, class, class, class, class, class> class Cont  //9arg
@@ -137,7 +147,7 @@ namespace dtl {
       , class U>
       struct container_rebind<Cont<V, A, P0, P1, P2, P3, P4, P5, P6, P7, P8>, U>
    {
-      typedef Cont<U, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, P0, P1, P2, P3, P4, P5, P6, P7, P8> type;
+      typedef Cont<U, typename void_or_portable_rebind_alloc<V, A, U>::type, P0, P1, P2, P3, P4, P5, P6, P7, P8> type;
    };
 
 #endif   //!defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
@@ -147,7 +157,7 @@ namespace dtl {
    template <typename V, std::size_t N, typename A, typename O, class U>
    struct container_rebind<small_vector<V, N, A, O>, U>
    {
-      typedef small_vector<U, N, typename allocator_traits<typename real_allocator<V, A>::type>::template portable_rebind_alloc<U>::type, O> type;
+      typedef small_vector<U, N, typename void_or_portable_rebind_alloc<V, A, U>::type, O> type;
    };
 
    template <typename V, std::size_t N, typename O, class U>

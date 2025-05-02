@@ -415,6 +415,11 @@ struct gcc_dcas_x86
 {
     typedef typename storage_traits< 8u >::type storage_type;
     typedef uint32_t BOOST_ATOMIC_DETAIL_MAY_ALIAS aliasing_uint32_t;
+#if defined(__SSE2__)
+    typedef uint32_t xmm_t __attribute__((__vector_size__(16)));
+#elif defined(__SSE__)
+    typedef float xmm_t __attribute__((__vector_size__(16)));
+#endif
 
     static BOOST_CONSTEXPR_OR_CONST std::size_t storage_size = 8u;
     static BOOST_CONSTEXPR_OR_CONST std::size_t storage_alignment = 8u;
@@ -423,31 +428,32 @@ struct gcc_dcas_x86
     static BOOST_CONSTEXPR_OR_CONST bool full_cas_based = true;
     static BOOST_CONSTEXPR_OR_CONST bool is_always_lock_free = true;
 
-    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order) BOOST_NOEXCEPT
+    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order order) BOOST_NOEXCEPT
     {
-        if (BOOST_LIKELY((((uintptr_t)&storage) & 0x00000007) == 0u))
+        if (BOOST_LIKELY(order != memory_order_seq_cst && (((uintptr_t)&storage) & 7u) == 0u))
         {
 #if defined(__SSE__)
-            typedef float xmm_t __attribute__((__vector_size__(16)));
-            xmm_t xmm_scratch;
+#if defined(__SSE2__)
+            xmm_t value = { static_cast< uint32_t >(v), static_cast< uint32_t >(v >> 32u), 0u, 0u };
+#else
+            xmm_t value;
+            BOOST_ATOMIC_DETAIL_MEMSET(&value, 0, sizeof(value));
+            BOOST_ATOMIC_DETAIL_MEMCPY(&value, &v, sizeof(v));
+#endif
             __asm__ __volatile__
             (
 #if defined(__AVX__)
-                "vmovq %[value], %[xmm_scratch]\n\t"
-                "vmovq %[xmm_scratch], %[storage]\n\t"
+                "vmovq %[value], %[storage]\n\t"
 #elif defined(__SSE2__)
-                "movq %[value], %[xmm_scratch]\n\t"
-                "movq %[xmm_scratch], %[storage]\n\t"
+                "movq %[value], %[storage]\n\t"
 #else
-                "xorps %[xmm_scratch], %[xmm_scratch]\n\t"
-                "movlps %[value], %[xmm_scratch]\n\t"
-                "movlps %[xmm_scratch], %[storage]\n\t"
+                "movlps %[value], %[storage]\n\t"
 #endif
-                : [storage] "=m" (storage), [xmm_scratch] "=x" (xmm_scratch)
-                : [value] "m" (v)
+                : [storage] "=m" (storage)
+                : [value] "x" (value)
                 : "memory"
             );
-#else
+#else // defined(__SSE__)
             __asm__ __volatile__
             (
                 "fildll %[value]\n\t"
@@ -456,7 +462,7 @@ struct gcc_dcas_x86
                 : [value] "m" (v)
                 : "memory"
             );
-#endif
+#endif // defined(__SSE__)
         }
         else
         {
@@ -472,7 +478,7 @@ struct gcc_dcas_x86
                 "jne 1b\n\t"
                 "xchgl %%ebx, %%esi\n\t"
                 :
-                : "a" ((uint32_t)v), "c" ((uint32_t)(v >> 32)), [dest] "D" (&storage)
+                : "a" ((uint32_t)v), "c" ((uint32_t)(v >> 32u)), [dest] "D" (&storage)
                 : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "edx", "memory"
             );
 #else // defined(BOOST_ATOMIC_DETAIL_X86_ASM_PRESERVE_EBX)
@@ -484,7 +490,7 @@ struct gcc_dcas_x86
                 "1: lock; cmpxchg8b %[dest_lo]\n\t"
                 "jne 1b\n\t"
                 : [dest_lo] "=m" (storage), [dest_hi] "=m" (reinterpret_cast< volatile aliasing_uint32_t* >(&storage)[1])
-                : [value_lo] "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32))
+                : [value_lo] "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32u))
                 : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "eax", "edx", "memory"
             );
 #endif // defined(BOOST_ATOMIC_DETAIL_X86_ASM_PRESERVE_EBX)
@@ -495,29 +501,31 @@ struct gcc_dcas_x86
     {
         storage_type value;
 
-        if (BOOST_LIKELY((((uintptr_t)&storage) & 0x00000007) == 0u))
+        if (BOOST_LIKELY((((uintptr_t)&storage) & 7u) == 0u))
         {
 #if defined(__SSE__)
-            typedef float xmm_t __attribute__((__vector_size__(16)));
-            xmm_t xmm_scratch;
+            xmm_t v;
             __asm__ __volatile__
             (
 #if defined(__AVX__)
-                "vmovq %[storage], %[xmm_scratch]\n\t"
-                "vmovq %[xmm_scratch], %[value]\n\t"
+                "vmovq %[storage], %[value]\n\t"
 #elif defined(__SSE2__)
-                "movq %[storage], %[xmm_scratch]\n\t"
-                "movq %[xmm_scratch], %[value]\n\t"
+                "movq %[storage], %[value]\n\t"
 #else
-                "xorps %[xmm_scratch], %[xmm_scratch]\n\t"
-                "movlps %[storage], %[xmm_scratch]\n\t"
-                "movlps %[xmm_scratch], %[value]\n\t"
+                "xorps %[value], %[value]\n\t"
+                "movlps %[storage], %[value]\n\t"
 #endif
-                : [value] "=m" (value), [xmm_scratch] "=x" (xmm_scratch)
+                : [value] "=x" (v)
                 : [storage] "m" (storage)
                 : "memory"
             );
+#if defined(__SSE2__) && (!defined(BOOST_GCC) || BOOST_GCC >= 40800)
+            // gcc prior to 4.8 don't support subscript operator for vector types
+            value = static_cast< storage_type >(v[0]) | (static_cast< storage_type >(v[1]) << 32u);
 #else
+            BOOST_ATOMIC_DETAIL_MEMCPY(&value, &v, sizeof(value));
+#endif
+#else // defined(__SSE__)
             __asm__ __volatile__
             (
                 "fildll %[storage]\n\t"
@@ -526,7 +534,7 @@ struct gcc_dcas_x86
                 : [storage] "m" (storage)
                 : "memory"
             );
-#endif
+#endif // defined(__SSE__)
         }
         else
         {
@@ -548,7 +556,7 @@ struct gcc_dcas_x86
                 : [storage] "m" (storage)
                 : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
             );
-            BOOST_ATOMIC_DETAIL_MEMCPY(&value, value_bits, sizeof(value));
+            value = static_cast< storage_type >(value_bits[0]) | (static_cast< storage_type >(value_bits[1]) << 32u);
 
 #else // defined(BOOST_ATOMIC_DETAIL_X86_NO_ASM_AX_DX_PAIRS)
 
@@ -591,7 +599,7 @@ struct gcc_dcas_x86
             "lock; cmpxchg8b (%[dest])\n\t"
             "xchgl %%ebx, %%esi\n\t"
             : "+A" (expected), [success] "=@ccz" (success)
-            : "S" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32)), [dest] "D" (&storage)
+            : "S" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32u)), [dest] "D" (&storage)
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 #else // defined(BOOST_ATOMIC_DETAIL_ASM_HAS_FLAG_OUTPUTS)
@@ -602,7 +610,7 @@ struct gcc_dcas_x86
             "xchgl %%ebx, %%esi\n\t"
             "sete %[success]\n\t"
             : "+A" (expected), [success] "=qm" (success)
-            : "S" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32)), [dest] "D" (&storage)
+            : "S" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32u)), [dest] "D" (&storage)
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 #endif // defined(BOOST_ATOMIC_DETAIL_ASM_HAS_FLAG_OUTPUTS)
@@ -618,7 +626,7 @@ struct gcc_dcas_x86
         (
             "lock; cmpxchg8b %[dest]\n\t"
             : "+A" (expected), [dest] "+m" (storage), [success] "=@ccz" (success)
-            : "b" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32))
+            : "b" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32u))
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 #else // defined(BOOST_ATOMIC_DETAIL_ASM_HAS_FLAG_OUTPUTS)
@@ -627,7 +635,7 @@ struct gcc_dcas_x86
             "lock; cmpxchg8b %[dest]\n\t"
             "sete %[success]\n\t"
             : "+A" (expected), [dest] "+m" (storage), [success] "=qm" (success)
-            : "b" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32))
+            : "b" ((uint32_t)desired), "c" ((uint32_t)(desired >> 32u))
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 #endif // defined(BOOST_ATOMIC_DETAIL_ASM_HAS_FLAG_OUTPUTS)
@@ -659,7 +667,7 @@ struct gcc_dcas_x86
             "jne 1b\n\t"
             "xchgl %%ebx, %%esi\n\t"
             : "=a" (old_bits[0]), "=d" (old_bits[1])
-            : "S" ((uint32_t)v), "c" ((uint32_t)(v >> 32)), [dest] "D" (&storage)
+            : "S" ((uint32_t)v), "c" ((uint32_t)(v >> 32u)), [dest] "D" (&storage)
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 
@@ -680,7 +688,7 @@ struct gcc_dcas_x86
             "jne 1b\n\t"
             "xchgl %%ebx, %%esi\n\t"
             : "=A" (old_value)
-            : "S" ((uint32_t)v), "c" ((uint32_t)(v >> 32)), [dest] "D" (&storage)
+            : "S" ((uint32_t)v), "c" ((uint32_t)(v >> 32u)), [dest] "D" (&storage)
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
         return old_value;
@@ -699,7 +707,7 @@ struct gcc_dcas_x86
             "1: lock; cmpxchg8b (%[dest])\n\t"
             "jne 1b\n\t"
             : "=&a" (old_bits[0]), "=&d" (old_bits[1])
-            : "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32)), [dest] "DS" (&storage)
+            : "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32u)), [dest] "DS" (&storage)
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 
@@ -718,7 +726,7 @@ struct gcc_dcas_x86
             "1: lock; cmpxchg8b %[dest_lo]\n\t"
             "jne 1b\n\t"
             : "=&a" (old_bits[0]), "=&d" (old_bits[1]), [dest_lo] "+m" (storage), [dest_hi] "+m" (reinterpret_cast< volatile aliasing_uint32_t* >(&storage)[1])
-            : "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32))
+            : "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32u))
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 
@@ -737,7 +745,7 @@ struct gcc_dcas_x86
             "1: lock; cmpxchg8b %[dest_lo]\n\t"
             "jne 1b\n\t"
             : "=&A" (old_value), [dest_lo] "+m" (storage), [dest_hi] "+m" (reinterpret_cast< volatile aliasing_uint32_t* >(&storage)[1])
-            : "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32))
+            : "b" ((uint32_t)v), "c" ((uint32_t)(v >> 32u))
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
         return old_value;
@@ -860,6 +868,9 @@ struct gcc_dcas_x86_64
 {
     typedef typename storage_traits< 16u >::type storage_type;
     typedef uint64_t BOOST_ATOMIC_DETAIL_MAY_ALIAS aliasing_uint64_t;
+#if defined(__AVX__)
+    typedef uint64_t __attribute__((__vector_size__(16))) xmm_t;
+#endif
 
     static BOOST_CONSTEXPR_OR_CONST std::size_t storage_size = 16u;
     static BOOST_CONSTEXPR_OR_CONST std::size_t storage_alignment = 16u;
@@ -868,8 +879,31 @@ struct gcc_dcas_x86_64
     static BOOST_CONSTEXPR_OR_CONST bool full_cas_based = true;
     static BOOST_CONSTEXPR_OR_CONST bool is_always_lock_free = true;
 
-    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order) BOOST_NOEXCEPT
+    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order order) BOOST_NOEXCEPT
     {
+#if defined(__AVX__)
+        if (BOOST_LIKELY(order != memory_order_seq_cst && (((uintptr_t)&storage) & 15u) == 0u))
+        {
+            // According to SDM Volume 3, 8.1.1 Guaranteed Atomic Operations, processors supporting AVX guarantee
+            // aligned vector moves to be atomic.
+#if defined(BOOST_HAS_INT128)
+            xmm_t value = { static_cast< uint64_t >(v), static_cast< uint64_t >(v >> 64u) };
+#else
+            xmm_t value;
+            BOOST_ATOMIC_DETAIL_MEMCPY(&value, &v, sizeof(v));
+#endif
+            __asm__ __volatile__
+            (
+                "vmovdqa %[value], %[storage]\n\t"
+                : [storage] "=m" (storage)
+                : [value] "x" (value)
+                : "memory"
+            );
+
+            return;
+        }
+#endif // defined(__AVX__)
+
         __asm__ __volatile__
         (
             "movq %[dest_lo], %%rax\n\t"
@@ -885,6 +919,31 @@ struct gcc_dcas_x86_64
 
     static BOOST_FORCEINLINE storage_type load(storage_type const volatile& storage, memory_order) BOOST_NOEXCEPT
     {
+#if defined(__AVX__)
+        if (BOOST_LIKELY((((uintptr_t)&storage) & 15u) == 0u))
+        {
+            // According to SDM Volume 3, 8.1.1 Guaranteed Atomic Operations, processors supporting AVX guarantee
+            // aligned vector moves to be atomic.
+            xmm_t v;
+            __asm__ __volatile__
+            (
+                "vmovdqa %[storage], %[value]\n\t"
+                : [value] "=x" (v)
+                : [storage] "m" (storage)
+                : "memory"
+            );
+
+#if defined(BOOST_HAS_INT128) && (!defined(BOOST_GCC) || BOOST_GCC >= 40800)
+            // gcc prior to 4.8 don't support subscript operator for vector types
+            storage_type value = static_cast< storage_type >(v[0]) | (static_cast< storage_type >(v[1]) << 64u);
+#else
+            storage_type value;
+            BOOST_ATOMIC_DETAIL_MEMCPY(&value, &v, sizeof(v));
+#endif
+            return value;
+        }
+#endif // defined(__AVX__)
+
         // Note that despite const qualification cmpxchg16b below may issue a store to the storage. The storage value
         // will not change, but this prevents the storage to reside in read-only memory.
 
@@ -904,8 +963,12 @@ struct gcc_dcas_x86_64
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 
+#if defined(BOOST_HAS_INT128)
+        storage_type value = static_cast< storage_type >(value_bits[0]) | (static_cast< storage_type >(value_bits[1]) << 64u);
+#else
         storage_type value;
         BOOST_ATOMIC_DETAIL_MEMCPY(&value, value_bits, sizeof(value));
+#endif
         return value;
 
 #else // defined(BOOST_ATOMIC_DETAIL_X86_NO_ASM_AX_DX_PAIRS)
@@ -1004,8 +1067,12 @@ struct gcc_dcas_x86_64
             : BOOST_ATOMIC_DETAIL_ASM_CLOBBER_CC_COMMA "memory"
         );
 
+#if defined(BOOST_HAS_INT128)
+        storage_type old_value = static_cast< storage_type >(old_bits[0]) | (static_cast< storage_type >(old_bits[1]) << 64u);
+#else
         storage_type old_value;
         BOOST_ATOMIC_DETAIL_MEMCPY(&old_value, old_bits, sizeof(old_value));
+#endif
         return old_value;
 #else // defined(BOOST_ATOMIC_DETAIL_X86_NO_ASM_AX_DX_PAIRS)
         storage_type old_value;

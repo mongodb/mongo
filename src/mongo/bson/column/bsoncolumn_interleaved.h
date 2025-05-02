@@ -1053,10 +1053,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
             if (auto it = elemToBuffer.find(elem.value()); it != elemToBuffer.end()) {
                 heap.emplace_back(scalarIdx, elem, std::move(it->second));
             } else {
-                MONGO_COMPILER_DIAGNOSTIC_PUSH
-                MONGO_COMPILER_DIAGNOSTIC_WORKAROUND_BOOST_SMALL_VECTOR
                 heap.emplace_back(scalarIdx, elem);
-                MONGO_COMPILER_DIAGNOSTIC_POP
             }
             heap.back().setLastValueFromBSONElem();
             for (auto&& b : heap.back()._buffers) {

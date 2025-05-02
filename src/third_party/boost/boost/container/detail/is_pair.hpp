@@ -61,25 +61,25 @@ struct pair;
 template <class T>
 struct is_pair
 {
-   static const bool value = false;
+   BOOST_STATIC_CONSTEXPR bool value = false;
 };
 
 template <class T1, class T2>
 struct is_pair< pair<T1, T2> >
 {
-   static const bool value = true;
+   BOOST_STATIC_CONSTEXPR bool value = true;
 };
 
 template <class T1, class T2>
 struct is_pair< std::pair<T1, T2> >
 {
-   static const bool value = true;
+   BOOST_STATIC_CONSTEXPR bool value = true;
 };
 
 template <class T>
 struct is_not_pair
 {
-   static const bool value = !is_pair<T>::value;
+   BOOST_STATIC_CONSTEXPR bool value = !is_pair<T>::value;
 };
 
 }  //namespace dtl {

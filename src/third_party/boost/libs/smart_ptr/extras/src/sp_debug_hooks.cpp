@@ -73,14 +73,10 @@ void * operator new(size_t n) throw(bad_alloc)
     return p;
 }
 
-#if !defined(BOOST_BORLANDC) || (BOOST_BORLANDC > 0x551)
-
 void * operator new(size_t n, nothrow_t const &) throw()
 {
     return allocate(n, allocated_scalar);
 }
-
-#endif
 
 void * operator new[](size_t n) throw(bad_alloc)
 {
@@ -95,14 +91,10 @@ void * operator new[](size_t n) throw(bad_alloc)
     return p;
 }
 
-#if !defined(BOOST_BORLANDC) || (BOOST_BORLANDC > 0x551)
-
 void * operator new[](size_t n, nothrow_t const &) throw()
 {
     return allocate(n, allocated_array);
 }
-
-#endif
 
 // debug hooks
 
@@ -205,14 +197,10 @@ void operator delete(void * p) throw()
     free(pm);
 }
 
-#if !defined(BOOST_BORLANDC) || (BOOST_BORLANDC > 0x551)
-
 void operator delete(void * p, nothrow_t const &) throw()
 {
     ::operator delete(p);
 }
-
-#endif
 
 void operator delete[](void * p) throw()
 {
@@ -231,13 +219,9 @@ void operator delete[](void * p) throw()
     free(pm);
 }
 
-#if !defined(BOOST_BORLANDC) || (BOOST_BORLANDC > 0x551)
-
 void operator delete[](void * p, nothrow_t const &) throw()
 {
     ::operator delete[](p);
 }
-
-#endif
 
 #endif // defined(BOOST_SP_ENABLE_DEBUG_HOOKS)

@@ -39,6 +39,7 @@
  *******************************************************/
 
 .text
+.private_extern _ontop_fcontext
 .globl _ontop_fcontext
 .align 2
 _ontop_fcontext:

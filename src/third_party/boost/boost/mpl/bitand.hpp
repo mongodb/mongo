@@ -19,7 +19,7 @@
 // macros, see http://tinyurl.com/ycwdxco; 'defined(bitand)'
 // has to be checked in a separate condition, otherwise GCC complains 
 // about 'bitand' being an alternative token
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && !defined(__cplusplus)
 #ifndef __GCCXML__
 #if defined(bitand)
 #   pragma push_macro("bitand")
@@ -34,7 +34,7 @@
 #define AUX778076_OP_TOKEN  &
 #include <boost/mpl/aux_/arithmetic_op.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__cplusplus)
 #ifndef __GCCXML__
 #if defined(bitand)
 #   pragma pop_macro("bitand")

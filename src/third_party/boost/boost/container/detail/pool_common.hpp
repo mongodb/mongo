@@ -45,7 +45,7 @@ struct node_slist
 template<class T>
 struct is_stateless_segment_manager
 {
-   static const bool value = false;
+   BOOST_STATIC_CONSTEXPR bool value = false;
 };
 
 }  //namespace dtl {

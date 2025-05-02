@@ -35,7 +35,7 @@ namespace {
 std::size_t pagesize()
 {
     // conform to POSIX.1-2001
-    return ::sysconf( _SC_PAGESIZE);
+    return static_cast<std::size_t>( ::sysconf( _SC_PAGESIZE) );
 }
 
 rlim_t stacksize_limit_()
@@ -86,7 +86,7 @@ stack_traits::default_size() BOOST_NOEXCEPT
 
 std::size_t
 stack_traits::minimum_size() BOOST_NOEXCEPT
-{ return SIGSTKSZ; }
+{ return static_cast<std::size_t>( SIGSTKSZ ); }
 
 std::size_t
 stack_traits::maximum_size() BOOST_NOEXCEPT

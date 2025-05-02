@@ -52,7 +52,12 @@ BOOST_FORCEINLINE __m128i mm_pand_si128(__m128i mm1, __m128i mm2)
     // Sandy Bridge can execute 3 pand instructions per cycle, but only one andps. For this reason
     // we prefer to generate pand and not andps.
 #if defined(__GNUC__)
+#if defined(__AVX__)
+    // Generate VEX-coded variant if the code is compiled for AVX and later.
+    __asm__("vpand %1, %0, %0\n\t" : "+x" (mm1) : "x" (mm2));
+#else
     __asm__("pand %1, %0\n\t" : "+x" (mm1) : "x" (mm2));
+#endif
 #else
     mm1 = _mm_and_si128(mm1, mm2);
 #endif

@@ -27,7 +27,6 @@
 
 #if BOOST_WINAPI_PARTITION_DESKTOP || BOOST_WINAPI_PARTITION_SYSTEM
 
-#include <boost/static_assert.hpp>
 #include <boost/memory_order.hpp>
 #include <boost/winapi/thread.hpp>
 #include <boost/winapi/get_proc_address.hpp>
@@ -53,7 +52,7 @@ BOOST_ATOMIC_DECL once_flag wait_functions_once_flag = { 2u };
 
 BOOST_ATOMIC_DECL void initialize_wait_functions() BOOST_NOEXCEPT
 {
-    BOOST_STATIC_ASSERT_MSG(once_flag_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for bytes");
+    static_assert(once_flag_operations::is_always_lock_free, "Boost.Atomic unsupported target platform: native atomic operations not implemented for bytes");
 
     once_flag_operations::storage_type old_val = once_flag_operations::load(wait_functions_once_flag.m_flag, boost::memory_order_acquire);
     while (true)
@@ -66,11 +65,11 @@ BOOST_ATOMIC_DECL void initialize_wait_functions() BOOST_NOEXCEPT
             boost::winapi::HMODULE_ kernel_base = boost::winapi::get_module_handle(L"api-ms-win-core-synch-l1-2-0.dll");
             if (BOOST_LIKELY(kernel_base != NULL))
             {
-                wait_on_address_t* woa = (wait_on_address_t*)boost::winapi::get_proc_address(kernel_base, "WaitOnAddress");
+                wait_on_address_t* woa = boost::winapi::get_proc_address<wait_on_address_t*>(kernel_base, "WaitOnAddress");
                 if (BOOST_LIKELY(woa != NULL))
                 {
-                    wake_by_address_t* wbas = (wake_by_address_t*)boost::winapi::get_proc_address(kernel_base, "WakeByAddressSingle");
-                    wake_by_address_t* wbaa = (wake_by_address_t*)boost::winapi::get_proc_address(kernel_base, "WakeByAddressAll");
+                    wake_by_address_t* wbas = boost::winapi::get_proc_address<wake_by_address_t*>(kernel_base, "WakeByAddressSingle");
+                    wake_by_address_t* wbaa = boost::winapi::get_proc_address<wake_by_address_t*>(kernel_base, "WakeByAddressAll");
 
                     if (BOOST_LIKELY(wbas != NULL && wbaa != NULL))
                     {

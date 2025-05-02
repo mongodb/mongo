@@ -28,6 +28,7 @@
 #include <boost/move/detail/iterator_traits.hpp>
 #include <boost/move/algo/detail/is_sorted.hpp>
 #include <boost/move/utility_core.hpp>
+#include <cassert>
 
 #if defined(BOOST_CLANG) || (defined(BOOST_GCC) && (BOOST_GCC >= 40600))
 #pragma GCC diagnostic push
@@ -100,12 +101,12 @@ class heap_sort_helper
    {
       make_heap(first, last, comp);
       sort_heap(first, last, comp);
-      BOOST_ASSERT(boost::movelib::is_sorted(first, last, comp));
+      assert(boost::movelib::is_sorted(first, last, comp));
    }
 };
 
 template <class RandomAccessIterator, class Compare>
-BOOST_MOVE_FORCEINLINE void heap_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
+inline void heap_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
 {
    heap_sort_helper<RandomAccessIterator, Compare>::sort(first, last, comp);
 }

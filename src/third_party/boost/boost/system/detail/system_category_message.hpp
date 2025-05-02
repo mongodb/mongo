@@ -32,7 +32,7 @@ inline std::string system_error_category_message( int ev )
     return system_category_message_win32( ev );
 }
 
-inline char const * system_error_category_message( int ev, char * buffer, std::size_t len ) BOOST_NOEXCEPT
+inline char const * system_error_category_message( int ev, char * buffer, std::size_t len ) noexcept
 {
     return system_category_message_win32( ev, buffer, len );
 }
@@ -57,7 +57,7 @@ inline std::string system_error_category_message( int ev )
     return generic_error_category_message( ev );
 }
 
-inline char const * system_error_category_message( int ev, char * buffer, std::size_t len ) BOOST_NOEXCEPT
+inline char const * system_error_category_message( int ev, char * buffer, std::size_t len ) noexcept
 {
     return generic_error_category_message( ev, buffer, len );
 }

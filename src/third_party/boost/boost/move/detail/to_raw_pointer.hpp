@@ -33,7 +33,7 @@ BOOST_MOVE_FORCEINLINE T* to_raw_pointer(T* p)
 {  return p; }
 
 template <class Pointer>
-BOOST_MOVE_FORCEINLINE typename boost::movelib::pointer_element<Pointer>::type*
+inline typename boost::movelib::pointer_element<Pointer>::type*
 to_raw_pointer(const Pointer &p)
 {  return ::boost::movelib::to_raw_pointer(p.operator->());  }
 

@@ -123,6 +123,17 @@
 # endif
 #endif
 
+// BOOST_MP11_HAS_TEMPLATE_AUTO
+
+#if defined(__cpp_nontype_template_parameter_auto) && __cpp_nontype_template_parameter_auto >= 201606L
+# define BOOST_MP11_HAS_TEMPLATE_AUTO
+#endif
+
+#if BOOST_MP11_WORKAROUND( BOOST_MP11_MSVC, < 1920 )
+// mp_value<0> is bool, mp_value<-1L> is int, etc
+# undef BOOST_MP11_HAS_TEMPLATE_AUTO
+#endif
+
 // BOOST_MP11_DEPRECATED(msg)
 
 #if BOOST_MP11_WORKAROUND( BOOST_MP11_CLANG, < 304 )

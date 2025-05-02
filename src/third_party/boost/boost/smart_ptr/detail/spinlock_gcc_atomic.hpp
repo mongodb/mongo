@@ -30,7 +30,16 @@ class spinlock
 {
 public:
 
-    unsigned char v_;
+    // `bool` alignment is required for Apple PPC32
+    // https://github.com/boostorg/smart_ptr/issues/105
+    // https://github.com/PurpleI2P/i2pd/issues/1726
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=107590
+
+    union
+    {
+        unsigned char v_;
+        bool align_;
+    };
 
 public:
 
@@ -80,6 +89,6 @@ public:
 } // namespace detail
 } // namespace boost
 
-#define BOOST_DETAIL_SPINLOCK_INIT {0}
+#define BOOST_DETAIL_SPINLOCK_INIT {{0}}
 
 #endif // #ifndef BOOST_SMART_PTR_DETAIL_SPINLOCK_GCC_ATOMIC_HPP_INCLUDED

@@ -50,7 +50,7 @@ private:
 
 private:
 
-    boost::ulong_long_type cat_id() const BOOST_NOEXCEPT
+    boost::ulong_long_type cat_id() const noexcept
     {
         return cat_? cat_->id_: detail::generic_category_id;
     }
@@ -59,17 +59,17 @@ public:
 
     // constructors:
 
-    BOOST_SYSTEM_CONSTEXPR error_condition() BOOST_NOEXCEPT:
+    BOOST_SYSTEM_CONSTEXPR error_condition() noexcept:
         val_( 0 ), cat_( 0 )
     {
     }
 
-    BOOST_SYSTEM_CONSTEXPR error_condition( int val, const error_category & cat ) BOOST_NOEXCEPT:
+    BOOST_SYSTEM_CONSTEXPR error_condition( int val, const error_category & cat ) noexcept:
         val_( val ), cat_( &cat )
     {
     }
 
-    BOOST_SYSTEM_CONSTEXPR explicit error_condition( boost::system::detail::generic_value_tag vt ) BOOST_NOEXCEPT:
+    BOOST_SYSTEM_CONSTEXPR explicit error_condition( boost::system::detail::generic_value_tag vt ) noexcept:
         val_( vt.value ), cat_( 0 )
     {
     }
@@ -77,20 +77,20 @@ public:
     template<class ErrorConditionEnum> BOOST_SYSTEM_CONSTEXPR error_condition( ErrorConditionEnum e,
       typename detail::enable_if<
         is_error_condition_enum<ErrorConditionEnum>::value && !boost::system::detail::is_same<ErrorConditionEnum, errc::errc_t>::value
-      >::type* = 0) BOOST_NOEXCEPT
+      >::type* = 0) noexcept
     {
         *this = make_error_condition( e );
     }
 
     template<class ErrorConditionEnum> BOOST_SYSTEM_CONSTEXPR error_condition( ErrorConditionEnum e,
-      typename detail::enable_if<boost::system::detail::is_same<ErrorConditionEnum, errc::errc_t>::value>::type* = 0) BOOST_NOEXCEPT:
+      typename detail::enable_if<boost::system::detail::is_same<ErrorConditionEnum, errc::errc_t>::value>::type* = 0) noexcept:
         val_( e ), cat_( 0 )
     {
     }
 
     // modifiers:
 
-    BOOST_SYSTEM_CONSTEXPR void assign( int val, const error_category & cat ) BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR void assign( int val, const error_category & cat ) noexcept
     {
         val_ = val;
         cat_ = &cat;
@@ -98,13 +98,13 @@ public:
 
     template<typename ErrorConditionEnum>
         BOOST_SYSTEM_CONSTEXPR typename detail::enable_if<is_error_condition_enum<ErrorConditionEnum>::value, error_condition>::type &
-        operator=( ErrorConditionEnum val ) BOOST_NOEXCEPT
+        operator=( ErrorConditionEnum val ) noexcept
     {
         *this = error_condition( val );
         return *this;
     }
 
-    BOOST_SYSTEM_CONSTEXPR void clear() BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR void clear() noexcept
     {
         val_ = 0;
         cat_ = 0;
@@ -112,12 +112,12 @@ public:
 
     // observers:
 
-    BOOST_SYSTEM_CONSTEXPR int value() const BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR int value() const noexcept
     {
         return val_;
     }
 
-    BOOST_SYSTEM_CONSTEXPR const error_category & category() const BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR const error_category & category() const noexcept
     {
         return cat_? *cat_: generic_category();
     }
@@ -134,7 +134,7 @@ public:
         }
     }
 
-    char const * message( char * buffer, std::size_t len ) const BOOST_NOEXCEPT
+    char const * message( char * buffer, std::size_t len ) const noexcept
     {
         if( cat_ )
         {
@@ -146,7 +146,7 @@ public:
         }
     }
 
-    BOOST_SYSTEM_CONSTEXPR bool failed() const BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR bool failed() const noexcept
     {
         if( cat_ )
         {
@@ -158,35 +158,16 @@ public:
         }
     }
 
-#if !defined(BOOST_NO_CXX11_EXPLICIT_CONVERSION_OPERATORS)
-
-    BOOST_SYSTEM_CONSTEXPR explicit operator bool() const BOOST_NOEXCEPT  // true if error
+    BOOST_SYSTEM_CONSTEXPR explicit operator bool() const noexcept  // true if error
     {
         return failed();
     }
-
-#else
-
-    typedef void (*unspecified_bool_type)();
-    static void unspecified_bool_true() {}
-
-    BOOST_SYSTEM_CONSTEXPR operator unspecified_bool_type() const BOOST_NOEXCEPT  // true if error
-    {
-        return failed()? unspecified_bool_true: 0;
-    }
-
-    BOOST_SYSTEM_CONSTEXPR bool operator!() const BOOST_NOEXCEPT  // true if no error
-    {
-        return !failed();
-    }
-
-#endif
 
     // relationals:
     //  the more symmetrical non-member syntax allows enum
     //  conversions work for both rhs and lhs.
 
-    BOOST_SYSTEM_CONSTEXPR inline friend bool operator==( const error_condition & lhs, const error_condition & rhs ) BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator==( const error_condition & lhs, const error_condition & rhs ) noexcept
     {
         if( lhs.val_ != rhs.val_ )
         {
@@ -206,19 +187,17 @@ public:
         }
     }
 
-    BOOST_SYSTEM_CONSTEXPR inline friend bool operator<( const error_condition & lhs, const error_condition & rhs ) BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator<( const error_condition & lhs, const error_condition & rhs ) noexcept
     {
         error_category const& lcat = lhs.category();
         error_category const& rcat = rhs.category();
         return lcat < rcat || ( lcat == rcat && lhs.val_ < rhs.val_ );
     }
 
-    BOOST_SYSTEM_CONSTEXPR inline friend bool operator!=( const error_condition & lhs, const error_condition & rhs ) BOOST_NOEXCEPT
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator!=( const error_condition & lhs, const error_condition & rhs ) noexcept
     {
         return !( lhs == rhs );
     }
-
-#if defined(BOOST_SYSTEM_HAS_SYSTEM_ERROR)
 
     operator std::error_condition () const
     {
@@ -241,27 +220,77 @@ public:
 #endif
     }
 
-    inline friend bool operator==( std::error_code const & lhs, error_condition const & rhs ) BOOST_NOEXCEPT
+    inline friend bool operator==( std::error_code const & lhs, error_condition const & rhs ) noexcept
     {
         return lhs == static_cast< std::error_condition >( rhs );
     }
 
-    inline friend bool operator==( error_condition const & lhs, std::error_code const & rhs ) BOOST_NOEXCEPT
+    inline friend bool operator==( error_condition const & lhs, std::error_code const & rhs ) noexcept
     {
         return static_cast< std::error_condition >( lhs ) == rhs;
     }
 
-    inline friend bool operator!=( std::error_code const & lhs, error_condition const & rhs ) BOOST_NOEXCEPT
+    inline friend bool operator!=( std::error_code const & lhs, error_condition const & rhs ) noexcept
     {
         return !( lhs == rhs );
     }
 
-    inline friend bool operator!=( error_condition const & lhs, std::error_code const & rhs ) BOOST_NOEXCEPT
+    inline friend bool operator!=( error_condition const & lhs, std::error_code const & rhs ) noexcept
     {
         return !( lhs == rhs );
     }
 
-#endif
+    //
+
+    template<class E, class N = typename detail::enable_if<std::is_error_condition_enum<E>::value>::type>
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator==( error_condition const & lhs, E rhs ) noexcept
+    {
+        return lhs == make_error_condition( rhs );
+    }
+
+    template<class E, class N = typename detail::enable_if<std::is_error_condition_enum<E>::value>::type>
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator==( E lhs, error_condition const & rhs ) noexcept
+    {
+        return make_error_condition( lhs ) == rhs;
+    }
+
+    template<class E, class N = typename detail::enable_if<std::is_error_condition_enum<E>::value>::type>
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator!=( error_condition const & lhs, E rhs ) noexcept
+    {
+        return !( lhs == rhs );
+    }
+
+    template<class E, class N = typename detail::enable_if<std::is_error_condition_enum<E>::value>::type>
+    BOOST_SYSTEM_CONSTEXPR inline friend bool operator!=( E lhs, error_condition const & rhs ) noexcept
+    {
+        return !( lhs == rhs );
+    }
+
+    //
+
+    template<class E, class N1 = void, class N2 = typename detail::enable_if<std::is_error_code_enum<E>::value>::type>
+    inline friend bool operator==( error_condition const & lhs, E rhs ) noexcept
+    {
+        return lhs == make_error_code( rhs );
+    }
+
+    template<class E, class N1 = void, class N2 = typename detail::enable_if<std::is_error_code_enum<E>::value>::type>
+    inline friend bool operator==( E lhs, error_condition const & rhs ) noexcept
+    {
+        return make_error_code( lhs ) == rhs;
+    }
+
+    template<class E, class N1 = void, class N2 = typename detail::enable_if<std::is_error_code_enum<E>::value>::type>
+    inline friend bool operator!=( error_condition const & lhs, E rhs ) noexcept
+    {
+        return !( lhs == rhs );
+    }
+
+    template<class E, class N1 = void, class N2 = typename detail::enable_if<std::is_error_code_enum<E>::value>::type>
+    inline friend bool operator!=( E lhs, error_condition const & rhs ) noexcept
+    {
+        return !( lhs == rhs );
+    }
 
     std::string to_string() const
     {

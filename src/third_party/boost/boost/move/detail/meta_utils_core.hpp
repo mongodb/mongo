@@ -131,6 +131,21 @@ struct enable_if_same : enable_if<is_same<T, U>, R> {};
 template <class T, class U, class R = enable_if_nat>
 struct disable_if_same : disable_if<is_same<T, U>, R> {};
 
+//////////////////////////////////////
+//             is_lvalue_reference
+//////////////////////////////////////
+template<class T>
+struct is_lvalue_reference
+{
+    static const bool value = false;
+};
+
+template<class T>
+struct is_lvalue_reference<T&>
+{
+    static const bool value = true;
+};
+
 }  //namespace move_detail {
 }  //namespace boost {
 

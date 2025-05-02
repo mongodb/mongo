@@ -29,6 +29,7 @@
 
 #include "mongo/db/startup_warnings_mongod.h"
 
+#include <boost/filesystem.hpp>
 #include <fmt/format.h>
 #include <fstream>
 #include <ios>

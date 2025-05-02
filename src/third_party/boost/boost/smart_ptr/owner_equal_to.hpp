@@ -5,8 +5,6 @@
 // Distributed under the Boost Software License, Version 1.0.
 // https://www.boost.org/LICENSE_1_0.txt
 
-#include <boost/config.hpp>
-
 namespace boost
 {
 
@@ -16,7 +14,7 @@ template<class T = void> struct owner_equal_to
     typedef T first_argument_type;
     typedef T second_argument_type;
 
-    template<class U, class V> bool operator()( U const & u, V const & v ) const BOOST_NOEXCEPT
+    template<class U, class V> bool operator()( U const & u, V const & v ) const noexcept
     {
         return u.owner_equals( v );
     }

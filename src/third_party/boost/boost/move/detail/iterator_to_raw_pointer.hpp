@@ -27,11 +27,11 @@ namespace movelib {
 namespace detail {
 
 template <class T>
-BOOST_MOVE_FORCEINLINE T* iterator_to_pointer(T* i)
+inline T* iterator_to_pointer(T* i)
 {  return i; }
 
 template <class Iterator>
-BOOST_MOVE_FORCEINLINE typename boost::movelib::iterator_traits<Iterator>::pointer
+inline typename boost::movelib::iterator_traits<Iterator>::pointer
    iterator_to_pointer(const Iterator &i)
 {  return i.operator->();  }
 
@@ -46,7 +46,7 @@ struct iterator_to_element_ptr
 }  //namespace detail {
 
 template <class Iterator>
-BOOST_MOVE_FORCEINLINE typename boost::movelib::detail::iterator_to_element_ptr<Iterator>::type
+inline typename boost::movelib::detail::iterator_to_element_ptr<Iterator>::type
    iterator_to_raw_pointer(const Iterator &i)
 {
    return ::boost::movelib::to_raw_pointer

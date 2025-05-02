@@ -1,0 +1,463 @@
+# copyright John Maddock 2003
+# Use, modification and distribution are subject to the 
+# Boost Software License, Version 1.0. (See accompanying file 
+# LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+#
+# the following variables contain our macro definitions:
+#
+required_defs=""
+required_undefs=""
+
+dnl Process this file with autoconf to produce a configure script.
+dnl disable cache processing, it has no effect here:
+define([AC_CACHE_LOAD], )dnl
+define([AC_CACHE_SAVE], )dnl
+AC_INIT(./tools/configure.in)
+
+
+AC_ARG_ENABLE(test,   --enable-test             tests current settings rather than defining new ones)
+
+if test "foo"$enable_test = "foo"; then
+   enable_test="no"
+fi
+
+cat << EOF
+*** $0: boost configuration utility ***
+
+Please stand by while exploring compiler capabilities...
+Be patient - this could take some time...
+
+Note that this test script only gives an approximate
+configuration - you will need to test the results carefully
+using the boost regression test suite before using the results.
+EOF
+
+if test $enable_test = 'yes'; then
+
+cat << EOF
+
+This script reports only the difference between the detected
+configuration, and the existing boost configuration.  Its 
+primary aim is to quickly report how well boost is configured
+for one compiler.
+
+***
+
+EOF
+
+else
+
+cat << EOF
+
+***
+
+EOF
+fi
+
+AC_ARG_ENABLE(extension,[--enable-extension=<ext>],
+[
+case "$enableval" in
+   no) AC_MSG_RESULT(Info :.cpp used as extension for tests) 
+       ac_ext=cpp 
+         ;;
+    *) AC_MSG_RESULT(Argument : .$enableval used as extension) 
+   ac_ext=$enableval
+esac
+],
+[AC_MSG_RESULT(Info : .cpp used as extension for tests) 
+   ac_ext=cpp
+]
+)
+
+dnl figure out which version of sed to use, on some platforms
+dnl the version in the path is not Unix conforming (MacOS X ? )
+
+if test -f /bin/sed ; then
+   SED=/bin/sed
+else
+   if test -f /usr/bin/sed ; then
+      SED=/usr/bin/sed
+   else
+      SED=sed
+   fi
+fi
+
+dnl Set the boost main directory.
+AC_MSG_CHECKING(for boost main tree)
+boost_base=
+AC_ARG_WITH(boost,
+  AC_HELP_STRING([--with-boost=DIR],[path to the boost main tree]),
+  [
+  #echo "--with boost is set"
+  if test "x$withval" != "x"; then
+    if test "x$withval" != no; then
+      boost_base=`echo "$withval" | $SED 's,//*,/,g' | $SED 's,/$,,'`
+      #echo boost_base=$boost_base
+      if test -f "$boost_base/boost/config.hpp"; then
+        if test -f "$boost_base/libs/config/configure"; then :; else
+          boost_base=
+          #echo "$boost_base/libs/config/configure" not found
+        fi
+      else
+        #echo "$boost_base/boost/config.hpp" not found
+        boost_base=
+      fi
+    fi
+  fi
+  ]
+)
+if test "x$boost_base" = "x"; then
+  #echo '$0 = ' $0
+  boost_base=`expr "x$0" : 'x\(.*\)/@<:@/@:>@*' \| '.'`
+  boost_base="$boost_base/../.."
+  #echo boost_base=$boost_base
+  if test -f "$boost_base/boost/config.hpp"; then
+    if test -f "$boost_base/libs/config/configure"; then :; else
+      boost_base=
+    fi
+  else
+    boost_base=
+  fi
+fi
+if test "x$boost_base" != "x"; then
+  AC_MSG_RESULT([$boost_base])
+else
+  AC_MSG_RESULT([not found])
+  AC_MSG_ERROR([The boost main tree was not found.
+  Specify its location by the --with-boost option.])
+fi
+  
+
+
+# Save that, as it is being redefined several times 
+use_ac_ext=$ac_ext
+
+AC_PROG_CXX
+ac_ext=$use_ac_ext
+
+AC_LANG_CPLUSPLUS
+
+OLD_CXXFLAGS="$CXXFLAGS"
+
+
+if test $enable_test = 'yes'; then
+   CXXFLAGS="-I$boost_base -I$boost_base/libs/config/test $CXXFLAGS"
+else
+   CXXFLAGS="-I$boost_base -I$boost_base/libs/config/test $CXXFLAGS -DBOOST_NO_CONFIG"
+fi
+
+# add the -AA conformance option to CXXFLAGS for HP aCC only
+if test $CXX = 'aCC'; then
+   CXXFLAGS="-AA $CXXFLAGS"
+fi
+
+dnl check for some standard libraries
+dnl without these some of the tests may fail:
+
+AC_CHECK_LIB(pthread, pthread_exit)
+AC_CHECK_LIB(m, cos)
+AC_CHECK_LIB(rt, clock)
+
+#
+# enumerate test files and test each one:
+#
+for file in $boost_base/libs/config/test/boost_no*.ipp; do
+
+   basename=`echo $file | $SED 's/.*boost_\(.*\)\.ipp/\1/'`
+   macroname=`cat $file | grep '^//[[ 	]]*MACRO:' | $SED 's/.*MACRO:[[ 	]]*\([[_A-Z0-9]]*\).*/\1/'`
+   title=`cat $file | grep '^//[[ 	]]*TITLE:' | $SED 's/.*TITLE:[[ 	]]*\([[^ 	]].*\)/\1/'`
+   namespace=`echo $macroname | tr ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz`
+
+#echo file      = $file
+#echo basename  = $basename
+#echo macroname = $macroname
+#echo title     = $title
+#echo namespace = $namespace
+
+   ac_ext=$use_ac_ext
+   if test $enable_test = 'yes'; then
+      AC_MSG_CHECKING($title (pass expected) )
+   else
+      AC_MSG_CHECKING($title )
+   fi
+   AC_TRY_RUN(
+   [
+#include <boost/config.hpp>
+#include "test.hpp"
+
+#if !defined($macroname) || defined(BOOST_NO_CONFIG)
+#include "boost_$basename.ipp"
+#else
+namespace ${namespace} = empty_boost;
+#endif
+
+int main(){ return ${namespace}::test(); } ]
+   ,
+   [AC_MSG_RESULT(OK)]
+   ,
+   [AC_MSG_RESULT(Failed)
+   required_defs="$macroname $required_defs"]
+   )
+
+   if test $enable_test = 'yes'; then
+   
+   ac_ext=$use_ac_ext
+   AC_MSG_CHECKING($title (fail expected) )
+   AC_TRY_RUN(
+   [
+#include <boost/config.hpp>
+#include "test.hpp"
+
+#ifdef $macroname
+#include "boost_$basename.ipp"
+#else
+#error "this file should not compile"
+#endif
+
+int main() { return ${namespace}::test(); }]
+   ,
+   [AC_MSG_RESULT(failed)
+   required_undefs="$macroname $required_undefs"]
+   ,
+   [AC_MSG_RESULT(OK)]
+   )
+   
+   fi
+
+done
+
+#
+# enumerate optional test files and test each one:
+#
+for file in $boost_base/libs/config/test/boost_has*.ipp; do
+
+   basename=`echo $file | $SED 's/.*boost_\(.*\)\.ipp/\1/'`
+   macroname=`cat $file | grep '^//[[ 	]]*MACRO:' | $SED 's/.*MACRO:[[ 	]]*\([[_A-Z0-9]]*\).*/\1/'`
+   title=`cat $file | grep '^//[[ 	]]*TITLE:' | $SED 's/.*TITLE:[[ 	]]*\([[^ 	]].*\)/\1/'`
+   namespace=`echo $macroname | tr ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz`
+
+#  echo $file
+#  echo $basename
+#  echo $macroname
+#  echo $title
+
+   ac_ext=$use_ac_ext
+   if test $enable_test = 'yes'; then
+   AC_MSG_CHECKING($title (pass expected) )
+   AC_TRY_RUN(
+   [
+#include <boost/config.hpp>
+#include "test.hpp"
+
+#ifdef $macroname
+#include "boost_$basename.ipp"
+#else
+namespace ${namespace} = empty_boost;
+#endif
+
+int main(){ return ${namespace}::test(); }]
+   ,
+   [AC_MSG_RESULT(OK)]
+   ,
+   [AC_MSG_RESULT(Failed)
+   required_undefs="$macroname $required_undefs"]
+   )
+   
+   AC_MSG_CHECKING($title (fail expected) )
+   AC_TRY_RUN(
+   [
+#include <boost/config.hpp>
+#include "test.hpp"
+
+#ifndef $macroname
+#include "boost_$basename.ipp"
+#else
+#error "this file should not compile"
+#endif
+
+int main(){ return ${namespace}::test(); }]
+   ,
+   [
+   AC_MSG_RESULT(failed)
+   required_defs="$macroname $required_defs"
+   ]
+   ,
+   [
+   AC_MSG_RESULT(OK)
+   ]
+   )
+
+   else
+
+   ac_ext=$use_ac_ext
+   AC_MSG_CHECKING($title)
+   AC_TRY_RUN(
+   [
+#include <boost/config.hpp>
+#include "test.hpp"
+
+#include "boost_$basename.ipp"
+
+int main(){ return ${namespace}::test(); }]
+   ,
+   [
+      AC_MSG_RESULT(Yes)
+      required_defs="$macroname $required_defs"
+   ]
+   ,
+   [
+      AC_MSG_RESULT(no)
+   ]
+   )
+   
+   fi
+
+done
+
+
+#echo $required_defs
+#echo $required_undefs
+
+if test $enable_test = 'yes'; then
+
+if test "$required_defs" = ""; then
+echo no boost macros need to be defined
+echo no boost macros need to be defined >&5
+else
+echo the following macros need to be defined
+echo    $required_defs
+echo the following macros need to be defined >&5
+echo    $required_defs >&5
+fi
+if test "$required_undefs" = ""; then
+echo no boost macros need to be undefined
+echo no boost macros need to be undefined >&5
+else
+echo "the following macros need to be undef'ed"
+echo    $required_undefs
+echo "the following macros need to be undef'ed" >&5
+echo    $required_undefs >&5
+fi
+
+else
+
+date_string=`date`
+
+echo boost_base=$boost_base
+
+cat > user.hpp << EOF
+//  (C) Copyright Boost.org 2001.
+//  Do not check in modified versions of this file,
+//  This file may be customised by the end user, but not by boost.
+
+//
+//  Use this file to define a site and compiler specific
+//  configuration policy, this version was auto-generated by
+//  configure on ${date_string}
+//  With the following options:
+//    CXX      = ${CXX}
+//    CXXFLAGS = ${CXXFLAGS}
+//    LDFLAGS  = ${LDFLAGS}
+//    LIBS     = ${LIBS}
+//
+
+// define this to disable all config options,
+// excluding the user config.  Use if your
+// setup is fully ISO complient, and has no
+// useful extentions, or for autoconf generated
+// setups:
+#ifndef BOOST_NO_CONFIG
+#  define BOOST_NO_CONFIG
+#endif
+
+
+// define if you want to disable threading support, even
+// when available:
+// #define BOOST_DISABLE_THREADS
+
+// define if you want the regex library to use the C locale
+// even on Win32:
+// #define BOOST_REGEX_USE_C_LOCALE
+
+// define this is you want the regex library to use the C++
+// locale:
+// #define BOOST_REGEX_USE_CPP_LOCALE
+
+
+//
+// options added by configure:
+//
+EOF
+
+for name in $required_defs; do
+echo '#define '"$name" >> user.hpp
+done
+
+cat_conts=`cat user.hpp`
+
+#
+# post configuration step:
+#   
+AC_MSG_CHECKING(original configuration )
+rm -f conftest$ac_exeext
+$CXX -I$boost_base $OLD_CXXFLAGS -DBOOST_NO_USER_CONFIG -o conftest$ac_exeext $LDFLAGS $boost_base/libs/config/test/config_info.cpp $LIBS >&5 2>&1
+./conftest >&5 2>&1
+AC_MSG_RESULT(done)
+AC_MSG_CHECKING(new configuration )
+rm -f conftest$ac_exeext
+$CXX -I$boost_base -I$boost_base/libs/config $OLD_CXXFLAGS -DBOOST_USER_CONFIG='"user.hpp"' -o conftest$ac_exeext $LDFLAGS $boost_base/libs/config/test/config_info.cpp $LIBS >&5 2>&1
+./conftest >&5 2>&1
+AC_MSG_RESULT(done)
+
+AC_OUTPUT(
+[],
+[
+cat > user.hpp << EEEOF
+${cat_conts}
+EEEOF
+cat << EEEOF
+
+Adjustments to boost configuration have been written to
+user.hpp.  Copy this to boost/config/user.hpp to use "as is",
+or define BOOST_SITE_CONFIG to point to its location.
+
+TREAT THIS FILE WITH CARE.
+Autoconf generated options are not infallible!
+
+EEEOF
+],
+[
+cat_conts="$cat_conts"
+]
+)
+
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -35,18 +35,18 @@ class BOOST_SYMBOL_VISIBLE generic_error_category: public error_category
 {
 public:
 
-    BOOST_SYSTEM_CONSTEXPR generic_error_category() BOOST_NOEXCEPT:
+    BOOST_SYSTEM_CONSTEXPR generic_error_category() noexcept:
         error_category( detail::generic_category_id )
     {
     }
 
-    const char * name() const BOOST_NOEXCEPT BOOST_OVERRIDE
+    const char * name() const noexcept BOOST_OVERRIDE
     {
         return "generic";
     }
 
     std::string message( int ev ) const BOOST_OVERRIDE;
-    char const * message( int ev, char * buffer, std::size_t len ) const BOOST_NOEXCEPT BOOST_OVERRIDE;
+    char const * message( int ev, char * buffer, std::size_t len ) const noexcept BOOST_OVERRIDE;
 };
 
 #if ( defined( BOOST_GCC ) && BOOST_GCC >= 40600 ) || defined( BOOST_CLANG )
@@ -55,7 +55,7 @@ public:
 
 // generic_error_category::message
 
-inline char const * generic_error_category::message( int ev, char * buffer, std::size_t len ) const BOOST_NOEXCEPT
+inline char const * generic_error_category::message( int ev, char * buffer, std::size_t len ) const noexcept
 {
     return generic_error_category_message( ev, buffer, len );
 }
@@ -86,7 +86,7 @@ template<class T> constexpr generic_error_category generic_cat_holder<T>::instan
 
 } // namespace detail
 
-constexpr error_category const & generic_category() BOOST_NOEXCEPT
+constexpr error_category const & generic_category() noexcept
 {
     return detail::generic_cat_holder<void>::instance;
 }
@@ -94,10 +94,10 @@ constexpr error_category const & generic_category() BOOST_NOEXCEPT
 #else // #if defined(BOOST_SYSTEM_HAS_CONSTEXPR)
 
 #if !defined(__SUNPRO_CC) // trailing __global is not supported
-inline error_category const & generic_category() BOOST_NOEXCEPT BOOST_SYMBOL_VISIBLE;
+inline error_category const & generic_category() noexcept BOOST_SYMBOL_VISIBLE;
 #endif
 
-inline error_category const & generic_category() BOOST_NOEXCEPT
+inline error_category const & generic_category() noexcept
 {
     static const detail::generic_error_category instance;
     return instance;

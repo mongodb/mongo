@@ -31,6 +31,10 @@
 #include <boost/atomic/detail/cas_based_exchange.hpp>
 #include <boost/atomic/detail/core_ops_cas_based.hpp>
 #endif
+#if defined(BOOST_ATOMIC_DETAIL_X86_HAS_CMPXCHG16B) && defined(__AVX__)
+#include <emmintrin.h>
+#include <boost/atomic/detail/string_ops.hpp>
+#endif
 #include <boost/atomic/detail/ops_msvc_common.hpp>
 #if !defined(_M_IX86) && !(defined(BOOST_ATOMIC_INTERLOCKED_COMPARE_EXCHANGE8) && defined(BOOST_ATOMIC_INTERLOCKED_COMPARE_EXCHANGE16))
 #include <boost/atomic/detail/extending_cas_based_arithmetic.hpp>
@@ -587,12 +591,12 @@ struct msvc_dcas_x86
     // Luckily, the memory is almost always 8-byte aligned in our case because atomic<> uses 64 bit native types for storage and dynamic memory allocations
     // have at least 8 byte alignment. The only unfortunate case is when atomic is placed on the stack and it is not 8-byte aligned (like on 32 bit Windows).
 
-    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order) BOOST_NOEXCEPT
+    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order order) BOOST_NOEXCEPT
     {
         BOOST_ATOMIC_DETAIL_COMPILER_BARRIER();
 
         storage_type volatile* p = &storage;
-        if (((uintptr_t)p & 0x00000007) == 0)
+        if (BOOST_LIKELY(order != memory_order_seq_cst && ((uintptr_t)p & 7u) == 0u))
         {
 #if defined(_M_IX86_FP) && _M_IX86_FP >= 2
 #if defined(__AVX__)
@@ -648,7 +652,7 @@ struct msvc_dcas_x86
         storage_type const volatile* p = &storage;
         storage_type value;
 
-        if (((uintptr_t)p & 0x00000007) == 0)
+        if (BOOST_LIKELY(((uintptr_t)p & 7u) == 0u))
         {
 #if defined(_M_IX86_FP) && _M_IX86_FP >= 2
 #if defined(__AVX__)
@@ -833,15 +837,38 @@ struct msvc_dcas_x86_64
     static BOOST_CONSTEXPR_OR_CONST std::size_t storage_alignment = 16u;
     static BOOST_CONSTEXPR_OR_CONST bool is_signed = Signed;
 
-    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order) BOOST_NOEXCEPT
+    static BOOST_FORCEINLINE void store(storage_type volatile& storage, storage_type v, memory_order order) BOOST_NOEXCEPT
     {
+#if defined(__AVX__)
+        if (BOOST_LIKELY(order != memory_order_seq_cst && (((uintptr_t)&storage) & 15u) == 0u))
+        {
+            BOOST_ATOMIC_DETAIL_COMPILER_BARRIER();
+            __m128i value;
+            BOOST_ATOMIC_DETAIL_MEMCPY(&value, &v, sizeof(value));
+            _mm_store_si128(const_cast< __m128i* >(reinterpret_cast< volatile __m128i* >(&storage)), value);
+            BOOST_ATOMIC_DETAIL_COMPILER_BARRIER();
+            return;
+        }
+#endif // defined(__AVX__)
+
         storage_type value = const_cast< storage_type& >(storage);
         while (!BOOST_ATOMIC_INTERLOCKED_COMPARE_EXCHANGE128(&storage, v, &value)) {}
     }
 
     static BOOST_FORCEINLINE storage_type load(storage_type const volatile& storage, memory_order) BOOST_NOEXCEPT
     {
-        storage_type value = storage_type();
+        storage_type value;
+#if defined(__AVX__)
+        if (BOOST_LIKELY((((uintptr_t)&storage) & 15u) == 0u))
+        {
+            __m128i v = _mm_load_si128(const_cast< const __m128i* >(reinterpret_cast< const volatile __m128i* >(&storage)));
+            BOOST_ATOMIC_DETAIL_MEMCPY(&value, &v, sizeof(value));
+            BOOST_ATOMIC_DETAIL_COMPILER_BARRIER();
+            return value;
+        }
+#endif // defined(__AVX__)
+
+        value = storage_type();
         BOOST_ATOMIC_INTERLOCKED_COMPARE_EXCHANGE128(&storage, value, &value);
         return value;
     }

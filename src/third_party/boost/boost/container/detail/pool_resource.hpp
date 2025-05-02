@@ -31,11 +31,11 @@ namespace pmr {
 
 class pool_data_t;
 
-static const std::size_t pool_options_minimum_max_blocks_per_chunk = 1u;
-static const std::size_t pool_options_default_max_blocks_per_chunk = 32u;
-static const std::size_t pool_options_minimum_largest_required_pool_block =
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_minimum_max_blocks_per_chunk = 1u;
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_default_max_blocks_per_chunk = 32u;
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_minimum_largest_required_pool_block =
    memory_resource::max_align > 2*sizeof(void*) ? memory_resource::max_align : 2*sizeof(void*);
-static const std::size_t pool_options_default_largest_required_pool_block =
+BOOST_CONTAINER_CONSTANT_VAR std::size_t pool_options_default_largest_required_pool_block =
    pool_options_minimum_largest_required_pool_block > 4096u
       ? pool_options_minimum_largest_required_pool_block : 4096u;
 

@@ -1,0 +1,257 @@
+Boost Phoenix: A Library for Functional Programming in C++
+http://www.boost.org/
+
+Copyright (c) 2005-2010 Joel de Guzman
+Copyright (c) 2010-2013 Thomas Heller
+Copyright (c) 2014-2015 John Fletcher
+Copyright (c) 2016 Kohei Takahashi
+
+Distributed under the Boost Software License, Version 1.0. (See accompanying
+file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+
+-------------------------------------------------------------------------------
+
+TODO (known issues):
+- Create a full list of known issues.
+- Check all the examples and ammend as needed.
+- Update documentation to be consistent with examples.
+- Identify other boost libraries using Phoenix in order to
+  decide on priorities for fixing the bugs below.
+    One such library is Boost log.
+- Identify dependencies on other libraries and cooperate on bugs.
+    It is now known that the other libraries which use Boost Phoenix
+    are Boost Spirit and Boost Meta State Machine (MSM)
+- Add more examples
+- Develop documentation.
+    A start has been made on this in release 3.1.0
+- Inspection report outstanding issues
+    Fix libs/phoenix/doc/html/boostbook.css: Unlinked File
+- Investigate fixes needed for the following bugs
+(all refer to phoenix though not all may be in fact phoenix bugs
+#9742 (NEW)
+#9291, #9260, #8820, #8800
+#8558, #8504, #8187, #8156, #7996
+#7953, #7946, #7481, #7480, #7423
+#7391, #7356, #6911, #6848,
+#6202, #6133, #6026, #5687
+- Feature requests
+#7730 Potential fixes for this have been removed for further work.
+#7633, #5541
+- Complete work on the following under investigation
+#9363, #9362, #8564, #7199
+- #5875 local variable in phoenix let discards value
+This seemed already fixed but is not doing well in tests.
+Added test bug5875 - test withdrawn for further checking.
+-------------------------------------------------------------------------------
+
+CHANGELOG
+
+- DEVELOP
+
+- Many of components now supports C++11 variadic templates.
+  This is not a breaking change.
+
+- Boost 1.59.0
+
+- Support for <unordered_set> and <unordered_map>
+  This involves the following changes.
+  phoenix/config.hpp - New section with the following description:
+
+  This section is to sort out whether hash types or unordered types
+  are available. This depends on whether stdlib or libc++ is being used
+  and also whether C++11 or C++03 is being used.
+
+  Client code should contain this:
+
+  #ifdef BOOST_PHOENIX_HAS_HASH
+  #include BOOST_PHOENIX_HASH_SET_HEADER
+  #include BOOST_PHOENIX_HASH_MAP_HEADER
+  #endif
+
+  #ifdef BOOST_PHOENIX_HAS_UNORDERED_SET_AND_MAP
+  #define BOOST_PHOENIX_UNORDERED_SET_HEADER <unordered_set>
+  #define BOOST_PHOENIX_UNORDERED_MAP_HEADER <unordered_map>
+  #endif
+
+  The client code can then chose the implementation provided.
+  See the example in test/stl/querying_find2.cpp
+  This example file has been adjusted for a problem with MSVC 10
+
+  Modified files:
+     phoenix/stl/algorithm/detail/has_find.hpp
+  New files:
+     phoenix/stl/algorithm/detail/is_unordered_set_or_map.hpp
+     phoenix/stl/algorithm/detail/std_unordered_set_or_map_fwd.hpp
+  New test file:
+     phoenix/test/algorithm/querying_find2.cpp
+
+  Support for retrieving the return type of boost::phoenix::function objects.
+  This is needed in the lazy functionality.
+  Modified file: boost/phoenix/function/function.hpp
+
+  Revised version of lazy functionality with added functions.
+  Modified files in boost/phoenix/function:
+    lazy_operator.hpp lazy_prelude.hpp lazy_reuse.hpp
+  New files:
+    lazy_signature.hpp lazy_smart.hpp
+  New test files:
+    lazy_compose_tests.cpp lazy_fold_tests.cpp lazy_scan_tests.cpp
+
+- Feature enhancements #5604 Sequenced statements of a catch_ statement is
+  now able to handle thrown exception via local variables.
+
+  Modified files:
+    boost/phoenix/statement/try_catch.hpp
+  Modified test files:
+    exceptions.cpp
+
+- V3.2.0 in Boost 1.58.0
+
+- patch for #10927 in test/stdlib/cmath.cpp
+- patch for #11085 in test/function/function_tests.cpp
+
+- Bump version number to 3.2.0 in version.hpp.
+
+- New header files in boost/phoenix/function
+  These are the first versions of the lazy functionality being introduced.
+  This is reimplementation of the ideas in FC++ on top of Phoenix.
+  The Phoenix code used is Phoenix.Function, along with Boost.Function.
+  lazy_prelude.hpp  This is the top level header and also has prelude functions.
+  lazy_operator.hpp This defines lazy operators such as plus and minus.
+  lazy_list.hpp     This defines list<T> a lazy list class and associated code.
+  lazy_reuser.hpp   This defines the reuser functions used in the code.
+
+- New tests for lazy functionality.
+  test/include/function/lazy_headers Test of the header structure.
+  test/function/lazy_list_tests      Simple tests of list<T>.
+  test/function/lazy_list2_tests     More tests of list<T>.
+- Develop documentation for version 3.2.0
+  This includes a new section on the lazy list implementation.
+
+- Fixed name clash by renaming 'at' to be 'at_' because the name 'at' is
+  used in phoenix/stl/container/container.hpp.
+
+- Fixed an unused typedef in phoenix/scope/let.hpp
+  - contributed by Kohei Takahashi
+
+- V3.1.1
+
+- Bump version number to 3.1.1 in version.hpp and branch for release.
+
+- New tests for lazy functions using existing phoenix/function capability.
+  lazy_argument_tests, lazy_make_pair_tests, lazy_templated_struct_tests
+
+- New example bind_goose.cpp comparing boost.bind and boost.phoenix.bind.
+
+- Changes to let_tests and more_let_tests to avoid failing cases.
+
+- Updates to documentation.
+
+- V3.1.0
+- Bump version number to 3.1.0 in version.hpp and branch for release.
+- New file boost/phoenix/config.hpp to centralise configuration issues.
+  At the moment it simply includes boost/config.hpp
+- Changes to some tests to identify problems with several compilers.
+- Add more cases to cmath test to test failures on some compilers.
+- #7165 and #7166 Change tests to phoenix/core.hpp to reduce compiler load
+- Testing fix for failures of tests as follows
+  bind_member_function_tests, bind_mf2_test, bind_test
+  with compilers including gcc 4.9.0 and clang 3.5
+  This involves use of boost::lazy_disable_if to resolve
+  the choice of overloaded bind functions in
+  bind/bind_member_variable.hpp
+  bind/bind_member_function.hpp Add reverse test boost::lazy_enable_if
+  This resolves a smaller number of failures.
+- #9742 New tests for_each and for_test to attempt to resolve this.
+- bind_rv_sp_test changed to give workaround for MSVC 8,9,10,
+  This removes a COMDAT error which does not occur with boost/bind.
+
+- V3.0.6
+- Fixed bug in example/container_actor.cpp in end() function.
+- Fixed bug4853 and 5626 - added header <utility> for std::forward.
+- Fixed bug4853 - added header <iostream> for gcc 4.9 test
+- New Feature - boost::phoenix::display_expr(expr)
+    In file boost/phoenix/core/debug.hpp
+    and also included from boost/phoenix/core.hpp
+    For now this drops through to the boost Proto version.
+    I intend to add some more tags for better information.
+    New test debug for the new header.
+KNOWN BUG - WARNING
+- New test more_let_tests to check for problems with losing temporary values.
+    I think this is a serious problem which is affecting some compilers
+    and not others. I have seen the problem with Clang 3.4 although not
+    when run with C++11. These tests should find out where else there is a
+    problem. At the moment these tests are passing.
+    I now have cases which fail for Clang 3.4 with optimization -O2 but not
+    without optimization. Under investigation.
+
+- V3.0.5
+- Documentation
+    Start on fixing main documentation - whats new.
+    Fixed reference for FC++ in two locations.
+    Fixed example for nested let (#8564)
+- Fixed #9113 warnings on -Wshadow
+    Fixed all warnings
+- Fixed #8298 Clang error with Boost Phoenix Local Name Assignment using C++11
+    This is not expected to compile in the form supplied.
+    Added test bug8298 to show correct operation.
+    Added test bug8298f to show expected failure.
+- Fixed #7730 Generic specializations of is_nullary for custom terminals
+    are not possible
+    Fix to specialize custom terminals is now set as a default.
+    Define BOOST_PHOENIX_NO_SPECIALIZE_CUSTOM_TERMINAL not to use this.
+    Test bug7730 tests the not use case.
+
+- V3.0.4
+- Inspection report outstanding issues
+    Fixed copyright and licence in preprocessed files for function_equal
+- boost/phoenix/version.hpp Added BOOST_PHOENIX_VERSION_NUMBER
+    when boost/predef is available.
+- Fixed tabs in ChangeLog!!
+- Fixed #9295 PHOENIX_LIMIT macro clash: property_tree -- log/sink
+    This will not show up in phoenix - used in spirit/classic
+- Fixed #8704 Using Phoenix lambdas on top of custom Proto expressions
+    This works for C++11 only.
+    Test cmath applies to this.
+- Fixed #7624 Deduction failure
+    This works for C++11 and has a workaround for C++03
+    Test bug7624 tests both versions.
+- Fixed #7166 Phoenix unconditionally sets BOOST_PROTO_MAX_ARITY
+    using patch supplied
+    Added test bug7166
+- Fixed #7165 cannot change BOOST_PHOENIX_LIMIT
+    using patch supplied
+    Added test bug7165
+- Fixed #6665 not-unary phoenix stl cmath adapted functions not working
+    Added test cmath
+
+- V3.0.3
+- Fixed #5824 Block statement headers and docs
+    Added test bug5824
+
+- V3.0.2
+- Fixed #5715 sequencing with comma does not work for boost::phoenix::bind
+    Added test bug5715
+
+- V3.0.1
+- Started CHANGELOG
+- Fixed bug_000008 to use phoenix headers correctly.
+    This fixes it for most systems but not for
+    Clang Linux C++11 with libstdc++ where the problem seems
+    to be in boost/thread.
+    Clang Linux C++11 with libc++ works.
+- Fixed #9113 warnings on -Wshadow (some fixed)
+- Fixed #9111 unused parameter warning in phoenix bind
+- Fixed #8417 Minor documentation
+- Fixed #7181 MSVC warnings
+- Fixed #6268 phoenix and fusion operator < and added test bug6268
+- Fixed many issues from Inspection report
+    phoenix/core/detail/phx_result.hpp Fixed clash with Apple macro 'check'
+    Fixed copyright and licence issues
+    Fixed tabs in some files
+    Deleted some empty unused files
+    Added tests for includes not being tested.
+
+Boost V1.55:
+- V3.0.0
+- Boost Phoenix as passed on to new maintainer John Fletcher

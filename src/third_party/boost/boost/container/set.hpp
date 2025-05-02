@@ -113,7 +113,7 @@ class set
    //!
    //! <b>Complexity</b>: Constant.
    
-   BOOST_CONTAINER_FORCEINLINE set()
+   inline set()
       BOOST_NOEXCEPT_IF(dtl::is_nothrow_default_constructible<allocator_type>::value &&
                         dtl::is_nothrow_default_constructible<Compare>::value)
       : base_t()
@@ -122,14 +122,14 @@ class set
    //! <b>Effects</b>: Constructs an empty set using the specified allocator object.
    //!
    //! <b>Complexity</b>: Constant.
-   BOOST_CONTAINER_FORCEINLINE explicit set(const allocator_type& a)
+   inline explicit set(const allocator_type& a)
       : base_t(a)
    {}
 
    //! <b>Effects</b>: Constructs an empty set using the specified comparison object.
    //!
    //! <b>Complexity</b>: Constant.
-   BOOST_CONTAINER_FORCEINLINE explicit set(const Compare& comp)
+   inline explicit set(const Compare& comp)
       : base_t(comp)
    {}
 
@@ -137,7 +137,7 @@ class set
    //! and allocator.
    //!
    //! <b>Complexity</b>: Constant.
-   BOOST_CONTAINER_FORCEINLINE set(const Compare& comp, const allocator_type& a)
+   inline set(const Compare& comp, const allocator_type& a)
       : base_t(comp, a)
    {}
 
@@ -147,7 +147,7 @@ class set
    //! <b>Complexity</b>: Linear in N if the range [first ,last ) is already sorted using
    //! the predicate and otherwise N logN, where N is last - first.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set(InputIterator first, InputIterator last)
+   inline set(InputIterator first, InputIterator last)
       : base_t(true, first, last)
    {}
 
@@ -157,7 +157,7 @@ class set
    //! <b>Complexity</b>: Linear in N if the range [first ,last ) is already sorted using
    //! the predicate and otherwise N logN, where N is last - first.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set(InputIterator first, InputIterator last, const allocator_type& a)
+   inline set(InputIterator first, InputIterator last, const allocator_type& a)
       : base_t(true, first, last, key_compare(), a)
    {}
 
@@ -167,7 +167,7 @@ class set
    //! <b>Complexity</b>: Linear in N if the range [first ,last ) is already sorted using
    //! the predicate and otherwise N logN, where N is last - first.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set(InputIterator first, InputIterator last, const Compare& comp)
+   inline set(InputIterator first, InputIterator last, const Compare& comp)
       : base_t(true, first, last, comp)
    {}
 
@@ -177,7 +177,7 @@ class set
    //! <b>Complexity</b>: Linear in N if the range [first ,last ) is already sorted using
    //! the predicate and otherwise N logN, where N is last - first.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set(InputIterator first, InputIterator last, const Compare& comp, const allocator_type& a)
+   inline set(InputIterator first, InputIterator last, const Compare& comp, const allocator_type& a)
       : base_t(true, first, last, comp, a)
    {}
 
@@ -192,7 +192,7 @@ class set
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set( ordered_unique_range_t, InputIterator first, InputIterator last)
+   inline set( ordered_unique_range_t, InputIterator first, InputIterator last)
       : base_t(ordered_range, first, last)
    {}
 
@@ -207,7 +207,7 @@ class set
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set( ordered_unique_range_t, InputIterator first, InputIterator last, const Compare& comp )
+   inline set( ordered_unique_range_t, InputIterator first, InputIterator last, const Compare& comp )
       : base_t(ordered_range, first, last, comp)
    {}
 
@@ -222,7 +222,7 @@ class set
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set( ordered_unique_range_t, InputIterator first, InputIterator last
+   inline set( ordered_unique_range_t, InputIterator first, InputIterator last
       , const Compare& comp, const allocator_type& a)
       : base_t(ordered_range, first, last, comp, a)
    {}
@@ -238,7 +238,7 @@ class set
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE set(ordered_unique_range_t, InputIterator first, InputIterator last, const allocator_type& a)
+   inline set(ordered_unique_range_t, InputIterator first, InputIterator last, const allocator_type& a)
       : base_t(ordered_range, first, last, Compare(), a)
    {}
 
@@ -248,7 +248,7 @@ class set
    //!
    //! <b>Complexity</b>: Linear in N if the range [il.begin(), il.end()) is already sorted using
    //! the predicate and otherwise N logN, where N is il.begin() - il.end().
-   BOOST_CONTAINER_FORCEINLINE set(std::initializer_list<value_type> il)
+   inline set(std::initializer_list<value_type> il)
       : base_t(true, il.begin(), il.end())
    {}
 
@@ -257,7 +257,7 @@ class set
    //!
    //! <b>Complexity</b>: Linear in N if the range [il.begin(), il.end()) is already sorted using
    //! the predicate and otherwise N logN, where N is il.begin() - il.end().
-   BOOST_CONTAINER_FORCEINLINE set(std::initializer_list<value_type> il, const allocator_type& a)
+   inline set(std::initializer_list<value_type> il, const allocator_type& a)
       : base_t(true, il.begin(), il.end(), Compare(), a)
    {}
 
@@ -266,7 +266,7 @@ class set
    //!
    //! <b>Complexity</b>: Linear in N if the range [il.begin(), il.end()) is already sorted using
    //! the predicate and otherwise N logN, where N is il.begin() - il.end().
-   BOOST_CONTAINER_FORCEINLINE set(std::initializer_list<value_type> il, const Compare& comp )
+   inline set(std::initializer_list<value_type> il, const Compare& comp )
       : base_t(true, il.begin(), il.end(), comp)
    {}
 
@@ -275,7 +275,7 @@ class set
    //!
    //! <b>Complexity</b>: Linear in N if the range [il.begin(), il.end()) is already sorted using
    //! the predicate and otherwise N logN, where N is il.begin() - il.end().
-   BOOST_CONTAINER_FORCEINLINE set(std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
+   inline set(std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
       : base_t(true, il.begin(), il.end(), comp, a)
    {}
 
@@ -289,7 +289,7 @@ class set
    //! <b>Complexity</b>: Linear in N.
    //!
    //! <b>Note</b>: Non-standard extension.
-   BOOST_CONTAINER_FORCEINLINE set( ordered_unique_range_t, std::initializer_list<value_type> il)
+   inline set( ordered_unique_range_t, std::initializer_list<value_type> il)
       : base_t(ordered_range, il.begin(), il.end())
    {}
 
@@ -303,7 +303,7 @@ class set
    //! <b>Complexity</b>: Linear in N.
    //!
    //! <b>Note</b>: Non-standard extension.
-   BOOST_CONTAINER_FORCEINLINE set( ordered_unique_range_t, std::initializer_list<value_type> il, const Compare& comp)
+   inline set( ordered_unique_range_t, std::initializer_list<value_type> il, const Compare& comp)
       : base_t(ordered_range, il.begin(), il.end(), comp)
    {}
 
@@ -317,7 +317,7 @@ class set
    //! <b>Complexity</b>: Linear in N.
    //!
    //! <b>Note</b>: Non-standard extension.
-   BOOST_CONTAINER_FORCEINLINE set( ordered_unique_range_t, std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
+   inline set( ordered_unique_range_t, std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
       : base_t(ordered_range, il.begin(), il.end(), comp, a)
    {}
 #endif
@@ -325,7 +325,7 @@ class set
    //! <b>Effects</b>: Copy constructs a set.
    //!
    //! <b>Complexity</b>: Linear in x.size().
-   BOOST_CONTAINER_FORCEINLINE set(const set& x)
+   inline set(const set& x)
       : base_t(static_cast<const base_t&>(x))
    {}
 
@@ -334,7 +334,7 @@ class set
    //! <b>Complexity</b>: Constant.
    //!
    //! <b>Postcondition</b>: x is emptied.
-   BOOST_CONTAINER_FORCEINLINE set(BOOST_RV_REF(set) x)
+   inline set(BOOST_RV_REF(set) x)
       BOOST_NOEXCEPT_IF(boost::container::dtl::is_nothrow_move_constructible<Compare>::value)
       : base_t(BOOST_MOVE_BASE(base_t, x))
    {}
@@ -342,7 +342,7 @@ class set
    //! <b>Effects</b>: Copy constructs a set using the specified allocator.
    //!
    //! <b>Complexity</b>: Linear in x.size().
-   BOOST_CONTAINER_FORCEINLINE set(const set& x, const allocator_type &a)
+   inline set(const set& x, const allocator_type &a)
       : base_t(static_cast<const base_t&>(x), a)
    {}
 
@@ -350,14 +350,14 @@ class set
    //!                 Constructs *this using x's resources.
    //!
    //! <b>Complexity</b>: Constant if a == x.get_allocator(), linear otherwise.
-   BOOST_CONTAINER_FORCEINLINE set(BOOST_RV_REF(set) x, const allocator_type &a)
+   inline set(BOOST_RV_REF(set) x, const allocator_type &a)
       : base_t(BOOST_MOVE_BASE(base_t, x), a)
    {}
 
    //! <b>Effects</b>: Makes *this a copy of x.
    //!
    //! <b>Complexity</b>: Linear in x.size().
-   BOOST_CONTAINER_FORCEINLINE set& operator=(BOOST_COPY_ASSIGN_REF(set) x)
+   inline set& operator=(BOOST_COPY_ASSIGN_REF(set) x)
    {  return static_cast<set&>(this->base_t::operator=(static_cast<const base_t&>(x)));  }
 
    //! <b>Effects</b>: this->swap(x.get()).
@@ -368,7 +368,7 @@ class set
    //! <b>Complexity</b>: Constant if allocator_traits_type::
    //!   propagate_on_container_move_assignment is true or
    //!   this->get>allocator() == x.get_allocator(). Linear otherwise.
-   BOOST_CONTAINER_FORCEINLINE set& operator=(BOOST_RV_REF(set) x)
+   inline set& operator=(BOOST_RV_REF(set) x)
       BOOST_NOEXCEPT_IF( (allocator_traits_type::propagate_on_container_move_assignment::value ||
                           allocator_traits_type::is_always_equal::value) &&
                            boost::container::dtl::is_nothrow_move_assignable<Compare>::value)
@@ -541,7 +541,7 @@ class set
    //!
    //! <b>Complexity</b>: Logarithmic.
    template <class... Args>
-   BOOST_CONTAINER_FORCEINLINE std::pair<iterator,bool> emplace(BOOST_FWD_REF(Args)... args)
+   inline std::pair<iterator,bool> emplace(BOOST_FWD_REF(Args)... args)
    {  return this->base_t::emplace_unique(boost::forward<Args>(args)...); }
 
    //! <b>Effects</b>:  Inserts an object of type Key constructed with
@@ -554,18 +554,18 @@ class set
    //!
    //! <b>Complexity</b>: Logarithmic.
    template <class... Args>
-   BOOST_CONTAINER_FORCEINLINE iterator emplace_hint(const_iterator p, BOOST_FWD_REF(Args)... args)
+   inline iterator emplace_hint(const_iterator p, BOOST_FWD_REF(Args)... args)
    {  return this->base_t::emplace_hint_unique(p, boost::forward<Args>(args)...); }
 
    #else // !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 
    #define BOOST_CONTAINER_SET_EMPLACE_CODE(N) \
    BOOST_MOVE_TMPL_LT##N BOOST_MOVE_CLASS##N BOOST_MOVE_GT##N \
-   BOOST_CONTAINER_FORCEINLINE std::pair<iterator,bool> emplace(BOOST_MOVE_UREF##N)\
+   inline std::pair<iterator,bool> emplace(BOOST_MOVE_UREF##N)\
    {  return this->base_t::emplace_unique(BOOST_MOVE_FWD##N);  }\
    \
    BOOST_MOVE_TMPL_LT##N BOOST_MOVE_CLASS##N BOOST_MOVE_GT##N \
-   BOOST_CONTAINER_FORCEINLINE iterator emplace_hint(const_iterator hint BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+   inline iterator emplace_hint(const_iterator hint BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
    {  return this->base_t::emplace_hint_unique(hint BOOST_MOVE_I##N BOOST_MOVE_FWD##N); }\
    //
    BOOST_MOVE_ITERATE_0TO9(BOOST_CONTAINER_SET_EMPLACE_CODE)
@@ -632,7 +632,7 @@ class set
    //!
    //! <b>Complexity</b>: At most N log(size()+N) (N is the distance from first to last)
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE void insert(InputIterator first, InputIterator last)
+   inline void insert(InputIterator first, InputIterator last)
    {  this->base_t::insert_unique_range(first, last);  }
 
 #if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
@@ -640,21 +640,21 @@ class set
    //!   if there is no element with key equivalent to the key of that element.
    //!
    //! <b>Complexity</b>: At most N log(size()+N) (N is the distance from il.begin() to il.end())
-   BOOST_CONTAINER_FORCEINLINE void insert(std::initializer_list<value_type> il)
+   inline void insert(std::initializer_list<value_type> il)
    {  this->base_t::insert_unique_range(il.begin(), il.end()); }
 #endif
 
    //! @copydoc ::boost::container::map::insert(node_type&&)
-   BOOST_CONTAINER_FORCEINLINE insert_return_type insert(BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
+   inline insert_return_type insert(BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
    {  return this->base_t::insert_unique_node(boost::move(nh));  }
 
    //! @copydoc ::boost::container::map::insert(const_iterator, node_type&&)
-   BOOST_CONTAINER_FORCEINLINE insert_return_type insert(const_iterator hint, BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
+   inline insert_return_type insert(const_iterator hint, BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
    {  return this->base_t::insert_unique_node(hint, boost::move(nh));  }
 
    //! @copydoc ::boost::container::map::merge(map<Key, T, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(set<Key, C2, Allocator, Options>& source)
+   inline void merge(set<Key, C2, Allocator, Options>& source)
    {
       typedef dtl::tree
          <Key, void, C2, Allocator, Options> base2_t;
@@ -663,12 +663,12 @@ class set
 
    //! @copydoc ::boost::container::set::merge(set<Key, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(BOOST_RV_REF_BEG set<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
+   inline void merge(BOOST_RV_REF_BEG set<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
    {  return this->merge(static_cast<set<Key, C2, Allocator, Options>&>(source));   }
 
    //! @copydoc ::boost::container::map::merge(multimap<Key, T, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(multiset<Key, C2, Allocator, Options>& source)
+   inline void merge(multiset<Key, C2, Allocator, Options>& source)
    {
       typedef dtl::tree
          <Key, void, C2, Allocator, Options> base2_t;
@@ -677,7 +677,7 @@ class set
 
    //! @copydoc ::boost::container::set::merge(multiset<Key, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(BOOST_RV_REF_BEG multiset<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
+   inline void merge(BOOST_RV_REF_BEG multiset<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
    {  return this->merge(static_cast<multiset<Key, C2, Allocator, Options>&>(source));   }
 
    //! <b>Effects</b>: If present, erases the element in the container with key equivalent to x.
@@ -685,7 +685,7 @@ class set
    //! <b>Returns</b>: Returns the number of erased elements (0/1).
    //!
    //! <b>Complexity</b>: log(size()) + count(k)
-   BOOST_CONTAINER_FORCEINLINE size_type erase(const key_type& x)
+   inline size_type erase(const key_type& x)
    {  return this->base_t::erase_unique(x);   }
 
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -779,7 +779,7 @@ class set
    //! <b>Returns</b>: The number of elements with key equivalent to x.
    //!
    //! <b>Complexity</b>: log(size())+count(k)
-   BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
+   BOOST_CONTAINER_ATTRIBUTE_NODISCARD inline
       size_type count(const key_type& x) const
    {  return static_cast<size_type>(this->base_t::find(x) != this->base_t::cend());  }
 
@@ -790,7 +790,7 @@ class set
    //!
    //! <b>Complexity</b>: log(size())+count(k)
    template<typename K>
-   BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
+   BOOST_CONTAINER_ATTRIBUTE_NODISCARD inline
       size_type count(const K& x) const
    {  return static_cast<size_type>(this->find(x) != this->cend());  }
 
@@ -881,23 +881,13 @@ class set
    //! <b>Effects</b>: Equivalent to std::make_pair(this->lower_bound(k), this->upper_bound(k)).
    //!
    //! <b>Complexity</b>: Logarithmic
-   BOOST_CONTAINER_FORCEINLINE std::pair<iterator,iterator> equal_range(const key_type& x)
+   inline std::pair<iterator,iterator> equal_range(const key_type& x)
    {  return this->base_t::lower_bound_range(x);  }
 
    //! <b>Effects</b>: Equivalent to std::make_pair(this->lower_bound(k), this->upper_bound(k)).
    //!
    //! <b>Complexity</b>: Logarithmic
-   BOOST_CONTAINER_FORCEINLINE std::pair<const_iterator, const_iterator> equal_range(const key_type& x) const
-   {  return this->base_t::lower_bound_range(x);  }
-
-   //! <b>Requires</b>: This overload is available only if
-   //! key_compare::is_transparent exists.
-   //!
-   //! <b>Effects</b>: Equivalent to std::make_pair(this->lower_bound(k), this->upper_bound(k)).
-   //!
-   //! <b>Complexity</b>: Logarithmic
-   template<typename K>
-   BOOST_CONTAINER_FORCEINLINE std::pair<iterator,iterator> equal_range(const K& x)
+   inline std::pair<const_iterator, const_iterator> equal_range(const key_type& x) const
    {  return this->base_t::lower_bound_range(x);  }
 
    //! <b>Requires</b>: This overload is available only if
@@ -907,7 +897,17 @@ class set
    //!
    //! <b>Complexity</b>: Logarithmic
    template<typename K>
-   BOOST_CONTAINER_FORCEINLINE std::pair<const_iterator,const_iterator> equal_range(const K& x) const
+   inline std::pair<iterator,iterator> equal_range(const K& x)
+   {  return this->base_t::lower_bound_range(x);  }
+
+   //! <b>Requires</b>: This overload is available only if
+   //! key_compare::is_transparent exists.
+   //!
+   //! <b>Effects</b>: Equivalent to std::make_pair(this->lower_bound(k), this->upper_bound(k)).
+   //!
+   //! <b>Complexity</b>: Logarithmic
+   template<typename K>
+   inline std::pair<const_iterator,const_iterator> equal_range(const K& x) const
    {  return this->base_t::lower_bound_range(x);  }
 
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -1026,7 +1026,7 @@ template <class Key, class Compare, class Allocator, class Options>
 struct has_trivial_destructor_after_move<boost::container::set<Key, Compare, Allocator, Options> >
 {
    typedef ::boost::container::dtl::tree<Key, void, Compare, Allocator, Options> tree;
-   static const bool value = ::boost::has_trivial_destructor_after_move<tree>::value;
+   BOOST_STATIC_CONSTEXPR bool value = ::boost::has_trivial_destructor_after_move<tree>::value;
 };
 
 namespace container {
@@ -1097,48 +1097,48 @@ class multiset
    //////////////////////////////////////////////
 
    //! @copydoc ::boost::container::set::set()
-   BOOST_CONTAINER_FORCEINLINE multiset()
+   inline multiset()
       BOOST_NOEXCEPT_IF(dtl::is_nothrow_default_constructible<allocator_type>::value &&
                         dtl::is_nothrow_default_constructible<Compare>::value)
       : base_t()
    {}
 
    //! @copydoc ::boost::container::set::set(const allocator_type&)
-   BOOST_CONTAINER_FORCEINLINE explicit multiset(const allocator_type& a)
+   inline explicit multiset(const allocator_type& a)
       : base_t(a)
    {}
 
    //! @copydoc ::boost::container::set::set(const Compare&)
-   BOOST_CONTAINER_FORCEINLINE explicit multiset(const Compare& comp)
+   inline explicit multiset(const Compare& comp)
       : base_t(comp)
    {}
 
    //! @copydoc ::boost::container::set::set(const Compare&, const allocator_type&)
-   BOOST_CONTAINER_FORCEINLINE multiset(const Compare& comp, const allocator_type& a)
+   inline multiset(const Compare& comp, const allocator_type& a)
       : base_t(comp, a)
    {}
 
    //! @copydoc ::boost::container::set::set(InputIterator, InputIterator)
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset(InputIterator first, InputIterator last)
+   inline multiset(InputIterator first, InputIterator last)
       : base_t(false, first, last)
    {}
 
    //! @copydoc ::boost::container::set::set(InputIterator, InputIterator, const allocator_type&)
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset(InputIterator first, InputIterator last, const allocator_type& a)
+   inline multiset(InputIterator first, InputIterator last, const allocator_type& a)
       : base_t(false, first, last, key_compare(), a)
    {}
 
    //! @copydoc ::boost::container::set::set(InputIterator, InputIterator, const Compare&)
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset(InputIterator first, InputIterator last, const Compare& comp)
+   inline multiset(InputIterator first, InputIterator last, const Compare& comp)
       : base_t(false, first, last, comp)
    {}
 
    //! @copydoc ::boost::container::set::set(InputIterator, InputIterator, const Compare&, const allocator_type&)
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset(InputIterator first, InputIterator last, const Compare& comp, const allocator_type& a)
+   inline multiset(InputIterator first, InputIterator last, const Compare& comp, const allocator_type& a)
       : base_t(false, first, last, comp, a)
    {}
 
@@ -1152,7 +1152,7 @@ class multiset
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset( ordered_range_t, InputIterator first, InputIterator last )
+   inline multiset( ordered_range_t, InputIterator first, InputIterator last )
       : base_t(ordered_range, first, last)
    {}
 
@@ -1166,7 +1166,7 @@ class multiset
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset( ordered_range_t, InputIterator first, InputIterator last, const Compare& comp)
+   inline multiset( ordered_range_t, InputIterator first, InputIterator last, const Compare& comp)
       : base_t(ordered_range, first, last, comp)
    {}
 
@@ -1180,7 +1180,7 @@ class multiset
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset( ordered_range_t, InputIterator first, InputIterator last, const Compare& comp, const allocator_type& a)
+   inline multiset( ordered_range_t, InputIterator first, InputIterator last, const Compare& comp, const allocator_type& a)
       : base_t(ordered_range, first, last, comp, a)
    {}
 
@@ -1194,74 +1194,74 @@ class multiset
    //!
    //! <b>Note</b>: Non-standard extension.
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE multiset(ordered_range_t, InputIterator first, InputIterator last, const allocator_type &a)
+   inline multiset(ordered_range_t, InputIterator first, InputIterator last, const allocator_type &a)
       : base_t(ordered_range, first, last, Compare(), a)
    {}
 
 #if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
    //! @copydoc ::boost::container::set::set(std::initializer_list<value_type>)
-   BOOST_CONTAINER_FORCEINLINE multiset(std::initializer_list<value_type> il)
+   inline multiset(std::initializer_list<value_type> il)
       : base_t(false, il.begin(), il.end())
    {}
 
    //! @copydoc ::boost::container::set::set(std::initializer_list<value_type>, const allocator_type&)
-   BOOST_CONTAINER_FORCEINLINE multiset(std::initializer_list<value_type> il, const allocator_type& a)
+   inline multiset(std::initializer_list<value_type> il, const allocator_type& a)
       : base_t(false, il.begin(), il.end(), Compare(), a)
    {}
 
    //! @copydoc ::boost::container::set::set(std::initializer_list<value_type>, const Compare&)
-   BOOST_CONTAINER_FORCEINLINE multiset(std::initializer_list<value_type> il, const Compare& comp)
+   inline multiset(std::initializer_list<value_type> il, const Compare& comp)
       : base_t(false, il.begin(), il.end(), comp)
    {}
 
    //! @copydoc ::boost::container::set::set(std::initializer_list<value_type>, const Compare&, const allocator_type&)
-   BOOST_CONTAINER_FORCEINLINE multiset(std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
+   inline multiset(std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
       : base_t(false, il.begin(), il.end(), comp, a)
    {}
 
    //! @copydoc ::boost::container::set::set(ordered_unique_range_t, std::initializer_list<value_type>)
-   BOOST_CONTAINER_FORCEINLINE multiset(ordered_range_t, std::initializer_list<value_type> il)
+   inline multiset(ordered_range_t, std::initializer_list<value_type> il)
       : base_t(ordered_range, il.begin(), il.end())
    {}
 
    //! @copydoc ::boost::container::set::set(ordered_unique_range_t, std::initializer_list<value_type>, const Compare&)
-   BOOST_CONTAINER_FORCEINLINE multiset(ordered_range_t, std::initializer_list<value_type> il, const Compare& comp)
+   inline multiset(ordered_range_t, std::initializer_list<value_type> il, const Compare& comp)
       : base_t(ordered_range, il.begin(), il.end(), comp)
    {}
 
    //! @copydoc ::boost::container::set::set(ordered_unique_range_t, std::initializer_list<value_type>, const Compare&, const allocator_type&)
-   BOOST_CONTAINER_FORCEINLINE multiset(ordered_range_t, std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
+   inline multiset(ordered_range_t, std::initializer_list<value_type> il, const Compare& comp, const allocator_type& a)
       : base_t(ordered_range, il.begin(), il.end(), comp, a)
    {}
 #endif
 
    //! @copydoc ::boost::container::set::set(const set &)
-   BOOST_CONTAINER_FORCEINLINE multiset(const multiset& x)
+   inline multiset(const multiset& x)
       : base_t(static_cast<const base_t&>(x))
    {}
 
    //! @copydoc ::boost::container::set::set(set &&)
-   BOOST_CONTAINER_FORCEINLINE multiset(BOOST_RV_REF(multiset) x)
+   inline multiset(BOOST_RV_REF(multiset) x)
       BOOST_NOEXCEPT_IF(boost::container::dtl::is_nothrow_move_constructible<Compare>::value)
       : base_t(BOOST_MOVE_BASE(base_t, x))
    {}
 
    //! @copydoc ::boost::container::set::set(const set &, const allocator_type &)
-   BOOST_CONTAINER_FORCEINLINE multiset(const multiset& x, const allocator_type &a)
+   inline multiset(const multiset& x, const allocator_type &a)
       : base_t(static_cast<const base_t&>(x), a)
    {}
 
    //! @copydoc ::boost::container::set::set(set &&, const allocator_type &)
-   BOOST_CONTAINER_FORCEINLINE multiset(BOOST_RV_REF(multiset) x, const allocator_type &a)
+   inline multiset(BOOST_RV_REF(multiset) x, const allocator_type &a)
       : base_t(BOOST_MOVE_BASE(base_t, x), a)
    {}
 
    //! @copydoc ::boost::container::set::operator=(const set &)
-   BOOST_CONTAINER_FORCEINLINE multiset& operator=(BOOST_COPY_ASSIGN_REF(multiset) x)
+   inline multiset& operator=(BOOST_COPY_ASSIGN_REF(multiset) x)
    {  return static_cast<multiset&>(this->base_t::operator=(static_cast<const base_t&>(x)));  }
 
    //! @copydoc ::boost::container::set::operator=(set &&)
-   BOOST_CONTAINER_FORCEINLINE multiset& operator=(BOOST_RV_REF(multiset) x)
+   inline multiset& operator=(BOOST_RV_REF(multiset) x)
       BOOST_NOEXCEPT_IF( (allocator_traits_type::propagate_on_container_move_assignment::value ||
                           allocator_traits_type::is_always_equal::value) &&
                            boost::container::dtl::is_nothrow_move_assignable<Compare>::value)
@@ -1342,7 +1342,7 @@ class multiset
    //!
    //! <b>Complexity</b>: Logarithmic.
    template <class... Args>
-   BOOST_CONTAINER_FORCEINLINE iterator emplace(BOOST_FWD_REF(Args)... args)
+   inline iterator emplace(BOOST_FWD_REF(Args)... args)
    {  return this->base_t::emplace_equal(boost::forward<Args>(args)...); }
 
    //! <b>Effects</b>: Inserts an object of type Key constructed with
@@ -1354,18 +1354,18 @@ class multiset
    //! <b>Complexity</b>: Logarithmic in general, but amortized constant if t
    //!   is inserted right before p.
    template <class... Args>
-   BOOST_CONTAINER_FORCEINLINE iterator emplace_hint(const_iterator p, BOOST_FWD_REF(Args)... args)
+   inline iterator emplace_hint(const_iterator p, BOOST_FWD_REF(Args)... args)
    {  return this->base_t::emplace_hint_equal(p, boost::forward<Args>(args)...); }
 
    #else // !defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
 
    #define BOOST_CONTAINER_MULTISET_EMPLACE_CODE(N) \
    BOOST_MOVE_TMPL_LT##N BOOST_MOVE_CLASS##N BOOST_MOVE_GT##N \
-   BOOST_CONTAINER_FORCEINLINE iterator emplace(BOOST_MOVE_UREF##N)\
+   inline iterator emplace(BOOST_MOVE_UREF##N)\
    {  return this->base_t::emplace_equal(BOOST_MOVE_FWD##N);  }\
    \
    BOOST_MOVE_TMPL_LT##N BOOST_MOVE_CLASS##N BOOST_MOVE_GT##N \
-   BOOST_CONTAINER_FORCEINLINE iterator emplace_hint(const_iterator hint BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
+   inline iterator emplace_hint(const_iterator hint BOOST_MOVE_I##N BOOST_MOVE_UREF##N)\
    {  return this->base_t::emplace_hint_equal(hint BOOST_MOVE_I##N BOOST_MOVE_FWD##N); }\
    //
    BOOST_MOVE_ITERATE_0TO9(BOOST_CONTAINER_MULTISET_EMPLACE_CODE)
@@ -1423,26 +1423,26 @@ class multiset
    //!
    //! <b>Complexity</b>: At most N log(size()+N) (N is the distance from first to last)
    template <class InputIterator>
-   BOOST_CONTAINER_FORCEINLINE void insert(InputIterator first, InputIterator last)
+   inline void insert(InputIterator first, InputIterator last)
    {  this->base_t::insert_equal_range(first, last);  }
 
 #if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
    //! @copydoc ::boost::container::set::insert(std::initializer_list<value_type>)
-   BOOST_CONTAINER_FORCEINLINE void insert(std::initializer_list<value_type> il)
+   inline void insert(std::initializer_list<value_type> il)
    {  this->base_t::insert_equal_range(il.begin(), il.end());  }
 #endif
 
    //! @copydoc ::boost::container::multimap::insert(node_type&&)
-   BOOST_CONTAINER_FORCEINLINE iterator insert(BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
+   inline iterator insert(BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
    {  return this->base_t::insert_equal_node(boost::move(nh));  }
 
    //! @copydoc ::boost::container::multimap::insert(const_iterator, node_type&&)
-   BOOST_CONTAINER_FORCEINLINE iterator insert(const_iterator hint, BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
+   inline iterator insert(const_iterator hint, BOOST_RV_REF_BEG_IF_CXX11 node_type BOOST_RV_REF_END_IF_CXX11 nh)
    {  return this->base_t::insert_equal_node(hint, boost::move(nh));  }
 
    //! @copydoc ::boost::container::multimap::merge(multimap<Key, T, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(multiset<Key, C2, Allocator, Options>& source)
+   inline void merge(multiset<Key, C2, Allocator, Options>& source)
    {
       typedef dtl::tree
          <Key, void, C2, Allocator, Options> base2_t;
@@ -1451,12 +1451,12 @@ class multiset
 
    //! @copydoc ::boost::container::multiset::merge(multiset<Key, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(BOOST_RV_REF_BEG multiset<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
+   inline void merge(BOOST_RV_REF_BEG multiset<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
    {  return this->merge(static_cast<multiset<Key, C2, Allocator, Options>&>(source));   }
 
    //! @copydoc ::boost::container::multimap::merge(map<Key, T, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(set<Key, C2, Allocator, Options>& source)
+   inline void merge(set<Key, C2, Allocator, Options>& source)
    {
       typedef dtl::tree
          <Key, void, C2, Allocator, Options> base2_t;
@@ -1465,7 +1465,7 @@ class multiset
 
    //! @copydoc ::boost::container::multiset::merge(set<Key, C2, Allocator, Options>&)
    template<class C2>
-   BOOST_CONTAINER_FORCEINLINE void merge(BOOST_RV_REF_BEG set<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
+   inline void merge(BOOST_RV_REF_BEG set<Key, C2, Allocator, Options> BOOST_RV_REF_END source)
    {  return this->merge(static_cast<set<Key, C2, Allocator, Options>&>(source));   }
 
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -1681,7 +1681,7 @@ template <class Key, class Compare, class Allocator, class Options>
 struct has_trivial_destructor_after_move<boost::container::multiset<Key, Compare, Allocator, Options> >
 {
    typedef ::boost::container::dtl::tree<Key, void, Compare, Allocator, Options> tree;
-   static const bool value = ::boost::has_trivial_destructor_after_move<tree>::value;
+   BOOST_STATIC_CONSTEXPR bool value = ::boost::has_trivial_destructor_after_move<tree>::value;
 };
 
 namespace container {

@@ -15,12 +15,14 @@
 #include <boost/config/warning_disable.hpp>
 
 #include <boost/filesystem/config.hpp>
-#include <boost/filesystem/path_traits.hpp>
+#include <boost/filesystem/detail/path_traits.hpp>
 #include <boost/system/error_category.hpp>
 #include <locale>
 #include <string>
 
 #include "private_config.hpp"
+
+#include <boost/filesystem/detail/header.hpp> // must be the last #include
 
 //--------------------------------------------------------------------------------------//
 
@@ -32,21 +34,21 @@ namespace {
 #if (defined(BOOST_GCC) && BOOST_GCC >= 40600) || defined(BOOST_CLANG)
 #pragma GCC diagnostic push
 // '(anonymous namespace)::codecvt_error_cat' has virtual functions but non-virtual destructor
-// This is no a problem as instances of codecvt_error_cat are never destroyed through a pointer to base.
+// This is not a problem as instances of codecvt_error_cat are never destroyed through a pointer to base.
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 #endif
 
-class codecvt_error_cat BOOST_FINAL :
+class codecvt_error_cat final :
     public boost::system::error_category
 {
 public:
     // clang up to version 3.8 requires a user-defined default constructor in order to be able to declare a static constant of the error category.
-    BOOST_SYSTEM_CONSTEXPR codecvt_error_cat() BOOST_NOEXCEPT {}
-    const char* name() const BOOST_NOEXCEPT BOOST_OVERRIDE;
-    std::string message(int ev) const BOOST_OVERRIDE;
+    BOOST_SYSTEM_CONSTEXPR codecvt_error_cat() noexcept {}
+    const char* name() const noexcept override;
+    std::string message(int ev) const override;
 };
 
-const char* codecvt_error_cat::name() const BOOST_NOEXCEPT
+const char* codecvt_error_cat::name() const noexcept
 {
     return "codecvt";
 }
@@ -81,7 +83,7 @@ std::string codecvt_error_cat::message(int ev) const
 
 } // unnamed namespace
 
-BOOST_FILESYSTEM_DECL boost::system::error_category const& codecvt_error_category() BOOST_NOEXCEPT
+BOOST_FILESYSTEM_DECL boost::system::error_category const& codecvt_error_category() noexcept
 {
     static
 #if defined(BOOST_SYSTEM_HAS_CONSTEXPR)
@@ -114,3 +116,5 @@ const codecvt_error_category_initializer g_codecvt_error_category_initializer;
 
 } // namespace filesystem
 } // namespace boost
+
+#include <boost/filesystem/detail/footer.hpp>

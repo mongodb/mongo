@@ -9,6 +9,8 @@
 
 #include <boost/filesystem/config.hpp>
 
+#include <boost/filesystem/detail/header.hpp>
+
 #define BOOST_UTF8_BEGIN_NAMESPACE \
     namespace boost { \
     namespace filesystem { \
@@ -26,4 +28,6 @@
 #undef BOOST_UTF8_END_NAMESPACE
 #undef BOOST_UTF8_DECL
 
-#endif
+#include <boost/filesystem/detail/footer.hpp>
+
+#endif // BOOST_FILESYSTEM_UTF8_CODECVT_FACET_HPP

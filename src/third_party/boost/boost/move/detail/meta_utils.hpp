@@ -17,10 +17,9 @@
 #if defined(BOOST_HAS_PRAGMA_ONCE)
 #  pragma once
 #endif
-#include <boost/move/detail/config_begin.hpp>
+
 #include <boost/move/detail/workaround.hpp>  //forceinline
 #include <boost/move/detail/meta_utils_core.hpp>
-#include <cstddef>   //for std::size_t
 #include <boost/move/detail/addressof.hpp>
 
 //Small meta-typetraits to support move
@@ -57,8 +56,8 @@ struct apply
 template< bool C_ >
 struct bool_ : integral_constant<bool, C_>
 {
-     operator bool() const { return C_; }
-   bool operator()() const { return C_; }
+   inline operator bool() const { return C_; }
+   inline bool operator()() const { return C_; }
 };
 
 typedef bool_<true>        true_;
@@ -70,6 +69,10 @@ typedef bool_<false>       false_;
 struct nat{};
 struct nat2{};
 struct nat3{};
+
+template <unsigned N>
+struct natN
+{};
 
 //////////////////////////////////////
 //          yes_type/no_type
@@ -198,22 +201,6 @@ struct add_const_lvalue_reference
 };
 
 //////////////////////////////////////
-//             is_lvalue_reference
-//////////////////////////////////////
-template<class T>
-struct is_lvalue_reference
-{
-    static const bool value = false;
-};
-
-template<class T>
-struct is_lvalue_reference<T&>
-{
-    static const bool value = true;
-};
-
-
-//////////////////////////////////////
 //             identity
 //////////////////////////////////////
 template <class T>
@@ -221,7 +208,7 @@ struct identity
 {
    typedef T type;
    typedef typename add_const_lvalue_reference<T>::type reference;
-   reference operator()(reference t)
+   BOOST_MOVE_FORCEINLINE reference operator()(reference t) const
    {  return t;   }
 };
 
@@ -553,7 +540,5 @@ template< class T > struct remove_rvalue_reference { typedef T type; };
 
 }  //namespace move_detail {
 }  //namespace boost {
-
-#include <boost/move/detail/config_end.hpp>
 
 #endif //#ifndef BOOST_MOVE_DETAIL_META_UTILS_HPP

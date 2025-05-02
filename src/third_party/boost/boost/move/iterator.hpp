@@ -58,20 +58,20 @@ class move_iterator
    typedef typename boost::movelib::iterator_traits<iterator_type>::difference_type   difference_type;
    typedef typename boost::movelib::iterator_traits<iterator_type>::iterator_category iterator_category;
 
-   BOOST_MOVE_FORCEINLINE move_iterator()
+   inline move_iterator()
       : m_it()
    {}
 
-   BOOST_MOVE_FORCEINLINE explicit move_iterator(const It &i)
+   inline explicit move_iterator(const It &i)
       :  m_it(i)
    {}
 
    template <class U>
-   BOOST_MOVE_FORCEINLINE move_iterator(const move_iterator<U>& u)
+   inline move_iterator(const move_iterator<U>& u)
       :  m_it(u.m_it)
    {}
 
-   BOOST_MOVE_FORCEINLINE reference operator*() const
+   inline reference operator*() const
    {
       #if defined(BOOST_NO_CXX11_RVALUE_REFERENCES) || defined(BOOST_MOVE_OLD_RVALUE_REF_BINDING_RULES)
       return *m_it;
@@ -80,34 +80,34 @@ class move_iterator
       #endif
    }
 
-   BOOST_MOVE_FORCEINLINE pointer   operator->() const
+   inline pointer   operator->() const
    {  return m_it;   }
 
-   BOOST_MOVE_FORCEINLINE move_iterator& operator++()
+   inline move_iterator& operator++()
    {  ++m_it; return *this;   }
 
-   BOOST_MOVE_FORCEINLINE move_iterator<iterator_type>  operator++(int)
+   inline move_iterator<iterator_type>  operator++(int)
    {  move_iterator<iterator_type> tmp(*this); ++(*this); return tmp;   }
 
-   BOOST_MOVE_FORCEINLINE move_iterator& operator--()
+   inline move_iterator& operator--()
    {  --m_it; return *this;   }
 
-   BOOST_MOVE_FORCEINLINE move_iterator<iterator_type>  operator--(int)
+   inline move_iterator<iterator_type>  operator--(int)
    {  move_iterator<iterator_type> tmp(*this); --(*this); return tmp;   }
 
    move_iterator<iterator_type>  operator+ (difference_type n) const
    {  return move_iterator<iterator_type>(m_it + n);  }
 
-   BOOST_MOVE_FORCEINLINE move_iterator& operator+=(difference_type n)
+   inline move_iterator& operator+=(difference_type n)
    {  m_it += n; return *this;   }
 
-   BOOST_MOVE_FORCEINLINE move_iterator<iterator_type>  operator- (difference_type n) const
+   inline move_iterator<iterator_type>  operator- (difference_type n) const
    {  return move_iterator<iterator_type>(m_it - n);  }
 
-   BOOST_MOVE_FORCEINLINE move_iterator& operator-=(difference_type n)
+   inline move_iterator& operator-=(difference_type n)
    {  m_it -= n; return *this;   }
 
-   BOOST_MOVE_FORCEINLINE reference operator[](difference_type n) const
+   inline reference operator[](difference_type n) const
    {
       #if defined(BOOST_NO_CXX11_RVALUE_REFERENCES) || defined(BOOST_MOVE_OLD_RVALUE_REF_BINDING_RULES)
       return m_it[n];
@@ -116,28 +116,28 @@ class move_iterator
       #endif
    }
 
-   BOOST_MOVE_FORCEINLINE friend bool operator==(const move_iterator& x, const move_iterator& y)
+   inline friend bool operator==(const move_iterator& x, const move_iterator& y)
    {  return x.m_it == y.m_it;  }
 
-   BOOST_MOVE_FORCEINLINE friend bool operator!=(const move_iterator& x, const move_iterator& y)
+   inline friend bool operator!=(const move_iterator& x, const move_iterator& y)
    {  return x.m_it != y.m_it;  }
 
-   BOOST_MOVE_FORCEINLINE friend bool operator< (const move_iterator& x, const move_iterator& y)
+   inline friend bool operator< (const move_iterator& x, const move_iterator& y)
    {  return x.m_it < y.m_it;   }
 
-   BOOST_MOVE_FORCEINLINE friend bool operator<=(const move_iterator& x, const move_iterator& y)
+   inline friend bool operator<=(const move_iterator& x, const move_iterator& y)
    {  return x.m_it <= y.m_it;  }
 
-   BOOST_MOVE_FORCEINLINE friend bool operator> (const move_iterator& x, const move_iterator& y)
+   inline friend bool operator> (const move_iterator& x, const move_iterator& y)
    {  return x.m_it > y.m_it;  }
 
-   BOOST_MOVE_FORCEINLINE friend bool operator>=(const move_iterator& x, const move_iterator& y)
+   inline friend bool operator>=(const move_iterator& x, const move_iterator& y)
    {  return x.m_it >= y.m_it;  }
 
-   BOOST_MOVE_FORCEINLINE friend difference_type operator-(const move_iterator& x, const move_iterator& y)
+   inline friend difference_type operator-(const move_iterator& x, const move_iterator& y)
    {  return x.m_it - y.m_it;   }
 
-   BOOST_MOVE_FORCEINLINE friend move_iterator operator+(difference_type n, const move_iterator& x)
+   inline friend move_iterator operator+(difference_type n, const move_iterator& x)
    {  return move_iterator(x.m_it + n);   }
 
    private:
@@ -170,7 +170,7 @@ struct is_move_iterator< ::boost::move_iterator<I> >
 //!
 //! <b>Returns</b>: move_iterator<It>(i).
 template<class It>
-BOOST_MOVE_FORCEINLINE move_iterator<It> make_move_iterator(const It &it)
+inline move_iterator<It> make_move_iterator(const It &it)
 {  return move_iterator<It>(it); }
 
 //////////////////////////////////////////////////////////////////////////////
