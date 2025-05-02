@@ -423,6 +423,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
+    explain_common::generateMaxUsedMemBytes(exec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
     auto* cq = exec->getCanonicalQuery();

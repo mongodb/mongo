@@ -60,6 +60,11 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
 void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out);
 
 /**
+ * Adds the 'maxUsedMemBytes' value to the BSON object being built by 'out'.
+ */
+void generateMaxUsedMemBytes(const OperationContext* opCtx, BSONObjBuilder* out);
+
+/**
  * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
  * BSON object will be exceeded.
  */

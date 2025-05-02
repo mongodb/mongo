@@ -135,6 +135,10 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            out["maxUsedMemBytes"] =
+                opts.serializeLiteral(static_cast<long long>(stats.maxUsedMemoryBytes));
+        }
     }
 
     return out.freezeToValue();

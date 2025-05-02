@@ -182,6 +182,10 @@ void GroupProcessor::readyGroups() {
         _groupsIterator = _groups.begin();
     }
 
+    // Update GroupStats here when reading groups in case the query finishes early without resetting
+    // the GroupProcessor. This guarantees we have $group-level statistics for explain.
+    _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+
     _groupsReady = true;
 }
 

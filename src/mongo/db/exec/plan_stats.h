@@ -1089,6 +1089,8 @@ struct GroupStats : public SpecificStats {
     size_t totalOutputDataSizeBytes = 0;
 
     SpillingStats spillingStats;
+
+    int64_t maxUsedMemoryBytes = 0;
 };
 
 struct DocumentSourceCursorStats : public SpecificStats {

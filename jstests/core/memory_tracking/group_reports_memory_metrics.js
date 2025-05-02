@@ -221,6 +221,65 @@ if (!FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking")) {
             tojson(exhaustedEntry));
 }
 
+/** EXPLAIN TESTS **/
+
+if (!FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking")) {
+    jsTestLog(
+        "Test that memory metrics do not appear in the explain output when the feature flag is off.");
+    const explainRes = db.coll.explain("executionStats")
+                           .aggregate(
+                               [{$group: {_id: "$groupKey", values: {$push: "$val"}}}],
+                           );
+    assert(!explainRes.hasOwnProperty("maxUsedMemBytes"),
+           "Unexpected maxUsedMemBytes in explain: " + tojson(explainRes));
+
+    // Memory usage metrics do not appear in the $group stage.
+    assert(explainRes.stages[0].$cursor,
+           "Expected $cursor stage in explain: " + tojson(explainRes));
+    assert(explainRes.stages[1].$group, "Expected $group stage in explain: " + tojson(explainRes));
+    assert(!explainRes.stages[1].$group.maxUsedMemBytes),
+        "Unexpected maxUsedMemBytes in $group stage: " + tojson(explainRes);
+} else {
+    jsTestLog(
+        "Test that memory usage metrics appear in the explain output when the feature flag is on.");
+    const explainRes = db.coll.explain("executionStats").aggregate([
+        {$group: {_id: "$groupKey", values: {$push: "$val"}}}
+    ]);
+
+    // Memory usage metrics appear in the top-level explain.
+    assert(explainRes.hasOwnProperty("maxUsedMemBytes"),
+           "Expected maxUsedMemBytes in explain: " + tojson(explainRes));
+    assert.gt(explainRes.maxUsedMemBytes,
+              0,
+              "Expected maxUsedMemBytes to be positive: " + tojson(explainRes));
+
+    // Memory usage metrics appear within the $group stage.
+    assert(explainRes.stages.length == 2, "Expected two stages in explain: " + tojson(explainRes));
+    assert(explainRes.stages[0].$cursor,
+           "Expected $cursor stage in explain: " + tojson(explainRes));
+    assert(explainRes.stages[1].$group, "Expected $group stage in explain: " + tojson(explainRes));
+    assert(explainRes.stages[1].hasOwnProperty("maxUsedMemBytes"),
+           "Expected maxUsedMemBytes in $group stage: " + tojson(explainRes));
+    assert.gt(explainRes.stages[1].maxUsedMemBytes,
+              0,
+              "Expected maxUsedMemBytes to be positive: " + tojson(explainRes));
+
+    jsTestLog(
+        "Test that memory usage metrics do not appear in the explain output when the verbosity is lower than executionStats.");
+    const explainQueryPlannerRes =
+        db.coll.explain("queryPlanner")
+            .aggregate([{$group: {_id: "$groupKey", values: {$push: "$val"}}}],
+                       {cursor: {batchSize: 1}});
+    assert(!explainQueryPlannerRes.hasOwnProperty("maxUsedMemBytes"),
+           "Unexpected maxUsedMemBytes in explain: " + tojson(explainQueryPlannerRes));
+    assert(explainQueryPlannerRes.stages[0].$cursor,
+           "Expected $cursor stage in explain: " + tojson(explainQueryPlannerRes));
+    assert(explainQueryPlannerRes.stages[1].$group,
+           "Expected $group stage in explain: " + tojson(explainQueryPlannerRes));
+    assert(!explainQueryPlannerRes.stages[1].hasOwnProperty("maxUsedMemBytes"),
+           "Unexpected maxUsedMemBytes in $group stage: " + tojson(explainQueryPlannerRes));
+}
+
 // Clean up.
 db.coll.drop();
 assert.commandWorked(db.adminCommand(

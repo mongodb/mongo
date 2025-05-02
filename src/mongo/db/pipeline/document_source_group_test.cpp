@@ -527,36 +527,49 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     ASSERT_DOCUMENT_EQ((Document{{"_id", Document{}}}), next.getDocument());
 }
 
-TEST_F(DocumentSourceGroupTest, CanOutputExectionStatsExplainWithoutProcessingDocuments) {
-    auto expCtx = getExpCtx();
-    expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
+TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingDocuments) {
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                                   flagStatus);
 
-    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
-    auto accumulatorArg = BSON("" << 1);
-    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement countStatement{"count", accExpr};
+        auto expCtx = getExpCtx();
+        expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
 
-    auto group = DocumentSourceGroup::create(
-        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
-    group->dispose();
+        auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
+        auto accumulatorArg = BSON("" << 1);
+        auto accExpr =
+            parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
+        AccumulationStatement countStatement{"count", accExpr};
 
-    SerializationOptions explainOpts;
-    explainOpts.verbosity = expCtx->getExplain();
-    ASSERT_DOCUMENT_EQ(Document(fromjson(
-                           R"({
-                            $group: {
-                                _id: {$const: null},
-                                count: {$sum: {$const: 1}},
-                                $willBeMerged: false},
-                                maxAccumulatorMemoryUsageBytes: {count: 0},
-                                totalOutputDataSizeBytes: 0,
-                                usedDisk: false,
-                                spills: 0,
-                                spilledDataStorageSize: 0,
-                                numBytesSpilledEstimate: 0,
-                                spilledRecords: 0
-                            })")),
-                       group->serialize(explainOpts).getDocument());
+        auto group = DocumentSourceGroup::create(
+            expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
+        group->dispose();
+
+        SerializationOptions explainOpts;
+        explainOpts.verbosity = expCtx->getExplain();
+
+        BSONObjBuilder bob;
+        bob.appendElements(fromjson(R"({
+            $group: {
+                _id: {$const: null},
+                count: {$sum: {$const: 1}},
+                $willBeMerged: false
+            },
+            maxAccumulatorMemoryUsageBytes: {count: 0},
+            totalOutputDataSizeBytes: 0,
+            usedDisk: false,
+            spills: 0,
+            spilledDataStorageSize: 0,
+            numBytesSpilledEstimate: 0,
+            spilledRecords: 0
+        })"));
+
+        if (flagStatus) {
+            bob.append("maxUsedMemBytes", 0);
+        }
+
+        ASSERT_DOCUMENT_EQ(Document(bob.obj()), group->serialize(explainOpts).getDocument());
+    }
 }
 
 TEST_F(DocumentSourceGroupTest, CorrectlyReportsTriviallyReferencedExprsFromID) {

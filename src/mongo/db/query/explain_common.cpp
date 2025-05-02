@@ -81,6 +81,12 @@ void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out) 
     }
 }
 
+void generateMaxUsedMemBytes(const OperationContext* opCtx, BSONObjBuilder* out) {
+    if (int64_t maxUsedMemBytes = mongo::CurOp::get(opCtx)->getMaxUsedMemoryBytes()) {
+        out->append("maxUsedMemBytes", maxUsedMemBytes);
+    }
+}
+
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {
     if ((out->len() + toAppend.objsize()) < BSONObjMaxUserSize) {
         out->append(fieldName, toAppend);
