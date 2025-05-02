@@ -9,6 +9,15 @@ filters:
   - "rss_sydney.yml":
     approvers:
       - 10gen/server-rss-sydney
-  - "storage_execution.yml":
+  - "server_collection_write_path.yml":
     approvers:
-      - 10gen/server-storage-execution
+      - 10gen/server-collection-write-path
+  - "server_index_builds.yml":
+    approvers:
+      - 10gen/server-index-builds
+  - "server_storage_engine_integration.yml":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "server_ttl.yml":
+    approvers:
+      - 10gen/server-ttl
