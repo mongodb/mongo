@@ -53,6 +53,8 @@ def fetch_evg_logs(task_id: str, evergreen_binary: Path, output_file: Path):
             f"job{job_num}",
         ]
 
+        # Ensure directories along the path exist.
+        output_file.parent.mkdir(parents=True, exist_ok=True)
         with output_file.open("a+") as file:
             result = subprocess.run(command, stdout=file, stderr=subprocess.PIPE, text=True)
         if result.stderr:
