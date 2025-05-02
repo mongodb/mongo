@@ -63,6 +63,9 @@ selector:
     - assumes_standalone_mongod
 
 executor:
+  hooks:
+    - class: CleanEveryN
+      n: 20
   config:
     shell_options:
       eval: >-

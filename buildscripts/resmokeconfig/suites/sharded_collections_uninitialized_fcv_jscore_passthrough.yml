@@ -112,6 +112,9 @@ selector:
     - assumes_sharding_initialized
 
 executor:
+  hooks:
+    - class: CleanEveryN
+      n: 20
   config:
     shell_options:
       eval: >-

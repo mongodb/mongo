@@ -86,6 +86,9 @@ selector:
     # an initial sync nodes is not a fully initialized shard server
     - assumes_sharding_initialized
 executor:
+  hooks:
+    - class: CleanEveryN
+      n: 20
   config:
     shell_options:
       eval: >-

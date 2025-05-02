@@ -41,6 +41,9 @@ selector:
     - uses_prepare_transaction
 
 executor:
+  hooks:
+    - class: CleanEveryN
+      n: 20
   config:
     shell_options:
       eval: >-
