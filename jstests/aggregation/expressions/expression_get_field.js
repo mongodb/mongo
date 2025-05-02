@@ -161,7 +161,7 @@ assertGetFieldFailedWithCode("$$USER_ROLES", 3041704);
 // Error code depends on presence of the enterprise module.
 assertGetFieldFailedWithCode("$$SEARCH_META", [6347902, 6347903]);
 // $$CLUSTER_TIME is only available on replica sets and sharded clusters.
-assertGetFieldFailedWithCode("$$CLUSTER_TIME", [3041704, 51144]);
+assertGetFieldFailedWithCode("$$CLUSTER_TIME", [3041704, 51144, 10071200]);
 
 // Test that $getField treats dotted fields as key literals instead of field paths. Note that it is
 // necessary to use $const in places, otherwise object field validation would reject some of these

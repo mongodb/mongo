@@ -687,6 +687,16 @@ void ExpressionContext::initializeReferencedSystemVariables() {
     }
     if (_systemVarsReferencedInQuery.contains(Variables::kClusterTimeId) &&
         !variables.hasValue(Variables::kClusterTimeId)) {
+        // TODO: SERVER-104560: Create utility functions that return the current server topology.
+        // Replace the code checking for standalone mode with a call to the utility provided by
+        // SERVER-104560.
+        auto* repl = repl::ReplicationCoordinator::get(getOperationContext());
+        if (repl && !repl->getSettings().isReplSet() &&
+            serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+            uasserted(10071200,
+                      str::stream() << "system variable $$CLUSTER_TIME"
+                                    << " is not available in standalone mode");
+        }
         variables.defineClusterTime(getOperationContext());
     }
     if (_systemVarsReferencedInQuery.contains(Variables::kUserRolesId) &&

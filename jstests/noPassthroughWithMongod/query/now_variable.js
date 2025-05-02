@@ -75,7 +75,8 @@ function runTests(query) {
 function runTestsExpectFailure(query) {
     const results = query();
     // Expect to see "Builtin variable '$$CLUSTER_TIME' is not available" error.
-    assert.commandFailedWithCode(results, 51144);
+    // Error code changed to 10071200 in fcv_82.
+    assert.commandFailedWithCode(results, [10071200, 51144]);
 }
 
 function baseCollectionNowFind() {

@@ -156,6 +156,8 @@ void readModifyWriteQuerySettingsConfigOption(
 }
 
 void assertNoStandalone(OperationContext* opCtx, const std::string& cmdName) {
+    // TODO: replace the code checking for standalone mode with a call to the utility provided by
+    // SERVER-104560.
     auto* repl = repl::ReplicationCoordinator::get(opCtx);
     bool isStandalone = repl && !repl->getSettings().isReplSet() &&
         serverGlobalParams.clusterRole.has(ClusterRole::None);

@@ -37,6 +37,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
@@ -160,6 +162,19 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kNowId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kClusterTimeId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kUserRolesId));
+}
+
+TEST_F(ExpressionContextTest, ErrorsIfClusterTimeUsedInStandalone) {
+    auto opCtx = makeOperationContext();
+    repl::ReplicationCoordinator::set(opCtx->getServiceContext(),
+                                      std::make_unique<repl::ReplicationCoordinatorMock>(
+                                          opCtx->getServiceContext(), repl::ReplSettings()));
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$project" << BSON("a" << "$$CLUSTER_TIME")));
+    AggregateCommandRequest acr({} /*nss*/, pipeline);
+    auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), acr).build();
+    Pipeline::parse(pipeline, expCtx);
+    ASSERT_THROWS_CODE(expCtx->initializeReferencedSystemVariables(), AssertionException, 10071200);
 }
 
 TEST_F(ExpressionContextTest, CanBuildWithoutView) {
