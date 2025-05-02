@@ -13,17 +13,13 @@ load(
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "COMPILERS",
     "all_c_compile_actions",
     "all_compile_actions",
     "all_cpp_compile_actions",
     "get_common_features",
 )
 load("//bazel/toolchains/cc/mongo_linux:mongo_defines.bzl", "DEFINES")
-
-COMPILERS = struct(
-    CLANG = "clang",
-    GCC = "gcc",
-)
 
 all_non_assembly_compile_actions = [
     ACTION_NAMES.c_compile,
@@ -961,11 +957,6 @@ def _impl(ctx):
                     # it isn't actively harmful to capture unused variables we are
                     # suppressing for now with a plan to fix later.
                     "-Wno-unused-lambda-capture",
-
-                    # This warning was added in Apple clang version 11 and flags many
-                    # explicitly defaulted move constructors and assignment operators for
-                    # being implicitly deleted, which is not useful.
-                    "-Wno-defaulted-function-deleted",
                 ])],
             ),
         ],

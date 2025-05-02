@@ -11,6 +11,7 @@ load(":cc_toolchain_config.bzl", "cc_toolchain_config")
 # mongo customization
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "COMPILERS",
     "FEATURES_ATTR_NAMES",
     "get_common_features_attrs")
 ###
@@ -113,6 +114,7 @@ feature_attrs = get_common_features_attrs()
         module_map = ":modulemap",
 ###
 # mongo customization
+        compiler = COMPILERS.CLANG,
         optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
 ###
     )

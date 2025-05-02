@@ -15,6 +15,11 @@ load(
 #    "//bazel/toolchains/cc/mongo_apple",
 #])
 
+COMPILERS = struct(
+    CLANG = "clang",
+    GCC = "gcc",
+)
+
 all_c_compile_actions = [
     ACTION_NAMES.assemble,
     ACTION_NAMES.c_compile,
@@ -183,10 +188,31 @@ def get_common_features(ctx):
         ],
     )
 
+    no_defaulted_function_deleted_feature = feature(
+        name = "no_defaulted_function_deleted",
+        enabled = ctx.attr.compiler == COMPILERS.CLANG,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            # This warning was added in Apple clang version 11 and flags many
+                            # explicitly defaulted move constructors and assignment operators for
+                            # being implicitly deleted, which is not useful.
+                            "-Wno-defaulted-function-deleted",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     return [
         optimization_level_g_feature,
         optimization_level_0_feature,
         optimization_level_2_feature,
         optimization_level_size_feature,
         no_unused_function_feature,
+        no_defaulted_function_deleted_feature,
     ]

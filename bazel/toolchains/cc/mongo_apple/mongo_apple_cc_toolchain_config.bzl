@@ -2785,6 +2785,7 @@ cc_toolchain_config = rule(
         )),
         ###
         # mongodb customization
+        "compiler": attr.string(mandatory = True),
         "optimization_level": attr.string(mandatory = False),
         ###
     },
