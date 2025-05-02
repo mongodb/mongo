@@ -650,4 +650,23 @@ void checkShardingAndLocalCatalogCollectionUUIDMatch(
     const CollectionPtr& collectionPtr);
 
 }  // namespace shard_role_details
+
+/*
+ * Anything under this namespace does not have any knowledge of sharding and doesn't take locks
+ */
+namespace shard_role_nocheck {
+
+/*
+Resolve the collection namespace without acquiring a collection. These helpers do not lock the
+namespace or provide shard version checks. They only make sense to run quick prechecks
+before executing code that will eventually acquire the collections.
+**/
+NamespaceString resolveNssWithoutAcquisition(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const UUID& uuid);
+
+boost::optional<NamespaceString> lookupNssWithoutAcquisition(OperationContext* opCtx,
+                                                             const UUID& uuid);
+
+}  // namespace shard_role_nocheck
 }  // namespace mongo

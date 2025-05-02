@@ -56,7 +56,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
@@ -402,9 +401,8 @@ public:
             return auth::checkAuthForFind(authSession, nsOrUUID.nss(), hasTerm);
         }
 
-        const auto resolvedNss =
-            CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
-                opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
+        const auto resolvedNss = shard_role_nocheck::resolveNssWithoutAcquisition(
+            opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
         return auth::checkAuthForFind(authSession, resolvedNss, hasTerm);
     }
 

@@ -60,7 +60,6 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -418,9 +417,8 @@ public:
                         nsOrUUID.nss().isValid());
                 uassertStatusOK(auth::checkAuthForFind(authSession, nsOrUUID.nss(), hasTerm));
             } else {
-                const auto resolvedNss =
-                    CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
-                        opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
+                const auto resolvedNss = shard_role_nocheck::resolveNssWithoutAcquisition(
+                    opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
                 uassertStatusOK(auth::checkAuthForFind(authSession, resolvedNss, hasTerm));
             }
         }

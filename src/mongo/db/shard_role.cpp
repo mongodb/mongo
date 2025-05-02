@@ -2067,4 +2067,16 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
     }
 }
 
+NamespaceString shard_role_nocheck::resolveNssWithoutAcquisition(OperationContext* opCtx,
+                                                                 const DatabaseName& dbName,
+                                                                 const UUID& uuid) {
+    return CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
+        opCtx, dbName, uuid);
+}
+
+boost::optional<NamespaceString> shard_role_nocheck::lookupNssWithoutAcquisition(
+    OperationContext* opCtx, const UUID& uuid) {
+    return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
+}
+
 }  // namespace mongo

@@ -51,7 +51,6 @@
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -166,7 +165,7 @@ public:
             : InvocationBaseGen(opCtx, command, opMsgRequest),
               _ns(request().getNamespaceOrUUID().isNamespaceString()
                       ? request().getNamespaceOrUUID().nss()
-                      : CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
+                      : shard_role_nocheck::resolveNssWithoutAcquisition(
                             opCtx,
                             request().getNamespaceOrUUID().dbName(),
                             request().getNamespaceOrUUID().uuid())) {

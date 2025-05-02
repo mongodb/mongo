@@ -54,7 +54,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/commands.h"
@@ -78,6 +77,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -246,8 +246,14 @@ public:
                 "Unauthorized",
                 authzSession->isAuthorizedToParseNamespaceElement(request().getNamespaceOrUUID()));
 
-            const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                opCtx, cmd.getNamespaceOrUUID());
+            const auto nss = [&]() {
+                auto& nssOrUuid = cmd.getNamespaceOrUUID();
+                if (nssOrUuid.isNamespaceString()) {
+                    return nssOrUuid.nss();
+                }
+                return shard_role_nocheck::resolveNssWithoutAcquisition(
+                    opCtx, nssOrUuid.dbName(), nssOrUuid.uuid());
+            }();
 
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to list indexes on collection:"
