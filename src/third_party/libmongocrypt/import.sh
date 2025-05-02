@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=libmongocrypt
-VERSION=1.12.0
+VERSION=1.14.0
 
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
@@ -43,9 +43,7 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/mongodb/libmongocrypt $CLONE_DEST
 
     pushd $SRC
-    # TODO: SERVER-97433 Revert back to `$VERSION` upon new release of libmongocrypt
-    # $GIT_EXE checkout $VERSION
-    $GIT_EXE checkout 41ea6a8b07aa40b4285b03f4c5c6d4f41e743841
+    $GIT_EXE checkout $VERSION
     popd
 fi
 

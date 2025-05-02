@@ -980,7 +980,7 @@
         "name": "Organization: github"
       },
       "name": "libmongocrypt",
-      "version": "1.12.0",
+      "version": "1.14.0",
       "licenses": [
         {
           "license": {
@@ -988,7 +988,7 @@
           }
         }
       ],
-      "purl": "pkg:github/mongodb/libmongocrypt@085a0ce6538a28179da6bfd2927aea106924443a",
+      "purl": "pkg:github/mongodb/libmongocrypt@6a3c15ef7502fe67b1f0fe15d817a7762f66fbac",
       "properties": [
         {
           "name": "internal:team_responsible",
