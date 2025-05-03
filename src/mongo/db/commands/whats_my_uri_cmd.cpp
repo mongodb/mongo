@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace {
+
 /* Returns client's uri */
 class CmdWhatsMyUri : public BasicCommand {
 public:
@@ -70,16 +71,10 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto client = opCtx->getClient();
         result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
-        auto session = client->session();
-        if (session && session->isConnectedToLoadBalancerPort()) {
-            result << "sourceClientIP" << session->getSourceRemoteEndpoint().host();
-        }
         return true;
     }
 };
-
 MONGO_REGISTER_COMMAND(CmdWhatsMyUri).forShard();
 
 }  // namespace

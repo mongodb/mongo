@@ -43,6 +43,7 @@
 
 namespace mongo {
 namespace {
+
 class WhatsMyUriCmd : public BasicCommand {
 public:
     WhatsMyUriCmd() : BasicCommand("whatsmyuri") {}
@@ -66,16 +67,11 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* opCtx,
+    bool run(OperationContext*,
              const DatabaseName&,
-             const BSONObj& cmdObj,
+             const BSONObj&,
              BSONObjBuilder& result) override {
-        auto client = opCtx->getClient();
-        result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
-        auto session = client->session();
-        if (session && session->isConnectedToLoadBalancerPort()) {
-            result << "sourceClientIP" << session->getSourceRemoteEndpoint().host();
-        }
+        result << "you" << cc().getRemote().toString();
         return true;
     }
 };
