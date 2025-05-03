@@ -3,6 +3,9 @@ filters:
   - "building.md":
     approvers:
       - 10gen/devprod-build
+  - "cpp_style.md":
+    approvers:
+      - 10gen/server-programmability
   - "poetry_execution.md":
     approvers:
       - 10gen/devprod-correctness
