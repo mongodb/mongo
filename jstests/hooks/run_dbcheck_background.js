@@ -122,9 +122,17 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
         return {ok: 1};
     };
 
-    return assert.dropExceptionsWithCode(() => {
-        return runBackgroundDbCheck(hosts);
-    }, [ErrorCodes.NamespaceNotFound, ErrorCodes.LockTimeout, ErrorCodes.Interrupted], onDrop);
+    return assert.dropExceptionsWithCode(
+        () => {
+            return runBackgroundDbCheck(hosts);
+        },
+        [
+            ErrorCodes.NamespaceNotFound,
+            ErrorCodes.LockTimeout,
+            ErrorCodes.Interrupted,
+            ErrorCodes.CommandNotSupportedOnView
+        ],
+        onDrop);
 };
 
 if (topology.type === Topology.kReplicaSet) {
