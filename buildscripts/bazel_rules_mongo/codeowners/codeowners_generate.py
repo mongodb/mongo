@@ -256,12 +256,10 @@ def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: s
         for file in unowned_new_files:
             print(f"- {file}", file=sys.stderr)
         print(
-            "New files will soon be required to have code owners. See http://go/codeowners-ug",
+            "New files are required to have code owners. See http://go/codeowners-ug",
             file=sys.stderr,
         )
-        # TODO: SERVER-104638
-        # Set back to 1 when we are ready to enforce this
-        return 0
+        return 1
 
     print("There are no new files added that are unowned.")
     return 0
