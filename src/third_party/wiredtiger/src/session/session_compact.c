@@ -314,9 +314,6 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     u_int i;
-    bool ignore_cache_size_set;
-
-    ignore_cache_size_set = false;
 
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL(session, compact, config, cfg);
@@ -325,15 +322,6 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
         WT_ERR_MSG(session, EINVAL, "Compaction requires a URI");
 
     WT_STAT_CONN_SET(session, session_table_compact_running, 1);
-
-    /*
-     * The compaction thread should not block when the cache is full: it is holding locks blocking
-     * checkpoints and once the cache is full, it can spend a long time doing eviction.
-     */
-    if (!F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE)) {
-        ignore_cache_size_set = true;
-        F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
-    }
 
     /* In-memory ignores compaction operations. */
     if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
@@ -406,9 +394,6 @@ err:
      * reconciliation structures/memory).
      */
     WT_TRET(__wt_session_release_resources(session));
-
-    if (ignore_cache_size_set)
-        F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
 
     if (ret != 0)
         WT_STAT_CONN_INCR(session, session_table_compact_fail);

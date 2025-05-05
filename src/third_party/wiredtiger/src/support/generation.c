@@ -107,6 +107,7 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
     struct timespec start, stop;
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *s;
+    WT_VERBOSE_LEVEL verbose_orig_level[WT_VERB_NUM_CATEGORIES];
     uint64_t minutes, time_diff_ms, v;
     uint32_t i, session_cnt;
     int pause_cnt;
@@ -137,8 +138,27 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
              *
              * The thread's generation may be 0 (that is, not set).
              */
-            if (v == 0 || v >= generation)
+            if (v == 0 || v >= generation) {
+                /*
+                 * We turn on additional logging just before generation drain times out, but it's
+                 * possible that we get unblocked after increasing the traces but before hitting the
+                 * timeout. If this occurs set verbose levels back to their original values so we
+                 * can continue normal operation.
+                 */
+                if (verbose_timeout_flags == true) {
+                    if (which == WT_GEN_EVICT) {
+                        WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT);
+                        WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTSERVER);
+                        WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT_STUCK);
+                    } else if (which == WT_GEN_CHECKPOINT) {
+                        WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT);
+                        WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT_CLEANUP);
+                        WT_VERBOSE_RESTORE(
+                          session, verbose_orig_level, WT_VERB_CHECKPOINT_PROGRESS);
+                    }
+                }
                 break;
+            }
 
             /* If we're waiting on ourselves, we're deadlocked. */
             if (session == s) {
@@ -176,15 +196,19 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
                 else if (!verbose_timeout_flags &&
                   time_diff_ms > (WT_GEN_DRAIN_TIMEOUT_MIN * WT_MINUTE * WT_THOUSAND - 20)) {
                     if (which == WT_GEN_EVICT) {
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(
+                          session, verbose_orig_level, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(
+                          session, verbose_orig_level, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(
+                          session, verbose_orig_level, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
                     } else if (which == WT_GEN_CHECKPOINT) {
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_1);
-                        WT_SET_VERBOSE_LEVEL(
-                          session, WT_VERB_CHECKPOINT_CLEANUP, WT_VERBOSE_DEBUG_1);
-                        WT_SET_VERBOSE_LEVEL(
-                          session, WT_VERB_CHECKPOINT_PROGRESS, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(
+                          session, verbose_orig_level, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(session, verbose_orig_level,
+                          WT_VERB_CHECKPOINT_CLEANUP, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(session, verbose_orig_level,
+                          WT_VERB_CHECKPOINT_PROGRESS, WT_VERBOSE_DEBUG_1);
                     }
                     verbose_timeout_flags = true;
                 }
