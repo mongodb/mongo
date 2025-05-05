@@ -36,6 +36,10 @@ class GenerateFuzzConfig(Subcommand):
         set_parameters["mirrorReads"] = json.dumps(set_parameters["mirrorReads"])
         # This is moved from Jepsen mongod.conf to have only one setParameter key value pair.
         set_parameters["enableTestCommands"] = True
+        # Increase the number of retry attempts for FCBIS due to the limitation of having only one
+        # $backupCursor open at a time. This restriction causes nodes to wait for others to complete
+        # their synchronization, leading to repeated failures.
+        set_parameters["numInitialSyncAttempts"] = 20
         set_parameters["testingDiagnosticsEnabled"] = True
         conf = {
             "setParameter": set_parameters, "storage": {
