@@ -69,8 +69,6 @@ def generate_compiledb(bazel_bin, persistent_compdb):
         + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
         + compiledb_config
         + [
-            "--remote_executor=",
-            "--remote_cache=",
             "--bes_backend=",
             "--bes_results_url=",
             "--noinclude_artifacts",
