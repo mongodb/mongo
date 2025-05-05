@@ -1546,6 +1546,7 @@ extern void __wt_session_dhandle_sweep(WT_SESSION_IMPL *session);
 extern void __wt_session_dhandle_writeunlock(WT_SESSION_IMPL *session);
 extern void __wt_session_gen_enter(WT_SESSION_IMPL *session, int which);
 extern void __wt_session_gen_leave(WT_SESSION_IMPL *session, int which);
+extern void __wt_session_reset_last_error(WT_SESSION_IMPL *session);
 extern void __wt_session_set_last_error(
   WT_SESSION_IMPL *session, int err, int sub_level_err, const char *fmt, ...);
 extern void __wt_stash_discard(WT_SESSION_IMPL *session);

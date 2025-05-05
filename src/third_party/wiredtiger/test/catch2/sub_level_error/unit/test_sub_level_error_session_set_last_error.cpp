@@ -18,7 +18,7 @@
 
 using namespace utils;
 
-TEST_CASE("Session set last error - test storing verbose info about the last error in the session",
+TEST_CASE("Test set_last_error and reset_last_error functions",
   "[sub_level_error_session_set_last_error],[sub_level_error]")
 {
     WT_SESSION *session;
@@ -33,13 +33,13 @@ TEST_CASE("Session set last error - test storing verbose info about the last err
     SECTION("Test with NULL session")
     {
         // Check that function can handle a NULL session without aborting.
-        __wt_session_set_last_error(NULL, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+        __wt_session_reset_last_error(NULL);
     }
 
     SECTION("Test with initial values")
     {
-        const char *err_msg_content = WT_ERROR_INFO_EMPTY;
-        __wt_session_set_last_error(session_impl, 0, WT_NONE, err_msg_content);
+        const char *err_msg_content = WT_ERROR_INFO_SUCCESS;
+        __wt_session_reset_last_error(session_impl);
         check_error_info(err_info, 0, WT_NONE, err_msg_content);
     }
 
@@ -62,7 +62,7 @@ TEST_CASE("Session set last error - test storing verbose info about the last err
         check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
 
         // The error message should be reset.
-        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+        __wt_session_reset_last_error(session_impl);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
@@ -70,26 +70,26 @@ TEST_CASE("Session set last error - test storing verbose info about the last err
     {
         const char *err_msg_content_EINVAL = "Some EINVAL error";
         const char *err_msg_content_EBUSY = "Some EBUSY error";
-        __wt_session_set_last_error(session_impl, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
-        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+        __wt_session_reset_last_error(session_impl);
+        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
         __wt_session_set_last_error(
           session_impl, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content_EINVAL);
         check_error_info(
           err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content_EINVAL);
 
         // Reset error.
-        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+        __wt_session_reset_last_error(session_impl);
 
         __wt_session_set_last_error(
           session_impl, EBUSY, WT_UNCOMMITTED_DATA, err_msg_content_EBUSY);
         check_error_info(err_info, EBUSY, WT_UNCOMMITTED_DATA, err_msg_content_EBUSY);
 
         // Reset error.
-        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+        __wt_session_reset_last_error(session_impl);
 
         __wt_session_set_last_error(session_impl, EBUSY, WT_DIRTY_DATA, err_msg_content_EBUSY);
         check_error_info(err_info, EBUSY, WT_DIRTY_DATA, err_msg_content_EBUSY);
-        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+        __wt_session_reset_last_error(session_impl);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
