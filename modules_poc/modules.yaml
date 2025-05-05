@@ -19,6 +19,10 @@
 #   to send questions/tickets to initially, understanding that we can always send them
 #   somewhere else if needed.
 
+# This module is a temporary home for files that also match a less-specific
+# (currently defined as shorter) glob in some module that these files should not
+# belong to. As part of assigning files to modules we should move these globs to
+# the module they belong to and eventually remove this module.
 __NONE__:
   files:
     - src/mongo/idl/cluster_server_parameter*
@@ -34,17 +38,8 @@ core:
     - src/mongo/platform/
     - src/mongo/stdx/
     - src/mongo/util/
-    - src/mongo/db/json.h
     - src/mongo/db/field_parser[._]*
     - src/mongo/db/generic_argument_util.*
-    - src/mongo/db/mongod.cpp
-    - src/mongo/db/mongod_initializers.cpp
-    - src/mongo/db/mongod_main.*
-    - src/mongo/db/mongod_options.*
-    - src/mongo/db/mongod_options_general.*
-    - src/mongo/db/mongod_options_init.cpp
-    - src/mongo/db/mongod_options_legacy.idl
-    - src/mongo/db/mongod_options_test.cpp
     - src/mongo/db/nesting_depth_test.cpp
     - src/mongo/db/operation_killer.*
     - src/mongo/db/operation_time_tracker[._]*
@@ -58,6 +53,7 @@ core:
     - src/mongo/db/throw_hook_impl[._]*
     - src/mongo/db/throw_hook_options.idl
     - src/mongo/dbtests/threadedtests.cpp
+    - src/mongo/dbtests/basictests.cpp
     - src/mongo/executor/cancelable_executor[._]*
     - src/mongo/executor/inline_executor[._]*
     - src/mongo/executor/scoped_task_executor[._]*
@@ -67,15 +63,19 @@ core:
 core.bson:
   files:
     - src/mongo/bson/
+    # Unsure about the next one but putting here for now:
+    - src/mongo/db/query/util/jparse_util* # needs to be same module as bson/json.h
     - src/mongo/dbtests/jsobjtests.cpp
-    # Unsure about this but putting here for now:
-    - src/mongo/db/query/util/jparse_util* # needs to be same module as util/json.h
+    - src/mongo/dbtests/jsontests.cpp
+    - src/mongo/db/hasher* # TODO move to bson/ or at least rename to be less generic
+    - src/mongo/db/json.h # TODO delete this forwarding header which is only included in 5 places
 
 core.idl:
   files:
     - src/mongo/idl/
     - src/mongo/db/basic_types.*
 
+# stuff that is part of a generic mongo service
 core.service:
   files:
     - src/mongo/db/commands[._]* # not the commands directory
@@ -84,6 +84,27 @@ core.service:
     - src/mongo/db/service_context*
     - src/mongo/db/dbdirectclient[._]*
     - src/mongo/dbtests/directclienttests.cpp
+    - src/mongo/db/feature_flag*
+    - src/mongo/db/error_labels*
+    - src/mongo/db/server_feature_flags.idl
+    - src/mongo/db/windows_options.idl
+
+# stuff that is part of a *specific* mongo server (eg mongos, mongod)
+core.servers:
+  files:
+    - src/mongo/db/mongod.cpp
+    - src/mongo/db/mongod_main.*
+    - src/mongo/db/mongod_options.*
+    - src/mongo/db/mongod_options_init.cpp
+    - src/mongo/db/mongod_initializers.cpp
+    - src/mongo/db/mongod_options_general.*
+    - src/mongo/db/mongod_options_legacy.idl
+    - src/mongo/db/mongod_options_test.cpp
+    - src/mongo/db/service_context_d_test_fixture*
+    - src/mongo/db/global_settings*
+    - src/mongo/s/mongos.cpp
+    - src/mongo/s/mongos_main.*
+    - src/mongo/s/mongos_options*
 
 core.commands:
   files:
@@ -102,6 +123,9 @@ core.commands:
     - src/mongo/db/commands/shutdown_d.cpp
     - src/mongo/db/commands/sleep_command.cpp
     - src/mongo/db/commands/test_commands[._]*
+    - src/mongo/db/commands/generic.*
+    - src/mongo/db/commands/generic_servers.*
+    - src/mongo/db/commmands/parameters.*
 
 core.unittest:
   files:
@@ -145,6 +169,7 @@ query:
     - src/mongo/db/update/
     - src/mongo/util/safe_num*
     - src/mongo/db/views/
+    - src/mongo/db/namespace_spec.idl # only used by query
 
 catalog:
   meta:
@@ -154,6 +179,10 @@ catalog:
     - src/mongo/db/catalog/
     - src/mongo/db/catalog_raii*
     - src/mongo/db/namespace_string*
+    - src/mongo/db/d_concurrency_* # TODO SERVER-104625 move to db/concurrency with siblings
+    - src/mongo/db/database_name*
+    - src/mongo/db/tenant_id* # needs to be same module as database_name.h
+    - src/mongo/dbtests/indexcatalogtests.cpp
     - src/mongo/util/namespace_string* # needs to be same module as db/namespace_string.h
 
 replication:
@@ -350,3 +379,10 @@ tracking_allocators: # authoritative: @10gen/server-tracking-allocators
     jira: TODO
   files:
     - src/mongo/util/tracking
+
+# This module doesn't really exist. It's files are only compiled on windows, and we don't
+# run the mod_scanner on a windows build. However, it is needed to ensure that all first-party
+# C++ files are assigned to a module. It should be a dependency island anyway.
+installer:
+  files:
+    - src/mongo/installer/

@@ -94,8 +94,6 @@ with open(parent / "modules.yaml") as f:
         for mod, info in raw_mods.items():
             for glob in info["files"]:
                 lines.append(f"/{glob} @10gen/{mod}")
-                if glob.endswith(".idl"):
-                    lines.append(f"/{glob[:-4]}_gen.* @10gen/{mod}")
         # If multiple rules match, later wins. So put rules with more
         # specificity later. For all of our current rules, longer means more
         # specific.
@@ -356,13 +354,19 @@ def normpath_for_file(f: Cursor | ClangFile | str | None) -> str | None:
     return os.path.normpath(name)  # fix up a/X/../b/c.h -> a/b/c.h
 
 
-file_mod_map: dict[str | None, str | None] = {None: None}
+file_mod_map: dict[str, str] = {}
 complete_headers = set[str]()
 incomplete_headers = set[str]()
 
 
 def mod_for_file(f: ClangFile | str | None) -> str | None:
     name = normpath_for_file(f)
+    if not name:
+        return None
+
+    if name and name.endswith("_gen.h") or name.endswith("_gen.cpp"):
+        name = re.sub(r"_gen\.(h|cpp)$", ".idl", name)
+
     if name in file_mod_map:
         return file_mod_map[name]
 
