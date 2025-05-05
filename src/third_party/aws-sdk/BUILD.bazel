@@ -101,8 +101,7 @@ mongo_cc_library(
         "-pedantic",
         "-Wno-long-long",
         "-std=gnu99",
-        "-Wno-macro-redefined",
-        "-Wno-newline-eof",
+        "-Wp,-w",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -115,6 +114,10 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+    cxxopts = [
+        "-Wno-newline-eof",
+        "-Wno-macro-redefined",
+    ],
     linkopts = [
         "-lpthread",
         "-ldl",
@@ -267,6 +270,7 @@ mongo_cc_library(
         "-DS2N_EXPORTS",
         "-include utils/s2n_prelude.h",
         "-Wno-macro-redefined",
+        "-Wp,-w",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -447,6 +451,7 @@ mongo_cc_library(
         "-std=gnu99",
         "-Wno-macro-redefined",
         "-Wno-newline-eof",
+        "-Wp,-w",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
@@ -556,6 +561,7 @@ mongo_cc_library(
         "-Wno-long-long",
         "-std=gnu99",
         "-Wno-newline-eof",
+        "-Wp,-w",
     ] + select({
         # Platform specific source file include path
         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
