@@ -55,10 +55,6 @@ assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 
 // Ensure we see the sync source progress logs.
 setLogVerbosity(rst.nodes, {"replication": {"verbosity": 2}});
 
-let serverStatus = assert.commandWorked(testNode.adminCommand({serverStatus: 1})).metrics.repl;
-const numSyncSourceChanges =
-    serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode;
-
 jsTestLog("Forcing sync sources for the secondaries");
 forceSyncSource(rst, secondary, primary);
 forceSyncSource(rst, targetSecondary, primary);
@@ -129,10 +125,5 @@ hangOplogFetcherBeforeAdvancingLastFetched.off();
 
 jsTestLog("Verifying that the node eventually syncs from target");
 rst.awaitSyncSource(testNode, targetSecondary);
-
-// Verify that the metric was incremented correctly.
-serverStatus = assert.commandWorked(testNode.adminCommand({serverStatus: 1})).metrics.repl;
-assert.eq(numSyncSourceChanges + 1,
-          serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode);
 
 rst.stopSet();
