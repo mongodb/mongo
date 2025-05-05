@@ -458,6 +458,7 @@ common:no-remote-exec --jobs=auto
 # Disable remote execution and caching for public releases
 --config=public-release
 common:public-release --remote_executor=
+common:public-release --experimental_remote_downloader=
 common:public-release --remote_cache=
 common:public-release --bes_backend=
 common:public-release --bes_results_url=
