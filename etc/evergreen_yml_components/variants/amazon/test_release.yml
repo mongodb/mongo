@@ -530,7 +530,6 @@ buildvariants:
           - amazon2-latest-large
       - name: streams
       - name: streams_kafka
-      - name: streams_kafka_gwproxy
       - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
