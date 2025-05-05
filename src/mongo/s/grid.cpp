@@ -33,11 +33,13 @@
 #include <utility>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -114,6 +116,60 @@ void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_customConnectionPoolStatsFn || !statsFn);
     _customConnectionPoolStatsFn = std::move(statsFn);
+}
+
+// TODO (SERVER-104701): Unify mongoS and mongoD implementations and get rid of `isMongos` parameter
+void Grid::shutdown(OperationContext* opCtx,
+                    BSONObjBuilder* shutdownTimeElapsedBuilder,
+                    bool isMongos) {
+    if (!this->isInitialized()) {
+        // Note that the Grid may not be initialized if a shutdown is triggered during the server
+        // startup.
+        return;
+    }
+
+    const auto serviceContext = opCtx->getServiceContext();
+
+    if (isMongos) {
+        if (auto cursorManager = this->getCursorManager()) {
+
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownCursorManager,
+                                           shutdownTimeElapsedBuilder);
+            cursorManager->shutdown(opCtx);
+        }
+    }
+
+    if (isMongos || TestingProctor::instance().isEnabled()) {
+        // The shutdown of the ExecutorPool is needed to prevent memory leaks. However, it can cause
+        // race conditions with sharding components that use ScopedTaskExecutor.
+        // Since memory leaks are more desired than crashing at shutdown, we decided to skip its
+        // shutdown on production but keep it on tests to have more manageable BF tracking (see
+        // SERVER-78971 for more info).
+        if (auto pool = this->getExecutorPool()) {
+            LOGV2(7698300, "Shutting down the ExecutorPool");
+            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                           TimedSectionId::shutDownExecutorPool,
+                                           shutdownTimeElapsedBuilder);
+            pool->shutdownAndJoin();
+        }
+    }
+
+    if (auto shardRegistry = this->shardRegistry()) {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownShardRegistry,
+                                       shutdownTimeElapsedBuilder);
+        LOGV2(4784919, "Shutting down the shard registry");
+        shardRegistry->shutdown();
+    }
+
+    if (this->isShardingInitialized()) {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownCatalogCache,
+                                       shutdownTimeElapsedBuilder);
+        LOGV2(7698301, "Shutting down the CatalogCache");
+        this->catalogCache()->shutDownAndJoin();
+    }
 }
 
 void Grid::clearForUnitTests() {

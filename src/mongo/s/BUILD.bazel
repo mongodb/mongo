@@ -230,6 +230,7 @@ mongo_cc_library(
         "//src/mongo/db:read_write_concern_defaults",
         "//src/mongo/db:server_base",
         "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/repl:replica_set_messages",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/update:update_common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/executor:task_executor_pool",

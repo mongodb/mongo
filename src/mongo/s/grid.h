@@ -154,6 +154,13 @@ public:
     }
 
     /**
+     * Shuts down all the services that are managed by the Grid class.
+     */
+    void shutdown(OperationContext* opCtx,
+                  BSONObjBuilder* shutdownTimeElapsedBuilder,
+                  bool isMongos = false);
+
+    /**
      * Clears the grid object so that it can be reused between test executions. This will not
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
      * own service context.

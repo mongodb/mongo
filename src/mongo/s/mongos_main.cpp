@@ -490,34 +490,8 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             validator->shutDown();
         }
 
-        if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
-            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                           TimedSectionId::shutDownCursorManager,
-                                           &shutdownTimeElapsedBuilder);
-            cursorManager->shutdown(opCtx);
-        }
-
-        if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
-            LOGV2_OPTIONS(7698300, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
-            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                           TimedSectionId::shutDownExecutorPool,
-                                           &shutdownTimeElapsedBuilder);
-            pool->shutdownAndJoin();
-        }
-
-        if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
-            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                           TimedSectionId::shutDownShardRegistry,
-                                           &shutdownTimeElapsedBuilder);
-            shardRegistry->shutdown();
-        }
-
-        if (Grid::get(serviceContext)->isShardingInitialized()) {
-            SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                           TimedSectionId::shutDownCatalogCache,
-                                           &shutdownTimeElapsedBuilder);
-            LOGV2_OPTIONS(7698301, {LogComponent::kSharding}, "Shutting down the CatalogCache");
-            Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
+        if (auto grid = Grid::get(opCtx)) {
+            grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, true /* isMongos */);
         }
 
         {
