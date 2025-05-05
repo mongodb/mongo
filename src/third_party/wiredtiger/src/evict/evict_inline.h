@@ -633,6 +633,11 @@ __wt_evict_app_assist_worker_check(
     if (didworkp != NULL)
         *didworkp = false;
 
+    /* It is not safe to proceed if the eviction server threads aren't setup yet. */
+    WT_CONNECTION_IMPL *conn = S2C(session);
+    if (!__wt_atomic_loadbool(&conn->evict_server_running))
+        return (0);
+
     /* Eviction causes reconciliation. So don't evict if we can't reconcile */
     if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
         return (0);
@@ -655,9 +660,8 @@ __wt_evict_app_assist_worker_check(
         return (0);
 
     /* Setting cache_max_wait_us to 1 effectively means "disable eviction when possible" */
-    uint64_t cache_max_wait_us = session->cache_max_wait_us != 0 ?
-      session->cache_max_wait_us :
-      S2C(session)->evict->cache_max_wait_us;
+    uint64_t cache_max_wait_us =
+      session->cache_max_wait_us != 0 ? session->cache_max_wait_us : conn->evict->cache_max_wait_us;
     if (cache_max_wait_us == 1)
         return (0);
 
@@ -667,7 +671,7 @@ __wt_evict_app_assist_worker_check(
      * evict what we can. Otherwise, we are at a transaction boundary and we can work harder to make
      * sure there is free space in the cache.
      */
-    WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
+    WT_TXN_GLOBAL *txn_global = &conn->txn_global;
     WT_TXN_SHARED *txn_shared = WT_SESSION_TXN_SHARED(session);
     busy = busy || __wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE ||
       session->hazards.num_active > 0 ||
@@ -687,7 +691,7 @@ __wt_evict_app_assist_worker_check(
         return (0);
 
     /* In memory configurations don't block when the cache is full. */
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_IN_MEMORY))
         return (0);
 
     /*
@@ -704,6 +708,13 @@ __wt_evict_app_assist_worker_check(
     if (!__wt_evict_needed(session, busy, readonly, &pct_full))
         return (0);
 
+    /*
+     * If the caller is holding shared resources, only evict if the cache is at any of its eviction
+     * targets.
+     */
+    if (busy && pct_full < 100.0)
+        return (0);
+
     /* Last check if application wants to prevent the thread from evicting. */
     if (!__evict_check_user_ok_with_eviction(session, interruptible))
         return (0);
@@ -715,7 +726,7 @@ __wt_evict_app_assist_worker_check(
     if (didworkp != NULL)
         *didworkp = true;
 
-    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible, pct_full));
+    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible));
 }
 
 /*

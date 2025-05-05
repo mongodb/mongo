@@ -100,8 +100,11 @@ class test_drop03(wttest.WiredTigerTestCase):
         self.verify_value(self.uri, self.session, 'key: bbb', 'value: bbb1')
 
         # Drop call should succeed without the force option.
-        self.prout("drop force=false without active transaction should succeed.")
-        self.dropUntilSuccess(self.session, self.uri, "force=false")
+        self.prout("drop force=false without active transaction should fail as the table is dirty.")
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, "force=false")),
+                        "was expecting drop call to fail with EBUSY")
+        self.prout("drop force=true without active transaction should succeed even if the table is dirty.")
+        self.session.drop(self.uri, "force=true")
 
         # Check that the table is dropped.
         self.prout("Does not exist after successful drop. confirm_does_not_exist().")

@@ -281,18 +281,17 @@ struct __wt_btree {
  * explanation.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 12 */
-#define WT_BTREE_BULK 0x001000u           /* Bulk-load handle */
-#define WT_BTREE_CLOSED 0x002000u         /* Handle closed */
-#define WT_BTREE_IGNORE_CACHE 0x004000u   /* Cache-resident object */
-#define WT_BTREE_IN_MEMORY 0x008000u      /* Cache-resident object */
-#define WT_BTREE_LOGGED 0x010000u         /* Commit-level durability without timestamps */
-#define WT_BTREE_NO_CHECKPOINT 0x020000u  /* Disable checkpoints */
-#define WT_BTREE_OBSOLETE_PAGES 0x040000u /* Handle has obsolete pages */
-#define WT_BTREE_READONLY 0x080000u       /* Handle is readonly */
-#define WT_BTREE_SALVAGE 0x100000u        /* Handle is for salvage */
-#define WT_BTREE_SKIP_CKPT 0x200000u      /* Handle skipped checkpoint */
-#define WT_BTREE_VERIFY 0x400000u         /* Handle is for verify */
-                                          /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+#define WT_BTREE_BULK 0x001000u          /* Bulk-load handle */
+#define WT_BTREE_CLOSED 0x002000u        /* Handle closed */
+#define WT_BTREE_IGNORE_CACHE 0x004000u  /* Cache-resident object */
+#define WT_BTREE_IN_MEMORY 0x008000u     /* Cache-resident object */
+#define WT_BTREE_LOGGED 0x010000u        /* Commit-level durability without timestamps */
+#define WT_BTREE_NO_CHECKPOINT 0x020000u /* Disable checkpoints */
+#define WT_BTREE_READONLY 0x040000u      /* Handle is readonly */
+#define WT_BTREE_SALVAGE 0x080000u       /* Handle is for salvage */
+#define WT_BTREE_SKIP_CKPT 0x100000u     /* Handle skipped checkpoint */
+#define WT_BTREE_VERIFY 0x200000u        /* Handle is for verify */
+                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
 

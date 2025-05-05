@@ -484,6 +484,9 @@ __rec_row_zero_len(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
      * The item must be globally visible because we're not writing anything on the page. Don't be
      * tempted to check the time window against the default here - the check is subtly different due
      * to the grouping.
+     *
+     * tw->start_ts == WT_TS_NONE && tw->start_txn == WT_TXN_NONE is a simpler check and can bypass
+     * evaluating the more expensive __wt_txn_tw_start_visible_all check.
      */
     return (!WT_TIME_WINDOW_HAS_STOP(tw) &&
       ((tw->start_ts == WT_TS_NONE && tw->start_txn == WT_TXN_NONE) ||

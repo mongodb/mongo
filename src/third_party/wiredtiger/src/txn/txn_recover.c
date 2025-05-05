@@ -1016,6 +1016,13 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
         r.metadata_only = true;
         r.backup_only = false;
     }
+
+    /*
+     * Start metadata recovery. Don't allow any Btree files to be opened, they depend on metadata
+     * that might be modified during recovery.
+     */
+    F_SET_ATOMIC_32(conn, WT_CONN_RECOVERING_METADATA);
+
     /*
      * If this is a read-only connection, check if the checkpoint LSN in the metadata file is up to
      * date, indicating a clean shutdown.
@@ -1036,6 +1043,9 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
         ret = __wt_log_scan(
           session, &metafile->ckpt_lsn, NULL, WT_LOGSCAN_RECOVER_METADATA, __txn_log_recover, &r);
     }
+    /* We're finished with metadata recovery, so allow other data files to be opened. */
+    F_CLR_ATOMIC_32(conn, WT_CONN_RECOVERING_METADATA);
+
     if (F_ISSET_ATOMIC_32(conn, WT_CONN_SALVAGE))
         ret = 0;
     /* We need to do some work after recovering backup information. Do that now. */

@@ -2818,7 +2818,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
  */
 int
 __wti_evict_app_assist_worker(
-  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, double pct_full)
+  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible)
 {
     WT_DECL_RET;
     WT_TRACK_OP_DECL;
@@ -2838,17 +2838,10 @@ __wti_evict_app_assist_worker(
      * Before we enter the eviction generation, make sure this session has a cached history store
      * cursor, otherwise we can deadlock with a session wanting exclusive access to a handle: that
      * session will have a handle list write lock and will be waiting on eviction to drain, we'll be
-     * inside eviction waiting on a handle list read lock to open a history store cursor.
+     * inside eviction waiting on a handle list read lock to open a history store cursor. The
+     * eviction server should be started at this point so it is safe to open the history store.
      */
     WT_ERR(__wt_curhs_cache(session));
-
-    /*
-     * It is not safe to proceed if the eviction server threads aren't setup yet. Also, if the
-     * caller is holding shared resources, only evict if the cache is at any of its eviction
-     * targets.
-     */
-    if (!__wt_atomic_loadbool(&conn->evict_server_running) || (busy && pct_full < 100.0))
-        goto done;
 
     /* Wake the eviction server if we need to do work. */
     __wt_evict_server_wake(session);
@@ -2911,6 +2904,7 @@ __wti_evict_app_assist_worker(
         uint64_t max_progress = busy ? 5 : 20;
 
         /* See if eviction is still needed. */
+        double pct_full;
         if (!__wt_evict_needed(session, busy, readonly, &pct_full) ||
           (pct_full < 100.0 &&
             (__wt_atomic_loadv64(&evict->eviction_progress) > initial_progress + max_progress)))
@@ -2967,7 +2961,6 @@ err:
         }
     }
 
-done:
     WT_TRACK_OP_END(session);
 
     return (ret);
