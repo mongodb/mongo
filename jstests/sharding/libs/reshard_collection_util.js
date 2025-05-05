@@ -286,7 +286,10 @@ export class ReshardCollectionCmdTest {
         const tempReshardingCollName =
             this._constructTemporaryReshardingCollName(this._dbName, this._collName);
 
+        const startTime = Date.now();
         assert.commandWorked(this._mongos.adminCommand(commandObj));
+        const endTime = Date.now();
+        this._reshardDuration = (endTime - startTime) / 1000;
 
         this._verifyShardKey(commandObj.key);
 

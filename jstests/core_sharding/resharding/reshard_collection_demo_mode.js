@@ -56,21 +56,17 @@ const testDemoModeTrue = (mongos) => {
     jsTestLog("Testing reshardCollection with demoMode: true should complete quickly.");
 
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
-
-    const startTime = Date.now();
+    const maxExpectedDurationMs = reshardingDelayBeforeRemainingOperationTimeQueryMillisValue - 1;
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1, demoMode: true},
         1);  // Expect 1 initial chunk
 
-    const endTime = Date.now();
-    const durationMs = endTime - startTime;
-    const maxExpectedDurationMs = reshardingDelayBeforeRemainingOperationTimeQueryMillisValue - 1;
-
-    assert.lte(durationMs,
-               maxExpectedDurationMs,
-               `Resharding with demoMode=true took ${
-                   durationMs}ms, which is longer than the expected maximum of ${
-                   maxExpectedDurationMs}ms.`);
+    assert.lte(
+        reshardCmdTest._reshardDuration,
+        maxExpectedDurationMs,
+        `Resharding with demoMode=true took ${
+            reshardCmdTest._reshardDuration}ms, which is longer than the expected maximum of ${
+            maxExpectedDurationMs}ms.`);
 };
 
 const testDemoModeFalse = (mongos) => {
