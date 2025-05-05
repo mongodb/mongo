@@ -82,6 +82,8 @@ yq '.[] |= (.server_programmability | values) |  with_entries(select(.key | star
 yq '.[].__NO_OWNER__ | values | to_entries | map("\(.key)/\(.value[])") | .[] ' modules_dump.yaml -r | sort
 # unowned files grouped by directory
 yq '[.[].__NO_OWNER__ | to_entries? | .[]] | group_by(.key) | map({key: .[0].key, value: ([.[].value] | add | sort)}) | from_entries' modules_dump.yaml
+# assigned files owned by non server-programmability teams inside of the core module (grouped by teams, then directory)
+yq '.core | with_entries(select(.key != "server_programmability"))' modules_dump.yaml
 ```
 
 ## Specifying public and private module APIs

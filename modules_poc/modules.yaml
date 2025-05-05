@@ -59,6 +59,7 @@ core:
     - src/mongo/executor/scoped_task_executor[._]*
     - src/mongo/executor/task_executor[._]*
     - src/mongo/executor/thread_pool[._]*
+    - src/mongo/db/exec/scoped_timer*
 
 core.bson:
   files:
@@ -126,6 +127,11 @@ core.commands:
     - src/mongo/db/commands/generic.*
     - src/mongo/db/commands/generic_servers.*
     - src/mongo/db/commmands/parameters.*
+    - src/mongo/s/request_types/wait_for_fail_point.idl
+    - src/mongo/s/commands/cluster_build_info.cpp
+    - src/mongo/s/commands/cluster_kill_op.cpp
+    - src/mongo/s/commands/cluster_killoperations_cmd.cpp
+    - src/mongo/s/commands/cluster_shutdown_cmd.cpp
 
 core.unittest:
   files:
@@ -167,9 +173,9 @@ query:
     - src/mongo/db/s/*query*analyzer* # note the filename pattern
     - src/mongo/db/stats/
     - src/mongo/db/update/
-    - src/mongo/util/safe_num*
     - src/mongo/db/views/
     - src/mongo/db/namespace_spec.idl # only used by query
+    - src/mongo/util/safe_num*
 
 catalog:
   meta:
