@@ -199,7 +199,7 @@ private:
                               const DatabaseName& dbName,
                               boost::optional<DatabaseVersion> receivedDbVersion);
 
-    // TODO (SERVER-100711): Place this method inside the new class to maintain DSS/CSS caches.
+    // TODO (SERVER-103712): Place this method inside the DatabaseShardingState.
     void _onDbVersionMismatchAuthoritative(OperationContext* opCtx,
                                            const DatabaseName& dbName,
                                            const DatabaseVersion& receivedDbVersion);
