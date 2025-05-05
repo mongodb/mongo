@@ -188,3 +188,8 @@ feature_flags:
         default: true
         version: 8.0
         shouldBeFCVGated: true
+    featureFlagRateLimitIngressConnectionEstablishment:
+        description: "Queues connection establishment after exceeding the maximum rate"
+        cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
+        default: false
+        shouldBeFCVGated: false
