@@ -7,6 +7,4 @@ DEFINES = [
     # TODO SERVER-54659 - ASIO depends on std::result_of which was removed
     # in C++ 20. xcode15 does not have backwards compatibility.
     "ASIO_HAS_STD_INVOKE_RESULT",
-    # This is needed to compile boost on the newer xcodes
-    "BOOST_NO_CXX98_FUNCTION_BASE",
 ]

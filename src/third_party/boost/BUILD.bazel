@@ -113,12 +113,7 @@ BOOST_LIB_HEADERS = glob([
 
 BOOST_DEFINES = [
     "BOOST_BIND_GLOBAL_PLACEHOLDERS",
-] + select({
-    "@platforms//os:macos": [
-        "BOOST_NO_CXX98_FUNCTION_BASE",
-    ],
-    "//conditions:default": [],
-})
+]
 
 BOOST_LIB_INCLUDES = ["."] + glob(
     ["libs/" + library + "/include" for library in BOOST_LIBS],
