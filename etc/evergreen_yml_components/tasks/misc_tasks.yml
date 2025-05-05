@@ -1145,14 +1145,19 @@ tasks:
       - func: "git get project and add git tag"
       - func: "do setup"
       - func: "get engflow creds"
-      - func: "run resmoke suite with bazel"
+      - func: "f_expansions_write"
+      - func: "bazel test"
         vars:
           targets: //buildscripts/resmokeconfig:core
+          compiling_for_test: true
           bazel_args: >-
             --config=no-remote-exec
             --test_output=all
             --workspace_status_command="bazel/resmoke/volatile_status.sh"
             --//bazel/resmoke:in_evergreen
+      - command: attach.results
+        params:
+          file_location: report.json
 
   # Experimental task running the jstestfuzz suite bazel target. To be removed with SERVER-103537.
   - name: bazel_test_jstestfuzz
@@ -1168,14 +1173,18 @@ tasks:
           jstestfuzz_vars: "--numGeneratedFiles 2 --jsTestsDir ../jstests"
           npm_command: "jstestfuzz"
       - func: "get engflow creds"
-      - func: "run resmoke suite with bazel"
+      - func: "bazel test"
         vars:
-          target: //buildscripts/resmokeconfig:jstestfuzz
-          args: >-
+          targets: //buildscripts/resmokeconfig:jstestfuzz
+          compiling_for_test: true
+          bazel_args: >-
             --config=no-remote-exec
             --test_output=all
             --workspace_status_command="bazel/resmoke/volatile_status.sh"
             --//bazel/resmoke:in_evergreen
+      - command: attach.results
+        params:
+          file_location: report.json
 
   - name: unit_test_group1_no_sandbox
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]

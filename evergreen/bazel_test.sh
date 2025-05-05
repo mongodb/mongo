@@ -88,7 +88,7 @@ done
 
 # For a target //path:test, the undeclared test outputs are in
 # bazel-testlogs/path/test/test.outputs/outputs.zip
-outputs=bazel-testlogs/$(sed "s|//||;s|:|/|" <<< ${target})/test.outputs/outputs.zip
+outputs=bazel-testlogs/$(sed "s|//||;s|:|/|" <<< ${targets})/test.outputs/outputs.zip
 if [ -f $outputs ]; then
   unzip $outputs -d ../
 fi
