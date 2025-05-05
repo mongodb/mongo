@@ -1432,7 +1432,17 @@ functions:
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
         author_email: ${author_email}
-      add_expansions_to_env: true
+        build_id: ${build_id}
+        distro_id: ${distro_id}
+        execution: ${execution}
+        project: ${project}
+        revision: ${revision}
+        revision_order_id: ${revision_order_id}
+        task_id: ${task_id}
+        task_name: ${task_name}
+        build_variant: ${build_variant}
+        version_id: ${version_id}
+        requester: ${requester}
       args:
         - "src/evergreen/bazel_test.sh"
 

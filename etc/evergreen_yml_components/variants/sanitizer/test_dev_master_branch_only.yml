@@ -271,7 +271,7 @@ buildvariants:
       - name: compile_test_serial_TG
         distros:
           - windows-2022-xxlarge
-      - name: run_unit_tests_TG
+      - name: run_unit_tests_no_sandbox_TG
         distros:
           - windows-2022-xxlarge
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
