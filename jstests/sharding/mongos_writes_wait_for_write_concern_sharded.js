@@ -30,7 +30,6 @@ checkWriteConcernBehaviorForAllCommands(
 st.stop();
 
 st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
-st.stopBalancer();
 
 assert.commandWorked(
     st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
