@@ -18,6 +18,7 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = jsTestName();
 
@@ -50,16 +51,30 @@ function createTestCollection(st) {
     assert.eq(1, st.shard0.getCollection(kRangeDeletionNs).find().toArray().length);
 }
 
-function validateRangeDeletionTasks(st, fcv) {
+function validateRangeDeletionTasks(st) {
     var terminateSecondaryFeatureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.configRS.getPrimary().getDB('admin'), "TerminateSecondaryReadsUponRangeDeletion");
-
-    var doc = st.shard0.getCollection(kRangeDeletionNs).findOne({nss: testRangeDeletionNS});
     // preMigrationShardVersion field is not removed during downgrade.
     // Therefore, we only need to check that it is present when the relevant Feature Flag is
     // enabled.
     if (terminateSecondaryFeatureFlagEnabled) {
-        assert(doc.hasOwnProperty('preMigrationShardVersion'));
+        assert.soon(() => {
+            try {
+                var doc =
+                    st.shard0.getCollection(kRangeDeletionNs).findOne({nss: testRangeDeletionNS});
+                assert(doc.hasOwnProperty('preMigrationShardVersion'));
+                return true;
+            } catch (e) {
+                if (isNetworkError(e)) {
+                    // It's a network error, attempting to reconnect and retry.
+                    reconnect(st.shard0);
+                    return false;
+                }
+                // It's a different error, re-throw it immediately.
+                // assert.soon will catch it and fail the assertion.
+                throw e;
+            }
+        });
     }
 }
 
@@ -124,7 +139,7 @@ function checkClusterBeforeUpgrade(fcv) {
 
 function checkClusterAfterFCVUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-    validateRangeDeletionTasks(st, fcv);
+    validateRangeDeletionTasks(st);
 }
 
 function checkClusterAfterBinaryDowngrade(fcv) {
