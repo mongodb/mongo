@@ -47,8 +47,15 @@
 namespace mongo {
 namespace resharding {
 
+using primary_only_service_helpers::kDefaultRetryabilityPredicate;
+using primary_only_service_helpers::RetryabilityPredicate;
 using primary_only_service_helpers::RetryingCancelableOperationContextFactory;
 using primary_only_service_helpers::WithAutomaticRetry;
+
+const auto kRetryabilityPredicateIncludeWriteConcernTimeout = [](const Status& status) {
+    return kDefaultRetryabilityPredicate(status) || status == ErrorCodes::WriteConcernTimeout;
+};
+
 
 /**
  * Converts a vector of SharedSemiFutures into a vector of ExecutorFutures.

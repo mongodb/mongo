@@ -1188,5 +1188,110 @@ TEST_F(ReshardingDonorServiceTest, FailoverAfterDonorErrorsPriorToObtainingTimes
     }
 }
 
+MONGO_FAIL_POINT_DEFINE(failFinishOpWithWCE);
+
+class ExternalStateForTestWCEOnRefresh : public ExternalStateForTest {
+public:
+    void refreshCollectionPlacementInfo(OperationContext* opCtx,
+                                        const NamespaceString& sourceNss) override {
+        if (MONGO_unlikely(failFinishOpWithWCE.shouldFail())) {
+            failFinishOpWithWCE.pauseWhileSet(opCtx);
+            uasserted(ErrorCodes::WriteConcernTimeout, "mock WCE");
+        }
+
+        uassertStatusOK(Status::OK());
+    }
+};
+
+class ReshardingDonorServiceWithWCEForTest : public ReshardingDonorServiceForTest {
+public:
+    explicit ReshardingDonorServiceWithWCEForTest(ServiceContext* serviceContext)
+        : ReshardingDonorServiceForTest(serviceContext), _serviceContext(serviceContext) {}
+
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
+        return std::make_shared<DonorStateMachine>(
+            this,
+            ReshardingDonorDocument::parse(IDLParserContext{"ReshardingDonorServiceForTest"},
+                                           initialState),
+            std::make_unique<ExternalStateForTestWCEOnRefresh>(),
+            _serviceContext);
+    }
+
+private:
+    ServiceContext* _serviceContext;
+};
+
+class ReshardingDonorServiceTestWithWCE : public ReshardingDonorServiceTest {
+public:
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
+        return std::make_unique<ReshardingDonorServiceWithWCEForTest>(serviceContext);
+    }
+
+    void setUp() override {
+        ReshardingDonorServiceTest::setUp();
+    }
+};
+
+TEST_F(ReshardingDonorServiceTestWithWCE,
+       RetryOnWCEAfterCriticalSectionDoesNotResetCriticalSectionTime) {
+    // No need to test this with all options
+    auto testOptions = makeAllTestOptions()[0];
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+
+    createSourceCollection(opCtx.get(), doc);
+
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    awaitDonorState(opCtx.get(), doc.getReshardingUUID(), DonorStateEnum::kBlockingWrites);
+
+    // At this point we've entered the critical section. Turn on the failpoint to force a
+    // WriteConcernError on the refresh that occurs after transitioning to "done".
+    auto timesEntered = failFinishOpWithWCE.setMode(FailPoint::alwaysOn);
+
+    // We'll compare the critical section elapsed time to ensure that the end time for the critical
+    // section will not be reset on the retry due to the WriteConcernError. Sleep for 1 second now
+    // to ensure the critical section elapsed time is greater than 0 (since nothing is really
+    // happening in this unit test this would otherwise happen nearly instantaneously).
+    sleepsecs(1);
+
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+    awaitDonorState(opCtx.get(), doc.getReshardingUUID(), DonorStateEnum::kDone);
+
+    // Wait until we're in the refresh function to ensure we've set the critical section end time.
+    // Then, run currentOp and get the elapsed time.
+    failFinishOpWithWCE.waitForTimesEntered(timesEntered + 1);
+    auto currOp =
+        donor->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
+                                  MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle);
+    auto elapsedCritSecTime = currOp->getIntField("totalCriticalSectionTimeElapsedSecs");
+
+    // Sleep for 1 more second before turning off the failpoint and throwing the WriteConcernError.
+    // This will allow us to assert that despite the extra time (the faked 1 second) that the retry
+    // causes, that the critical section elapsed time remains the same.
+    sleepsecs(1);
+    failFinishOpWithWCE.setMode(FailPoint::off);
+
+    // Assert the operation successfully completes despite the WriteConcernError.
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+
+    auto currOpAfterFinish =
+        donor->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
+                                  MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle);
+    auto elapsedCritSecTimeAfterFinish =
+        currOpAfterFinish->getIntField("totalCriticalSectionTimeElapsedSecs");
+
+    // Assert the critical section elapsed time is unchanged even after the retry.
+    ASSERT_EQ(elapsedCritSecTime, elapsedCritSecTimeAfterFinish);
+}
+
 }  // namespace
 }  // namespace mongo

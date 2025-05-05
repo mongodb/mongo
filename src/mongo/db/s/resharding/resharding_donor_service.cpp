@@ -424,78 +424,89 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& stepdownToken,
     bool aborted) {
-    return resharding::WithAutomaticRetry([this, executor, stepdownToken, aborted] {
-               if (!aborted) {
-                   // If a failover occured after the donor transitioned to done locally, but before
-                   // it notified the coordinator, it will already be in state done here. Otherwise,
-                   // it must be in blocking-writes before transitioning to done.
-                   invariant(_donorCtx.getState() == DonorStateEnum::kBlockingWrites ||
-                             _donorCtx.getState() == DonorStateEnum::kDone);
+    return resharding::WithAutomaticRetry(
+               [this, executor, stepdownToken, aborted] {
+                   if (!aborted) {
+                       // If a failover occured after the donor transitioned to done locally, but
+                       // before it notified the coordinator, it will already be in state done here.
+                       // Otherwise, it must be in blocking-writes before transitioning to done.
+                       invariant(_donorCtx.getState() == DonorStateEnum::kBlockingWrites ||
+                                 _donorCtx.getState() == DonorStateEnum::kDone);
 
-                   _dropOriginalCollectionThenTransitionToDone();
-               } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
-                   {
-                       // Unblock the RecoverRefreshThread as quickly as possible when aborting.
-                       stdx::lock_guard<stdx::mutex> lk(_mutex);
-                       ensureFulfilledPromise(lk,
-                                              _critSecWasAcquired,
-                                              {ErrorCodes::ReshardCollectionAborted, "aborted"});
-                       ensureFulfilledPromise(lk,
-                                              _critSecWasPromoted,
-                                              {ErrorCodes::ReshardCollectionAborted, "aborted"});
-                   }
-
-                   // If aborted, the donor must be allowed to transition to done from any state.
-                   _transitionToDone(aborted);
-               }
-
-               {
-                   auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-                   // Clear filtering metadata for the temp resharding namespace;
-                   // We force a refresh to make sure that the placement information is updated in
-                   // cache after abort decision before the donor state document is deleted.
-                   {
-                       AutoGetCollection autoColl(
-                           opCtx.get(), _metadata.getTempReshardingNss(), MODE_IX);
-                       CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                           opCtx.get(), _metadata.getTempReshardingNss())
-                           ->clearFilteringMetadata(opCtx.get());
-                   }
-
-                   const auto onReleaseCriticalSectionAction =
-                       _externalState->getOnReleaseCriticalSectionCustomAction();
-                   ShardingRecoveryService::get(opCtx.get())
-                       ->releaseRecoverableCriticalSection(
-                           opCtx.get(),
-                           _metadata.getSourceNss(),
-                           _critSecReason,
-                           ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                           *onReleaseCriticalSectionAction);
-
-                   _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                       resharding::getCurrentTime());
-
-                   // We force a refresh to make sure that the placement information is updated in
-                   // cache after abort decision before the donor state document is deleted.
-                   std::initializer_list<NamespaceString> namespacesToRefresh{
-                       _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
-                   for (const auto& nss : namespacesToRefresh) {
-                       _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
-                       _externalState->waitForCollectionFlush(opCtx.get(), nss);
-                   }
-               }
-
-               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-               return _updateCoordinator(opCtx.get(), executor)
-                   .then([this, aborted, stepdownToken] {
+                       _dropOriginalCollectionThenTransitionToDone();
+                   } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
                        {
-                           auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                           removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
+                           // Unblock the RecoverRefreshThread as quickly as possible when aborting.
+                           stdx::lock_guard<stdx::mutex> lk(_mutex);
+                           ensureFulfilledPromise(
+                               lk,
+                               _critSecWasAcquired,
+                               {ErrorCodes::ReshardCollectionAborted, "aborted"});
+                           ensureFulfilledPromise(
+                               lk,
+                               _critSecWasPromoted,
+                               {ErrorCodes::ReshardCollectionAborted, "aborted"});
                        }
-                       _removeDonorDocument(stepdownToken, aborted);
-                   });
-           })
+
+                       // If aborted, the donor must be allowed to transition to done from any
+                       // state.
+                       _transitionToDone(aborted);
+                   }
+
+                   {
+                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+                       // Clear filtering metadata for the temp resharding namespace;
+                       // We force a refresh to make sure that the placement information is updated
+                       // in cache after abort decision before the donor state document is deleted.
+                       {
+                           AutoGetCollection autoColl(
+                               opCtx.get(), _metadata.getTempReshardingNss(), MODE_IX);
+                           CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                               opCtx.get(), _metadata.getTempReshardingNss())
+                               ->clearFilteringMetadata(opCtx.get());
+                       }
+
+                       const auto onReleaseCriticalSectionAction =
+                           _externalState->getOnReleaseCriticalSectionCustomAction();
+                       ShardingRecoveryService::get(opCtx.get())
+                           ->releaseRecoverableCriticalSection(
+                               opCtx.get(),
+                               _metadata.getSourceNss(),
+                               _critSecReason,
+                               ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                               *onReleaseCriticalSectionAction);
+
+                       // Only set the current time if not already set, if we hit a transient error
+                       // when refreshing or updating the coordinator doc below, we would have
+                       // already released the critical section and set the end time. We won't want
+                       // to reset the end time in this case.
+                       if (!_metrics->getEndFor(ReshardingMetrics::TimedPhase::kCriticalSection)) {
+                           _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                               resharding::getCurrentTime());
+                       }
+
+                       // We force a refresh to make sure that the placement information is updated
+                       // in cache after abort decision before the donor state document is deleted.
+                       std::initializer_list<NamespaceString> namespacesToRefresh{
+                           _metadata.getSourceNss(), _metadata.getTempReshardingNss()};
+                       for (const auto& nss : namespacesToRefresh) {
+                           _externalState->refreshCollectionPlacementInfo(opCtx.get(), nss);
+                           _externalState->waitForCollectionFlush(opCtx.get(), nss);
+                       }
+                   }
+
+                   auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                   return _updateCoordinator(opCtx.get(), executor)
+                       .then([this, aborted, stepdownToken] {
+                           {
+                               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                               removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
+                           }
+                           _removeDonorDocument(stepdownToken, aborted);
+                       });
+               },
+               resharding::kRetryabilityPredicateIncludeWriteConcernTimeout)
         .onTransientError([](const Status& status) {
             LOGV2(5633600,
                   "Transient error while finishing resharding operation",
