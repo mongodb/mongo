@@ -146,3 +146,8 @@ feature_flags:
         cpp_varname: gFeatureFlagRawDataCrudOperations
         default: false
         shouldBeFCVGated: false
+    featureFlagRateLimitIngressConnectionEstablishment:
+        description: "Queues connection establishment after exceeding the maximum rate"
+        cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
+        default: false
+        shouldBeFCVGated: false
