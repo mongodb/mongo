@@ -171,6 +171,7 @@ common --//bazel/config:dbg_level=1
 common --//bazel/config:debug_symbols=True
 common --//bazel/config:separate_debug=False
 common --//bazel/config:compiler_type=clang
+common --//bazel/config:linker=mold
 common --//bazel/config:linkstatic=True
 common --//bazel/config:build_enterprise=True
 common --//bazel/config:skip_archive=True
@@ -196,6 +197,7 @@ common:fastbuild --//bazel/config:dbg_level=1
 common:fastbuild --//bazel/config:debug_symbols=True
 common:fastbuild --//bazel/config:separate_debug=False
 common:fastbuild --//bazel/config:compiler_type=clang
+common:fastbuild --//bazel/config:linker=mold
 common:fastbuild --//bazel/config:linkstatic=True
 common:fastbuild --//bazel/config:build_enterprise=True
 common:fastbuild --//bazel/config:skip_archive=True
@@ -218,6 +220,7 @@ common:dbg --//bazel/config:dbg_level=2
 common:dbg --//bazel/config:debug_symbols=True
 common:dbg --//bazel/config:separate_debug=False
 common:dbg --//bazel/config:compiler_type=clang
+common:dbg --//bazel/config:linker=auto
 common:dbg --//bazel/config:linkstatic=True
 common:dbg --//bazel/config:build_enterprise=True
 common:dbg --//bazel/config:skip_archive=True
@@ -261,6 +264,7 @@ common:opt --//bazel/config:dbg_level=2
 common:opt --//bazel/config:debug_symbols=True
 common:opt --//bazel/config:separate_debug=False
 common:opt --//bazel/config:compiler_type=gcc
+common:opt --//bazel/config:linker=auto
 common:opt --//bazel/config:linkstatic=True
 common:opt --//bazel/config:build_enterprise=True
 common:opt --//bazel/config:skip_archive=True
@@ -360,6 +364,7 @@ common:windows --//bazel/config:linkstatic=True
 
 # The only Windows compiler we support is MSVC.
 common:windows --//bazel/config:compiler_type=msvc
+common:windows --//bazel/config:linker=auto
 
 # Data dependencies don't work in bazel run or bazel test on windows without this
 startup --windows_enable_symlinks
@@ -369,6 +374,7 @@ test:windows --action_env=MSYS=winsymlinks:nativestrict
 
 # Always use clang on macos
 common:macos --//bazel/config:compiler_type=clang
+common:macos --//bazel/config:linker=auto
 
 common:macos --macos_minimum_os=11.0
 # TODO(SERVER-102959): Find out why tests fail when mac is not in compilation mode dbg

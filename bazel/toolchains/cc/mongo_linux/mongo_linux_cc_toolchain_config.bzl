@@ -3,6 +3,8 @@
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "action_config",
+    "env_entry",
+    "env_set",
     "feature",
     "flag_group",
     "flag_set",
@@ -14,6 +16,7 @@ load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
     "COMPILERS",
+    "LINKERS",
     "all_c_compile_actions",
     "all_compile_actions",
     "all_cpp_compile_actions",
@@ -1102,6 +1105,19 @@ def _impl(ctx):
         ],
     )
 
+    # Some of the linux versions are missing libatomic.so.1 - this is a hack so mold will use the one contained
+    # within the mongo toolchain rather than needing one installed on the machine
+    mold_shared_libraries_feature = feature(
+        name = "mold_shared_libraries",
+        enabled = ctx.attr.linker == LINKERS.MOLD,
+        env_sets = [
+            env_set(
+                actions = all_link_actions,
+                env_entries = [env_entry(key = "LD_LIBRARY_PATH", value = "external/mongo_toolchain_v5/stow/gcc-v5/lib64/")],
+            ),
+        ],
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1164,6 +1180,7 @@ def _impl(ctx):
         global_libs_feature,
         build_id_feature,
         gcc_no_ignored_attributes_features,
+        mold_shared_libraries_feature,
     ] + get_common_features(ctx)
 
     return [
@@ -1198,6 +1215,7 @@ mongo_linux_cc_toolchain_config = rule(
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "cpu": attr.string(mandatory = True),
         "compiler": attr.string(mandatory = True),
+        "linker": attr.string(mandatory = True),
         "distro": attr.string(mandatory = False),
         "extra_cflags": attr.string_list(mandatory = False),
         "extra_cxxflags": attr.string_list(mandatory = False),

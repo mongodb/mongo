@@ -304,10 +304,16 @@ SHARED_ARCHIVE_COPTS = select({
     "//conditions:default": [],
 })
 
-SHARED_ARCHIVE_LINKFLAGS = select({
+SHARED_ARCHIVE_LINKFLAGS_GNU_UNIQUE = select({
+    "//bazel/config:shared_archive_enabled_gcc_not_mold": [
+        "-Wl,--no-gnu-unique",
+    ],
+    "//conditions:default": [],
+})
+
+SHARED_ARCHIVE_LINKFLAGS_B_SYMBOLIC = select({
     "//bazel/config:shared_archive_enabled_gcc": [
         "-Wl,-Bsymbolic",
-        "-Wl,--no-gnu-unique",
     ],
     "//conditions:default": [],
 })
@@ -380,6 +386,7 @@ MONGO_LINUX_CC_LINKFLAGS = (
     COVERAGE_FLAGS +
     PGO_PROFILE_FLAGS +
     SANITIZE_WITHOUT_TSAN_LINKFLAGS +
-    SHARED_ARCHIVE_LINKFLAGS +
+    SHARED_ARCHIVE_LINKFLAGS_GNU_UNIQUE +
+    SHARED_ARCHIVE_LINKFLAGS_B_SYMBOLIC +
     LIBGCC_LINKFLAGS
 )

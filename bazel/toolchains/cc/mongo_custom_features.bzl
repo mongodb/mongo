@@ -20,6 +20,12 @@ COMPILERS = struct(
     GCC = "gcc",
 )
 
+LINKERS = struct(
+    GOLD = "gold",
+    LLD = "lld",
+    MOLD = "mold",
+)
+
 all_c_compile_actions = [
     ACTION_NAMES.assemble,
     ACTION_NAMES.c_compile,

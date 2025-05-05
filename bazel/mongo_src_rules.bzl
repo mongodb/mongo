@@ -816,7 +816,7 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:bolt_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
             "//conditions:default": [],
         }) + select({
-            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x%x%x" % (hash(name), hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
+            "//bazel/config:simple_build_id_enabled": ["-Wl,--build-id=0x%x%x%x" % (hash(name), hash(name), hash(str(UNSAFE_VERSION_ID) + str(UNSAFE_COMPILE_VARIANT)))],
             "//conditions:default": [],
         }),
         "linkstatic": LINKSTATIC_ENABLED,

@@ -1,5 +1,6 @@
 load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
+load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 
 def _toolchain_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
@@ -19,6 +20,15 @@ def _toolchain_download(ctx):
             url = urls,
             sha256 = sha,
         )
+
+        if arch in MOLD_MAP:
+            print("Downloading mold from {}.".format(MOLD_MAP[arch]["url"]))
+            retry_download_and_extract(
+                ctx = ctx,
+                tries = 5,
+                url = MOLD_MAP[arch]["url"],
+                sha256 = MOLD_MAP[arch]["sha"],
+            )
 
         ctx.report_progress("generating toolchain " + ctx.attr.version + " build file")
         ctx.template(

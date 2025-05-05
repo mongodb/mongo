@@ -51,8 +51,18 @@ LINKER_LINKFLAGS = select(
         "@//bazel/config:linker_default": [],
         "@//bazel/config:linker_gold": ["-fuse-ld=gold"],
         "@//bazel/config:linker_lld_valid_settings": ["-fuse-ld=lld"],
+        "@//bazel/config:linker_mold_valid_settings": ["-fuse-ld=mold", "-B./external/mongo_toolchain_{version}/mold-2.37.1-{arch}-linux/bin/"],
     },
     no_match_error = LINKER_ERROR_MESSAGE,
+)
+
+CHOSEN_LINKER = select(
+    {
+        "@//bazel/config:linker_default": "",
+        "@//bazel/config:linker_gold": "gold",
+        "@//bazel/config:linker_lld_valid_settings": "lld",
+        "@//bazel/config:linker_mold_valid_settings": "mold",
+    }
 )
 
 LINKSTATIC_ENABLED = select({
@@ -96,6 +106,7 @@ mongo_linux_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
     bin_dirs = COMMON_BINDIRS,
     compiler = "gcc",
+    linker = CHOSEN_LINKER,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,
@@ -134,6 +145,7 @@ mongo_linux_cc_toolchain_config(
     name = "cc_clang_toolchain_config",
     bin_dirs = COMMON_BINDIRS,
     compiler = "clang",
+    linker = CHOSEN_LINKER,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES,

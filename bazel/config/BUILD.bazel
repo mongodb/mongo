@@ -737,6 +737,13 @@ config_setting(
 )
 
 config_setting(
+    name = "_linker_mold",
+    flag_values = {
+        "//bazel/config:linker": "mold",
+    },
+)
+
+config_setting(
     name = "_linker_lld",
     flag_values = {
         "//bazel/config:linker": "lld",
@@ -787,6 +794,23 @@ selects.config_setting_group(
         ":linker_lld",
         ":not_s390x",
         ":not_macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linker_mold_valid_settings",
+    match_all = [
+        ":_linker_mold",
+        ":not_macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linker_not_mold",
+    match_any = [
+        ":linker_default",
+        ":linker_lld",
+        ":linker_gold",
     ],
 )
 
@@ -1725,6 +1749,15 @@ selects.config_setting_group(
     match_all = [
         ":shared_archive_enabled",
         ":compiler_type_gcc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "shared_archive_enabled_gcc_not_mold",
+    match_all = [
+        ":shared_archive_enabled",
+        ":compiler_type_gcc",
+        ":linker_not_mold",
     ],
 )
 
