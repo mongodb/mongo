@@ -518,7 +518,7 @@ def main():
         binder.bind(
             ResmokeProxyService,
             ResmokeProxyService(
-                run_options=f"--installDir={shlex.quote(options.install_dir)} {options.test_flags}"
+                run_options=f"--installDir={shlex.quote(options.install_dir)} {options.test_flags or ''}",
             ),
         )
 

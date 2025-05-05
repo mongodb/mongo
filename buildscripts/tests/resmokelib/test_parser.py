@@ -1,6 +1,7 @@
 """Unit tests for buildscripts/resmokelib/parser.py."""
 
 import unittest
+from unittest.mock import patch
 
 from buildscripts.resmokelib.parser import parse, parse_command_line
 from buildscripts.resmokelib.run import to_local_args
@@ -409,8 +410,17 @@ class TestParseCommandLine(unittest.TestCase):
         subcommand_obj = parse_command_line(["list-suites"], should_configure_otel=False)
         self.assertTrue(hasattr(subcommand_obj, "execute"))
 
-    def test_run(self):
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_run(self, mock_exists):
         subcommand_obj = parse_command_line(
             ["run", "--suite=my_suite", "my_test.js"], should_configure_otel=False
         )
+
         self.assertTrue(hasattr(subcommand_obj, "execute"))
+
+        mock_exists.assert_called_once()
+
+    def test_run_fails_with_nonexistent_file(self):
+        with self.assertRaises(SystemExit) as cm:
+            parse_command_line(["run", "nonexistent_file.js"], should_configure_otel=False)
+        self.assertEqual(cm.exception.code, 2)

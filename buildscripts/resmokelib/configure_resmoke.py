@@ -71,6 +71,11 @@ def _validate_options(parser, args):
             "Cannot use --replayFile with additional test files listed on the command line invocation."
         )
 
+    for f in args.test_files or []:
+        # args.test_files can be a "replay" command or a list of tests files, if it's neither raise an error.
+        if not f.startswith("@") and not Path(f).exists():
+            parser.error(f"Test file {f} does not exist.")
+
     if args.shell_seed and (not args.test_files or len(args.test_files) != 1):
         parser.error("The --shellSeed argument must be used with only one test.")
 
