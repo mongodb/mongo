@@ -161,6 +161,51 @@ private:
     std::shared_ptr<ConnectionPool> _pool;
 };
 
+TEST_F(ConnectionPoolTest, StatsTest) {
+    constexpr auto numConnections = 3;
+    auto hosts = std::vector<HostAndPort>(
+        {HostAndPort("host1:123"), HostAndPort("host2:456"), HostAndPort("host3:789")});
+
+    auto pool = makePool();
+    auto createAndUseConnection = [&](HostAndPort host) {
+        ConnectionImpl::pushSetup(Status::OK());
+        pool->get_forTest(
+            host, Milliseconds(5000), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                doneWith(swConn.getValue());
+            });
+        pool->setKeepOpen(host, false);
+    };
+    auto getStats = [&] {
+        ConnectionPoolStats stats;
+        pool->appendConnectionStats(&stats);
+        return stats;
+    };
+
+    for (int i = 0; i < numConnections; ++i) {
+        createAndUseConnection(hosts.at(i));
+    }
+
+    ASSERT_EQ(getStats().totalCreated, numConnections);
+
+    // After dropping connections to the first host, totalCreated stat should not change.
+    pool->dropConnections(hosts.at(0));
+    ASSERT_EQ(getStats().totalCreated, numConnections);
+
+    // After dropping connections to all hosts, totalCreated stat should not change.
+    pool->dropConnections();
+    ASSERT_EQ(getStats().totalCreated, numConnections);
+
+    // Opening a connection to an old host should update created stats accordingly.
+    createAndUseConnection(hosts.at(0));
+    auto stats = getStats();
+    ASSERT_EQ(stats.statsByHost[hosts.at(0)].created, 2);
+    ASSERT_EQ(getStats().totalCreated, numConnections + 1);
+
+    // And dropping the connection again should not change totalCreated.
+    pool->dropConnections();
+    ASSERT_EQ(getStats().totalCreated, numConnections + 1);
+}
+
 /**
  * Verify that we get the same connection if we grab one, return it and grab
  * another.

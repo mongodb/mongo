@@ -63,9 +63,9 @@ function resetPools() {
     // FTDC data is collected periodically. Check that the data returned reflects that the pools
     // have been dropped before resuming testing.
     assert.soon(() => {
-        const stats = getDiagnosticData();
+        const stats = getDiagnosticData()[allHosts[0]];
         // The shard has a single node in its replica set.
-        return !stats.hasOwnProperty(allHosts[0]);
+        return stats.inUse == 0;
     }, "Failed to wait for pool stats to reflect dropped pools");
 }
 

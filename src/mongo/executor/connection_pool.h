@@ -341,6 +341,9 @@ private:
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
     bool _isShutDown = false;
 
+    // Preserves the total created connection count for SpecificPools that were destroyed.
+    stdx::unordered_map<HostAndPort, size_t> _cachedCreatedConnections;
+
     EgressConnectionCloserManager* _manager;
 
     mutable ClockSource* _fastClockSource{nullptr};

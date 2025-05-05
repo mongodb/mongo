@@ -1,5 +1,10 @@
 // Check that rotation works for the cluster certificate in a sharded cluster
 
+import {
+    assertHasConnPoolStats,
+    checkHostHasNoOpenConnections,
+    checkHostHasOpenConnections
+} from "jstests/libs/conn_pool_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 
@@ -13,12 +18,6 @@ const NEW_SERVER = "jstests/libs/trusted-server.pem";
 
 (function() {
 let mongos;
-function getConnPoolHosts() {
-    const ret = mongos.adminCommand({connPoolStats: 1});
-    assert.commandWorked(ret);
-    jsTestLog("Connection pool stats by host: " + tojson(ret.hosts));
-    return ret.hosts;
-}
 
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
 mkdir(dbPath);
@@ -73,6 +72,7 @@ for (let key in output.hosts) {
 const rst = st.rs0;
 const primary = rst.getPrimary();
 const primaryHost = "localhost:" + primary.port;
+let currentCheckNumber = 0;
 
 // Assert we can connect to the primary shard using the old certificates since these have not
 // changed.
@@ -89,7 +89,8 @@ copyCertificateFile(NEW_SERVER, dbPath + "/server-test.pem");
 assert.commandWorked(primary.adminCommand({rotateCertificates: 1}));
 
 // Make sure the primary is initially present
-assert(primary.host in getConnPoolHosts());
+currentCheckNumber = assertHasConnPoolStats(
+    mongos, [primary.host], {checkStatsFunc: checkHostHasOpenConnections}, currentCheckNumber);
 
 // Connecting with the old certificates to the now rotated primary shard should fail.
 assert.throws(() => {
@@ -100,7 +101,8 @@ assert.throws(() => {
 
 // Drop connection to all hosts to see what we can reconnect to
 assert.commandWorked(mongos.adminCommand({dropConnections: 1, hostAndPort: keys}));
-assert(!(primary.host in getConnPoolHosts()));
+currentCheckNumber = assertHasConnPoolStats(
+    mongos, [primary.host], {checkStatsFunc: checkHostHasNoOpenConnections}, currentCheckNumber);
 
 assert.soon(() => {
     output = mongos.adminCommand({multicast: {ping: 0}});
@@ -132,7 +134,8 @@ assert.soon(() => {
 assert.commandWorked(mongos.adminCommand({rotateCertificates: 1}));
 
 mongos.adminCommand({dropConnections: 1, hostAndPort: keys});
-assert(!(primary.host in getConnPoolHosts()));
+currentCheckNumber = assertHasConnPoolStats(
+    mongos, [primary.host], {checkStatsFunc: checkHostHasNoOpenConnections}, currentCheckNumber);
 
 assert.soon(() => {
     output = mongos.adminCommand({multicast: {ping: 0}});

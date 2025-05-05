@@ -5,6 +5,11 @@
  * ]
  */
 
+import {
+    assertHasConnPoolStats,
+    checkHostHasNoOpenConnections,
+    checkHostHasOpenConnections
+} from "jstests/libs/conn_pool_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 3});
@@ -14,12 +19,7 @@ rst.initiate();
 const primary = rst.getPrimary();
 rst.awaitSecondaryNodes();
 
-function getConnPoolHosts() {
-    const ret = primary.adminCommand({connPoolStats: 1});
-    assert.commandWorked(ret);
-    jsTestLog("Connection pool stats by host: " + tojson(ret.hosts));
-    return ret.hosts;
-}
+let currentCheckNumber = 0;
 
 // To test the dropConnections command, first remove the secondary. This should have no effect
 // on the existing connection pool, but it'll prevent the primary from reconnecting to it after
@@ -27,7 +27,8 @@ function getConnPoolHosts() {
 // to the secondary.
 const cfg = primary.getDB('local').system.replset.findOne();
 const memberHost = cfg.members[2].host;
-assert.eq(memberHost in getConnPoolHosts(), true);
+currentCheckNumber = assertHasConnPoolStats(
+    primary, [memberHost], {checkStatsFunc: checkHostHasOpenConnections}, currentCheckNumber);
 
 const removedMember = cfg.members.splice(2, 1);
 assert.eq(removedMember[0].host, memberHost);
@@ -37,14 +38,14 @@ jsTestLog("Reconfiguring to omit " + memberHost);
 assert.commandWorked(primary.adminCommand({replSetReconfig: cfg}));
 
 // Reconfig did not affect the connection pool
-assert.eq(memberHost in getConnPoolHosts(), true);
+currentCheckNumber = assertHasConnPoolStats(
+    primary, [memberHost], {checkStatsFunc: checkHostHasOpenConnections}, currentCheckNumber);
 
 // Test dropConnections
 jsTestLog("Dropping connections to " + memberHost);
 assert.commandWorked(primary.adminCommand({dropConnections: 1, hostAndPort: [memberHost]}));
-assert.soon(() => {
-    return !(memberHost in getConnPoolHosts());
-});
+currentCheckNumber = assertHasConnPoolStats(
+    primary, [memberHost], {checkStatsFunc: checkHostHasNoOpenConnections}, currentCheckNumber);
 
 // Need to re-add removed node, or the test complains about the replset config
 cfg.members.push(removedMember[0]);

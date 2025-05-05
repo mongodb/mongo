@@ -388,6 +388,18 @@ public:
     size_t requestsPending(WithLock) const;
 
     /**
+     * Updates the ConnectionPool's _cachedCreatedConnections map with the number of created
+     * connections that this SpecificPool made. This should be called before removing a SpecificPool
+     * from the ConnectionPool.
+     */
+    void updateCachedCreatedConnections(WithLock);
+
+    /**
+     * Returns the number of cached created connections associated with _hostAndPort.
+     */
+    size_t getCachedCreatedConnections(WithLock) const;
+
+    /**
      * Records the time it took to return the connection since it was requested, so that it can be
      * reported in the connection pool stats.
      */
@@ -812,6 +824,12 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
         hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats(lk);
         stats->updateStatsForHost(_name, host, hostStats);
     }
+    for (const auto& kv : _cachedCreatedConnections) {
+        ConnectionStatsPer hostStats;
+        hostStats.created = kv.second;
+
+        stats->updateStatsForHost(_name, kv.first, hostStats);
+    }
 }
 
 size_t ConnectionPool::getNumConnectionsPerHost(const HostAndPort& hostAndPort) const {
@@ -893,6 +911,20 @@ size_t ConnectionPool::SpecificPool::openConnections(WithLock) const {
 
 size_t ConnectionPool::SpecificPool::requestsPending(WithLock) const {
     return _requests.size();
+}
+
+void ConnectionPool::SpecificPool::updateCachedCreatedConnections(WithLock lk) {
+    auto totalCreated = createdConnections(lk) + getCachedCreatedConnections(lk);
+    _parent->_cachedCreatedConnections[_hostAndPort] = totalCreated;
+}
+
+size_t ConnectionPool::SpecificPool::getCachedCreatedConnections(WithLock) const {
+    auto elem = _parent->_cachedCreatedConnections.find(_hostAndPort);
+    if (elem == _parent->_cachedCreatedConnections.end()) {
+        return 0;
+    }
+
+    return elem->second;
 }
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnection(
@@ -1219,13 +1251,15 @@ void ConnectionPool::SpecificPool::addToReady(WithLock, OwnedConnection conn) {
     connPtr->setTimeout(_parent->_controller->toRefreshTimeout(), std::move(returnConnectionFunc));
 }
 
-bool ConnectionPool::SpecificPool::initiateShutdown(WithLock) {
+bool ConnectionPool::SpecificPool::initiateShutdown(WithLock lk) {
     auto wasShutdown = std::exchange(_health.isShutdown, true);
     if (wasShutdown) {
         return false;
     }
 
     LOGV2_DEBUG(22571, 2, "Delisting connection pool", "hostAndPort"_attr = _hostAndPort);
+
+    updateCachedCreatedConnections(lk);
 
     _parent->_controller->removeHost(_id);
 
