@@ -1,7 +1,4 @@
 // Regression test to check that different document sizes work correctly with $lookup.
-// @tags: [
-//   requires_fcv_71,
-// ]
 (function() {
 'use strict';
 

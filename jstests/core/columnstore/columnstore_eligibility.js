@@ -14,7 +14,7 @@
  *   not_allowed_with_security_token,
  *   # Columnstore indexes never shipped to the customers in older versions, so there is no need to
  *   # test multiversion suites.
- *   requires_fcv_73,
+ *   multiversion_incompatible,
  * ]
  */
 (function() {

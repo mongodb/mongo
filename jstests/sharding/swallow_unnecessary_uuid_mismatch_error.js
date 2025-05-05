@@ -1,10 +1,6 @@
 // Tests that a deleteMany operation on a cluster doesn't return a UUID mismatch in case it targets
 // a shard with no chunks.
 //
-// @tags: [
-//    requires_fcv_81,
-// ]
-//
 const st = new ShardingTest({shards: 3});
 
 const db = st.s.getDB(jsTestName());

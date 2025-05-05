@@ -2,7 +2,6 @@
  * Tests createIndexes in a stale shard and stale db router
  * @tags: [
  *   multiversion_incompatible,
- *   requires_fcv_73,
  * ]
  */
 const dbName = 'testDB';

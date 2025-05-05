@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_timeseries,
- *   requires_fcv_71,
  * ]
  */
 
