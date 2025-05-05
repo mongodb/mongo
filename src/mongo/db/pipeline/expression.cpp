@@ -4847,8 +4847,18 @@ ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx
     auto value = constant.getValue();
     auto encryptedBinDataType = getEncryptedBinDataType(value);
     if (encryptedBinDataType) {
-        // TODO SERVER-101128: Implement ParsedFindTextSearchPayload once SPM-2880 delivers the
-        // FLE2FindTextPayload. Initialize _evaluatorV2 with the zerosTokens.
+        if (encryptedBinDataType == EncryptedBinDataType::kFLE2FindTextPayload) {
+            // TODO SERVER-104568: Parse the value as a ParsedFindTextSearchPayload, and use the
+            // server token to initiate _evaluatorV2 with the zerosTokens.
+        } else {
+            // We may encounter a kFLE2Placeholder in the case that we reparse with query analysis.
+            // This happens when running in agg, as we serialize and reparse a $match during
+            // analyzeForMatch().
+            uassert(10112803,
+                    "Unexpected encrypted bindata type found on encrypted text search on field '" +
+                        fieldPathExpression.getFieldPathWithoutCurrentPrefix().fullPath() + "'.",
+                    encryptedBinDataType == EncryptedBinDataType::kFLE2Placeholder);
+        }
     } else {
         uassert(10111802,
                 "Unexpected value type found on encrypted text search on field '" +
@@ -4875,7 +4885,9 @@ const ExpressionConstant& ExpressionEncTextSearch::getText() const {
 }
 
 bool ExpressionEncTextSearch::canBeEvaluated() const {
-    return getEncryptedBinDataType(getText().getValue()) != boost::none;
+    auto encryptedBinDataType = getEncryptedBinDataType(getText().getValue());
+    return encryptedBinDataType &&
+        encryptedBinDataType == EncryptedBinDataType::kFLE2FindTextPayload;
 }
 
 /* --------------------------------- encStrStartsWith ------------------------------------------- */

@@ -84,7 +84,7 @@ Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Var
     boost::optional<FLE2IndexedTextEncryptedValue> value;
     return Value(expr.getEncryptedPredicateEvaluator().evaluate(
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
-            // TODO SERVER-101128: Implement this lambda expression's body which should extract the
+            // TODO SERVER-104568: Implement this lambda expression's body which should extract the
             // metadata blocks.
             std::vector<ConstDataRange> metadataBlocks;
             return metadataBlocks;

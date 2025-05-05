@@ -1194,6 +1194,24 @@ struct ParsedFindRangePayload {
     }
 };
 
+struct ParsedFindTextSearchPayload {
+    boost::optional<mongo::TextExactFindTokenSet> exactTokens;
+    boost::optional<mongo::TextSubstringFindTokenSet> substringTokens;
+    boost::optional<mongo::TextSuffixFindTokenSet> suffixTokens;
+    boost::optional<mongo::TextPrefixFindTokenSet> prefixTokens;
+
+    explicit ParsedFindTextSearchPayload(BSONElement fleFindPayload);
+    explicit ParsedFindTextSearchPayload(const Value& fleFindPayload);
+    explicit ParsedFindTextSearchPayload(ConstDataRange cdr);
+
+    std::int64_t maxCounter{};
+
+    EDCDerivedFromDataToken edc;
+    ESCDerivedFromDataToken esc;
+
+    ServerDerivedFromDataToken server;
+};
+
 
 /**
  * Edges calculator

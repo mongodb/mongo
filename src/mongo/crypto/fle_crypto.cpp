@@ -4216,6 +4216,44 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     maxCounter = info.getMaxCounter();
 }
 
+ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(BSONElement fleFindPayload) {
+    // We should never parse a BSONElement payload since we don't support match expressions.
+    MONGO_UNREACHABLE_TASSERT(10112804);
+};
+
+ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(const Value& fleFindPayload)
+    : ParsedFindTextSearchPayload(binDataToCDR(fleFindPayload)) {};
+
+ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
+    auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
+    auto encryptedType = encryptedTypeBinding;
+    uassert(10112800,
+            str::stream() << "Unexpected encrypted payload type: "
+                          << static_cast<uint32_t>(encryptedType),
+            encryptedType == EncryptedBinDataType::kFLE2FindTextPayload);
+
+    auto payload = parseFromCDR<FLE2FindTextPayload>(subCdr);
+
+    mongo::TextSearchFindTokenSets& tokens = payload.getTokenSets();
+
+    // There must be only one of the following in the payload
+    prefixTokens = tokens.getPrefixTokens();
+    suffixTokens = tokens.getSuffixTokens();
+    exactTokens = tokens.getExactTokens();
+    substringTokens = tokens.getSubstringTokens();
+
+    if (prefixTokens) {
+        edc = EDCDerivedFromDataToken{prefixTokens->getEdcDerivedToken().asPrfBlock()};
+        esc = ESCDerivedFromDataToken{prefixTokens->getEscDerivedToken().asPrfBlock()};
+        server = ServerDerivedFromDataToken{prefixTokens->getServerDerivedToken().asPrfBlock()};
+    }
+    // TODO SERVER-101217: set edc, esc, server for suffix tokens.
+    // TODO SERVER-102560: set edc, esc, server for exact tokens.
+    // TODO SERVER-102091: set edc, esc, server for substring tokens.
+
+    maxCounter = payload.getMaxCounter();
+}
+
 
 std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj compactionTokens) {
     std::vector<CompactionToken> parsed;
