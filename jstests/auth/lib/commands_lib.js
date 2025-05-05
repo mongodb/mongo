@@ -124,6 +124,7 @@ var roles_read = {
     dbOwner: 1,
     backup: 1,
     root: 1,
+    searchCoordinator: 1,
     __system: 1
 };
 var roles_userAdmin = {
@@ -140,7 +141,14 @@ var roles_userAdminAny = {
     root: 1,
     __system: 1,
 };
-var roles_readAny = {readAnyDatabase: 1, readWriteAnyDatabase: 1, backup: 1, root: 1, __system: 1};
+var roles_readAny = {
+    readAnyDatabase: 1,
+    readWriteAnyDatabase: 1,
+    backup: 1,
+    root: 1,
+    searchCoordinator: 1,
+    __system: 1
+};
 var roles_dbAdmin = {dbAdmin: 1, dbAdminAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1};
 var roles_dbAdminAny = {dbAdminAnyDatabase: 1, root: 1, __system: 1};
 var roles_writeDbAdmin = {
@@ -162,11 +170,19 @@ var roles_readDbAdmin = {
     dbAdminAnyDatabase: 1,
     dbOwner: 1,
     root: 1,
+    searchCoordinator: 1,
     __system: 1
 };
-var roles_readDbAdminAny =
-    {readAnyDatabase: 1, readWriteAnyDatabase: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1};
-var roles_monitoring = {clusterMonitor: 1, clusterAdmin: 1, root: 1, __system: 1};
+var roles_readDbAdminAny = {
+    readAnyDatabase: 1,
+    readWriteAnyDatabase: 1,
+    dbAdminAnyDatabase: 1,
+    root: 1,
+    searchCoordinator: 1,
+    __system: 1
+};
+var roles_monitoring =
+    {clusterMonitor: 1, clusterAdmin: 1, root: 1, searchCoordinator: 1, __system: 1};
 var roles_hostManager = {hostManager: 1, clusterAdmin: 1, root: 1, __system: 1};
 var roles_clusterManager = {clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1};
 var roles_all = {
@@ -548,7 +564,7 @@ export const authCommandsLib = {
           skipUnlessSharded: true,
           testcases: [{
               runOnDb: "config",
-              roles: roles_clusterManager,
+              roles: {...roles_clusterManager, searchCoordinator: 1},
           }]
         },
         {
@@ -1703,7 +1719,7 @@ export const authCommandsLib = {
           testcases: [{
               runOnDb: "config",
               roles:
-                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1}
+                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, searchCoordinator: 1, __system: 1}
           }],
           skipSharded: true
         },
@@ -1723,7 +1739,7 @@ export const authCommandsLib = {
           testcases: [{
               runOnDb: "config",
               roles:
-                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, __system: 1}
+                  {clusterAdmin: 1, clusterMonitor: 1, clusterManager: 1, root: 1, searchCoordinator: 1, __system: 1}
           }]
         },
         {
@@ -2023,6 +2039,7 @@ export const authCommandsLib = {
                     clusterAdmin: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges:
@@ -2038,6 +2055,7 @@ export const authCommandsLib = {
                     clusterAdmin: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges:
@@ -2076,6 +2094,7 @@ export const authCommandsLib = {
                     clusterAdmin: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges:
@@ -2292,6 +2311,7 @@ export const authCommandsLib = {
                     readWriteAnyDatabase: 1,
                     dbOwner: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -2302,7 +2322,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{
                     resource: {db: secondDbName, collection: "foo"},
                     actions: ["changeStream", "find"]
@@ -2324,6 +2344,7 @@ export const authCommandsLib = {
                     readWriteAnyDatabase: 1,
                     dbOwner: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -2334,7 +2355,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{
                     resource: {db: secondDbName, collection: ""},
                     actions: ["changeStream", "find"]
@@ -2349,7 +2370,7 @@ export const authCommandsLib = {
               {aggregate: 1, pipeline: [{$changeStream: {allChangesForCluster: true}}], cursor: {}},
           testcases: [{
               runOnDb: adminDbName,
-              roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+              roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
               privileges: [{resource: {db: "", collection: ""}, actions: ["changeStream", "find"]}],
               expectFail: true,  // because no replication enabled
           }]
@@ -2373,6 +2394,7 @@ export const authCommandsLib = {
                     readWriteAnyDatabase: 1,
                     dbOwner: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -2383,7 +2405,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{
                     resource: {db: secondDbName, collection: "foo"},
                     actions: ["changeStream", "find"]
@@ -2405,6 +2427,7 @@ export const authCommandsLib = {
                     readWriteAnyDatabase: 1,
                     dbOwner: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -2415,7 +2438,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: secondDbName,
-                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{
                     resource: {db: secondDbName, collection: ""},
                     actions: ["changeStream", "find"]
@@ -2430,7 +2453,7 @@ export const authCommandsLib = {
               {aggregate: 1, pipeline: [{$changeStream: {allChangesForCluster: true}}, {$changeStreamSplitLargeEvent:{}}], cursor: {}},
           testcases: [{
               runOnDb: adminDbName,
-              roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+              roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
               privileges: [{resource: {db: "", collection: ""}, actions: ["changeStream", "find"]}],
               expectFail: true,  // because no replication enabled
           }]
@@ -3094,6 +3117,7 @@ export const authCommandsLib = {
                     clusterAdmin: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges:
@@ -3109,6 +3133,7 @@ export const authCommandsLib = {
                     clusterAdmin: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges:
@@ -3164,6 +3189,10 @@ export const authCommandsLib = {
           testname: "_shardsvrCommitToShardLocalCatalog",
           command: {_shardsvrCommitToShardLocalCatalog: "test.x", operation: "createDatabase"},
           skipSharded: true,
+          // TODO SERVER-103024: Enable this test
+          skipTest: function(conn) {
+            return true;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -3190,7 +3219,7 @@ export const authCommandsLib = {
         },
         {
           testname: "_shardsvrReshardRecipientClone",
-          command: {_shardsvrReshardRecipientClone: "test.x", reshardingUUID: UUID()},
+          command: {_shardsvrReshardRecipientClone: UUID(), approxCopySize: {}, cloneTimestamp: new Timestamp(), donorShards: []},
           skipSharded: true,
           testcases: [
             {
@@ -3702,7 +3731,7 @@ export const authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: {__system: 1, root: 1, backup: 1},
+                roles: {__system: 1, root: 1, backup: 1, searchCoordinator: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
                     {resource: {cluster: true}, actions: ["useUUID"]}
@@ -4269,13 +4298,14 @@ export const authCommandsLib = {
                     readWriteAnyDatabase: 1,
                     dbOwner: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{resource: {db: firstDbName, collection: ""}, actions: ["dbHash"]}]
               },
               {
                 runOnDb: secondDbName,
-                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges:
                     [{resource: {db: secondDbName, collection: ""}, actions: ["dbHash"]}]
               }
@@ -4298,6 +4328,7 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{resource: {db: firstDbName, collection: ""}, actions: ["dbStats"]}]
@@ -4311,6 +4342,7 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges:
@@ -4566,6 +4598,7 @@ export const authCommandsLib = {
                     "clusterMonitor": 1,
                     "root": 1,
                     "__system": 1,
+                    searchCoordinator: 1,
                 },
               },
           ]
@@ -4582,7 +4615,8 @@ export const authCommandsLib = {
                     "clusterMonitor": 1,
                     "backup": 1,
                     "root": 1,
-                    "__system": 1
+                    "__system": 1,
+                    searchCoordinator: 1,
                 },
                 privileges:
                     [{resource: {db: "config", collection: "changelog"}, actions: ["find"]}]
@@ -4603,7 +4637,8 @@ export const authCommandsLib = {
                     "readWriteLocal": 1,
                     "backup": 1,
                     "root": 1,
-                    "__system": 1
+                    "__system": 1,
+                    searchCoordinator: 1,
                 },
                 privileges: [{resource: {db: "local", collection: "me"}, actions: ["find"]}]
               },
@@ -4623,7 +4658,8 @@ export const authCommandsLib = {
                     "readWriteLocal": 1,
                     "backup": 1,
                     "root": 1,
-                    "__system": 1
+                    "__system": 1,
+                    searchCoordinator: 1,
                 },
                 privileges:
                     [{resource: {db: "local", collection: "oplog.$main"}, actions: ["find"]}]
@@ -4644,7 +4680,8 @@ export const authCommandsLib = {
                     "readWriteLocal": 1,
                     "backup": 1,
                     "root": 1,
-                    "__system": 1
+                    "__system": 1,
+                    searchCoordinator: 1,
                 },
                 privileges: [{resource: {db: "local", collection: "oplog.rs"}, actions: ["find"]}]
               },
@@ -4658,7 +4695,7 @@ export const authCommandsLib = {
               {
                 runOnDb: "local",
                 roles:
-                    {"clusterAdmin": 1, "clusterMonitor": 1, "backup": 1, "root": 1, "__system": 1},
+                    {"clusterAdmin": 1, "clusterMonitor": 1, "backup": 1, "root": 1, "__system": 1, searchCoordinator: 1},
                 privileges:
                     [{resource: {db: "local", collection: "replset.election"}, actions: ["find"]}]
               },
@@ -4672,7 +4709,7 @@ export const authCommandsLib = {
               {
                 runOnDb: "local",
                 roles:
-                    {"clusterAdmin": 1, "clusterMonitor": 1, "backup": 1, "root": 1, "__system": 1},
+                    {"clusterAdmin": 1, "clusterMonitor": 1, "backup": 1, "root": 1, "__system": 1, searchCoordinator: 1},
                 privileges:
                     [{resource: {db: "local", collection: "replset.minvalid"}, actions: ["find"]}]
               },
@@ -4692,7 +4729,8 @@ export const authCommandsLib = {
                     "readWriteLocal": 1,
                     "backup": 1,
                     "root": 1,
-                    "__system": 1
+                    "__system": 1,
+                    searchCoordinator: 1,
                 },
                 privileges: [{resource: {db: "local", collection: "sources"}, actions: ["find"]}]
               },
@@ -4712,7 +4750,8 @@ export const authCommandsLib = {
                     "readWriteLocal": 1,
                     "backup": 1,
                     "root": 1,
-                    "__system": 1
+                    "__system": 1,
+                    searchCoordinator: 1,
                 },
                 privileges:
                     [{resource: {db: "local", collection: "startup_log"}, actions: ["find"]}]
@@ -4776,7 +4815,7 @@ export const authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: {__system: 1, root: 1, backup: 1},
+                roles: {__system: 1, root: 1, backup: 1, searchCoordinator: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
                     {resource: {cluster: true}, actions: ["useUUID"]}
@@ -4978,7 +5017,8 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
-                    __system: 1
+                    __system: 1,
+                    searchCoordinator: 1,
                 },
                 privileges: [{resource: {cluster: true}, actions: ["getParameter"]}]
               },
@@ -5138,7 +5178,7 @@ export const authCommandsLib = {
           testcases: [{
               runOnDb: "config",
               roles:
-                  {"clusterAdmin": 1, "clusterManager": 1, "root": 1, "__system": 1, "restore": 1},
+                  {"clusterAdmin": 1, "clusterManager": 1, "root": 1, "__system": 1, "restore": 1, searchCoordinator: 1},
               privileges:
                   [{resource: {db: "config", collection: "changelog"}, actions: ["insert"]}],
           }]
@@ -5343,6 +5383,7 @@ export const authCommandsLib = {
                     dbOwner: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}],
@@ -5351,7 +5392,7 @@ export const authCommandsLib = {
               {
                 runOnDb: secondDbName,
                 roles:
-                    {readAnyDatabase: 1, readWriteAnyDatabase: 1, backup: 1, root: 1, __system: 1},
+                    {readAnyDatabase: 1, readWriteAnyDatabase: 1, backup: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}],
                 expectFail: true
               }
@@ -5449,6 +5490,7 @@ export const authCommandsLib = {
                   backup: 1,
                   restore: 1,
                   root: 1,
+                  searchCoordinator: 1,
                   __system: 1
               },
               privileges:
@@ -5487,6 +5529,7 @@ export const authCommandsLib = {
                     backup: 1,
                     restore: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
               },
@@ -5542,6 +5585,7 @@ export const authCommandsLib = {
                   dbOwner: 1,
                   backup: 1,
                   root: 1,
+                  searchCoordinator: 1,
                   __system: 1
               },
               privileges:
@@ -5565,7 +5609,7 @@ export const authCommandsLib = {
           },
           testcases: [{
               runOnDb: firstDbName,
-              roles: {backup: 1, root: 1, __system: 1},
+              roles: {backup: 1, root: 1, searchCoordinator: 1, __system: 1},
               privileges: [
                   {resource: {db: firstDbName, collection: ""}, actions: ["listIndexes"]},
                   {resource: {cluster: true}, actions: ["useUUID"]}
@@ -5588,6 +5632,7 @@ export const authCommandsLib = {
                   dbOwner: 1,
                   backup: 1,
                   root: 1,
+                  searchCoordinator: 1,
                   __system: 1,
               },
               privileges:
@@ -5715,7 +5760,7 @@ export const authCommandsLib = {
         },
         {
           testname: "d_mergeChunks",
-          command: {mergeChunks: "test.x", bounds: [{i: 0}, {i: 5}]},
+          command: {mergeChunks: "test.x", bounds: [{i: 0}, {i: 5}], epoch: ObjectId("57dc3d7da4fce4358afa85b8")},
           skipSharded: true,
           testcases: [
               {
@@ -5993,6 +6038,7 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -6008,6 +6054,7 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -6067,6 +6114,7 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -6084,6 +6132,7 @@ export const authCommandsLib = {
                     clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [{
@@ -6303,7 +6352,7 @@ export const authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 roles:
-                    {clusterMonitor: 1, clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1},
+                    {clusterMonitor: 1, clusterManager: 1, clusterAdmin: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{resource: {cluster: true}, actions: ["replSetGetStatus"]}],
                 expectFail: true
               },
@@ -6319,7 +6368,7 @@ export const authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 roles:
-                    {clusterMonitor: 1, clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1},
+                    {clusterMonitor: 1, clusterManager: 1, clusterAdmin: 1, root: 1, searchCoordinator: 1, __system: 1},
                 privileges: [{resource: {cluster: true}, actions: ["replSetGetConfig"]}],
                 expectFail: true
               },
@@ -6923,7 +6972,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: {...roles_clusterManager, searchCoordinator: 1},
                 expectFail: true, // shard0name doesn't exist
               },
               {
@@ -6956,7 +7005,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: {...roles_clusterManager, searchCoordinator: 1},
                 expectFail: true, // shard0name doesn't exist
               },
               {
@@ -6992,7 +7041,7 @@ export const authCommandsLib = {
               },
               {
                 runOnDb: adminDbName,
-                roles: roles_clusterManager,
+                roles: {...roles_clusterManager, searchCoordinator: 1},
                 expectFail: true,
               },
               {
@@ -7373,7 +7422,7 @@ export const authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: {read:1, readWrite:1, readAnyDatabase: 1, readWriteAnyDatabase: 1, dbOwner:1, backup:1, root:1, __system:1},
+                roles: {read:1, readWrite:1, readAnyDatabase: 1, readWriteAnyDatabase: 1, dbOwner:1, backup:1, root:1, searchCoordinator: 1, __system:1},
               },
             ]
         },
@@ -7390,7 +7439,7 @@ export const authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: {read:1, readWrite:1, readAnyDatabase: 1, readWriteAnyDatabase: 1, dbOwner:1, backup:1, root:1, __system:1},
+                roles: {read:1, readWrite:1, readAnyDatabase: 1, readWriteAnyDatabase: 1, dbOwner:1, backup:1, root:1, searchCoordinator: 1, __system:1},
               },
             ]
         },
@@ -7404,7 +7453,7 @@ export const authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: {read:1, readWrite:1, readAnyDatabase: 1, readWriteAnyDatabase: 1, dbAdmin:1, dbOwner:1, dbAdminAnyDatabase: 1, backup:1, root:1, __system:1},
+                roles: {read:1, readWrite:1, readAnyDatabase: 1, readWriteAnyDatabase: 1, dbAdmin:1, dbOwner:1, dbAdminAnyDatabase: 1, backup:1, root:1, searchCoordinator: 1, __system:1},
                 privileges: [{resource: {db: firstDbName, collection: ""}, actions: ["listSearchIndexes"]}],
                 expectFail: true, // Expect to fail with SearchNotEnabled.
               },
@@ -7652,6 +7701,7 @@ export const authCommandsLib = {
                   readWriteAnyDatabase: 1,
                   backup: 1,
                   root: 1,
+                  searchCoordinator: 1,
                   __system: 1
                 },
                 privileges: [
@@ -7668,6 +7718,7 @@ export const authCommandsLib = {
                     readWriteAnyDatabase: 1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [
@@ -7700,6 +7751,7 @@ export const authCommandsLib = {
                     dbOwner:1,
                     backup: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [
@@ -8438,7 +8490,26 @@ export const authCommandsLib = {
         },
         setup: db => { db.createCollection("foo"); },
         disableSearch: true,
-        testcases: testcases_transformationOnlyExpectFail
+        testcases: [
+          {
+            runOnDb: firstDbName,
+            roles: {__system: 1},
+            // $setMetadata requires __system role OR a user with internal and find action types as privileges.
+            expectFail: true,
+            privileges: [
+              {resource: {cluster: true}, actions: ["internal"]},
+              {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+            ],
+          },
+          {
+            runOnDb: firstDbName,
+            // Find action type as a privilege alone is not sufficient for $setMetadata.
+            expectAuthzFailure: true,
+            privileges: [
+              {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+            ],
+          },
+        ],
       },
       {
         testname: "aggregate_$scoreFusion",
@@ -8447,7 +8518,7 @@ export const authCommandsLib = {
           cursor: {},
           pipeline: [{
             $scoreFusion: {
-              inputs: {
+              input: {
                 pipelines: {
                   matchScore1: [
                     {
@@ -8529,6 +8600,7 @@ export const authCommandsLib = {
                     backup: 1,
                     restore: 1,
                     root: 1,
+                    searchCoordinator: 1,
                     __system: 1
                 },
                 privileges: [
@@ -8667,8 +8739,7 @@ export const authCommandsLib = {
 
         var failures = [];
 
-
-        for (var i = this.tests.length-1; i < this.tests.length; i++) {
+        for (let i = 0; i < this.tests.length; i++) {
             const res = this.runOneTest(conn, this.tests[i], impls, options);
             failures = failures.concat(res);
         }
