@@ -81,6 +81,14 @@ function traverseEvent(event, outputMap, prefixPath = "") {
     }
 }
 
+// Ensure all events are replicated and visible to the change stream.
+assert.soon(() => {
+    const allEvents = getAllChangeStreamEvents(
+        testDB, [], {fullDocument: "updateLookup", showExpandedEvents: true}, startPoint);
+    const ns = {db: dbName, coll: "view"};
+    return allEvents.some(event => event.operationType == "drop" && friendlyEqual(event.ns, ns));
+});
+
 // Obtain a list of all events that occurred during the write workload.
 const allEvents = getAllChangeStreamEvents(
     testDB, [], {fullDocument: "updateLookup", showExpandedEvents: true}, startPoint);
