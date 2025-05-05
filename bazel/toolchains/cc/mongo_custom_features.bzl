@@ -87,310 +87,277 @@ def get_common_features(ctx):
     Returns:
         list: The list of features.
     """
-    optimization_level_g_feature = feature(
-        name = "og",
-        enabled = ctx.attr.optimization_level == "Og",
-        provides = [
-            "O0",
-            "O2",
-            "Os",
-        ],
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-Og",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    optimization_level_0_feature = feature(
-        name = "o0",
-        enabled = ctx.attr.optimization_level == "O0",
-        provides = [
-            "Og",
-            "O2",
-            "Os",
-        ],
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-O0",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    optimization_level_2_feature = feature(
-        name = "o2",
-        enabled = ctx.attr.optimization_level == "O2",
-        provides = [
-            "Og",
-            "O1",
-            "Os",
-        ],
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-O2",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    optimization_level_size_feature = feature(
-        name = "os",
-        enabled = ctx.attr.optimization_level == "Os",
-        provides = [
-            "Og",
-            "O1",
-            "O2",
-        ],
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-Os",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    no_unused_function_feature = feature(
-        name = "no_unused_function",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            # Clang likes to warn about unused functions, which seems a tad
-                            # aggressive and breaks -Werror, which we want to be able to use.
-                            "-Wno-unused-function",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    clang_no_defaulted_function_deleted_feature = feature(
-        name = "no_defaulted_function_deleted",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            # This warning was added in Apple clang version 11 and flags many
-                            # explicitly defaulted move constructors and assignment operators for
-                            # being implicitly deleted, which is not useful.
-                            "-Wno-defaulted-function-deleted",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-    # -Wno-invalid-offsetof is only valid for C++ but not for C
-    no_invalid_offsetof_warning_feature = feature(
-        name = "no_invalid_offsetof_warning",
-        enabled = False,
-        flag_sets = [
-            flag_set(
-                actions = all_cpp_compile_actions,
-                flag_groups = [flag_group(flags = ["-Wno-invalid-offsetof"])],
-            ),
-        ],
-    )
-
-    no_unknown_pragmas_feature = feature(
-        name = "no_unknown_pragmas",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # Do not warn on unknown pragmas.
-                    "-Wno-unknown-pragmas",
-                ])],
-            ),
-        ],
-    )
-
-    no_builtin_macro_redefined_feature = feature(
-        name = "no_builtin_macro_redefined",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # Replace compile timestamp-related macros for reproducible binaries with consistent hashes.
-                    "-Wno-builtin-macro-redefined",
-                ])],
-            ),
-        ],
-    )
-
-    no_unused_local_typedefs_feature = feature(
-        name = "no_unused_local_typedefs",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # This warning was added in g++-4.8.
-                    "-Wno-unused-local-typedefs",
-                ])],
-            ),
-        ],
-    )
-
-    clang_no_unused_lambda_capture_feature = feature(
-        name = "no_unused_lambda_capture",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # This warning was added in clang-5 and flags many of our lambdas. Since
-                    # it isn't actively harmful to capture unused variables we are
-                    # suppressing for now with a plan to fix later.
-                    "-Wno-unused-lambda-capture",
-                ])],
-            ),
-        ],
-    )
-
-    clang_no_deprecated_declarations_feature = feature(
-        name = "no_deprecated_declarations",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # Prevents warning about using deprecated features (such as auto_ptr in
-                    # c++11) Using -Wno-error=deprecated-declarations does not seem to work
-                    # on some compilers, including at least g++-4.6.
-                    "-Wno-deprecated-declarations",
-                ])],
-            ),
-        ],
-    )
-
-    no_unused_const_variable_feature = feature(
-        name = "no_unused_const_variable",
-        enabled = True,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # New in clang-3.4, trips up things mostly in third_party, but in a few
-                    # places in the primary mongo sources as well.
-                    "-Wno-unused-const-variable",
-                ])],
-            ),
-        ],
-    )
-
-    clang_no_deprecate_this_capture_feature = feature(
-        name = "no_deprecate_this_capture",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wno-deprecated-this-capture",
-                ])],
-            ),
-        ],
-    )
-
-    clang_no_undefined_var_template_feature = feature(
-        name = "no_undefined_var_template",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # Disable warning about templates that can't be implicitly instantiated.
-                    # It is an attempt to make a link error into an easier-to-debug compiler
-                    # failure, but it triggers false positives if explicit instantiation is
-                    # used in a TU that can see the full definition. This is a problem at
-                    # least for the S2 headers.
-                    "-Wno-undefined-var-template",
-                ])],
-            ),
-        ],
-    )
-
-    clang_no_unused_private_field_feature = feature(
-        name = "no_unused_private_field",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # Clang likes to warn about unused private fields, but some of our
-                    # third_party libraries have such things.
-                    "-Wno-unused-private-field",
-                ])],
-            ),
-        ],
-    )
-
-    clang_no_potentially_evaluated_expression_feature = feature(
-        name = "no_potentially_evaluated_expression",
-        enabled = ctx.attr.compiler == COMPILERS.CLANG,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    # Don't issue warnings about potentially evaluated expressions
-                    "-Wno-potentially-evaluated-expression",
-                ])],
-            ),
-        ],
-    )
-
     return [
-        clang_no_defaulted_function_deleted_feature,
-        clang_no_deprecate_this_capture_feature,
-        clang_no_deprecated_declarations_feature,
-        clang_no_potentially_evaluated_expression_feature,
-        clang_no_undefined_var_template_feature,
-        clang_no_unused_lambda_capture_feature,
-        clang_no_unused_private_field_feature,
-        no_builtin_macro_redefined_feature,
-        no_invalid_offsetof_warning_feature,
-        no_unknown_pragmas_feature,
-        no_unused_const_variable_feature,
-        no_unused_function_feature,
-        no_unused_local_typedefs_feature,
-        optimization_level_0_feature,
-        optimization_level_2_feature,
-        optimization_level_g_feature,
-        optimization_level_size_feature,
+        feature(
+            name = "og",
+            enabled = ctx.attr.optimization_level == "Og",
+            provides = [
+                "O0",
+                "O2",
+                "Os",
+            ],
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-Og",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "o0",
+            enabled = ctx.attr.optimization_level == "O0",
+            provides = [
+                "Og",
+                "O2",
+                "Os",
+            ],
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-O0",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "o2",
+            enabled = ctx.attr.optimization_level == "O2",
+            provides = [
+                "Og",
+                "O1",
+                "Os",
+            ],
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-O2",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "os",
+            enabled = ctx.attr.optimization_level == "Os",
+            provides = [
+                "Og",
+                "O1",
+                "O2",
+            ],
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "-Os",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_unused_function",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                # Clang likes to warn about unused functions, which seems a tad
+                                # aggressive and breaks -Werror, which we want to be able to use.
+                                "-Wno-unused-function",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_defaulted_function_deleted",
+            enabled = ctx.attr.compiler == COMPILERS.CLANG,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                # This warning was added in Apple clang version 11 and flags many
+                                # explicitly defaulted move constructors and assignment operators for
+                                # being implicitly deleted, which is not useful.
+                                "-Wno-defaulted-function-deleted",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+
+        # -Wno-invalid-offsetof is only valid for C++ but not for C
+        feature(
+            name = "no_invalid_offsetof_warning",
+            enabled = False,
+            flag_sets = [
+                flag_set(
+                    actions = all_cpp_compile_actions,
+                    flag_groups = [flag_group(flags = ["-Wno-invalid-offsetof"])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_unknown_pragmas",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # Do not warn on unknown pragmas.
+                        "-Wno-unknown-pragmas",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_builtin_macro_redefined",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # Replace compile timestamp-related macros for reproducible binaries with consistent hashes.
+                        "-Wno-builtin-macro-redefined",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_unused_local_typedefs",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # This warning was added in g++-4.8.
+                        "-Wno-unused-local-typedefs",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_unused_lambda_capture",
+            enabled = ctx.attr.compiler == COMPILERS.CLANG,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # This warning was added in clang-5 and flags many of our lambdas. Since
+                        # it isn't actively harmful to capture unused variables we are
+                        # suppressing for now with a plan to fix later.
+                        "-Wno-unused-lambda-capture",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_deprecated_declarations",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # Prevents warning about using deprecated features (such as auto_ptr in
+                        # c++11) Using -Wno-error=deprecated-declarations does not seem to work
+                        # on some compilers, including at least g++-4.6.
+                        "-Wno-deprecated-declarations",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_unused_const_variable",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # New in clang-3.4, trips up things mostly in third_party, but in a few
+                        # places in the primary mongo sources as well.
+                        "-Wno-unused-const-variable",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_deprecate_this_capture",
+            enabled = ctx.attr.compiler == COMPILERS.CLANG,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        "-Wno-deprecated-this-capture",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_undefined_var_template",
+            enabled = ctx.attr.compiler == COMPILERS.CLANG,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # Disable warning about templates that can't be implicitly instantiated.
+                        # It is an attempt to make a link error into an easier-to-debug compiler
+                        # failure, but it triggers false positives if explicit instantiation is
+                        # used in a TU that can see the full definition. This is a problem at
+                        # least for the S2 headers.
+                        "-Wno-undefined-var-template",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_unused_private_field",
+            enabled = ctx.attr.compiler == COMPILERS.CLANG,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # Clang likes to warn about unused private fields, but some of our
+                        # third_party libraries have such things.
+                        "-Wno-unused-private-field",
+                    ])],
+                ),
+            ],
+        ),
+        feature(
+            name = "no_potentially_evaluated_expression",
+            enabled = ctx.attr.compiler == COMPILERS.CLANG,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        # Don't issue warnings about potentially evaluated expressions
+                        "-Wno-potentially-evaluated-expression",
+                    ])],
+                ),
+            ],
+        ),
     ]
