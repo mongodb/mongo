@@ -102,3 +102,7 @@ feature_flags:
         cpp_varname: gFeatureFlagMongodProxyProcolSupport
         default: true
         version: 7.0
+    featureFlagRateLimitIngressConnectionEstablishment:
+        description: "Queues connection establishment after exceeding the maximum rate"
+        cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
+        default: false
