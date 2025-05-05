@@ -6,7 +6,8 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
+ *   # TODO (SERVER-103295) remove this tag once 9.0 becomes last LTS
+ *   known_query_shape_computation_problem,
  * ]
  */
 

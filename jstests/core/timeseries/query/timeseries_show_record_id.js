@@ -4,7 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";

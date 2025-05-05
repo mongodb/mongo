@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 

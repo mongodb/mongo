@@ -5,7 +5,6 @@
  *   requires_timeseries,
  *   does_not_support_transactions,
  *   requires_non_retryable_writes,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 

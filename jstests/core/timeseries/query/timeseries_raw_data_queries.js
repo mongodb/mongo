@@ -5,7 +5,10 @@
  *   requires_timeseries,
  *   requires_fcv_82,
  *   does_not_support_transactions,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
+ *   # TODO (SERVER-104682): Remove this exclusion tag once the bug is fixed
+ *   # Explain on $indexStats aggregation with rawData on mongos
+ *   # does not contain queryShapeHash field.
+ *   known_query_shape_computation_problem,
  * ]
  */
 

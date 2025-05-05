@@ -5,7 +5,6 @@
  *   # $listCatalog does not include the tenant prefix in its results.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 import {

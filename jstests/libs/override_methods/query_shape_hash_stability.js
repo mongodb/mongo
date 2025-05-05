@@ -6,7 +6,9 @@
 import {getCommandName, getExplainCommand, getInnerCommand} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {getQueryPlanners} from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 // Flag which tracks if we run this test using the two-cluster fixture.
@@ -56,26 +58,19 @@ function getAllMongosConnections(conn) {
 }
 
 /**
- * Assert that all elements of 'array' are identical.
- */
-function assertAllEqual(array) {
-    assert(array.every(x => x === array[0]), `not all elements are same: ${array}`);
-}
-
-/**
  * Given a connection, discover all the cluster connected nodes (both mongod and mongos), and
  * assert that all the explain results for 'explainCmd' have identical query shape hashes.
  */
 export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
-    let queryShapeHashes;
+    let explainResults;
     try {
         // We run explain on all connections in the topology and assert that the query shape hash is
         // the same on all nodes.
-        queryShapeHashes = getTopologyConnections(conn).map(conn => conn.getDB(dbName)).map(db => {
+        explainResults = getTopologyConnections(conn).map(conn => conn.getDB(dbName)).map(db => {
             jsTest.log.info('About to run the explain', {host: db.getMongo().host});
             const explainResult =
                 retryOnRetryableError(() => assert.commandWorked(db.runCommand(explainCmd)), 50);
-            return explainResult.queryShapeHash;
+            return explainResult;
         });
     } catch (ex) {
         // Fuzzer may generate invalid commands, which will fail on assert.commandWorked().
@@ -92,7 +87,35 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
 
         throw ex;
     }
-    assertAllEqual(queryShapeHashes);
+
+    const isRawOperationOnLegacyTimeseries = (() => {
+        if (explainCmd.explain.rawData !== true) {
+            // This is not a 'rawData' operation.
+            return false;
+        }
+        const isSystemBucketsNamespace = (nss) => {
+            return getCollectionNameFromFullNamespace(nss).startsWith('system.buckets.');
+        };
+        return explainResults.some(explainRes => getQueryPlanners(explainRes)
+                                                     .some(queryPlanner => isSystemBucketsNamespace(
+                                                               queryPlanner.namespace)));
+    })();
+
+    // TODO SERVER-103551 remove this once query shape hash calculation for legacy timeseries
+    // collection is fixed
+    if (isRawOperationOnLegacyTimeseries) {
+        // Operations that specify `rawData` targeting legacy timeseries collection will not produce
+        // a query shape hash on the shards of a sharded cluster (SERVER-103069)
+        return;
+    }
+
+    // Check that all the explain commands executed on all nodes returned the same 'queryShapeHash'.
+    assert.gt(explainResults.length, 0, `Found explain results array to be empty`);
+    const firstQueryShapeHash = explainResults[0].queryShapeHash;
+    assert(
+        explainResults.every(explainRes => explainRes.queryShapeHash === firstQueryShapeHash),
+        `Not all nodes returned same QueryShapeHash in explain command results. Explain command: ${
+            tojson(explainCmd)}. Explain results from all nodes: ${tojson(explainResults)}`);
 }
 
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {

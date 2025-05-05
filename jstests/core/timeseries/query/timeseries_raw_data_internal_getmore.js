@@ -7,7 +7,6 @@
  *   does_not_support_transactions,
  *   # Refusing to run a test that issues commands that may return different values after a failover
  *   does_not_support_stepdowns,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  *   # This test will hang if initial sync ignores the setParameter command.
  *   incompatible_with_initial_sync,
  *   # Running setParameter is not allowed with a signed security token.

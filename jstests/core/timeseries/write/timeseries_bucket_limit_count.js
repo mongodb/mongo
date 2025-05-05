@@ -10,7 +10,6 @@
  *   requires_getmore,
  *   # The config fuzzer can fuzz the bucketMaxCount.
  *   does_not_support_config_fuzzer,
- *   known_query_shape_computation_problem,  # TODO (SERVER-103069): Remove this tag.
  * ]
  */
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
