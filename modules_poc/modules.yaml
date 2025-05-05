@@ -380,6 +380,13 @@ tracking_allocators: # authoritative: @10gen/server-tracking-allocators
   files:
     - src/mongo/util/tracking
 
+atlas-streams:
+  meta:
+    slack: streams-engine
+    jira: Atlas Streams
+  files:
+    - src/mongo/db/modules/enterprise/src/streams
+
 # This module doesn't really exist. It's files are only compiled on windows, and we don't
 # run the mod_scanner on a windows build. However, it is needed to ensure that all first-party
 # C++ files are assigned to a module. It should be a dependency island anyway.
