@@ -18,19 +18,11 @@
   - Query Execution
 10gen/query-integration:
   - Query Integration
-10gen/query-integration-analytic-extensions:
-  - Query Integration
-10gen/query-integration-fle:
-  - Query Integration
-10gen/query-integration-geo:
-  - Query Integration
-10gen/query-integration-javascript:
+10gen/query-integration-extensions:
   - Query Integration
 10gen/query-integration-observability:
   - Query Integration
 10gen/query-integration-search:
-  - Query Integration
-10gen/query-integration-search-testing:
   - Query Integration
 10gen/query-integration-staff-leads:
   - Query Integration

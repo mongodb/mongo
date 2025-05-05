@@ -118,10 +118,10 @@ filters:
       - 10gen/query-execution-classic
   - "expression_from_accumulator_quantile.h":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "expression_function*":
     approvers:
-      - 10gen/query-integration-javascript
+      - 10gen/query-integration-extensions
   - "expression_hasher*":
     approvers:
       - 10gen/query-optimization
@@ -181,7 +181,7 @@ filters:
       - 10gen/query-optimization
   - "partition_key_comparator*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "pipeline_d*":
     approvers:
       - 10gen/query-optimization

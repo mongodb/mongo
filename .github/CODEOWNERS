@@ -188,7 +188,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /etc/evergreen_yml_components/variants/codecoverage/**/* @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/mongot/OWNERS.yml
-/etc/evergreen_yml_components/variants/mongot/**/* @10gen/query-integration-search-testing @svc-auto-approve-bot
+/etc/evergreen_yml_components/variants/mongot/**/* @10gen/query-integration-search @svc-auto-approve-bot
 
 # The following patterns are parsed from ./evergreen/OWNERS.yml
 /evergreen/**/restore_git_history_and_tags.sh @10gen/devprod-correctness @svc-auto-approve-bot
@@ -703,7 +703,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/pin_getmore_cursor.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/**/profiler.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/**/stats.js @10gen/query-integration-observability @svc-auto-approve-bot
-/jstests/libs/**/search.js @10gen/query-integration-search-testing @svc-auto-approve-bot
+/jstests/libs/**/search.js @10gen/query-integration-search @svc-auto-approve-bot
 /jstests/libs/**/shard_targeting_util.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/**/api_version_helpers.js @10gen/query-optimization @svc-auto-approve-bot
 
@@ -1917,8 +1917,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_sort_by_count* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_find_internal* @10gen/query-execution-classic @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/expression_from_accumulator_quantile.h @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/expression_function* @10gen/query-integration-javascript @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_from_accumulator_quantile.h @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression_function* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_hasher* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_test_api_version* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_dependencies* @10gen/query-optimization @svc-auto-approve-bot
@@ -1938,7 +1938,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*_processor* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/group_processor* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/lite_parsed* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/partition_key_comparator* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/partition_key_comparator* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/pipeline_d* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/pipeline_test.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/query_request_conversion* @10gen/query-optimization @svc-auto-approve-bot
@@ -2661,7 +2661,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_current_op.cpp @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_getmore_cmd* @10gen/query-execution-router @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_killcursors_cmd.cpp @10gen/query-execution-router @svc-auto-approve-bot
-/src/mongo/s/commands/query_cmd/**/cluster_map_reduce_agg* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/s/commands/query_cmd/**/cluster_map_reduce_agg* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_index_filter_cmd.cpp @10gen/query-execution-query-settings @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_plan_cache_clear_cmd.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/s/commands/query_cmd/**/cluster_profile_cmd.cpp @10gen/query-integration-observability @svc-auto-approve-bot

@@ -22,7 +22,7 @@ filters:
       - 10gen/query-execution-router
   - "cluster_map_reduce_agg*":
     approvers:
-      - 10gen/query-integration-analytic-extensions
+      - 10gen/query-integration-extensions
   - "cluster_index_filter_cmd.cpp":
     approvers:
       - 10gen/query-execution-query-settings

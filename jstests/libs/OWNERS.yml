@@ -50,7 +50,7 @@ filters:
       - 10gen/query-integration-observability
   - "search.js":
     approvers:
-      - 10gen/query-integration-search-testing
+      - 10gen/query-integration-search
   - "shard_targeting_util.js":
     approvers:
       - 10gen/query-optimization
