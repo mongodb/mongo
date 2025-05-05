@@ -798,9 +798,11 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
     // With the view & collation resolved, we can relinquish locks.
     aggCatalogState->relinquishResources();
 
+    OperationContext* opCtx = resolvedViewAggExState.getOpCtx();
+    auto& originalNss = resolvedViewAggExState.getOriginalNss();
+
     auto status{Status::OK()};
-    if (!OperationShardingState::get(resolvedViewAggExState.getOpCtx())
-             .shouldBeTreatedAsFromRouter(resolvedViewAggExState.getOpCtx())) {
+    if (!OperationShardingState::get(opCtx).shouldBeTreatedAsFromRouter(opCtx)) {
         // Non sharding-aware operation.
         // Run the translated query on the view on this node.
         status = _runAggregate(resolvedViewAggExState, result);
@@ -809,16 +811,14 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
 
         // Stash the shard role for the resolved view nss, in case it was set, as we are about to
         // transition into the router role for it.
-        const ScopedStashShardRole scopedUnsetShardRole{resolvedViewAggExState.getOpCtx(),
-                                                        resolvedView.getNamespace()};
+        const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedView.getNamespace()};
 
-        sharding::router::CollectionRouter router(
-            resolvedViewAggExState.getOpCtx()->getServiceContext(),
-            resolvedView.getNamespace(),
-            false  // retryOnStaleShard=false
+        sharding::router::CollectionRouter router(opCtx->getServiceContext(),
+                                                  resolvedView.getNamespace(),
+                                                  false  // retryOnStaleShard=false
         );
         status = router.route(
-            resolvedViewAggExState.getOpCtx(),
+            opCtx,
             "runAggregateOnView",
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                 // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
@@ -856,12 +856,15 @@ Status runAggregateOnView(ResolvedViewAggExState& resolvedViewAggExState,
             });
     }
 
+    // Set the namespace of the curop back to the view namespace so ctx records stats on this view
+    // namespace on destruction.
     {
-        // Set the namespace of the curop back to the view namespace so ctx records
-        // stats on this view namespace on destruction.
-        stdx::lock_guard<Client> lk(*resolvedViewAggExState.getOpCtx()->getClient());
-        CurOp::get(resolvedViewAggExState.getOpCtx())
-            ->setNS(lk, resolvedViewAggExState.getOriginalNss());
+        // It's possible this resolvedViewAggExState will be unusable by the time _runAggregate
+        // returns, so we must use opCtx and originalNss variables instead of trying to retrieve
+        // from resolvedViewAggExState.
+        // TODO SERVER-93536 Clarify ownership of aggExState.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setNS(lk, originalNss);
     }
 
     return status;
@@ -1184,6 +1187,8 @@ Status runAggregate(
     AggExState aggExState(
         opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources, verbosity);
 
+    // NOTE: It's possible this aggExState will be unusable by the time _runAggregate returns.
+    // TODO SERVER-93536 Clarify ownership of aggExState.
     Status status = _runAggregate(aggExState, result);
 
     // The aggregation pipeline may change the namespace of the curop and we need to set it back to
