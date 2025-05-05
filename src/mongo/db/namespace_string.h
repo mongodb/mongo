@@ -30,32 +30,21 @@
 #pragma once
 
 #include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include <array>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 #include <cstdint>
-#include <cstring>
 #include <fmt/format.h>
-#include <iosfwd>
-#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <variant>
 
-#include "mongo/base/data_view.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -270,7 +259,7 @@ public:
     static NamespaceString makeMovePrimaryOplogBufferNSS(const UUID& migrationId);
 
     /**
-     * Constructs the NamesapceString to store the collections to clone by the movePrimary op.
+     * Constructs the NamespaceString to store the collections to clone by the movePrimary op.
      */
     static NamespaceString makeMovePrimaryCollectionsToCloneNSS(const UUID& migrationId);
 
@@ -386,7 +375,7 @@ public:
     }
 
     /**
-     * This function should only be used when creating a resouce id for nss.
+     * This function should only be used when creating a resource id for nss.
      */
     std::string toStringForResourceId() const {
         return toStringWithTenantId();
@@ -831,7 +820,7 @@ private:
 };
 
 /**
- * This class is intented to be used by commands which can accept either a collection name or
+ * This class is intended to be used by commands which can accept either a collection name or
  * database + collection UUID. It will never be initialized with both.
  */
 class NamespaceStringOrUUID {

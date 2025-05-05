@@ -29,17 +29,9 @@
 
 #include "mongo/db/namespace_string.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 
-#include "mongo/base/parse_number.h"
-#include "mongo/base/status.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/server_options.h"
 // IWYU pragma: no_include "mongo/db/namespace_string_reserved.def.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
