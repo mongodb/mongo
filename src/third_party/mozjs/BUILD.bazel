@@ -297,6 +297,7 @@ mongo_cc_library(
     }),
     features = select({
         "@platforms//os:linux": ["no_invalid_offsetof_warning"],
+        "@platforms//os:macos": ["no_invalid_offsetof_warning"],
         "//conditions:default": [],
     }) + select({
         "//bazel/config:compiler_type_gcc": ["no_class_memaccess_warning"],
