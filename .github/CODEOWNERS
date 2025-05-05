@@ -2910,6 +2910,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/unicode* @10gen/query-execution @svc-auto-approve-bot
 /src/third_party/**/unwind @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/valgrind @10gen/devprod-build @svc-auto-approve-bot
+/src/third_party/**/wiredtiger @10gen/storage-engines @svc-auto-approve-bot
 /src/third_party/**/yaml-cpp @10gen/server-security @svc-auto-approve-bot
 /src/third_party/**/zlib @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/zstandard @10gen/server-networking-and-observability @svc-auto-approve-bot

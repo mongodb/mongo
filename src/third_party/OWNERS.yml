@@ -121,10 +121,9 @@ filters:
   - "valgrind":
     approvers:
       - 10gen/devprod-build
-  # We're not ready for this yet, there some dependent tooling work to make sure we can vendor changes from the wiredtiger repo without being disruptive.
-  # - "wiredtiger":
-  #   approvers:
-  #     - 10gen/storage-engines
+  - "wiredtiger":
+    approvers:
+      - 10gen/storage-engines
   - "yaml-cpp":
     approvers:
       - 10gen/server-security
