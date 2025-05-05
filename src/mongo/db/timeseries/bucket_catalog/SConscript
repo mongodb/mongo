@@ -61,3 +61,15 @@ env.CppUnitTest(
         'bucket_catalog',
     ],
 )
+
+env.CppUnitTest(
+    target='timeseries_sizing_test',
+    source=[
+        'timeseries_sizing_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_column',
+        '$BUILD_DIR/mongo/util/processinfo',
+        'bucket_catalog',
+    ],
+)
