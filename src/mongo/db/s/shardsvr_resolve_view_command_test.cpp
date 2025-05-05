@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/database_version.h"
 #include "mongo/unittest/assert.h"
@@ -57,10 +58,10 @@ protected:
                                  const DatabaseName& dbName,
                                  const DatabaseVersion& dbVersion) {
         AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
 
         // Once locked, initialize the database version.
-        scopedDss->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
+        scopedDsr->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
     }
 
     // Database and version information.

@@ -677,7 +677,7 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         // Check that the sharding database version matches our read.
         if (dbName) {
             // Check that the sharding database version matches our read.
-            DatabaseShardingState::assertMatchingDbVersion(opCtx, *dbName);
+            DatabaseShardingState::acquire(opCtx, *dbName)->checkDbVersionOrThrow(opCtx);
         }
 
         // We must open a storage snapshot consistent with the fetched in-memory Catalog instance.
@@ -869,7 +869,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         (!shard_role_details::getRecoveryUnit(opCtx)->isActive() || _isLockFreeReadSubOperation));
 
     // Pre-snapshot shard version checks.
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.dbName());
+    DatabaseShardingState::acquire(opCtx, nsOrUUID.dbName())->checkDbVersionOrThrow(opCtx);
     if (nsOrUUID.isNamespaceString()) {
         CollectionShardingState::acquire(opCtx, nsOrUUID.nss())->checkShardVersionOrThrow(opCtx);
     }

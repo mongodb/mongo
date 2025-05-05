@@ -51,7 +51,7 @@
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -285,9 +285,9 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
                         }
-                        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
                             opCtx, insertedNss.dbName());
-                        scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
+                        scopedDsr->enterCriticalSectionCatchUpPhase(reason);
                     } else {
                         // Primaries take locks when writing to certain internal namespaces. It must
                         // be ensured that those locks are also taken on secondaries, when
@@ -439,9 +439,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                         lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
                     }
 
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
                         opCtx, updatedNss.dbName());
-                    scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
+                    scopedDsr->enterCriticalSectionCommitPhase(reason);
                 } else {
                     // Primaries take locks when writing to certain internal namespaces. It must
                     // be ensured that those locks are also taken on secondaries, when
@@ -689,16 +689,16 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
                     }
 
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
                         opCtx, deletedNss.dbName());
 
                     // Secondaries that are in oplog application must clear the database metadata
                     // before releasing the in-memory critical section.
                     if (!opCtx->isEnforcingConstraints() && clearDbInfo) {
-                        scopedDss->clearDbInfo_DEPRECATED(opCtx);
+                        scopedDsr->clearDbInfo_DEPRECATED(opCtx);
                     }
 
-                    scopedDss->exitCriticalSection(opCtx, reason);
+                    scopedDsr->exitCriticalSection(reason);
                 } else {
                     // Primaries take locks when writing to certain internal namespaces. It must
                     // be ensured that those locks are also taken on secondaries, when
@@ -927,8 +927,8 @@ void ShardServerOpObserver::onCreateDatabaseMetadata(OperationContext* opCtx,
     auto dbMetadata = entry.getDb();
     auto dbName = dbMetadata.getDbName();
 
-    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo(opCtx, dbMetadata);
+    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+    scopedDsr->setDbInfo(opCtx, dbMetadata);
 }
 
 void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
@@ -938,8 +938,8 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
 
     auto dbName = entry.getDbName();
 
-    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
-    scopedDss->clearDbInfo(opCtx);
+    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+    scopedDsr->clearDbInfo();
 }
 
 }  // namespace mongo

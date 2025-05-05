@@ -3561,7 +3561,6 @@ mongo_cc_library(
         "//src/mongo/db/s:query_analysis_writer",
         "//src/mongo/db/s:sessions_collection_config_server",
         "//src/mongo/db/s:sharding_commands_d",
-        "//src/mongo/db/s:sharding_runtime_d",
         "serverinit",
         "service_context_d",
         "//src/mongo/db/session:kill_sessions_local",

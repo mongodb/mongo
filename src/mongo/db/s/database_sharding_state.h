@@ -29,21 +29,14 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <shared_mutex>
-#include <utility>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/database_version.h"
-#include "mongo/util/cancellation.h"
-#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -58,19 +51,26 @@ namespace mongo {
  * the function-level comments for details.
  */
 class DatabaseShardingState {
-public:
-    DatabaseShardingState(const DatabaseName& dbName);
-    virtual ~DatabaseShardingState() = default;
-
     DatabaseShardingState(const DatabaseShardingState&) = delete;
     DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
 
+public:
+    DatabaseShardingState() = default;
+    virtual ~DatabaseShardingState() = default;
+
     /**
-     * Obtains the sharding state for the specified database along with a lock in exclusive mode,
-     * which will be held until the object goes out of scope.
+     * Obtains the sharding state for the specified database along with a lock in shared mode, which
+     * will be held until the object goes out of scope.
      */
-    class ScopedExclusiveDatabaseShardingState {
+    class ScopedDatabaseShardingState {
+        using LockType = std::variant<std::shared_lock<std::shared_mutex>,   // NOLINT
+                                      std::unique_lock<std::shared_mutex>>;  // NOLINT
+
     public:
+        ScopedDatabaseShardingState(ScopedDatabaseShardingState&&);
+
+        ~ScopedDatabaseShardingState();
+
         DatabaseShardingState* operator->() const {
             return _dss;
         }
@@ -81,50 +81,21 @@ public:
 
     private:
         friend class DatabaseShardingState;
+        friend class DatabaseShardingRuntime;
 
-        ScopedExclusiveDatabaseShardingState(std::unique_lock<std::shared_mutex> lock,  // NOLINT
-                                             DatabaseShardingState* dss);
+        ScopedDatabaseShardingState(LockType lock, DatabaseShardingState* dss);
 
-        // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
-        std::unique_lock<std::shared_mutex> _lock;  // NOLINT
+        static ScopedDatabaseShardingState acquireScopedDatabaseShardingState(
+            OperationContext* opCtx, const DatabaseName& dbName, LockMode mode);
+
+        LockType _lock;
         DatabaseShardingState* _dss;
     };
 
-    /**
-     * Obtains the sharding state for the specified database along with a lock in shared mode, which
-     * will be held until the object goes out of scope.
-     */
-    class ScopedSharedDatabaseShardingState {
-    public:
-        const DatabaseShardingState* operator->() const {
-            return _dss;
-        }
+    static ScopedDatabaseShardingState acquire(OperationContext* opCtx, const DatabaseName& dbName);
 
-        const DatabaseShardingState& operator*() const {
-            return *_dss;
-        }
-
-    private:
-        friend class DatabaseShardingState;
-
-        ScopedSharedDatabaseShardingState(std::shared_lock<std::shared_mutex> lock,  // NOLINT
-                                          DatabaseShardingState* dss);
-        // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
-        std::shared_lock<std::shared_mutex> _lock;  // NOLINT
-        DatabaseShardingState* _dss;
-    };
-
-    static ScopedExclusiveDatabaseShardingState acquireExclusive(OperationContext* opCtx,
-                                                                 const DatabaseName& dbName);
-
-    static ScopedSharedDatabaseShardingState acquireShared(OperationContext* opCtx,
-                                                           const DatabaseName& dbName);
-
-    static ScopedExclusiveDatabaseShardingState assertDbLockedAndAcquireExclusive(
-        OperationContext* opCtx, const DatabaseName& dbName);
-
-    static ScopedSharedDatabaseShardingState assertDbLockedAndAcquireShared(
-        OperationContext* opCtx, const DatabaseName& dbName);
+    static ScopedDatabaseShardingState assertDbLockedAndAcquire(OperationContext* opCtx,
+                                                                const DatabaseName& dbName);
 
     /**
      * Returns the names of the databases that have a DatabaseShardingState.
@@ -139,170 +110,66 @@ public:
      * cached database version, or the cached database version does not match the one sent by the
      * client.
      */
-    static void assertMatchingDbVersion(OperationContext* opCtx, const DatabaseName& dbName);
-    void assertMatchingDbVersion(OperationContext* opCtx,
-                                 const DatabaseVersion& receivedVersion) const;
+    virtual void checkDbVersionOrThrow(OperationContext* opCtx) const = 0;
+
+    virtual void checkDbVersionOrThrow(OperationContext* opCtx,
+                                       const DatabaseVersion& receivedVersion) const = 0;
 
     /**
      * Checks that the current shard server is the primary for the given database, throwing
      * `IllegalOperation` if not.
      */
-    void assertIsPrimaryShardForDb(OperationContext* opCtx) const;
-
-    /**
-     * Returns the name of the database related to the current sharding state.
-     */
-    const DatabaseName& getDbName() const {
-        return _dbName;
-    }
-
-    /**
-     * Sets this node's cached database info in a non-authoritative way.
-     *
-     * The caller must hold the database lock in MODE_IX.
-     *
-     * NOTE: This method is deprecated and should not be used. In the authoritative model, database
-     * refreshes are not required, and there is no need to lock the database. The method is retained
-     * for backward compatibility, but its usage is discouraged in favor of the updated approach.
-     */
-    void setDbInfo_DEPRECATED(OperationContext* opCtx, const DatabaseType& dbInfo);
-
-    /**
-     * Sets this node's cached database info.
-     */
-    void setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
-
-    /**
-     * Resets this node's cached database info in a non-authoritative way.
-     *
-     * NOTE: Only the thread that refreshes the database metadata (which calls the function
-     * `onDbVersionMismatch`) actually needs to change the default initialization of
-     * `cancelOngoingRefresh`. This parameter must be ignored in any other case.
-     *
-     * The caller must hold the database lock in MODE_IX.
-     *
-     * NOTE: This method is deprecated and should not be used. In the authoritative model, database
-     * refreshes are not required, and there is no need to lock the database. The method is retained
-     * for backward compatibility, but its usage is discouraged in favor of the updated approach.
-     */
-    void clearDbInfo_DEPRECATED(OperationContext* opCtx, bool cancelOngoingRefresh = true);
-
-    /**
-     * Resets this node's cached database info.
-     */
-    void clearDbInfo(OperationContext* opCtx);
-
-
-    /**
-     * Returns this node's cached  database version if the database info is cached, otherwise
-     * it returns `boost::none`.
-     */
-    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const;
-
-    /**
-     * Methods to control the databases's critical section. Must be called with the database X lock
-     * held.
-     */
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, const BSONObj& reason);
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx, const BSONObj& reason);
-    void exitCriticalSection(OperationContext* opCtx, const BSONObj& reason);
-    void exitCriticalSectionNoChecks(OperationContext* opCtx);
-
-    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
-        return _critSec.getSignal(op);
-    }
-
-    auto getCriticalSectionReason() const {
-        return _critSec.getReason();
-    }
+    virtual void assertIsPrimaryShardForDb(OperationContext* opCtx) const = 0;
 
     /**
      * Returns `true` whether a `movePrimary` operation on this database is in progress, `false`
      * otherwise.
      */
-    bool isMovePrimaryInProgress() const {
-        return _movePrimaryInProgress;
-    }
+    virtual bool isMovePrimaryInProgress() const = 0;
 
     /**
-     * Declares that a `movePrimary` operation on this database is in progress. This causes write
-     * operations on this database to fail with the `MovePrimaryInProgress` error.
-     *
-     * Must be called with the database locked in X mode.
+     * Returns the name of the database related to the current sharding state.
      */
-    void setMovePrimaryInProgress(OperationContext* opCtx);
+    virtual const DatabaseName& getDbName() const = 0;
 
     /**
-     * Declares that the `movePrimary` operation on this database is over. This re-enables write
-     * operations on this database.
-     *
-     * Must be called with the database locked in IX mode.
+     * Returns this node's cached  database version if the database info is cached, otherwise it
+     * returns `boost::none`.
      */
-    void unsetMovePrimaryInProgress(OperationContext* opCtx);
+    virtual boost::optional<DatabaseVersion> getDbVersion() const = 0;
 
     /**
-     * Sets the database metadata refresh future for other threads to wait on it.
-     */
-    void setDbMetadataRefreshFuture(SharedSemiFuture<void> future,
-                                    CancellationSource cancellationSource);
-
-    /**
-     * If there is an ongoing database metadata refresh, returns the future to wait on it, otherwise
+     * Returns this node's cached primary shard if the database info is cached, otherwise it returns
      * `boost::none`.
      */
-    boost::optional<SharedSemiFuture<void>> getDbMetadataRefreshFuture() const;
+    virtual boost::optional<ShardId> getDbPrimaryShard() const = 0;
+};
+
+
+/**
+ * Singleton factory to instantiate DatabaseShardingState objects specific to the type of instance
+ * which is running.
+ */
+class DatabaseShardingStateFactory {
+    DatabaseShardingStateFactory(const DatabaseShardingStateFactory&) = delete;
+    DatabaseShardingStateFactory& operator=(const DatabaseShardingStateFactory&) = delete;
+
+public:
+    static void set(ServiceContext* service, std::unique_ptr<DatabaseShardingStateFactory> factory);
+    static void clear(ServiceContext* service);
+
+    virtual ~DatabaseShardingStateFactory() = default;
 
     /**
-     * Resets the database metadata refresh future to `boost::none`.
-     */
-    void resetDbMetadataRefreshFuture();
-
-private:
-    struct DbMetadataRefresh {
-        DbMetadataRefresh(SharedSemiFuture<void> future, CancellationSource cancellationSource)
-            : future(std::move(future)), cancellationSource(std::move(cancellationSource)) {};
-
-        // Tracks the ongoing database metadata refresh.
-        SharedSemiFuture<void> future;
-
-        // Cancellation source to cancel the ongoing database metadata refresh.
-        CancellationSource cancellationSource;
-    };
-
-    /**
-     * Cancel any ongoing database metadata refresh.
-     */
-    void _cancelDbMetadataRefresh();
-
-    const DatabaseName _dbName;
-
-    // This node's cached database info.
-    boost::optional<DatabaseType> _dbInfo;
-
-    // Modifying the state below requires holding the DBLock.
-
-    // Tracks the movePrimary critical section state for this collection.
-    ShardingMigrationCriticalSection _critSec;
-
-    // Is `true` when this database is serving as a source shard for a movePrimary, `false`
-    // otherwise.
-    bool _movePrimaryInProgress{false};
-
-    // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads to
-    // wait on it, and a cancellation source to cancel the ongoing database metadata refresh.
-    boost::optional<DbMetadataRefresh> _dbMetadataRefresh;
-
-    /**
-     * If there is cached database info, returns `true` if the current shard is the primary shard
-     * for the database of the current sharding state. If there is no cached database info, returns
-     * `boost::none`.
+     * Called by the DatabaseShardingState::acquire method once per newly cached database. It is
+     * invoked under a mutex and must not acquire any locks or do blocking work.
      *
-     * This method is unsafe to use since it doesn't honor the critical section.
+     * Implementations must be thread-safe when called from multiple threads.
      */
-    boost::optional<bool> _isPrimaryShardForDb(OperationContext* opCtx) const;
+    virtual std::unique_ptr<DatabaseShardingState> make(const DatabaseName& dbName) = 0;
 
-    // Permit the `getDatabaseVersion` command to access the private method `_isPrimaryShardForDb`.
-    friend class GetDatabaseVersionCmd;
+protected:
+    DatabaseShardingStateFactory() = default;
 };
 
 }  // namespace mongo

@@ -138,8 +138,7 @@ Status validateDBNameForWindows(StringData dbname) {
 }
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    const auto scopedDss =
-        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+    const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(opCtx, nss.dbName());
     if (scopedDss->isMovePrimaryInProgress()) {
         LOGV2(4909100, "assertNoMovePrimaryInProgress", logAttrs(nss));
 

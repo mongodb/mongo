@@ -552,7 +552,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, source.dbName());
+    DatabaseShardingState::acquire(opCtx, source.dbName())->checkDbVersionOrThrow(opCtx);
 
     DisableDocumentValidation validationDisabler(opCtx);
 

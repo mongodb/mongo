@@ -61,7 +61,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
@@ -211,8 +211,8 @@ void ShardRoleTest::installDatabaseMetadata(OperationContext* opCtx,
                                             const DatabaseName& dbName,
                                             const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
+    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+    scopedDsr->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
 }
 
 void ShardRoleTest::installUnshardedCollectionMetadata(OperationContext* opCtx,
@@ -469,9 +469,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
     {
         // Clear the database metadata
         AutoGetDb autoDb(operationContext(), dbNameTestDb, MODE_X, {}, {});
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
             operationContext(), dbNameTestDb);
-        scopedDss->clearDbInfo_DEPRECATED(operationContext());
+        scopedDsr->clearDbInfo_DEPRECATED(operationContext());
     }
 
     auto validateException = [&](const DBException& ex) {
@@ -507,10 +507,10 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
     {
         // Enter critical section.
         AutoGetDb autoDb(operationContext(), dbNameTestDb, MODE_X, {}, {});
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
             operationContext(), dbNameTestDb);
-        scopedDss->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
-        scopedDss->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
+        scopedDsr->enterCriticalSectionCatchUpPhase(criticalSectionReason);
+        scopedDsr->enterCriticalSectionCommitPhase(criticalSectionReason);
     }
 
     {
@@ -546,9 +546,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
         // Exit critical section.
         AutoGetDb autoDb(operationContext(), dbNameTestDb, MODE_X, {}, {});
         const BSONObj criticalSectionReason = BSON("reason" << 1);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
             operationContext(), dbNameTestDb);
-        scopedDss->exitCriticalSection(operationContext(), criticalSectionReason);
+        scopedDsr->exitCriticalSection(criticalSectionReason);
     }
 }
 

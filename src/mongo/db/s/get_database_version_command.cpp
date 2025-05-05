@@ -53,6 +53,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/get_database_version_gen.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -99,18 +100,16 @@ public:
 
             const auto dbName = _targetDb();
 
-            AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-            const auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+            const auto scopedDss = DatabaseShardingState::acquire(opCtx, dbName);
 
             BSONObj versionObj;
-            if (const auto dbVersion = scopedDss->getDbVersion(opCtx)) {
+            if (const auto dbVersion = scopedDss->getDbVersion()) {
                 versionObj = dbVersion->toBSON();
             }
             result->getBodyBuilder().append("dbVersion", versionObj);
 
-            if (const auto isPrimaryShardForDb = scopedDss->_isPrimaryShardForDb(opCtx)) {
-                result->getBodyBuilder().append("isPrimaryShardForDb", *isPrimaryShardForDb);
+            if (ShardingState::get(opCtx)->shardId() == scopedDss->getDbPrimaryShard()) {
+                result->getBodyBuilder().append("isPrimaryShardForDb", true);
             }
         }
 

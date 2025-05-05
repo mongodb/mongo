@@ -35,35 +35,24 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -72,7 +61,7 @@
 namespace mongo {
 namespace {
 
-class DatabaseShardingStateTestWithMockedLoader
+class DatabaseShardingRuntimeTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
     const DatabaseName kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
@@ -143,7 +132,7 @@ public:
     }
 };
 
-TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, OnDbVersionMismatch) {
     const auto oldDb = createDatabase(UUID::gen(), Timestamp(1));
     const auto newDb = createDatabase(UUID::gen(), Timestamp(2));
 
@@ -151,8 +140,8 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
         auto getActiveDbVersion = [&] {
-            const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, kDbName);
-            return scopedDss->getDbVersion(opCtx);
+            const auto scopedDsr = DatabaseShardingRuntime::acquire(opCtx, kDbName);
+            return scopedDsr->getDbVersion();
         };
 
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
@@ -171,7 +160,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
     checkOnDbVersionMismatch(oldDb, false);
 }
 
-TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
     const auto uuid = UUID::gen();
 
     const auto oldDb = createDatabase(uuid, Timestamp(1));
@@ -186,8 +175,8 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
             opCtx, kDbName));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {
-            const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, kDbName);
-            return scopedDss->getDbVersion(opCtx);
+            const auto scopedDsr = DatabaseShardingRuntime::acquire(opCtx, kDbName);
+            return scopedDsr->getDbVersion();
         }();
         ASSERT_TRUE(activeDbVersion);
         if (expectRefresh) {
@@ -200,38 +189,38 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
     checkForceDatabaseRefresh(oldDb, false);
 }
 
-TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) {
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckReceivedDatabaseVersion) {
     const auto installedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(10, 0));
 
-    // Install DSS
+    // Install DSR
     {
         const auto dbInfoToInstall =
             DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
 
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
-        const auto dss =
-            DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
-        dss->setDbInfo_DEPRECATED(operationContext(), dbInfoToInstall);
+        const auto dsr =
+            DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
+        dsr->setDbInfo_DEPRECATED(operationContext(), dbInfoToInstall);
     }
 
-    const auto dss = DatabaseShardingState::acquireShared(operationContext(), kDbName);
+    const auto dsr = DatabaseShardingRuntime::acquireShared(operationContext(), kDbName);
 
     // If received version matches, then success.
-    ASSERT_DOES_NOT_THROW(dss->assertMatchingDbVersion(operationContext(), installedDbVersion));
+    ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
 
     // If received version timestamp does not match, then throw.
     {
         auto versionWithOlderTimestamp = installedDbVersion;
         versionWithOlderTimestamp.setTimestamp({9, 0});
         ASSERT_THROWS_CODE(
-            dss->assertMatchingDbVersion(operationContext(), versionWithOlderTimestamp),
+            dsr->checkDbVersionOrThrow(operationContext(), versionWithOlderTimestamp),
             AssertionException,
             ErrorCodes::StaleDbVersion);
 
         auto versionWithNewerTimestamp = installedDbVersion;
         versionWithNewerTimestamp.setTimestamp({10, 1});
         ASSERT_THROWS_CODE(
-            dss->assertMatchingDbVersion(operationContext(), versionWithNewerTimestamp),
+            dsr->checkDbVersionOrThrow(operationContext(), versionWithNewerTimestamp),
             AssertionException,
             ErrorCodes::StaleDbVersion);
     }
@@ -240,17 +229,15 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) 
     {
         auto versionWithOlderLastMod = installedDbVersion;
         versionWithOlderLastMod.setLastMod(installedDbVersion.getLastMod() + 1);
-        ASSERT_THROWS_CODE(
-            dss->assertMatchingDbVersion(operationContext(), versionWithOlderLastMod),
-            AssertionException,
-            ErrorCodes::StaleDbVersion);
+        ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(), versionWithOlderLastMod),
+                           AssertionException,
+                           ErrorCodes::StaleDbVersion);
 
         auto versionWithNewerLastMod = installedDbVersion;
         versionWithNewerLastMod.setLastMod(installedDbVersion.getLastMod() - 1);
-        ASSERT_THROWS_CODE(
-            dss->assertMatchingDbVersion(operationContext(), versionWithNewerLastMod),
-            AssertionException,
-            ErrorCodes::StaleDbVersion);
+        ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(), versionWithNewerLastMod),
+                           AssertionException,
+                           ErrorCodes::StaleDbVersion);
     }
 
     // If installed database timestamp is greater than opCtx's atClusterTime, then throw
@@ -262,19 +249,19 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) 
         repl::ReadConcernArgs cmdLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
         cmdLevelReadConcern.setArgsAtClusterTimeForSnapshot(Timestamp(11, 0));
         repl::ReadConcernArgs::get(operationContext()) = cmdLevelReadConcern;
-        ASSERT_DOES_NOT_THROW(dss->assertMatchingDbVersion(operationContext(), installedDbVersion));
+        ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion));
 
         // Command atClusterTime is older than db timestamp.
         cmdLevelReadConcern.setArgsAtClusterTimeForSnapshot(Timestamp(8, 0));
         repl::ReadConcernArgs::get(operationContext()) = cmdLevelReadConcern;
-        ASSERT_THROWS_CODE(dss->assertMatchingDbVersion(operationContext(), installedDbVersion),
+        ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(), installedDbVersion),
                            AssertionException,
                            ErrorCodes::MigrationConflict);
 
         // StaleDbVersion has precedence over MigrationConflict
         auto staleReceivedVersion = installedDbVersion;
         staleReceivedVersion.setTimestamp({9, 0});
-        ASSERT_THROWS_CODE(dss->assertMatchingDbVersion(operationContext(), staleReceivedVersion),
+        ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(), staleReceivedVersion),
                            AssertionException,
                            ErrorCodes::StaleDbVersion);
 
@@ -282,7 +269,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) 
         auto receivedVersionWithPlacementConflictTimeZero = installedDbVersion;
         receivedVersionWithPlacementConflictTimeZero.setPlacementConflictTime(
             LogicalTime(Timestamp{0, 0}));
-        ASSERT_DOES_NOT_THROW(dss->assertMatchingDbVersion(
+        ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
             operationContext(), receivedVersionWithPlacementConflictTimeZero));
 
         repl::ReadConcernArgs::get(operationContext()) = previousReadConcern;
@@ -294,13 +281,13 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) 
         auto receivedVersionWithGreaterPlacementConflictTime = installedDbVersion;
         receivedVersionWithGreaterPlacementConflictTime.setPlacementConflictTime(
             LogicalTime(Timestamp{11, 0}));
-        ASSERT_DOES_NOT_THROW(dss->assertMatchingDbVersion(
+        ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
             operationContext(), receivedVersionWithGreaterPlacementConflictTime));
 
         auto receivedVersionWithLowerPlacementConflictTime = installedDbVersion;
         receivedVersionWithLowerPlacementConflictTime.setPlacementConflictTime(
             LogicalTime(Timestamp{8, 0}));
-        ASSERT_THROWS_CODE(dss->assertMatchingDbVersion(
+        ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(
                                operationContext(), receivedVersionWithLowerPlacementConflictTime),
                            AssertionException,
                            ErrorCodes::MigrationConflict);
@@ -308,26 +295,26 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, CheckReceivedDatabaseVersion) 
         auto receivedVersionWithZeroPlacementConflictTime = installedDbVersion;
         receivedVersionWithZeroPlacementConflictTime.setPlacementConflictTime(
             LogicalTime(Timestamp{0, 0}));
-        ASSERT_DOES_NOT_THROW(dss->assertMatchingDbVersion(
+        ASSERT_DOES_NOT_THROW(dsr->checkDbVersionOrThrow(
             operationContext(), receivedVersionWithZeroPlacementConflictTime));
     }
 }
 
-TEST_F(DatabaseShardingStateTestWithMockedLoader,
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
        CheckReceivedDatabaseVersionWhenCriticalSectionActive) {
     // If critical section is active, then throw.
     AutoGetDb autoDb(operationContext(), kDbName, MODE_X);
-    const auto dss =
-        DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
-    dss->enterCriticalSectionCatchUpPhase(operationContext(), BSONObj());
-    dss->enterCriticalSectionCommitPhase(operationContext(), BSONObj());
+    const auto dsr =
+        DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
+    dsr->enterCriticalSectionCatchUpPhase(BSONObj());
+    dsr->enterCriticalSectionCommitPhase(BSONObj());
 
-    ASSERT_THROWS_CODE(dss->assertMatchingDbVersion(operationContext(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(10, 0))),
+    ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(),
+                                                  DatabaseVersion(UUID::gen(), Timestamp(10, 0))),
                        AssertionException,
                        ErrorCodes::StaleDbVersion);
 
-    ASSERT_DOES_NOT_THROW(dss->exitCriticalSection(operationContext(), BSONObj()));
+    ASSERT_DOES_NOT_THROW(dsr->exitCriticalSection(BSONObj()));
 }
 
 }  // namespace

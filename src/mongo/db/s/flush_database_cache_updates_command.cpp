@@ -53,7 +53,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/service_context.h"
@@ -216,10 +216,10 @@ public:
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                const auto scopedDss =
-                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+                const auto scopedDsr =
+                    DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName);
                 criticalSectionSignal =
-                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                    scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
             }
 
             if (criticalSectionSignal)

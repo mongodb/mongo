@@ -62,7 +62,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -111,9 +111,9 @@ protected:
         auto databaseHolder = DatabaseHolder::get(operationContext());
         auto db = databaseHolder->openDb(operationContext(), kTestNss.dbName(), &justCreated);
         {
-            auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+            auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
                 operationContext(), kTestNss.dbName());
-            scopedDss->setDbInfo_DEPRECATED(
+            scopedDsr->setDbInfo_DEPRECATED(
                 operationContext(), DatabaseType{kTestNss.dbName(), ShardId("this"), dbVersion1});
         }
         ASSERT_TRUE(db);

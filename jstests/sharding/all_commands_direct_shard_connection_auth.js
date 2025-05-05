@@ -678,7 +678,7 @@ const allCommands = {
     getDatabaseVersion: {
         isAdminCommand: true,
         command: {getDatabaseVersion: dbName},
-        shouldFail: true,
+        shouldFail: false,
     },
     getDefaultRWConcern: {skip: requiresMongoS},
     getDiagnosticData: {

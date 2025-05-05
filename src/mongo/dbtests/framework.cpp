@@ -51,6 +51,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
@@ -119,6 +120,8 @@ int runDbTests(int argc, char** argv) {
     ShardingState::create(serviceContext);
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
+    DatabaseShardingStateFactory::set(serviceContext,
+                                      std::make_unique<DatabaseShardingStateFactoryShard>());
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,
@@ -127,6 +130,7 @@ int runDbTests(int argc, char** argv) {
 
     // So everything shuts down cleanly
     CollectionShardingStateFactory::clear(serviceContext);
+    DatabaseShardingStateFactory::clear(serviceContext);
     exitCleanly((ExitCode)ret);
     return ret;
 }

@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/storage/control/storage_control.h"
@@ -180,6 +181,8 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     }
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
+    DatabaseShardingStateFactory::set(serviceContext,
+                                      std::make_unique<DatabaseShardingStateFactoryShard>());
     serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
 
     if (options._indexBuildsCoordinator) {
@@ -201,6 +204,7 @@ MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTes
 
     IndexBuildsCoordinator::get(opCtx.get())->shutdown(opCtx.get());
     CollectionShardingStateFactory::clear(getServiceContext());
+    DatabaseShardingStateFactory::clear(getServiceContext());
 
     {
         Lock::GlobalLock glk(opCtx.get(), MODE_X);

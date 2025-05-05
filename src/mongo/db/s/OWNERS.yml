@@ -75,7 +75,7 @@ filters:
   - "*collection_creation*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "database_sharding_state*":
+  - "database_sharding_*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "operation_sharding_state*":

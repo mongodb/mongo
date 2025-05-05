@@ -254,7 +254,7 @@ void DDLLockManager::ScopedDatabaseDDLLock::_lock(OperationContext* opCtx,
                         timeout);
 
         // Check under the DDL dbLock if this is the primary shard for the database
-        const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, db);
+        const auto scopedDss = DatabaseShardingState::acquire(opCtx, db);
         scopedDss->assertIsPrimaryShardForDb(opCtx);
     } catch (...) {
         _dbLock.reset();
@@ -312,7 +312,7 @@ void DDLLockManager::ScopedCollectionDDLLock::_lock(OperationContext* opCtx,
 
         // Check under the DDL db lock if this is the primary shard for the database
         {
-            const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, ns.dbName());
+            const auto scopedDss = DatabaseShardingState::acquire(opCtx, ns.dbName());
             scopedDss->assertIsPrimaryShardForDb(opCtx);
         }
 

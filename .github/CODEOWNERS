@@ -2249,7 +2249,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/*collmod* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*convert_to_capped* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*collection_creation* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/database_sharding_state* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/database_sharding_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/operation_sharding_state* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/flush*updates* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/get*version*command* @10gen/server-catalog-and-routing @svc-auto-approve-bot

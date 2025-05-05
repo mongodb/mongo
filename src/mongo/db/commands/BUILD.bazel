@@ -1652,7 +1652,6 @@ mongo_cc_library(
         "//src/mongo/db/repl/dbcheck",
         "//src/mongo/db/s:sharding_catalog_manager",
         "//src/mongo/db/s:sharding_commands_d",
-        "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/s:transaction_coordinator",
         "//src/mongo/db/s:user_writes_recoverable_critical_section",
         "//src/mongo/db/stats:top",

@@ -86,6 +86,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
@@ -197,6 +198,8 @@ public:
         ShardingState::create(_svcCtx);
         CollectionShardingStateFactory::set(
             _svcCtx, std::make_unique<CollectionShardingStateFactoryShard>(_svcCtx));
+        DatabaseShardingStateFactory::set(_svcCtx,
+                                          std::make_unique<DatabaseShardingStateFactoryShard>());
 
         MongoDSessionCatalog::set(
             _svcCtx,

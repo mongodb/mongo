@@ -37,6 +37,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -98,9 +99,9 @@ void commitDropDatabaseMetadataLocally(OperationContext* opCtx, const DatabaseNa
         });
     }
 
-    // Update DSS in primary node.
-    auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
-    scopedDss->clearDbInfo(opCtx);
+    // Update DSR in primary node.
+    auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+    scopedDsr->clearDbInfo();
 }
 
 class ShardsvrCommitDropDatabaseMetadataCommand final
@@ -143,15 +144,10 @@ public:
 
             const auto dbName = request().getDbName();
 
-            {
-                AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-                auto scopedDss =
-                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
-                tassert(
-                    10105901,
+            tassert(10105901,
                     "The critical section must be taken in order to execute this command",
-                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-            }
+                    DatabaseShardingRuntime::acquireShared(opCtx, dbName)
+                        ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
 
             LOGV2(10105902,
                   "About to commit dropDatabase metadata in the shard catalog",

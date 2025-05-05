@@ -36,6 +36,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/database_version.h"
@@ -63,9 +64,9 @@ public:
         DDLLockManager::get(getServiceContext())->setRecoverable(_recoverable.get());
 
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
-        auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo_DEPRECATED(operationContext(), {_dbName, kMyShardName, _dbVersion});
+        auto scopedDsr =
+            DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
+        scopedDsr->setDbInfo_DEPRECATED(operationContext(), {_dbName, kMyShardName, _dbVersion});
     }
 
 protected:

@@ -35,7 +35,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/views/view_catalog_helpers.h"
@@ -62,8 +62,8 @@ protected:
     // Install database metadata for the "test" database and fills the cache.
     void installDatabaseMetadata(OperationContext* opCtx, const DatabaseVersion& dbVersion) {
         AutoGetDb autoDb(opCtx, _dbName, MODE_X, {}, {});
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
-        scopedDss->setDbInfo_DEPRECATED(opCtx, {_dbName, kMyShardName, dbVersion});
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
+        scopedDsr->setDbInfo_DEPRECATED(opCtx, {_dbName, kMyShardName, dbVersion});
         getCatalogCacheMock()->setDatabaseReturnValue(
             _dbName, CatalogCacheMock::makeDatabaseInfo(_dbName, kMyShardName, dbVersion));
         _dbVersion = dbVersion;

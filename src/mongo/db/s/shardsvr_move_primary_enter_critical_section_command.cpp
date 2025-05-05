@@ -52,7 +52,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/service_context.h"
@@ -159,13 +159,13 @@ public:
                                               const BSONObj& movePrimaryReason) {
             auto criticalSectionSignal = [&]() -> boost::optional<SharedSemiFuture<void>> {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                const auto scopedDss =
-                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+                const auto scopedDsr =
+                    DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName);
 
                 auto optCritSectionSignalSignal =
-                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                    scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
                 if (optCritSectionSignalSignal) {
-                    auto optCritSectionReason = scopedDss->getCriticalSectionReason();
+                    auto optCritSectionReason = scopedDsr->getCriticalSectionReason();
                     tassert(7578800, "Found critical section without reason", optCritSectionReason);
                     if (movePrimaryReason.woCompare(*optCritSectionReason) == 0) {
                         return boost::none;

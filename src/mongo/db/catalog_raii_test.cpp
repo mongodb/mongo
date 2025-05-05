@@ -42,6 +42,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -90,6 +91,8 @@ private:
 };
 
 void CatalogRAIITestFixture::setUp() {
+    DatabaseShardingStateFactory::set(getServiceContext(),
+                                      std::make_unique<DatabaseShardingStateFactoryShard>());
     DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
 }
 

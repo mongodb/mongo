@@ -59,7 +59,7 @@
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/transaction_resources.h"
@@ -102,9 +102,9 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
 
     if (nssBeingReleased.isDbOnly()) {
         AutoGetDb autoDb(opCtx, nssBeingReleased.dbName(), MODE_IX);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
             opCtx, nssBeingReleased.dbName());
-        scopedDss->clearDbInfo_DEPRECATED(opCtx);
+        scopedDsr->clearDbInfo_DEPRECATED(opCtx);
         return;
     }
 
@@ -574,8 +574,8 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
     }
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
         AutoGetDb dbLock(opCtx, dbName, MODE_X);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->exitCriticalSectionNoChecks(opCtx);
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+        scopedDsr->exitCriticalSectionNoChecks();
     }
 
     // Map the critical sections that are on disk to memory
@@ -585,11 +585,11 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
         const auto& nss = doc.getNss();
         if (nss.isDbOnly()) {
             AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
-            auto scopedDss =
-                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
-            scopedDss->enterCriticalSectionCatchUpPhase(opCtx, doc.getReason());
+            auto scopedDsr =
+                DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
+            scopedDsr->enterCriticalSectionCatchUpPhase(doc.getReason());
             if (doc.getBlockReads()) {
-                scopedDss->enterCriticalSectionCommitPhase(opCtx, doc.getReason());
+                scopedDsr->enterCriticalSectionCommitPhase(doc.getReason());
             }
         } else {
             AutoGetCollection collLock(opCtx,
@@ -624,15 +624,15 @@ void ShardingRecoveryService::_recoverDatabaseShardingState(OperationContext* op
 
     const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
     for (const auto& dbName : allDatabases) {
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDss->clearDbInfo(opCtx);
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+        scopedDsr->clearDbInfo();
     }
 
     PersistentTaskStore<DatabaseType> store(NamespaceString::kConfigShardCatalogDatabasesNamespace);
     store.forEach(opCtx, BSONObj{}, [&opCtx](const DatabaseType& dbMetadata) {
-        auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbMetadata.getDbName());
-        scopedDss->setDbInfo(opCtx, dbMetadata);
+        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
+            opCtx, dbMetadata.getDbName());
+        scopedDsr->setDbInfo(opCtx, dbMetadata);
 
         return true;
     });

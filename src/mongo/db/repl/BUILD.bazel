@@ -1487,7 +1487,6 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/stats:counters",

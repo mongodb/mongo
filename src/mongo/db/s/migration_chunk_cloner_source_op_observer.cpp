@@ -87,7 +87,7 @@ void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
         return;
     }
 
-    const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, nss.dbName());
+    const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());
     if (scopedDss->isMovePrimaryInProgress()) {
         LOGV2(4908600, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
@@ -159,7 +159,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
 
     auto* const css = shardingWriteRouter->getCss();
     css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+    DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -230,7 +230,7 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
 
     auto* const css = shardingWriteRouter->getCss();
     css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+    DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -277,7 +277,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
     ShardingWriteRouter shardingWriteRouter(opCtx, nss);
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName());
+    DatabaseShardingState::acquire(opCtx, nss.dbName())->checkDbVersionOrThrow(opCtx);
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();

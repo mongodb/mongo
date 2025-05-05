@@ -176,6 +176,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
@@ -1497,6 +1498,8 @@ void setUpSharding(ServiceContext* service) {
     ShardingState::create(service);
     CollectionShardingStateFactory::set(
         service, std::make_unique<CollectionShardingStateFactoryShard>(service));
+    DatabaseShardingStateFactory::set(service,
+                                      std::make_unique<DatabaseShardingStateFactoryShard>());
 }
 
 namespace {

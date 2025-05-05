@@ -317,7 +317,7 @@ bool indexesAlreadyExist(OperationContext* opCtx,
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
         bool isMovePrimaryInProgress =
-            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName())
+            DatabaseShardingState::assertDbLockedAndAcquire(opCtx, nss.dbName())
                 ->isMovePrimaryInProgress();
 
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);

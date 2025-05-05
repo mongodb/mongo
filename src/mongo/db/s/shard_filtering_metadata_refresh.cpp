@@ -56,7 +56,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
@@ -133,22 +133,22 @@ bool waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> re
  * Returns 'true' if there was a concurrent critical section that had to be waited (in which case
  * all locks will be dropped). If there was none, returns false and the locks continue to be held.
  */
-template <typename ScopedDatabaseShardingState>
+template <typename ScopedDatabaseShardingRuntime>
 bool waitForDbCriticalSectionToComplete(OperationContext* opCtx,
                                         boost::optional<Lock::DBLock>* dbLock,
-                                        boost::optional<ScopedDatabaseShardingState>* scopedDss) {
+                                        boost::optional<ScopedDatabaseShardingRuntime>* scopedDsr) {
     invariant(dbLock->has_value());
-    invariant(scopedDss->has_value());
+    invariant(scopedDsr->has_value());
 
     if (auto critSect =
-            (**scopedDss)->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
+            (**scopedDsr)->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
         LOGV2_DEBUG(6697201,
                     2,
                     "Waiting for exit from the critical section",
-                    logAttrs((**scopedDss)->getDbName()),
-                    "reason"_attr = (**scopedDss)->getCriticalSectionReason());
+                    logAttrs((**scopedDsr)->getDbName()),
+                    "reason"_attr = (**scopedDsr)->getCriticalSectionReason());
 
-        scopedDss->reset();
+        scopedDsr->reset();
         dbLock->reset();
 
         uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSect));
@@ -165,21 +165,21 @@ bool waitForDbCriticalSectionToComplete(OperationContext* opCtx,
  * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
  * will be dropped). If there were none, returns false and the locks continue to be held.
  */
-template <typename ScopedDatabaseShardingState>
+template <typename ScopedDatabaseShardingRuntime>
 bool waitForOngoingDbMetadataRefreshToComplete(
     OperationContext* opCtx,
     boost::optional<Lock::DBLock>* dbLock,
-    boost::optional<ScopedDatabaseShardingState>* scopedDss) {
+    boost::optional<ScopedDatabaseShardingRuntime>* scopedDsr) {
     invariant(dbLock->has_value());
-    invariant(scopedDss->has_value());
+    invariant(scopedDsr->has_value());
 
-    if (auto refreshVersionFuture = (**scopedDss)->getDbMetadataRefreshFuture()) {
+    if (auto refreshVersionFuture = (**scopedDsr)->getDbMetadataRefreshFuture_DEPRECATED()) {
         LOGV2_DEBUG(6697202,
                     2,
                     "Waiting for completion of another database metadata refresh",
-                    logAttrs((**scopedDss)->getDbName()));
+                    logAttrs((**scopedDsr)->getDbName()));
 
-        scopedDss->reset();
+        scopedDsr->reset();
         dbLock->reset();
 
         waitForRefreshToComplete(opCtx, *refreshVersionFuture);
@@ -197,15 +197,15 @@ bool waitForOngoingDbMetadataRefreshToComplete(
  * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
  * will be dropped). If there were none, returns false and the locks continue to be held.
  */
-template <typename ScopedDatabaseShardingState>
+template <typename ScopedDatabaseShardingRuntime>
 bool joinDbVersionOperation(OperationContext* opCtx,
                             boost::optional<Lock::DBLock>* dbLock,
-                            boost::optional<ScopedDatabaseShardingState>* scopedDss) {
-    if (waitForDbCriticalSectionToComplete(opCtx, dbLock, scopedDss)) {
+                            boost::optional<ScopedDatabaseShardingRuntime>* scopedDsr) {
+    if (waitForDbCriticalSectionToComplete(opCtx, dbLock, scopedDsr)) {
         return true;
     }
 
-    return waitForOngoingDbMetadataRefreshToComplete(opCtx, dbLock, scopedDss);
+    return waitForOngoingDbMetadataRefreshToComplete(opCtx, dbLock, scopedDsr);
 }
 
 /**
@@ -670,8 +670,8 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
                                                   const DatabaseName& dbName,
                                                   CancellationToken cancellationToken) {
     ScopeGuard resetRefreshFutureOnError([&] {
-        auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
-        scopedDss->resetDbMetadataRefreshFuture();
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->resetDbMetadataRefreshFuture_DEPRECATED();
     });
 
     // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
@@ -682,11 +682,11 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
     const auto swDbMetadata = catalogCache->getDatabase(opCtx, dbName);
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     if (!cancellationToken.isCanceled()) {
         if (swDbMetadata.isOK()) {
             // Set the refreshed database metadata in the local catalog.
-            scopedDss->setDbInfo_DEPRECATED(opCtx, *swDbMetadata.getValue());
+            scopedDsr->setDbInfo_DEPRECATED(opCtx, *swDbMetadata.getValue());
         } else if (swDbMetadata == ErrorCodes::NamespaceNotFound) {
             // The non-authoritative database model stores metadata from other shards in the DSS to
             // respond to stale routers without requiring a refresh each time. While clearing
@@ -699,7 +699,7 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
     }
 
     // Reset the future reference to allow any other thread to refresh the database metadata.
-    scopedDss->resetDbMetadataRefreshFuture();
+    scopedDsr->resetDbMetadataRefreshFuture_DEPRECATED();
     resetRefreshFutureOnError.dismiss();
 
     return swDbMetadata.getStatus();
@@ -785,10 +785,10 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             dbLock.emplace(opCtx, dbName, MODE_IS);
 
             if (receivedDbVersion) {
-                auto scopedDss = boost::make_optional(
-                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName));
+                auto scopedDsr = boost::make_optional(
+                    DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName));
 
-                if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
+                if (joinDbVersionOperation(opCtx, &dbLock, &scopedDsr)) {
                     // Waited for another thread to exit from the critical section or to complete an
                     // ongoing refresh, so reacquire the locks.
                     continue;
@@ -799,7 +799,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
                 // is in progress or can start (would require to exclusive lock the DSS).
                 // Therefore, the database version can be accessed safely.
 
-                const auto wantedVersion = (*scopedDss)->getDbVersion(opCtx);
+                const auto wantedVersion = (*scopedDsr)->getDbVersion();
                 if (receivedDbVersion <= wantedVersion) {
                     // No need to refresh the database metadata as the wanted version is newer
                     // than the one received.
@@ -811,10 +811,10 @@ void FilteringMetadataCache::_onDbVersionMismatch(
                 return;
             }
 
-            auto scopedDss = boost::make_optional(
-                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName));
+            auto scopedDsr = boost::make_optional(
+                DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName));
 
-            if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
+            if (joinDbVersionOperation(opCtx, &dbLock, &scopedDsr)) {
                 // Waited for another thread to exit from the critical section or to complete an
                 // ongoing refresh, so reacquire the locks.
                 continue;
@@ -827,11 +827,11 @@ void FilteringMetadataCache::_onDbVersionMismatch(
 
             CancellationSource cancellationSource;
             CancellationToken cancellationToken = cancellationSource.token();
-            (*scopedDss)
-                ->setDbMetadataRefreshFuture(
+            (*scopedDsr)
+                ->setDbMetadataRefreshFuture_DEPRECATED(
                     _recoverRefreshDbVersion(opCtx, dbName, cancellationToken),
                     std::move(cancellationSource));
-            dbMetadataRefreshFuture = (*scopedDss)->getDbMetadataRefreshFuture();
+            dbMetadataRefreshFuture = (*scopedDsr)->getDbMetadataRefreshFuture_DEPRECATED();
         }
 
         // No other metadata refresh for this database can run in parallel. If another thread enters
@@ -880,10 +880,10 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
         boost::optional<Lock::DBLock> dbLock;
         dbLock.emplace(opCtx, dbName, MODE_IS);
 
-        auto scopedDss = boost::make_optional(
-            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName));
+        auto scopedDsr = boost::make_optional(
+            DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName));
 
-        if (waitForDbCriticalSectionToComplete(opCtx, &dbLock, &scopedDss)) {
+        if (waitForDbCriticalSectionToComplete(opCtx, &dbLock, &scopedDsr)) {
             // Waited for another thread to exit from the critical section, so reacquire the locks.
             continue;
         }
@@ -892,7 +892,7 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
         // it (would require to X-lock the database). Therefore, the database version can be
         // accessed safely.
 
-        const auto wantedVersion = (*scopedDss)->getDbVersion(opCtx);
+        const auto wantedVersion = (*scopedDsr)->getDbVersion();
 
         // If shards are the authoritative source for database metadata, at this stage this node
         // has waited until the received version's optime and that any necessary critical section

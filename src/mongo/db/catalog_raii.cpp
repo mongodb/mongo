@@ -153,7 +153,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
     }
 
     // The 'primary' database must be version checked for sharding.
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
+    DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
 }
 
 bool AutoGetDb::canSkipRSTLLock(const NamespaceStringOrUUID& nsOrUUID) {
@@ -221,7 +221,8 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     _db = databaseHolder->openDb(opCtx, _dbName, nullptr);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
+
+    DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
 
     return _db;
 }
@@ -230,7 +231,8 @@ Database* AutoGetDb::refreshDbReferenceIfNull(OperationContext* opCtx) {
     if (!_db) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
         _db = databaseHolder->getDb(opCtx, _dbName);
-        DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
+
+        DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
     }
     return _db;
 }
