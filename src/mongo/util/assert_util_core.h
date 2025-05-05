@@ -87,9 +87,9 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
     ::mongo::invariantWithLocation((Expression), #Expression, MONGO_SOURCE_LOCATION())
 
 template <typename T>
-inline void invariantWithLocation(const T& testOK,
-                                  const char* expr,
-                                  SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+constexpr void invariantWithLocation(const T& testOK,
+                                     const char* expr,
+                                     SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!testOK)) {
         ::mongo::invariantFailed(expr, loc);
     }
@@ -110,10 +110,10 @@ inline void invariantWithLocation(const T& testOK,
                                              MONGO_SOURCE_LOCATION())
 
 template <typename T, typename ContextExpr>
-inline void invariantWithContextAndLocation(const T& testOK,
-                                            const char* expr,
-                                            ContextExpr&& contextExpr,
-                                            SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+constexpr void invariantWithContextAndLocation(const T& testOK,
+                                               const char* expr,
+                                               ContextExpr&& contextExpr,
+                                               SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!testOK)) {
         ::mongo::invariantFailedWithMsg(expr, contextExpr(), loc);
     }

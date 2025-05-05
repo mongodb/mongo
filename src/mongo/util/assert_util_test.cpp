@@ -688,5 +688,16 @@ void mustNotCompile() {
 #endif
 }
 
+
+constexpr bool checkCanUseInvariantInConstexprCode = [] {
+    invariant(true);
+    invariant(true, "with message");
+
+    // TODO need to make intrusive_ptr constexpr-friendly first
+    // invariant(Status::OK(), "with message");
+    // invariant(StatusWith(1), "with message");
+
+    return true;
+}();
 }  // namespace
 }  // namespace mongo
