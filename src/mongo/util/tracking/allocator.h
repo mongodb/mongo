@@ -34,9 +34,9 @@
 #include <type_traits>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/new.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/aligned.h"
-#include "mongo/util/shared_buffer.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::tracking {
 
@@ -47,15 +47,17 @@ namespace mongo::tracking {
 class AllocatorStats {
 public:
     explicit AllocatorStats(size_t numPartitions)
-        : _numPartitions(numPartitions), _bytesAllocated(_numPartitions) {}
+        : _numPartitions(numPartitions * 2), _bytesAllocated(_numPartitions) {}
 
     void bytesAllocated(size_t n) {
-        auto& counter = _bytesAllocated[_getSlot()];
+        // The second half of '_bytesAllocated' is reserved for tracking allocation.
+        auto& counter = _bytesAllocated[_getAllocSlot()];
         counter.value.fetchAndAddRelaxed(n);
     }
 
     void bytesDeallocated(size_t n) {
-        auto& counter = _bytesAllocated[_getSlot()];
+        // The first half of '_bytesAllocated' is reserved for tracking deallocation.
+        auto& counter = _bytesAllocated[_getDeallocSlot()];
         counter.value.fetchAndSubtractRelaxed(n);
     }
 
@@ -66,13 +68,21 @@ public:
         }
 
         // After summing the memory usage, we should not have a negative number.
+        // Since the first half is only for deallocation and second half for allocation, iterating
+        // through '_bytesAllocated' can only miss the bytes decremented in a matching
+        // allocation/deallocation when there is a race. This avoids undercounting.
         invariant(sum >= 0, std::to_string(sum));
         return static_cast<uint64_t>(sum);
     }
 
 private:
-    size_t _getSlot() const {
-        return std::hash<std::thread::id>{}(stdx::this_thread::get_id()) % _numPartitions;
+    size_t _getDeallocSlot() const {
+        return std::hash<std::thread::id>{}(stdx::this_thread::get_id()) % (_numPartitions / 2);
+    }
+
+    size_t _getAllocSlot() const {
+        return std::hash<std::thread::id>{}(stdx::this_thread::get_id()) % (_numPartitions / 2) +
+            _numPartitions / 2;
     }
 
     const size_t _numPartitions;
