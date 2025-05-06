@@ -124,6 +124,8 @@ MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangAfterBatchUpdate);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterDocumentInsertsReserveOpTimes);
+MONGO_FAIL_POINT_DEFINE(hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection);
+
 // The withLock fail points are for testing interruptability of these operations, so they will not
 // themselves check for interrupt.
 MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchInsert);
@@ -2536,7 +2538,6 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
                                                    TimeseriesOptions& timeSeriesOptions,
                                                    const NamespaceString& bucketsNs) {
-    AutoGetCollectionForRead coll(opCtx, bucketsNs);
     auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
                         ->getCollectionDescription(opCtx);
     if (collDesc.isSharded()) {
@@ -2710,24 +2711,34 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
     std::vector<write_ops::WriteError>* errors,
     bool* containsRetry,
     const write_ops::InsertCommandRequest& request) {
+    hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection.pauseWhileSet();
+
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-
     auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
-    // Holding this shared pointer to the collection guarantees that the collator is not
-    // invalidated.
+
+    // Explicitly hold a refrence to the CollectionCatalog, such that the corresponding
+    // Collection instances remain valid, and the collator is not invalidated.
     auto catalog = CollectionCatalog::get(opCtx);
-    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Could not find time-series buckets collection for write",
-            bucketsColl);
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series buckets collection is missing time-series options",
-            bucketsColl->getTimeseriesOptions());
+    const Collection* bucketsColl = nullptr;
 
-    auto timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
+    Status collectionAcquisitionStatus = Status::OK();
+    TimeseriesOptions timeSeriesOptions;
 
-    boost::optional<Status> rebuildOptionsError;
     try {
+        // The associated collection must be acquired before we check for the presence of
+        // buckets collection. This ensures that a potential ShardVersion mismatch can be
+        // detected, before checking for other errors.
+        AutoGetCollectionForRead coll(opCtx, bucketsNs);
+        bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
+        // Check for the presence of the buckets collection
+        uassert(ErrorCodes::NamespaceNotFound,
+                "Could not find time-series buckets collection for write",
+                bucketsColl);
+        uassert(ErrorCodes::InvalidOptions,
+                "Time-series buckets collection is missing time-series options",
+                bucketsColl->getTimeseriesOptions());
+        // Process timeSeriesOptions
+        timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
         rebuildOptionsWithGranularityFromConfigServer(opCtx, timeSeriesOptions, bucketsNs);
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // This could occur when the shard version attached to the request is for the time
@@ -2735,7 +2746,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
         // bucket namespace. Consequently, every single entry fails but the whole operation
         // succeeds.
 
-        rebuildOptionsError = ex.toStatus();
+        collectionAcquisitionStatus = ex.toStatus();
 
         auto& oss{OperationShardingState::get(opCtx)};
         oss.setShardingOperationFailedStatus(ex.toStatus());
@@ -2744,15 +2755,17 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
     TimeseriesBatches batches;
     TimeseriesStmtIds stmtIds;
 
-    auto insert = [&](size_t index) {
+    std::function<bool(size_t)> attachCollectionAcquisitionError = [&](size_t index) {
         invariant(start + index < request.getDocuments().size());
+        const auto error{write_ops_exec::generateError(
+            opCtx, collectionAcquisitionStatus, start + index, errors->size())};
+        errors->emplace_back(std::move(*error));
+        return false;
+    };
 
-        if (rebuildOptionsError) {
-            const auto error{write_ops_exec::generateError(
-                opCtx, *rebuildOptionsError, start + index, errors->size())};
-            errors->emplace_back(std::move(*error));
-            return false;
-        }
+    std::function<bool(size_t)> insert = [&](size_t index) {
+        invariant(collectionAcquisitionStatus);
+        invariant(start + index < request.getDocuments().size());
 
         auto stmtId = request.getStmtIds() ? request.getStmtIds()->at(start + index)
                                            : request.getStmtId().value_or(0) + start + index;
@@ -2904,12 +2917,15 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
         return true;
     };
 
+    auto insertOrErrorFn =
+        collectionAcquisitionStatus.isOK() ? insert : attachCollectionAcquisitionError;
+
     try {
         if (!indices.empty()) {
-            std::for_each(indices.begin(), indices.end(), insert);
+            std::for_each(indices.begin(), indices.end(), insertOrErrorFn);
         } else {
             for (size_t i = 0; i < numDocs; i++) {
-                if (!insert(i) && request.getOrdered()) {
+                if (!insertOrErrorFn(i) && request.getOrdered()) {
                     return {std::move(batches), std::move(stmtIds), i};
                 }
             }
@@ -2979,6 +2995,10 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
         insertIntoBucketCatalog(opCtx, start, numDocs, indices, errors, containsRetry, request);
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
+
+    if (batches.empty()) {
+        return {};
+    }
 
     bool canContinue = true;
     std::vector<size_t> docsToRetry;
