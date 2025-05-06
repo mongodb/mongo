@@ -212,10 +212,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
         query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
             expCtx, deferredShape, nss, parsedRequest->findCommandRequest->getQuerySettings()));
 
-    // Register query stats collection. Exclude queries against collections with encrypted fields.
+    // Register query stats collection. Exclude queries with encrypted fields as indicated by the
+    // inclusion of encryptionInformation in the request.
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
-    if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
+    if (!parsedRequest->findCommandRequest->getEncryptionInformation()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
             uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::FindKey>(

@@ -894,14 +894,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     auto pipeline = Pipeline::parse(requestForQueryStats.getPipeline(), expCtx);
     expCtx->stopExpressionCounters();
 
-    // Register query stats with the pre-optimized pipeline. Exclude queries against collections
-    // with encrypted fields. We still collect query stats on collection-less aggregations.
-    bool hasEncryptedFields = aggCatalogState.lockAcquired() &&
-        aggCatalogState.getMainCollectionOrView().collectionExists() &&
-        aggCatalogState.getMainCollectionOrView()
-            .getCollectionPtr()
-            ->getCollectionOptions()
-            .encryptedFieldConfig;
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     query_shape::DeferredQueryShape deferredShape{[&]() {
@@ -919,7 +911,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             aggExState.getOriginalNss(),
             requestForQueryStats.getQuerySettings()));
 
-    if (!hasEncryptedFields) {
+    // Register query stats with the pre-optimized pipeline. Exclude queries with encrypted fields
+    // as indicated by the inclusion of encryptionInformation in the request. We still collect query
+    // stats on collection-less aggregations.
+    if (!aggExState.getRequest().getEncryptionInformation()) {
         // If this is a query over a resolved view, we want to register query stats with the
         // original user-given request and pipeline, rather than the new request generated when
         // resolving the view.
