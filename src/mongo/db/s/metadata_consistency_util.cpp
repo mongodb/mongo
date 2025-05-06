@@ -92,6 +92,21 @@ MONGO_FAIL_POINT_DEFINE(insertFakeInconsistencies);
 MONGO_FAIL_POINT_DEFINE(simulateCatalogTopLevelMetadataInconsistency);
 
 /*
+ * Returns the number of documents in the local collection.
+ *
+ * TODO SERVER-24266: get rid of the `getNumDocs` function and simply rely on `numRecords`.
+ */
+long long getNumDocs(OperationContext* opCtx, const Collection* localColl) {
+    // Since users are advised to delete empty misplaced collections, rely on isEmpty
+    // that is safe because the implementation guards against SERVER-24266.
+    if (AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS); localColl->isEmpty(opCtx)) {
+        return 0;
+    }
+    DBDirectClient client(opCtx);
+    return client.count(localColl->ns());
+}
+
+/*
  * Emit a warning log containing information about the given inconsistency
  */
 void logMetadataInconsistency(const MetadataInconsistencyItem& inconsistencyItem) {
@@ -190,9 +205,10 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     const auto& catalogUUID = catalogColl.getUuid();
     const auto& localUUID = localColl->uuid();
     if (catalogUUID != localUUID) {
-        inconsistencies.emplace_back(
-            makeInconsistency(MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
-                              CollectionUUIDMismatchDetails{nss, shardId, localUUID, catalogUUID}));
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
+            CollectionUUIDMismatchDetails{
+                nss, shardId, localUUID, catalogUUID, getNumDocs(opCtx, localColl.get())}));
     }
 
     const auto makeOptionsMismatchInconsistencyBetweenShardAndConfig =
@@ -534,7 +550,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
         for (int i = 0; i < numInconsistencies; i++) {
             inconsistencies.emplace_back(makeInconsistency(
                 MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
-                CollectionUUIDMismatchDetails{nss, ShardId{"shard"}, UUID::gen(), UUID::gen()}));
+                CollectionUUIDMismatchDetails{nss, ShardId{"shard"}, UUID::gen(), UUID::gen(), 0}));
         }
     });
 
@@ -668,9 +684,10 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
             const auto& nss = localNss;
 
             if (!nss.isShardLocalNamespace() && shardId != primaryShardId) {
-                inconsistencies.emplace_back(
-                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                                      MisplacedCollectionDetails{nss, shardId, localColl->uuid()}));
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                    MisplacedCollectionDetails{
+                        nss, shardId, localColl->uuid(), getNumDocs(opCtx, localColl.get())}));
             }
             itLocalCollections++;
         }
@@ -682,9 +699,12 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
         while (itLocalCollections != localCatalogCollections.end()) {
             const auto localColl = itLocalCollections->get();
             if (!localColl->ns().isShardLocalNamespace()) {
-                inconsistencies.emplace_back(makeInconsistency(
-                    MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                    MisplacedCollectionDetails{localColl->ns(), shardId, localColl->uuid()}));
+                inconsistencies.emplace_back(
+                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                                      MisplacedCollectionDetails{localColl->ns(),
+                                                                 shardId,
+                                                                 localColl->uuid(),
+                                                                 getNumDocs(opCtx, localColl)}));
             }
             itLocalCollections++;
         }
