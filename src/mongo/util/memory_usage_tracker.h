@@ -149,18 +149,6 @@ public:
     }
 
     /**
-     * Provides read-only access to the function memory tracker for 'name'.
-     */
-    const Impl& operator[](StringData name) const {
-        auto it = _functionMemoryTracker.find(_key(name));
-        tassert(5466400,
-                str::stream() << "Invalid call to memory usage tracker, could not find function "
-                              << name,
-                it != _functionMemoryTracker.end());
-        return it->second;
-    }
-
-    /**
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
     Impl& operator[](StringData name) {
@@ -189,6 +177,11 @@ public:
     }
     auto maxMemoryBytes() const {
         return _baseTracker.maxMemoryBytes();
+    }
+
+    auto maxMemoryBytes(StringData name) const {
+        const auto it = _functionMemoryTracker.find(_key(name));
+        return it == _functionMemoryTracker.end() ? 0 : it->second.maxMemoryBytes();
     }
 
     bool withinMemoryLimit() const {

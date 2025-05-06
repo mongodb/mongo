@@ -373,6 +373,37 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     ASSERT_DOCUMENT_EQ((Document{{"_id", Document{}}}), next.getDocument());
 }
 
+TEST_F(DocumentSourceGroupTest, CanOutputExectionStatsExplainWithoutProcessingDocuments) {
+    auto expCtx = getExpCtx();
+    expCtx->explain = ExplainOptions::Verbosity::kExecStats;
+
+    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
+    auto accumulatorArg = BSON("" << 1);
+    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
+    AccumulationStatement countStatement{"count", accExpr};
+
+    auto group = DocumentSourceGroup::create(
+        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
+    group->dispose();
+
+    SerializationOptions explainOpts;
+    explainOpts.verbosity = expCtx->explain;
+    ASSERT_DOCUMENT_EQ(Document(fromjson(
+                           R"({
+                            $group: {
+                                _id: {$const: null},
+                                count: {$sum: {$const: 1}}},
+                                maxAccumulatorMemoryUsageBytes: {count: 0},
+                                totalOutputDataSizeBytes: 0,
+                                usedDisk: false,
+                                spills: 0,
+                                spilledDataStorageSize: 0,
+                                numBytesSpilledEstimate: 0,
+                                spilledRecords: 0
+                            })")),
+                       group->serialize(explainOpts).getDocument());
+}
+
 BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {
     std::vector<Value> arr;
     source->serializeToArray(arr);

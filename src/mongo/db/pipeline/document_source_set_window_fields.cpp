@@ -345,7 +345,7 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
 
         for (auto&& [fieldName, function] : _executableOutputs) {
             md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteral(
-                static_cast<long long>(_memoryTracker[fieldName].maxMemoryBytes()));
+                static_cast<long long>(_memoryTracker.maxMemoryBytes(fieldName)));
         }
 
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
