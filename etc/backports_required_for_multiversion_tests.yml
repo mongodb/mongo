@@ -767,6 +767,8 @@ last-continuous:
     ticket: SERVER-93099
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
     ticket: SERVER-93099
+  - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
+    ticket: SERVER-92806
   - test_file: jstests/core/index/index_creation_on_different_collations.js
     ticket: SERVER-93112
   - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
@@ -1650,6 +1652,8 @@ last-lts:
     ticket: SERVER-93099
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
     ticket: SERVER-93099
+  - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
+    ticket: SERVER-92806
   - test_file: jstests/core/index/index_creation_on_different_collations.js
     ticket: SERVER-93112
   - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js

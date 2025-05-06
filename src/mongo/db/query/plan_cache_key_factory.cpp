@@ -64,12 +64,40 @@ void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
 
 void encodeIndexabilityRecursive(const MatchExpression* tree,
                                  const PlanCacheIndexabilityState& indexabilityState,
-                                 StringBuilder* keyBuilder) {
+                                 StringBuilder* keyBuilder,
+                                 StringData parentPath = {}) {
+    std::string fullPath;
+    // Accumulate the path components from any ancestors with partial paths (eg. $elemMatch) through
+    // the tree to the leaves. Leaf expressions as children of these partial-path expressions will
+    // have an empty path and would otherwise fail to include the discriminators in the key.
+    StringData path;
     if (!tree->path().empty()) {
+        // This expression has a path component. Either use it, or append it to the parent path.
+        if (parentPath.empty()) {
+            path = tree->path();
+        } else {
+            fullPath = parentPath.toString() + "." + tree->path();
+            path = fullPath;
+        }
+    } else {
+        path = parentPath;
+    }
+
+    // Check for $not first. We don't need to look at 'path' here; if it is non-empty, then
+    // we would have checked the relevant path discriminators while vising an ancestor node.
+    if (tree->matchType() == MatchExpression::MatchType::NOT) {
+        // If the node is not compatible with any type of index, add a single '0' discriminator
+        // here. Otherwise add a '1'.
+        *keyBuilder << kEncodeDiscriminatorsBegin;
+        *keyBuilder << QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(tree);
+        *keyBuilder << kEncodeDiscriminatorsEnd;
+    } else if (!path.empty() && tree->getCategory() != MatchExpression::MatchCategory::kLogical) {
+        // Skip checking the discriminators for logical nodes like $and/$or. These are not leaf
+        // nodes and don't have paths, so they would never affect the indexability.
         const IndexToDiscriminatorMap& discriminators =
-            indexabilityState.getPathDiscriminators(tree->path());
+            indexabilityState.getPathDiscriminators(path);
         IndexToDiscriminatorMap wildcardDiscriminators =
-            indexabilityState.buildWildcardDiscriminators(tree->path());
+            indexabilityState.buildWildcardDiscriminators(path);
         if (!discriminators.empty() || !wildcardDiscriminators.empty()) {
             *keyBuilder << kEncodeDiscriminatorsBegin;
             // For each discriminator on this path, append the character '0' or '1'.
@@ -78,16 +106,10 @@ void encodeIndexabilityRecursive(const MatchExpression* tree,
 
             *keyBuilder << kEncodeDiscriminatorsEnd;
         }
-    } else if (tree->matchType() == MatchExpression::MatchType::NOT) {
-        // If the node is not compatible with any type of index, add a single '0' discriminator
-        // here. Otherwise add a '1'.
-        *keyBuilder << kEncodeDiscriminatorsBegin;
-        *keyBuilder << QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(tree);
-        *keyBuilder << kEncodeDiscriminatorsEnd;
     }
 
     for (size_t i = 0; i < tree->numChildren(); ++i) {
-        encodeIndexabilityRecursive(tree->getChild(i), indexabilityState, keyBuilder);
+        encodeIndexabilityRecursive(tree->getChild(i), indexabilityState, keyBuilder, path);
     }
 }
 
