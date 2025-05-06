@@ -105,7 +105,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                 const auto& featureFlag = parserRegistration.featureFlag;
 
                 if (featureFlag) {
-                    expCtx->throwIfParserShouldRejectFeature(exprName, *featureFlag);
+                    expCtx->ignoreFeatureInParserOrRejectAndThrow(exprName, *featureFlag);
                 }
 
                 auto allowedWithApi = parserRegistration.allowedWithApi;

@@ -847,6 +847,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/bindata_convert_numeric_view_upgrade_downgrade.js @10gen/query-execution-classic @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/error_and_log_validation_action.js @10gen/query-execution @svc-auto-approve-bot
+/jstests/multiVersion/targetedTestsLastLtsFeatures/**/create_coll_validator_new_feature_no_applyops_check.js @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

@@ -114,7 +114,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
 
     auto& entry = it->second;
     if (entry.featureFlag) {
-        expCtx->throwIfParserShouldRejectFeature(stageName, *entry.featureFlag);
+        expCtx->ignoreFeatureInParserOrRejectAndThrow(stageName, *entry.featureFlag);
     }
 
     return it->second.parser(stageSpec, expCtx);

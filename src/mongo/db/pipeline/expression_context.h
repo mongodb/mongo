@@ -522,9 +522,30 @@ public:
 
     /**
      * Throws if the provided feature flag is not enabled according to the expressions
-     * VersionContext and IncrementalFeatureRolloutContext.
+     * VersionContext and IncrementalFeatureRolloutContext. This function assumes the caller has
+     * verified that the feature flag should be checked.
      */
     void throwIfParserShouldRejectFeature(StringData name, FeatureFlag& flag);
+
+    /**
+     * Returns true if parsers should not check if feature flags are enabled on the expressions
+     * VersionContext or IncrementalFeatureRolloutContext and false otherwise.
+     *
+     * TODO SERVER-99552 remove function when support is added for 'VersionContext' for all DDL
+     * operations in replica sets. Currently, secondaries can fail to apply oplog entries when
+     * creating collections that have validators or views that depend on expressions with new query
+     * features.
+     */
+    bool shouldParserIgnoreFeatureFlagCheck() const {
+        return !_params.opCtx->isEnforcingConstraints() &&
+            (_params.isParsingCollectionValidator || _params.isParsingViewDefinition);
+    }
+
+    /**
+     * Throws only if the parser should check the feature flag and the feature flag provided is not
+     * enabled in the expressions VersionContext and IncrementalFeatureRolloutContext
+     */
+    void ignoreFeatureInParserOrRejectAndThrow(StringData name, FeatureFlag& flag);
 
     void setOperationContext(OperationContext* opCtx) {
         _params.opCtx = opCtx;
@@ -969,8 +990,8 @@ public:
             VersionContext::getDecoration(getOperationContext()));
     }
 
-    bool isFeatureFlagStreamsEnabled() const {
-        return _featureFlagStreams.get(VersionContext::getDecoration(getOperationContext()));
+    bool shouldParserAllowStreams() const {
+        return shouldParserIgnoreFeatureFlagCheck() || _featureFlagStreams.get(_params.vCtx);
     }
 
     bool isMapReduceCommand() const {

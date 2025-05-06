@@ -114,6 +114,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
+MONGO_FAIL_POINT_DEFINE(hangAfterParsingValidator);
 MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedDefault);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
@@ -927,6 +928,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }
+
+        hangAfterParsingValidator.pauseWhileSet();
     }
 
     Status status = validateStorageOptions(

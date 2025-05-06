@@ -109,7 +109,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
         AccumulationStatement::getParser(accName);
 
     if (featureFlag) {
-        expCtx->throwIfParserShouldRejectFeature(accName, *featureFlag);
+        expCtx->ignoreFeatureInParserOrRejectAndThrow(accName, *featureFlag);
     }
 
     tassert(5837900,

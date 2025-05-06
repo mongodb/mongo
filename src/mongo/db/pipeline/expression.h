@@ -3886,7 +3886,7 @@ public:
     }
 
     static bool checkBinDataConvertAllowed();
-    static bool checkBinDataConvertNumericAllowed(const VersionContext& vCtx);
+    static bool checkBinDataConvertNumericAllowed(const ExpressionContext* expCtx);
 
     const Expression* getInput() const {
         return _children[_kInput].get();

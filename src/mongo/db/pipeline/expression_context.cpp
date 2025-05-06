@@ -719,4 +719,11 @@ void ExpressionContext::throwIfParserShouldRejectFeature(StringData name, Featur
                               _params.ifrContext,
                               ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}));
 }
+
+void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(StringData name, FeatureFlag& flag) {
+    if (!shouldParserIgnoreFeatureFlagCheck()) {
+        throwIfParserShouldRejectFeature(name, flag);
+    }
+}
+
 }  // namespace mongo
