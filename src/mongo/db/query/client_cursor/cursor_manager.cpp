@@ -170,6 +170,10 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
               "Cursor timed out",
               "cursorId"_attr = cursor->cursorid(),
               "idleSince"_attr = cursor->getLastUseDate());
+        // The memory tracker needs to be moved from the cursor to the opCtx in order for memory
+        // metrics to be reset on a valid tracker.
+        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursor.get(), opCtx);
+
         cursor->dispose(opCtx, boost::none);
     }
     return toDisposeWithoutMutex.size();
