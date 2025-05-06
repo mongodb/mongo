@@ -21,6 +21,12 @@ filters:
   - "jsobjtests.cpp":
     approvers:
       - 10gen/server-programmability
+  - "jsontests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "basictests.cpp":
+    approvers:
+      - 10gen/server-programmability
   - "storage_debug_util*":
     approvers:
       - 10gen/server-storage-engine-integration
@@ -57,7 +63,7 @@ filters:
   - "query_stage_multiplan.cpp":
     approvers:
       - 10gen/query-optimization
-  - "catalogtests.cpp":
+  - "*catalogtests.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
   - "socktests.cpp":

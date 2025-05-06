@@ -72,6 +72,15 @@ filters:
   - "routing_*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "mongos.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "mongos_main*":
+    approvers:
+      - 10gen/server-programmability
+  - "mongos_options_*":
+    approvers:
+      - 10gen/server-programmability
   - "service_entry_point*":
     approvers:
       - 10gen/server-programmability

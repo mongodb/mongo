@@ -1490,6 +1490,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/periodic_runner_cache_pressure_rollback* @10gen/server-rss-sydney @svc-auto-approve-bot
 /src/mongo/db/**/startup_warnings_mongod_thp_test* @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/mongo/db/**/namespace_string* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/**/database_name* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/rs_local_client* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/raw_data_operation* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/validate_api_parameters* @10gen/query-optimization @svc-auto-approve-bot
@@ -2482,6 +2483,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/indexupdatetests.cpp @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/dbtests/**/insert_test.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/dbtests/**/jsobjtests.cpp @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/dbtests/**/jsontests.cpp @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/dbtests/**/basictests.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/dbtests/**/storage_debug_util* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/dbtests/**/validate_tests.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/dbtests/**/*plan_executor* @10gen/query-execution @svc-auto-approve-bot
@@ -2494,7 +2497,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/updatetests.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/plan_ranking.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/dbtests/**/query_stage_multiplan.cpp @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/dbtests/**/catalogtests.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/dbtests/**/*catalogtests.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/dbtests/**/socktests.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/dbtests/**/mock_replica_set* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/dbtests/**/replica_set_tests.cpp @10gen/server-replication @svc-auto-approve-bot
@@ -2564,6 +2567,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/resource_yielders* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/router_role* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/routing_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/s/**/mongos.cpp @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/s/**/mongos_main* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/s/**/mongos_options_* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/**/service_entry_point* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/**/shard_cannot_refresh_due_to_locks_held_exception* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/shard_key_pattern* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2746,7 +2752,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/scripting/mozjs/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/shell/OWNERS.yml
-/src/mongo/shell/**/kms_* @10gen/server-security @svc-auto-approve-bot
+/src/mongo/shell/**/kms* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/encrypted* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/keyvault.js @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot

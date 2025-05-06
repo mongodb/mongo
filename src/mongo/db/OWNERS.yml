@@ -307,6 +307,9 @@ filters:
   - "namespace_string*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "database_name*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "rs_local_client*":
     approvers:
       - 10gen/server-catalog-and-routing
