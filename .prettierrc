@@ -2,7 +2,7 @@
     "bracketSpacing": false,
     "overrides": [
         {
-            "files": "*.js",
+            "files": ["*.js", "*.mjs"],
             "options": {
                 "tabWidth": 4
             }
@@ -13,6 +13,6 @@
                 "parser": "yaml",
                 "tabWidth": 4
             }
-        },
+        }
     ]
 }
