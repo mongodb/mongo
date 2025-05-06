@@ -51,6 +51,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/catalog/validate/validate_state.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/fsync.h"
@@ -564,6 +565,9 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 
         // Don't allow the fsync+lock thread to see intermediate states of batch application.
         stdx::lock_guard<stdx::mutex> fsynclk(oplogApplierLockedFsync);
+
+        // Obtain the validation lock to synchronise batch application with validation.
+        auto lk = CollectionValidation::ValidateState::obtainExclusiveValidationLock(&opCtx);
 
         // Apply the operations in this batch. '_applyOplogBatch' returns the optime of the
         // last op that was applied, which should be the last optime in the batch.
