@@ -48,7 +48,7 @@ Value evaluate(const ExpressionInternalFLEEqual& expr, const Document& root, Var
             // extractMetadataBlocks should only be run once.
             tassert(9588901, "extractMetadataBlocks should only be run once by evaluate", !value);
             value.emplace(serverValue);
-            std::vector<ConstDataRange> metadataBlocks;
+            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
             metadataBlocks.push_back(value->getRawMetadataBlock());
             return metadataBlocks;
         }));
@@ -86,7 +86,7 @@ Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Var
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
             // TODO SERVER-104568: Implement this lambda expression's body which should extract the
             // metadata blocks.
-            std::vector<ConstDataRange> metadataBlocks;
+            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
             return metadataBlocks;
         }));
 }
@@ -108,7 +108,7 @@ Value evaluate(const ExpressionEncStrEndsWith& expr, const Document& root, Varia
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
             // TODO SERVER-101217: Implement this lambda expression's body which should extract the
             // metadata blocks.
-            std::vector<ConstDataRange> metadataBlocks;
+            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
             return metadataBlocks;
         }));
 }
@@ -130,7 +130,7 @@ Value evaluate(const ExpressionEncStrContains& expr, const Document& root, Varia
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
             // TODO SERVER-102091: Implement this lambda expression's body which should extract the
             // metadata blocks.
-            std::vector<ConstDataRange> metadataBlocks;
+            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
             return metadataBlocks;
         }));
 }
@@ -154,7 +154,7 @@ Value evaluate(const ExpressionEncStrNormalizedEq& expr,
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
             // TODO SERVER-102560: Implement this lambda expression's body which should extract the
             // metadata blocks.
-            std::vector<ConstDataRange> metadataBlocks;
+            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
             return metadataBlocks;
         }));
 }

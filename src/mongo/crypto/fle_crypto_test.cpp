@@ -1921,6 +1921,26 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_IsValidZerosBlob) {
     ASSERT_FALSE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
 }
 
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_FLE2TagAndEncryptedMetadataBlockView) {
+    char badbuf[11];
+    FLE2TagAndEncryptedMetadataBlock::EncryptedCountersBlob counters;
+    PrfBlock tag;
+    FLE2TagAndEncryptedMetadataBlock::ZerosBlob zeros;
+    ASSERT_THROWS_CODE(
+        FLE2TagAndEncryptedMetadataBlockView{ConstDataRange(badbuf)}, DBException, 10164500);
+    ASSERT_THROWS_CODE(FLE2TagAndEncryptedMetadataBlockView(
+                           ConstDataRange(badbuf), ConstDataRange(tag), ConstDataRange(zeros)),
+                       DBException,
+                       10164501);
+    ASSERT_THROWS_CODE(FLE2TagAndEncryptedMetadataBlockView(
+                           ConstDataRange(counters), ConstDataRange(badbuf), ConstDataRange(zeros)),
+                       DBException,
+                       10164502);
+    ASSERT_THROWS_CODE(FLE2TagAndEncryptedMetadataBlockView(
+                           ConstDataRange(counters), ConstDataRange(tag), ConstDataRange(badbuf)),
+                       DBException,
+                       10164503);
+}
 
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     TestKeyVault keyVault;

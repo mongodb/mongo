@@ -616,6 +616,15 @@ struct ECOCCompactionDocumentV2 {
 // TODO SERVER-96973 Refactor this into a full wrapper class around
 // mc_FLE2TagAndEncryptedMetadataBlock_t
 struct FLE2TagAndEncryptedMetadataBlockView {
+    /**
+     * Create a view from a 96-byte serialized metadata block buffer
+     */
+    FLE2TagAndEncryptedMetadataBlockView(ConstDataRange serializedBlock);
+
+    FLE2TagAndEncryptedMetadataBlockView(ConstDataRange counts,
+                                         ConstDataRange tag,
+                                         ConstDataRange zeros);
+
     ConstDataRange encryptedCounts;
     ConstDataRange tag;
     ConstDataRange encryptedZeros;
@@ -667,19 +676,13 @@ struct FLE2TagAndEncryptedMetadataBlock {
     StatusWith<std::vector<uint8_t>> serialize(ServerDerivedFromDataToken token);
 
     static StatusWith<FLE2TagAndEncryptedMetadataBlock> decryptAndParse(
-        ServerDerivedFromDataToken token, ConstDataRange serializedBlock);
-
-    static StatusWith<FLE2TagAndEncryptedMetadataBlock> decryptAndParse(
         ServerDerivedFromDataToken token, const FLE2TagAndEncryptedMetadataBlockView& block);
 
-    static StatusWith<PrfBlock> parseTag(ConstDataRange serializedBlock);
-
     /*
-     * Decrypts and returns only the zeros blob from the serialized
-     * FLE2TagAndEncryptedMetadataBlock in serializedBlock.
+     * Decrypts and returns the zeros blob from the FLE2TagAndEncryptedMetadataBlockView.
      */
-    static StatusWith<ZerosBlob> decryptZerosBlob(ServerZerosEncryptionToken token,
-                                                  ConstDataRange serializedBlock);
+    static StatusWith<ZerosBlob> decryptZerosBlob(
+        ServerZerosEncryptionToken token, const FLE2TagAndEncryptedMetadataBlockView& block);
 
     static bool isValidZerosBlob(const ZerosBlob& blob);
 
@@ -732,7 +735,7 @@ public:
     StatusWith<std::vector<uint8_t>> serialize() const;
 
     ConstDataRange getServerEncryptedValue() const;
-    ConstDataRange getRawMetadataBlock() const;
+    FLE2TagAndEncryptedMetadataBlockView getRawMetadataBlock() const;
     PrfBlock getMetadataBlockTag() const;
     UUID getKeyId() const;
     BSONType getBsonType() const;
@@ -743,7 +746,6 @@ private:
     // Cached parsed values
     mutable boost::optional<UUID> _cachedKeyId;
     mutable boost::optional<ConstDataRange> _cachedServerEncryptedValue;
-    mutable boost::optional<std::vector<uint8_t>> _cachedRawMetadata;
     mutable boost::optional<PrfBlock> _cachedMetadataBlockTag;
     mutable boost::optional<std::vector<uint8_t>> _cachedSerializedPayload;
 };
@@ -826,7 +828,7 @@ struct FLE2IndexedRangeEncryptedValueV2 {
         BSONType bsonType;
         uint8_t edgeCount;
         ConstDataRange ciphertext;
-        std::vector<ConstDataRange> metadataBlocks;
+        std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
     };
     static StatusWith<ParsedFields> parseAndValidateFields(ConstDataRange serializedServerValue);
 

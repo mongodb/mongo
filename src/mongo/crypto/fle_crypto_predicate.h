@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+struct FLE2TagAndEncryptedMetadataBlockView;
 class EncryptedPredicateEvaluatorV2 {
 public:
     EncryptedPredicateEvaluatorV2(std::vector<ServerZerosEncryptionToken> zerosTokens);
@@ -50,10 +51,10 @@ public:
      *
      * Returns a boolean indicator.
      */
-    bool evaluate(
-        Value fieldValue,
-        EncryptedBinDataType indexedValueType,
-        std::function<std::vector<ConstDataRange>(ConstDataRange)> extractMetadataBlocks) const;
+    bool evaluate(Value fieldValue,
+                  EncryptedBinDataType indexedValueType,
+                  std::function<std::vector<FLE2TagAndEncryptedMetadataBlockView>(ConstDataRange)>
+                      extractMetadataBlocks) const;
 
     std::vector<ServerZerosEncryptionToken> zerosDecryptionTokens() const {
         return _zerosDecryptionTokens;
