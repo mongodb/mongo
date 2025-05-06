@@ -105,6 +105,8 @@ namespace sbe {
  *  childStage
  */
 class HashAggStage final : public HashAggBaseStage<HashAggStage> {
+    friend class HashAggBaseStage<HashAggStage>;
+
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
@@ -133,22 +135,9 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
-    void doForceSpill() final;
-
-private:
-    /**
-     * Given a 'record' from the record store and a 'collator', decodes it into a pair of
-     * materialized rows (one for the group-by key and another one for the agg value).
-     * Both the group-by key and the agg value are read from the data part of the record.
-     */
-    HashAggBaseStage::SpilledRow deserializeSpilledRecordWithCollation(
-        const Record& record, const CollatorInterface& collator);
-
-    PlanState getNextSpilled();
-
+protected:
     // Set the in memory data iterator to the next record that should be returned.
     void setIteratorToNextRecord() {
-        // We didn't spill. Obtain the next output row from the hash table.
         if (_htIt == _ht->end()) {
             // First invocation of getNext() after open().
             if (!_seekKeysAccessors.empty()) {
@@ -183,6 +172,17 @@ private:
             accessor->setIndex(1);
         }
     }
+
+private:
+    /**
+     * Given a 'record' from the record store and a 'collator', decodes it into a pair of
+     * materialized rows (one for the group-by key and another one for the agg value).
+     * Both the group-by key and the agg value are read from the data part of the record.
+     */
+    HashAggBaseStage::SpilledRow deserializeSpilledRecordWithCollation(
+        const Record& record, const CollatorInterface& collator);
+
+    PlanState getNextSpilled();
 
     const value::SlotVector _gbs;
     const AggExprVector _aggs;

@@ -183,7 +183,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMulti(
-    PlanStage* stage, std::vector<value::SlotAccessor*> accessors) {
+    PlanStage* stage, std::vector<value::SlotAccessor*> accessors, bool forceSpill) {
     // Allocate an SBE array to hold the results.
     auto [resultsTag, resultsVal] = value::makeNewArray();
     value::ValueGuard resultsGuard{resultsTag, resultsVal};
@@ -210,6 +210,11 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
             const bool disableSlotAccess = true;
             stage->saveState(disableSlotAccess);
             stage->restoreState();
+        }
+
+        if (forceSpill && resultsView->size() % 3 == 0) {
+            // check the forceSpill stage
+            stage->forceSpill();
         }
     }
 
@@ -257,6 +262,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(
     value::TypeTags inputTag,
     value::Value inputVal,
     const MakeStageFn<value::SlotVector>& makeStageMulti,
+    bool forceSpill,
     const AssertStageStatsFn& assertStageStats) {
     auto ctx = makeCompileCtx();
 
@@ -271,7 +277,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(
     auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
 
     // Get all the results produced by the PlanStage we want to test.
-    auto results = getAllResultsMulti(stage.get(), resultAccessors);
+    auto results = getAllResultsMulti(stage.get(), resultAccessors, forceSpill);
     if (assertStageStats) {
         assertStageStats(stage->getSpecificStats());
     }
@@ -285,12 +291,13 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         value::TypeTags expectedTag,
                                         value::Value expectedVal,
                                         const MakeStageFn<value::SlotVector>& makeStageMulti,
+                                        bool forceSpill,
                                         const AssertStageStatsFn& assertStageStats) {
     // Set up a ValueGuard to ensure `expected` gets released.
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
-    auto [resultsTag, resultsVal] =
-        runTestMulti(numInputSlots, inputTag, inputVal, makeStageMulti, assertStageStats);
+    auto [resultsTag, resultsVal] = runTestMulti(
+        numInputSlots, inputTag, inputVal, makeStageMulti, forceSpill, assertStageStats);
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
     // Compare the results produced with the expected output and assert that they match.

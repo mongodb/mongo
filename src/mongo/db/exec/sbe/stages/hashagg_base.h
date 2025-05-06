@@ -145,8 +145,9 @@ protected:
      */
     int64_t spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
     void spill(MemoryCheckData& mcd);
-    void spill();
     void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
+
+    void doForceSpill() final;
 
     // Memory tracking and spilling to disk.
     const long long _approxMemoryUseInBytesBeforeSpill =
@@ -174,6 +175,13 @@ protected:
     // key. We ensure uniqueness by appending a unique integer to the end of this key, which is
     // simply ignored during deserialization.
     int64_t _ridSuffixCounter = 0;
+
+private:
+    void spill();
+
+    Derived& derived() {
+        return static_cast<Derived&>(*this);
+    }
 };
 
 }  // namespace sbe

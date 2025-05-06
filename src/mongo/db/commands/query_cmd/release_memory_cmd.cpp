@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/acquire_locks.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
 #include "mongo/db/query/client_cursor/release_memory_util.h"
@@ -91,6 +92,9 @@ public:
             for (CursorId cursorId : request().getCommandParameter()) {
                 auto cursorPin = CursorManager::get(opCtx)->pinCursor(opCtx, cursorId);
                 if (cursorPin.isOK()) {
+                    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
+                        cursorPin.getValue().getCursor(), opCtx);
+
                     if (MONGO_unlikely(releaseMemoryHangAfterPinCursor.shouldFail())) {
                         LOGV2(9745500,
                               "releaseMemoryHangAfterPinCursor fail point enabled. Blocking until "
@@ -122,6 +126,9 @@ public:
                     if (response.isOK()) {
                         response = acquireLocksAndReleaseMemory(opCtx, cursorPin.getValue());
                     }
+
+                    OperationMemoryUsageTracker::moveToCursorIfAvailable(
+                        opCtx, cursorPin.getValue().getCursor());
                     if (response.isOK()) {
                         released.push_back(cursorId);
                     } else {

@@ -17,7 +17,6 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
@@ -74,12 +73,6 @@ const docs = [
 ];
 assert.commandWorked(coll.insertMany(docs));
 
-// TODO: Remove this in SERVER-99156.
-if (isTimeSeriesCollection(db, coll.getName())) {
-    jsTestLog("Skipping test because Timeseries are not supported");
-    quit();
-}
-
 const pipeline = [{
     $group: {
         _id: "$item",
@@ -88,10 +81,10 @@ const pipeline = [{
     }
 }];
 
+// ToDo: Remove the mergeCursors on SERVER-104522
 const explain = coll.explain().aggregate(pipeline);
 if (hasMergeCursors(explain)) {
-    jsTest.log(
-        `Skipping test. Pipeline has $mergeCursors. All results are returned in the first batch`);
+    jsTest.log(`Skipping test. Pipeline has $mergeCursors but spilling on mongos is not allowed`);
     quit();
 }
 
@@ -104,15 +97,18 @@ const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArra
 
     setServerParameter(sbeMemorySizeKnob, 100 * 1024 * 1024);
     setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
+    let initialSpillCount = getSpillCounter();
 
     // Retrieve the first batch without spilling.
     jsTest.log.info("Running pipeline: ", pipeline[0]);
 
     const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
     const cursorId = cursor.getId();
+    const newSpillCount = getSpillCounter();
+    assert.eq(newSpillCount, initialSpillCount);
+    initialSpillCount = newSpillCount;
 
     // Release memory (i.e., spill)
-    const initialSpillCount = getSpillCounter();
     const releaseMemoryCmd = {releaseMemory: [cursorId]};
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
@@ -133,12 +129,16 @@ const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArra
     jsTest.log(`Running spill in first batch`);
     setServerParameter(sbeMemorySizeKnob, 1);
     setServerParameter(classicMemorySizeKnob, 1);
+    let initialSpillCount = getSpillCounter();
 
     // Retrieve the first batch.
     jsTest.log.info("Running pipeline: ", pipeline[0]);
 
     const cursor = coll.aggregate(pipeline, {allowDiskUse: true, cursor: {batchSize: 1}});
     const cursorId = cursor.getId();
+    const newSpillCount = getSpillCounter();
+    assert.lt(initialSpillCount, newSpillCount);
+    initialSpillCount = newSpillCount;
 
     // Release memory (i.e., spill)
     const releaseMemoryCmd = {releaseMemory: [cursorId]};
@@ -146,6 +146,7 @@ const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArra
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
     assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+    assert.eq(initialSpillCount, newSpillCount);
 
     jsTest.log.info("Running getMore");
     const results = cursor.toArray();

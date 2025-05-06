@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
@@ -109,10 +110,16 @@ public:
                 auto pinnedCursor = cursorManager->checkOutCursorNoAuthCheck(id, opCtx);
 
                 if (pinnedCursor.isOK()) {
-                    ScopeGuard returnCursorGuard([&pinnedCursor] {
+                    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
+                        pinnedCursor.getValue().get(), opCtx);
+
+                    ScopeGuard returnCursorGuard([&pinnedCursor, opCtx] {
+                        OperationMemoryUsageTracker::moveToCursorIfAvailable(
+                            opCtx, pinnedCursor.getValue().get());
                         pinnedCursor.getValue().returnCursor(
                             ClusterCursorManager::CursorState::NotExhausted);
                     });
+
                     Status response = Status::OK();
                     {
                         // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an

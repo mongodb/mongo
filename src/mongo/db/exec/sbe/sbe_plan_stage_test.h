@@ -271,7 +271,7 @@ public:
      * Note that the caller assumes ownership of the SBE array returned.
      */
     std::pair<value::TypeTags, value::Value> getAllResultsMulti(
-        PlanStage* stage, std::vector<value::SlotAccessor*> accessors);
+        PlanStage* stage, std::vector<value::SlotAccessor*> accessors, bool forceSpill = false);
 
     /**
      * This method is intended to make it easy to write basic tests. The caller passes in an input
@@ -312,6 +312,7 @@ public:
                       value::TypeTags expectedTag,
                       value::Value expectedVal,
                       const MakeStageFn<value::SlotVector>& makeStageMulti,
+                      bool forceSpill = false,
                       const AssertStageStatsFn& assertStageStats = AssertStageStatsFn{});
 
     // Similar to above method but returns the result instead of comparing to an expected.
@@ -320,6 +321,7 @@ public:
         value::TypeTags inputTag,
         value::Value inputVal,
         const MakeStageFn<value::SlotVector>& makeStageMulti,
+        bool forceSpill = false,
         const AssertStageStatsFn& assertStageStats = AssertStageStatsFn{});
 
     value::SlotIdGenerator* getSlotIdGenerator() {

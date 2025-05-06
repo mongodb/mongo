@@ -154,6 +154,7 @@ TEST_F(SortStageTest, SortStringsWithSpillingTest) {
                  expected.first,
                  expected.second,
                  makeStageFn,
+                 false,
                  assertStageStats);
 }
 
@@ -188,36 +189,16 @@ TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
                   sortStats->spillingStats.getSpilledBytes());
     };
 
-    auto ctx = makeCompileCtx();
     inputGuard.reset();
-    auto [scanSlots, scanStage] = generateVirtualScanMulti(2, input.first, input.second);
-    auto [outputSlots, stage] = makeStageFn(scanSlots, std::move(scanStage));
-    auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
-
-    auto [resultsTag, resultsVal] = value::makeNewArray();
-    value::ValueGuard resultsGuard{resultsTag, resultsVal};
-    auto resultsView = value::getArrayView(resultsVal);
-
-    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard{arrTag, arrVal};
-        auto arrView = value::getArrayView(arrVal);
-        for (size_t i = 0; i < resultAccessors.size(); ++i) {
-            auto [tag, val] = resultAccessors[i]->getCopyOfValue();
-            arrView->push_back(tag, val);
-        }
-        guard.reset();
-        resultsView->push_back(arrTag, arrVal);
-
-        if (resultsView->size() >= 3) {
-            // Force spill after returning 3 results. This should spill the rest of the data, making
-            // following forceSpill() calls do nothing.
-            stage->forceSpill();
-        }
-    }
-
-    assertValuesEqual(resultsTag, resultsVal, expected.first, expected.second);
-    assertStageStats(stage->getSpecificStats());
+    expectedGuard.reset();
+    runTestMulti(2,
+                 input.first,
+                 input.second,
+                 expected.first,
+                 expected.second,
+                 makeStageFn,
+                 true,
+                 assertStageStats);
 }
 
 }  // namespace mongo::sbe
