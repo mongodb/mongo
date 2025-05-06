@@ -822,6 +822,7 @@ mongo_cc_unit_test(
     deps = [
         ":parsed_distinct_command",
         ":query_planner_test_fixture",
+        "//src/mongo/db:service_context_d",
         "//src/mongo/db/catalog:collection_mock",
         "//src/mongo/db/query:index_bounds_builder_test_fixture",
         "//src/mongo/idl:server_parameter_test_util",

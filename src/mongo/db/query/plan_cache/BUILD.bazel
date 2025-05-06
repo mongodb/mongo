@@ -83,6 +83,7 @@ mongo_cc_benchmark(
     tags = ["query_bm"],
     deps = [
         "plan_cache_test_util",
+        "//src/mongo/db:service_context_d",
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/catalog:collection_mock",
         "//src/mongo/db/query:canonical_query_base",
@@ -114,6 +115,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         "plan_cache_test_util",
+        "//src/mongo/db:service_context_d",
         "//src/mongo/db/catalog:collection_mock",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/pipeline:expression_context_for_test",

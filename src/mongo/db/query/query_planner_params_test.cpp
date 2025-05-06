@@ -99,9 +99,11 @@ protected:
                                        stdx::unordered_set<std::string> indexNames,
                                        stdx::unordered_set<std::string> expectedFilteredNames) {
         // Create collection.
-        auto collection = std::make_unique<CollectionMock>(nss);
-        // TODO(SERVER-103405): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        auto collectionPtr = CollectionPtr::CollectionPtr_UNSAFE(collection.get());
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
+        auto catalog = CollectionCatalog::get(_opCtx.get());
+        catalog->onCreateCollection(_opCtx.get(), collection);
+        auto collectionPtr = CollectionPtr(catalog->establishConsistentCollection(
+            _opCtx.get(), nss, boost::none /* readTimestamp */));
 
         // Retrieve query settings decoration.
         auto& querySettings = *QuerySettingsDecoration::get(collectionPtr->getSharedDecorations());
