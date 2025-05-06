@@ -135,9 +135,16 @@ TEST(PlanRankerTest, DistinctBonus) {
     ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
     ASSERT_GT(distinctScore, ixscanScore);
 
-    // If we make the IXSCAN productive enough, however, it can still win!
+    // If we make the IXSCAN 5x more productive, it will tie with the DISTINCT_SCAN.
     ixscanPlan->children[0]->common.advanced = 10;
     ixscanPlan->common.advanced = 10;
+    distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+    ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+    ASSERT_EQ(ixscanScore, distinctScore);
+
+    // If we make the IXSCAN 5.5x more productive, it will win!
+    ixscanPlan->children[0]->common.advanced = 11;
+    ixscanPlan->common.advanced = 11;
     distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
     ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
     ASSERT_GT(ixscanScore, distinctScore);
