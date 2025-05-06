@@ -158,22 +158,33 @@ query:
     slack: TODO
     jira: TODO
   files:
+    - src/mongo/db/commands/profile*
     - src/mongo/db/commands/query_cmd/
     - src/mongo/db/commands/server_status*
+    - src/mongo/db/commands/set_profiling_*
+    - src/mongo/db/commands/shardsvr_resolve_view_command*
+    - src/mongo/db/commands/top_command*
     - src/mongo/db/exec/
+    - src/mongo/db/fle_*
+    - src/mongo/db/curop*
     - src/mongo/db/fts/
     - src/mongo/db/geo/
     - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
     - src/mongo/db/matcher/
     - src/mongo/db/memory_tracking/
     - src/mongo/db/modules/enterprise/src/fle/query_analysis
+    - src/mongo/db/op_debug*
     - src/mongo/db/pipeline/
+    - src/mongo/db/profile_*
     - src/mongo/db/query/
     - src/mongo/db/s/query_analysis* # note the filename pattern
     - src/mongo/db/s/*query*analyzer* # note the filename pattern
     - src/mongo/db/stats/
     - src/mongo/db/update/
     - src/mongo/db/views/
+    - src/mongo/dbtests/extensions_callback_real_test.cpp
+    - src/mongo/dbtests/jstests.cpp
+    - src/mongo/scripting/
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/util/safe_num*
 
