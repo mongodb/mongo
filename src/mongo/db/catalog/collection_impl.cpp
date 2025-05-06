@@ -521,17 +521,17 @@ void CollectionImpl::_setMetadata(
     if (metadata->options.timeseries) {
         // If present, reuse the storageEngine options to work around the issue described in
         // SERVER-91194.
-        _shared->_durableTimeseriesBucketsMayHaveMixedSchemaData = getFlagFromStorageEngineBson(
+        metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData = getFlagFromStorageEngineBson(
             metadata->options.storageEngine,
             backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
-        if (_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value()) {
+        if (metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value()) {
             metadata->timeseriesBucketsMayHaveMixedSchemaData =
-                *_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData;
+                *metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData;
         }
 
         // If present, reuse storageEngine options to work around the issue described in
         // SERVER-91193
-        _shared->_durableTimeseriesBucketingParametersHaveChanged = getFlagFromStorageEngineBson(
+        metadata->_durableTimeseriesBucketingParametersHaveChanged = getFlagFromStorageEngineBson(
             metadata->options.storageEngine,
             backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
     }
@@ -859,12 +859,12 @@ timeseries::MixedSchemaBucketsState CollectionImpl::getTimeseriesMixedSchemaBuck
         return timeseries::MixedSchemaBucketsState::Invalid;
     }
 
-    if (!_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value() &&
+    if (!_metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value() &&
         !_metadata->timeseriesBucketsMayHaveMixedSchemaData.has_value()) {
         return timeseries::MixedSchemaBucketsState::Invalid;
     }
 
-    if (_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(false)) {
+    if (_metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(false)) {
         return timeseries::MixedSchemaBucketsState::DurableMayHaveMixedSchemaBuckets;
     }
 
@@ -872,7 +872,7 @@ timeseries::MixedSchemaBucketsState CollectionImpl::getTimeseriesMixedSchemaBuck
         return timeseries::MixedSchemaBucketsState::NonDurableMayHaveMixedSchemaBuckets;
     }
 
-    invariant(!_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(true) ||
+    invariant(!_metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(true) ||
               !_metadata->timeseriesBucketsMayHaveMixedSchemaData.value_or(true));
     return timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets;
 }
@@ -894,7 +894,7 @@ boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged()
         return true;
     }
 
-    return _shared->_durableTimeseriesBucketingParametersHaveChanged;
+    return _metadata->_durableTimeseriesBucketingParametersHaveChanged;
 }
 
 void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
@@ -904,7 +904,7 @@ void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* o
     // TODO SERVER-92265 properly set this catalog option
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         // Reuse storageEngine options to work around the issue described in SERVER-91193
-        _shared->_durableTimeseriesBucketingParametersHaveChanged = value;
+        md._durableTimeseriesBucketingParametersHaveChanged = value;
         md.options.storageEngine = setFlagToStorageEngineBson(
             md.options.storageEngine,
             backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged,
@@ -933,13 +933,13 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         // Reuse storageEngine options to work around the issue described in SERVER-91194
         if (setting.has_value()) {
-            _shared->_durableTimeseriesBucketsMayHaveMixedSchemaData =
+            md._durableTimeseriesBucketsMayHaveMixedSchemaData =
                 MONGO_unlikely(simulateLegacyTimeseriesMixedSchemaFlag.shouldFail()) ? boost::none
                                                                                      : setting;
             md.options.storageEngine = setFlagToStorageEngineBson(
                 md.options.storageEngine,
                 backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData,
-                _shared->_durableTimeseriesBucketsMayHaveMixedSchemaData);
+                md._durableTimeseriesBucketsMayHaveMixedSchemaData);
         }
 
         // Also update legacy parameter for compatibility when downgrading to older sub-versions

@@ -188,6 +188,19 @@ public:
         // unreliable and must not be used. Use the flag stored in the collection options instead.
         // TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
         boost::optional<bool> timeseriesBucketingParametersHaveChanged_DO_NOT_USE;
+
+        // Parsed value of the time-series mixed-schema flag stored in the backwards-compatible
+        // field in the collection options (md.options.storageEngine.wiredTiger.configString).
+        boost::optional<bool> _durableTimeseriesBucketsMayHaveMixedSchemaData;
+
+        // Value of the time-series bucketing parameters changed flag in the backwards-compatible
+        // field in the collection options (md.options.storageEngine.wiredTiger.configString).
+        // The flag will be set to false at the time of time-series collection creation if
+        // TSBucketingParametersUnchanged is enabled. For any other collection type and earlier
+        // versions the flag will be boost::none. Thus, if the field is absent, we assume the
+        // time-series bucketing parameters have changed. If a subsequent collMod operation changes
+        // either 'bucketRoundingSeconds' or 'bucketMaxSpanSeconds', we set the flag to true.
+        boost::optional<bool> _durableTimeseriesBucketingParametersHaveChanged;
     };
 };
 }  // namespace mongo

@@ -443,7 +443,7 @@ private:
     void _setMetadata(std::shared_ptr<BSONCollectionCatalogEntry::MetaData>&& metadata);
 
     /**
-     * Holder of shared state between CollectionImpl clones
+     * Holder of shared state between CollectionImpl clones and snapshots at a point in time.
      */
     struct SharedState {
         SharedState(OperationContext* opCtx,
@@ -476,19 +476,6 @@ private:
         // This mutex synchronizes allocating and registering RecordIds for uncommited writes on
         // capped collections that accept concurrent writes (i.e. usesCappedSnapshots()).
         mutable stdx::mutex _registerCappedIdsMutex;
-
-        // Parsed value of the time-series mixed-schema flag stored in the backwards-compatible
-        // field in the collection options (md.options.storageEngine.wiredTiger.configString).
-        boost::optional<bool> _durableTimeseriesBucketsMayHaveMixedSchemaData;
-
-        // Value of the time-series bucketing parameters changed flag in the backwards-compatible
-        // field in the collection options (md.options.storageEngine.wiredTiger.configString).
-        // The flag will be set to false at the time of time-series collection creation if
-        // TSBucketingParametersUnchanged is enabled. For any other collection type and earlier
-        // versions the flag will be boost::none. Thus, if the field is absent, we assume the
-        // time-series bucketing parameters have changed. If a subsequent collMod operation changes
-        // either 'bucketRoundingSeconds' or 'bucketMaxSpanSeconds', we set the flag to true.
-        boost::optional<bool> _durableTimeseriesBucketingParametersHaveChanged;
 
         // Time-series collections are allowed to contain measurements with arbitrary dates;
         // however, many of our query optimizations only work properly with dates that can be stored
