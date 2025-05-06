@@ -363,5 +363,23 @@ function assertNoInconsistencies() {
     assertNoInconsistencies();
 })();
 
+(function testUnexpectedAdminDatabaseInGlobalCatalog() {
+    jsTest.log("Executing testUnexpectedAdminDatabaseInGlobalCatalog");
+
+    // Register the 'admin' database in the global catalog.
+    assert.commandWorked(st.configRS.getPrimary().getDB("config").databases.insertOne({
+        _id: "admin",
+        primary: "config",
+        version: {uuid: UUID(), lastMod: NumberInt(1), timestamp: Timestamp(1, 0)}
+    }));
+
+    // Check no inconsistencies are present, but with a successful run of checkMetadataConsistency.
+    assertNoInconsistencies();
+
+    // Clean up the inconsistency for following test cases.
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB("config").databases.deleteOne({_id: "admin"}));
+})();
+
 st.stop();
 })();
