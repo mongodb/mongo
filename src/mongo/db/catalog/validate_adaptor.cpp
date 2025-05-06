@@ -92,7 +92,6 @@
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -744,14 +743,8 @@ void _timeseriesValidationFailed(CollectionValidation::ValidateState* state,
     }
     state->setTimeseriesDataInconsistent();
 
-    if (TestingProctor::instance().isEnabled()) {
-        // In testing this is a fatal error. Some time-series checks are vital to test correctness,
-        // such as the time field being out-of-order for v: 2 buckets.
-        results->errors.push_back(kTimeseriesValidationInconsistencyReason);
-        results->valid = false;
-    } else {
-        results->warnings.push_back(kTimeseriesValidationInconsistencyReason);
-    }
+    results->errors.push_back(kTimeseriesValidationInconsistencyReason);
+    results->valid = false;
 }
 
 void _BSONSpecValidationFailed(CollectionValidation::ValidateState* state,
