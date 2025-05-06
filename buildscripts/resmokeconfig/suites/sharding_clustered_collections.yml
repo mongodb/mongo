@@ -20,6 +20,10 @@ selector:
     # TODO SERVER-85395: remove the following exclusion together with the test
     # Expects the collection creation options not to change.
     - jstests/sharding/create_unsplittable_collection_on_shard.js
+    # TODO SERVER-102058: remove the following exclusion after fixing this ticket
+    # Create is not idempotent when the failpoint `clusterAllCollectionsByDefault` is enabled.
+    - jstests/sharding/mongos_writes_wait_for_write_concern_sharded.js
+    - jstests/sharding/mongos_writes_wait_for_write_concern_unsharded.js
   exclude_with_any_tags:
     - expects_explicit_underscore_id_index
 
