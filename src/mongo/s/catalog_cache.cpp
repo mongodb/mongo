@@ -273,10 +273,12 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
 }
 
 CatalogCache::CatalogCache(ServiceContext* const service,
-                           std::shared_ptr<CatalogCacheLoader> cacheLoader,
+                           std::shared_ptr<CatalogCacheLoader> databaseCacheLoader,
+                           std::shared_ptr<CatalogCacheLoader> collectionCacheLoader,
+                           bool cascadeDatabaseCacheLoaderShutdown,
+                           bool cascadeCollectionCacheLoaderShutdown,
                            StringData kind)
     : _kind(kind),
-      _cacheLoader(cacheLoader),
       _executor([this] {
           ThreadPool::Options options;
           options.poolName = "CatalogCache" + (_kind.empty() ? "" : "::" + _kind);
@@ -284,8 +286,29 @@ CatalogCache::CatalogCache(ServiceContext* const service,
           options.maxThreads = 6;
           return options;
       }()),
-      _databaseCache(service, _executor, _cacheLoader),
-      _collectionCache(service, _executor, _cacheLoader) {
+      _cascadeDatabaseCacheLoaderShutdown(cascadeDatabaseCacheLoaderShutdown),
+      _cascadeCollectionCacheLoaderShutdown(cascadeCollectionCacheLoaderShutdown),
+      _databaseCache(service, _executor, databaseCacheLoader),
+      _collectionCache(service, _executor, collectionCacheLoader) {
+    _executor.startup();
+}
+
+CatalogCache::CatalogCache(ServiceContext* const service,
+                           std::shared_ptr<CatalogCacheLoader> cacheLoader,
+                           StringData kind)
+    : _kind(kind),
+      _executor([this] {
+          ThreadPool::Options options;
+          options.poolName = "CatalogCache" + (_kind.empty() ? "" : "::" + _kind);
+          options.minThreads = 0;
+          options.maxThreads = 6;
+          return options;
+      }()),
+      // As both caches points to the same cache loader, it is enough to shutDown once.
+      _cascadeDatabaseCacheLoaderShutdown(true),
+      _cascadeCollectionCacheLoaderShutdown(false),
+      _databaseCache(service, _executor, cacheLoader),
+      _collectionCache(service, _executor, cacheLoader) {
     _executor.startup();
 }
 
@@ -301,7 +324,13 @@ void CatalogCache::shutDownAndJoin() {
     _executor.shutdown();
     _executor.join();
 
-    _cacheLoader->shutDown();
+    if (_cascadeDatabaseCacheLoaderShutdown) {
+        _databaseCache.shutDown();
+    }
+
+    if (_cascadeCollectionCacheLoaderShutdown) {
+        _collectionCache.shutDown();
+    }
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,

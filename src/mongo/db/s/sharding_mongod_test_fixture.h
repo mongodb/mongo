@@ -80,7 +80,7 @@ protected:
     Status initializeGlobalShardingStateForMongodForTest(
         const ConnectionString& configConnStr,
         std::unique_ptr<CatalogCache> catalogCache,
-        std::shared_ptr<ShardServerCatalogCacheLoader> catalogCacheLoader = nullptr);
+        std::shared_ptr<ShardServerCatalogCacheLoader> catalogCacheLoader);
 
     // Syntactic sugar for getting sharding components off the Grid, if they have been initialized.
 

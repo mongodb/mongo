@@ -284,6 +284,9 @@ protected:
                             BSON(kShardKey << 1));
         coll.setAllowMigrations(false);
 
+        getConfigServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+            DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
+
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
             DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
         getCatalogCacheLoaderMock()->setCollectionRefreshValues(
@@ -303,12 +306,21 @@ protected:
                          "y"),
             boost::none);
 
+        // Refresh the filtering metadata for the nss.
         ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
             opCtx, kNss.dbName()));
         FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, kNss);
 
-        if (refreshTempNss)
+        // Also refresh the routing information.
+        const auto catalogCache = Grid::get(opCtx)->catalogCache();
+        catalogCache->onStaleCollectionVersion(kNss, boost::none);
+        (void)catalogCache->getCollectionRoutingInfo(opCtx, kNss);
+
+        if (refreshTempNss) {
             FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, env.tempNss);
+            catalogCache->onStaleCollectionVersion(env.tempNss, boost::none);
+            (void)catalogCache->getCollectionRoutingInfo(opCtx, env.tempNss);
+        }
 
         return env;
     }

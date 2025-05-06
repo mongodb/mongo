@@ -164,6 +164,15 @@ public:
     Status forceDatabaseMetadataRefresh_DEPRECATED(OperationContext* opCtx,
                                                    const DatabaseName& dbName) noexcept;
 
+    /**
+     * Clears the filtering metadata cache object so that it can be reused between test executions.
+     *
+     * NOTE: Do not use this outside of unit-tests.
+     */
+    void clearForUnitTests() {
+        _cache.reset();
+    }
+
 private:
     /**
      * Unconditionally get the shard's filtering metadata from the config server on the calling
@@ -171,8 +180,8 @@ private:
      *
      * NOTE: Does network I/O, so it must not be called with a lock
      */
-    CollectionMetadata _forceGetCurrentMetadata(OperationContext* opCtx,
-                                                const NamespaceString& nss);
+    CollectionMetadata _forceGetCurrentCollectionMetadata(OperationContext* opCtx,
+                                                          const NamespaceString& nss);
 
     /**
      * Drive each unfished migration coordination in the given namespace to completion.

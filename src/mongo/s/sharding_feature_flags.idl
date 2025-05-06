@@ -144,6 +144,14 @@ feature_flags:
         default: true
         version: 8.1
         shouldBeFCVGated: true
+    # TODO (SERVER-104762): remove once 9.0 becomes last LTS.
+    featureFlagDatabaseDualCatalogCache:
+        description:
+            "Feature flag to enable one catalog cache for the shard role and another one for
+            the router role, only for database metadata usages."
+        cpp_varname: feature_flags::gDatabaseDualCatalogCache
+        default: true
+        shouldBeFCVGated: false
     # TODO (SERVER-97261): remove once 9.0 becomes last LTS.
     featureFlagDualCatalogCache:
         description:

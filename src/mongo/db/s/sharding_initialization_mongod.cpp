@@ -378,10 +378,35 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
         }
     }();
 
-    auto catalogCache = feature_flags::gDualCatalogCache.isEnabled()
-        ? std::make_unique<CatalogCache>(service,
-                                         std::make_shared<ConfigServerCatalogCacheLoaderImpl>())
-        : std::make_unique<CatalogCache>(service, shardRoleCatalogCacheLoader);
+    auto catalogCache = [&]() -> std::unique_ptr<CatalogCache> {
+        // If the dual catalog cache feature flag is enabled, use the ConfigServer implementation
+        // for both the database and collection caches.
+        if (feature_flags::gDualCatalogCache.isEnabled()) {
+            return std::make_unique<CatalogCache>(
+                service, std::make_shared<ConfigServerCatalogCacheLoaderImpl>());
+        }
+
+        // If only the database dual catalog cache is enabled, use the ConfigServer implementation
+        // for database metadata, and the ShardServer implementation for collection metadata.
+        //
+        // We pass `true` for `cascadeDatabaseCacheLoaderShutdown` because the CatalogCache owns the
+        // ConfigServer catalog cache loader.
+        //
+        // We pass `false` for `cascadeCollectionCacheLoaderShutdown` because the ShardServer
+        // catalog cache loader is owned and shut down by the FilteringMetadataCache. This avoids
+        // double shutdown or undefined behavior from shared ownership.
+        if (feature_flags::gDatabaseDualCatalogCache.isEnabled()) {
+            return std::make_unique<CatalogCache>(
+                service,
+                std::make_shared<ConfigServerCatalogCacheLoaderImpl>(),
+                shardRoleCatalogCacheLoader,
+                true /* cascadeDatabaseCacheLoaderShutdown */,
+                false /* cascadeCollectionCacheLoaderShutdown */);
+        }
+
+        // Otherwise, use the ShardServer implementation for both caches.
+        return std::make_unique<CatalogCache>(service, shardRoleCatalogCacheLoader);
+    }();
 
     bool isStandaloneOrPrimary = [&]() {
         // This is only called in startup when there shouldn't be replication state changes, but to

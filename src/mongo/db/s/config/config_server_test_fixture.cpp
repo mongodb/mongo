@@ -132,7 +132,12 @@ void ConfigServerTestFixture::setUp() {
 
     auto loader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
         std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
-    auto catalogCache = std::make_unique<CatalogCache>(getServiceContext(), loader);
+    auto catalogCache =
+        std::make_unique<CatalogCache>(getServiceContext(),
+                                       std::make_unique<ConfigServerCatalogCacheLoaderImpl>(),
+                                       loader,
+                                       true /* cascadeDatabaseCacheLoaderShutdown */,
+                                       false /* cascadeCollectionCacheLoaderShutdown */);
 
     RoutingInformationCache::set(getServiceContext());
 

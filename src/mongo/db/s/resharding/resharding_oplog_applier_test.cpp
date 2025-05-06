@@ -93,9 +93,8 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/config_server_catalog_cache_loader_mock.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -175,13 +174,18 @@ public:
                                     ConnectionString(kConfigHostAndPort),
                                     _sourceId.getShardId()});
 
-        _mockCatalogCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
+        _mockConfigServerCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
+        _mockShardServerCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
         auto catalogCache =
-            std::make_unique<CatalogCache>(getServiceContext(), _mockCatalogCacheLoader);
+            std::make_unique<CatalogCache>(getServiceContext(),
+                                           _mockConfigServerCacheLoader,
+                                           _mockShardServerCacheLoader,
+                                           true /* cascadeDatabaseCacheLoaderShutdown */,
+                                           false /* cascadeCollectionCacheLoaderShutdown */);
         uassertStatusOK(
             initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort),
                                                           std::move(catalogCache),
-                                                          _mockCatalogCacheLoader));
+                                                          _mockShardServerCacheLoader));
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
@@ -310,7 +314,7 @@ public:
     }
 
     void loadCatalogCacheValues() {
-        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
+        _mockConfigServerCacheLoader->setDatabaseRefreshReturnValue(
             DatabaseType(kAppliedToNs.dbName(),
                          _sourceId.getShardId(),
                          DatabaseVersion(UUID::gen(), Timestamp(1, 1))));
@@ -320,7 +324,7 @@ public:
                 _cm->getUUID(), chunk.getRange(), chunk.getLastmod(), chunk.getShardId());
             return true;
         });
-        _mockCatalogCacheLoader->setCollectionRefreshValues(
+        _mockShardServerCacheLoader->setCollectionRefreshValues(
             kAppliedToNs,
             CollectionType(kAppliedToNs,
                            _cm->getVersion().epoch(),
@@ -474,7 +478,9 @@ protected:
     service_context_test::ShardRoleOverride _shardRole;
 
     boost::optional<ChunkManager> _cm;
-    std::shared_ptr<ShardServerCatalogCacheLoaderMock> _mockCatalogCacheLoader;
+
+    std::shared_ptr<ConfigServerCatalogCacheLoaderMock> _mockConfigServerCacheLoader;
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> _mockShardServerCacheLoader;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;

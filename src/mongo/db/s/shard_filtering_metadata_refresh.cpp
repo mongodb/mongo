@@ -299,7 +299,8 @@ void FilteringMetadataCache::init(ServiceContext* serviceCtx,
     invariant(decoration->_loader == nullptr);
     decoration->_loader = loader;
 
-    if (feature_flags::gDualCatalogCache.isEnabled()) {
+    if (feature_flags::gDualCatalogCache.isEnabled() ||
+        feature_flags::gDatabaseDualCatalogCache.isEnabled()) {
         decoration->_cache =
             std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
     }
@@ -312,6 +313,12 @@ void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
     auto decoration = FilteringMetadataCache::get(serviceCtx);
     invariant(decoration->_loader == nullptr);
     decoration->_loader = loader;
+
+    if (feature_flags::gDualCatalogCache.isEnabled() ||
+        feature_flags::gDatabaseDualCatalogCache.isEnabled()) {
+        decoration->_cache =
+            std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
+    }
 }
 
 FilteringMetadataCache* FilteringMetadataCache::get(ServiceContext* serviceCtx) {
@@ -409,8 +416,18 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
     }
 
-    // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
-    const auto catalogCache = _cache ? _cache.get() : Grid::get(opCtx)->catalogCache();
+    const auto catalogCache = [&]() {
+        if (!feature_flags::gDualCatalogCache.isEnabled()) {
+            return Grid::get(opCtx)->catalogCache();
+        }
+
+        tassert(10429300,
+                "Expected to find the CatalogCache used for filtering purposes initialized",
+                _cache);
+
+        return _cache.get();
+    }();
+
     const auto cm =
         uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
@@ -498,11 +515,21 @@ Status FilteringMetadataCache::forceDatabaseMetadataRefresh_DEPRECATED(
     }
 }
 
-CollectionMetadata FilteringMetadataCache::_forceGetCurrentMetadata(OperationContext* opCtx,
-                                                                    const NamespaceString& nss) {
+CollectionMetadata FilteringMetadataCache::_forceGetCurrentCollectionMetadata(
+    OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
-        const auto catalogCache = _cache ? _cache.get() : Grid::get(opCtx)->catalogCache();
+        const auto catalogCache = [&]() {
+            if (!feature_flags::gDualCatalogCache.isEnabled()) {
+                return Grid::get(opCtx)->catalogCache();
+            }
+
+            tassert(10429301,
+                    "Expected to find the CatalogCache used for filtering purposes initialized",
+                    _cache);
+
+            return _cache.get();
+        }();
+
         const auto cm =
             uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
@@ -566,7 +593,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
 
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
 
-            auto currentMetadata = _forceGetCurrentMetadata(opCtx, doc.getNss());
+            auto currentMetadata = _forceGetCurrentCollectionMetadata(opCtx, doc.getNss());
 
             if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
                     .shouldFail()) {
@@ -674,8 +701,17 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
         scopedDsr->resetDbMetadataRefreshFuture_DEPRECATED();
     });
 
-    // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
-    const auto catalogCache = _cache ? _cache.get() : Grid::get(opCtx)->catalogCache();
+    const auto catalogCache = [&]() {
+        if (!feature_flags::gDatabaseDualCatalogCache.isEnabled()) {
+            return Grid::get(opCtx)->catalogCache();
+        }
+
+        tassert(10429302,
+                "Expected to find the CatalogCache used for filtering purposes initialized",
+                _cache);
+
+        return _cache.get();
+    }();
 
     // Force a refresh of the cached database metadata from the config server.
     catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
@@ -961,7 +997,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 }
             }
 
-            auto currentMetadata = _forceGetCurrentMetadata(opCtx, nss);
+            auto currentMetadata = _forceGetCurrentCollectionMetadata(opCtx, nss);
 
             if (currentMetadata.hasRoutingTable()) {
                 // Abort and join any ongoing migration if migrations are disallowed for the

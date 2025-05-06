@@ -85,8 +85,13 @@ protected:
 
                     auto loader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
                         std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
-                    auto catalogCache =
-                        std::make_unique<CatalogCache>(opCtx->getServiceContext(), loader);
+                    auto catalogCache = std::make_unique<CatalogCache>(
+                        opCtx->getServiceContext(),
+                        std::make_unique<ConfigServerCatalogCacheLoaderImpl>(),
+                        loader,
+                        true /* cascadeDatabaseCacheLoaderShutdown */,
+                        false /* cascadeCollectionCacheLoaderShutdown */);
+
                     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
                         configConnStr, std::move(catalogCache), std::move(loader)));
 
