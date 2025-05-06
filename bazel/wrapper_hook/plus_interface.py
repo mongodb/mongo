@@ -97,7 +97,8 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
 
     if lint_target:
         command_start_index = args.index("lint") + 1
-        run_rules_lint(args[0], args[command_start_index:])
+        if run_rules_lint(args[0], args[command_start_index:]):
+            return ["run", "lint", "--", "ALL_PASSING"]
         return args[1:command_start_index]
 
     if skip_plus_interface and not autocomplete_query:
