@@ -90,6 +90,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                     severity.toInt(),
                     "You are connecting to a sharded cluster improperly by connecting directly "
                     "to a shard. Please connect to the cluster via a router (mongos).",
+                    logAttrs(nss),
                     "command"_attr = CurOp::get(opCtx)->getCommand()->getName());
             }
         }

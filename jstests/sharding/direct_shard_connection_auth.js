@@ -22,6 +22,9 @@ const userTestDB = userConn.getDB("test");
 shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
 assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
 
+assert.commandWorked(shardAdminDB.runCommand(
+    {setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}}}));
+
 function getUnauthorizedDirectWritesCount() {
     return assert.commandWorked(shardAdminDB.runCommand({serverStatus: 1}))
         .shardingStatistics.unauthorizedDirectShardOps;
