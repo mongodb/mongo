@@ -644,12 +644,19 @@ void checkShardingPlacement(OperationContext* opCtx,
 
 ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock(
     OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
+    invariant(!acquisitionRequests.empty());
+
+    const auto deadline =
+        std::min_element(acquisitionRequests.begin(),
+                         acquisitionRequests.end(),
+                         [](const auto& lhs, const auto& rhs) {
+                             return lhs.lockAcquisitionDeadline < rhs.lockAcquisitionDeadline;
+                         })
+            ->lockAcquisitionDeadline;
+
     auto lockFreeReadsBlock = std::make_shared<LockFreeReadsBlock>(opCtx);
-    auto globalLock = std::make_shared<Lock::GlobalLock>(opCtx,
-                                                         MODE_IS,
-                                                         Date_t::max(),
-                                                         Lock::InterruptBehavior::kThrow,
-                                                         kLockFreeReadsGlobalLockOptions);
+    auto globalLock = std::make_shared<Lock::GlobalLock>(
+        opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, kLockFreeReadsGlobalLockOptions);
     return {lockFreeReadsBlock, globalLock};
 }
 
