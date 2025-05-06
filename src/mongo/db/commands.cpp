@@ -703,6 +703,15 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;
     }
 
+    if (client->isInDirectClient()) {
+        bool failDirectClientCommands = data.hasField("failDirectClientCommands")
+            ? data.getBoolField("failDirectClientCommands")
+            : true;
+        if (!failDirectClientCommands) {
+            return false;
+        }
+    }
+
     if (data.hasField("failAllCommands")) {
         LOGV2(6348500,
               "Activating 'failCommand' failpoint for all commands",
