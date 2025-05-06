@@ -417,7 +417,10 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
       _fieldMatchPipelineIdx(original._fieldMatchPipelineIdx),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())),
-      _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs, original._fromExpCtx->getUUID())),
+      _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs,
+                                                 original._fromExpCtx->getUUID(),
+                                                 boost::none,
+                                                 original._fromExpCtx->getView())),
       _resolvedPipeline(original._resolvedPipeline),
       _userPipeline(original._userPipeline),
       _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone(_fromExpCtx)),
@@ -708,7 +711,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
 
     // Update the expression context with any new namespaces the resolved pipeline has introduced.
     LiteParsedPipeline liteParsedPipeline(resolvedNamespace.ns, resolvedNamespace.pipeline);
-    _fromExpCtx = _fromExpCtx->copyWith(resolvedNamespace.ns, resolvedNamespace.uuid);
+    _fromExpCtx = _fromExpCtx->copyWith(resolvedNamespace.ns,
+                                        resolvedNamespace.uuid,
+                                        boost::none,
+                                        std::make_pair(_fromNs, resolvedNamespace.pipeline));
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
     return pipeline;

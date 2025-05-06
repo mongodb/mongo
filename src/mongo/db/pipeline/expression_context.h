@@ -297,14 +297,17 @@ public:
     boost::intrusive_ptr<ExpressionContext> copyWith(
         NamespaceString ns,
         boost::optional<UUID> uuid = boost::none,
-        boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none) const;
+        boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none,
+        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none) const;
 
     /**
      * Returns an ExpressionContext that is identical to 'this' except for the 'subPipelineDepth'
      * and 'needsMerge' fields.
      */
     boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(
-        NamespaceString nss, boost::optional<UUID> uuid = boost::none) {
+        NamespaceString nss,
+        boost::optional<UUID> uuid = boost::none,
+        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none) {
         uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
                 str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
                               << internalMaxSubPipelineViewDepth.load(),
@@ -312,7 +315,7 @@ public:
         // Initialize any referenced system variables now so that the subpipeline has the same
         // values for these variables.
         this->initializeReferencedSystemVariables();
-        auto newCopy = copyWith(std::move(nss), uuid);
+        auto newCopy = copyWith(std::move(nss), uuid, boost::none, view);
         newCopy->_params.subPipelineDepth += 1;
         // The original expCtx might have been attached to an aggregation pipeline running on the
         // shards. We must reset 'needsMerge' in order to get fully merged results for the

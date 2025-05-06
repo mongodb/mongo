@@ -579,7 +579,8 @@ std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarily
 boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     NamespaceString ns,
     boost::optional<UUID> uuid,
-    boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {
+    boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator,
+    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view) const {
     auto collator = [&]() {
         if (updatedCollator) {
             return std::move(*updatedCollator);
@@ -621,6 +622,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                       .originalAggregateCommand(_params.originalAggregateCommand)
                       .subPipelineDepth(_params.subPipelineDepth)
                       .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
+                      .view(view)
                       .build();
 
     if (_collator.getIgnore()) {
