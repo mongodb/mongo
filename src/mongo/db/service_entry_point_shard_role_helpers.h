@@ -199,11 +199,18 @@ inline void waitForWriteConcern(OperationContext* opCtx,
     // approximation is to use the system’s last op time, which is guaranteed to be >= than the
     // original op time.
 
-    // Ensures that we always wait for write concern, even if that write was a noop. We do not need
-    // to update this for multi-document transactions as read-only/noop transactions will do a noop
-    // write at commit time, which should have incremented the lastOp. And speculative majority
-    // semantics dictate that "abortTransaction" should not wait for write concern on operations the
-    // transaction observed.
+    // Ensures that if we tried to do a write, we wait for write concern, even if that write was
+    // a noop. We do not need to update this for multi-document transactions as read-only/noop
+    // transactions will do a noop write at commit time, which should have incremented the
+    // lastOp. And speculative majority semantics dictate that "abortTransaction" should not
+    // wait for write concern on operations the transaction observed.
+    if (!opCtx->inMultiDocumentTransaction() &&
+        shard_role_details::getLocker(opCtx)->wasGlobalLockTakenForWrite()) {
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        waitForWriteConcernAndAppendStatus();
+        return;
+    }
 
     // Aggregate and getMore requests can be read ops or write ops. We only want to wait for write
     // concern if the op could have done a write (i.e. had any write stages in its pipeline).
