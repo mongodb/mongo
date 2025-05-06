@@ -67,6 +67,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingCollStatsMetrics);
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangInClusterAggregate);
 
 constexpr StringData kIndexKeyFieldName = "key"_sd;
 constexpr StringData kDocFieldName = "doc"_sd;
@@ -297,6 +298,10 @@ void runClusterAggregate(OperationContext* opCtx,
             }
             return CollatorInterface::cloneCollator(collection->getDefaultCollator());
         }();
+    }
+
+    if (MONGO_unlikely(analyzeShardKeyHangInClusterAggregate.shouldFail())) {
+        analyzeShardKeyHangInClusterAggregate.pauseWhileSet();
     }
 
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
