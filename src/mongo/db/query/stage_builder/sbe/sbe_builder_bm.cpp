@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 namespace mongo {
@@ -75,10 +76,12 @@ public:
     }
 
 private:
-    void _doTest() override {};
+    void _doTest() override {}
 
     void setUp() final {
         CatalogTestFixture::setUp();
+        QueryFCVEnvironmentForTest::setUp();
+
         OperationContext* opCtx = operationContext();
         ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions{}));
     }

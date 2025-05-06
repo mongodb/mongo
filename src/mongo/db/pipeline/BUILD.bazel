@@ -1570,6 +1570,7 @@ mongo_cc_benchmark(
     deps = [
         ":accumulator",
         ":expression_context_for_test",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
     ],
 )
 
@@ -1584,6 +1585,7 @@ mongo_cc_benchmark(
         ":accumulator",
         ":expression_context_for_test",
         "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
@@ -1599,6 +1601,7 @@ mongo_cc_benchmark(
         ":accumulator",
         ":expression_context_for_test",
         "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )

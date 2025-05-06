@@ -66,6 +66,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:canonical_query_base",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
         "//src/third_party/benchmark",
     ],

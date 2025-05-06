@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_bm_constants.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/duration.h"
@@ -103,6 +104,8 @@ void runBenchmark(BSONObj predicate,
                   boost::optional<int64_t> limit,
                   boost::optional<int64_t> skip,
                   benchmark::State& state) {
+    QueryFCVEnvironmentForTest::setUp();
+
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->getService()->makeClient("query_test");
 

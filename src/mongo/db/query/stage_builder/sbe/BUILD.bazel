@@ -20,6 +20,7 @@ mongo_cc_benchmark(
     tags = ["query_bm"],
     deps = [
         "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],
 )

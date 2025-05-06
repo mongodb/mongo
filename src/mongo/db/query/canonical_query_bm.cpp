@@ -33,6 +33,7 @@
 
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/util/assert_util.h"
 
@@ -434,6 +435,7 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
 }
 
 void BM_CreateCanonicalQuery(benchmark::State& state) {
+    QueryFCVEnvironmentForTest::setUp();
 
     CanonicalQueryBenchmarkParameters params(state);
 

@@ -29,16 +29,19 @@
 
 #pragma once
 #include <benchmark/benchmark.h>
-#include <iostream>
 #include <vector>
 
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
-#include "mongo/platform/basic.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 
 namespace mongo {
 
 class PercentileAlgoBenchmarkFixture : public benchmark::Fixture {
 public:
+    void SetUp(benchmark::State& state) final {
+        QueryFCVEnvironmentForTest::setUp();
+    }
+
     void tdigest_normalData(benchmark::State& state,
                             TDigest::ScalingFunction k_limit,
                             double delta,
@@ -82,7 +85,6 @@ public:
     BENCHMARK_F(Fixture, tdigest_k2_delta1000_batched)(benchmark::State & state) {                 \
         tdigest_normalData_batched(state, TDigest::k2_limit, 1000);                                \
     }                                                                                              \
-                                                                                                   \
                                                                                                    \
     BENCHMARK_F(Fixture, tdigest_mid_10)(benchmark::State & state) {                               \
         tdigest_normalData(                                                                        \

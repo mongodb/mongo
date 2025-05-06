@@ -31,10 +31,16 @@
 #include <benchmark/benchmark.h>
 #include <vector>
 
+#include "mongo/db/query/query_fcv_environment_for_test.h"
+
 namespace mongo {
 
 class WindowFunctionPercentileBenchmarkFixture : public benchmark::Fixture {
 public:
+    void SetUp(benchmark::State& state) final {
+        QueryFCVEnvironmentForTest::setUp();
+    }
+
     void removable_unbounded_percentile(benchmark::State& state,
                                         PercentileMethodEnum method,
                                         std::vector<double> ps);

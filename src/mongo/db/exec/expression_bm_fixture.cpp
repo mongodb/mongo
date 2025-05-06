@@ -1616,10 +1616,6 @@ BSONArray ExpressionBenchmarkFixture::randomBSONArray(int count, int max, int of
 void ExpressionBenchmarkFixture::benchmarkPercentile(benchmark::State& state,
                                                      int arraySize,
                                                      const std::vector<double>& ps) {
-    // (Generic FCV reference): Must be initialized to check the AccuratePercentiles feature flag
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-    ON_BLOCK_EXIT([&] { serverGlobalParams.mutableFCV.reset(); });
-
     std::vector<double> inputs = generateNormal(arraySize);
     benchmarkExpression(BSON("$percentile" << BSON("input" << "$data"
                                                            << "p" << vectorToBSON(ps) << "method"

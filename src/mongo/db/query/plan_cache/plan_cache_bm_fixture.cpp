@@ -35,7 +35,6 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/util/assert_util.h"
@@ -109,6 +108,7 @@ void PlanCacheBenchmarkFixture::benchmarkMatch(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
+
 void PlanCacheBenchmarkFixture::benchmarkMatchTwoFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(2);
     benchmarkQueryMatchProject(state, match, BSONObj());

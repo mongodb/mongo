@@ -32,11 +32,16 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 
 namespace mongo {
 
 class WindowFunctionConcatArraysBenchmarkFixture : public benchmark::Fixture {
 public:
+    void SetUp(benchmark::State& state) final {
+        QueryFCVEnvironmentForTest::setUp();
+    }
+
     void no_removal_concat_arrays(benchmark::State& state, int n_documents, int n_vals_per_array);
     void removable_unbounded_concat_arrays(benchmark::State& state,
                                            int n_documents,
