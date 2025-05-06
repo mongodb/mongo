@@ -912,6 +912,14 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("planSummary", _planSummary);
     }
 
+    if (int64_t inUseMemBytes = getInUseMemoryBytes()) {
+        builder->append("inUseMemBytes", inUseMemBytes);
+    }
+
+    if (int64_t maxUsedMemBytes = getMaxUsedMemoryBytes()) {
+        builder->append("maxUsedMemBytes", maxUsedMemBytes);
+    }
+
     if (_genericCursor) {
         builder->append("cursor", truncateAndSerializeGenericCursor(*_genericCursor, maxQuerySize));
     }

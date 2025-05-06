@@ -496,6 +496,35 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     ASSERT_EQ(15, res.getIntField("maxUsedMemBytes"));
 }
 
+TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               true);
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+
+    // If the memory stats are zero, they are *not* included in the state.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        ASSERT_FALSE(state.hasField("inUseMemBytes"));
+        ASSERT_FALSE(state.hasField("maxUsedMemBytes"));
+    }
+
+    // If the memory stats are not zero, they *are* included in the state.
+    {
+        BSONObjBuilder bob;
+        curOp->setMemoryTrackingStats(128, 256);
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+        ASSERT_TRUE(state.hasField("inUseMemBytes"));
+        ASSERT_EQ(state["inUseMemBytes"].Long(), 128);
+        ASSERT_TRUE(state.hasField("maxUsedMemBytes"));
+        ASSERT_EQ(state["maxUsedMemBytes"].Long(), 256);
+    }
+}
+
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
