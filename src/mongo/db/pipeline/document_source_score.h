@@ -64,7 +64,7 @@ class DocumentSourceScore final {
 public:
     static constexpr StringData kStageName = "$score"_sd;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
+    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:

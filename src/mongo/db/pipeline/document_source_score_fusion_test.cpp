@@ -579,6 +579,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
             "expectedStages": [
                 {
                     "$setMetadata": {
+                        "score": "$score_50"
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$divide": [
                                 {
@@ -596,7 +601,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                                         {
                                                             "$const": -1
                                                         },
-                                                        "$score_50"
+                                                        {
+                                                            "$meta": "score"
+                                                        }
                                                     ]
                                                 }
                                             ]
@@ -656,6 +663,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                         "pipeline": [
                             {
                                 "$setMetadata": {
+                                    "score": "$score_10"
+                                }
+                            },
+                            {
+                                "$setMetadata": {
                                     "score": {
                                         "$divide": [
                                             {
@@ -673,7 +685,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                                                     {
                                                                         "$const": -1
                                                                     },
-                                                                    "$score_10"
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
                                                                 ]
                                                             }
                                                         ]
@@ -1113,6 +1127,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
             "expectedStages": [
                 {
                     "$setMetadata": {
+                        "score": "$score_50"
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$divide": [
                                 {
@@ -1130,7 +1149,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                                                         {
                                                             "$const": -1
                                                         },
-                                                        "$score_50"
+                                                        {
+                                                            "$meta": "score"
+                                                        }
                                                     ]
                                                 }
                                             ]
@@ -1193,6 +1214,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                         "pipeline": [
                             {
                                 "$setMetadata": {
+                                    "score": "$score_10"
+                                }
+                            },
+                            {
+                                "$setMetadata": {
                                     "score": {
                                         "$divide": [
                                             {
@@ -1210,7 +1236,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                                                                     {
                                                                         "$const": -1
                                                                     },
-                                                                    "$score_10"
+                                                                    {
+                                                                        "$meta": "score"
+                                                                    }
                                                                 ]
                                                             }
                                                         ]
@@ -1490,25 +1518,32 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                     }
                 },
                 {
-                    $setMetadata: {
-                        score: {
-                            $divide: [
+                    "$setMetadata": {
+                        "score": { "$divide": [ { "$const": 6.0 }, { "$const": 3.0 } ] }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
                                 {
-                                    $const: 1
+                                    "$const": 1
                                 },
                                 {
-                                    $add: [
+                                    "$add": [
                                         {
-                                            $const: 1
+                                            "$const": 1
                                         },
                                         {
-                                            $exp: [
+                                            "$exp": [
                                                 {
-                                                    $multiply: [
+                                                    "$multiply": [
                                                         {
-                                                            $const: -1
+                                                            "$const": -1
                                                         },
-                                                        { $divide: [ { $const: 6.0 }, { $const: 3.0 } ] }
+                                                        {
+                                                            "$meta": "score"
+                                                        }
                                                     ]
                                                 }
                                             ]
@@ -2235,26 +2270,31 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                     }
                 },
                 {
-                    $setMetadata: {
-                        score: {
-                            $divide: [
+                    "$setMetadata": {
+                        "score": { "$const": 5.0 }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
                                 {
-                                    $const: 1
+                                    "$const": 1
                                 },
                                 {
-                                    $add: [
+                                    "$add": [
                                         {
-                                            $const: 1
+                                            "$const": 1
                                         },
                                         {
-                                            $exp: [
+                                            "$exp": [
                                                 {
-                                                    $multiply: [
+                                                    "$multiply": [
                                                         {
-                                                            $const: -1
+                                                            "$const": -1
                                                         },
                                                         {
-                                                            $const: 5.0
+                                                            "$meta": "score"
                                                         }
                                                     ]
                                                 }
@@ -2311,26 +2351,31 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                                 }
                             },
                             {
-                                $setMetadata: {
-                                    score: {
-                                        $divide: [
+                                "$setMetadata": {
+                                    "score": { "$const": 5.0 }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
                                             {
-                                                $const: 1
+                                                "$const": 1
                                             },
                                             {
-                                                $add: [
+                                                "$add": [
                                                     {
-                                                        $const: 1
+                                                        "$const": 1
                                                     },
                                                     {
-                                                        $exp: [
+                                                        "$exp": [
                                                             {
-                                                                $multiply: [
+                                                                "$multiply": [
                                                                     {
-                                                                        $const: -1
+                                                                        "$const": -1
                                                                     },
                                                                     {
-                                                                        $const: 5.0
+                                                                        "$meta": "score"
                                                                     }
                                                                 ]
                                                             }
@@ -2701,6 +2746,11 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                 },
                 {
                     "$setMetadata": {
+                        "score": { "$meta": "geoNearDistance" }
+                    }
+                },
+                {
+                    "$setMetadata": {
                         "score": {
                             "$divide": [
                                 {
@@ -2719,7 +2769,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                                                             "$const": -1
                                                         },
                                                         {
-                                                            "$meta": "geoNearDistance"
+                                                            "$meta": "score"
                                                         }
                                                     ]
                                                 }
@@ -5322,6 +5372,16 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                             {
                                 "$setMetadata": {
                                     "score": {
+                                        "$add": [
+                                            {"$const": 10},
+                                            {"$const": 2}
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
                                         "$divide": [
                                             {
                                                 "$const": 1
@@ -5339,14 +5399,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                                                                         "$const": -1
                                                                     },
                                                                     {
-                                                                        "$add": [
-                                                                            {
-                                                                                "$const": 10
-                                                                            },
-                                                                            {
-                                                                                "$const": 2
-                                                                            }
-                                                                        ]
+                                                                        "$meta": "score"
                                                                     }
                                                                 ]
                                                             }

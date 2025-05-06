@@ -33,9 +33,12 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_gen.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
@@ -61,41 +64,255 @@ REGISTER_DOCUMENT_SOURCE(score,
                          AllowedWithApiStrict::kNeverInVersion1);
 
 namespace {
-intrusive_ptr<Expression> buildMetadataExpression(const intrusive_ptr<ExpressionContext>& pExpCtx,
-                                                  const ScoreSpec& spec) {
 
-    intrusive_ptr<Expression> scoreAndNormalizeExpr = [&]() {
-        switch (spec.getNormalizeFunction()) {
-            // $sigomid will recursively parse and nest the score Expression.
-            case ScoreNormalizeFunctionEnum::kSigmoid:
-                return ExpressionSigmoid::parseExpressionSigmoid(
-                    pExpCtx.get(), spec.getScore().getElement(), pExpCtx->variablesParseState);
-            // TODO SERVER-94600: Handle minMaxScaler expression behavior.
-            // The default case is no normalization, so parse just the score operator itself.
-            default:
-                return Expression::parseOperand(
-                    pExpCtx.get(), spec.getScore().getElement(), pExpCtx->variablesParseState);
+// Internal, intermediate top-level field name used for minMaxScaler normalization. The
+// $minMaxScaler is output into this field during intermediate processing, and then written back to
+// the score metadata variable.
+static constexpr StringData kInternalMinMaxScalerNormalizationField =
+    "internal_min_max_scaler_normalization_score"_sd;
+
+/**
+ * Builds a $setMetadata expression to set the score metadata variable.
+ */
+boost::intrusive_ptr<DocumentSource> buildSetMetadataStageFromExpression(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::intrusive_ptr<Expression>&& expr) {
+    return DocumentSourceSetMetadata::create(
+        expCtx, std::move(expr), DocumentMetadataFields::MetaType::kScore);
+}
+
+/**
+ * Builds the set of stages required to calculate and evaluate the raw score expression, then sets
+ * the "score" metadata variable. Note that the calculated score is both unnormalized and
+ * unweighted. Currently, this helper function builds the following subpipeline:
+ * [
+ *     {
+ *         $setMetadata: {
+ *             score: <evaluate_score_expression>
+ *         }
+ *     }
+ * ]
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildRawScoreCalculationStages(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+
+    auto scoreExpression = Expression::parseOperand(
+        expCtx.get(), spec.getScore().getElement(), expCtx->variablesParseState);
+    outputStages.emplace_back(
+        buildSetMetadataStageFromExpression(expCtx, std::move(scoreExpression)));
+
+    return outputStages;
+}
+
+/**
+ * Builds the set of stages required to calculate the sigmoid normalization of the score. Note that
+ * the resulting score is normalized, but unweighted. Currently, this helper function builds the
+ * following subpipeline:
+ * [
+ *     {
+ *         $setMetadata: {
+ *             score: <sigmoid_expression>
+ *         }
+ *     }
+ * ]
+ */
+std::list<boost::intrusive_ptr<DocumentSource>>
+buildNormalizationCalculationStagesForSigmoidNormalization(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(9460009,
+            "Expected normalization to be sigmoid",
+            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kSigmoid);
+
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+
+    auto sigmoidExpression = ExpressionSigmoid::parseExpressionSigmoid(
+        expCtx.get(),
+        BSON("" << BSON("$meta" << "score")).firstElement(),
+        expCtx->variablesParseState);
+    outputStages.emplace_back(
+        buildSetMetadataStageFromExpression(expCtx, std::move(sigmoidExpression)));
+
+    return outputStages;
+}
+
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
+ * This has the effect of storing the unmodified user's document in the path '$docs'.
+ */
+boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(9460002,
+            "Expected normalization to be minMaxScaler",
+            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+
+    return DocumentSourceReplaceRoot::createFromBson(
+        BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
+}
+
+/**
+ * Builds and returns a $setWindowFields stage to calculate the minMaxScaler normalization.
+ */
+boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(9460005,
+            "Expected normalization to be minMaxScaler",
+            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+
+    const std::string score = kInternalMinMaxScalerNormalizationField.toString();
+    SortPattern sortPattern{BSON(score << -1), expCtx};
+
+    return make_intrusive<DocumentSourceInternalSetWindowFields>(
+        expCtx,
+        boost::none,
+        sortPattern,
+        std::vector<WindowFunctionStatement>{WindowFunctionStatement{
+            score,  // output field
+            window_function::Expression::parse(
+                BSON("$minMaxScaler" << BSON("input" << BSON("$meta" << "score"))),
+                sortPattern,
+                expCtx.get())}},
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        SbeCompatibility::notCompatible);
+}
+
+/**
+ * Builds and returns a $setMetadata stage to set the score metadata variable to the value of the
+ * output of the $setWindowFields stage. This is necessary because it is not possible to have
+ * $setWindowFields output to a metadata variable.
+ */
+boost::intrusive_ptr<DocumentSource> buildSetMetadataStageForMinMaxScalerOutput(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(9460007,
+            "Expected normalization to be minMaxScaler",
+            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+
+    const std::string dollarScore = "$" + kInternalMinMaxScalerNormalizationField;
+    auto scoreExpression = Expression::parseOperand(
+        expCtx.get(), BSON("" << dollarScore).firstElement(), expCtx->variablesParseState);
+    return buildSetMetadataStageFromExpression(expCtx, std::move(scoreExpression));
+}
+
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceWith: {"newRoot": "$docs"}}.  This restores the
+ * user's document.
+ */
+boost::intrusive_ptr<DocumentSource> buildRestoreRootStage(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(9460003,
+            "Expected normalization to be minMaxScaler",
+            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+
+    return DocumentSourceReplaceRoot::create(expCtx,
+                                             ExpressionFieldPath::createPathFromString(
+                                                 expCtx.get(), "docs", expCtx->variablesParseState),
+                                             "documents",
+                                             SbeCompatibility::noRequirements);
+}
+
+/**
+ * Builds the set of stages required to calculate the minMaxScaler normalization of the score. Note
+ * that the resulting score is normalized, but unweighted. This helper function replaces the user's
+ * root document (so that the window function can use an intermediate top level field to operate
+ * on), runs the score metadata variable through the $minMaxScaler window function, then restores
+ * the user's root document. To see the exact desugared output, look at
+ * document_source_score_test.cpp.
+ */
+std::list<boost::intrusive_ptr<DocumentSource>>
+buildNormalizationCalculationStagesForMinMaxScalerNormalization(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(9460008,
+            "Expected normalization to be minMaxScaler",
+            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+
+    outputStages.emplace_back(buildReplaceRootStage(spec, expCtx));
+    outputStages.emplace_back(buildSetWindowFieldsStage(spec, expCtx));
+    outputStages.emplace_back(buildSetMetadataStageForMinMaxScalerOutput(spec, expCtx));
+    outputStages.emplace_back(buildRestoreRootStage(spec, expCtx));
+
+    return outputStages;
+}
+
+/**
+ * Builds the set of stages required to calculate the normalized score.
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildNormalizationCalculationStages(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    switch (spec.getNormalizeFunction()) {
+        case ScoreNormalizeFunctionEnum::kNone: {
+            return {};
         }
-    }();
-
-    if (spec.getWeight() == 1) {
-        return scoreAndNormalizeExpr;
+        case ScoreNormalizeFunctionEnum::kSigmoid: {
+            return buildNormalizationCalculationStagesForSigmoidNormalization(spec, expCtx);
+        }
+        case ScoreNormalizeFunctionEnum::kMinMaxScaler: {
+            return buildNormalizationCalculationStagesForMinMaxScalerNormalization(spec, expCtx);
+        }
     }
+    MONGO_UNREACHABLE_TASSERT(9460010);
+}
 
-    std::vector<intrusive_ptr<Expression>> children = {
-        std::move(scoreAndNormalizeExpr),
-        make_intrusive<ExpressionConstant>(pExpCtx.get(), Value(spec.getWeight()))};
-    return make_intrusive<ExpressionMultiply>(pExpCtx.get(), std::move(children));
+/**
+ * Builds the set of stages required to calculate the weighted score from the unweighted and
+ * normalized score. Currently, this helper function builds the following subpipeline (if a weight
+ * is provided):
+ * [
+ *     {
+ *         $setMetadata: {
+ *             score: {
+ *                 $multiply: {
+ *                     [{$meta: "score", {"$const": <weight>}}]
+ *                 }
+ *             }
+ *         }
+ *     }
+ * ]
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildWeightCalculationStages(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (spec.getWeight() == 1) {
+        // No calculation is necessary, the weighted score is the same as the unweighted score.
+        return {};
+    }
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+
+    auto scoreMetadataExpression =
+        Expression::parseOperand(expCtx.get(),
+                                 BSON("" << BSON("$meta" << "score")).firstElement(),
+                                 expCtx->variablesParseState);
+    std::vector<intrusive_ptr<Expression>> multiplyChildren = {
+        std::move(scoreMetadataExpression),
+        make_intrusive<ExpressionConstant>(expCtx.get(), Value(spec.getWeight()))};
+    auto multiplyExpression =
+        make_intrusive<ExpressionMultiply>(expCtx.get(), std::move(multiplyChildren));
+    outputStages.emplace_back(
+        buildSetMetadataStageFromExpression(expCtx, std::move(multiplyExpression)));
+
+    return outputStages;
 }
 }  // namespace
 
+std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
+    const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
 
-intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
+    // std::list.splice() has a runtime complexity of O(1), because under the hood it just reassigns
+    // internal pointers.
+    outputStages.splice(outputStages.end(), buildRawScoreCalculationStages(spec, pExpCtx));
+    outputStages.splice(outputStages.end(), buildNormalizationCalculationStages(spec, pExpCtx));
+    outputStages.splice(outputStages.end(), buildWeightCalculationStages(spec, pExpCtx));
+
+    return outputStages;
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(
         ErrorCodes::QueryFeatureNotAllowed,
         "$score is not allowed in the current configuration. You may need to enable the "
-        "correponding feature flag",
+        "corresponding feature flag",
         feature_flags::gFeatureFlagSearchHybridScoringFull.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(pExpCtx->getOperationContext()),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
@@ -104,12 +321,9 @@ intrusive_ptr<DocumentSource> DocumentSourceScore::createFromBson(
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
+
     auto spec = ScoreSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
-
-    boost::intrusive_ptr<Expression> expr = buildMetadataExpression(pExpCtx, spec);
-
-    return DocumentSourceSetMetadata::create(
-        pExpCtx, std::move(expr), DocumentMetadataFields::MetaType::kScore);
+    return constructDesugaredOutput(spec, pExpCtx);
 }
 
 }  // namespace mongo
