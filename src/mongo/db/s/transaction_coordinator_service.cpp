@@ -103,12 +103,12 @@ void TransactionCoordinatorService::createCoordinator(
         latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
-    auto coordinator = std::make_shared<TransactionCoordinator>(opCtx,
-                                                                lsid,
-                                                                txnNumberAndRetryCounter,
-                                                                scheduler.makeChildScheduler(),
-                                                                commitDeadline,
-                                                                _cancelSource.token());
+    auto coordinator = std::make_shared<TransactionCoordinator>(
+        opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _activeTransactionCoordinators.insert(coordinator);
+    }
     coordinator->start(opCtx);
 
     try {
@@ -237,8 +237,7 @@ void TransactionCoordinatorService::_scheduleRecoveryTask(OperationContext* opCt
         _catalogAndScheduler->scheduler
             .scheduleWorkIn(
                 recoveryDelay,
-                [catalogAndScheduler = _catalogAndScheduler,
-                 cancelSource = _cancelSource](OperationContext* opCtx) {
+                [catalogAndScheduler = _catalogAndScheduler](OperationContext* opCtx) {
                     if (MONGO_unlikely(hangBeforeTxnCoordinatorOnStepUpWork.shouldFail())) {
                         LOGV2(8288301, "Hit hangBeforeTxnCoordinatorOnStepUpWork failpoint");
                         hangBeforeTxnCoordinatorOnStepUpWork.pauseWhileSet(opCtx);
@@ -300,8 +299,7 @@ void TransactionCoordinatorService::_scheduleRecoveryTask(OperationContext* opCt
                             lsid,
                             TxnNumberAndRetryCounter{txnNumber, txnRetryCounter},
                             scheduler.makeChildScheduler(),
-                            clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()),
-                            cancelSource.token());
+                            clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
                         coordinator->start(opCtx);
 
                         catalog.insert(opCtx,
@@ -347,7 +345,6 @@ void TransactionCoordinatorService::initializeIfNeeded(OperationContext* opCtx,
 
         LOGV2(9307801, "Creating the transaction catalog and scheduler for primary node.");
         _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
-        _cancelSource = CancellationSource();
         _initTerm = term;
 
         _scheduleRecoveryTask(opCtx, recoveryDelay);
@@ -363,16 +360,28 @@ void TransactionCoordinatorService::initializeIfNeeded(OperationContext* opCtx,
 }
 
 void TransactionCoordinatorService::interrupt() {
+    std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
+
     {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
-        if (!_catalogAndScheduler)
-            return;
-
-        _catalogAndSchedulerToCleanup = std::move(_catalogAndScheduler);
+        if (_catalogAndScheduler) {
+            _catalogAndSchedulerToCleanup = std::move(_catalogAndScheduler);
+        }
+        for (auto& ptr : _activeTransactionCoordinators) {
+            if (auto shared = ptr.lock(); shared) {
+                coordinatorsToCancel.emplace_back(std::move(shared));
+            }
+        }
+        _activeTransactionCoordinators.clear();
     }
 
-    _cancelSource.cancel();
-    _catalogAndSchedulerToCleanup->interrupt();
+    if (_catalogAndSchedulerToCleanup) {
+        _catalogAndSchedulerToCleanup->interrupt();
+    }
+
+    for (auto& ptr : coordinatorsToCancel) {
+        ptr->cancel();
+    }
 }
 
 void TransactionCoordinatorService::shutdown() {
@@ -425,4 +434,12 @@ void TransactionCoordinatorService::CatalogAndScheduler::join() {
     catalog.join();
 }
 
+void TransactionCoordinatorService::notifyCoordinatorFinished(
+    const std::shared_ptr<TransactionCoordinator> coordinator) {
+    std::lock_guard<stdx::mutex> lock(_mutex);
+    // we don't need to know or care if we actually erased this weak ptr. its valid for this
+    // service to cancel and clear its set of coordinators and have already erased them when
+    // this continuation executes. all we're trying to do is bound memory usage.
+    _activeTransactionCoordinators.erase(coordinator);
+}
 }  // namespace mongo
