@@ -1363,10 +1363,29 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
             return false;
         }
 
+        auto&& collectionsInfo = [&]() -> std::map<NamespaceString, CollectionInfo> {
+            if (pipelineHasLookup(pipeline)) {
+                // If the pipeline has a lookup stage, we check if the foreign collection has an
+                // index that can be used in both classic and sbe. We do not push to sbe if the
+                // classic engine might use an index for the foreign collection but sbe cannot.
+                // In such a case, executing the lookup in classic might provide better
+                // performance.
+                auto plannerParams = makeQueryPlannerParams(plannerOptions);
+                // Find all indexes.
+                plannerParams->fillOutSecondaryCollectionsPlannerParams(
+                    opCtx, *canonicalQuery, collections, false /*checkPipelineExistence*/);
+
+                return std::move(plannerParams->secondaryCollectionsInfo);
+            } else {
+                return {};
+            }
+        }();
+
         // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
         // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
         // creating the planner.
-        attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
+        attachPipelineStages(
+            collections, pipeline, needsMerge, canonicalQuery.get(), collectionsInfo);
 
         const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
         return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, mainColl, sbeFull);
@@ -1390,7 +1409,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         // pipeline and by mutating the canonical query with search specific metadata.
         finalizePipelineStages(pipeline, canonicalQuery.get());
     }
-
 
     auto makePlanner = [&](std::unique_ptr<QueryPlannerParams> plannerParams)
         -> std::unique_ptr<PlannerInterface> {
