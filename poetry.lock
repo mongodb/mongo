@@ -932,14 +932,14 @@ Flask = ">=0.9"
 
 [[package]]
 name = "gdbmongo"
-version = "0.14.0"
+version = "0.15.1"
 description = "GDB pretty printers and commands for debugging the MongoDB Server"
 optional = false
 python-versions = ">=3.9"
 groups = ["testing"]
 files = [
-    {file = "gdbmongo-0.14.0-py3-none-any.whl", hash = "sha256:6149c16e6658996d37844d5821a221e70387c09d1894056dc2ae50f7a5a27564"},
-    {file = "gdbmongo-0.14.0.tar.gz", hash = "sha256:579bee970ab35a3671979a845c767d6027a8b248af0fd641edf172e52b8c8cb3"},
+    {file = "gdbmongo-0.15.1-py3-none-any.whl", hash = "sha256:92348f382540405b8c2359d13de8b0f6bcaad3b9dd18d9ebcfbef98cf21d3990"},
+    {file = "gdbmongo-0.15.1.tar.gz", hash = "sha256:09764667574705d1bfa1bab5221087d81305a15f7e88745057fc06e0c7b4d439"},
 ]
 
 [[package]]
@@ -4292,4 +4292,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "7332118377c98561b230ef0e7729b1c75036c9d5cdc058f67a315a68a2b8f3e1"
+content-hash = "d8969bfe2e827cb913689ba89555b4a64cd53f1b4d2f69842a72c9b86cefda6e"
