@@ -51,6 +51,37 @@ bool isScoredPipeline(const Pipeline& pipeline);
  */
 double getPipelineWeight(const StringMap<double>& weights, const std::string& pipelineName);
 
+/**
+ * Verifies that each entry in inputWeights specifies a numerical weight value associated with a
+ * unique and valid pipeline name from inputPipelines. inputWeights has the following structure:
+ * {"pipelineName": weightVal} where "pipelineName" is a string and weightVal is a double. Returns a
+ * map from the pipeline name to the specified weight (as a double) for that pipeline.
+ * Note: not all pipelines must be in the returned map. This means any valid subset from none to all
+ * of the pipelines may be contained in the resulting map. Any pipelines not present in the
+ * resulting map have an implicit default weight of 1.
+ */
+StringMap<double> validateWeights(
+    const mongo::BSONObj& inputWeights,
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    StringData stageName);
+
+/**
+ * This function will fail the query in the case where nonexistent pipelines were referenced in the
+ * weights. Before failing the query outright, the function first computes the best valid, unmatched
+ * pipeline the user could have intended for each invalid weight and builds it into a
+ * user-friendly error message to give the best possible feedback.
+ *
+ * Note: This function needs a list of the unmatched pipelines, but is instead given a list of
+ *       all pipelines and matched pipelines, which can be used to compute the unmatched pipelines.
+ *       This is for performance reasons, because the caller of this function can easily know these
+ *       inputs, and only needs to call this function in error cases.
+ */
+void failWeightsValidationWithPipelineSuggestions(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& allPipelines,
+    const stdx::unordered_set<std::string>& matchedPipelines,
+    const std::vector<std::string>& invalidWeights,
+    StringData stageName);
+
 namespace score_details {
 
 /**

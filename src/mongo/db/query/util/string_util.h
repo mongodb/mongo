@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace mongo::query_string_util {
 
@@ -40,5 +41,19 @@ namespace mongo::query_string_util {
  * This function is used to rank/compare similarities between one string, and a set of others.
  */
 unsigned int levenshteinDistance(const std::string& s1, const std::string& s2);
+
+/**
+ * Given a set of strings that are typos (don't match any strings in validStrings), compute a list
+ * of suggestions from the set of valid strings for each typo string. The return vector has one
+ * entry per typo, with the first entry in the pair being typo and the second being a list of
+ * suggestions.
+ *
+ * For example: say the user passes in {'apple', 'bat', 'bag'} for the validStrings
+ * and {'app', 'bam'} for the set of identified typos. This function, using the underlying
+ * "Levenshtein Distance" algorithm to compare each typo with each valid string to find the closest
+ * suggestions, will output {{"app": {"apple"}}, {"bam": {"bat", "bag"}}}.
+ */
+std::vector<std::pair<std::string, std::vector<std::string>>> computeTypoSuggestions(
+    const std::vector<std::string>& validStrings, const std::vector<std::string>& typos);
 
 }  // namespace mongo::query_string_util

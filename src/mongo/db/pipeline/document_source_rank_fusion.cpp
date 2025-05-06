@@ -62,7 +62,6 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/util/string_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -139,205 +138,6 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
                     stage->constraints().noFieldModifications);
         }
     });
-}
-
-/**
- * Computes a suggestion for each invalid / non-existent weight entry in the 'validWeights' array.
- * The valid / existing pipelines that did not have a matching weight specification are
- * the set of options that can be suggested from.
- * The return vector has one entry per invalid weight, with the first entry in pair being
- * the name of the invalid weight, and the second being a list of suggestions.
- */
-std::vector<std::pair<std::string, std::vector<std::string>>> computeWeightsTypoSuggestions(
-    const std::vector<std::string>& unmatchedPipelines,
-    const std::vector<std::string>& invalidWeights) {
-    std::vector<std::pair<std::string, std::vector<std::string>>> suggestions;
-    for (const std::string& invalidWeight : invalidWeights) {
-        // First, check a special, but also likely, case where there is only a single unmatched
-        // pipeline. If so, this is the only possible suggestion, and there is no need to
-        // waste time computing the levenshtein distance.
-        if (unmatchedPipelines.size() == 1) {
-            suggestions.push_back({invalidWeight, {unmatchedPipelines.front()}});
-            continue;
-        }
-
-        // There are multiple unmatched pipelines, so find the best suggestion.
-        // 'shortestDistance' is the levenshtein distance of the best suggestion found so far.
-        // Initialize with the first unmatched pipeline, then compare to the rest.
-        unsigned int shortestDistance =
-            query_string_util::levenshteinDistance(invalidWeight, unmatchedPipelines[0]);
-        std::vector<std::string> bestSuggestions = {unmatchedPipelines[0]};
-        for (std::size_t i = 1; i < unmatchedPipelines.size(); i++) {
-            unsigned int ld =
-                query_string_util::levenshteinDistance(invalidWeight, unmatchedPipelines[i]);
-            if (ld == shortestDistance) {
-                // Equally good suggestion found.
-                bestSuggestions.push_back(unmatchedPipelines[i]);
-            } else if (ld < shortestDistance) {
-                // Better suggestion found.
-                shortestDistance = ld;
-                bestSuggestions = {unmatchedPipelines[i]};
-            }
-        }
-        // Record best suggestion for this invalid weight.
-        suggestions.push_back({invalidWeight, bestSuggestions});
-    }
-    return suggestions;
-}
-
-/**
- * This function will fail the query in the case where non-existent weight(s) were referenced in
- * 'combinations.weights' in the RankFusionSpec.
- * Before failing the query outright, the function first computes the best valid, unmatched pipeline
- * the user could have intended for each non-existent specified weight, and builds it into a user
- * friendly error message to give the best possible feedback.
- *
- * Note: This function needs a list of the unmatched pipelines, but is instead given a list of
- *       all pipelines and matched pipelines, which can be used to compute the unmatched pipelines.
- *       This is for performance reasons, because the caller of this function can easily know these
- *       inputs, and only needs to call this function in error cases.
- */
-void failWeightsValidationWithPipelineSuggestions(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& allPipelines,
-    const stdx::unordered_set<std::string>& matchedPipelines,
-    const std::vector<std::string>& invalidWeights) {
-    // The list of unmatchedPipelines is first computed to find
-    // the valid set of possible suggestions.
-    std::vector<std::string> unmatchedPipelines;
-    for (const auto& pipeline : allPipelines) {
-        if (!matchedPipelines.contains(pipeline.first)) {
-            unmatchedPipelines.push_back(pipeline.first);
-        }
-    }
-
-    // For each invalid weight, find the best possible suggested unmatched pipeline,
-    // that is, the one with the shortest levenshtein distance.
-    // The first entry in the pair is the name of the invalid weight,
-    // the second entry is the name of the suggested unmatched pipeline.
-    const std::vector<std::pair<std::string, std::vector<std::string>>> suggestions =
-        computeWeightsTypoSuggestions(unmatchedPipelines, invalidWeights);
-
-    // 'i' is the index into the 'suggestions' array.
-    auto convertSingleSuggestionToString = [&](const std::size_t i) -> std::string {
-        std::string s = fmt::format("(provided: '{}' -> ", suggestions[i].first);
-        if (suggestions[i].second.size() == 1) {
-            s += fmt::format("suggested: '{}')", suggestions[i].second.front());
-        } else {
-            s += fmt::format("suggestions: [{}])", fmt::join(suggestions[i].second, ", "));
-        }
-        if (i < suggestions.size() - 1) {
-            s += ", ";
-        }
-        return s;
-    };
-
-    // All best suggestions have been computed.
-    // The build error message that contains all suggestions.
-    std::string errorMsg = fmt::format(
-        "$rankFusion stage contained ({}) weight(s) in "
-        "'combination.weights' that did not reference valid pipeline names. "
-        "Suggestions for valid pipeline names: ",
-        std::to_string(invalidWeights.size()));
-    for (std::size_t i = 0; i < suggestions.size(); i++) {
-        errorMsg += convertSingleSuggestionToString(i);
-    }
-
-    // Fail query.
-    uasserted(9967500, errorMsg);
-}
-
-/**
- * Parses and validates the weights for pipelines that have been explicitly specified in the
- * RankFusionSpec. Returns a map from the pipeline name to the specified weight (as a double)
- * for that pipeline. This function also validates that the weights specification is valid,
- * and fails the query if for example, a non-existant pipeline is specified, or a pipeline
- * is specified more than once.
- * Note: not all pipelines must be in the returned map; it only holds the ones that were explicitly
- * listed in the stage specification. This means any valid subset from none to all of the pipelines
- * may be contained in the resulting map. Any pipelines not present in the resulting map have
- * an implicit default weight of 1.
- */
-StringMap<double> extractAndValidateWeights(
-    const RankFusionSpec& spec,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
-    // Output map of pipeline name, to weight of pipeline.
-    StringMap<double> weights;
-
-    // If no weights specified, no work to do; return empty map.
-    const auto& combinationSpec = spec.getCombination();
-    if (!combinationSpec.has_value()) {
-        return weights;
-    }
-
-    // Keeps track of the weights in the RankFusionSpec that do not reference a valid pipeline
-    // most often from a misspelling/typo.
-    std::vector<std::string> invalidWeights;
-    // Keeps track of the pipelines that have been successfully matched/taken by specified weights.
-    // We use this to build a list of pipelines that have not been matched later,
-    // if necessary to suggest pipelines that might have been misspelled.
-    stdx::unordered_set<std::string> matchedPipelines;
-
-    for (const auto& weightEntry : combinationSpec->getWeights()) {
-        // First validate that this pipeline exists.
-        if (!pipelines.contains(weightEntry.fieldName())) {
-            // This weight does not reference a valid pipeline.
-            // The query will eventually fail, but we process all the weights first
-            // to give the best suggestions in the error message.
-            invalidWeights.push_back(weightEntry.fieldName());
-            continue;
-        }
-
-        // The pipeline exists, but must not already have been seen; else its a duplicate.
-        // Otherwise, add it to the output map.
-        // Practically, this should never arise because the BSON processing layer filters out
-        // redundant keys, but we leave it in as a defensive programming measure.
-        uassert(
-            9967401,
-            str::stream()
-                << "A pipeline named '" << weightEntry.fieldName()
-                << "' is specified more than once in the $rankFusion 'combinations.weight' object.",
-            !weights.contains(weightEntry.fieldName()));
-
-        // Unique, existing pipeline weight found.
-        // Validate the weight number and add to output map.
-        // weightEntry.Number() throws a uassert if non-numeric.
-        double weight = weightEntry.Number();
-        uassert(9460300,
-                str::stream() << "Rank fusion pipeline weight must be non-negative, but given "
-                              << weight << " for pipeline '" << weightEntry.fieldName() << "'.",
-                weight >= 0);
-        weights[weightEntry.fieldName()] = weight;
-        matchedPipelines.insert(weightEntry.fieldName());
-    }
-
-    // All weights that the user has specified have been processed.
-    // Check for error cases.
-    if (int(pipelines.size()) < combinationSpec->getWeights().nFields()) {
-        // There are more specified weights than input pipelines.
-        // Give feedback on which possible weights are extraneous.
-        tassert(9967501,
-                "There must be at least some invalid weights when there are more weights "
-                "than input pipelines to $rankFusion",
-                !invalidWeights.empty());
-        // Fail query.
-        uasserted(
-            9460301,
-            fmt::format(
-                "$rankFusion input has more weights ({}) than pipelines ({}). "
-                "If 'combination.weights' is specified, there must be a less or equal number of "
-                "weights as pipelines, each of which is unique and existing. "
-                "Possible extraneous specified weights = [{}]",
-                combinationSpec->getWeights().nFields(),
-                int(pipelines.size()),
-                fmt::join(invalidWeights, ", ")));
-    } else if (!invalidWeights.empty()) {
-        // There are invalid / misspelled weights.
-        // Fail the query with the best pipeline recommendations we can generate.
-        failWeightsValidationWithPipelineSuggestions(pipelines, matchedPipelines, invalidWeights);
-    }
-
-    // Successfully validated weights.
-    return weights;
 }
 
 auto makeSureSortKeyIsOutput(const auto& stageList) {
@@ -637,7 +437,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         inputPipelines[inputName] = std::move(pipeline);
     }
 
-    StringMap<double> weights = extractAndValidateWeights(spec, inputPipelines);
+    StringMap<double> weights;
+    // If RankFusionCombinationSpec has no value (no weights specified), no work to do.
+    const auto& combinationSpec = spec.getCombination();
+    if (combinationSpec.has_value()) {
+        weights = hybrid_scoring_util::validateWeights(
+            combinationSpec->getWeights(), inputPipelines, "rankFusion");
+    }
 
     // For now, the rankConstant is always 60.
     static const double rankConstant = 60;

@@ -34,7 +34,8 @@
 
 namespace mongo {
 
-unsigned int query_string_util::levenshteinDistance(const std::string& s1, const std::string& s2) {
+namespace query_string_util {
+unsigned int levenshteinDistance(const std::string& s1, const std::string& s2) {
     if (s1.empty()) {
         return s2.size();
     }
@@ -101,4 +102,38 @@ unsigned int query_string_util::levenshteinDistance(const std::string& s1, const
     return editDistance.back().back();
 }
 
+std::vector<std::pair<std::string, std::vector<std::string>>> computeTypoSuggestions(
+    const std::vector<std::string>& validStrings, const std::vector<std::string>& typos) {
+    std::vector<std::pair<std::string, std::vector<std::string>>> suggestions;
+    // First, check a special, but also likely, case where there is only a single unmatched
+    // entry. If so, this is the only possible suggestion, and there is no need to
+    // waste time computing the levenshtein distance.
+    if (validStrings.size() == 1) {
+        suggestions.push_back({typos.front(), {validStrings.front()}});
+    } else {
+        for (const std::string& typo : typos) {
+            // There are multiple unmatched entries, so find the best suggestion.
+            // 'shortestDistance' is the levenshtein distance of the best suggestion found so far.
+            // Initialize with the first unmatched entry, then compare to the rest.
+            unsigned int shortestDistance = levenshteinDistance(typo, validStrings[0]);
+            std::vector<std::string> bestSuggestions = {validStrings[0]};
+            for (std::size_t i = 1; i < validStrings.size(); i++) {
+                unsigned int ld = levenshteinDistance(typo, validStrings[i]);
+                if (ld == shortestDistance) {
+                    // Equally good suggestion found.
+                    bestSuggestions.push_back(validStrings[i]);
+                } else if (ld < shortestDistance) {
+                    // Better suggestion found.
+                    shortestDistance = ld;
+                    bestSuggestions = {validStrings[i]};
+                }
+            }
+            // Record best suggestion for this invalid weight.
+            suggestions.push_back({typo, bestSuggestions});
+        }
+    }
+    return suggestions;
+}
+
+}  // namespace query_string_util
 }  // namespace mongo
