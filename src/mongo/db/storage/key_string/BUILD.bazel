@@ -23,18 +23,45 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "key_string_test_util",
+    srcs = [
+        "key_string_test_util.cpp",
+        "//src/mongo/bson:bsonobj_comparator.h",
+    ],
+    hdrs = [
+        "key_string_test_util.h",
+    ],
+    deps = [
+        "key_string",
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "key_string_test",
     srcs = [
         "key_string_test.cpp",
-        "//src/mongo/bson:bsonobj_comparator.h",
     ],
     tags = [
         "mongo_unittest_third_group",
         "server-key-string",
     ],
     deps = [
-        "key_string",
+        ":key_string_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "key_string_long_running_test",
+    srcs = [
+        "key_string_long_running_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_eighth_group",
+    ],
+    deps = [
+        ":key_string_test_util",
     ],
 )
 
