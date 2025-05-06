@@ -2169,6 +2169,7 @@ env.Library(
         'service_context_test_fixture',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth_impl_internal',
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/commands/mongod',
         '$BUILD_DIR/mongo/db/index/index_access_method',

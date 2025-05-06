@@ -73,6 +73,20 @@ public:
 
     Status createUser(const UserName& username, const std::vector<RoleName>& roles);
 
+private:
+    static Options createServiceContextOptions() {
+        Options o;
+        return o.useMockAuthzManagerExternalState(
+            std::make_unique<FailureCapableAuthzManagerExternalStateMock>());
+    }
+
+protected:
+    AuthorizationSessionTestFixture() : ServiceContextMongoDTest(createServiceContextOptions()) {
+        managerState =
+            dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(_authzExternalState);
+        invariant(managerState);
+    }
+
 protected:
     FailureCapableAuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;

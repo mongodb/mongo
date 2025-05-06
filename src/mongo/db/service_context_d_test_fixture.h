@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/unittest/temp_dir.h"
@@ -84,6 +85,12 @@ protected:
             return std::move(*this);
         }
 
+        Options useMockAuthzManagerExternalState(
+            std::unique_ptr<AuthzManagerExternalStateMock> mockAuthzExternalState) {
+            _mockAuthzExternalState = std::move(mockAuthzExternalState);
+            return std::move(*this);
+        }
+
     private:
         std::string _engine = "wiredTiger";
         // We use ephemeral instances by default to advise Storage Engines (in particular
@@ -94,6 +101,7 @@ protected:
         bool _useReplSettings = false;
         bool _useMockClock = false;
         std::unique_ptr<TickSource> _mockTickSource;
+        std::unique_ptr<AuthzManagerExternalStateMock> _mockAuthzExternalState;
 
         friend class ServiceContextMongoDTest;
     };
@@ -103,6 +111,9 @@ protected:
     virtual ~ServiceContextMongoDTest();
 
     void tearDown() override;
+
+    // Raw pointer authorization manager external state if using a mock
+    AuthzManagerExternalStateMock* _authzExternalState = nullptr;
 
 private:
     struct {

@@ -44,20 +44,13 @@
 namespace mongo {
 
 void AuthorizationSessionTestFixture::setUp() {
-    // AuthorizationManager must be initialized prior to creating Client objects.
-    auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
-    managerState = localManagerState.get();
-    auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-        getServiceContext(), std::move(localManagerState));
-
     _session = transportLayer.createSession();
     _client = getServiceContext()->makeClient("testClient", _session);
     RestrictionEnvironment::set(_session,
                                 std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
     _opCtx = _client->makeOperationContext();
     managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-    authzManager = uniqueAuthzManager.get();
-    AuthorizationManager::set(getServiceContext(), std::move(uniqueAuthzManager));
+    authzManager = AuthorizationManager::get(getServiceContext());
     auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
     sessionState = localSessionState.get();
     authzSession = std::make_unique<AuthorizationSessionForTest>(
