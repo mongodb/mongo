@@ -4212,8 +4212,12 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
         edc = EDCDerivedFromDataToken{prefixTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{prefixTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{prefixTokens->getServerDerivedToken().asPrfBlock()};
+    } else if (suffixTokens) {
+        edc = EDCDerivedFromDataToken{suffixTokens->getEdcDerivedToken().asPrfBlock()};
+        esc = ESCDerivedFromDataToken{suffixTokens->getEscDerivedToken().asPrfBlock()};
+        server = ServerDerivedFromDataToken{suffixTokens->getServerDerivedToken().asPrfBlock()};
     }
-    // TODO SERVER-101217: set edc, esc, server for suffix tokens.
+
     // TODO SERVER-102560: set edc, esc, server for exact tokens.
     // TODO SERVER-102091: set edc, esc, server for substring tokens.
 
