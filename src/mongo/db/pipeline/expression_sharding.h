@@ -53,6 +53,12 @@ public:
         expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
+    ExpressionInternalOwningShard(ExpressionContext* const expCtx,
+                                  Expression::ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionInternalOwningShard, 1>(expCtx, std::move(children)) {
+        expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
+    }
+
     Value evaluate(const Document& root, Variables* variables) const final;
 
     const char* getOpName() const final {

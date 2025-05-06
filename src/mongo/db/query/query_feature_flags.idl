@@ -221,12 +221,6 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
-    featureFlagSbeUpgradeBinaryTrees:
-      description: "Feature flag to enable N-ary ABT nodes"
-      cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
-      default: false
-      shouldBeFCVGated: false
-
     featureFlagUUIDExpression:
       description: "Feature flag to enable $uuid expression"
       cpp_varname: gFeatureFlagUUIDExpression

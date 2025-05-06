@@ -94,9 +94,8 @@ public:
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& benchmarkState,
                              const std::vector<Document>& documents) final {
-        // TODO SERVER-100579 Remove this when feature flag is removed
-        RAIIServerParameterControllerForTest sbeUpgrageBinaryTreesFeatureFlag{
-            "featureFlagSbeUpgradeBinaryTrees", true};
+        RAIIServerParameterControllerForTest controller{"internalQueryEnableSbeForNaryExpression",
+                                                        true};
 
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
