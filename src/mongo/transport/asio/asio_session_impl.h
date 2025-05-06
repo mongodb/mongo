@@ -76,7 +76,23 @@ public:
         return _local;
     }
 
-    const SockAddr& remoteAddr() const override {
+    const HostAndPort& getSourceRemoteEndpoint() const override {
+        if (_proxiedSrcEndpoint) {
+            return _proxiedSrcEndpoint.value();
+        }
+
+        return remote();
+    }
+
+    boost::optional<const HostAndPort&> getProxiedDstEndpoint() const override {
+        if (_proxiedDstEndpoint) {
+            return _proxiedDstEndpoint.value();
+        }
+
+        return boost::none;
+    }
+
+    const SockAddr& remoteAddr() const {
         return _remoteAddr;
     }
 
@@ -263,8 +279,8 @@ protected:
     AsioTransportLayer* const _tl;
     bool _isIngressSession;
     bool _isFromLoadBalancer = false;
-    boost::optional<SockAddr> _proxiedSrcEndpoint;
-    boost::optional<SockAddr> _proxiedDstEndpoint;
+    boost::optional<HostAndPort> _proxiedSrcEndpoint;
+    boost::optional<HostAndPort> _proxiedDstEndpoint;
 
     AsyncOperationState _asyncOpState;
 

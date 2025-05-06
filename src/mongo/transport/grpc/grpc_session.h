@@ -131,9 +131,12 @@ public:
     }
 #endif
 
-    // TODO SERVER-71100: remove `local()`, `remoteAddr()`, and `localAddr()`.
-    const HostAndPort& local() const final {
-        MONGO_UNIMPLEMENTED;
+    const HostAndPort& remote() const override {
+        return _remote;
+    }
+
+    const HostAndPort& local() const override {
+        return _local;
     }
 
     const SockAddr& remoteAddr() const final {
@@ -148,6 +151,8 @@ private:
     // TODO SERVER-74020: replace this with `GRPCTransportLayer`.
     TransportLayer* const _tl;
 
+    const HostAndPort _remote;
+    HostAndPort _local;
     synchronized_value<boost::optional<Status>> _terminationStatus;
 };
 

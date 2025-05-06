@@ -80,6 +80,10 @@ using SetsockoptPtr = char*;
 using SetsockoptPtr = void*;
 #endif
 
+std::string testHostName() {
+    return "127.0.0.1";
+}
+
 class JoinThread : public stdx::thread {
 public:
     using stdx::thread::thread;
@@ -293,6 +297,23 @@ private:
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
 
+transport::AsioTransportLayer::Options defaultTLAOptions() {
+    ServerGlobalParams params;
+    params.noUnixSocket = true;
+    params.bind_ips = {testHostName()};
+    transport::AsioTransportLayer::Options opts(&params);
+    opts.port = 0;
+    return opts;
+}
+
+std::unique_ptr<transport::AsioTransportLayer> makeTLA(
+    ServiceEntryPoint* sep, const transport::AsioTransportLayer::Options& options) {
+    auto tla = std::make_unique<transport::AsioTransportLayer>(options, sep);
+    ASSERT_OK(tla->setup());
+    ASSERT_OK(tla->start());
+    return tla;
+}
+
 std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
     auto options = [] {
         ServerGlobalParams params;
@@ -316,6 +337,9 @@ std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
 class TestFixture {
 public:
     TestFixture() : _tla{makeTLA(&_sep)} {}
+
+    explicit TestFixture(const transport::AsioTransportLayer::Options& options)
+        : _tla{makeTLA(&_sep, options)} {}
 
     ~TestFixture() {
         _sep.endAllSessions({});
@@ -849,6 +873,112 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 }
 #endif  // _WIN32
 #endif  // MONGO_CONFIG_SSL
+
+class AsioTransportLayerWithRouterLoadBalancerPortsTest : public ServiceContextTest {
+public:
+    // We opted to use static ports for simplicity. If this results in test failures due to busy
+    // ports, we may change the fixture, as well as the underlying transport layer, to dynamically
+    // choose the listening ports.
+    static constexpr auto kMainPort = 22000;
+    static constexpr auto kLoadBalancerPort = 22002;
+
+    // The local IP address reported should be 127.0.0.1 regardless of port.
+    static constexpr auto kLocalIP = "127.0.0.1"_sd;
+
+    // We report arbitrary values in the proxy protocol header that will be sent when connecting to
+    // the loadBalancerPort.
+    static constexpr auto kSourceRemoteIP = "10.122.9.63"_sd;
+    static constexpr auto kProxyIP = "54.225.237.121"_sd;
+    static constexpr auto kSourceRemotePort = 1000;
+    static constexpr auto kProxyPort = 3000;
+    inline static const std::string kProxyProtocolHeader = "PROXY TCP4 {} {} {} {}\r\n"_format(
+        kSourceRemoteIP, kProxyIP, kSourceRemotePort, kProxyPort);
+
+    void setUp() override {
+        auto options = defaultTLAOptions();
+        options.port = kMainPort;
+        options.loadBalancerPort = kLoadBalancerPort;
+        _fixture = std::make_unique<TestFixture>(options);
+    }
+
+    void tearDown() override {
+        _fixture.reset();
+    }
+
+    MockSEP& sessionManager() {
+        return _fixture->sep();
+    }
+
+    StatusWith<std::shared_ptr<transport::Session>> connect(HostAndPort remote) {
+        return _fixture->tla().connect(
+            remote, transport::ConnectSSLMode::kDisableSSL, Seconds{10}, {});
+    }
+
+    void doDifferentiatesConnectionsCase(int port) {
+        auto onStartSession = std::make_shared<Notification<void>>();
+        sessionManager().setOnStartSession([&](SessionThread& st) {
+            // The local HostAndPort on the session should be 127.0.0.1:{port}.
+            ASSERT_EQ(st.session().local().host(), kLocalIP);
+            ASSERT_EQ(st.session().local().port(), port);
+            ASSERT_TRUE(st.session().local().isLocalHost());
+
+            switch (port) {
+                case kLoadBalancerPort: {
+                    ASSERT_TRUE(st.session().isFromLoadBalancer());
+                    ASSERT_EQ(st.session().getSourceRemoteEndpoint().host(), kSourceRemoteIP);
+                    ASSERT_EQ(st.session().getSourceRemoteEndpoint().port(), kSourceRemotePort);
+                    ASSERT_EQ(st.session().getProxiedDstEndpoint()->host(), kProxyIP);
+                    ASSERT_EQ(st.session().getProxiedDstEndpoint()->port(), kProxyPort);
+                    break;
+                }
+                case kMainPort: {
+                    ASSERT_FALSE(st.session().isFromLoadBalancer());
+                    ASSERT_FALSE(st.session().getProxiedDstEndpoint());
+                    break;
+                }
+            };
+
+            onStartSession->set();
+        });
+
+        switch (port) {
+            case kMainPort: {
+                // Use the TestFixture to connect to the TransportLayer. Session establishment
+                // should occur immediately after the socket is opened and connected to.
+                HostAndPort target{testHostName(), port};
+                auto conn = connect(target);
+                ASSERT_OK(conn) << " target={}"_format(target);
+                break;
+            }
+            case kLoadBalancerPort: {
+                // Use a SyncClient to connect to the TransportLayer. After the connection is made,
+                // the TransportLayer will expect the proxy protocol header in raw bytes in order to
+                // establish the session and parse the supplied endpoints. SyncClient makes this
+                // possible.
+                SyncClient client(_fixture->tla().loadBalancerPort().value());
+                auto ec = client.write(kProxyProtocolHeader.data(), kProxyProtocolHeader.size());
+                ASSERT_FALSE(ec) << errorMessage(ec);
+            }
+        };
+
+        onStartSession->get();
+    }
+
+private:
+    std::unique_ptr<TestFixture> _fixture;
+};
+
+TEST_F(AsioTransportLayerWithRouterLoadBalancerPortsTest, ListensOnAllPorts) {
+    for (auto port : {kMainPort, kLoadBalancerPort}) {
+        HostAndPort remote(testHostName(), port);
+        ASSERT_OK(connect(remote).getStatus()) << "Unable to connect to " << remote;
+    }
+}
+
+TEST_F(AsioTransportLayerWithRouterLoadBalancerPortsTest,
+       DifferentiatesConnectionsLoadBalancerPort) {
+    doDifferentiatesConnectionsCase(kLoadBalancerPort);
+}
 
 #ifdef __linux__
 
