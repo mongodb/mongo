@@ -131,6 +131,8 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
                         opCtx, uuid, /*isDropPending=*/false, /*ts=*/boost::none);
                 });
             });
+
+            globalFailPointRegistry().find("hangAfterPreCommittingCatalogUpdates")->pauseWhileSet();
         });
     }
 

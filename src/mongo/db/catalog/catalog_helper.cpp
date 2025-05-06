@@ -53,6 +53,14 @@ void acquireCollectionLocksInResourceIdOrder(
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
     std::vector<CollectionNamespaceOrUUIDLock>* collLocks) {
     invariant(collLocks->empty());
+
+    // Optimisation for single lock requests. CollectionNamespaceOrUUIDLock has the same logic
+    // internally as this method for UUID lookups so it avoids unnecessary memory allocations/work.
+    if (secondaryNssOrUUIDs.empty()) {
+        collLocks->emplace_back(opCtx, nsOrUUID, modeColl, deadline);
+        return;
+    }
+
     auto catalog = CollectionCatalog::get(opCtx);
 
     // Use a set so that we can easily dedupe namespaces to avoid locking the same collection twice.
@@ -66,13 +74,15 @@ void acquireCollectionLocksInResourceIdOrder(
 
         // Create a single set with all the resolved namespaces sorted by ascending
         // ResourceId(RESOURCE_COLLECTION, nss).
-        temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
+        temp.insert(
+            catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID));
         for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
             invariant(secondaryNssOrUUID.dbName() == nsOrUUID.dbName(),
                       str::stream()
                           << "Unable to acquire locks for collections across different databases ("
-                          << secondaryNssOrUUID << " vs " << nsOrUUID << ")");
-            temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+                          << secondaryNssOrUUID.toString() << " vs " << nsOrUUID.toString() << ")");
+            temp.insert(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                opCtx, secondaryNssOrUUID));
         }
 
         // Acquire all of the locks in order. And clear the 'catalog' because the locks will access
@@ -88,10 +98,12 @@ void acquireCollectionLocksInResourceIdOrder(
         //
         // The catalog reference must be refreshed to see the latest Collection data. Otherwise we
         // won't see any concurrent DDL/catalog operations.
-        auto catalog = CollectionCatalog::get(opCtx);
-        verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
+        catalog = CollectionCatalog::get(opCtx);
+        verifyTemp.insert(
+            catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID));
         for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
-            verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+            verifyTemp.insert(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                opCtx, secondaryNssOrUUID));
         }
     } while (temp != verifyTemp);
 }
