@@ -176,10 +176,7 @@ let coll1 = db["coll1"];
             db = st.s.getDB(dbName);
             coll1 = db["coll1"];
         } else if (testCase === "stepUp") {
-            // Wait for replication to ensure the step up does not fail due to a lagged secondary.
-            st.configRS.awaitReplication();
-            assert.commandWorked(st.configRS.getSecondary().adminCommand({replSetStepUp: 1}));
-            st.configRS.awaitNodesAgreeOnPrimary();
+            st.configRS.stepUp(st.configRS.getSecondary());
         }
 
         // Turn off the failpoint for the coordinator case where the command is still stuck
