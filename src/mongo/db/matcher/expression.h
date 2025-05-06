@@ -498,7 +498,7 @@ public:
      * It is expected that most callers want to set 'includePath' to true to get a correct
      * serialization. Internally, we may set this to false if we have a situation where an outer
      * expression serializes a path and we don't want to repeat the path in the inner expression.
-
+     *
      * For example in {a: {$elemMatch: {$eq: 2}}} the "a" is serialized by the $elemMatch, and
      * should not be serialized by the EQ child.
      * The $elemMatch will serialize {a: {$elemMatch: <recurse>}} and the EQ will serialize just
