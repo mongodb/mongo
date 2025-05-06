@@ -185,9 +185,14 @@ public:
     AsioReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
     void run() override {
-        ThreadIdGuard threadIdGuard(this);
-        asio::io_context::work work(_ioContext);
-        _ioContext.run();
+        try {
+            ThreadIdGuard threadIdGuard(this);
+            asio::io_context::work work(_ioContext);
+            _ioContext.run();
+        } catch (...) {
+            auto status = exceptionToStatus();
+            LOGV2_FATAL(10470501, "Unable to start an ASIO reactor", "error"_attr = status);
+        }
     }
 
     void stop() override {
