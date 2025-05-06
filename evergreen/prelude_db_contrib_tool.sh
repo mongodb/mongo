@@ -6,7 +6,33 @@ function setup_db_contrib_tool {
   export PATH="$PATH:$PIPX_BIN_DIR"
   export PIP_CACHE_DIR=${workdir}/pip_cache
 
-  python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
-  python -m pip --disable-pip-version-check install "pipx" || exit 1
-  pipx install "db-contrib-tool==0.8.3" --pip-args="--no-cache-dir" || exit 1
+  for i in {1..5}; do
+    python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
+    echo "Failed to install pip and wheel, retrying..."
+  done
+
+  if [ $RET -ne 0 ]; then
+    echo "Failed to install pip and wheel"
+    exit $RET
+  fi
+
+  for i in {1..5}; do
+    python -m pip --disable-pip-version-check install "pipx" && RET=0 && break || RET=$? && sleep 1
+    echo "Failed to install pipx, retrying..."
+  done
+
+  if [ $RET -ne 0 ]; then
+    echo "Failed to install pipx"
+    exit $RET
+  fi
+
+  for i in {1..5}; do
+    pipx install --force "db-contrib-tool==0.8.3" --pip-args="--no-cache-dir" && RET=0 && break || RET=$? && sleep 1
+    echo "Failed to install db-contrib-tool, retrying..."
+  done
+
+  if [ $RET -ne 0 ]; then
+    echo "Failed to install db-contrib-tool"
+    exit $RET
+  fi
 }
