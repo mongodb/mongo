@@ -167,7 +167,7 @@ void BonsaiQueryBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state)
         "{'g.h': {$eq: 3}}"
         "]}"
         "]}"
-        "]}}");
+        "]}");
     benchmarkQueryMatchProject(state, match, BSONObj());
 }
 
