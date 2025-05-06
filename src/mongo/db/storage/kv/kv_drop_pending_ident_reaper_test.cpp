@@ -37,7 +37,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -76,7 +75,8 @@ public:
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 StringData ident,
-                                                const CollectionOptions& options) override {
+                                                const RecordStore::Options& options,
+                                                boost::optional<UUID> uuid) override {
         return {};
     }
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
@@ -90,9 +90,7 @@ public:
 
     Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
-                             KeyFormat keyFormat,
-                             bool isTimeseries,
-                             const BSONObj& storageEngineCollectionOptions) override {
+                             const RecordStore::Options& options) override {
         return Status::OK();
     }
 

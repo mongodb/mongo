@@ -58,7 +58,7 @@ struct Fixture {
     Fixture(Direction direction, int nToInsert, bool capped = false)
         : nToInsert(nToInsert),
           harness(newRecordStoreHarnessHelper()),
-          rs(harness->newRecordStore("ns", CollectionOptions{.capped = capped})),
+          rs(harness->newRecordStore("ns", RecordStore::Options{.isCapped = capped})),
           opCtx(harness->newOperationContext()),
           cursor(rs->getCursor(opCtx.get(), direction == kForward)) {
         char data[] = "data";

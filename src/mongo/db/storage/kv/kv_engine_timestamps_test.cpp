@@ -226,11 +226,11 @@ public:
 
         auto op = makeOperation();
         WriteUnitOfWork wuow(op);
-        std::string ns = "a.b";
-        ASSERT_OK(
-            engine->createRecordStore(NamespaceString::createNamespaceString_forTest(ns), ns));
-        rs = engine->getRecordStore(
-            op, NamespaceString::createNamespaceString_forTest(ns), ns, CollectionOptions());
+        const auto nss = NamespaceString::createNamespaceString_forTest("a.b");
+        const auto ident = "ident";
+        RecordStore::Options options;
+        ASSERT_OK(engine->createRecordStore(nss, ident, options));
+        rs = engine->getRecordStore(op, nss, ident, options, UUID::gen());
         ASSERT(rs);
     }
 

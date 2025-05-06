@@ -32,8 +32,6 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -60,11 +58,20 @@ public:
     }
 
     virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
-        return newRecordStore(ns, CollectionOptions());
+        return newRecordStore(ns, RecordStore::Options{});
     }
 
-    std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
-                                                const CollectionOptions& collOptions) override;
+    std::unique_ptr<RecordStore> newRecordStore(
+        const std::string& ns, const RecordStore::Options& recordStoreOptions) override {
+        auto ident = ns;
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+        return newRecordStore(nss, ident, recordStoreOptions, UUID::gen());
+    }
+
+    std::unique_ptr<RecordStore> newRecordStore(const NamespaceString& nss,
+                                                StringData ident,
+                                                const RecordStore::Options& recordStoreOptions,
+                                                boost::optional<UUID> uuid);
 
     std::unique_ptr<RecordStore> newOplogRecordStore() override;
 

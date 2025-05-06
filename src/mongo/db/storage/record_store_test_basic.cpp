@@ -41,8 +41,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/catalog/clustered_collection_options_gen.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
@@ -621,29 +619,26 @@ TEST(RecordStoreTest, CursorSaveUnpositionedRestoreSeek) {
 
 TEST(RecordStoreTest, ClusteredRecordStore) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
-    const std::string ns = "test.system.buckets.a";
-    CollectionOptions options;
-    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options);
+    const std::string ns = "testDB.clusteredColl";
+    RecordStore::Options rsOptions = harnessHelper->clusteredRecordStoreOptions();
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, rsOptions);
     invariant(rs->keyFormat() == KeyFormat::String);
-
-    auto opCtx = harnessHelper->newOperationContext();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     const int numRecords = 100;
     std::vector<Record> records;
     std::vector<Timestamp> timestamps(numRecords, Timestamp());
 
     for (int i = 0; i < numRecords; i++) {
-        BSONObj doc = BSON("_id" << OID::gen() << "i" << i);
+        auto oid = OID::gen();
+        BSONObj doc = BSON("_id" << oid << "i" << i);
         RecordData recordData = RecordData(doc.objdata(), doc.objsize());
         recordData.makeOwned();
-
-        RecordId id = uassertStatusOK(
-            record_id_helpers::keyForDoc(doc, options.clusteredIndex->getIndexSpec(), nullptr));
-        records.push_back({id, recordData});
+        auto rid = record_id_helpers::keyForOID(oid);
+        records.push_back({rid, recordData});
     }
 
+    auto opCtx = harnessHelper->newOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     {
         StorageWriteTransaction txn(ru);
         ASSERT_OK(rs->insertRecords(opCtx.get(), &records, timestamps));
@@ -728,21 +723,18 @@ TEST(RecordStoreTest, ClusteredRecordStore) {
 TEST(RecordStoreTest, ClusteredCappedRecordStoreCreation) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "config.changes.c";
-    CollectionOptions options;
-    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
-    options.expireAfterSeconds = 1;
-    options.capped = true;
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options);
+    RecordStore::Options rsOptions = harnessHelper->clusteredRecordStoreOptions();
+    rsOptions.isCapped = true;
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, rsOptions);
     invariant(rs->keyFormat() == KeyFormat::String);
 }
 
 TEST(RecordStoreTest, ClusteredCappedRecordStoreSeek) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
-    const std::string ns = "test.system.buckets.a";
-    CollectionOptions options;
-    options.capped = true;
-    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options);
+    RecordStore::Options rsOptions = harnessHelper->clusteredRecordStoreOptions();
+    rsOptions.isCapped = true;
+    const std::string ns = "test.clusteredCappedColl";
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, rsOptions);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();

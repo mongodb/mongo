@@ -89,15 +89,13 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
-    const std::string& ns, const CollectionOptions& collOptions) {
+    const NamespaceString& nss,
+    StringData ident,
+    const RecordStore::Options& recordStoreOptions,
+    boost::optional<UUID> uuid) {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    StringData ident = ns;
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-
-    const auto keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
-    const auto res = _engine->createRecordStore(
-        nss, ident, keyFormat, collOptions.timeseries.has_value(), collOptions.storageEngine);
-    return _engine->getRecordStore(opCtx.get(), nss, ident, collOptions);
+    const auto res = _engine->createRecordStore(nss, ident, recordStoreOptions);
+    return _engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
@@ -111,33 +109,17 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
-    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    WiredTigerRecoveryUnit* ru =
-        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     std::string ident = redactTenant(NamespaceString::kRsOplogNamespace).toString();
-    std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
+    RecordStore::Options oplogRecordStoreOptions;
+    oplogRecordStoreOptions.isOplog = true;
+    oplogRecordStoreOptions.isCapped = true;
+    // Large enough not to exceed capped limits.
+    oplogRecordStoreOptions.oplogMaxSize = 1024 * 1024 * 1024;
+    const auto res = _engine->createRecordStore(
+        NamespaceString::kRsOplogNamespace, ident, oplogRecordStoreOptions);
 
-    CollectionOptions options;
-    options.capped = true;
-
-    const NamespaceString oplogNss = NamespaceString::kRsOplogNamespace;
-    WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions();
-    wtTableConfig.keyFormat = KeyFormat::Long;
-    wtTableConfig.logEnabled =
-        WiredTigerUtil::useTableLogging(oplogNss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
-    StatusWith<std::string> result = WiredTigerRecordStoreBase::generateCreateString(
-        NamespaceStringUtil::serializeForCatalog(oplogNss), wtTableConfig, true);
-    ASSERT_TRUE(result.isOK());
-    std::string config = result.getValue();
-
-    {
-        StorageWriteTransaction txn(*ru);
-        WiredTigerSession* s = ru->getSession();
-        invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
-        txn.commit();
-    }
-
+    // Cannot use 'getRecordStore', which automatically starts the the oplog manager.
+    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     return std::make_unique<WiredTigerRecordStore::Oplog>(
         _engine.get(),
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
@@ -146,7 +128,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
                                              .engineName = std::string{kWiredTigerEngineName},
                                              .inMemory = false,
                                              // Large enough not to exceed capped limits.
-                                             .oplogMaxSize = 1024 * 1024 * 1024,
+                                             .oplogMaxSize = oplogRecordStoreOptions.oplogMaxSize,
                                              .sizeStorer = nullptr,
                                              .tracksSizeAdjustments = true,
                                              .forceUpdateWithFullDocument = false});

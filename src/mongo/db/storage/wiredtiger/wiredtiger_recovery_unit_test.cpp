@@ -109,8 +109,8 @@ public:
                                                    const std::string& ns) final {
         std::string ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        const auto res = _engine->createRecordStore(nss, ident);
-        return _engine->getRecordStore(opCtx, nss, ident, CollectionOptions());
+        const auto res = _engine->createRecordStore(nss, ident, RecordStore::Options{});
+        return _engine->getRecordStore(opCtx, nss, ident, RecordStore::Options{}, UUID::gen());
     }
 
     WiredTigerKVEngine* getEngine() {

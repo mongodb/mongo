@@ -43,7 +43,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_block.h"
@@ -70,16 +69,15 @@ public:
 
     Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
-                             KeyFormat keyFormat = KeyFormat::Long,
-                             bool isTimeseries = false,
-                             const BSONObj& storageEngineCollectionOptions = BSONObj()) override {
+                             const RecordStore::Options& options) override {
         return Status::OK();
     }
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 StringData ident,
-                                                const CollectionOptions& options) override;
+                                                const RecordStore::Options& options,
+                                                boost::optional<UUID> uuid) override;
 
     std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
                                                          StringData ident,

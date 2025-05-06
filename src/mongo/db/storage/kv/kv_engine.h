@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -81,19 +80,17 @@ public:
     }
 
     /**
-     * Requesting multiple copies for the same ns/ident is a rules violation; Calling on a
+     * Requesting multiple copies for the same ident is a rules violation; Calling on a
      * non-created ident is invalid and may crash.
      *
      * Trying to access this record store in the future will retrieve the pointer from the
      * collection object, and therefore this function can only be called once per namespace.
-     *
-     * @param ident Will be created if it does not already exist.
      */
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         StringData ident,
-                                                        const CollectionOptions& options) = 0;
-
+                                                        const RecordStore::Options& options,
+                                                        boost::optional<UUID> uuid) = 0;
     /**
      * Opens an existing ident as a temporary record store. Must be used for record stores created
      * with `makeTemporaryRecordStore`. Using `getRecordStore` would cause the record store to use
@@ -118,28 +115,11 @@ public:
      * drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
      * back and it is safe to immediately reclaim storage.
      *
-     *      . 'keyFormat': Defaults to the key format of a regular collection, 'KeyFormat::Long'.
-     *      Callers must specify 'KeyFormat::String' when creating a RecordStore for a clustered
-     *      collection.
-     *
-     *      . 'isTimeseries': True when the RecordStore is for a timeseries collection. Timeseries
-     *      collections require specialized storage engine table configuration. TODO SERVER-100964:
-     *      Remove timeseries concept from KvEngine.
-     *
-     *      . 'storageEngineCollectionOptions': Empty by default. Holds collection-specific storage
-     *      engine configuration options. For example, the 'storageEngine' options passed into
-     *      `db.createCollection()`. Expected to be mirror the 'CollectionOptions::storageEngine'
-     *      format { storageEngine: { <storage engine name> : { configString:
-     *      "<option>=<setting>,..."} } }.
-     *
-     * Creates a 'RecordStore' and its underlying storage engine table with the designated
-     * 'keyFormat' and 'storageEngineCollectionOptions'.
+     * Creates a 'RecordStore' and generated from the provided 'options'.
      */
     virtual Status createRecordStore(const NamespaceString& nss,
                                      StringData ident,
-                                     KeyFormat keyFormat = KeyFormat::Long,
-                                     bool isTimeseries = false,
-                                     const BSONObj& storageEngineCollectionOptions = BSONObj()) = 0;
+                                     const RecordStore::Options& options) = 0;
 
     /**
      * RecordStores initially created with `makeTemporaryRecordStore` must be opened with
@@ -270,11 +250,8 @@ public:
      */
     virtual Status recoverOrphanedIdent(const NamespaceString& nss,
                                         StringData ident,
-                                        KeyFormat keyFormat = KeyFormat::Long,
-                                        bool isTimeseries = false,
-                                        const BSONObj& storageEngineCollectionOptions = BSONObj()) {
-        auto status =
-            createRecordStore(nss, ident, keyFormat, isTimeseries, storageEngineCollectionOptions);
+                                        const RecordStore::Options& recordStoreOptions) {
+        auto status = createRecordStore(nss, ident, recordStoreOptions);
         if (status.isOK()) {
             return {ErrorCodes::DataModifiedByRepair, "Orphan recovery created a new record store"};
         }

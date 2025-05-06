@@ -319,6 +319,72 @@ public:
     class Capped;
     class Oplog;
 
+    /**
+     * Options for generating a new RecordStore. Each RecordStore subclass is responsible for
+     * parsing its applicable fields - not all fields apply to every RecordStore implementation.
+     */
+    struct Options {
+        /**
+         * The KeyFormat for RecordIds in the RecordStore.
+         */
+        KeyFormat keyFormat{KeyFormat::Long};
+
+        /**
+         * True if the RecordStore is for a capped collection.
+         */
+        bool isCapped{false};
+
+        /*
+         * True if the RecordStore is for the oplog collection.
+         */
+        bool isOplog{false};
+
+        /**
+         * The initial maximum size an Oplog's RecordStore should reach. Non-zero value is only
+         * valid when 'isOplog' is true.
+         */
+        long long oplogMaxSize{0};
+
+        /*
+         * True if the RecordStore is for a change collection.
+         *
+         * TODO SERVER-97046: Remove once no longer needed for ResourceConsumptionMetrics in
+         * 'WiredTigerRecordStore'.
+         */
+        bool isChangeCollection{false};
+
+        /**
+         * Whether or not the RecordStore allows allows writes to overwrite existing records with
+         * the same RecordId.
+         */
+        bool allowOverwrite{true};
+
+        /**
+         * True if updates through the RecordStore must force updates to the full document.
+         */
+        bool forceUpdateWithFullDocument{false};
+
+        /**
+         * When not none, defines a block compression algorithm to use in liu of the default for
+         * RecordStores which support block compression. Otherwise, the RecordStore should utilize
+         * the default block compressor.
+         */
+        boost::optional<std::string> customBlockCompressor;
+
+        /**
+         * Empty by default. Holds collection-specific storage engine configuration options. For
+         * example, the 'storageEngine' options passed into `db.createCollection()`. Expected to be
+         * mirror the 'CollectionOptions::storageEngine' format { storageEngine: { <storage engine
+         * name> : { configString: "<option>=<setting>,..."} } }.
+         *
+         * If fields in the 'configString' conflict with fields set either by global defaults or
+         * other members of the 'RecordStore::Options' struct, RecordStores should prefer values
+         * from the 'configString'. However, this is difficult to guarantee across RecordStores, and
+         * any concerns should be validated through explicit testing.
+         */
+        BSONObj storageEngineCollectionOptions;
+    };
+
     virtual ~RecordStore() {}
 
     virtual const char* name() const = 0;

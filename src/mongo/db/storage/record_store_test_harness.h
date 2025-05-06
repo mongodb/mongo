@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -49,15 +48,28 @@ public:
     virtual std::unique_ptr<RecordStore> newRecordStore() = 0;
 
     std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
-        return newRecordStore(ns, CollectionOptions());
+        return newRecordStore(ns, RecordStore::Options{});
     }
 
     virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
-                                                        const CollectionOptions& options) = 0;
+                                                        const RecordStore::Options& rsOptions) = 0;
 
     virtual std::unique_ptr<RecordStore> newOplogRecordStore() = 0;
 
     virtual KVEngine* getEngine() = 0;
+
+    /**
+     * For test convenience only - in general, the notion of a 'clustered' collection should exist
+     * above the storage layer.
+     *
+     * Returns RecordStore::Options for a 'clustered' collection.
+     */
+    RecordStore::Options clusteredRecordStoreOptions() {
+        RecordStore::Options clusteredRSOptions;
+        clusteredRSOptions.keyFormat = KeyFormat::String;
+        clusteredRSOptions.allowOverwrite = true;
+        return clusteredRSOptions;
+    }
 
     /**
      * Advances the stable timestamp of the engine.

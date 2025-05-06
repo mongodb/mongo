@@ -55,6 +55,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_record_store_options.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
@@ -201,7 +202,9 @@ void initCollectionObject(OperationContext* opCtx,
         // repaired. This also ensures that if we try to use it, it will blow up.
         rs = nullptr;
     } else {
-        rs = engine->getEngine()->getRecordStore(opCtx, nss, ident, md->options);
+        const auto uuid = md->options.uuid;
+        const auto recordStoreOptions = getRecordStoreOptions(nss, md->options);
+        rs = engine->getEngine()->getRecordStore(opCtx, nss, ident, recordStoreOptions, uuid);
         invariant(rs);
     }
 
@@ -1558,28 +1561,30 @@ std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
     }
 
     // Instantiate a new collection without any shared state.
+    const auto nss = catalogEntry.metadata->nss;
     LOGV2_DEBUG(6825401,
                 1,
                 "Instantiating a new collection",
-                logAttrs(catalogEntry.metadata->nss),
+                logAttrs(nss),
                 "ident"_attr = catalogEntry.ident,
                 "md"_attr = catalogEntry.metadata->toBSON(),
                 "timestamp"_attr = readTimestamp);
 
+    const auto collectionOptions = catalogEntry.metadata->options;
     std::unique_ptr<RecordStore> rs =
         opCtx->getServiceContext()->getStorageEngine()->getEngine()->getRecordStore(
-            opCtx, catalogEntry.metadata->nss, catalogEntry.ident, catalogEntry.metadata->options);
+            opCtx,
+            nss,
+            catalogEntry.ident,
+            getRecordStoreOptions(nss, collectionOptions),
+            collectionOptions.uuid);
 
     // Set the ident to the one returned by the ident reaper. This is to prevent the ident from
     // being dropping prematurely.
     rs->setIdent(std::move(newIdent));
 
-    std::shared_ptr<Collection> collToReturn =
-        Collection::Factory::get(opCtx)->make(opCtx,
-                                              catalogEntry.metadata->nss,
-                                              catalogEntry.catalogId,
-                                              catalogEntry.metadata,
-                                              std::move(rs));
+    std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
+        opCtx, nss, catalogEntry.catalogId, catalogEntry.metadata, std::move(rs));
     Status status =
         collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, catalogEntry, readTimestamp);
     if (!status.isOK()) {

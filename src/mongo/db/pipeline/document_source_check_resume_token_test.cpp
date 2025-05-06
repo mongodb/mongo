@@ -49,7 +49,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -163,7 +162,7 @@ class ChangeStreamOplogCollectionMock : public CollectionMock {
 public:
     ChangeStreamOplogCollectionMock() : CollectionMock(NamespaceString::kRsOplogNamespace) {
         _recordStore = _devNullEngine.getRecordStore(
-            nullptr, NamespaceString::kRsOplogNamespace, "", {.uuid = UUID::gen()});
+            nullptr, NamespaceString::kRsOplogNamespace, "", RecordStore::Options{}, UUID::gen());
     }
 
     void push_back(Document doc) {

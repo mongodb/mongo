@@ -282,6 +282,7 @@ mongo_cc_library(
         ":bson_collection_catalog_entry",
         ":record_store_base",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:collection_record_store_options",  # TODO(SERVER-100964): Remove.
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/storage:feature_document_util",
         "//src/mongo/db/storage:ident",

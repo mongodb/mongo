@@ -67,6 +67,9 @@ filters:
   - "collection_options*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "collection_record_store_options*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "collection_test.cpp":
     approvers:
       - 10gen/server-catalog-and-routing

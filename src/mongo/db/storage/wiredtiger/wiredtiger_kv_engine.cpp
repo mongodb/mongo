@@ -1538,11 +1538,11 @@ void WiredTigerKVEngine::setSortedDataInterfaceExtraOptions(const std::string& o
     _indexOptions = options;
 }
 
-Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
-                                             StringData ident,
-                                             KeyFormat keyFormat,
-                                             bool isTimeseries,
-                                             const BSONObj& storageEngineCollectionOptions) {
+Status WiredTigerKVEngine::_createRecordStore(const NamespaceString& nss,
+                                              StringData ident,
+                                              KeyFormat keyFormat,
+                                              const BSONObj& storageEngineCollectionOptions,
+                                              boost::optional<std::string> customBlockCompressor) {
     WiredTigerSession session(_connection.get());
 
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
@@ -1555,11 +1555,8 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
 
-    if (isTimeseries) {
-        // Time-series collections use zstd compression by default while all other collections use
-        // the globally configured default.
-        wtTableConfig.blockCompressor =
-            WiredTigerGlobalOptions::kDefaultTimeseriesCollectionCompressor.toString();
+    if (customBlockCompressor) {
+        wtTableConfig.blockCompressor = *customBlockCompressor;
     }
 
     auto customConfigString = WiredTigerRecordStore::parseOptionsField(
@@ -1611,9 +1608,7 @@ Status WiredTigerKVEngine::importRecordStore(StringData ident,
 
 Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
                                                 StringData ident,
-                                                KeyFormat keyFormat,
-                                                bool isTimeseries,
-                                                const BSONObj& storageEngineCollectionOptions) {
+                                                const RecordStore::Options& options) {
 #ifdef _WIN32
     return {ErrorCodes::CommandNotSupported, "Orphan file recovery is not supported on Windows"};
 #else
@@ -1645,7 +1640,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
 
     LOGV2(22333, "Creating new RecordStore", logAttrs(nss));
 
-    status = createRecordStore(nss, ident, keyFormat, isTimeseries, storageEngineCollectionOptions);
+    status = createRecordStore(nss, ident, options);
     if (!status.isOK()) {
         return status;
     }
@@ -1691,21 +1686,22 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
 std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
                                                                 const NamespaceString& nss,
                                                                 StringData ident,
-                                                                const CollectionOptions& options) {
+                                                                const RecordStore::Options& options,
+                                                                boost::optional<UUID> uuid) {
     std::unique_ptr<WiredTigerRecordStore> ret;
-    if (nss.isOplog()) {
+    if (options.isOplog) {
         ret = std::make_unique<WiredTigerRecordStore::Oplog>(
             this,
             WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
-            WiredTigerRecordStore::Oplog::Params{.uuid = *options.uuid,
+            WiredTigerRecordStore::Oplog::Params{.uuid = *uuid,
                                                  .ident = ident.toString(),
                                                  .engineName = _canonicalName,
                                                  .inMemory = _wtConfig.inMemory,
-                                                 .oplogMaxSize = options.cappedSize,
+                                                 .oplogMaxSize = options.oplogMaxSize,
                                                  .sizeStorer = _sizeStorer.get(),
                                                  .tracksSizeAdjustments = true,
                                                  .forceUpdateWithFullDocument =
-                                                     options.timeseries.has_value()});
+                                                     options.forceUpdateWithFullDocument});
 
         // If the server was started in read-only mode or if we are restoring the node, skip
         // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
@@ -1730,21 +1726,21 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             return !isReplSet && !shouldRecoverFromOplogAsStandalone;
         }();
         WiredTigerRecordStore::Params params{
-            .baseParams{.uuid = options.uuid,
+            .baseParams{.uuid = uuid,
                         .ident = ident.toString(),
                         .engineName = _canonicalName,
-                        .keyFormat = options.clusteredIndex ? KeyFormat::String : KeyFormat::Long,
-                        .overwrite = !options.clusteredIndex,
+                        .keyFormat = options.keyFormat,
+                        .overwrite = options.allowOverwrite,
                         .isLogged = isLogged,
-                        .forceUpdateWithFullDocument = options.timeseries.has_value()},
+                        .forceUpdateWithFullDocument = options.forceUpdateWithFullDocument},
             // Record stores for clustered collections need to guarantee uniqueness by preventing
             // overwrites.
             .inMemory = _wtConfig.inMemory,
-            .isChangeCollection = nss.isChangeCollection(),
+            .isChangeCollection = options.isChangeCollection,
             .sizeStorer = _sizeStorer.get(),
             .tracksSizeAdjustments = true};
 
-        ret = options.capped
+        ret = options.isCapped
             ? std::make_unique<WiredTigerRecordStore::Capped>(
                   this,
                   WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),

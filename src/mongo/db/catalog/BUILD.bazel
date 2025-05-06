@@ -516,6 +516,7 @@ mongo_cc_library(
     deps = [
         ":catalog_stats",
         ":collection_catalog",
+        ":collection_record_store_options",
         ":database_holder",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
@@ -544,6 +545,21 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_record_store_options",
+    srcs = [
+        "collection_record_store_options.cpp",
+    ],
+    hdrs = [
+        "collection_record_store_options.h",
+    ],
+    deps = [
+        ":collection_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:record_store_base",
     ],
 )
 
@@ -815,5 +831,19 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:pcre_wrapper",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "collection_record_store_options_test",
+    srcs = [
+        "collection_record_store_options_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":collection_record_store_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/unittest",
     ],
 )

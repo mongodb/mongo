@@ -87,7 +87,8 @@ public:
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 StringData ident,
-                                                const CollectionOptions& options) override {
+                                                const RecordStore::Options& options,
+                                                boost::optional<UUID> uuid) override {
         MONGO_UNREACHABLE;
     }
 
@@ -102,9 +103,7 @@ public:
 
     Status createRecordStore(const NamespaceString& nss,
                              StringData ident,
-                             KeyFormat keyFormat = KeyFormat::Long,
-                             bool isTimeseries = false,
-                             const BSONObj& storageEngineCollectionOptions = BSONObj()) override {
+                             const RecordStore::Options& options) override {
         MONGO_UNREACHABLE;
     }
 

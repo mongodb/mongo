@@ -47,7 +47,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

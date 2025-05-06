@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_record_store_options.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
@@ -464,26 +465,16 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::string& ident,
-    const CollectionOptions& options) {
+    const CollectionOptions& collectionOptions) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
     invariant(nss.coll().size() > 0);
 
-    StatusWith<EntryIdentifier> swEntry = _addEntry(opCtx, nss, ident, options);
+    StatusWith<EntryIdentifier> swEntry = _addEntry(opCtx, nss, ident, collectionOptions);
     if (!swEntry.isOK())
         return swEntry.getStatus();
     EntryIdentifier& entry = swEntry.getValue();
-
-    const auto keyFormat = [&] {
-        // Clustered collections require KeyFormat::String, but the opposite is not necessarily
-        // true: a clustered record store that is not associated with a collection has
-        // KeyFormat::String and and no CollectionOptions.
-        if (options.clusteredIndex) {
-            return KeyFormat::String;
-        }
-        return KeyFormat::Long;
-    }();
-    Status status = _engine->createRecordStore(
-        nss, entry.ident, keyFormat, options.timeseries.has_value(), options.storageEngine);
+    const auto recordStoreOptions = getRecordStoreOptions(nss, collectionOptions);
+    Status status = _engine->createRecordStore(nss, ident, recordStoreOptions);
     if (!status.isOK())
         return status;
 
@@ -494,7 +485,8 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
             catalog->_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
         });
 
-    auto rs = _engine->getRecordStore(opCtx, nss, entry.ident, options);
+    auto rs =
+        _engine->getRecordStore(opCtx, nss, ident, recordStoreOptions, collectionOptions.uuid);
     invariant(rs);
 
     return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
@@ -599,7 +591,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
         }
     }
 
-    auto rs = _engine->getRecordStore(opCtx, nss, entry.ident, md.options);
+    auto rs = _engine->getRecordStore(
+        opCtx, nss, entry.ident, getRecordStoreOptions(nss, md.options), md.options.uuid);
     invariant(rs);
 
     return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.value());
