@@ -1,7 +1,7 @@
 #Release builds have no debug symbols, and this prevents packaging errors on RHEL 8
 %global   debug_package %{nil}
-%define   _name mongodb-enterprise
-%define   _crypto_pkg_name %{_name}-crypt_v1
+%define   _name mongodb-enterprise-unstable
+%define   _crypto_pkg_name %{_name}-crypt-v1
 
 Name:      %{_crypto_pkg_name}
 Version:   %{dynamic_version}
@@ -9,7 +9,7 @@ Release:   %{dynamic_release}%{?dist}
 Summary:   MongoDB Crypto v1 Library
 License:   Commercial
 Group:     Applications/Databases
-Conflicts: %{_name}-unstable-crypt_v1
+Conflicts: %{_name}-crypt-v1
 Source:    %{_crypto_pkg_name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{_crypto_pkg_name}-%{version}-%{release}-root
 
