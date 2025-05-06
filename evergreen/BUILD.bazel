@@ -1,0 +1,6 @@
+py_binary(
+    name = "validate_compile_commands",
+    srcs = ["validate_compile_commands.py"],
+    main = "validate_compile_commands.py",
+    visibility = ["//visibility:public"],
+)

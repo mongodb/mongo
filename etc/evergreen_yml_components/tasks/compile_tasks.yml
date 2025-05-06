@@ -105,19 +105,6 @@ variables:
       - func: "run hang analyzer"
       - func: "wait for resmoke to shutdown"
 
-  - &clang_tidy_task_template
-    tags:
-      [
-        "assigned_to_jira_team_devprod_build",
-        "development_critical_single_variant",
-        "requires_large_host",
-        "clang_tidy",
-      ]
-    exec_timeout_secs: 7200 # 1 hour timeout for the task overall
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-
   # TODO: split this up into the user files.
   # List of all variants that make mongocryptd
   # If a variant is listed here and has a push task, mongocryptd is pushed
@@ -318,8 +305,18 @@ tasks:
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
-  - <<: *clang_tidy_task_template
-    name: run_bazel_clang_tidy
+  - name: run_bazel_clang_tidy
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "requires_large_host",
+        "clang_tidy",
+      ]
+    exec_timeout_secs: 1800 # 30 min timeout for the task overall
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     commands:
       - func: "do bazel setup"
       - func: "bazel compile"
@@ -328,6 +325,26 @@ tasks:
           targets: //src/mongo/...
           bazel_args: --config=clang-tidy --mongo_toolchain_version=${clang_tidy_toolchain|v5} --keep_going
       - func: "generate clang-tidy report"
+
+  - name: run_bazel_compiledb
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "development_critical_single_variant",
+        "lint",
+      ]
+    exec_timeout_secs: 600 # 10 min timeout for the task overall
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do bazel setup"
+      - func: "bazel compile"
+        vars:
+          targets: compiledb
+      - func: bazel run
+        vars:
+          target: //evergreen:validate_compile_commands
 
   - name: run_bazel_program_windows
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]

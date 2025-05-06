@@ -6,3 +6,6 @@ filters:
   - "retry_git.sh":
     approvers:
       - 10gen/devprod-correctness
+  - "validate_compile_commands.py":
+    approvers:
+      - 10gen/devprod-build
