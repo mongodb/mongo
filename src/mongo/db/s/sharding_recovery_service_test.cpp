@@ -153,10 +153,8 @@ public:
             ASSERT(!scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
-            ASSERT(csr->getCriticalSectionSignal(operationContext(),
-                                                 ShardingMigrationCriticalSection::kWrite));
-            ASSERT(!csr->getCriticalSectionSignal(operationContext(),
-                                                  ShardingMigrationCriticalSection::kRead));
+            ASSERT(csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         }
     }
 
@@ -168,10 +166,8 @@ public:
             ASSERT(scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
-            ASSERT(csr->getCriticalSectionSignal(operationContext(),
-                                                 ShardingMigrationCriticalSection::kWrite));
-            ASSERT(csr->getCriticalSectionSignal(operationContext(),
-                                                 ShardingMigrationCriticalSection::kRead));
+            ASSERT(csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         }
     }
 
@@ -183,10 +179,8 @@ public:
             ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
-            ASSERT(!csr->getCriticalSectionSignal(operationContext(),
-                                                  ShardingMigrationCriticalSection::kWrite));
-            ASSERT(!csr->getCriticalSectionSignal(operationContext(),
-                                                  ShardingMigrationCriticalSection::kRead));
+            ASSERT(!csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         }
     }
 

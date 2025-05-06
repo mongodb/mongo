@@ -124,12 +124,12 @@ public:
                 AutoGetCollection coll(opCtx, ns(), LockMode::MODE_IS);
                 auto scopedCsr =
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
-                uassert(7079502,
-                        fmt::format("The critical section for collection {} must be taken in "
-                                    "order to execute this command",
-                                    ns().toStringForErrorMsg()),
-                        scopedCsr->getCriticalSectionSignal(
-                            opCtx, ShardingMigrationCriticalSection::kWrite));
+                uassert(
+                    7079502,
+                    fmt::format("The critical section for collection {} must be taken in "
+                                "order to execute this command",
+                                ns().toStringForErrorMsg()),
+                    scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
                 if (scopedCsr->getIndexesInCritSec(opCtx)) {
                     renameOp = RenameIndexCatalogOperationEnum::kRename;
                 }
@@ -146,7 +146,7 @@ public:
                                     "order to execute this command",
                                     ns().toStringForErrorMsg()),
                         scopedToCsr->getCriticalSectionSignal(
-                            opCtx, ShardingMigrationCriticalSection::kWrite));
+                            ShardingMigrationCriticalSection::kWrite));
                 const auto& indexMetadata = scopedToCsr->getIndexesInCritSec(opCtx);
                 if (indexMetadata &&
                     indexMetadata->getCollectionIndexes().uuid() ==

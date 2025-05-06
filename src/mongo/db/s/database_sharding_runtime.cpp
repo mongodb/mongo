@@ -315,8 +315,7 @@ void DatabaseShardingRuntime::setDbMetadataRefreshFuture_DEPRECATED(
     _dbMetadataRefresh.emplace(std::move(future), std::move(cancellationSource));
 }
 
-boost::optional<SharedSemiFuture<void>>
-DatabaseShardingRuntime::getDbMetadataRefreshFuture_DEPRECATED() const {
+boost::optional<SharedSemiFuture<void>> DatabaseShardingRuntime::getMetadataRefreshFuture() const {
     return _dbMetadataRefresh ? boost::optional<SharedSemiFuture<void>>(_dbMetadataRefresh->future)
                               : boost::none;
 }

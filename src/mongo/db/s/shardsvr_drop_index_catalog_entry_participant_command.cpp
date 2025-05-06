@@ -113,10 +113,10 @@ public:
                 AutoGetCollection coll(opCtx, ns(), LockMode::MODE_IS);
                 const auto scopedCsr =
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
-                uassert(6711904,
-                        "The critical section must be taken in order to execute this command",
-                        scopedCsr->getCriticalSectionSignal(
-                            opCtx, ShardingMigrationCriticalSection::kWrite));
+                uassert(
+                    6711904,
+                    "The critical section must be taken in order to execute this command",
+                    scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
             }
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

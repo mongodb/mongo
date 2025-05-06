@@ -324,7 +324,7 @@ void CollectionShardingRuntime::exitCriticalSectionNoChecks() {
 }
 
 boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getCriticalSectionSignal(
-    OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op) const {
+    ShardingMigrationCriticalSection::Operation op) const {
     return _critSec.getSignal(op);
 }
 
@@ -667,8 +667,8 @@ void CollectionShardingRuntime::setPlacementVersionRecoverRefreshFuture(
     _placementVersionInRecoverOrRefresh.emplace(std::move(future), std::move(cancellationSource));
 }
 
-boost::optional<SharedSemiFuture<void>>
-CollectionShardingRuntime::getPlacementVersionRecoverRefreshFuture(OperationContext* opCtx) const {
+boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getMetadataRefreshFuture()
+    const {
     return _placementVersionInRecoverOrRefresh
         ? boost::optional<SharedSemiFuture<void>>(_placementVersionInRecoverOrRefresh->future)
         : boost::none;

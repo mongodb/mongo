@@ -209,15 +209,12 @@ public:
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
-                AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                const auto scopedDsr =
-                    DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName);
+                const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
                 criticalSectionSignal =
                     scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
             }

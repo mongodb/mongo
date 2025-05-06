@@ -130,26 +130,18 @@ bool waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> re
 /**
  * Blocking method, which will wait for any critical section to be released.
  *
- * Returns 'true' if there was a concurrent critical section that had to be waited (in which case
- * all locks will be dropped). If there was none, returns false and the locks continue to be held.
+ * Returns 'true' if there were concurrent metadata refreshes that had to be waited (in which case
+ * the sharding runtime mutex is released). If there were none, returns 'false' and the sharding
+ * runtime mutex continues to be held.
  */
-template <typename ScopedDatabaseShardingRuntime>
-bool waitForDbCriticalSectionToComplete(OperationContext* opCtx,
-                                        boost::optional<Lock::DBLock>* dbLock,
-                                        boost::optional<ScopedDatabaseShardingRuntime>* scopedDsr) {
-    invariant(dbLock->has_value());
-    invariant(scopedDsr->has_value());
+template <typename ScopedShardingRuntime>
+bool waitForCriticalSectionIfNeeded(OperationContext* opCtx,
+                                    boost::optional<ScopedShardingRuntime>* scopedShardingRuntime) {
+    invariant(scopedShardingRuntime->has_value());
 
-    if (auto critSect =
-            (**scopedDsr)->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
-        LOGV2_DEBUG(6697201,
-                    2,
-                    "Waiting for exit from the critical section",
-                    logAttrs((**scopedDsr)->getDbName()),
-                    "reason"_attr = (**scopedDsr)->getCriticalSectionReason());
-
-        scopedDsr->reset();
-        dbLock->reset();
+    if (auto critSect = (**scopedShardingRuntime)
+                            ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
+        scopedShardingRuntime->reset();
 
         uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSect));
 
@@ -160,27 +152,20 @@ bool waitForDbCriticalSectionToComplete(OperationContext* opCtx,
 }
 
 /**
- * Blocking method, which will wait for any concurrent database metadata refresh to complete.
+ * Blocking method, which will wait for any concurrent database or collection metadata refresh to
+ * complete.
  *
- * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
- * will be dropped). If there were none, returns false and the locks continue to be held.
+ * Returns 'true' if there were concurrent metadata refreshes that had to be joined (in which case
+ * the sharding runtime mutex is released). If there were none, returns 'false' and the sharding
+ * runtime mutex continues to be held.
  */
-template <typename ScopedDatabaseShardingRuntime>
-bool waitForOngoingDbMetadataRefreshToComplete(
-    OperationContext* opCtx,
-    boost::optional<Lock::DBLock>* dbLock,
-    boost::optional<ScopedDatabaseShardingRuntime>* scopedDsr) {
-    invariant(dbLock->has_value());
-    invariant(scopedDsr->has_value());
+template <typename ScopedShardingRuntime>
+bool waitForOngoingMetadataRefreshToComplete(
+    OperationContext* opCtx, boost::optional<ScopedShardingRuntime>* scopedShardingRuntime) {
+    invariant(scopedShardingRuntime->has_value());
 
-    if (auto refreshVersionFuture = (**scopedDsr)->getDbMetadataRefreshFuture_DEPRECATED()) {
-        LOGV2_DEBUG(6697202,
-                    2,
-                    "Waiting for completion of another database metadata refresh",
-                    logAttrs((**scopedDsr)->getDbName()));
-
-        scopedDsr->reset();
-        dbLock->reset();
+    if (auto refreshVersionFuture = (**scopedShardingRuntime)->getMetadataRefreshFuture()) {
+        scopedShardingRuntime->reset();
 
         waitForRefreshToComplete(opCtx, *refreshVersionFuture);
 
@@ -191,63 +176,22 @@ bool waitForOngoingDbMetadataRefreshToComplete(
 }
 
 /**
- * Blocking method, which will wait for any concurrent operations that could change the database
- * version to complete (namely critical section and concurrent onDbVersionMismatch invocations).
+ * Blocking method that waits for any concurrent operations which could change the placement version
+ * (i.e., the database or shard version, depending on the template used) to complete (specifically,
+ * critical section or concurrent refresh invocations).
  *
- * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
- * will be dropped). If there were none, returns false and the locks continue to be held.
+ * Returns 'true' if there were concurrent operations that had to be joined (in which case the
+ * sharding runtime mutex is released). If there were none, returns 'false' and the sharding runtime
+ * mutex continues to be held.
  */
-template <typename ScopedDatabaseShardingRuntime>
-bool joinDbVersionOperation(OperationContext* opCtx,
-                            boost::optional<Lock::DBLock>* dbLock,
-                            boost::optional<ScopedDatabaseShardingRuntime>* scopedDsr) {
-    if (waitForDbCriticalSectionToComplete(opCtx, dbLock, scopedDsr)) {
+template <typename ScopedShardingRuntime>
+bool joinPlacementVersionOperations(OperationContext* opCtx,
+                                    boost::optional<ScopedShardingRuntime>* scopedShardingRuntime) {
+    if (waitForCriticalSectionIfNeeded(opCtx, scopedShardingRuntime)) {
         return true;
     }
 
-    return waitForOngoingDbMetadataRefreshToComplete(opCtx, dbLock, scopedDsr);
-}
-
-/**
- * Blocking method, which will wait for any concurrent operations that could change the shard
- * version to complete (namely critical section and concurrent onCollectionPlacementVersionMismatch
- * invocations).
- *
- * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
- * will be dropped). If there were none, returns false and the locks continue to be held.
- */
-template <typename ScopedCSR>
-bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
-                                             boost::optional<Lock::DBLock>* dbLock,
-                                             boost::optional<Lock::CollectionLock>* collLock,
-                                             boost::optional<ScopedCSR>* scopedCsr) {
-    invariant(dbLock->has_value());
-    invariant(collLock->has_value());
-    invariant(scopedCsr->has_value());
-
-    if (auto critSecSignal =
-            (**scopedCsr)
-                ->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite)) {
-        scopedCsr->reset();
-        collLock->reset();
-        dbLock->reset();
-
-        uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSecSignal));
-
-        return true;
-    }
-
-    if (auto inRecoverOrRefresh = (**scopedCsr)->getPlacementVersionRecoverRefreshFuture(opCtx)) {
-        scopedCsr->reset();
-        collLock->reset();
-        dbLock->reset();
-
-        waitForRefreshToComplete(opCtx, *inRecoverOrRefresh);
-
-        return true;
-    }
-
-    return false;
+    return waitForOngoingMetadataRefreshToComplete(opCtx, scopedShardingRuntime);
 }
 
 void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
@@ -432,10 +376,7 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
         uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
     if (!cm.hasRoutingTable()) {
-        Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata::UNTRACKED());
         return;
     }
@@ -458,10 +399,8 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
         return false;
     };
 
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+
     if (isCollectionPlacementUpToDate(scopedCsr->getCurrentMetadataIfKnown() /* optMetadata */)) {
         return;
     }
@@ -604,11 +543,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
             }
 
             auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
-                AutoGetDb autoDb(opCtx, doc.getNss().dbName(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                        opCtx, doc.getNss());
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, doc.getNss());
 
                 auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
                 invariant(!optMetadata);
@@ -814,50 +749,47 @@ void FilteringMetadataCache::_onDbVersionMismatch(
                 "receivedDbVersion"_attr = receivedDbVersion);
 
     while (true) {
+        if (receivedDbVersion) {
+            auto scopedDsr =
+                boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
+
+            if (joinPlacementVersionOperations(opCtx, &scopedDsr)) {
+                // Waited for another thread to exit from the critical section or to complete an
+                // ongoing refresh, so reacquire the locks.
+                continue;
+            }
+
+            // From now until the end of this block [1] no thread is in the critical section or
+            // can enter it (would require to exclusive lock the DSS) and [2] no metadata
+            // refresh is in progress or can start (would require to exclusive lock the DSS).
+            // Therefore, the database version can be accessed safely.
+
+            const auto wantedVersion = (*scopedDsr)->getDbVersion();
+            if (receivedDbVersion <= wantedVersion) {
+                // No need to refresh the database metadata as the wanted version is newer
+                // than the one received.
+                return;
+            }
+        }
+
+        if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
+            return;
+        }
+
         boost::optional<SharedSemiFuture<void>> dbMetadataRefreshFuture;
 
         {
-            boost::optional<Lock::DBLock> dbLock;
-            dbLock.emplace(opCtx, dbName, MODE_IS);
+            auto scopedDsr =
+                boost::make_optional(DatabaseShardingRuntime::acquireExclusive(opCtx, dbName));
 
-            if (receivedDbVersion) {
-                auto scopedDsr = boost::make_optional(
-                    DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName));
-
-                if (joinDbVersionOperation(opCtx, &dbLock, &scopedDsr)) {
-                    // Waited for another thread to exit from the critical section or to complete an
-                    // ongoing refresh, so reacquire the locks.
-                    continue;
-                }
-
-                // From now until the end of this block [1] no thread is in the critical section or
-                // can enter it (would require to X-lock the database) and [2] no metadata refresh
-                // is in progress or can start (would require to exclusive lock the DSS).
-                // Therefore, the database version can be accessed safely.
-
-                const auto wantedVersion = (*scopedDsr)->getDbVersion();
-                if (receivedDbVersion <= wantedVersion) {
-                    // No need to refresh the database metadata as the wanted version is newer
-                    // than the one received.
-                    return;
-                }
-            }
-
-            if (MONGO_unlikely(skipDatabaseVersionMetadataRefresh.shouldFail())) {
-                return;
-            }
-
-            auto scopedDsr = boost::make_optional(
-                DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName));
-
-            if (joinDbVersionOperation(opCtx, &dbLock, &scopedDsr)) {
+            if (joinPlacementVersionOperations(opCtx, &scopedDsr)) {
                 // Waited for another thread to exit from the critical section or to complete an
                 // ongoing refresh, so reacquire the locks.
                 continue;
             }
 
             // From now until the end of this block [1] no thread is in the critical section or can
-            // enter it (would require to X-lock the database) and [2] this is the only metadata
+            // enter it (would require to exclusive lock the DSS) and [2] this is the only metadata
             // refresh in progress (holding the exclusive lock on the DSS).
             // Therefore, the future to refresh the database metadata can be set.
 
@@ -867,7 +799,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
                 ->setDbMetadataRefreshFuture_DEPRECATED(
                     _recoverRefreshDbVersion(opCtx, dbName, cancellationToken),
                     std::move(cancellationSource));
-            dbMetadataRefreshFuture = (*scopedDsr)->getDbMetadataRefreshFuture_DEPRECATED();
+            dbMetadataRefreshFuture = (*scopedDsr)->getMetadataRefreshFuture();
         }
 
         // No other metadata refresh for this database can run in parallel. If another thread enters
@@ -913,19 +845,16 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
         repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(opCtx, readConcern));
 
     while (true) {
-        boost::optional<Lock::DBLock> dbLock;
-        dbLock.emplace(opCtx, dbName, MODE_IS);
+        auto scopedDsr =
+            boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
 
-        auto scopedDsr = boost::make_optional(
-            DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName));
-
-        if (waitForDbCriticalSectionToComplete(opCtx, &dbLock, &scopedDsr)) {
+        if (waitForCriticalSectionIfNeeded(opCtx, &scopedDsr)) {
             // Waited for another thread to exit from the critical section, so reacquire the locks.
             continue;
         }
 
         // From now until the end of this block: no thread is in the critical section or can enter
-        // it (would require to X-lock the database). Therefore, the database version can be
+        // it (would require to exclusive lock the DSS). Therefore, the database version can be
         // accessed safely.
 
         const auto wantedVersion = (*scopedDsr)->getDbVersion();
@@ -1005,12 +934,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 if (!currentMetadata.allowMigrations()) {
                     boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
                     {
-                        Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
-                        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-
-                        const auto scopedCsr =
-                            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx,
-                                                                                              nss);
+                        const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
                         // There is no need to abort an ongoing migration if the refresh is
                         // cancelled.
                         if (!cancellationToken.isCanceled()) {
@@ -1039,13 +963,8 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 // Only if all actions taken as part of refreshing the placement version completed
                 // successfully do we want to install the current metadata. A view can potentially
                 // be created after spawning a thread to recover nss's shard version. It is then ok
-                // to lock views in order to clear filtering metadata. DBLock and CollectionLock
-                // must be used in order to avoid placement version checks
-                Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                         nss);
+                // to lock views in order to clear filtering metadata.
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
                 // cancellationToken needs to be checked under the CSR lock before overwriting the
                 // filtering metadata to serialize with other threads calling
@@ -1068,17 +987,9 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 waitForMigrationAbort->get(opCtx);
             }
 
-            {
-                // Remember to wake all waiting threads for this refresh to finish.
-                Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                         nss);
-
-                scopedCsr->resetPlacementVersionRecoverRefreshFuture();
-                resetRefreshFutureOnError.dismiss();
-            }
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            scopedCsr->resetPlacementVersionRecoverRefreshFuture();
+            resetRefreshFutureOnError.dismiss();
         })
         .onCompletion([=](Status status) {
             // Check the cancellation token here to ensure we throw in all cancelation events.
@@ -1130,17 +1041,11 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
             ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
                 opCtx, AdmissionContext::Priority::kExempt);
 
-            boost::optional<Lock::DBLock> dbLock;
-            boost::optional<Lock::CollectionLock> collLock;
-            dbLock.emplace(opCtx, nss.dbName(), MODE_IS);
-            collLock.emplace(opCtx, nss, MODE_IS);
-
             if (chunkVersionReceived) {
-                auto scopedCsr = boost::make_optional(
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss));
+                auto scopedCsr =
+                    boost::make_optional(CollectionShardingRuntime::acquireShared(opCtx, nss));
 
-                if (joinCollectionPlacementVersionOperation(
-                        opCtx, &dbLock, &collLock, &scopedCsr)) {
+                if (joinPlacementVersionOperations(opCtx, &scopedCsr)) {
                     continue;
                 }
 
@@ -1156,10 +1061,10 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
                 }
             }
 
-            auto scopedCsr = boost::make_optional(
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss));
+            auto scopedCsr =
+                boost::make_optional(CollectionShardingRuntime::acquireExclusive(opCtx, nss));
 
-            if (joinCollectionPlacementVersionOperation(opCtx, &dbLock, &collLock, &scopedCsr)) {
+            if (joinPlacementVersionOperations(opCtx, &scopedCsr)) {
                 continue;
             }
 
@@ -1175,7 +1080,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
                     _recoverRefreshCollectionPlacementVersion(
                         opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
                     std::move(cancellationSource));
-            inRecoverOrRefresh = (*scopedCsr)->getPlacementVersionRecoverRefreshFuture(opCtx);
+            inRecoverOrRefresh = (*scopedCsr)->getMetadataRefreshFuture();
         }
 
         if (!waitForRefreshToComplete(opCtx, *inRecoverOrRefresh)) {

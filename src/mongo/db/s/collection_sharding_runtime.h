@@ -241,7 +241,7 @@ public:
      * be waited on. Otherwise, returns nullptr.
      */
     boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
-        OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op) const;
+        ShardingMigrationCriticalSection::Operation op) const;
 
     /**
      * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
@@ -274,8 +274,7 @@ public:
      * If there an ongoing placement version recover/refresh, it returns the shared semifuture to be
      * waited on. Otherwise, returns boost::none.
      */
-    boost::optional<SharedSemiFuture<void>> getPlacementVersionRecoverRefreshFuture(
-        OperationContext* opCtx) const;
+    boost::optional<SharedSemiFuture<void>> getMetadataRefreshFuture() const;
 
     /**
      * Resets the placement version recover/refresh shared semifuture to boost::none.

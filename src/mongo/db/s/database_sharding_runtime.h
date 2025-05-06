@@ -215,7 +215,7 @@ public:
      * If there is an ongoing database metadata refresh, returns the future to wait on it,
      * otherwise `boost::none`.
      */
-    boost::optional<SharedSemiFuture<void>> getDbMetadataRefreshFuture_DEPRECATED() const;
+    boost::optional<SharedSemiFuture<void>> getMetadataRefreshFuture() const;
 
     /**
      * Resets the database metadata refresh future to `boost::none`.

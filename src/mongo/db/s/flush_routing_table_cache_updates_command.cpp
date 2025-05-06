@@ -135,19 +135,14 @@ public:
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
-                // TODO (SERVER-74313): Replace with AutoGetCollection
-                Lock::DBLock dbLock(opCtx, ns().dbName(), MODE_IS);
-                Lock::CollectionLock collLock(opCtx, ns(), MODE_IS);
-
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                const auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
-                criticalSectionSignal = scopedCsr->getCriticalSectionSignal(
-                    opCtx, ShardingMigrationCriticalSection::kWrite);
+                const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, ns());
+                criticalSectionSignal =
+                    scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
             }
 
             if (criticalSectionSignal)
@@ -158,18 +153,6 @@ public:
                 uassertStatusOK(
                     FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
                         opCtx, ns(), boost::none));
-            }
-
-            // A config server could receive this command even if not in config shard mode if the CS
-            // secondary is on an older binary version running a ShardServerCatalogCacheLoader. In
-            // that case we don't want to hit the MONGO_UNREACHABLE in
-            // ConfigServerCatalogCacheLoader::waitForCollectionFlush() but throw an error instead
-            // so that the secondaries know they don't have updated metadata yet.
-
-            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-            if (!gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe() &&
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                uasserted(8454802, "config server is not storing cached metadata");
             }
 
             FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, ns());

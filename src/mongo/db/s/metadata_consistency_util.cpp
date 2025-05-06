@@ -317,7 +317,7 @@ bool _collectionMustExistLocallyButDoesnt(OperationContext* opCtx,
         return false;
     }
     auto criticalSectionSignal =
-        scopedCsr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
+        scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
     if (criticalSectionSignal) {
         LOGV2_DEBUG(9461000,
                     1,
