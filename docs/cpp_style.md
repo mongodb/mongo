@@ -24,7 +24,7 @@ without having to first rediscover those problems for themselves.
 > this notice on or around 2025-05-15.
 >
 > For proposals for future changes, please feel free to add entries to the
-> (MongoDB C++ Style Guide Proposals)[https://docs.google.com/document/d/1nvmEnjw-5DNFIoXPa7WzM1PbOOl1fN19jl1sz9cpzAg]
+> [MongoDB C++ Style Guide Proposals](https://docs.google.com/document/d/1nvmEnjw-5DNFIoXPa7WzM1PbOOl1fN19jl1sz9cpzAg)
 > document (which will remain linked below).
 
 ## Style
