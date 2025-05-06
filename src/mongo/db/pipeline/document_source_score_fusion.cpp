@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -115,6 +116,54 @@ StringMap<double> extractAndValidateWeights(
     return weights;
 }
 
+std::string getScoreFieldFromPipelineName(const StringData pipelineName,
+                                          bool includeDollarSign = false) {
+    return includeDollarSign ? fmt::format("${}_score", pipelineName)
+                             : fmt::format("{}_score", pipelineName);
+}
+
+/**
+ * Builds and returns a $setWindowFields stage, like the following:
+ * {$setWindowFields:
+ *     {sortBy:
+ *         {<pipeline_name>_score: -1
+ *         },
+ *      output:
+ *          {<pipeline_name>_score:
+ *              {$minMaxScaler:
+ *                  {input: "$<pipeline_name>_score"
+ *                  }
+ *              }
+ *          }
+ *      }
+ * }
+ *
+ * Unlike $sigmoid normalization, which only relies on value of the raw score to compute the
+ * normalized score, $minMaxScaler needs to observe all the raw scores in each input pipeline to
+ * produce each normalized score in that input pipeline. Thus this $setWindowFields stage is
+ * appended once per input pipeline (both the first one, and each other one wrapped in the
+ * $unionWith
+ */
+boost::intrusive_ptr<DocumentSource> builtSetWindowFieldsStageForMinMaxScalerNormalization(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const StringData inputPipelineName,
+    const BSONObj& scorePath) {
+    const std::string score = getScoreFieldFromPipelineName(inputPipelineName);
+    const std::string dollarScore = "$" + score;
+    SortPattern sortPattern{BSON(score << -1), expCtx};
+
+    return make_intrusive<DocumentSourceInternalSetWindowFields>(
+        expCtx,
+        boost::none,  // partitionBy
+        sortPattern,
+        std::vector<WindowFunctionStatement>{WindowFunctionStatement{
+            score,  // output field
+            window_function::Expression::parse(
+                BSON("$minMaxScaler" << BSON("input" << dollarScore)), sortPattern, expCtx.get())}},
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        SbeCompatibility::notCompatible);
+}
+
 /**
  * Builds and returns an $addFields stage, like the following:
  * {$addFields:
@@ -131,7 +180,7 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
     const BSONObj& scorePath,
     const ScoreFusionNormalizationEnum normalization,
     const double weight) {
-    const std::string score = fmt::format("{}_score", inputPipelineName);
+    const std::string score = getScoreFieldFromPipelineName(inputPipelineName);
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
@@ -145,10 +194,9 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
                         normalizationScorePath = BSON("$sigmoid" << scorePath);
                         break;
                     case ScoreFusionNormalizationEnum::kMinMaxScaler:
-                        // TODO SERVER-100211: Handle minMaxScaler expression behavior.
-                        uasserted(ErrorCodes::NotImplemented,
-                                  "minMaxScaler input normalization is not yet supported");
-                        break;
+                        // For minMaxScaler normalization, parse just the score operator into
+                        // the $addFields stage. The normalization will happen separately in a
+                        // $setWindowFields stage, after the $addFields stage.
                     case ScoreFusionNormalizationEnum::kNone:
                         // In the case of no normalization, parse just the score operator
                         // itself.
@@ -199,6 +247,12 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     outputStages.emplace_back(buildReplaceRootStage(expCtx));
     outputStages.emplace_back(
         buildScoreAddFieldsStage(expCtx, inputPipelineOneName, scorePath, normalization, weight));
+
+    // Build the $setWindowFields stage, to perform minMaxScaler normalization, if applicable.
+    if (normalization == ScoreFusionNormalizationEnum::kMinMaxScaler) {
+        outputStages.emplace_back(builtSetWindowFieldsStageForMinMaxScalerNormalization(
+            expCtx, inputPipelineOneName, scorePath));
+    }
     return outputStages;
 }
 
@@ -263,7 +317,7 @@ BSONObj groupEachScore(
 
         for (auto pipeline_it = pipelines.begin(); pipeline_it != pipelines.end(); pipeline_it++) {
             const auto& pipelineName = pipeline_it->first;
-            const std::string scoreName = fmt::format("{}_score", pipelineName);
+            const std::string scoreName = getScoreFieldFromPipelineName(pipelineName);
             groupBob.append(
                 scoreName,
                 BSON("$max" << BSON("$ifNull" << BSON_ARRAY(fmt::format("${}", scoreName) << 0))));
@@ -299,7 +353,8 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
             BSONObjBuilder varsAndInFields;
             for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
                  pipeline_it++) {
-                std::string fieldScoreName = fmt::format("${}_score", pipeline_it->first);
+                std::string fieldScoreName =
+                    getScoreFieldFromPipelineName(pipeline_it->first, true);
                 varsAndInFields.appendElements(BSON(pipeline_it->first << fieldScoreName));
             }
             varsAndInFields.done();
@@ -328,7 +383,8 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
             BSONArrayBuilder expressionFieldPaths;
             for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
                  pipeline_it++) {
-                std::string fieldScoreName = fmt::format("${}_score", pipeline_it->first);
+                std::string fieldScoreName =
+                    getScoreFieldFromPipelineName(pipeline_it->first, true);
                 expressionFieldPaths.append(fieldScoreName);
             }
             expressionFieldPaths.done();
@@ -342,7 +398,7 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
             Expression::ExpressionVector allInputScores;
             for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
                  pipeline_it++) {
-                std::string fieldScoreName = fmt::format("{}_score", pipeline_it->first);
+                std::string fieldScoreName = getScoreFieldFromPipelineName(pipeline_it->first);
                 allInputScores.push_back(ExpressionFieldPath::createPathFromString(
                     expCtx.get(), fieldScoreName, expCtx->variablesParseState));
             }
@@ -379,6 +435,11 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     inputPipelineStages->pushBack(buildReplaceRootStage(expCtx));
     inputPipelineStages->pushBack(
         buildScoreAddFieldsStage(expCtx, inputPipelineName, scorePath, normalization, weight));
+    // Build the $setWindowFields stage, to perform minMaxScaler normalization, if applicable.
+    if (normalization == ScoreFusionNormalizationEnum::kMinMaxScaler) {
+        inputPipelineStages->pushBack(builtSetWindowFieldsStageForMinMaxScalerNormalization(
+            expCtx, inputPipelineName, scorePath));
+    }
     std::vector<BSONObj> bsonPipeline = inputPipelineStages->serializeToBson();
 
     auto collName = expCtx->getNamespaceString().coll();
@@ -514,6 +575,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
             outputStages.emplace_back(unionWithStage);
         }
     }
+
     // Build all remaining stages to perform the fusion.
     // The ScoreCombination class sets the combination.method and combination.expression to the
     // correct user input after performing the necessary error checks (ex: verify that if

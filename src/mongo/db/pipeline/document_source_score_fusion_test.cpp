@@ -46,6 +46,26 @@ namespace {
  */
 class DocumentSourceScoreFusionTest : service_context_test::WithSetupTransportLayer,
                                       public AggregationContextFixture {
+public:
+    DocumentSourceScoreFusionTest() {
+        // TODO SERVER-82020: Delete this once the feature flag defaults to true.
+        // $minMaxScaler is gated behind a feature flag and does
+        // not get put into the map as the flag is off by default. Changing the value of the feature
+        // flag with RAIIServerParameterControllerForTest() does not solve the issue because the
+        // registration logic is not re-hit.
+        try {
+            window_function::Expression::registerParser(
+                "$minMaxScaler",
+                window_function::ExpressionMinMaxScaler::parse,
+                nullptr,
+                AllowedWithApiStrict::kNeverInVersion1);
+        } catch (const DBException& e) {
+            // Allow this exception, to allow multiple instances
+            // to be created in this process.
+            ASSERT(e.reason() == "Duplicate parsers ($minMaxScaler) registered.");
+        }
+    }
+
 private:
     RAIIServerParameterControllerForTest scoreFusionFlag{"featureFlagSearchHybridScoringFull",
                                                          true};
@@ -375,6 +395,376 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationSigmoi
                         "score": {
                             "$add": [
                                 "$name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationMinMaxScaler) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "minMaxScaler"
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "name1_score": -1
+                        },
+                        "output": {
+                            "name1_score": {
+                                "$minMaxScaler": {
+                                    "input": "$name1_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalizationMinMaxScaler) {
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {$score: {score: "$score_50"}}
+                    ],
+                    name2: [
+                        {$score: {score: "$score_10"}}
+                    ]
+                },
+                normalization: "minMaxScaler"
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        "$score_50"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "name1_score": -1
+                        },
+                        "output": {
+                            "name1_score": {
+                                "$minMaxScaler": {
+                                    "input": "$name1_score",
+                                    "min": 0,
+                                    "max": 1
+                                },
+                                "window": {
+                                    "documents": [
+                                        "unbounded",
+                                        "unbounded"
+                                    ]
+                                }
+                            }
+                        }
+                    } 
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    "$score_10"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "name2_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "name2_score": -1
+                                    },
+                                    "output": {
+                                        "name2_score": {
+                                            "$minMaxScaler": {
+                                                "input": "$name2_score",
+                                                "min": 0,
+                                                "max": 1
+                                            },
+                                            "window": {
+                                                "documents": [
+                                                    "unbounded",
+                                                    "unbounded"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                } 
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$name1_score",
+                                "$name2_score"
                             ]
                         }
                     }
