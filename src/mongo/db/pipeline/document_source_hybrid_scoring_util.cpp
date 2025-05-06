@@ -31,6 +31,8 @@
 
 #include <fmt/ranges.h>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -208,10 +210,10 @@ namespace score_details {
 
 boost::intrusive_ptr<DocumentSource> addScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::string& prefix,
+    const StringData inputPipelinePrefix,
     const bool inputGeneratesScore,
     const bool inputGeneratesScoreDetails) {
-    const std::string scoreDetails = fmt::format("{}_scoreDetails", prefix);
+    const std::string scoreDetails = fmt::format("{}_scoreDetails", inputPipelinePrefix);
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
@@ -253,19 +255,30 @@ std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(const std::stri
 boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
     const StringMap<double>& weights,
+    const bool isRankFusion,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::vector<boost::intrusive_ptr<Expression>> detailsChildren;
     for (auto it = inputs.begin(); it != inputs.end(); it++) {
         const std::string& pipelineName = it->first;
-        const std::string rankFieldName = fmt::format("${}_rank", pipelineName);
         const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", pipelineName);
-        double weight = getPipelineWeight(weights, pipelineName);
+        double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
-        auto mergeObjectsObj =
-            BSON("$mergeObjects"_sd << BSON_ARRAY(BSON("inputPipelineName"_sd
-                                                       << pipelineName << "rank"_sd << rankFieldName
-                                                       << "weight"_sd << weight)
-                                                  << scoreDetailsFieldName));
+        BSONObjBuilder mergeObjectsArrSubObj;
+        mergeObjectsArrSubObj.append("inputPipelineName"_sd, pipelineName);
+        if (isRankFusion) {
+            mergeObjectsArrSubObj.append("rank"_sd, fmt::format("${}_rank", pipelineName));
+        } else {
+            // ScoreFusion case.
+            mergeObjectsArrSubObj.append("inputPipelineRawScore"_sd,
+                                         fmt::format("${}_rawScore", pipelineName));
+        }
+        mergeObjectsArrSubObj.append("weight"_sd, weight);
+        mergeObjectsArrSubObj.done();
+        BSONArrayBuilder mergeObjectsArr;
+        mergeObjectsArr.append(mergeObjectsArrSubObj.obj());
+        mergeObjectsArr.append(scoreDetailsFieldName);
+        mergeObjectsArr.done();
+        BSONObj mergeObjectsObj = BSON("$mergeObjects"_sd << mergeObjectsArr.arr());
         boost::intrusive_ptr<Expression> mergeObjectsExpr =
             ExpressionFromAccumulator<AccumulatorMergeObjects>::parse(
                 expCtx.get(), mergeObjectsObj.firstElement(), expCtx->variablesParseState);
@@ -279,21 +292,6 @@ boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
     auto addFields = DocumentSourceAddFields::create(
         "calculatedScoreDetails"_sd, std::move(arrayExpr), expCtx.get());
     return addFields;
-}
-
-boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
-    const std::string& scoreDetailsDescription,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto setScoreDetails = DocumentSourceSetMetadata::create(
-        expCtx,
-        Expression::parseObject(expCtx.get(),
-                                BSON("value" << "$score"
-                                             << "description" << scoreDetailsDescription
-                                             << "details"
-                                             << "$calculatedScoreDetails"),
-                                expCtx->variablesParseState),
-        DocumentMetadataFields::kScoreDetails);
-    return setScoreDetails;
 }
 }  // namespace score_details
 }  // namespace mongo::hybrid_scoring_util

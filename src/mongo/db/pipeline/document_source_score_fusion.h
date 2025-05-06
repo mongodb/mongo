@@ -39,6 +39,8 @@
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
 
@@ -91,17 +93,18 @@ public:
         }
     };
 
-    // TODO (SERVER-102534): Make ScoreCombination private.
+    // TODO (SERVER-102534): Make ScoreFusionScoringOptions private.
 
-    // The ScoreCombination class validates and stores the combination.method and
-    // combination.expression fields. combination.expression is not immediately parsed into an
-    // expression because any pipelines variables it references will be considered undefined and
-    // will therefore throw an error at parsing time. combination.expression will only be parsed
-    // into an expression when the enclosing $let var (which defines the pipeline variables) is
-    // constructed.
-    class ScoreCombination {
+    // The ScoreFusionScoringOptions class validates and stores the normalization,
+    // combination.method, and combination.expression fields. combination.expression is not
+    // immediately parsed into an expression because any pipelines variables it references will be
+    // considered undefined and will therefore throw an error at parsing time.
+    // combination.expression will only be parsed into an expression when the enclosing $let var
+    // (which defines the pipeline variables) is constructed.
+    class ScoreFusionScoringOptions {
     public:
-        ScoreCombination(const ScoreFusionSpec& spec) {
+        ScoreFusionScoringOptions(const ScoreFusionSpec& spec) {
+            _normalizationMethod = spec.getInput().getNormalization();
             auto& combination = spec.getCombination();
             ScoreFusionCombinationMethodEnum combinationMethod =
                 ScoreFusionCombinationMethodEnum::kSum;
@@ -125,8 +128,40 @@ public:
             _combinationExpression = std::move(combinationExpression);
         }
 
+        ScoreFusionNormalizationEnum getNormalizationMethod() const {
+            return _normalizationMethod;
+        }
+
+        std::string getNormalizationString(ScoreFusionNormalizationEnum normalization) const {
+            switch (normalization) {
+                case ScoreFusionNormalizationEnum::kSigmoid:
+                    return "sigmoid";
+                case ScoreFusionNormalizationEnum::kMinMaxScaler:
+                    return "minMaxScaler";
+                case ScoreFusionNormalizationEnum::kNone:
+                    return "none";
+                default:
+                    // Only one of the above options can be specified for normalization.
+                    MONGO_UNREACHABLE_TASSERT(9467100);
+            }
+        }
+
         ScoreFusionCombinationMethodEnum getCombinationMethod() const {
             return _combinationMethod;
+        }
+
+        std::string getCombinationMethodString(ScoreFusionCombinationMethodEnum comboMethod) const {
+            switch (comboMethod) {
+                case ScoreFusionCombinationMethodEnum::kExpression:
+                    return "custom expression";
+                case ScoreFusionCombinationMethodEnum::kAvg:
+                    return "average";
+                case ScoreFusionCombinationMethodEnum::kSum:
+                    return "sum";
+                default:
+                    // Only one of the above options can be specified for combination.method.
+                    MONGO_UNREACHABLE_TASSERT(9467101);
+            }
         }
 
         boost::optional<IDLAnyType> getCombinationExpression() const {
@@ -134,6 +169,9 @@ public:
         }
 
     private:
+        // The default normalization value is ScoreFusionCombinationMethodEnum::kNone. The IDL
+        // handles the default behavior.
+        ScoreFusionNormalizationEnum _normalizationMethod;
         // The default combination.method value is ScoreFusionCombinationMethodEnum::kSum. The IDL
         // handles the default behavior.
         ScoreFusionCombinationMethodEnum _combinationMethod;

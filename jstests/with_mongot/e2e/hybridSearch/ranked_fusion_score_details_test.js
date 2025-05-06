@@ -64,8 +64,7 @@ let testQuery = [
             scoreDetails: true,
         },
     },
-    {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
-    {$project: {plot_embedding: 0}}
+    {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
 ];
 
 let results = coll.aggregate(testQuery).toArray();
@@ -203,8 +202,7 @@ testQuery = [
             scoreDetails: true,
         },
     },
-    {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
-    {$project: {plot_embedding: 0}}
+    {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
 ];
 
 results = coll.aggregate(testQuery).toArray();
@@ -265,8 +263,7 @@ testQuery = [
             scoreDetails: false,
         },
     },
-    {$addFields: {score: {$meta: "score"}}},
-    {$project: {plot_embedding: 0}}
+    {$project: {score: {$meta: "score"}}}
 ];
 
 results = coll.aggregate(testQuery).toArray();
@@ -289,8 +286,7 @@ testQuery = [
             scoreDetails: false,
         },
     },
-    {$addFields: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
-    {$project: {plot_embedding: 0}}
+    {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
 ];
 
 assertErrCodeAndErrMsgContains(coll, testQuery, 40218, "query requires scoreDetails metadata");

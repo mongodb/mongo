@@ -180,7 +180,7 @@ boost::intrusive_ptr<DocumentSource> setWindowFields(const auto& expCtx,
  */
 boost::intrusive_ptr<DocumentSource> addScoreField(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::string& prefix,
+    const StringData prefix,
     const int rankConstant,
     const double weight) {
     const std::string score = fmt::format("{}_score", prefix);
@@ -217,7 +217,7 @@ boost::intrusive_ptr<DocumentSource> nestUserDocs(const auto& expCtx) {
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
-    const std::string& prefixOne,
+    const StringData prefixOne,
     const int rankConstant,
     const double weight,
     const bool includeScoreDetails,
@@ -340,6 +340,26 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     return DocumentSourceUnionWith::createFromBson(inputToUnionWith.firstElement(), expCtx);
 }
 
+/**
+ * Constuct the scoreDetails metadata object. Looks like the following:
+ * { "$setMetadata": {"scoreDetails": {"value": "$score", "description":
+ * {"scoreDetailsDescription..."}, "details": "$calculatedScoreDetails"}}},
+ */
+boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
+    const std::string& scoreDetailsDescription,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    boost::intrusive_ptr<DocumentSource> setScoreDetails = DocumentSourceSetMetadata::create(
+        expCtx,
+        Expression::parseObject(expCtx.get(),
+                                BSON("value" << "$score"
+                                             << "description" << scoreDetailsDescription
+                                             << "details"
+                                             << "$calculatedScoreDetails"),
+                                expCtx->variablesParseState),
+        DocumentMetadataFields::kScoreDetails);
+    return setScoreDetails;
+}
+
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
     const StringMap<double>& weights,
@@ -365,9 +385,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     if (includeScoreDetails) {
         boost::intrusive_ptr<DocumentSource> addFieldsDetails =
             hybrid_scoring_util::score_details::constructCalculatedFinalScoreDetails(
-                inputPipelines, weights, expCtx);
-        auto setScoreDetails = hybrid_scoring_util::score_details::constructScoreDetailsMetadata(
-            rankFusionScoreDetailsDescription, expCtx);
+                inputPipelines, weights, true, expCtx);
+        auto setScoreDetails =
+            constructScoreDetailsMetadata(rankFusionScoreDetailsDescription, expCtx);
         return {group, addFields, addFieldsDetails, setScoreDetails, sort, restoreUserDocs};
     }
     // TODO SERVER-85426: Remove this check once all feature flags have been removed.

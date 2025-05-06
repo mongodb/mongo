@@ -1,9 +1,10 @@
 /**
  * Tests that the 'scoreDetails' metadata field is appropriately accessible or inaccessible from a
- * $rankFusion stage. This test focuses on exercising scoreDetails dependency analysis in various
- * pipeline structures and does not verify correctness of the scoreDetails field contents itself.
+ * $rankFusion or $scoreFusion stage. This test focuses on exercising scoreDetails dependency
+ * analysis in various pipeline structures and does not verify correctness of the scoreDetails field
+ * contents itself.
  *
- * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
@@ -57,22 +58,23 @@ function assertCorrectScoreDetailsStructure(resultDoc, numInputPipelines) {
 }
 
 /**
- * Run a $rankFusion pipeline followed by a {$meta: "scoreDetails"} projection and validate whether
- * or not score details are present in the results.
+ * Run a $rankFusion and $scoreFusion pipeline followed by a {$meta: "scoreDetails"} projection and
+ * validate whether or not score details are present in the results.
  *
- * @param {boolean} requestScoreDetails request $rankFusion to generate score details metadata.
- * @param {boolean} requestSearchScoreDetails request the $search nested inside $rankFusion to
- *     generate score details. Defaults to false.
+ * @param {boolean} requestScoreDetails request $rankFusion and $scoreFusion to generate score
+ *     details metadata.
+ * @param {boolean} requestSearchScoreDetails request the $search nested inside $rankFusion and
+ *     $scoreFusion to generate score details. Defaults to false.
  * @param {boolean} forceProjectionOnMerger force the metadata project to be run on the merging
  *     shard, otherwise allow it to be pushed down. Defaults to false (i.e. no pipeline split).
- * @param {int} numInputPipelines the number of input pipelines to pass to $rankFusion. Defaults
- *     to 1.
+ * @param {int} numInputPipelines the number of input pipelines to pass to $rankFusion and
+ *     $scoreFusion. Defaults to 1.
  */
 function runTest({
     requestScoreDetails,
     requestSearchScoreDetails = false,
     forceProjectionOnMerger = false,
-    numInputPipelines = 1
+    numInputPipelines = 1,
 }) {
     const searchQueryWithScoreDetails =
         Object.assign({scoreDetails: requestSearchScoreDetails}, searchQuery);
@@ -82,27 +84,45 @@ function runTest({
         inputPipelines[`searchPipeline${i}`] = [{$search: searchQueryWithScoreDetails}];
     }
 
-    let pipeline = [
+    const rankFusionPipeline = [
         {
             $rankFusion: {input: {pipelines: inputPipelines}, scoreDetails: requestScoreDetails},
         },
     ];
 
+    const scoreFusionPipeline = [
+        {
+            $scoreFusion: {
+                input: {pipelines: inputPipelines, normalization: "none"},
+                scoreDetails: requestScoreDetails
+            },
+        },
+    ];
+
     if (forceProjectionOnMerger) {
         // Add a splitPipeline stage so that the $project will stay on the merging shard.
-        pipeline.push({$_internalSplitPipeline: {}});
+        rankFusionPipeline.push({$_internalSplitPipeline: {}});
+        scoreFusionPipeline.push({$_internalSplitPipeline: {}});
     }
 
-    pipeline.push({$project: scoreDetailsProjection});
+    rankFusionPipeline.push({$project: scoreDetailsProjection});
+    scoreFusionPipeline.push({$project: scoreDetailsProjection});
 
     if (requestScoreDetails) {
-        const results = coll.aggregate(pipeline).toArray();
-        assert.eq(results.length, 2);
-        for (let result of results) {
+        const rankFusionResults = coll.aggregate(rankFusionPipeline).toArray();
+        assert.eq(rankFusionResults.length, 2);
+        for (let result of rankFusionResults) {
+            assertCorrectScoreDetailsStructure(result, numInputPipelines);
+        }
+
+        const scoreFusionResults = coll.aggregate(scoreFusionPipeline).toArray();
+        assert.eq(scoreFusionResults.length, 2);
+        for (let result of scoreFusionResults) {
             assertCorrectScoreDetailsStructure(result, numInputPipelines);
         }
     } else {
-        assertFailsScoreDetailsUnavailable(pipeline);
+        assertFailsScoreDetailsUnavailable(rankFusionPipeline);
+        assertFailsScoreDetailsUnavailable(scoreFusionPipeline);
     }
 }
 
@@ -116,7 +136,8 @@ runTest({requestScoreDetails: false, numInputPipelines: 2});
 runTest({requestScoreDetails: true, forceProjectionOnMerger: true});
 runTest({requestScoreDetails: false, forceProjectionOnMerger: true});
 
-// Request $searchScoreDetails and ensure that it is not directly accessible outside of $rankFusion.
+// Request $searchScoreDetails and ensure that it is not directly accessible outside of $rankFusion
+// and $scoreFusion.
 runTest({requestScoreDetails: true, requestSearchScoreDetails: true});
 runTest({requestScoreDetails: true, requestSearchScoreDetails: true, numInputPipelines: 2});
 runTest({
@@ -145,6 +166,31 @@ runTest({
                     {
                         $rankFusion: {
                             input: {pipelines: {searchPipeline0: [{$search: searchQuery}]}},
+                            scoreDetails: true
+                        },
+                    },
+                ]
+            }
+        },
+        {$project: scoreDetailsProjection},
+    ];
+    assertFailsScoreDetailsUnavailable(pipeline);
+}
+
+// Run $scoreFusion in a $unionWith and request "scoreDetails" from the outer pipeline. This
+// should fail since "scoreDetails" is not generated by the outer (empty) pipeline.
+{
+    const pipeline = [
+        {
+            $unionWith: {
+                coll: collName,
+                pipeline: [
+                    {
+                        $scoreFusion: {
+                            input: {
+                                pipelines: {searchPipeline0: [{$search: searchQuery}]},
+                                normalization: "none"
+                            },
                             scoreDetails: true
                         },
                     },
@@ -191,6 +237,44 @@ runTest({
     }
 }
 
+// Run $scoreFusion in a $unionWith and request "scoreDetails" from the inner pipeline. This
+// should succeed since "scoreDetails" is generated by the inner pipeline.
+{
+    const results =
+        coll.aggregate([
+                {
+                    $unionWith: {
+                        coll: collName,
+                        pipeline: [
+                            {
+                                $scoreFusion: {
+                                    input: {
+                                        pipelines: {searchPipeline0: [{$search: searchQuery}]},
+                                        normalization: "none"
+                                    },
+                                    scoreDetails: true
+                                },
+                            },
+                            {$project: scoreDetailsProjection},
+                        ]
+                    }
+                },
+            ])
+            .toArray();
+    assert.eq(results.length, 6);
+
+    // The first 4 documents from the outer pipeline should not have scoreDetails.
+    for (let i = 0; i < 4; i++) {
+        assert(!results[i].hasOwnProperty("scoreDetails"));
+    }
+
+    // The final 2 documents from the subpipeline should have scoreDetails.
+    for (let i = 4; i < 6; i++) {
+        const numInputPipelines = 1;
+        assertCorrectScoreDetailsStructure(results[i], numInputPipelines);
+    }
+}
+
 // Run $rankFusion in a $lookup and request "scoreDetails" from the outer pipeline. This
 // should fail since "scoreDetails" is not generated by the outer (empty) pipeline.
 {
@@ -203,6 +287,30 @@ runTest({
                     $rankFusion: {
                         input: {
                             pipelines: {searchPipeline0: [{$search: searchQuery}]}
+                        },
+                        scoreDetails: true
+                    },
+                },]
+            }
+        },
+        { $project: scoreDetailsProjection },
+    ];
+    assertFailsScoreDetailsUnavailable(pipeline);
+}
+
+// Run $scoreFusion in a $lookup and request "scoreDetails" from the outer pipeline. This
+// should fail since "scoreDetails" is not generated by the outer (empty) pipeline.
+{
+    const pipeline = [
+        {
+            $lookup: {
+                from: collName,
+                as: "docs",
+                pipeline: [{
+                    $scoreFusion: {
+                        input: {
+                            pipelines: {searchPipeline0: [{$search: searchQuery}]},
+                            normalization: "none"
                         },
                         scoreDetails: true
                     },
@@ -253,6 +361,46 @@ runTest({
     }
 }
 
+// Run $scoreFusion in a $lookup and request "scoreDetails" from the inner pipeline. This
+// should succeed since "scoreDetails" is generated by the inner pipeline.
+{
+    const results = coll.aggregate([
+        {
+            $lookup: {
+                from: collName,
+                as: "docs",
+                pipeline: [{
+                    $scoreFusion: {
+                        input: {
+                            pipelines: {searchPipeline0: [{$search: searchQuery}]},
+                            normalization: "none"
+                        },
+                        scoreDetails: true
+                    },
+                }, { $project: scoreDetailsProjection },
+                ]
+            }
+        },
+        ])
+        .toArray();
+    assert.eq(results.length, 4);
+
+    for (let result of results) {
+        // The top-level document should not have scoreDetails.
+        assert(!result.hasOwnProperty("scoreDetails"),
+               `Did not request scoreDetails to be calculated, but was found on document ${
+                   tojson(result)}`);
+
+        // The subpipeline-generate data should include scoreDetails.
+        let docs = result["docs"];
+        assert.eq(docs.length, 2);
+        for (let subpipelineDoc of docs) {
+            const numInputPipelines = 1;
+            assertCorrectScoreDetailsStructure(subpipelineDoc, numInputPipelines);
+        }
+    }
+}
+
 // Verify that scoreDetails cannot be projected from a $facet subpipeline where $rankFusion sets
 // scoreDetails to false.
 {
@@ -260,6 +408,29 @@ runTest({
         {
             $rankFusion:
                 {input: {pipelines: {pipe: [{$sort: {textField: -1}}]}}, scoreDetails: false}
+        },
+        {
+            $facet: {
+                pipe1: [
+                    {$project: {scoreDetails: {$meta: "scoreDetails"}}},
+                    {$project: {scoreDetailsVal: "$scoreDetails.value"}},
+                    {$sort: {_id: 1}}
+                ]
+            }
+        }
+    ];
+    assertFailsScoreDetailsUnavailable(pipeline);
+}
+
+// Verify that scoreDetails cannot be projected from a $facet subpipeline where $scoreFusion sets
+// scoreDetails to false.
+{
+    const pipeline = [
+        {
+            $scoreFusion: {
+                input: {pipelines: {pipe: [{$search: searchQuery}]}, normalization: "none"},
+                scoreDetails: false
+            }
         },
         {
             $facet: {
@@ -304,10 +475,51 @@ runTest({
         let docs = result["pipe1"];
         for (let doc of docs) {
             assert(doc.hasOwnProperty("scoreDetailsVal"),
-                   `Result doc does not have property 
+                   `Result doc does not have property
             'scoreDetailsVal'. See  ${tojson(doc)}`);
             assert(doc.hasOwnProperty("score"),
-                   `Result doc does not have property 
+                   `Result doc does not have property
+            'score'. See  ${tojson(doc)}`);
+        }
+    }
+}
+
+// Verify that scoreDetails can be projected from a $facet subpipeline where $scoreFusion sets
+// scoreDetails to true.
+{
+    const results =
+        coll.aggregate([
+                {
+                    $scoreFusion: {
+                        input: {pipelines: {pipe: [{$search: searchQuery}]}, normalization: "none"},
+                        scoreDetails: true
+                    }
+                },
+                {
+                    $facet: {
+                        pipe1: [
+                            {$project: {scoreDetails: {$meta: "scoreDetails"}}},
+                            {
+                                $project: {
+                                    scoreDetailsVal: "$scoreDetails.value",
+                                    score: {$meta: "score"}
+                                }
+                            },
+                            {$sort: {_id: 1}}
+                        ]
+                    }
+                }
+            ])
+            .toArray();
+
+    for (let result of results) {
+        let docs = result["pipe1"];
+        for (let doc of docs) {
+            assert(doc.hasOwnProperty("scoreDetailsVal"),
+                   `Result doc does not have property
+            'scoreDetailsVal'. See  ${tojson(doc)}`);
+            assert(doc.hasOwnProperty("score"),
+                   `Result doc does not have property
             'score'. See  ${tojson(doc)}`);
         }
     }

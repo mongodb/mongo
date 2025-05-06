@@ -94,7 +94,7 @@ namespace score_details {
  */
 boost::intrusive_ptr<DocumentSource> addScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::string& prefix,
+    StringData inputPipelinePrefix,
     bool inputGeneratesScore,
     bool inputGeneratesScoreDetails);
 
@@ -104,38 +104,38 @@ boost::intrusive_ptr<DocumentSource> addScoreDetails(
  */
 std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(std::string pipelineName);
 
-// Calculate the final scoreDetails field for the entire stage. Creates the following object:
+// Calculate the final scoreDetails field for the entire stage. If rankFusion is false, then the
+// object for scoreFusion gets generated. Creates the following object:
+// For rankFusion:
 /*
     { $addFields: {
         calculatedScoreDetails: [
         {
             $mergeObjects: [
-                {inputPipelineName: "name1", rank: "$name1_rank", weight: <weight>},
+                {inputPipelineName: "name1", rank: "$name1_rank",
+                    weight: <weight>},
                 "$name1_scoreDetails"
             ]
         },
+*/
+// For scoreFusion:
+/*
+    { $addFields: {
+        calculatedScoreDetails: [
         {
             $mergeObjects: [
-                {inputPipelineName: "name2", rank: "$name2_rank", weight: <weight>},
+                {inputPipelineName: "name2", inputPipelineRawScore: "$name2_inputPipelineRawScore",
+                    weight: <weight>},
                 "$name2_scoreDetails"
             ]
-        },
-        ...
+        }
         ]
     }}
 */
 boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
     const StringMap<double>& weights,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-/**
- * Constuct the scoreDetails metadata object. Looks like the following:
- * { "$setMetadata": {"scoreDetails": {"value": "$score", "description":
- * {"scoreDetailsDescription..."}, "details": "$calculatedScoreDetails"}}},
- */
-boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
-    const std::string& scoreDetailsDescription,
+    bool isRankFusion,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 }  // namespace score_details
 }  // namespace mongo::hybrid_scoring_util
