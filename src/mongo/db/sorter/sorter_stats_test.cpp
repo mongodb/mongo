@@ -36,11 +36,9 @@ namespace {
 TEST(SorterStatsTest, Basic) {
     SorterTracker sorterTracker;
     SorterStats sorterStats(&sorterTracker);
-
     sorterStats.incrementSpilledRanges();
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
 }
-
 TEST(SorterStatsTest, MultipleSorters) {
     SorterTracker sorterTracker;
     SorterStats sorterStats1(&sorterTracker);
@@ -49,20 +47,37 @@ TEST(SorterStatsTest, MultipleSorters) {
 
     sorterStats1.incrementSpilledRanges();
     sorterStats2.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats1.spilledRanges(), 1);
+    ASSERT_EQ(sorterStats2.spilledRanges(), 1);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 2);
 
+    // Simulate increasing spilled ranges.
     sorterStats3.setSpilledRanges(10);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 12);
 }
 
-DEATH_TEST(SorterStatsTest, SetNonZeroNumSpilledRanges, "invariant") {
+TEST(SorterStatsTest, SingleSorterSpilledRanges) {
     SorterTracker sorterTracker;
     SorterStats sorterStats(&sorterTracker);
 
     sorterStats.incrementSpilledRanges();
+    sorterStats.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats.spilledRanges(), 2);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 2);
+
+    // Simulate increasing spilled ranges.
+    sorterStats.setSpilledRanges(3);
+    ASSERT_EQ(sorterStats.spilledRanges(), 3);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 3);
+
+    // Simulate decreasing spilled ranges.
+    sorterStats.setSpilledRanges(1);
+    ASSERT_EQ(sorterStats.spilledRanges(), 1);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
 
-    sorterStats.setSpilledRanges(10);
+    sorterStats.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats.spilledRanges(), 2);
+    ASSERT_EQ(sorterTracker.spilledRanges.load(), 2);
 }
 }  // namespace
 }  // namespace mongo

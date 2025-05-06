@@ -61,8 +61,7 @@ public:
     void incrementSpilledRanges();
 
     /**
-     * Sets the number of spilled ranges to the specified amount. Cannot be called after
-     * incrementSpilledRanges.
+     * Sets the number of spilled ranges to the specified amount.
      */
     void setSpilledRanges(long long spills);
 
