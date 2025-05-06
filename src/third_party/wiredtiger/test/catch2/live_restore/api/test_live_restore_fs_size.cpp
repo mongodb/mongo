@@ -15,7 +15,7 @@
 using namespace utils;
 
 // Wrapper for the calling the C implementation of fs_size.
-int
+static int
 file_size(live_restore_test_env &env, const std::string &file_name, wt_off_t *sizep)
 {
     WT_SESSION *session = (WT_SESSION *)env.session;
@@ -26,20 +26,15 @@ file_size(live_restore_test_env &env, const std::string &file_name, wt_off_t *si
     return env.lr_fs->iface.fs_size(fs, session, dest_file_path.c_str(), sizep);
 }
 
-enum HasDest { DEST, NO_DEST };
-enum HasSource { SOURCE, NO_SOURCE };
-enum IsMigrating { MIGRATING, NOT_MIGRATING };
-enum HasStop { STOP, NO_STOP };
-
-const int DEST_FILE_SIZE = 10;
-const int SOURCE_FILE_SIZE = 100;
+static const int DEST_FILE_SIZE = 10;
+static const int SOURCE_FILE_SIZE = 100;
 
 /*
  * Set up a live restore scenario where a file exists in some combination of the destination and
  * source directories, might have a stop file, and live restore might be in the process of
  * migrating. Then return the result of an fs_size call.
  */
-int
+static int
 test_file_size(live_restore_test_env *env, HasDest has_dest, HasSource has_source,
   IsMigrating is_migrating, HasStop stop_file_exists, wt_off_t *sizep)
 {

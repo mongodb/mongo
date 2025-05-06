@@ -537,11 +537,11 @@ void testutil_backup_create_incremental(
 void testutil_backup_force_stop(WT_SESSION *);
 void testutil_backup_force_stop_conn(WT_CONNECTION *);
 void testutil_build_dir(TEST_OPTS *, char *, int);
-void testutil_clean_test_artifacts(const char *);
+void testutil_clean_test_artifacts(void);
 void testutil_cleanup(TEST_OPTS *);
 void testutil_copy(const char *, const char *);
-void testutil_copy_data(const char *);
-void testutil_copy_data_opt(const char *, const char *);
+void testutil_copy_data(void);
+void testutil_copy_data_opt(const char *);
 void testutil_copy_ext(const char *, const char *, const WT_FILE_COPY_OPTS *opts);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);

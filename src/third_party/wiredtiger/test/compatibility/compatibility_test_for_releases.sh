@@ -113,7 +113,7 @@ build_branch()
         config+="-DENABLE_LZ4=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0 "
         config+="-DWT_STANDALONE_BUILD=0 "
         # Use the stable MongoDB toolchain for this build.
-        config+="-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake "
+        config+="-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake "
         # Disable cppsuite - not all versions build with the toolchain
         config+="-DENABLE_CPPSUITE=0"
 

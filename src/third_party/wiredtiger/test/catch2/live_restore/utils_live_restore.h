@@ -14,6 +14,11 @@
 
 namespace utils {
 
+typedef enum { DEST, NO_DEST } HasDest;
+typedef enum { SOURCE, NO_SOURCE } HasSource;
+typedef enum { MIGRATING, NOT_MIGRATING } IsMigrating;
+typedef enum { STOP, NO_STOP } HasStop;
+
 // File op helpers
 void create_file(const std::string &filepath, int len = 1);
 int open_lr_fh(const live_restore_test_env &env, const std::string &dest_file,

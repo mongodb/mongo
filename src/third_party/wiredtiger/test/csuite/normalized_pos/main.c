@@ -261,7 +261,6 @@ run(const char *working_dir, bool in_mem)
     test_normalized_pos(conn, in_mem, __wt_page_from_npos_for_read);
 
     testutil_check(conn->close(conn, ""));
-    testutil_clean_test_artifacts(home);
     testutil_remove(home);
 }
 

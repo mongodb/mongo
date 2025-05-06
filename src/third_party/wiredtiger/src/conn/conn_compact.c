@@ -383,12 +383,10 @@ __wt_background_compact_end(WT_SESSION_IMPL *session)
      * compaction to do work (rewriting bytes) while other operations cause the file to increase in
      * size.
      */
-    if (bytes_recovered <= 0) {
-        compact_stat->consecutive_unsuccessful_attempts++;
+    if (bytes_recovered <= 0)
         compact_stat->prev_compact_success = false;
-    } else {
+    else {
         WT_STAT_CONN_INCRV(session, background_compact_bytes_recovered, bytes_recovered);
-        compact_stat->consecutive_unsuccessful_attempts = 0;
         conn->background_compact.files_compacted++;
         compact_stat->prev_compact_success = true;
 

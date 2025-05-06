@@ -21,7 +21,7 @@ set -euf -o pipefail
 die() { echo "$@"; exit 1; }
 
 # Require the MongoDB toolchain.
-MDBTOOLCHAIN_PATH=/opt/mongodbtoolchain/v4/bin
+MDBTOOLCHAIN_PATH=/opt/mongodbtoolchain/v5/bin
 
 [[ $# -ne 2 ]] && die "Usage: $0 url srcdir"
 url=$1

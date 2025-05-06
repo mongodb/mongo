@@ -55,7 +55,7 @@ There are two options:
   For Ubuntu on Evergreen, first ensure that the correct C++ compiler is on the path:
   
   ```
-  export "PATH=/opt/mongodbtoolchain/v4/bin:$PATH"
+  export "PATH=/opt/mongodbtoolchain/v5/bin:$PATH"
   ```
 
   On both Mac or Evergreen, compile using g++.

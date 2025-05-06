@@ -94,7 +94,7 @@ EOF
 
 # Install tcmalloc library.
 (cd $PATCHED_SRC_DIR ;
- PATH=/opt/mongodbtoolchain/v4/bin:$PATH bazel build --verbose_failures libtcmalloc )
+ PATH=/opt/mongodbtoolchain/v5/bin:$PATH bazel build --verbose_failures libtcmalloc )
 
 # Package and upload. If the upload fails: fail the WT build, even though
 # there is an available binary. This is to ensure any problem becomes

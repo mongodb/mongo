@@ -48,7 +48,7 @@ functions:
               export PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
               export PYTHONPATH="($WT_TOPDIR/lang/python/wiredtiger):$(cygpath -w $WT_TOPDIR/lang/python)"
             else
-              export PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+              export PATH=/opt/mongodbtoolchain/v5/bin:$PATH
               export LD_LIBRARY_PATH=$WT_BUILDDIR
             fi
 
@@ -76,7 +76,7 @@ functions:
             if [ "$OS" = "Windows_NT" ]; then
               export PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
             else
-              export PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+              export PATH=/opt/mongodbtoolchain/v5/bin:$PATH
             fi
   # Since Bazel (currently used in SCons) uses EngFlow's remote execution system instead of icecream,
   # additional credentials need to be setup to maintain efficient compilation speed.
@@ -344,7 +344,13 @@ functions:
 
             # Preload tcmalloc in the Evergreen environment: this will affect
             # ALL binaries.
-            export LD_PRELOAD=$PWD/TCMALLOC_LIB/libtcmalloc.so
+            # FIXME-WT-14389 v5 toolchain clang Cmake configuration fails with tcmalloc preloading
+            # so it worth doing LD_PRELOAD right before running the tests (in PREPARE_TEST_ENV).
+            # Didn't move it there as part of this patch, since it is very likely that currently
+            # WT is tested without TCMalloc, because Evergreen resets the environment after
+            # execution of "configure wiredtiger" step which is another bug, but it should
+            # be handled in a separate PR.
+            # export LD_PRELOAD=$PWD/TCMALLOC_LIB/libtcmalloc.so
           fi
 
           # Compiling with CMake.
@@ -2911,7 +2917,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            env CC=/opt/mongodbtoolchain/v4/bin/gcc CXX=/opt/mongodbtoolchain/v4/bin/g++ PATH=/opt/mongodbtoolchain/v4/bin:/opt/java/jdk11/bin:$PATH bash s_release `date +%Y%m%d`
+            env CC=/opt/mongodbtoolchain/v5/bin/gcc CXX=/opt/mongodbtoolchain/v5/bin/g++ PATH=/opt/mongodbtoolchain/v5/bin:/opt/java/jdk11/bin:$PATH bash s_release `date +%Y%m%d`
 
   # Note that the project settings use this task name to compile the documentation during PR
   # testing, keep this in mind if you decide to change it.
@@ -3548,7 +3554,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            export "PATH=/opt/mongodbtoolchain/v5/bin:$PATH"
+            ${PREPARE_TEST_ENV}
             g++ -o memory_model_test -O2 memory_model_test.cpp -lpthread -std=c++20 -Wall -Werror
             ./memory_model_test -n 100000000
 
@@ -5530,8 +5536,8 @@ buildvariants:
     # Reduce the number of test iterations in validation stressing as TSan increases runtime by a factor of roughly 10x
     validation_stress_num_runs: 20
   tasks:
-    # Skip the azure/gcp tests as they don't compile under clang
-    - name: ".pull_request !.tiered_unittest !azure-gcp-tiered-test-small !.pull_request_compilers !.model_checking !csuite-wt12015-backup-corruption-test"
+    # Skip the azure/gcp/s3 tests as they don't compile under clang
+    - name: ".pull_request !s3-tiered-test-small !.tiered_unittest !azure-gcp-tiered-test-small !.pull_request_compilers !.model_checking !csuite-wt12015-backup-corruption-test"
     - name: compile
     - name: make-check-test
     - name: configure-combinations
@@ -5547,10 +5553,8 @@ buildvariants:
     - name: format-smoke-test
     - name: ".data-validation-stress-test"
     - name: catch2-test
-    - name: s3-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
     - name: catch2-assertions
-    - name: bench-tiered-push-pull-s3
 
 # Very minimal set without any extensions
 - name: ubuntu2004-minimal
@@ -5837,7 +5841,6 @@ buildvariants:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
-    - name: ".lint"
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: checkpoint-filetypes-test
@@ -6223,6 +6226,8 @@ buildvariants:
   batchtime: 1440 # 24 hours
   expansions:
     ENABLE_TCMALLOC: 1
+    # FIXME-WT-14461: Use stable toolchain once workgen tests are fixed.
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
     - name: ".workgen-test"

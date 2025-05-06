@@ -1276,8 +1276,8 @@ main(int argc, char *argv[])
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
 
-    /* Copy the data to a separate folder for debugging purpose. */
-    testutil_copy_data(home);
+    /* Copy the data to a separate folder for debugging purposes. */
+    testutil_copy_data();
 
     /*
      * Clear the cache, if we are using LazyFS. Do this after we save the data for debugging
@@ -1461,9 +1461,9 @@ main(int argc, char *argv[])
         printf("OPLOG: %" PRIu64 " record(s) absent from %" PRIu64 "\n", absent_oplog, count);
         fatal = true;
     }
-    if (fatal) {
+    if (fatal)
         ret = EXIT_FAILURE;
-    } else {
+    else {
         ret = EXIT_SUCCESS;
         printf("%" PRIu64 " records verified\n", count);
     }
@@ -1474,9 +1474,14 @@ main(int argc, char *argv[])
 
     /* Clean up the test directory. */
     if (ret == EXIT_SUCCESS && !opts->preserve)
-        testutil_clean_test_artifacts(home);
+        /* Current working directory is home (aka WT_TEST) */
+        testutil_clean_test_artifacts();
 
-    /* At this point, we are inside `home`, which we intend to delete. cd to the parent dir. */
+    /*
+     * We are in the home directory (typically WT_TEST), which we intend to delete. Go to the start
+     * directory. We do this to avoid deleting the current directory, which is disallowed on some
+     * platforms.
+     */
     if (chdir(cwd_start) != 0)
         testutil_die(errno, "root chdir: %s", home);
 

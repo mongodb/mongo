@@ -189,10 +189,8 @@ run_test(bool column_store, bool background_compact, const char *uri, bool prese
     conn = NULL;
 
     /* Cleanup */
-    if (!preserve) {
+    if (!preserve)
         testutil_remove(home);
-        testutil_clean_test_artifacts(home);
-    }
 
     return (EXIT_SUCCESS);
 }

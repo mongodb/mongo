@@ -28,11 +28,6 @@ file_exists(live_restore_test_env &env, const std::string &file_name)
     return exists;
 }
 
-enum HasDest { DEST, NO_DEST };
-enum HasSource { SOURCE, NO_SOURCE };
-enum IsMigrating { MIGRATING, NOT_MIGRATING };
-enum HasStop { STOP, NO_STOP };
-
 /*
  * Set up a live restore scenario where a file exists in some combination of the destination and
  * source directories, might have a stop file, and live restore might be in the process of

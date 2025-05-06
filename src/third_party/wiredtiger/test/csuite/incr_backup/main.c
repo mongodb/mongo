@@ -544,6 +544,7 @@ run_test(char const *working_dir, WT_RAND_STATE *rnd, bool preserve)
     const char *backup_verbose;
     int ncheckpoints, nreopens;
     char backup_src[1024], conf[1024], home[1024];
+    char cwd_start[PATH_MAX];
 
     /* Save the rnd state in the seed global variable for error reporting */
     seed = rnd->v;
@@ -557,6 +558,10 @@ run_test(char const *working_dir, WT_RAND_STATE *rnd, bool preserve)
     printf("Seed: %" PRIu64 " (0x%" PRIx64 ")\n", seed, seed);
 
     testutil_recreate_dir(home);
+
+    /* Remember the current working directory. */
+    testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
+
     /*
      * Go inside the home directory and create the database home. We also use the home directory as
      * the top level for creating the backup directories and check directory.
@@ -682,7 +687,15 @@ run_test(char const *working_dir, WT_RAND_STATE *rnd, bool preserve)
     printf("Success.\n");
     if (!preserve) {
         testutil_delete_old_backups(0);
-        testutil_clean_test_artifacts(home);
+        /*
+         * We are in the home directory (typically WT_TEST), which we intend to delete. Go to the
+         * start directory. We do this to avoid deleting the current directory, which is disallowed
+         * on some platforms.
+         */
+        if (chdir(cwd_start) != 0)
+            testutil_die(errno, "root chdir: %s", home);
+
+        /* Delete the work directory. */
         testutil_remove(home);
     }
 }
@@ -741,6 +754,12 @@ main(int argc, char *argv[])
          *
          * Whereas a seed of 0x9b1bde3f111fe316 will succeed even if the WT-10551 fix is commented
          * out because that seed doesn't generate the right set of steps to hit the issue.
+         */
+
+        /*
+         * TODO: WT-14558 - incr_backup test artifacts are generated and retained in a nested manner
+         * (WT_TEST.incr_backup/WT_TEST.incr_backup...) when preserve is true. These artifacts
+         * should instead be alongside the WT_TEST directory.
          */
         rnd.v = 0x9b1bde3f111fe316;
         run_test(working_dir, &rnd, preserve);

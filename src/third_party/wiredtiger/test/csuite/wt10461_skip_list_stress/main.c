@@ -223,7 +223,6 @@ run(const char *working_dir)
     testutil_check(cursor->close(cursor));
     testutil_check(session->close(session, ""));
     testutil_check(conn->close(conn, ""));
-    testutil_clean_test_artifacts(home);
     testutil_remove(home);
 }
 

@@ -17,7 +17,7 @@ echo "$0: compiler: $compiler"
 echo "$0: scan-build: $scan"
 
 # Check if Clang is available with the desired version.
-desired_version="12.0.1"
+desired_version="19.1.7"
 if ! $compiler --version | grep -q $desired_version; then
     echo "$compiler is not using the expected version: $desired_version"
     $compiler --version

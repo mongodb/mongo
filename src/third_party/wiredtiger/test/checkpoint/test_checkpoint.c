@@ -562,7 +562,7 @@ flcs_encode_value(size_t offset, char digit)
 static void
 flcs_decode_value(uint8_t value, size_t *offsetp, char *digitp)
 {
-    static const char digits[4] = "2357";
+    static const char digits[] = "2357";
 
     value -= FLCS_OFFSET;
 

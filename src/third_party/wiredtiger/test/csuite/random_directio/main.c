@@ -537,11 +537,7 @@ again:
          * Every 1000th record write a very large value that exceeds the log buffer size. This
          * forces us to use the unbuffered path.
          */
-        if (i % WT_THOUSAND == 0) {
-            cursor->set_value(cursor, large);
-        } else {
-            cursor->set_value(cursor, buf2);
-        }
+        cursor->set_value(cursor, (i % WT_THOUSAND == 0) ? large : buf2);
         testutil_check(cursor->insert(cursor));
 
         /*
@@ -885,9 +881,9 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
         large_arr[th] = dcalloc(LARGE_WRITE_SIZE, 1);
         large_buf(large_arr[th], LARGE_WRITE_SIZE, th, true);
     }
-    testutil_snprintf(checkdir, sizeof(checkdir), "../%s.CHECK", opts->home);
-    testutil_snprintf(dbgdir, sizeof(savedir), "../%s.DEBUG", opts->home);
-    testutil_snprintf(savedir, sizeof(savedir), "../%s.SAVE", opts->home);
+    testutil_snprintf(checkdir, sizeof(checkdir), "%s.CHECK", opts->home);
+    testutil_snprintf(dbgdir, sizeof(dbgdir), "%s.DEBUG", opts->home);
+    testutil_snprintf(savedir, sizeof(savedir), "%s.SAVE", opts->home);
 
     /*
      * We make a copy of the directory (possibly using direct I/O) for recovery and checking, and an
@@ -1140,6 +1136,7 @@ main(int argc, char *argv[])
     int ch, status;
     char *arg, *p;
     char args[1024], buf[1024];
+    char cwd_start[PATH_MAX]; /* The working directory when we started */
     const char *method, *working_dir;
     bool populate_only, preserve, rand_th, rand_time, verify_only;
 
@@ -1266,6 +1263,10 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(opts->home, PATH_MAX, working_dir);
+
+    /* Remember the current working directory. */
+    testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
+
     /*
      * If the user wants to verify they need to tell us how many threads there were so we know what
      * records we can expect.
@@ -1362,7 +1363,19 @@ main(int argc, char *argv[])
     printf("SUCCESS\n");
 
     if (!preserve) {
-        testutil_clean_test_artifacts(opts->home);
+        if (chdir(opts->home) != 0)
+            testutil_die(errno, "Child chdir: %s", opts->home);
+        testutil_clean_test_artifacts();
+
+        /*
+         * We are in the home directory (typically WT_TEST), which we intend to delete. Go to the
+         * start directory. We do this to avoid deleting the current directory, which is disallowed
+         * on some platforms.
+         */
+        if (chdir(cwd_start) != 0)
+            testutil_die(errno, "root chdir: %s", opts->home);
+
+        /* Delete the work directory. */
         testutil_remove(opts->home);
     }
 

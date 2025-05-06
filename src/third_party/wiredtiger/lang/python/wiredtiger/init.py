@@ -58,7 +58,7 @@ if os.environ.get("TESTUTIL_TSAN") == "1":
     import subprocess
 
     # FIXME-WT-13143 We assume TSan is only compatible with clang here. This may change in the future.
-    command = "clang --print-file-name libtsan.so.0"
+    command = "clang --print-file-name libtsan.so.2"
     find_tsan_so = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     tsan_so_path = find_tsan_so.stdout.strip()
     if not os.path.isfile(tsan_so_path):
