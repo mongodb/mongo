@@ -78,6 +78,7 @@ public:
     ~NetworkInterfaceTL() override;
 
     constexpr static Milliseconds kCancelCommandTimeout{1000};
+    constexpr static Milliseconds kCancelCommandTimeout_forTest{5000};
 
     std::string getDiagnosticString() override;
     void appendConnectionStats(ConnectionPoolStats* stats) const override;

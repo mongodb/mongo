@@ -392,6 +392,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelLocally) {
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotely) {
     // Enable blockConnection for "echo".
+    FailPointEnableBlock fpb("increaseTimeoutOnKillOp");
     assertCommandOK(DatabaseName::kAdmin,
                     BSON("configureFailPoint"
                          << "failCommand"
@@ -454,10 +455,12 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
                          << "mode"
                          << "alwaysOn"
                          << "data"
-                         << BSON("blockConnection" << true << "blockTimeMS" << 5000
-                                                   << "failCommands"
-                                                   << BSON_ARRAY("echo"
-                                                                 << "_killOperations"))),
+                         << BSON("blockConnection"
+                                 << true << "blockTimeMS"
+                                 << NetworkInterfaceTL::kCancelCommandTimeout.count() + 4000
+                                 << "failCommands"
+                                 << BSON_ARRAY("echo"
+                                               << "_killOperations"))),
                     kNoTimeout);
 
     ON_BLOCK_EXIT([&] {
