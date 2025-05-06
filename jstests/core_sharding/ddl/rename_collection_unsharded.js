@@ -197,28 +197,3 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     assert.eq(
         shardedToColl.find({x: {$exists: true}}).itcount(), 0, 'Expected no target documents');
 }
-
-// TODO SERVER-98025 move this test case to jstests/core/ddl/rename_collection.js
-{
-    jsTest.log('[C2C] Rename of existing collection with extra UUID parameter must succeed');
-    const dbName = 'testRenameToUnshardedCollectionWithSourceUUID';
-    const testDB = setupTestDatabase(db, dbName);
-
-    const unshardedFromColl = testDB.getCollection(fromCollName);
-    unshardedFromColl.insert({a: 0});
-
-    const unshardedToColl = testDB.getCollection(toCollName);
-    unshardedToColl.insert({b: 0});
-
-    const sourceUUID = assert.commandWorked(testDB.runCommand({listCollections: 1}))
-                           .cursor.firstBatch.find(c => c.name === fromCollName)
-                           .info.uuid;
-
-    // The command succeeds when the correct UUID is provided.
-    assert.commandWorked(testDB.adminCommand({
-        renameCollection: unshardedFromColl.getFullName(),
-        to: unshardedToColl.getFullName(),
-        dropTarget: true,
-        collectionUUID: sourceUUID,
-    }));
-}
