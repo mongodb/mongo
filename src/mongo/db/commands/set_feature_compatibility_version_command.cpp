@@ -866,30 +866,36 @@ private:
         }
 
         if (isUpgrading) {
-            // TODO SERVER-102084: drain all coordinators that started under the original FCV
-
-            // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-            if (feature_flags::gShardAuthoritativeDbMetadataDDL
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                // This is is needed for SPM-3729. Since we're going to have a feature flag changing
-                // value in kUpgrading, we need to drain coordinators that started in FCV 8.0.
-                // waitForOngoingCoordinatorsToFinish() could also wait for coordinators that
-                // started AFTER the transition to kUpgrading. That's OK, it's a performance
-                // penalty, but there is no correctness issue.
-                // TODO (SERVER-102084): update draining mechanism.
+            if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(requestedVersion)) {
+                // Wait until all DDL coordinators that run are on the kUpgrading* FCV
                 ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForOngoingCoordinatorsToFinish(
-                        opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
-                            static constexpr std::array drainCoordinatorTypes{
-                                DDLCoordinatorTypeEnum::kMovePrimary,
-                                DDLCoordinatorTypeEnum::kDropDatabase,
-                                DDLCoordinatorTypeEnum::kCreateDatabase,
-                            };
-                            const auto opType = coordinatorInstance.operationType();
-                            return std::ranges::any_of(drainCoordinatorTypes,
-                                                       [&](auto&& type) { return opType == type; });
+                    ->waitForCoordinatorsOfGivenOfcvToComplete(
+                        opCtx, [fcvSnapshot](boost::optional<FCV> ofcv) -> bool {
+                            return ofcv != fcvSnapshot.getVersion();
                         });
+            } else {
+                // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
+                if (feature_flags::gShardAuthoritativeDbMetadataDDL
+                        .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                      originalVersion)) {
+                    // Since we have a feature flag changing value in kUpgrading, we need to drain
+                    // coordinators that started in FCV 8.0. waitForOngoingCoordinatorsToFinish may
+                    // also wait for coordinators that started AFTER the transition to kUpgrading.
+                    // That's OK, it's a performance penalty, but there is no correctness issue.
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForOngoingCoordinatorsToFinish(
+                            opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                                static constexpr std::array drainCoordinatorTypes{
+                                    DDLCoordinatorTypeEnum::kMovePrimary,
+                                    DDLCoordinatorTypeEnum::kDropDatabase,
+                                    DDLCoordinatorTypeEnum::kCreateDatabase,
+                                };
+                                const auto opType = coordinatorInstance.operationType();
+                                return std::ranges::any_of(drainCoordinatorTypes, [&](auto&& type) {
+                                    return opType == type;
+                                });
+                            });
+                }
             }
         }
     }
@@ -1739,7 +1745,24 @@ private:
                             const multiversion::FeatureCompatibilityVersion requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
-        // TODO SERVER-102084: drain all coordinators that started during kDowngrading
+        // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
+        // (Ignore FCV check): Skip draining by OFCV if the feature flag is not enabled on any FCV
+        if (role && role->has(ClusterRole::ShardServer) &&
+            feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledAndIgnoreFCVUnsafe()) {
+            auto expectedOfcv =
+                feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(requestedVersion)
+                ? boost::make_optional(requestedVersion)
+                : boost::none;
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenOfcvToComplete(
+                    opCtx, [expectedOfcv](boost::optional<FCV> ofcv) -> bool {
+                        return ofcv != expectedOfcv;
+                    });
+        }
+
+        // The following draining of DDL coordinators are redundant if their feature flag is enabled
+        // on a version greater than or equal to that of featureFlagSnapshotFCVInDDLCoordinators.
+        // Keeping them has the purpose of allowing those features to be released independently.
 
         // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
         if (role && role->has(ClusterRole::ConfigServer) &&

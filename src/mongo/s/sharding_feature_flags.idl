@@ -207,6 +207,7 @@ feature_flags:
         default: true
         version: 8.2
         shouldBeFCVGated: true
+        enable_on_transitional_fcv: true
     # TODO (SERVER-103838): remove feature once 9.0 becomes LTS.
     featureFlagPersistRecipientPlacementInfoInMigrationRecoveryDoc:
         description:

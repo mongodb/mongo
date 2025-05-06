@@ -430,7 +430,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType)
     mbocTasks.push_back({spawnMigrationBlockingOperationCoordinator(
         opCtx,
         NamespaceString::createNamespaceString_forTest("testDB.collA"),
-        multiversion::GenericFCV::kLastLTS)});
+        multiversion::GenericFCV::kDowngradingFromLatestToLastLTS)});
     mbocTasks.push_back({spawnMigrationBlockingOperationCoordinator(
         opCtx,
         NamespaceString::createNamespaceString_forTest("testDB.collB"),
@@ -450,7 +450,8 @@ TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType)
 
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLatest, 2);
-    assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLastLTS, 1);
+    assertNumActiveCoordinatorsWithGivenOfcv(
+        multiversion::GenericFCV::kDowngradingFromLatestToLastLTS, 1);
     assertNumActiveCoordinatorsWithGivenOfcv(boost::none, 1);
 
     PseudoRandom prng(Date_t::now().asInt64());
@@ -465,7 +466,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType)
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     ddlService()->waitForCoordinatorsOfGivenOfcvToComplete(
         opCtx, [](boost::optional<FCV> ofcv) -> bool {
-            return ofcv != multiversion::GenericFCV::kLastLTS;
+            return ofcv != multiversion::GenericFCV::kDowngradingFromLatestToLastLTS;
         });
 
     ASSERT_FALSE(mbocTasks[0].instance->getCompletionFuture().isReady());
@@ -475,7 +476,8 @@ TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType)
 
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLatest, 0);
-    assertNumActiveCoordinatorsWithGivenOfcv(multiversion::GenericFCV::kLastLTS, 1);
+    assertNumActiveCoordinatorsWithGivenOfcv(
+        multiversion::GenericFCV::kDowngradingFromLatestToLastLTS, 1);
     assertNumActiveCoordinatorsWithGivenOfcv(boost::none, 0);
 
     endLatestAndNoOfcvTasksThread.join();
@@ -488,7 +490,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType)
     // (Generic FCV reference): used for testing, should exist across LTS binary versions
     ddlService()->waitForCoordinatorsOfGivenOfcvToComplete(
         opCtx, [](boost::optional<FCV> ofcv) -> bool {
-            return ofcv == multiversion::GenericFCV::kLastLTS;
+            return ofcv == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS;
         });
 
     ASSERT_TRUE(mbocTasks[0].instance->getCompletionFuture().isReady());
