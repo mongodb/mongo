@@ -81,6 +81,8 @@ types:
 
 structs:
 
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
     WriteCommandReplyBase:
         description: "Contains fields that is common in all the write commands reply."
         fields:
@@ -114,10 +116,12 @@ structs:
                 stability: unstable
             writeConcernError:
                 description: "Contains a write concern error encountered."
-                type: object
+                type: object_owned
                 optional: true
                 stability: unstable
 
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
     InsertCommandReply:
         description: "Contains information related to insert command reply."
         strict: false
@@ -137,6 +141,8 @@ structs:
                 type: IDLAnyTypeOwned
                 stability: stable
 
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
     UpdateCommandReply:
         description: "Contains information related to update command reply."
         strict: false
@@ -155,6 +161,8 @@ structs:
                 default: 0
                 stability: stable
 
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
     DeleteCommandReply:
         description: "Contains information related to delete command reply."
         strict: false
@@ -365,6 +373,8 @@ structs:
                 optional: true
                 stability: stable
 
+    # Note that all fields in this struct must be owned to prevent memory problems during parsing
+    # via write_ops.cpp helpers. See SERVER-103148 for more information.
     FindAndModifyCommandReply:
         description: "Parser for the response from a `findAndModify` command"
         strict: false
@@ -388,7 +398,7 @@ structs:
                 stability: unstable
             writeConcernError:
                 description: "Contains a write concern error encountered."
-                type: object
+                type: object_owned
                 optional: true
                 stability: unstable
 
