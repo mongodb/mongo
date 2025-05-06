@@ -1218,6 +1218,14 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--multiversionDir",
+            dest="multiversion_dirs",
+            action="append",
+            metavar="MULTIVERSION_DIR",
+            help="Directory to search for multiversion binaries. Can be specified multiple times.",
+        )
+
+        parser.add_argument(
             "--excludeWithAnyTags",
             action="append",
             dest="exclude_with_any_tags",
@@ -1701,6 +1709,13 @@ class RunPlugin(PluginInterface):
             dest="test_selection_strategies_array",
             action="append",
             help="Specify test selection strategy. Can be specified multiple times.",
+        )
+
+        parser.add_argument(
+            "--noValidateSelectorPaths",
+            dest="validate_selector_paths",
+            action="store_false",
+            help="Skip validating that all paths in suite config selectors are valid.",
         )
 
         configure_resmoke.add_otel_args(parser)

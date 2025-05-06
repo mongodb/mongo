@@ -13,7 +13,9 @@ export PIPX_HOME="${workdir}/pipx"
 export PIPX_BIN_DIR="${workdir}/pipx/bin"
 export PATH="$PATH:$PIPX_BIN_DIR"
 
-rm -rf /data/install /data/multiversion
+link_dir="${multiversion_link_dir}"
+install_dir="${multiversion_install_dir}"
+rm -rf $link_dir $install_dir
 
 edition="${multiversion_edition}"
 platform="${multiversion_platform}"
@@ -36,8 +38,8 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
 fi
 
 base_command="db-contrib-tool setup-repro-env"
-evergreen_args="--installDir /data/install \
-  --linkDir /data/multiversion \
+evergreen_args="--installDir $install_dir \
+  --linkDir $link_dir \
   --platform $platform \
   --architecture $architecture \
   --evgVersionsFile multiversion-downloads.json"
@@ -56,8 +58,8 @@ if [ ! -z "${multiversion_platform_50_or_later}" ]; then
   platform="${multiversion_platform_50_or_later}"
 fi
 
-evergreen_args="--installDir /data/install \
-  --linkDir /data/multiversion \
+evergreen_args="--installDir $install_dir \
+  --linkDir $link_dir \
   --platform $platform \
   --architecture $architecture \
   --evgVersionsFile multiversion-downloads.json"
@@ -84,8 +86,8 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
     last_continuous_arg="${last_continuous_evg_version_id}=last-continuous"
   fi
 
-  future_git_tag_args="--installDir /data/install \
-    --linkDir /data/multiversion \
+  future_git_tag_args="--installDir $install_dir \
+    --linkDir $link_dir \
     --variant ${multiversion_last_continuous_variant} \
     --evgVersionsFile multiversion-downloads.json \
     --resmokeCmd \"python buildscripts/resmoke.py\" \

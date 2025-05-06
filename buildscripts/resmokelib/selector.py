@@ -221,7 +221,7 @@ class _TestList(object):
 
     def _expand_roots(self, tests: List[str]) -> List[str]:
         paths = self._evaluate_paths(tests)
-        if len(paths.unrecognized) > 0:
+        if len(paths.unrecognized) > 0 and config.VALIDATE_SELECTOR_PATHS:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
                     config_section="roots", not_matching_paths=paths.unrecognized
@@ -239,7 +239,7 @@ class _TestList(object):
             raise TypeError("_TestList does not contain files.")
 
         paths = self._evaluate_paths(include_files)
-        if len(paths.unrecognized) > 0:
+        if len(paths.unrecognized) > 0 and config.VALIDATE_SELECTOR_PATHS:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
                     config_section="include_files", not_matching_paths=paths.unrecognized
@@ -252,7 +252,7 @@ class _TestList(object):
             if path.startswith(self._test_file_explorer.get_jstests_dir())
             and path not in self._roots
         ]
-        if len(paths_missing_from_roots) > 0:
+        if len(paths_missing_from_roots) > 0 and config.VALIDATE_SELECTOR_PATHS:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
                     config_section="include_files", not_matching_paths=paths_missing_from_roots
@@ -271,7 +271,7 @@ class _TestList(object):
             raise TypeError("_TestList does not contain files.")
 
         paths = self._evaluate_paths(exclude_files)
-        if len(paths.unrecognized) > 0:
+        if len(paths.unrecognized) > 0 and config.VALIDATE_SELECTOR_PATHS:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
                     config_section="exclude_files", not_matching_paths=paths.unrecognized
@@ -284,7 +284,7 @@ class _TestList(object):
             if path.startswith(self._test_file_explorer.get_jstests_dir())
             and path not in self._roots
         ]
-        if len(paths_missing_from_roots) > 0:
+        if len(paths_missing_from_roots) > 0 and config.VALIDATE_SELECTOR_PATHS:
             raise errors.SuiteSelectorConfigurationError(
                 _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
                     config_section="exclude_files", not_matching_paths=paths_missing_from_roots

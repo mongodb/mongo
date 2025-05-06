@@ -156,3 +156,28 @@ resmoke_suite_test(
         "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
     ],
 )
+
+# This is an experimental test target for running running the multiversion_sanity_check
+# suite as a bazel test. It runs in an experimental Evergreen task on an
+# infrequent build variant. You should not worry about this target being
+# perfectly up-to-date with the suite config, nor create similar bazel targets
+# for other suites. Cleanup with SERVER-103537.
+resmoke_suite_test(
+    name = "multiversion_sanity_check_last_continuous_new_new_old",
+    srcs = [
+        "//jstests/core/testing:all_javascript_files",
+    ],
+    config = ":matrix_suites/generated_suites/multiversion_sanity_check_last_continuous_new_new_old.yml",
+    data = [
+        "//:multiversion_binaries",
+        "//jstests/hooks:all_javascript_files",
+    ],
+    needs_mongo = True,
+    needs_mongod = True,
+    resmoke_args = [
+        "--storageEngineCacheSizeGB=1",
+    ],
+    tags = [
+        "manual",  # exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+)

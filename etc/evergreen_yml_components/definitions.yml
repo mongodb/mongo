@@ -867,6 +867,9 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/multiversion_setup.sh"
+      env:
+        multiversion_install_dir: ${multiversion_install_dir|/data/install}
+        multiversion_link_dir: ${multiversion_link_dir|/data/multiversion}
 
   "do multiversion setup":
     - *f_expansions_write

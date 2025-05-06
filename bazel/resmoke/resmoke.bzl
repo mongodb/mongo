@@ -26,6 +26,8 @@ def _resmoke_suite_test_impl(ctx):
         "run",
         "--dbpathPrefix=$TEST_UNDECLARED_OUTPUTS_DIR/data",
         "--taskWorkDir=$TEST_UNDECLARED_OUTPUTS_DIR",
+        "--multiversionDir=multiversion_binaries",
+        "--noValidateSelectorPaths",  # Skip validating selector paths. Excluded files in a suite config should not be required dependencies.
         "--continueOnFailure",
         "--suite",
         suite,

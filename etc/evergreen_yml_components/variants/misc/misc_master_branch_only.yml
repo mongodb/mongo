@@ -45,6 +45,11 @@ buildvariants:
         variant: amazon-linux2023-arm64-static-compile
     expansions:
       compile_variant: amazon-linux2023-arm64-static-compile
+      multiversion_platform: amazon2023
+      multiversion_edition: enterprise
+      multiversion_architecture: aarch64
+      multiversion_link_dir: multiversion_binaries
     tasks:
       - name: bazel_test_jscore
+      - name: bazel_test_multiversion_sanity_check_last_continuous_new_new_old
       - name: bazel_test_jstestfuzz

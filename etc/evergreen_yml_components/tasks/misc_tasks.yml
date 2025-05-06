@@ -1145,7 +1145,6 @@ tasks:
       - func: "git get project and add git tag"
       - func: "do setup"
       - func: "get engflow creds"
-      - func: "f_expansions_write"
       - func: "bazel test"
         vars:
           targets: //buildscripts/resmokeconfig:core
@@ -1176,6 +1175,31 @@ tasks:
       - func: "bazel test"
         vars:
           targets: //buildscripts/resmokeconfig:jstestfuzz
+          compiling_for_test: true
+          bazel_args: >-
+            --config=no-remote-exec
+            --test_output=all
+            --workspace_status_command="bazel/resmoke/volatile_status.sh"
+            --//bazel/resmoke:in_evergreen
+      - command: attach.results
+        params:
+          file_location: report.json
+
+  # Experimental task running one of the multiversion sanity check suites bazel target. To be removed with SERVER-103537.
+  - name: bazel_test_multiversion_sanity_check_last_continuous_new_new_old
+    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "git get project and add git tag"
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - func: "configure evergreen api credentials"
+      - func: "do multiversion setup"
+      - func: "get engflow creds"
+      - func: "bazel test"
+        vars:
+          targets: //buildscripts/resmokeconfig:multiversion_sanity_check_last_continuous_new_new_old
           compiling_for_test: true
           bazel_args: >-
             --config=no-remote-exec

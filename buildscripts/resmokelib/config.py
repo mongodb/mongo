@@ -92,6 +92,7 @@ DEFAULTS = {
     "mongocryptd_set_parameters": [],
     "mongo_set_parameters": [],
     "mrlog": None,
+    "multiversion_dirs": DEFAULT_MULTIVERSION_DIRS,
     "no_journal": False,
     "num_clients_per_fixture": 1,
     "use_tenant_client": False,
@@ -144,6 +145,7 @@ DEFAULTS = {
     "shell_tls_certificate_key_file": None,
     "mongos_tls_certificate_key_file": None,
     "mongod_tls_certificate_key_file": None,
+    "validate_selector_paths": True,
     # Internal testing options.
     "internal_params": [],
     # Evergreen options.
@@ -337,6 +339,9 @@ DBPATH_PREFIX = None
 
 # The path to the dbtest executable used by resmoke.py.
 DBTEST_EXECUTABLE = None
+
+# Directories to search for multiversion binaries
+MULTIVERSION_DIRS = []
 
 # If set to "tests", then resmoke.py will output the tests that would be run by each suite (without
 # actually running them).
@@ -779,3 +784,6 @@ CONFIG_FUZZER_ENCRYPTION_OPTS = None
 # we need a way to provide the JS_GC_ZEAL setting provided as part of the mongo_mozjs_opts
 # exclusively to mongod/mongos.
 MOZJS_JS_GC_ZEAL = None
+
+# If resmoke should check that all paths in suite config selectors are valid.
+VALIDATE_SELECTOR_PATHS = True

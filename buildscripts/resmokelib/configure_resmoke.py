@@ -477,6 +477,8 @@ be invoked as either:
             if config.get(keyname, None) is None:
                 config[keyname] = os.path.join(_config.INSTALL_DIR, binary)
 
+    _config.MULTIVERSION_DIRS = [_expand_user(dir) for dir in config.pop("multiversion_dirs")]
+
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
 
@@ -768,6 +770,8 @@ be invoked as either:
     _config.MAX_TEST_QUEUE_SIZE = config.pop("max_test_queue_size")
 
     _config.FUZZ_RUNTIME_STRESS = config.pop("fuzz_runtime_stress")
+
+    _config.VALIDATE_SELECTOR_PATHS = config.pop("validate_selector_paths")
 
     def configure_tests(test_files, replay_file):
         # `_validate_options` has asserted that at most one of `test_files` and `replay_file` contains input.
