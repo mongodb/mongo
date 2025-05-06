@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
@@ -247,6 +248,27 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         auto serializedPipe = _pipeline->serializeToBson();
         logStartingSubPipeline(serializedPipe);
         try {
+
+            // We determine whether we should dismiss disposal for a $search subpipeline here for a
+            // combination of reasons:
+            // 1. The subpipeline of the $search stage will have an invalid opCtx on its
+            // PipelineDeleter during getMore operations. After the call to
+            // attachCursorSourceToPipeline(), the subpipeline goes out of scope, and during
+            // disposal, its invalid opCtx is set to the opCtx used for _pipeline execution. This
+            // results in the _pipeline executing with an invalid opCtx, which leads to errors.
+            // 2. To address an invalid opCtx on the pipelineDeleter, there is a dismissDisposal()
+            // to prevent pipelines from disposing of themselves. This allows an owner to dispose of
+            // a pipeline with a valid opCtx. The $search stage must call dismissDisposal() on its
+            // subpipeline and then ensure its proper disposal with a valid opCtx.
+            // 3. Calling dismissDisposal() for a subpipeline is only safe when its parent document
+            // source is part of a pipeline as the pipeline object handles calling disposal for its
+            // document sources. Generally, we can be sure that a document source is part of a
+            // pipeline during doGetNext(). Since attachCursorSourceToPipeline() and setup is done
+            // prior to _pipeline execution, we cannot dismiss disposal for the $search subpipeline
+            // during its doGetNext() - as that occurs after setup - so we add some $search logic
+            // here, where we know that the $search stage is in a pipeline.
+            _pipeline = getSearchHelpers(pExpCtx->opCtx->getServiceContext())
+                            ->dismissSearchSubpipelineDisposal(std::move(_pipeline));
             _pipeline =
                 pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
             _executionState = ExecutionProgress::kIteratingSubPipeline;

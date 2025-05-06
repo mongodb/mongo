@@ -132,6 +132,7 @@ buildvariants:
   - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
+  - name: search
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: generate_buildid_to_debug_symbols_mapping

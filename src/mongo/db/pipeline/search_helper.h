@@ -86,6 +86,11 @@ public:
     virtual bool isSearchMetaPipeline(const Pipeline* pipeline) {
         return false;
     }
+
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> dismissSearchSubpipelineDisposal(
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
+        return pipeline;
+    };
 };
 
 /**
