@@ -44,6 +44,7 @@ mongo_cc_library(
             "-DHAVE_DIRENT_H",
             "-DHAVE_SYS_TIME_H",
             "-DHAVE_UNISTD_H",
+            "-Wno-implicit-fallthrough",
         ],
         "//conditions:default": [
             "-DHAVE_DIRENT_H",
