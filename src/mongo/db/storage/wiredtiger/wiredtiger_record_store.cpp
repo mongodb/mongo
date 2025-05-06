@@ -762,6 +762,22 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
     CursorKey key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+    if (ret == WT_NOTFOUND) {
+        if (TestingProctor::instance().isEnabled()) {
+            LOGV2_FATAL(9099700,
+                        "Record to be deleted not found",
+                        "nss"_attr = namespaceForUUID(opCtx, _uuid),
+                        "RecordId"_attr = id);
+        } else {
+            // Return early without crash if in production.
+            LOGV2_ERROR(9099701,
+                        "Record to be deleted not found",
+                        "nss"_attr = namespaceForUUID(opCtx, _uuid),
+                        "RecordId"_attr = id);
+            printStackTrace();
+            return;
+        }
+    }
     invariantWTOK(ret, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
