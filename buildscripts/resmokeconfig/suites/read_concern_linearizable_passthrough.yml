@@ -16,6 +16,8 @@ selector:
     # The NoOp write from linearizable getMores will cause awaitdata_getmore_cmd.js to loop
     # indefinitely as it tails the oplog.
     - jstests/core/**/awaitdata_getmore_cmd.js
+    # express_pbt.js takes a long time and consistently times out
+    - jstests/core/index/express_pbt.js
   exclude_with_any_tags:
     ##
     # The next three tags correspond to the special errors thrown by the

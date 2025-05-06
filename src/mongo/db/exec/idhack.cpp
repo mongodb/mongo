@@ -60,11 +60,10 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          WorkingSet* ws,
                          VariantCollectionPtrOrAcquisition collection,
                          const IndexDescriptor* descriptor)
-    : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
-      _workingSet(ws),
-      _key(static_cast<ComparisonMatchExpressionBase*>(query->getPrimaryMatchExpression())
-               ->getData()
-               .wrap("_id")) {
+    : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws), _workingSet(ws) {
+    auto cmpExpr = dynamic_cast<ComparisonMatchExpressionBase*>(query->getPrimaryMatchExpression());
+    tassert(10269300, "Invalid match expression", cmpExpr);
+    _key = cmpExpr->getData().wrap("_id");
     _specificStats.indexName = descriptor->indexName();
     _addKeyMetadata = query->getFindCommandRequest().getReturnKey();
 }
