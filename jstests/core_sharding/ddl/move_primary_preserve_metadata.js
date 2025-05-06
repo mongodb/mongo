@@ -89,10 +89,20 @@ function testMovePrimary(sharded) {
     // ----------------------------
     // Change database primary shard
     // ----------------------------
-    const fromShard = db.getDatabasePrimaryShardId();
-    const toShard = getRandomShardName(db, /* exclude= */ fromShard);
+    assert.soon(() => {
+        const fromShard = db.getDatabasePrimaryShardId();
+        const toShard = getRandomShardName(db, /* exclude= */ fromShard);
 
-    assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: toShard}));
+        jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${toShard}`);
+        const res = db.adminCommand({movePrimary: db.getName(), to: toShard});
+        if (res.code == ErrorCodes.ShardNotFound) {
+            jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${
+                toShard} failed, retrying...`);
+            return false;
+        }
+        assert.commandWorked(res);
+        return true;
+    });
 
     // ----------------------------
     // Check post conditions

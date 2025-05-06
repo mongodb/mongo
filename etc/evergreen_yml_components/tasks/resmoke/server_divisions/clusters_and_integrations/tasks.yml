@@ -1916,7 +1916,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: sharded_collections_jscore_passthrough_with_config_transitions_gen
+    name: sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
@@ -2141,7 +2141,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: sharding_jscore_passthrough_with_config_transitions_gen
+    name: sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
@@ -2270,7 +2270,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_gen
+    name: aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_and_add_remove_shard_gen
     # TODO SERVER-83445 Enable on non-all-feature-flag variants.
     tags:
       [
@@ -2388,7 +2388,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_gen
+    name: concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
@@ -3045,7 +3045,7 @@ tasks:
 
   ## jstestfuzz sharded cluster with config transitions ##
   - <<: *jstestfuzz_template
-    name: jstestfuzz_sharded_with_config_transitions_gen
+    name: jstestfuzz_sharded_with_config_transitions_and_add_remove_shard_gen
     # TODO(SERVER-69996) remove "incompatible_debug_mode" tag
     tags:
       [
@@ -3062,7 +3062,7 @@ tasks:
         vars:
           <<: *jstestfuzz_config_vars
           jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_sharded_with_config_transitions
+          suite: jstestfuzz_sharded_with_config_transitions_and_add_remove_shard
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   - <<: *gen_task_template

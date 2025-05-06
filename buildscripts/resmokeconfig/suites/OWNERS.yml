@@ -134,3 +134,12 @@ filters:
   - "sharding_unified_write_executor.yml":
     approvers:
       - 10gen/query-execution-router
+  - "sharded_collections_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "jstestfuzz_sharded_with_config_transitions_and_add_remove_shard.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing

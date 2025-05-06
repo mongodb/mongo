@@ -39,6 +39,47 @@ const kRetryableErrors = [
     {code: ErrorCodes.AddOrRemoveShardInProgress}
 ];
 
+const kCommandRetryableOnShardNotFoundError = {
+    // The function in the KV pair's value must return true if the command is retryable
+    "moveChunk": (command) => {
+        // only retryable if the target is the config shard (as eventually it will show up again)
+        return command.toShard == "config";
+    },
+    "moveRange": (command) => {
+        // only retryable if the target is the config shard (as eventually it will show up again)
+        return command.toShard == "config";
+    },
+    "movePrimary": (command) => {
+        // only retryable if the target is the config shard (as eventually it will show up again)
+        return command.to == "config";
+    },
+    "moveCollection": (command) => {
+        // only retryable if the target is the config shard (as eventually it will show up again)
+        return command.toShard == "config";
+    },
+    "enableSharding": (command) => {
+        // if the target is omitted, we can retry
+        if (!command.hasOwnProperty["primaryShard"]) {
+            return true;
+        }
+        // only retryable if the target is the config shard (as eventually it will show up again)
+        return command.primaryShard == "config";
+    },
+    "reshardCollection": (command) => {
+        // if the target is omitted, we can retry
+        if (!command.hasOwnProperty["shardDistribution"]) {
+            return true;
+        }
+        // if we have more than one target, it's non-retryable
+        if (command.shardDistribution.length > 1) {
+            return false;
+        }
+        // if we have one target, only retryable if the target is the config shard (as eventually it
+        // will show up again)
+        return command.shardDistribution[0].shard == "config";
+    }
+};
+
 // Commands known not to work with transitions so tests can fail immediately with a clear error.
 // Empty for now.
 const kDisallowedCommandsInsideTxns = [];
@@ -53,10 +94,21 @@ function matchesRetryableError(error, retryableError) {
     return true;
 }
 
-function isRetryableError(error) {
+function isRetryableError(cmdObj, error) {
     for (const retryableError of kRetryableErrors) {
         if (matchesRetryableError(error, retryableError)) {
-            return true;
+            // we only have special handlers for the ShardNotFound, so otherwise it's retryable
+            if (retryableError.code != ErrorCodes.ShardNotFound) {
+                return true;
+            }
+
+            const commandName = getCommandName(cmdObj);
+            // if it has no special handler, we can retry
+            if (!kCommandRetryableOnShardNotFoundError.hasOwnProperty(commandName)) {
+                return true;
+            }
+
+            return kCommandRetryableOnShardNotFoundError[commandName](cmdObj);
         }
     }
     return false;
@@ -74,7 +126,7 @@ function shouldRetry(cmdObj, res) {
         return false;
     }
 
-    if (isRetryableError(res)) {
+    if (isRetryableError(cmdObj, res)) {
         return true;
     }
 
@@ -93,7 +145,7 @@ function shouldRetry(cmdObj, res) {
         }
 
         for (const writeError of res.writeErrors) {
-            if (isRetryableError(writeError)) {
+            if (isRetryableError(cmdObj, writeError)) {
                 return true;
             }
         }
@@ -104,7 +156,7 @@ function shouldRetry(cmdObj, res) {
             return false;
 
         for (let opRes of res.cursor.firstBatch) {
-            if (isRetryableError(opRes)) {
+            if (isRetryableError(cmdObj, opRes)) {
                 return true;
             }
         }

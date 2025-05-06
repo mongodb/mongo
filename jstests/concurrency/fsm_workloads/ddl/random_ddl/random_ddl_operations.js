@@ -74,13 +74,26 @@ export const $config = (function() {
                 ]);
         },
         movePrimary: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const shardId = getRandomShard(connCache);
+            let count = 0;
+            assert.soon(() => {
+                if (count === 5) {
+                    jsTestLog(`movePrimary failed ${
+                        count} times because the target was not found, giving up`);
+                }
+                db = this.getRandomDb(db);
+                const shardId = getRandomShard(connCache);
 
-            jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({movePrimary: db.getName(), to: shardId}),
-                this.movePrimaryAllowedErrorCodes);
+                jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
+                const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
+                if (res.code == ErrorCodes.ShardNotFound) {
+                    count++;
+                    jsTestLog(`Fail #${count}: The movePrimary target ${
+                        shardId} was not found, retrying...`);
+                    return false;
+                }
+                assert.commandWorkedOrFailedWithCode(res, this.movePrimaryAllowedErrorCodes);
+                return true;
+            });
         },
         collMod: function(db, collName, connCache) {
             db = this.getRandomDb(db);

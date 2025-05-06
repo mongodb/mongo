@@ -53,7 +53,7 @@ SUITE_HIERARCHY = {
     "concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer": {
         "concurrency_sharded_local_read_write_multi_stmt_txn": {}
     },
-    "concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions": {
+    "concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard": {
         "concurrency_sharded_multi_stmt_txn_with_balancer": {
             "concurrency_sharded_multi_stmt_txn": {}
         }
