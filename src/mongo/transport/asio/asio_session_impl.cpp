@@ -892,9 +892,9 @@ bool CommonAsioSession::checkForHTTPRequest(const Buffer& buffers) {
     return (bufferAsStr == "GET "_sd);
 }
 
-bool CommonAsioSession::shouldOverrideMaxConns(
+bool CommonAsioSession::isExemptedByCIDRList(
     const std::vector<std::variant<CIDR, std::string>>& exemptions) const {
-    return transport::util::shouldOverrideMaxConns(
+    return transport::util::isExemptedByCIDRList(
         getProxiedSrcRemoteAddr(), localAddr(), exemptions);
 }
 

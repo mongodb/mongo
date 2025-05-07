@@ -241,7 +241,7 @@ public:
         return builder.obj();
     }
 
-    virtual bool shouldOverrideMaxConns(
+    virtual bool isExemptedByCIDRList(
         const std::vector<std::variant<CIDR, std::string>>& exemptions) const = 0;
 
 #ifdef MONGO_CONFIG_SSL

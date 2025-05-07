@@ -100,8 +100,8 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     // some sessions would have used the non-threaded ServiceExecutorFixed.
     // Currently all sessions are threaded, so this number is redundant.
     appendInt("threaded", sessionCount);
-    auto maxConnsOverride = serverGlobalParams.maxConnsOverride.makeSnapshot();
-    if (maxConnsOverride && !maxConnsOverride->empty()) {
+    auto maxIncomingConnsOverride = serverGlobalParams.maxIncomingConnsOverride.makeSnapshot();
+    if (maxIncomingConnsOverride && !maxIncomingConnsOverride->empty()) {
         appendInt("limitExempt", serviceExecutorStats.limitExempt.load());
     }
 

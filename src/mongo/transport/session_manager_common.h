@@ -104,10 +104,10 @@ protected:
 };
 
 /**
- * Returns true if a session with remote/local addresses should be exempted from maxConns.
+ * Returns true if a session with remote/local addresses is part of the exemption list.
  */
-bool shouldOverrideMaxConns(const std::shared_ptr<Session>& session,
-                            const std::vector<std::variant<CIDR, std::string>>& exemptions);
+bool isExemptedByCIDRList(const std::shared_ptr<Session>& session,
+                          const std::vector<std::variant<CIDR, std::string>>& exemptions);
 
 }  // namespace transport
 }  // namespace mongo

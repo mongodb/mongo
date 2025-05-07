@@ -33,12 +33,12 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-    MaxIncomingConnectionsParameters:
-        description: "Represents CIDR ranges that are exempt from the maxIncomingConnections limit"
+    ConnectionListParameters:
+        description: "Represents CIDR ranges for parameters that operate on a set of connections"
         strict: true
         fields:
             ranges:
-                description: "An array of exempted CIDR ranges"
+                description: "An array of CIDR ranges"
                 type: array<string>
 
 server_parameters:
@@ -75,6 +75,15 @@ server_parameters:
         set_at: runtime # Use the configuration option for setting this at startup.
         cpp_class:
             name: "MaxIncomingConnectionsOverrideServerParameter"
-            # Expects the payload to be an instance of `MaxIncomingConnectionsParameters`.
+            # Expects the payload to be an instance of `ConnectionListParameters`.
+            override_set: true
+        redact: false
+
+    maxEstablishingConnectionsOverride:
+        description: "A list of CIDRs to be exempted from the max establishing limits"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "MaxEstablishingConnectionsOverrideServerParameter"
+            # Expects the payload to be an instance of `ConnectionListParameters`.
             override_set: true
         redact: false

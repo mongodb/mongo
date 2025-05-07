@@ -358,18 +358,19 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.maxIncomingConnectionsOverride")) {
-        std::vector<std::variant<CIDR, std::string>> maxConnsOverride;
+        std::vector<std::variant<CIDR, std::string>> maxIncomingConnsOverride;
         auto ranges = params["net.maxIncomingConnectionsOverride"].as<std::vector<std::string>>();
         for (const auto& range : ranges) {
             auto swr = CIDR::parse(range);
             if (!swr.isOK()) {
-                maxConnsOverride.push_back(range);
+                maxIncomingConnsOverride.push_back(range);
             } else {
-                maxConnsOverride.push_back(std::move(swr.getValue()));
+                maxIncomingConnsOverride.push_back(std::move(swr.getValue()));
             }
         }
-        serverGlobalParams.maxConnsOverride.update(
-            std::make_shared<decltype(maxConnsOverride)>(std::move(maxConnsOverride)));
+        serverGlobalParams.maxIncomingConnsOverride.update(
+            std::make_shared<decltype(maxIncomingConnsOverride)>(
+                std::move(maxIncomingConnsOverride)));
     }
 
     if (params.count("net.reservedAdminThreads")) {
