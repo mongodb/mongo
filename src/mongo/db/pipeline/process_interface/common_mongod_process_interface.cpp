@@ -598,15 +598,16 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     Pipeline::SourceContainer& sources = pipeline->getSources();
     boost::optional<DocumentSource*> firstStage =
         sources.empty() ? boost::optional<DocumentSource*>{} : sources.front().get();
-    invariant(!firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
+    tassert(10287400,
+            "Pipeline must not yet have a DocumentSourceCursor as the first stage.",
+            !firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
 
-    bool skipRequiresInputDocSourceCheck =
-        PipelineD::isSearchPresentAndEligibleForSbe(pipeline.get());
-
-    if (!skipRequiresInputDocSourceCheck && firstStage &&
-        !(*firstStage)->constraints().requiresInputDocSource) {
-        // There's no need to attach a cursor here.
-        search_helpers::prepareSearchForNestedPipelineLegacyExecutor(pipeline.get());
+    const bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
+    if (!isMongotPipeline && firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
+        // There's no need to attach a cursor or perform collection acquisition here (for stages
+        // like $documents or $collStats that will not read from a user collection). Mongot
+        // pipelines will not need a cursor but _do_ need to acquire the collection to check for a
+        // stale shard version.
         return pipeline;
     }
 
@@ -671,12 +672,13 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
         initializeAutoGet(opCtx, primaryNss, secondaryNamespaces, initAutoGetCallback);
 
     // Extract the main acquisition.
-    auto primaryAcquisition = allAcquisitions.extract(primaryNss).mapped();
-    auto& secondaryAcquisitions = allAcquisitions;
+    boost::optional<CollectionOrViewAcquisition> primaryAcquisition =
+        allAcquisitions.extract(primaryNss).mapped();
+    auto secondaryAcquisitions = std::move(allAcquisitions);
 
     tassert(10004200,
             "Expected the primary namespace to be a collection.",
-            primaryAcquisition.isCollection());
+            primaryAcquisition.has_value() && primaryAcquisition->isCollection());
 
     bool isAnySecondaryNamespaceAView =
         std::any_of(secondaryAcquisitions.begin(),
@@ -686,7 +688,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     bool isAnySecondaryNamespaceAViewOrNotFullyLocal =
         isAnySecondaryNamespaceAView || isAnySecondaryCollectionNotLocal;
 
-    const auto& collPtr = primaryAcquisition.getCollection().getCollectionPtr();
+    const auto& collPtr = primaryAcquisition->getCollection().getCollectionPtr();
     if (aggRequest && aggRequest->getCollectionUUID() && collPtr) {
         checkCollectionUUIDMismatch(
             opCtx, expCtx->getNamespaceString(), collPtr, aggRequest->getCollectionUUID());
@@ -700,7 +702,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     }
 
     MultipleCollectionAccessor holder{
-        primaryAcquisition, secondaryAcquisitions, isAnySecondaryNamespaceAViewOrNotFullyLocal};
+        *primaryAcquisition, secondaryAcquisitions, isAnySecondaryNamespaceAViewOrNotFullyLocal};
 
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
@@ -711,6 +713,19 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
                                                           pipeline.get(),
                                                           catalogResourceHandle,
                                                           shardFilterPolicy);
+
+    if (isMongotPipeline) {
+        // For mongot pipelines, we will not have a cursor attached and now must perform
+        // $search-specific stage preparation. It's important that we release locks early, before
+        // preparing the pipeline, so that we don't hold them during network calls to mongot. This
+        // is fine for search pipelines since they are not reading any local (lock-protected) data
+        // in the main pipeline. It was important that we still acquired the collection in order to
+        // check for a stale shard version.
+        holder.clear();
+        primaryAcquisition.reset();
+        secondaryAcquisitions.clear();
+        search_helpers::prepareSearchForNestedPipelineLegacyExecutor(pipeline.get());
+    }
 
     // Stash resources to free locks.
     stashTransactionResourcesFromOperationContext(opCtx, sharedStasher.get());

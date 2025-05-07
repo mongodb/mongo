@@ -1,3 +1,4 @@
+// @tags: [ requires_sharding ]
 // Jstests rely on the shell eval option, implicitly_shard_accessed_collections.js, to override
 // any command that calls DB.prototype.getCollection() with function that attempts to shard
 // the collection before returning it. This test confirms that this sharding test override works

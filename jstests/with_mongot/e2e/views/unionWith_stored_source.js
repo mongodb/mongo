@@ -8,20 +8,12 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {assertViewNotApplied} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const testUnionWithStoredSource = function() {
-    // TODO SERVER-102874: Remove this guard and revert the test to it's original format in order to
-    // match adjacent tests in e2e/tests/*.
-    if (FeatureFlagUtil.isEnabled(db, "DualCatalogCache")) {
-        jsTestLog("Skipping test since DualCatalogCache is enabled.");
-        return;
-    }
-
     const testDb = db.getSiblingDB(jsTestName());
     const primaryStateFacts = testDb.primaryStateFacts;
     primaryStateFacts.drop();
