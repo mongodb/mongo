@@ -1,4 +1,4 @@
-var CollInfos = class {
+let CollInfos = class {
     /**
      * OO wrapper around the response of db.getCollectionInfos() to avoid calling it multiple times.
      * This class stores information about all collections but its methods typically apply to a
@@ -94,7 +94,7 @@ var CollInfos = class {
     }
 };
 
-var {DataConsistencyChecker} = (function() {
+let {DataConsistencyChecker} = (function() {
     "use strict";
 
     class PeekableCursor {

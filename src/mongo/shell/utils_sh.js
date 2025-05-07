@@ -1,6 +1,6 @@
 /* global ShardingTest */
 
-var sh = function() {
+let sh = function() {
     return "try sh.help();";
 };
 
@@ -10,7 +10,7 @@ sh._checkMongos = function() {
         // config shard which returns mongod hello responses (i.e. do not have "isdbgrid").
         return;
     }
-    var x = globalThis.db._helloOrLegacyHello();
+    let x = globalThis.db._helloOrLegacyHello();
     if (x.msg != "isdbgrid") {
         throw Error("not connected to a mongos");
     }
@@ -167,7 +167,7 @@ sh.addShard = function(url) {
 
 sh.enableSharding = function(dbname, shardName) {
     assert(dbname, "need a valid dbname");
-    var command = {enableSharding: dbname};
+    let command = {enableSharding: dbname};
     if (shardName) {
         command.primaryShard = shardName;
     }
@@ -179,7 +179,7 @@ sh.shardCollection = function(fullName, key, unique, options) {
     assert(key, "need a key");
     assert(typeof (key) == "object", "key needs to be an object");
 
-    var cmd = {shardCollection: fullName, key: key};
+    let cmd = {shardCollection: fullName, key: key};
     if (unique)
         cmd.unique = true;
     if (options) {
@@ -232,21 +232,21 @@ sh.isBalancerRunning = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
 
-    var result = configDB.adminCommand({balancerStatus: 1});
+    let result = configDB.adminCommand({balancerStatus: 1});
     return assert.commandWorked(result).inBalancerRound;
 };
 
 sh.stopBalancer = function(timeoutMs, interval) {
     timeoutMs = timeoutMs || 60000;
 
-    var result = globalThis.db.adminCommand({balancerStop: 1, maxTimeMS: timeoutMs});
+    let result = globalThis.db.adminCommand({balancerStop: 1, maxTimeMS: timeoutMs});
     return assert.commandWorked(result);
 };
 
 sh.startBalancer = function(timeoutMs, interval) {
     timeoutMs = timeoutMs || 60000;
 
-    var result = globalThis.db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
+    let result = globalThis.db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
     return assert.commandWorked(result);
 };
 
@@ -279,7 +279,7 @@ sh.stopAutoMerger = function(configDB) {
 sh.shouldAutoMerge = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    var automerge = configDB.settings.findOne({_id: 'automerge'});
+    let automerge = configDB.settings.findOne({_id: 'automerge'});
     if (automerge == null) {
         return true;
     }
@@ -290,7 +290,7 @@ sh.disableAutoMerger = function(coll) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
-    var dbase = globalThis.db;
+    let dbase = globalThis.db;
     if (coll instanceof DBCollection) {
         dbase = coll.getDB();
     } else {
@@ -304,7 +304,7 @@ sh.enableAutoMerger = function(coll) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
-    var dbase = globalThis.db;
+    let dbase = globalThis.db;
     if (coll instanceof DBCollection) {
         dbase = coll.getDB();
     } else {
@@ -315,8 +315,8 @@ sh.enableAutoMerger = function(coll) {
 };
 
 sh.waitForPingChange = function(activePings, timeout, interval) {
-    var isPingChanged = function(activePing) {
-        var newPing = sh._getConfigDB().mongos.findOne({_id: activePing._id});
+    let isPingChanged = function(activePing) {
+        let newPing = sh._getConfigDB().mongos.findOne({_id: activePing._id});
         return !newPing || newPing.ping + "" != activePing.ping + "";
     };
 
@@ -324,17 +324,17 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
     // happened
 
     // Timeout all pings on the same clock
-    var start = new Date();
+    let start = new Date();
 
-    var remainingPings = [];
-    for (var i = 0; i < activePings.length; i++) {
-        var activePing = activePings[i];
+    let remainingPings = [];
+    for (let i = 0; i < activePings.length; i++) {
+        let activePing = activePings[i];
         print("Waiting for active host " + activePing._id +
               " to recognize new settings... (ping : " + activePing.ping + ")");
 
         // Do a manual timeout here, avoid scary assert.soon errors
-        var timeout = timeout || 30000;
-        var interval = interval || 200;
+        timeout = timeout || 30000;
+        interval = interval || 200;
         while (isPingChanged(activePing) != true) {
             if ((new Date()).getTime() - start.getTime() > timeout) {
                 print("Waited for active ping to change for host " + activePing._id +
@@ -356,8 +356,8 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
 sh.awaitBalancerRound = function(timeout, interval) {
     timeout = timeout || 60000;
 
-    var initialStatus = sh._getBalancerStatus();
-    var currentStatus;
+    let initialStatus = sh._getBalancerStatus();
+    let currentStatus;
     assert.soon(function() {
         currentStatus = sh._getBalancerStatus();
         assert.eq(currentStatus.mode, 'full', "Balancer is disabled");
@@ -408,7 +408,7 @@ sh.awaitCollectionBalance = function(coll, timeout, interval) {
         {'$group': {'_id': null, 'totalNumOrphanDocs': {'$sum': '$storageStats.numOrphanDocs'}}}
     ];
 
-    var oldDb = (typeof (globalThis.db) === 'undefined' ? undefined : globalThis.db);
+    let oldDb = (typeof (globalThis.db) === 'undefined' ? undefined : globalThis.db);
     try {
         globalThis.db = coll.getDB();
 
@@ -454,7 +454,7 @@ sh.verifyCollectionIsBalanced = function(coll) {
         throw Error("Must specify collection");
     }
 
-    var oldDb = globalThis.db;
+    let oldDb = globalThis.db;
     try {
         globalThis.db = coll.getDB();
 
@@ -507,9 +507,9 @@ sh.verifyCollectionIsBalanced = function(coll) {
  * mongos )
  */
 sh._lastMigration = function(ns) {
-    var coll = null;
-    var dbase = null;
-    var config = null;
+    let coll = null;
+    let dbase = null;
+    let config = null;
 
     if (!ns) {
         config = globalThis.db.getSiblingDB("config");
@@ -535,13 +535,13 @@ sh._lastMigration = function(ns) {
         }
     }
 
-    var searchDoc = {what: /^moveChunk/};
+    let searchDoc = {what: /^moveChunk/};
     if (coll)
         searchDoc.ns = coll + "";
     if (dbase)
         searchDoc.ns = new RegExp("^" + dbase + "\\.");
 
-    var cursor = config.changelog.find(searchDoc).sort({time: -1}).limit(1);
+    let cursor = config.changelog.find(searchDoc).sort({time: -1}).limit(1);
     if (cursor.hasNext())
         return cursor.next();
     else
@@ -549,12 +549,12 @@ sh._lastMigration = function(ns) {
 };
 
 sh.addShardTag = function(shard, tag) {
-    var result = sh.addShardToZone(shard, tag);
+    let result = sh.addShardToZone(shard, tag);
     if (result.code != ErrorCodes.CommandNotFound) {
         return result;
     }
 
-    var config = sh._getConfigDB();
+    let config = sh._getConfigDB();
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
     }
@@ -563,12 +563,12 @@ sh.addShardTag = function(shard, tag) {
 };
 
 sh.removeShardTag = function(shard, tag) {
-    var result = sh.removeShardFromZone(shard, tag);
+    let result = sh.removeShardFromZone(shard, tag);
     if (result.code != ErrorCodes.CommandNotFound) {
         return result;
     }
 
-    var config = sh._getConfigDB();
+    let config = sh._getConfigDB();
     if (config.shards.findOne({_id: shard}) == null) {
         throw Error("can't find a shard with name: " + shard);
     }
@@ -577,7 +577,7 @@ sh.removeShardTag = function(shard, tag) {
 };
 
 sh.addTagRange = function(ns, min, max, tag) {
-    var result = sh.updateZoneKeyRange(ns, min, max, tag);
+    let result = sh.updateZoneKeyRange(ns, min, max, tag);
     if (result.code != ErrorCodes.CommandNotFound) {
         return result;
     }
@@ -586,7 +586,7 @@ sh.addTagRange = function(ns, min, max, tag) {
         throw new Error("min and max cannot be the same");
     }
 
-    var config = sh._getConfigDB();
+    let config = sh._getConfigDB();
     return assert.commandWorked(
         config.tags.update({_id: {ns: ns, min: min}},
                            {_id: {ns: ns, min: min}, ns: ns, min: min, max: max, tag: tag},
@@ -617,7 +617,7 @@ sh.removeRangeFromZone = function(ns, min, max) {
 sh.getBalancerWindow = function(configDB) {
     if (configDB === undefined)
         configDB = globalThis.db.getSiblingDB('config');
-    var settings = configDB.settings.findOne({_id: 'balancer'});
+    let settings = configDB.settings.findOne({_id: 'balancer'});
     if (settings == null) {
         return null;
     }
@@ -630,8 +630,8 @@ sh.getBalancerWindow = function(configDB) {
 sh.getActiveMigrations = function(configDB) {
     if (configDB === undefined)
         configDB = globalThis.db.getSiblingDB('config');
-    var activeLocks = configDB.locks.find({state: {$eq: 2}});
-    var result = [];
+    let activeLocks = configDB.locks.find({state: {$eq: 2}});
+    let result = [];
     if (activeLocks != null) {
         activeLocks.forEach(function(lock) {
             result.push({_id: lock._id, when: lock.when});
@@ -643,8 +643,8 @@ sh.getActiveMigrations = function(configDB) {
 sh.getRecentFailedRounds = function(configDB) {
     if (configDB === undefined)
         configDB = globalThis.db.getSiblingDB('config');
-    var balErrs = configDB.actionlog.find({what: "balancer.round"}).sort({time: -1}).limit(5);
-    var result = {count: 0, lastErr: "", lastTime: " "};
+    let balErrs = configDB.actionlog.find({what: "balancer.round"}).sort({time: -1}).limit(5);
+    let result = {count: 0, lastErr: "", lastTime: " "};
     if (balErrs != null) {
         balErrs.forEach(function(r) {
             if (r.details.errorOccurred) {
@@ -667,10 +667,10 @@ sh.getRecentFailedRounds = function(configDB) {
 sh.getRecentMigrations = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
-    var yesterday = new Date(new Date() - 24 * 60 * 60 * 1000);
+    let yesterday = new Date(new Date() - 24 * 60 * 60 * 1000);
 
     // Successful migrations.
-    var result = configDB.changelog
+    let result = configDB.changelog
                      .aggregate([
                          {
                              $match: {
@@ -750,15 +750,15 @@ function printShardingStatus(configDB, verbose) {
         configDB = globalThis.db.getSiblingDB('config');
     }
 
-    var version = configDB.getCollection("version").findOne();
+    let version = configDB.getCollection("version").findOne();
     if (version == null) {
         print(
             "printShardingStatus: this db does not have sharding enabled. be sure you are connecting to a mongos from the shell and not to a mongod.");
         return;
     }
 
-    var raw = "";
-    var output = function(indent, s) {
+    let raw = "";
+    let output = function(indent, s) {
         raw += sh._shardingStatusStr(indent, s);
     };
     output(0, "--- Sharding Status --- ");
@@ -770,10 +770,10 @@ function printShardingStatus(configDB, verbose) {
     });
 
     // (most recently) active mongoses
-    var mongosActiveThresholdMs = 60000;
-    var mostRecentMongos = configDB.mongos.find().sort({ping: -1}).limit(1);
-    var mostRecentMongosTime = null;
-    var mongosAdjective = "most recently active";
+    let mongosActiveThresholdMs = 60000;
+    let mostRecentMongos = configDB.mongos.find().sort({ping: -1}).limit(1);
+    let mostRecentMongosTime = null;
+    let mongosAdjective = "most recently active";
     if (mostRecentMongos.hasNext()) {
         mostRecentMongosTime = mostRecentMongos.next().ping;
         // Mongoses older than the threshold are the most recent, but cannot be
@@ -788,10 +788,10 @@ function printShardingStatus(configDB, verbose) {
     if (mostRecentMongosTime === null) {
         output(2, "none");
     } else {
-        var recentMongosQuery = {
+        let recentMongosQuery = {
             ping: {
                 $gt: (function() {
-                    var d = mostRecentMongosTime;
+                    let d = mostRecentMongosTime;
                     d.setTime(d.getTime() - mongosActiveThresholdMs);
                     return d;
                 })()
@@ -845,7 +845,7 @@ function printShardingStatus(configDB, verbose) {
     output(2, "Currently running: " + (balancerRunning ? "yes" : "no"));
 
     // Output the balancer window
-    var balSettings = sh.getBalancerWindow(configDB);
+    let balSettings = sh.getBalancerWindow(configDB);
     if (balSettings) {
         output(3,
                "Balancer active window is set between " + balSettings.start + " and " +
@@ -853,7 +853,7 @@ function printShardingStatus(configDB, verbose) {
     }
 
     // Output the list of active migrations
-    var activeMigrations = sh.getActiveMigrations(configDB);
+    let activeMigrations = sh.getActiveMigrations(configDB);
     if (activeMigrations.length > 0) {
         output(2, "Collections with active migrations: ");
         activeMigrations.forEach(function(migration) {
@@ -862,13 +862,13 @@ function printShardingStatus(configDB, verbose) {
     }
 
     // Actionlog and version checking only works on 2.7 and greater
-    var versionHasActionlog = false;
-    var metaDataVersion = configDB.getCollection("version").findOne().currentVersion;
+    let versionHasActionlog = false;
+    let metaDataVersion = configDB.getCollection("version").findOne().currentVersion;
     if (metaDataVersion > 5) {
         versionHasActionlog = true;
     }
     if (metaDataVersion == 5) {
-        var verArray = globalThis.db.getServerBuildInfo().rawData().versionArray;
+        let verArray = globalThis.db.getServerBuildInfo().rawData().versionArray;
         if (verArray[0] == 2 && verArray[1] > 6) {
             versionHasActionlog = true;
         }
@@ -876,7 +876,7 @@ function printShardingStatus(configDB, verbose) {
 
     if (versionHasActionlog) {
         // Review config.actionlog for errors
-        var actionReport = sh.getRecentFailedRounds(configDB);
+        let actionReport = sh.getRecentFailedRounds(configDB);
         // Always print the number of failed rounds
         output(2, "Failed balancer rounds in last 5 attempts: " + actionReport.count);
 
@@ -887,7 +887,7 @@ function printShardingStatus(configDB, verbose) {
         }
 
         output(2, "Migration results for the last 24 hours: ");
-        var migrations = sh.getRecentMigrations(configDB);
+        let migrations = sh.getRecentMigrations(configDB);
         if (migrations.length > 0) {
             migrations.forEach(function(x) {
                 if (x._id === "Success") {
@@ -905,7 +905,7 @@ function printShardingStatus(configDB, verbose) {
 
     output(1, "databases:");
 
-    var databases = configDB.databases.find().sort({name: 1}).toArray();
+    let databases = configDB.databases.find().sort({name: 1}).toArray();
 
     // Special case the config db, since it doesn't have a record in config.databases.
     databases.push({"_id": "config", "primary": "config", "partitioned": true});
@@ -914,14 +914,14 @@ function printShardingStatus(configDB, verbose) {
     });
 
     databases.forEach(function(db) {
-        var truthy = function(value) {
+        let truthy = function(value) {
             return !!value;
         };
-        var nonBooleanNote = function(name, value) {
+        let nonBooleanNote = function(name, value) {
             // If the given value is not a boolean, return a string of the
             // form " (<name>: <value>)", where <value> is converted to JSON.
-            var t = typeof (value);
-            var s = "";
+            let t = typeof (value);
+            let s = "";
             if (t != "boolean" && t != "undefined") {
                 s = " (" + name + ": " + tojson(value) + ")";
             }
@@ -956,7 +956,7 @@ function printShardingStatus(configDB, verbose) {
                                                {$sort: {shard: 1}})
                                     .toArray();
 
-                    var totalChunks = 0;
+                    let totalChunks = 0;
                     res.forEach(function(z) {
                         totalChunks += z.nChunks;
                         output(5, z.shard + "\t" + z.nChunks);
@@ -995,14 +995,14 @@ function printShardingSizes(configDB) {
         configDB = globalThis.db.getSiblingDB('config');
     }
 
-    var version = configDB.getCollection("version").findOne();
+    let version = configDB.getCollection("version").findOne();
     if (version == null) {
         print("printShardingSizes : not a shard db!");
         return;
     }
 
-    var raw = "";
-    var output = function(indent, s) {
+    let raw = "";
+    let output = function(indent, s) {
         raw += sh._shardingStatusStr(indent, s);
     };
     output(0, "--- Sharding Sizes --- ");
@@ -1013,7 +1013,7 @@ function printShardingSizes(configDB) {
         output(2, tojson(z));
     });
 
-    var saveDB = globalThis.db;
+    let saveDB = globalThis.db;
     output(1, "databases:");
     configDB.databases.find().sort({name: 1}).forEach(function(db) {
         output(2, tojson(db, "", true));
@@ -1023,7 +1023,7 @@ function printShardingSizes(configDB) {
             .forEach(function(coll) {
                 output(3, coll._id + " chunks:");
                 configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
-                    var out = saveDB.adminCommand(
+                    let out = saveDB.adminCommand(
                         {dataSize: coll._id, keyPattern: coll.key, min: chunk.min, max: chunk.max});
                     delete out.millis;
                     delete out.ok;

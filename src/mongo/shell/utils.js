@@ -21,7 +21,7 @@ function reconnect(db) {
 }
 
 function _getErrorWithCode(codeOrObj, message) {
-    var e = new Error(message);
+    let e = new Error(message);
     if (typeof codeOrObj === "object" && codeOrObj !== null) {
         if (TestData?.logFormat === "json") {
             e.extraAttr = codeOrObj;
@@ -261,7 +261,7 @@ friendlyEqual = function(a, b) {
     if (a == b)
         return true;
 
-    var clean = function(s) {
+    let clean = function(s) {
         s = s.replace(/NumberInt\((\-?\d+)\)/g, "$1");
         return s;
     };
@@ -302,10 +302,10 @@ setVerboseShell = function(value) {
 // e.g. _barFormat([[.3, "="], [.5, '-']], 80) returns
 //      "[========================----------------------------------------                ]"
 _barFormat = function(data, width) {
-    var remaining = width;
-    var res = "[";
-    for (var i = 0; i < data.length; i++) {
-        for (var x = 0; x < data[i][0] * width; x++) {
+    let remaining = width;
+    let res = "[";
+    for (let i = 0; i < data.length; i++) {
+        for (let x = 0; x < data[i][0] * width; x++) {
             if (remaining-- > 0) {
                 res += data[i][1];
             }
@@ -346,9 +346,9 @@ enablePrint = function() {
 };
 
 print.captureAllOutput = function(fn, args) {
-    var res = {};
+    let res = {};
     res.output = [];
-    var __orig_print = print;
+    let __orig_print = print;
     print = function() {
         Array.prototype.push.apply(res.output,
                                    Array.prototype.slice.call(arguments).join(" ").split("\n"));
@@ -362,7 +362,7 @@ print.captureAllOutput = function(fn, args) {
     return res;
 };
 
-var indentStr = function(indent, s) {
+let indentStr = function(indent, s) {
     if (typeof (s) === "undefined") {
         s = indent;
         indent = 0;
@@ -408,7 +408,7 @@ jsTestName = function() {
     return "__unknown_name__";
 };
 
-var _jsTestOptions = {};
+let _jsTestOptions = {};
 
 jsTestOptions = function() {
     if (TestData) {
@@ -681,7 +681,7 @@ jsTest.authenticate = function(conn) {
 
 jsTest.authenticateNodes = function(nodes) {
     assert.soonNoExcept(function() {
-        for (var i = 0; i < nodes.length; i++) {
+        for (let i = 0; i < nodes.length; i++) {
             // Don't try to authenticate to arbiters
             let res = {};
             try {
@@ -709,12 +709,13 @@ jsTest.isMongos = function(conn) {
 };
 
 defaultPrompt = function() {
-    var status = globalThis.db.getMongo().authStatus;
-    var prefix = globalThis.db.getMongo().promptPrefix;
+    let status = globalThis.db.getMongo().authStatus;
+    let prefix = globalThis.db.getMongo().promptPrefix;
+    let hello;
 
     if (typeof prefix == 'undefined') {
         prefix = "";
-        var buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
+        let buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
         try {
             if (buildInfo.modules.indexOf("enterprise") > -1) {
                 prefix += "MongoDB Enterprise ";
@@ -722,7 +723,7 @@ defaultPrompt = function() {
         } catch (e) {
             // Don't do anything here. Just throw the error away.
         }
-        var hello = globalThis.db._helloOrLegacyHello({forShell: 1});
+        hello = globalThis.db._helloOrLegacyHello({forShell: 1});
         try {
             if (hello.hasOwnProperty("automationServiceDescriptor")) {
                 prefix += "[automated] ";
@@ -737,7 +738,7 @@ defaultPrompt = function() {
         // try to use repl set prompt -- no status or auth detected yet
         if (!status || !status.authRequired) {
             try {
-                var prompt = replSetMemberStatePrompt();
+                let prompt = replSetMemberStatePrompt();
                 // set our status that it was good
                 globalThis.db.getMongo().authStatus = {replSetGetStatus: true, hello: true};
                 return prefix + prompt;
@@ -752,7 +753,7 @@ defaultPrompt = function() {
         // try to use replSetGetStatus?
         if (status.replSetGetStatus) {
             try {
-                var prompt = replSetMemberStatePrompt();
+                let prompt = replSetMemberStatePrompt();
                 // set our status that it was good
                 status.replSetGetStatus = true;
                 globalThis.db.getMongo().authStatus = status;
@@ -768,7 +769,7 @@ defaultPrompt = function() {
         // try to use hello?
         if (status.hello) {
             try {
-                var prompt = helloStatePrompt(hello);
+                let prompt = helloStatePrompt(hello);
                 status.hello = true;
                 globalThis.db.getMongo().authStatus = status;
                 return prefix + prompt;
@@ -788,8 +789,8 @@ defaultPrompt = function() {
 };
 
 replSetMemberStatePrompt = function() {
-    var state = '';
-    var stateInfo = globalThis.db.getSiblingDB('admin')._runCommandWithoutApiStrict(
+    let state = '';
+    let stateInfo = globalThis.db.getSiblingDB('admin')._runCommandWithoutApiStrict(
         {replSetGetStatus: 1, forShell: 1});
     if (stateInfo.ok) {
         // Report the self member's stateStr if it's present.
@@ -804,7 +805,7 @@ replSetMemberStatePrompt = function() {
         }
         state = '' + stateInfo.set + ':' + state;
     } else {
-        var info = stateInfo.info;
+        let info = stateInfo.info;
         if (info && info.length < 20) {
             state = info;  // "mongos", "configsvr"
         } else {
@@ -815,10 +816,10 @@ replSetMemberStatePrompt = function() {
 };
 
 helloStatePrompt = function(helloReply) {
-    var state = '';
-    var hello = helloReply || globalThis.db._helloOrLegacyHello({forShell: 1});
+    let state = '';
+    let hello = helloReply || globalThis.db._helloOrLegacyHello({forShell: 1});
     if (hello.ok) {
-        var role = "";
+        let role = "";
 
         if (hello.msg == "isdbgrid") {
             role = "mongos";
@@ -880,11 +881,11 @@ shellPrintHelper = function(x) {
     if (typeof x != "object")
         return print(x);
 
-    var p = x.shellPrint;
+    let p = x.shellPrint;
     if (typeof p == "function")
         return x.shellPrint();
 
-    var p = x.tojson;
+    p = x.tojson;
     if (typeof p == "function")
         print(x.tojson());
     else
@@ -893,11 +894,11 @@ shellPrintHelper = function(x) {
 
 shellAutocomplete = function(
     /*prefix*/) {  // outer scope function called on init. Actual function at end
-    var universalMethods =
+    let universalMethods =
         "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable"
             .split(' ');
 
-    var builtinMethods = {};  // uses constructor objects as keys
+    let builtinMethods = {};  // uses constructor objects as keys
     builtinMethods[Array] =
         "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight"
             .split(' ');
@@ -927,14 +928,14 @@ shellAutocomplete = function(
     builtinMethods[Mongo] = "find update insert remove".split(' ');
     builtinMethods[BinData] = "hex base64 length subtype".split(' ');
 
-    var extraGlobals =
+    let extraGlobals =
         "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp JSON"
             .split(' ');
     if (typeof NumberDecimal !== 'undefined') {
         extraGlobals[extraGlobals.length] = "NumberDecimal";
     }
 
-    var isPrivate = function(name) {
+    let isPrivate = function(name) {
         if (shellAutocomplete.showPrivate)
             return false;
         if (name == '_id')
@@ -946,10 +947,10 @@ shellAutocomplete = function(
         return false;
     };
 
-    var customComplete = function(obj) {
+    let customComplete = function(obj) {
         try {
             if (obj.__proto__.constructor.autocomplete) {
-                var ret = obj.constructor.autocomplete(obj);
+                let ret = obj.constructor.autocomplete(obj);
                 if (ret.constructor != Array) {
                     print("\nautocompleters must return real Arrays");
                     return [];
@@ -964,26 +965,26 @@ shellAutocomplete = function(
         }
     };
 
-    var worker = function(prefix) {
-        var global = (function() {
+    let worker = function(prefix) {
+        let global = (function() {
                          return this;
                      }).call();  // trick to get global object
 
-        var curObj = global;
-        var parts = prefix.split('.');
-        for (var p = 0; p < parts.length - 1; p++) {  // doesn't include last part
+        let curObj = global;
+        let parts = prefix.split('.');
+        for (let p = 0; p < parts.length - 1; p++) {  // doesn't include last part
             curObj = curObj[parts[p]];
             if (curObj == null)
                 return [];
         }
 
-        var lastPrefix = parts[parts.length - 1] || '';
-        var lastPrefixLowercase = lastPrefix.toLowerCase();
-        var beginning = parts.slice(0, parts.length - 1).join('.');
+        let lastPrefix = parts[parts.length - 1] || '';
+        let lastPrefixLowercase = lastPrefix.toLowerCase();
+        let beginning = parts.slice(0, parts.length - 1).join('.');
         if (beginning.length)
             beginning += '.';
 
-        var possibilities =
+        let possibilities =
             new Array().concat(universalMethods,
                                Object.keySet(curObj),
                                Object.keySet(curObj.__proto__),
@@ -993,10 +994,10 @@ shellAutocomplete = function(
                                curObj == global ? extraGlobals : [],
                                customComplete(curObj));
 
-        var noDuplicates =
+        let noDuplicates =
             {};  // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
-        for (var i = 0; i < possibilities.length; i++) {
-            var p = possibilities[i];
+        for (let i = 0; i < possibilities.length; i++) {
+            let p = possibilities[i];
             if (typeof (curObj[p]) == "undefined" && curObj != global)
                 continue;  // extraGlobals aren't in the global object
             if (p.length == 0 || p.length < lastPrefix.length)
@@ -1008,15 +1009,15 @@ shellAutocomplete = function(
             if (p.substr(0, lastPrefix.length).toLowerCase() != lastPrefixLowercase)
                 continue;
 
-            var completion = beginning + p;
+            let completion = beginning + p;
             if (curObj[p] && curObj[p].constructor == Function && p != 'constructor')
                 completion += '(';
 
             noDuplicates[completion] = 0;
         }
 
-        var ret = [];
-        for (var i in noDuplicates)
+        let ret = [];
+        for (let i in noDuplicates)
             ret.push(i);
 
         return ret;
@@ -1037,12 +1038,12 @@ shellAutocomplete.showPrivate = false;  // toggle to show (useful when working o
 
 shellHelper = function(command, rest, shouldPrint) {
     command = command.trim();
-    var args = rest.trim().replace(/\s*;$/, "").split("\s+");
+    let args = rest.trim().replace(/\s*;$/, "").split("\s+");
 
     if (!shellHelper[command])
         throw Error("no command [" + command + "]");
 
-    var res = shellHelper[command].apply(null, args);
+    let res = shellHelper[command].apply(null, args);
     if (shouldPrint) {
         shellPrintHelper(res);
     }
@@ -1050,7 +1051,7 @@ shellHelper = function(command, rest, shouldPrint) {
 };
 
 shellHelper.use = function(dbname) {
-    var s = "" + dbname;
+    let s = "" + dbname;
     if (s == "") {
         print("bad use parameter");
         return;
@@ -1093,11 +1094,11 @@ shellHelper.it = function() {
 shellHelper.show = function(what) {
     assert(typeof what == "string");
 
-    var args = what.split(/\s+/);
+    let args = what.split(/\s+/);
     what = args[0];
     args = args.splice(1);
 
-    var messageIndent = "        ";
+    let messageIndent = "        ";
 
     if (what == "profile") {
         if (globalThis.db.system.profile.count() == 0) {
@@ -1112,13 +1113,13 @@ shellHelper.show = function(what) {
                 .forEach(function(x) {
                     print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " +
                           String(x.ts).substring(0, 24));
-                    var l = "";
-                    for (var z in x) {
+                    let l = "";
+                    for (let z in x) {
                         if (z == "op" || z == "ns" || z == "millis" || z == "ts")
                             continue;
 
-                        var val = x[z];
-                        var mytype = typeof (val);
+                        let val = x[z];
+                        let mytype = typeof (val);
 
                         if (mytype == "string" || mytype == "number")
                             l += z + ":" + val + " ";
@@ -1154,8 +1155,8 @@ shellHelper.show = function(what) {
     }
 
     if (what == "dbs" || what == "databases") {
-        var mongo = globalThis.db.getMongo();
-        var dbs;
+        let mongo = globalThis.db.getMongo();
+        let dbs;
         try {
             dbs = mongo.getDBs(globalThis.db.getSession(), undefined, false);
         } catch (ex) {
@@ -1166,14 +1167,14 @@ shellHelper.show = function(what) {
             return "";
         }
 
-        var dbinfo = [];
-        var maxNameLength = 0;
-        var maxGbDigits = 0;
+        let dbinfo = [];
+        let maxNameLength = 0;
+        let maxGbDigits = 0;
 
         dbs.databases.forEach(function(x) {
-            var sizeStr = (x.sizeOnDisk / 1024 / 1024 / 1024).toFixed(3);
-            var nameLength = x.name.length;
-            var gbDigits = sizeStr.indexOf(".");
+            let sizeStr = (x.sizeOnDisk / 1024 / 1024 / 1024).toFixed(3);
+            let nameLength = x.name.length;
+            let gbDigits = sizeStr.indexOf(".");
 
             if (nameLength > maxNameLength)
                 maxNameLength = nameLength;
@@ -1192,9 +1193,9 @@ shellHelper.show = function(what) {
 
         dbinfo.sort(compareOn('name'));
         dbinfo.forEach(function(db) {
-            var namePadding = maxNameLength - db.name_size;
-            var sizePadding = maxGbDigits - db.gb_digits;
-            var padding = Array(namePadding + sizePadding + 3).join(" ");
+            let namePadding = maxNameLength - db.name_size;
+            let sizePadding = maxGbDigits - db.gb_digits;
+            let padding = Array(namePadding + sizePadding + 3).join(" ");
             if (db.size > 1) {
                 print(db.name + padding + db.size_str + "GB");
             } else if (db.empty) {
@@ -1208,35 +1209,35 @@ shellHelper.show = function(what) {
     }
 
     if (what == "log") {
-        var n = "global";
+        let n = "global";
         if (args.length > 0)
             n = args[0];
 
-        var res = globalThis.db.adminCommand({getLog: n});
+        let res = globalThis.db.adminCommand({getLog: n});
         if (!res.ok) {
             print("Error while trying to show " + n + " log: " + res.errmsg);
             return "";
         }
-        for (var i = 0; i < res.log.length; i++) {
+        for (let i = 0; i < res.log.length; i++) {
             print(res.log[i]);
         }
         return "";
     }
 
     if (what == "logs") {
-        var res = globalThis.db.adminCommand({getLog: "*"});
+        let res = globalThis.db.adminCommand({getLog: "*"});
         if (!res.ok) {
             print("Error while trying to show logs: " + res.errmsg);
             return "";
         }
-        for (var i = 0; i < res.names.length; i++) {
+        for (let i = 0; i < res.names.length; i++) {
             print(res.names[i]);
         }
         return "";
     }
 
     if (what == "startupWarnings") {
-        var dbDeclared, ex;
+        let dbDeclared, ex;
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
@@ -1245,7 +1246,7 @@ shellHelper.show = function(what) {
             dbDeclared = false;
         }
         if (dbDeclared) {
-            var res = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict(
+            let res = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict(
                 {getLog: "startupWarnings"});
             if (res.ok) {
                 if (res.log.length == 0) {
@@ -1253,14 +1254,14 @@ shellHelper.show = function(what) {
                 }
                 print("---");
                 print("The server generated these startup warnings when booting: ");
-                for (var i = 0; i < res.log.length; i++) {
-                    var logOut;
+                for (let i = 0; i < res.log.length; i++) {
+                    let logOut;
                     try {
-                        var parsedLog = JSON.parse(res.log[i]);
-                        var linePrefix = messageIndent + parsedLog.t["$date"] + ": ";
+                        let parsedLog = JSON.parse(res.log[i]);
+                        let linePrefix = messageIndent + parsedLog.t["$date"] + ": ";
                         logOut = linePrefix + parsedLog.msg + "\n";
                         if (parsedLog.attr) {
-                            for (var attr in parsedLog.attr) {
+                            for (let attr in parsedLog.attr) {
                                 logOut += linePrefix + messageIndent + attr + ": " +
                                     parsedLog.attr[attr] + "\n";
                             }
@@ -1291,7 +1292,7 @@ shellHelper.show = function(what) {
     }
 
     if (what == "automationNotices") {
-        var dbDeclared, ex;
+        let dbDeclared, ex;
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
@@ -1301,7 +1302,7 @@ shellHelper.show = function(what) {
         }
 
         if (dbDeclared) {
-            var res = globalThis.db._helloOrLegacyHello({forShell: 1});
+            let res = globalThis.db._helloOrLegacyHello({forShell: 1});
             if (!res.ok) {
                 print("Note: Cannot determine if automation is active");
                 return "";
@@ -1399,13 +1400,13 @@ Math.sigFig = function(x, N) {
     if (!N) {
         N = 3;
     }
-    var p = Math.pow(10, N - Math.ceil(Math.log(Math.abs(x)) / Math.log(10)));
+    let p = Math.pow(10, N - Math.ceil(Math.log(Math.abs(x)) / Math.log(10)));
     return Math.round(x * p) / p;
 };
 
-var Random = (function() {
-    var initialized = false;
-    var errorMsg = "The random number generator hasn't been seeded yet; " +
+let Random = (function() {
+    let initialized = false;
+    let errorMsg = "The random number generator hasn't been seeded yet; " +
         "call Random.setRandomSeed()";
 
     function isInitialized() {
@@ -1420,14 +1421,14 @@ var Random = (function() {
 
     // Set the random generator seed & print the result.
     function setRandomSeed(s) {
-        var seed = srand(s);
+        let seed = srand(s);
         print("setting random seed: " + seed);
         return seed;
     }
 
     // Set the random generator seed with defined seed if it exists or a random seed if it does not.
     function setRandomFixtureSeed() {
-        var seed = setRandomSeed(TestData.seed).valueOf();
+        let seed = setRandomSeed(TestData.seed).valueOf();
         print(
             `Reproduce this randomized jstest fixture topology by adding the --shellSeed
             ${seed} option to your resmoke invocation.`);
@@ -1457,7 +1458,7 @@ var Random = (function() {
         if (!initialized) {
             throw new Error(errorMsg);
         }
-        var r = rand();
+        let r = rand();
         if (r == 0) {
             r = rand();
             if (r == 0) {
@@ -1477,12 +1478,12 @@ var Random = (function() {
         }
         // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
         while (true) {
-            var x = (2 * rand()) - 1;
-            var y = (2 * rand()) - 1;
-            var s = (x * x) + (y * y);
+            let x = (2 * rand()) - 1;
+            let y = (2 * rand()) - 1;
+            let s = (x * x) + (y * y);
 
             if (s > 0 && s < 1) {
-                var standardNormal = x * Math.sqrt(-2 * Math.log(s) / s);
+                let standardNormal = x * Math.sqrt(-2 * Math.log(s) / s);
                 return mean + (standardDeviation * standardNormal);
             }
         }
@@ -1522,19 +1523,19 @@ function timestampCmp(ts1, ts2) {
 
 Geo = {};
 Geo.distance = function(a, b) {
-    var ax = null;
-    var ay = null;
-    var bx = null;
-    var by = null;
+    let ax = null;
+    let ay = null;
+    let bx = null;
+    let by = null;
 
-    for (var key in a) {
+    for (let key in a) {
         if (ax == null)
             ax = a[key];
         else if (ay == null)
             ay = a[key];
     }
 
-    for (var key in b) {
+    for (let key in b) {
         if (bx == null)
             bx = b[key];
         else if (by == null)
@@ -1545,32 +1546,32 @@ Geo.distance = function(a, b) {
 };
 
 Geo.sphereDistance = function(a, b) {
-    var ax = null;
-    var ay = null;
-    var bx = null;
-    var by = null;
+    let ax = null;
+    let ay = null;
+    let bx = null;
+    let by = null;
 
     // TODO swap order of x and y when done on server
-    for (var key in a) {
+    for (let key in a) {
         if (ax == null)
             ax = a[key] * (Math.PI / 180);
         else if (ay == null)
             ay = a[key] * (Math.PI / 180);
     }
 
-    for (var key in b) {
+    for (let key in b) {
         if (bx == null)
             bx = b[key] * (Math.PI / 180);
         else if (by == null)
             by = b[key] * (Math.PI / 180);
     }
 
-    var sin_x1 = Math.sin(ax), cos_x1 = Math.cos(ax);
-    var sin_y1 = Math.sin(ay), cos_y1 = Math.cos(ay);
-    var sin_x2 = Math.sin(bx), cos_x2 = Math.cos(bx);
-    var sin_y2 = Math.sin(by), cos_y2 = Math.cos(by);
+    let sin_x1 = Math.sin(ax), cos_x1 = Math.cos(ax);
+    let sin_y1 = Math.sin(ay), cos_y1 = Math.cos(ay);
+    let sin_x2 = Math.sin(bx), cos_x2 = Math.cos(bx);
+    let sin_y2 = Math.sin(by), cos_y2 = Math.cos(by);
 
-    var cross_prod = (cos_y1 * cos_x1 * cos_y2 * cos_x2) + (cos_y1 * sin_x1 * cos_y2 * sin_x2) +
+    let cross_prod = (cos_y1 * cos_x1 * cos_y2 * cos_x2) + (cos_y1 * sin_x1 * cos_y2 * sin_x2) +
         (sin_y1 * sin_y2);
 
     if (cross_prod >= 1 || cross_prod <= -1) {
@@ -1604,23 +1605,23 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
     print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " +
           " rs " + rsName);
 
-    var tests = 0;
+    let tests = 0;
     assert.soon(
         function() {
-            var stats = _replMonitorStats(rsName);
+            let stats = _replMonitorStats(rsName);
             if (tests++ % 10 == 0) {
                 printjson(stats);
             }
 
-            for (var i = 0; i < stats.length; i++) {
-                var node = stats[i];
+            for (let i = 0; i < stats.length; i++) {
+                let node = stats[i];
                 printjson(node);
                 if (node["addr"] !== hostAddr)
                     continue;
 
                 // Check that *all* hostAddr properties match desiredState properties
-                var stateReached = true;
-                for (var prop in desiredState) {
+                let stateReached = true;
+                for (let prop in desiredState) {
                     if (isObject(desiredState[prop])) {
                         if (!friendlyEqual(sortDoc(desiredState[prop]), sortDoc(node[prop]))) {
                             stateReached = false;
@@ -1721,7 +1722,7 @@ rs.printReplicationInfo = function() {
 };
 rs._runCmd = function(c) {
     // after the command, catch the disconnect and reconnect if necessary
-    var res = null;
+    let res = null;
     try {
         res = globalThis.db.adminCommand(c);
     } catch (e) {
@@ -1802,18 +1803,18 @@ rs.add = function(hostport, arb) {
     let self = this;
 
     assert.soon(function() {
-        var cfg = hostport;
+        let cfg = hostport;
 
-        var local = globalThis.db.getSiblingDB("local");
+        let local = globalThis.db.getSiblingDB("local");
         assert(local.system.replset.count() <= 1,
                "error: local.system.replset has unexpected contents");
-        var c = local.system.replset.findOne();
+        let c = local.system.replset.findOne();
         assert(c, "no config object retrievable from local.system.replset");
 
         const attemptedVersion = c.version++;
 
-        var max = 0;
-        for (var i in c.members) {
+        let max = 0;
+        for (let i in c.members) {
             // Omit 'newlyAdded' field if it exists in the config.
             delete c.members[i].newlyAdded;
             if (c.members[i]._id > max)
@@ -1863,7 +1864,7 @@ rs.syncFrom = function(host) {
     return globalThis.db._adminCommand({replSetSyncFrom: host});
 };
 rs.stepDown = function(stepdownSecs, catchUpSecs) {
-    var cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
+    let cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
     if (catchUpSecs !== undefined) {
         cmdObj['secondaryCatchUpPeriodSecs'] = catchUpSecs;
     }
@@ -1877,7 +1878,7 @@ rs.addArb = function(hn) {
 };
 
 rs.conf = function() {
-    var resp = globalThis.db._adminCommand({replSetGetConfig: 1});
+    let resp = globalThis.db._adminCommand({replSetGetConfig: 1});
     if (resp.ok && !(resp.errmsg) && resp.config)
         return resp.config;
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
@@ -1887,14 +1888,14 @@ rs.conf = function() {
 rs.config = rs.conf;
 
 rs.remove = function(hn) {
-    var local = globalThis.db.getSiblingDB("local");
+    let local = globalThis.db.getSiblingDB("local");
     assert(local.system.replset.count() <= 1,
            "error: local.system.replset has unexpected contents");
-    var c = local.system.replset.findOne();
+    let c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
     c.version++;
 
-    for (var i in c.members) {
+    for (let i in c.members) {
         if (c.members[i].host == hn) {
             c.members.splice(i, 1);
             return globalThis.db._adminCommand({replSetReconfig: c});
@@ -1907,12 +1908,12 @@ rs.remove = function(hn) {
 rs.debug = {};
 
 rs.debug.nullLastOpWritten = function(primary, secondary) {
-    var p = connect(primary + "/local");
-    var s = connect(secondary + "/local");
+    let p = connect(primary + "/local");
+    let s = connect(secondary + "/local");
     s.getMongo().setSecondaryOk();
 
-    var secondToLast = s.oplog.rs.find().sort({$natural: -1}).limit(1).next();
-    var last = p.runCommand({
+    let secondToLast = s.oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    let last = p.runCommand({
         findAndModify: "oplog.rs",
         query: {ts: {$gt: secondToLast.ts}},
         sort: {$natural: 1},
@@ -1930,7 +1931,7 @@ rs.debug.nullLastOpWritten = function(primary, secondary) {
 };
 
 rs.debug.getLastOpWritten = function(server) {
-    var s = globalThis.db.getSiblingDB("local");
+    let s = globalThis.db.getSiblingDB("local");
     if (server) {
         s = connect(server + "/local");
     }
@@ -1989,10 +1990,10 @@ help = shellHelper.help = function(x) {
         print(
             "\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
         print("Additional connections may be opened:\n");
-        print("    var x = new Mongo('host[:port]');");
-        print("    var mydb = x.getDB('mydb');");
+        print("    let x = new Mongo('host[:port]');");
+        print("    let mydb = x.getDB('mydb');");
         print("  or");
-        print("    var mydb = connect('host[:port]/mydb');");
+        print("    let mydb = connect('host[:port]/mydb');");
         return;
     } else if (x == "keys") {
         print("Tab completion and command history is available at the command prompt.\n");

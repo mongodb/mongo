@@ -31,7 +31,7 @@ class KeyVault {
 
     constructor(mongo) {
         this.mongo = mongo;
-        var collection = this._runCommand(this.mongo, this.mongo.getDataKeyCollection, {});
+        let collection = this._runCommand(this.mongo, this.mongo.getDataKeyCollection, {});
         this.keyColl = collection;
         this._runCommand(this.keyColl, this.keyColl.createIndex, [
             {keyAltNames: 1},
@@ -59,14 +59,14 @@ class KeyVault {
             return "TypeError: customer master key must be of String type.";
         }
 
-        var masterKeyAndMaterial = this._runCommand(
+        let masterKeyAndMaterial = this._runCommand(
             this.mongo, this.mongo.generateDataKey, [kmsProvider, customerMasterKey]);
-        var masterKey = masterKeyAndMaterial.masterKey;
+        let masterKey = masterKeyAndMaterial.masterKey;
 
-        var current = ISODate();
-        var uuid = UUID();
+        let current = ISODate();
+        let uuid = UUID();
 
-        var doc = {
+        let doc = {
             "_id": uuid,
             "keyMaterial": masterKeyAndMaterial.keyMaterial,
             "creationDate": current,
