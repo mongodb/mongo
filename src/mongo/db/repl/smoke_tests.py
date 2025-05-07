@@ -16,6 +16,7 @@
 
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -31,7 +32,7 @@ REPL = Path(__file__).resolve().parent
 ROOT = REPL.parent.parent.parent.parent
 MONGO_PYTHON = ROOT.joinpath("python3-venv")
 MONGO_PYTHON_INTERPRETER = MONGO_PYTHON.joinpath("bin", "python")
-BAZEL = Path("/usr/local/bin/bazel")
+BAZEL = Path(shutil.which("bazel"))
 
 
 def make_unique_name():
