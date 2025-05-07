@@ -36,6 +36,7 @@
 #include <fmt/format.h>
 #include <iostream>
 #include <psapi.h>
+#include <winsock2.h>
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
@@ -367,6 +368,12 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     osType = "Windows";
     osVersion = verstr.str();
     _extraStats = bExtra.obj();
+
+    // On Windows, `SOMAXCONN` is not a maximum value. Instead, it's a special
+    // placeholder value (`2**31 - 1`) indicating that the runtime should
+    // choose a suitable maximum value.
+    // See <https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-listen>.
+    defaultListenBacklog = SOMAXCONN;
 }
 
 }  // namespace mongo

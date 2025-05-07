@@ -65,6 +65,7 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
@@ -1152,9 +1153,12 @@ void AsioTransportLayer::_runListener() {
         return;
     }
 
+    const int listenBacklog = serverGlobalParams.listenBacklog
+        ? *serverGlobalParams.listenBacklog
+        : ProcessInfo::getDefaultListenBacklog();
     for (auto& acceptorRecord : _acceptorRecords) {
         asio::error_code ec;
-        (void)acceptorRecord->acceptor.listen(serverGlobalParams.listenBacklog, ec);
+        (void)acceptorRecord->acceptor.listen(listenBacklog, ec);
         if (ec) {
             LOGV2_FATAL(31339,
                         "Error listening for new connections on listen address",

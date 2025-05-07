@@ -119,6 +119,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:executor_stats",
+        "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.

@@ -357,7 +357,7 @@ Set \fB\-\-bind_ip_all\f1\f1 to \fBtrue\f1\&.
 \fBmongod \-\-listenBacklog\f1
 .RS
 .PP
-\fIDefault\f1: Target system \fBSOMAXCONN\f1 constant
+\fIDefault\f1: Target system specific maximum value
 .PP
 The maximum number of connections that can exist in the listen
 queue.
@@ -370,8 +370,9 @@ To prevent undefined behavior, specify a value for this
 parameter between \fB1\f1 and the local system \fBSOMAXCONN\f1
 constant.
 .PP
-The default value for the \fBlistenBacklog\f1 parameter is set at
-compile time to the target system \fBSOMAXCONN\f1 constant.
+The default value for the \fBlistenBacklog\f1 parameter depends on the target
+system. On Linux, \fB/proc/sys/net/core/somaxconn\f1 is used. On all other
+target systems, the compile time constant \fBSOMAXCONN\f1 is used.
 \fBSOMAXCONN\f1 is the maximum valid value that is documented for
 the \fIbacklog\f1 parameter to the \fIlisten\f1 system call.
 .PP
@@ -379,7 +380,7 @@ Some systems may interpret \fBSOMAXCONN\f1 symbolically, and others
 numerically. The actual \fIlisten backlog\f1 applied in practice may
 differ from any numeric interpretation of the \fBSOMAXCONN\f1 constant
 or argument to \fB\-\-listenBacklog\f1, and may also be constrained by
-system settings like \fBnet.core.somaxconn\f1 on Linux.
+system settings like \fB/proc/sys/net/core/somaxconn\f1 on Linux.
 .PP
 Passing a value for the \fBlistenBacklog\f1 parameter that exceeds the
 \fBSOMAXCONN\f1 constant for the local system is, by the letter of the
