@@ -58,10 +58,16 @@ class ReplicationStateTransitionGuard {
 public:
     ReplicationStateTransitionGuard() = default;
     ReplicationStateTransitionGuard(const ReplicationStateTransitionGuard&) = delete;
-    ReplicationStateTransitionGuard(ReplicationStateTransitionGuard&&) noexcept = default;
+    ReplicationStateTransitionGuard(ReplicationStateTransitionGuard&& other) noexcept
+        : _releaseCallback(std::move(other._releaseCallback)) {
+        other._releaseCallback = nullptr;
+    };
     ReplicationStateTransitionGuard& operator=(const ReplicationStateTransitionGuard&) = delete;
-    ReplicationStateTransitionGuard& operator=(ReplicationStateTransitionGuard&&) noexcept =
-        default;
+    ReplicationStateTransitionGuard& operator=(ReplicationStateTransitionGuard&& other) noexcept {
+        _releaseCallback = std::move(other._releaseCallback);
+        other._releaseCallback = nullptr;
+        return *this;
+    }
 
     void release() {
         if (_releaseCallback) {
