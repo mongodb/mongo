@@ -97,11 +97,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-import {
-    isShardMergeEnabled,
-    makeMigrationCertificatesForTest
-} from "jstests/replsets/libs/tenant_migration_util.js";
-
 // constants
 
 // All roles that are specific to one database will be given only for 'firstDbName'. For example,
@@ -114,20 +109,6 @@ export const adminDbName = "admin";
 export const authErrCode = 13;
 export const commandNotSupportedCode = 115;
 let shard0name = "shard0000";
-const migrationCertificates = makeMigrationCertificatesForTest();
-
-function buildTenantMigrationCmd(cmd, state) {
-    const {isShardMergeEnabled} = state;
-    const cmdCopy = Object.assign({}, cmd, {
-        protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
-    });
-
-    if (!isShardMergeEnabled) {
-        cmdCopy.tenantId = ObjectId().str;
-    }
-
-    return cmdCopy;
-}
 
 // useful shorthand when defining the tests below
 var roles_write =
@@ -4020,126 +4001,6 @@ export const authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "coll"}, actions: ["find"]}]
               }
-          ]
-        },
-        {
-          testname: "donorAbortMigration",
-          command: {
-              donorAbortMigration: 1,
-              migrationId: UUID(),
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to throw NoSuchTenantMigration.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "donorForgetMigration",
-          command: {
-              donorForgetMigration: 1,
-              migrationId: UUID(),
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to throw NoSuchTenantMigration.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "donorStartMigration",
-          setup: (db) => {
-              return {isShardMergeEnabled: isShardMergeEnabled(db)};
-          },
-          command: (state) => {
-              return buildTenantMigrationCmd({
-                  donorStartMigration: 1,
-                  migrationId: UUID(),
-                  recipientConnectionString: "recipient-rs/localhost:1234",
-                  readPreference: {mode: "primary"},
-                  donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-                  recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
-            }, state);
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // Cannot start tenant migration on a standalone mongod.
-                  expectFail: true
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "recipientSyncData",
-          setup: (db) => {
-              return {isShardMergeEnabled: isShardMergeEnabled(db)};
-          },
-          command: (state) => {
-              return buildTenantMigrationCmd({
-                  recipientSyncData: 1,
-                  migrationId: UUID(),
-                  donorConnectionString: "donor-rs/localhost:1234",
-                  readPreference: {mode: "primary"},
-                  startMigrationDonorTimestamp: Timestamp(1, 1),
-                  recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
-              }, state);
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // Cannot start tenant migration on a standalone mongod.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "recipientForgetMigration",
-          setup: (db) => {
-              return {isShardMergeEnabled: isShardMergeEnabled(db)};
-          },
-          command: (state) => {
-              return buildTenantMigrationCmd({
-                  recipientForgetMigration: 1,
-                  migrationId: UUID(),
-                  donorConnectionString: "donor-rs/localhost:1234",
-                  readPreference: {mode: "primary"},
-              }, state);
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to fail with InvalidOptions without cluster certificate.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
           ]
         },
         {

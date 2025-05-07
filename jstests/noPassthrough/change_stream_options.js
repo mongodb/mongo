@@ -7,9 +7,6 @@
 (function() {
 "use strict";
 
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
-
 const testDBName = jsTestName();
 
 // Tests set and get change stream options command with 'admin' database.
@@ -178,22 +175,6 @@ function testChangeStreamOptionsWithAdminDB(conn) {
     assert.commandWorked(
         primary.getDB("admin").runCommand({getClusterParameter: "changeStreamOptions"}));
     primary.getDB("admin").logout();
-
-    replSetTest.stopSet();
-})();
-
-// Tests that 'changeStreamOptions.preAndPostImages.expireAfterSeconds' is not available in
-// serverless.
-(function testChangeStreamOptionsInServerless() {
-    const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 1});
-
-    const primary = replSetTest.getPrimary();
-    const adminDB = primary.getDB("admin");
-    assert.commandFailedWithCode(adminDB.runCommand({
-        setClusterParameter:
-            {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: NumberLong(40)}}}
-    }),
-                                 ErrorCodes.CommandNotSupported);
 
     replSetTest.stopSet();
 })();

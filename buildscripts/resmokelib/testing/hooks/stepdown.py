@@ -10,10 +10,9 @@ import pymongo.errors
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface, talk_directly_to_shardsvrs
+from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
-from buildscripts.resmokelib.testing.fixtures import tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
@@ -138,30 +137,10 @@ class ContinuousStepdown(interface.Hook):
                 self._add_fixture(fixture.configsvr)
             for mongos_fixture in fixture.mongos:
                 self._mongos_fixtures.append(mongos_fixture)
-        elif isinstance(fixture, tenant_migration.TenantMigrationFixture):
-            if not fixture.all_nodes_electable:
-                raise ValueError(
-                    "The replica sets that are the target of the ContinuousStepdown hook must have"
-                    " the 'all_nodes_electable' option set.")
-
-            for rs_fixture in fixture.get_replsets():
-                self._rs_fixtures.append(rs_fixture)
         elif isinstance(fixture, fixture_interface.MultiClusterFixture):
             # Recursively call _add_fixture on all the independent clusters.
             for cluster_fixture in fixture.get_independent_clusters():
                 self._add_fixture(cluster_fixture)
-        elif isinstance(fixture, talk_directly_to_shardsvrs.TalkDirectlyToShardsvrsFixture):
-            if not fixture.all_nodes_electable:
-                raise ValueError(
-                    "The replica sets that are the target of the ContinuousStepdown hook must have"
-                    " the 'all_nodes_electable' option set.")
-            for rs_fixture in fixture.get_replsets():
-                self._rs_fixtures.append(rs_fixture)
-
-
-def is_shard_split(fixture):
-    """Used to determine if the provided fixture is an instance of the ShardSplitFixture class."""
-    return fixture.__class__.__name__ == 'ShardSplitFixture'
 
 
 class _StepdownThread(threading.Thread):
@@ -212,10 +191,6 @@ class _StepdownThread(threading.Thread):
 
                 self._is_idle_evt.clear()
 
-                if is_shard_split(self._fixture):
-                    self._fixture.enter_step_down()
-                    self._rs_fixtures = [self._fixture.get_donor_rs()]
-
                 now = time.time()
                 if now - self._last_exec > self._stepdown_interval_secs:
                     self.logger.info("Starting stepdown of all primaries")
@@ -225,10 +200,6 @@ class _StepdownThread(threading.Thread):
                     self._last_exec = time.time()
                     self.logger.info("Completed stepdown of all primaries in %0d ms",
                                      (self._last_exec - now) * 1000)
-
-                if is_shard_split(self._fixture):
-                    self._rs_fixtures = []
-                    self._fixture.exit_step_down()
 
                 found_idle_request = self.__lifecycle.poll_for_idle_request()
                 if found_idle_request:
