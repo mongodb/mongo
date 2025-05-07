@@ -217,7 +217,8 @@ TCMALLOC_DEPS = select({
 }, no_match_error = TCMALLOC_ERROR_MESSAGE)
 
 SYMBOL_ORDER_FILES = [
-    "//:symbols.orderfile",
+    "//buildscripts:symbols.orderfile",
+    "//buildscripts:symbols-al2023.orderfile",
 ]
 
 # These are warnings are disabled globally at the toolchain level to allow external repository compilation.

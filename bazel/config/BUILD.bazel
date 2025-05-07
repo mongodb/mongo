@@ -2321,11 +2321,39 @@ selects.config_setting_group(
 # --------------------------------------
 
 selects.config_setting_group(
+    name = "symbol_ordering_file_enabled_al2023",
+    match_all = [
+        "@platforms//os:linux",
+        "//bazel/platforms:amazon_linux_2023",
+        ":opt_any",
+        ":linker_lld",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_amazon_linux_2023",
+    match_any = [
+        "//bazel/platforms:ubuntu18",
+        "//bazel/platforms:ubuntu20",
+        "//bazel/platforms:ubuntu22",
+        "//bazel/platforms:ubuntu24",
+        "//bazel/platforms:amazon_linux_2",
+        "//bazel/platforms:debian10",
+        "//bazel/platforms:debian12",
+        "//bazel/platforms:rhel8",
+        "//bazel/platforms:rhel9",
+        "//bazel/platforms:suse12",
+        "//bazel/platforms:suse15",
+    ],
+)
+
+selects.config_setting_group(
     name = "symbol_ordering_file_enabled",
     match_all = [
         "@platforms//os:linux",
         ":opt_any",
         ":linker_lld",
+        "//bazel/config:not_amazon_linux_2023",
     ],
 )
 

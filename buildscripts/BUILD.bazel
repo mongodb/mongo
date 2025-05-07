@@ -8,6 +8,8 @@ exports_files([
     "jstoh.py",
     "msitrim.py",
     "pip_requirements.py",
+    "symbols.orderfile",
+    "symbols-al2023.orderfile",
 ])
 
 py_binary(
