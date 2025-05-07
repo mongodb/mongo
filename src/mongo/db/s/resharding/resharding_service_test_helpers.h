@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/logv2/log.h"

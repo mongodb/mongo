@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"

@@ -30,7 +30,6 @@
 
 #if defined(_WIN32)
 
-#include "mongo/platform/basic.h"
 
 #include <boost/range/size.hpp>
 

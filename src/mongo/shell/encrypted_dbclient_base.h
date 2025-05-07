@@ -71,7 +71,6 @@
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/rpc/op_msg.h"

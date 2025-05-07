@@ -28,9 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"

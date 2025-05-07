@@ -51,7 +51,6 @@
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <boost/optional/optional.hpp>
 #include <cstdlib>
 #include <fstream>

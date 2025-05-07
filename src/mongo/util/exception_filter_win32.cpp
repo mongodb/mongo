@@ -30,7 +30,6 @@
 
 #ifdef _WIN32
 
-#include "mongo/platform/basic.h"
 
 #pragma warning(push)
 // C4091: 'typedef ': ignored on left of '' when no variable is declared

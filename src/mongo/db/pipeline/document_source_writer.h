@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 
 #include <fmt/format.h>
 

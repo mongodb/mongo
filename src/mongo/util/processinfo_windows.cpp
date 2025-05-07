@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <bitset>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>

@@ -36,7 +36,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/str.h"
 
 namespace mongo::sbe::value {

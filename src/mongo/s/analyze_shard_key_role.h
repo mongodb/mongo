@@ -31,7 +31,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 namespace analyze_shard_key {

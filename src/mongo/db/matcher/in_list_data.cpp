@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/in_list_data.h"
 #include "mongo/util/string_listset.h"

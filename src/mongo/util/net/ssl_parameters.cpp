@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/net/ssl_parameters.h"
 
 #include "mongo/bson/json.h"

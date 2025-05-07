@@ -31,7 +31,6 @@
 
 #include <cstddef>
 
-#include "mongo/platform/basic.h"
 
 namespace mongo::sbe {
 

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/initial_sync/all_database_cloner.h"

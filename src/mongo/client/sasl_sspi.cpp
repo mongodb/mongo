@@ -30,8 +30,6 @@
 #ifdef _WIN32
 
 
-#include "mongo/platform/basic.h"
-
 #include <sasl/sasl.h>
 #include <sasl/saslplug.h>
 

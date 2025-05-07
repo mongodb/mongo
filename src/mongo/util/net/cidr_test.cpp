@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/cidr.h"

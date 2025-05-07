@@ -29,8 +29,6 @@
 
 #ifdef _WIN32
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/sasl_sspi_options.h"
 
 #include <string>

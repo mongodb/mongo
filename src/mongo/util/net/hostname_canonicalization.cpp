@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/net/hostname_canonicalization.h"
 
 #if !defined(_WIN32)

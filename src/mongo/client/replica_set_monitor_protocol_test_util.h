@@ -38,7 +38,6 @@
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

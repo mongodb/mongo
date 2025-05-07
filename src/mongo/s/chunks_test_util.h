@@ -40,7 +40,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/platform/basic.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"

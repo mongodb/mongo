@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/unwind_processor.h"
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

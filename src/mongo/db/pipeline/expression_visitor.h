@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/expression_walker.h"
 
 namespace ExpressionTests {

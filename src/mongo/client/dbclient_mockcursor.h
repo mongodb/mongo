@@ -34,7 +34,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

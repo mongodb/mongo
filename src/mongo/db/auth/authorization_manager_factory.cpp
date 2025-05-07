@@ -29,7 +29,6 @@
 
 #include "authorization_manager_factory.h"
 
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

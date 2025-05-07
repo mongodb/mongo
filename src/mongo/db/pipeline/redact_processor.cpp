@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/redact_processor.h"
 
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

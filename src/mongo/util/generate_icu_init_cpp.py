@@ -85,7 +85,6 @@ def generate_cpp_file(data_file_path, cpp_file_path):
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include <unicode/udata.h>
 

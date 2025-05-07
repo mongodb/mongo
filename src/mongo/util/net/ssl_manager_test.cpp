@@ -33,7 +33,6 @@
 #include <fstream>
 
 #include "mongo/config.h"
-#include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/transport/asio/asio_transport_layer.h"

@@ -30,7 +30,6 @@
 #include "mongo/util/net/cidr.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/basic.h"
 
 #ifdef _WIN32
 #include <Ws2tcpip.h>

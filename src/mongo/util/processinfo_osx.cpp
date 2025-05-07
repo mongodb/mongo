@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/processinfo.h"
 
 #include <boost/none.hpp>

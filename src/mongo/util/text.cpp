@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/util/text.h"
 
@@ -41,7 +40,6 @@
 #include <io.h>
 #endif
 
-#include "mongo/platform/basic.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/str.h"
 

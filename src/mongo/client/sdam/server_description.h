@@ -48,7 +48,6 @@
 #include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/platform/basic.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/net/hostandport.h"

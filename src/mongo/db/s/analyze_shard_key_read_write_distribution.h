@@ -51,7 +51,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/basic.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"

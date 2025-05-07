@@ -52,7 +52,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

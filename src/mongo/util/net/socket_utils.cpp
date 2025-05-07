@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/net/socket_utils.h"
 
 #if !defined(_WIN32)

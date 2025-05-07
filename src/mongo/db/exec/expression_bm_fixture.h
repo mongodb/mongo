@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
-#include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/time_support.h"
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
 #include <CommonCrypto/CommonCryptor.h>
 #include <Security/Security.h>

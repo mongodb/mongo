@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 
 #include "mongo/s/write_ops/batched_command_request.h"
 

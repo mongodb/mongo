@@ -43,7 +43,6 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/platform/basic.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/tick_source_mock.h"

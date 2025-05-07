@@ -47,7 +47,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"

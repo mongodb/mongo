@@ -34,7 +34,6 @@
 #error This file assumes a UNICODE WIN32 build
 #endif
 
-#include "mongo/platform/basic.h"
 
 #include <string>
 #include <vector>

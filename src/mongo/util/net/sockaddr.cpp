@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <iterator>
 #include <memory>
 #include <set>

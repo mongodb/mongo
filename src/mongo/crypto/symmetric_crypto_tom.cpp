@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <cstdint>
 #include <iterator>
 #include <memory>

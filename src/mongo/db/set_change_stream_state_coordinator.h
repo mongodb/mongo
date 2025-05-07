@@ -43,7 +43,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/set_change_stream_state_coordinator_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
-#include "mongo/platform/basic.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"

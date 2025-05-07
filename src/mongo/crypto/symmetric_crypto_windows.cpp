@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <bcrypt.h>
 #include <limits>
 #include <memory>

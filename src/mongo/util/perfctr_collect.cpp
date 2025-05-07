@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/perfctr_collect.h"
 
 #include "mongo/base/init.h"

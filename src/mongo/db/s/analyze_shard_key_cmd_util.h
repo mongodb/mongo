@@ -36,7 +36,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/basic.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/util/uuid.h"
 
