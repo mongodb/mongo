@@ -84,6 +84,7 @@ struct MemberState;
 
 // Maximum number of retries for a failed heartbeat.
 const int kMaxHeartbeatRetries = 2;
+extern mongo::Counter64& numSyncSourceChangesDueToSignificantlyCloserNode;
 
 /**
  * Replication Topology Coordinator

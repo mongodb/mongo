@@ -59,6 +59,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/isself.h"
@@ -4634,17 +4635,20 @@ public:
 };
 
 TEST_F(ReevalSyncSourceTest, ChangeWhenSourceSignificantlyCloserNode) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
-
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
                                                                    MemberState::RS_SECONDARY,
                                                                    lastOpTimeFetched,
                                                                    now(),
                                                                    ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial + 1 ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodesEquidistant) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), pingTime);
 
@@ -4653,9 +4657,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodesEquidistant) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeOnlySlightlyCloser) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), slightlyCloserPingTime);
 
@@ -4664,9 +4671,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeOnlySlightlyCloser) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenFurtherNodeFound) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), slightlyFurtherPingTime);
 
@@ -4675,9 +4685,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenFurtherNodeFound) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenSignificantlyCloserNodeButIsNotEligible) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4691,9 +4704,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSignificantlyCloserNodeButIsNotEligible
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenThresholdIsZero) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     changeSyncSourceThresholdMillis.store(0LL);
 
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
@@ -4705,9 +4721,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenThresholdIsZero) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4717,9 +4736,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup2) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4729,9 +4751,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeIsInStartup2) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryOnlyReadPref) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4741,9 +4766,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryOnlyReadPref) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::PrimaryOnly));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryPrefAndCurrentlySyncingFromPrimary) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     // Tell the node that we're currently syncing from the primary.
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
                                                             "rs0",
@@ -4763,9 +4791,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryPrefAndCurrentlySyncingFromPrima
                                                            lastOpTimeFetched,
                                                            now(),
                                                            ReadPreference::PrimaryPreferred));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrimary) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     // Tell the node that we're currently not syncing from the primary.
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
                                                             "rs0",
@@ -4785,9 +4816,12 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
                                                            lastOpTimeFetched,
                                                            now(),
                                                            ReadPreference::PrimaryPreferred));
+    ASSERT_TRUE(syncSrcChangeMetricInitial + 1 ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenSourcePingTimeIsMissing) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     updateConfig(BSON("_id" << "rs0"
                             << "version" << 5 << "term" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -4813,9 +4847,12 @@ TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenSourcePingTimeIsMissing) {
                                                                     lastFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenCandidatePingTimeIsMissing) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     updateConfig(BSON("_id" << "rs0"
                             << "version" << 5 << "term" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -4841,9 +4878,12 @@ TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenCandidatePingTimeIsMissing) {
                                                                     lastFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSecondaryDelaySecs) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     updateConfig(
         BSON("_id" << "rs0"
                    << "version" << 5 << "term" << 1 << "members"
@@ -4867,9 +4907,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSecondaryDelaySecs) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     updateConfig(
         BSON("_id" << "rs0"
                    << "version" << 5 << "term" << 1 << "members"
@@ -4893,9 +4936,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenChangedTooManyTimesRecently) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4920,9 +4966,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenChangedTooManyTimesRecently) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, ChangeWhenHaveNotChangedTooManyTimesRecently) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4944,9 +4993,12 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenHaveNotChangedTooManyTimesRecently) {
                                                                    lastOpTimeFetched,
                                                                    now(),
                                                                    ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial + 1 ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(TopoCoordTest, DontChangeWhenNodeRequiresMorePings) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     updateConfig(BSON("_id" << "rs0"
                             << "version" << 5 << "term" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -4984,9 +5036,12 @@ TEST_F(TopoCoordTest, DontChangeWhenNodeRequiresMorePings) {
                                                                     lastFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByReplSetSyncFromCommand) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     getTopoCoord().setForceSyncSourceIndex(1);
 
     // This will cause us to set that the current sync source is forced.
@@ -5003,9 +5058,12 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByReplSetSyncFromComman
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByFailPoint) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     auto forceSyncSourceCandidateFailPoint =
         globalFailPointRegistry().find("forceSyncSourceCandidate");
     forceSyncSourceCandidateFailPoint->setMode(
@@ -5028,6 +5086,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByFailPoint) {
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 // Test that we will select the node specified by the 'unsupportedSyncSource' parameter as a sync
@@ -5049,6 +5109,7 @@ TEST_F(ReevalSyncSourceTest, ChooseSyncSourceForcedByStartupParameterEvenIfFarth
 // Test that we will not change from the node specified by the 'unsupportedSyncSource' parameter
 // due to ping time.
 TEST_F(ReevalSyncSourceTest, NoChangeDueToPingTimeWhenSyncSourceForcedByStartupParameter) {
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
                                                               "host2:27017"};
     // Select a sync source.
@@ -5066,6 +5127,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeDueToPingTimeWhenSyncSourceForcedByStartupP
                                                                     lastOpTimeFetched,
                                                                     now(),
                                                                     ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
 // Test that we will not change sync sources due to the replSetSyncFrom command being run when
@@ -5754,9 +5817,9 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
     getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host2:27017"));
     getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
 
-    // Simulates a scenario where the node hasn't received a heartbeat from the primary in a while
-    // but the primary is caught up and has written something. The node is aware of this change
-    // and as a result realizes the primary is caught up.
+    // Simulates a scenario where the node hasn't received a heartbeat from the primary in a
+    // while but the primary is caught up and has written something. The node is aware of this
+    // change and as a result realizes the primary is caught up.
     topoCoordSetMyLastAppliedOpTime(currentOptime, Date_t(), false);
     topoCoordSetMyLastWrittenOpTime(currentOptime, Date_t(), false);
     getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
@@ -5780,8 +5843,8 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
                            "primary, and therefore cannot call for catchup takeover");
 }
 
-// Test for the bug described in SERVER-48958 where we would schedule a catchup takeover for a node
-// with priority 0.
+// Test for the bug described in SERVER-48958 where we would schedule a catchup takeover for a
+// node with priority 0.
 TEST_F(TopoCoordTest, NodeWontScheduleCatchupTakeoverIfPriorityZero) {
     updateConfig(BSON("_id" << "rs0"
                             << "version" << 5 << "members"
@@ -5923,7 +5986,8 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastStepDownUntil) {
         getTopoCoord().tryToStartStepDown(term, curTime, futureTime, curTime, false),
         DBException,
         ErrorCodes::ExceededTimeLimit,
-        "By the time we were ready to step down, we were already past the time we were supposed to "
+        "By the time we were ready to step down, we were already past the time we were "
+        "supposed to "
         "step down until");
 }
 
@@ -6679,8 +6743,8 @@ TEST_F(ConfigReplicationTest, NonVotingNodeExcludedFromMajorityReplicatedConfigC
     auto pred = getTopoCoord().makeConfigPredicate();
     ASSERT_FALSE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
 
-    // Receive a heartbeat from the non-voting node, but haveTaggedNodesSatisfiedCondition should
-    // still return false.
+    // Receive a heartbeat from the non-voting node, but haveTaggedNodesSatisfiedCondition
+    // should still return false.
     simulateHBWithConfigVersionAndTerm(1);
     ASSERT_FALSE(getTopoCoord().haveTaggedNodesSatisfiedCondition(pred, tagPattern.getValue()));
 
@@ -6856,7 +6920,8 @@ TEST_F(TopoCoordTest, HaveTaggedNodesReachedOpTime) {
 }
 
 TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
-    // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
+    // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy
+    // it.
     updateConfig(BSON("_id" << "rs0"
                             << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -6893,8 +6958,8 @@ TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
 }
 
 TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
-    // In a PSSAA set, a w:2 write should only be acknowledged if at least one of the secondaries
-    // can satisfy it.
+    // In a PSSAA set, a w:2 write should only be acknowledged if at least one of the
+    // secondaries can satisfy it.
     RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     updateConfig(BSON("_id" << "rs0"
                             << "version" << 2 << "members"
@@ -6935,7 +7000,8 @@ TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
 }
 
 TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
-    // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
+    // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy
+    // it.
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagReduceMajorityWriteLatency", true);
     updateConfig(BSON("_id" << "rs0"
@@ -7087,8 +7153,8 @@ TEST_F(TopoCoordTest, CommitQuorumBuildIndexesFalse) {
     }
 
     {
-        // The buildIndexes:false node can vote but not build indexes. The commit quorum should be
-        // unsatisfiable.
+        // The buildIndexes:false node can vote but not build indexes. The commit quorum should
+        // be unsatisfiable.
         CommitQuorumOptions cq;
         cq.mode = "votingMembers";
         ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(cq));
@@ -7160,8 +7226,8 @@ TEST_F(TopoCoordTest, AdvanceCommittedOpTimeDisregardsWallTimeOrder) {
 
     // memberOne's lastApplied and lastDurable OpTimeAndWallTimes are equal to
     // lastCommittedOpTimeAndWallTime, but memberTwo's are equal to
-    // initialCommittedOpTimeAndWallTime. Only the ordering of OpTimes should influence advancing
-    // the commit point.
+    // initialCommittedOpTimeAndWallTime. Only the ordering of OpTimes should influence
+    // advancing the commit point.
     hb.setAppliedOpTimeAndWallTime(lastCommittedOpTimeAndWallTime);
     hb.setWrittenOpTimeAndWallTime(lastCommittedOpTimeAndWallTime);
     hb.setDurableOpTimeAndWallTime(lastCommittedOpTimeAndWallTime);
@@ -7809,8 +7875,8 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotRetryHeartbeatIfTheFirstFailureTakesT
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberDoesNotBuildIndexes) {
     // In this test, the TopologyCoordinator should not tell us to change sync sources away
-    // from "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
-    // "host3", since "host3" does not build indexes
+    // from "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30)
+    // behind "host3", since "host3" does not build indexes
     OpTime election = OpTime();
     // Our last op time fetched must be behind host2, or we'll hit the case where we change
     // sync sources due to the sync source being behind, without a sync source, and not primary.
@@ -7846,8 +7912,8 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberDoesNo
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotReadable) {
     // In this test, the TopologyCoordinator should not tell us to change sync sources away
-    // from "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
-    // "host3", since "host3" is in a non-readable mode (RS_ROLLBACK)
+    // from "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30)
+    // behind "host3", since "host3" is in a non-readable mode (RS_ROLLBACK)
     OpTime election = OpTime();
     // Our last op time fetched must be behind host2, or we'll hit the case where we change
     // sync sources due to the sync source being behind, without a sync source, and not primary.
@@ -7930,7 +7996,8 @@ public:
             Milliseconds(3990),              // Spent 3.99 of the 4 seconds in the network.
             _target,
             StatusWith<ReplSetHeartbeatResponse>(
-                ErrorCodes::ExceededTimeLimit, "Took too long"));  // We've never applied anything.
+                ErrorCodes::ExceededTimeLimit,
+                "Took too long"));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
@@ -8058,8 +8125,8 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, NodeDoesNotRetryHeartbeatsAfterFailing
         StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"));
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
-    // Because this is the second retry, rather than retry again, we expect to wait for a quarter
-    // of the heartbeat interval to elapse.
+    // Because this is the second retry, rather than retry again, we expect to wait for a
+    // quarter of the heartbeat interval to elapse.
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(4800) +
                       ReplSetConfig::kDefaultHeartbeatInterval / 4,
                   action.getNextHeartbeatStartDate());

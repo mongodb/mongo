@@ -92,7 +92,7 @@ constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 
 // Tracks the number of times we decide to change sync sources in order to sync from a significantly
 // closer node.
-auto& numSyncSourceChangesDueToSignificantlyCloserNode =
+mongo::Counter64& numSyncSourceChangesDueToSignificantlyCloserNode =
     *MetricBuilder<Counter64>("repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode");
 
 std::string TopologyCoordinator::roleToString(TopologyCoordinator::Role role) {
