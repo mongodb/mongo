@@ -705,7 +705,7 @@ protected:
     void writeStateTransitionUpdateExpectSuccess(
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
         writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-            opCtx, _metrics.get(), expectedCoordinatorDoc);
+            opCtx, _metrics.get(), expectedCoordinatorDoc, boost::none);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly

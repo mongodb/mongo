@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
@@ -43,6 +44,9 @@ class ReshardingMetrics;
 class ReshardingCoordinatorDocument;
 
 namespace resharding {
+
+typedef unique_function<ReshardingCoordinatorDocument(OperationContext*, DaoStorageClient*)>
+    PhaseTransitionFn;
 
 const WriteConcernOptions kMajorityWriteConcern{
     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
@@ -81,7 +85,8 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc);
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<PhaseTransitionFn> phaseTransitionFn = boost::none);
 
 ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx,

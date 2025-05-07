@@ -180,6 +180,7 @@ using resharding_metrics::getIntervalStartFieldName;
 using DocT = ReshardingCoordinatorDocument;
 const auto metricsPrefix = resharding_metrics::getMetricsPrefix<DocT>();
 
+
 void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
     bob.append(getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
                timestamp);
@@ -200,6 +201,7 @@ void buildStateDocumentBlockingWritesMetricsForUpdate(BSONObjBuilder& bob, Date_
         timestamp);
 }
 
+// TODO SERVER-102424: Remove once we can delete writeToCoordinatorStateNss().
 void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
                                         CoordinatorStateEnum newState,
                                         Date_t timestamp) {
@@ -826,7 +828,8 @@ void writeParticipantShardsAndTempCollInfo(
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc) {
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<PhaseTransitionFn> phaseTransitionFn) {
     // Run updates to config.reshardingOperations and config.collections in a transaction
     auto nextState = coordinatorDoc.getState();
 
@@ -841,19 +844,32 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
             collNames,
             [&](OperationContext* opCtx, TxnNumber txnNumber) {
                 // Update the config.reshardingOperations entry
-                writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
+
+                // TODO SERVER-103243 - once this ticket is done we can remove if statement and
+                // directly call the phase transition function.
+                ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
+                if (phaseTransitionFn) {
+                    resharding::TransactionalDaoStorageClientImpl client(txnNumber);
+                    updatedCoordinatorDoc = (*phaseTransitionFn)(opCtx, &client);
+                } else {
+                    writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
+                }
 
                 // Update the config.collections entry for the original collection
                 updateConfigCollectionsForOriginalNss(
-                    opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
+                    opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
 
                 // Update the config.collections entry for the temporary resharding collection. If
                 // we've already successfully committed that the operation will succeed, we've
                 // removed the entry for the temporary collection and updated the entry with
                 // original namespace to have the new shard key, UUID, and epoch
                 if (nextState < CoordinatorStateEnum::kCommitting) {
-                    writeToConfigCollectionsForTempNss(
-                        opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
+                    writeToConfigCollectionsForTempNss(opCtx,
+                                                       updatedCoordinatorDoc,
+                                                       boost::none,
+                                                       boost::none,
+                                                       boost::none,
+                                                       txnNumber);
                 }
             },
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
