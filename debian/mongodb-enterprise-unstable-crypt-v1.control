@@ -1,0 +1,27 @@
+Source: mongodb-enterprise-unstable-crypt-v1
+Section: database
+Priority: optional
+Maintainer: MongoDB Packaging <packaging@mongodb.com>
+Standards-Version: 3.8.0
+Homepage: http://www.mongodb.org
+
+Package: mongodb-enterprise-unstable-crypt-v1
+Conflicts: mongodb-enterprise-crypt-v1
+Architecture: any
+Description: MongoDB Enterprise Field Level Encryption Crypto v1 Library
+ MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB▒~@~Ys native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+ .
+ MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ .
+ MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ .
+ MongoDB features:
+ * JSON Data Model with Dynamic Schemas
+ * Auto-Sharding for Horizontal Scalability
+ * Built-In Replication for High Availability
+ * Rich Secondary Indexes, including geospatial
+ * TTL indexes
+ * Text Search
+ * Aggregation Framework & Native MapReduce
+ .
+ This package contains MongoDB Enterprise Field Level Encryption Crypto v1 library.

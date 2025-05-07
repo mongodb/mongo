@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+	touch configure-stamp
+
+build: build-stamp
+
+build-stamp: configure-stamp
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-crypt-v1
+	dh_clean debian/files
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-crypt-v1/usr/include/mongo_crypt/v1/mongo_crypt
+	install -m 644 $(CURDIR)/include/mongo_crypt/v1/mongo_crypt/mongo_crypt.h $(CURDIR)/debian/mongodb-enterprise-crypt-v1/usr/include/mongo_crypt/v1/mongo_crypt
+
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-crypt-v1/usr/lib
+	install -m 755 $(CURDIR)/lib/mongo_crypt_v1.so $(CURDIR)/debian/mongodb-enterprise-crypt-v1/usr/lib
+
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure
