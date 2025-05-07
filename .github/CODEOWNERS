@@ -89,12 +89,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/*
 /buildscripts/resmokeconfig/suites/**/aggregation* @10gen/query @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_disabled_optimization.yml @10gen/query-optimization @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/aggregation_embedded_router_jscore_passthrough.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_repeat_queries_multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_unsplittable_collections_on_random_shard_passthrough* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_facet_unwind_passthrough.yml @10gen/query-execution-classic @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_sharded_collections_causally_consistent_passthrough.yml @10gen/query-execution-classic @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/aggregation_sharded_collections_embedded_router_jscore_passthrough.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_secondary_reads.yml @10gen/query-execution-classic @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/benchmarks_abt_lowering.yml @10gen/query-execution-sbe @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/benchmarks_expression.yml @10gen/query-execution-classic @svc-auto-approve-bot

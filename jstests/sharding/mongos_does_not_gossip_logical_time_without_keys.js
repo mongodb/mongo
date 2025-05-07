@@ -1,10 +1,6 @@
 /**
  * Tests that mongos does not gossip cluster time metadata until at least one key is created on the
  * config server, and that it does not block waiting for keys at startup.
- * @tags: [
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
- * ]
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/multi_cluster.js";

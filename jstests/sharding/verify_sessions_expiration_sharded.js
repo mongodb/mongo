@@ -12,11 +12,6 @@
 //    expiring from the config.system.sessions collection. If the expiration date has been reached
 //    during a currently running operation, the logical session cache should vivify the session and
 //    replace it in the config.system.sessions collection.
-//
-// @tags: [
-//    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
-//    embedded_router_incompatible,
-// ]
 
 // This test makes assertions about the number of logical session records.
 TestData.disableImplicitSessions = true;

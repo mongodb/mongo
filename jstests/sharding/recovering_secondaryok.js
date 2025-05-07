@@ -1,10 +1,6 @@
 /**
  * This tests that secondaryOk'd queries in sharded setups get correctly routed when a secondary
  * goes into RECOVERING state, and don't break
- * @tags: [
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
- * ]
  */
 
 // Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does

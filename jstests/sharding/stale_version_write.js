@@ -1,9 +1,4 @@
 // Tests whether a reset sharding version triggers errors
-// @tags: [
-//   # TODO (SERVER-97257): Re-enable this test.
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   embedded_router_incompatible,
-// ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 1, mongos: 2});

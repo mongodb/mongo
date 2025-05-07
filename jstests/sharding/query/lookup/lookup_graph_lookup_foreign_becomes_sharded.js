@@ -4,9 +4,6 @@
  *
  * @tags: [
  *   requires_persistence,
- *   # TODO (SERVER-97257): Re-enable this test.
- *   # Test doesn't start enough mongods to have num_mongos routers
- *   embedded_router_incompatible,
  * ]
  */
 import "jstests/multiVersion/libs/multi_cluster.js";

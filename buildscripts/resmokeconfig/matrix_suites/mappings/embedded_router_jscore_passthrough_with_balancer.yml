@@ -1,5 +1,0 @@
-base_suite: sharding_jscore_passthrough_with_balancer
-overrides:
-  - "embedded_router.embedded_router"
-excludes:
-  - "embedded_router.exclude_auth_tests"

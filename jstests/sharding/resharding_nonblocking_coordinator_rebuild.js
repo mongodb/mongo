@@ -9,8 +9,6 @@
  *  # This tests logic that shouldn't be different on a config server,
  *  # so there's no need to run it with a config shard.
  *  config_shard_incompatible,
- *  # TODO SERVER-97257: Re-enable this test on embedded router suites.
- *  embedded_router_incompatible,
  *  ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";

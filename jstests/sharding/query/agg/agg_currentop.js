@@ -15,8 +15,6 @@
  * This test requires replica set configuration and user credentials to persist across a restart.
  * @tags: [
  *   requires_persistence,
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  *   requires_fcv_81,

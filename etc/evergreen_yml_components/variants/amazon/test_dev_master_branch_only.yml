@@ -228,13 +228,6 @@ buildvariants:
       - name: .cluster_scalability_only
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2023-arm64-all-feature-flags-embedded-router
-    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Embedded Router Tasks"
-    tags: ["suggested"]
-    tasks:
-      - name: .embedded_router
-
-  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-magic-restore
     display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Magic Restore Tasks"
     tags: ["suggested"]

@@ -9,8 +9,6 @@
  * @tags: [
  *    uses_transactions,
  *    uses_multi_shard_transaction,
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
  * ]
  */
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";

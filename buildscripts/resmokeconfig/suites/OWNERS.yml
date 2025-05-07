@@ -8,9 +8,6 @@ filters:
   - "aggregation_disabled_optimization.yml":
     approvers:
       - 10gen/query-optimization
-  - "aggregation_embedded_router_jscore_passthrough.yml":
-    approvers:
-      - 10gen/query-optimization
   - "aggregation_repeat_queries_multiplan_single_solutions.yml":
     approvers:
       - 10gen/query-optimization
@@ -23,9 +20,6 @@ filters:
   - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
     approvers:
       - 10gen/query-execution-classic
-  - "aggregation_sharded_collections_embedded_router_jscore_passthrough.yml":
-    approvers:
-      - 10gen/query-optimization
   - "aggregation_secondary_reads.yml":
     approvers:
       - 10gen/query-execution-classic

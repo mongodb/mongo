@@ -1,8 +1,6 @@
 // Tests that mapReduce commands fail if the result set does not fit into a single batch.
 // @tags: [
 //   does_not_support_stepdowns,
-//   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
-//   embedded_router_incompatible,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting
 // ]

@@ -1,10 +1,6 @@
 /**
  * Tests that the connection string in the config.shards document is correctly updated when a node
  * is added or removed from the replica set.
- * @tags: [
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
- * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

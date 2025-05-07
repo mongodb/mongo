@@ -1,9 +1,5 @@
 // This test was designed to reproduce SERVER-31475. It issues sharded aggregations with an error
 // returned from one shard, and a delayed response from another shard.
-// @tags: [
-//   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
-//   embedded_router_incompatible,
-// ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, useBridge: true});

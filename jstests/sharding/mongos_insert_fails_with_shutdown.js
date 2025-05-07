@@ -1,8 +1,6 @@
 /**
  * @tags: [
  *    multiversion_incompatible,
- *    # This tests needs to stop mongoS, which is impossible with an embedded router.
- *    embedded_router_incompatible,
  * ]
  */
 

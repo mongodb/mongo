@@ -2,9 +2,7 @@
  * This test is labeled resource intensive because its total io_write is 47MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
- *   resource_intensive,
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
+ *    resource_intensive,
  *    requires_scripting
  * ]
  */

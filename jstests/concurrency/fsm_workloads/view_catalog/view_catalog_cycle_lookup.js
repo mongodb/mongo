@@ -5,10 +5,8 @@
  * views against other eachother and the underlying collection. We are looking to expose situations
  * where a $lookup or $graphLookup view that forms a cycle is created successfully.
  *
- * TODO SERVER-90385 Enable this test in embedded router suites
  * @tags: [
  *     requires_fcv_51,
- *     temp_disabled_embedded_router_uncategorized,
  * ]
  */
 

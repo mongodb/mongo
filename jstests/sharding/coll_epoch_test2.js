@@ -2,12 +2,6 @@
 //
 // The idea here is that a collection may be resharded / unsharded at any point, and any type of
 // operation on a mongos may be active when it happens.  All operations should handle gracefully.
-//
-// @tags: [
-//   # TODO (SERVER-97257): Re-enable this test.
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   embedded_router_incompatible,
-// ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

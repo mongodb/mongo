@@ -4,8 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_80,
- *   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *   embedded_router_incompatible,
  * ]
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";

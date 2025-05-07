@@ -2,8 +2,6 @@
 // after restarting.
 // @tags: [
 //   requires_persistence,
-//   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
-//   embedded_router_incompatible,
 // ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

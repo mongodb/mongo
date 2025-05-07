@@ -16,22 +16,6 @@ SUITE_HIERARCHY = {
     # Concurrency suites
     "concurrency": {},
     "concurrency_compute_mode": {},
-    "concurrency_embedded_router_causal_consistency_and_balancer": {
-        "concurrency_embedded_router_causal_consistency": {}
-    },
-    "concurrency_embedded_router_clusterwide_ops_add_remove_shards": {},
-    "concurrency_embedded_router_local_read_write_multi_stmt_txn_with_balancer": {
-        "concurrency_embedded_router_local_read_write_multi_stmt_txn": {}
-    },
-    "concurrency_embedded_router_multi_stmt_txn_with_balancer": {
-        # concurrency_embedded_multi_stmt_txn is not considered a superset in terms
-        # of complexity of concurrency_embedded_router_replication because multi_stmt_txns
-        # are not a superset feature of regular operations.
-        "concurrency_embedded_router_multi_stmt_txn": {}
-    },
-    "concurrency_embedded_router_replication_with_balancer": {
-        "concurrency_embedded_router_replication": {},
-    },
     "concurrency_multitenancy_replication_with_atlas_proxy": {},
     "simulate_crash_concurrency_replication": {},
     "concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard": {

@@ -1,8 +1,6 @@
 /**
  * @tags: [
  *   requires_sharding,
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  *   requires_fcv_81,

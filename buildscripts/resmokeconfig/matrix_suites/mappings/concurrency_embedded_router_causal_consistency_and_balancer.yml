@@ -1,6 +1,0 @@
-base_suite: concurrency_sharded_causal_consistency_and_balancer
-overrides:
-  - "embedded_router.embedded_router"
-  - "embedded_router.concurrency_embedded_router"
-excludes:
-  - "embedded_router.exclude_disabled_embedded_router_tests"

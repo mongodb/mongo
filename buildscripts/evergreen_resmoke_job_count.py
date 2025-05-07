@@ -78,8 +78,6 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
             "task": "aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_and_add_remove_shard",
             "factor": 0.25,
         },
-        {"task": "embedded_router_jscore_passthrough_with_config_shard", "factor": 0.25},
-        {"task": "embedded_router_sharded_collections_jscore_passthrough", "factor": 0.25},
         {"task": "fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
         {"task": "fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
         {"task": "fle2_sharding", "factor": 0.25},

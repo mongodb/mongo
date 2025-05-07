@@ -2,12 +2,6 @@
 // Tests that mongos validating writes when stale does not DOS config servers
 //
 // Note that this is *unsafe* with broadcast removes and updates
-//
-// @tags: [
-//   # TODO (SERVER-97257): Re-enable this test.
-//   # Test doesn't start enough mongods to have num_mongos routers
-//   embedded_router_incompatible,
-// ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 2, mongos: 3, other: {rsOptions: {verbose: 2}}});
