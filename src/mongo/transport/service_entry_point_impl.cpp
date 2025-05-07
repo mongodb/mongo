@@ -330,10 +330,11 @@ void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> ses
             // an atomic increment is not necessary here.
             _rejectedSessions++;
             if (!quiet()) {
-                LOGV2(22942,
-                      "Connection refused because there are too many open connections",
-                      "remote"_attr = session->remote(),
-                      "connectionCount"_attr = sync.size());
+                ClientSummary cs(clientPtr);
+                logv2::DynamicAttributes attrs = logAttrs(cs);
+                attrs.add("connectionCount", sync.size());
+                LOGV2(
+                    22942, "Connection refused because there are too many open connections", attrs);
             }
             return;
         }
