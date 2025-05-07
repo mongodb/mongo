@@ -120,7 +120,8 @@ struct ServerGlobalParams {
     std::string socket = "/tmp";  // UNIX domain socket directory
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
-    VersionedValue<std::vector<std::variant<CIDR, std::string>>> maxConnsOverride;
+    VersionedValue<std::vector<std::variant<CIDR, std::string>>> maxIncomingConnsOverride;
+    VersionedValue<std::vector<std::variant<CIDR, std::string>>> maxEstablishingConnsOverride;
     int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket

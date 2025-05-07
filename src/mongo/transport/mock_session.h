@@ -98,9 +98,9 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    bool shouldOverrideMaxConns(
+    bool isExemptedByCIDRList(
         const std::vector<std::variant<CIDR, std::string>>& exemptions) const override {
-        return transport::util::shouldOverrideMaxConns(remoteAddr(), localAddr(), exemptions);
+        return transport::util::isExemptedByCIDRList(remoteAddr(), localAddr(), exemptions);
     }
 
 #ifdef MONGO_CONFIG_SSL

@@ -30,9 +30,9 @@
 #include "mongo/transport/session_util.h"
 
 namespace mongo::transport::util {
-bool shouldOverrideMaxConns(const SockAddr& ra,
-                            const SockAddr& la,
-                            const std::vector<std::variant<CIDR, std::string>>& exemptions) {
+bool isExemptedByCIDRList(const SockAddr& ra,
+                          const SockAddr& la,
+                          const std::vector<std::variant<CIDR, std::string>>& exemptions) {
     if (exemptions.empty())
         return false;
 
