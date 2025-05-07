@@ -91,8 +91,6 @@ one argument, the connection object.
 
 */
 
-load("jstests/replsets/libs/tenant_migration_util.js");
-
 // constants
 
 // All roles that are specific to one database will be given only for 'firstDbName'. For example,
@@ -105,8 +103,6 @@ var adminDbName = "admin";
 var authErrCode = 13;
 var commandNotSupportedCode = 115;
 var shard0name = "shard0000";
-const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
-const isShardMergeEnabled = TestData.setParameters.featureFlagShardMerge;
 
 // useful shorthand when defining the tests below
 var roles_write =
@@ -3668,115 +3664,6 @@ var authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "coll"}, actions: ["find"]}]
               }
-          ]
-        },
-        {
-          testname: "donorAbortMigration",
-          command: {
-              donorAbortMigration: 1,
-              migrationId: UUID(),
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to throw NoSuchTenantMigration.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "donorForgetMigration",
-          command: {
-              donorForgetMigration: 1,
-              migrationId: UUID(),
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to throw NoSuchTenantMigration.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "donorStartMigration",
-          command: {
-              donorStartMigration: 1,
-              protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
-              tenantId: "testTenantId",
-              migrationId: UUID(),
-              recipientConnectionString: "recipient-rs/localhost:1234",
-              readPreference: {mode: "primary"},
-              donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-              recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // Cannot start tenant migration on a standalone mongod.
-                  expectFail: true
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "recipientSyncData",
-          command: {
-              recipientSyncData: 1,
-              migrationId: UUID(),
-              donorConnectionString: "donor-rs/localhost:1234",
-              tenantId: "testTenantId",
-              readPreference: {mode: "primary"},
-              startMigrationDonorTimestamp: Timestamp(1, 1),
-              recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // Cannot start tenant migration on a standalone mongod.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "recipientForgetMigration",
-          command: {
-              recipientForgetMigration: 1,
-              migrationId: UUID(),
-              donorConnectionString: "donor-rs/localhost:1234",
-              tenantId: "testTenantId",
-              readPreference: {mode: "primary"},
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to fail with InvalidOptions without cluster certificate.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
           ]
         },
         {

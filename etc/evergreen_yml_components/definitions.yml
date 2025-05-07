@@ -5616,72 +5616,6 @@ tasks:
   - func: "run tests"
 
 - <<: *gen_task_template
-  name: tenant_migration_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["serverless", "txn"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_stepdown_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: tenant_migration_kill_primary_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_kill_primary_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
   name: clustered_collection_passthrough_gen
   tags: ["large", "clustered_collections"]
   commands:
@@ -6167,13 +6101,6 @@ tasks:
 - <<: *task_template
   name: sasl
   tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: serverless
-  tags: ["serverless"]
   commands:
   - func: "do setup"
   - func: "run tests"
