@@ -455,8 +455,11 @@ class SetupMultiversion(Subcommand):
             if url is not None:
 
                 def try_download(download_url):
+                    self.logger.info("Downloading '%s'", download_url)
                     tarball = download.download_from_s3(download_url)
+                    self.logger.info("Extracting '%s' in '%s' folder", tarball, install_dir)
                     download.extract_archive(tarball, install_dir)
+                    self.logger.info("Removing tarball '%s'", tarball)
                     os.remove(tarball)
 
                 try:

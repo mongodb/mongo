@@ -7,10 +7,12 @@ import os
 import shutil
 import tarfile
 import zipfile
+from urllib.parse import parse_qs, urlparse
 
 import requests
 import structlog
 
+from buildscripts.resmokelib.utils import archival
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path, mkdtemp_in_build_dir
 
 S3_BUCKET = "mciuploads"
@@ -24,6 +26,44 @@ class DownloadError(Exception):
     pass
 
 
+def is_s3_presigned_url(url: str) -> bool:
+    """
+    Return True if `url` looks like an AWS S3 presigned URL (SigV4).
+    """
+    qs = parse_qs(urlparse(url).query)
+    return "X-Amz-Signature" in qs
+
+
+def extract_s3_bucket_key(url: str) -> tuple[str, str]:
+    """
+    Extracts the S3 bucket name and object key from an HTTP(s) S3 URL.
+
+    Supports both:
+      - https://bucket.s3.amazonaws.com/key/…
+      - https://bucket.s3.<region>.amazonaws.com/key/…
+
+    Returns:
+      (bucket, key)
+    """
+    parsed = urlparse(url)
+    # Hostname labels, e.g. ["bucket","s3","us-east-1","amazonaws","com"]
+    bucket = parsed.hostname.split(".")[0]
+    key = parsed.path.lstrip("/")
+    return bucket, key
+
+
+def download_from_s3_with_requests(url, output_file):
+    with requests.get(url, stream=True) as reader:
+        with open(output_file, "wb") as file_handle:
+            shutil.copyfileobj(reader.raw, file_handle)
+
+
+def download_from_s3_with_boto(url, output_file):
+    bucket_name, object_key = extract_s3_bucket_key(url)
+    s3_client = archival.Archival._get_s3_client()
+    s3_client.download_file(bucket_name, object_key, output_file)
+
+
 def download_from_s3(url):
     """Download file from S3 bucket by a given URL."""
 
@@ -33,9 +73,14 @@ def download_from_s3(url):
     LOGGER.info("Downloading.", url=url)
     filename = os.path.join(mkdtemp_in_build_dir(), url.split("/")[-1].split("?")[0])
 
-    with requests.get(url, stream=True) as reader:
-        with open(filename, "wb") as file_handle:
-            shutil.copyfileobj(reader.raw, file_handle)
+    if is_s3_presigned_url(url):
+        # S3 presigned URL can't be downloaded with boto3 library
+        # thus we fall back using standard requests library
+        download_from_s3_with_requests(url, filename)
+    else:
+        # Prefer boto3 library when possible.
+        # boto3 library is much faster because it use multipart download.
+        download_from_s3_with_boto(url, filename)
 
     return filename
 
