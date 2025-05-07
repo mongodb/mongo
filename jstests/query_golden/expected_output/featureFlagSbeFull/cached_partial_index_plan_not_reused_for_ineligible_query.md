@@ -228,7 +228,7 @@ Verifying that the plan cache contains an entry with the partial index
 			}
 		},
 		"isActive" : true,
-		"planCacheKey" : "01169688"
+		"planCacheKey" : "7D81D3A7"
 	}
 ]
 ```
