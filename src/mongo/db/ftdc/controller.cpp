@@ -213,9 +213,8 @@ void FTDCController::stop() {
     }
 }
 
-void FTDCController::doLoop(Service* service) {
-    // Note: All exceptions thrown in this loop are considered process fatal. The default terminate
-    // is used to provide a good stack trace of the issue.
+void FTDCController::doLoop(Service* service) try {
+    // Note: All exceptions thrown in this loop are considered process fatal.
     Client::initThread(kFTDCThreadName, service);
     Client* client = &cc();
 
@@ -313,6 +312,11 @@ void FTDCController::doLoop(Service* service) {
             iassert(s);
         }
     }
+} catch (...) {
+    LOGV2_FATAL(9399800,
+                "Exception thrown in full-time diagnostic data capture subsystem. Terminating the "
+                "process because diagnostics cannot be captured.",
+                "exception"_attr = exceptionToStatus());
 }
 
 }  // namespace mongo

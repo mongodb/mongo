@@ -49,6 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source.h"
@@ -261,6 +262,37 @@ public:
     }
 
 protected:
+    void setUpControllerAndCheckpoint(
+        FTDCConfig config,
+        UseMultiServiceSchema multiServiceSchema = UseMultiServiceSchema{false}) {
+        createDirectoryClean(_dir);
+
+        auto env = std::make_unique<MockControllerEnv>();
+        _checkpoint = &env->loopCheckpoint;
+
+        _controller =
+            std::make_unique<FTDCController>(_dir, config, multiServiceSchema, std::move(env));
+    }
+
+    void startController() {
+        _controller->start(getClient()->getService());
+        _checkpoint->wait();
+    }
+
+    void releaseCheckpointAndStopController() {
+        _checkpoint->release();
+        _controller->stop();
+    }
+
+    const boost::filesystem::path& dir() const {
+        return _dir;
+    }
+
+    void doCollection() {
+        _checkpoint->advance();
+        _checkpoint->wait();
+    }
+
     void testPeriodicCollector(UseMultiServiceSchema multiServiceSchema,
                                bool enabled,
                                std::unique_ptr<MockCollector> collector);
@@ -270,6 +302,10 @@ protected:
 
 private:
     uint64_t _metadataCaptureFrequency;
+    unittest::TempDir _tempdir{"metrics_testpath"};
+    boost::filesystem::path _dir{_tempdir.path()};
+    Checkpoint* _checkpoint;
+    std::unique_ptr<FTDCController> _controller;
 };
 
 auto toMetadataCollector(MockCollector* collector) {
@@ -280,11 +316,6 @@ auto toMetadataCollector(MockCollector* collector) {
 void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServiceSchema,
                                                bool enabled,
                                                std::unique_ptr<MockCollector> collector) {
-    unittest::TempDir tempdir("metrics_testpath");
-    boost::filesystem::path dir(tempdir.path());
-
-    createDirectoryClean(dir);
-
     FTDCConfig config;
     config.enabled = enabled;
     config.period = Milliseconds(1);
@@ -292,47 +323,34 @@ void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServic
     config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
     config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    auto env = std::make_unique<MockControllerEnv>();
-    Checkpoint& checkpoint = env->loopCheckpoint;
-
-    FTDCController c(dir, config, multiServiceSchema, std::move(env));
+    setUpControllerAndCheckpoint(config, multiServiceSchema);
 
     uint64_t numCollections = 3;
 
     auto collectorPtr = collector.get();
     if (toMetadataCollector(collectorPtr)) {
-        c.addPeriodicMetadataCollector(std::move(collector), ClusterRole::None);
+        _controller->addPeriodicMetadataCollector(std::move(collector), ClusterRole::None);
     } else {
-        c.addPeriodicCollector(std::move(collector), ClusterRole::None);
+        _controller->addPeriodicCollector(std::move(collector), ClusterRole::None);
     }
 
-    c.start(getClient()->getService());
+    _controller->start(getClient()->getService());
     if (!enabled) {
-        auto files = scanDirectory(dir);
+        auto files = scanDirectory(_dir);
         ASSERT_EQUALS(files.size(), 0);
-        ASSERT_OK(c.setEnabled(true));
+        ASSERT_OK(_controller->setEnabled(true));
     }
-
-    checkpoint.wait();
-
-    auto doCollection = [&](uint64_t n = 1) {
-        while (n--) {
-            checkpoint.advance();
-            checkpoint.wait();
-        }
-    };
+    _checkpoint->wait();
 
     // Wait for numCollections samples to have occured
     LOGV2_DEBUG(9129201, 0, "Collecting");
-
     auto collectUntilDocCount = [&](auto& collectorPtr, size_t docs) {
         while (collectorPtr->getDocs().size() < docs)
-            doCollection(1);
+            doCollection();
     };
-
     collectUntilDocCount(collectorPtr, numCollections);
-    checkpoint.release();
-    c.stop();
+
+    releaseCheckpointAndStopController();
 
     auto docs = collectorPtr->getDocs();
     ASSERT_GTE(docs.size(),
@@ -343,7 +361,7 @@ void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServic
         docs = insertNewSchemaDocuments(docs, "common");
     }
 
-    auto files = scanDirectory(dir);
+    auto files = scanDirectory(_dir);
     ASSERT_EQUALS(files.size(), 1);
 
     decltype(docs) metaDocs;
@@ -355,31 +373,19 @@ void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServic
 void FTDCControllerTest::testRotateCollector(UseMultiServiceSchema multiServiceSchema,
                                              int numRotations,
                                              std::unique_ptr<MockCollector> collector) {
-    unittest::TempDir tempdir("metrics_testpath");
-    boost::filesystem::path dir(tempdir.path());
-
-    createDirectoryClean(dir);
-
-    auto env = std::make_unique<MockControllerEnv>();
-    Checkpoint& checkpoint = env->loopCheckpoint;
-
-    auto collectorPtr = collector.get();
-
     FTDCConfig config;
     config.period = Milliseconds(100);
+    setUpControllerAndCheckpoint(config, multiServiceSchema);
 
-    FTDCController c(dir, config, multiServiceSchema, std::move(env));
-    c.addOnRotateCollector(std::move(collector), ClusterRole::ShardServer);
-    c.start(getClient()->getService());
-    checkpoint.wait();
+    auto collectorPtr = collector.get();
+    _controller->addOnRotateCollector(std::move(collector), ClusterRole::ShardServer);
 
+    startController();
     for (int i = numRotations; i--;) {
-        c.triggerRotate();
-        checkpoint.advance();
-        checkpoint.wait();
+        _controller->triggerRotate();
+        doCollection();
     }
-    checkpoint.release();
-    c.stop();
+    releaseCheckpointAndStopController();
 
     // A rotation closes the current file and creates a new one so if we rotate n times we have 1 +
     // n total files.
@@ -392,7 +398,7 @@ void FTDCControllerTest::testRotateCollector(UseMultiServiceSchema multiServiceS
         docs = insertNewSchemaDocuments(docs, "shard");
     }
 
-    auto files = scanDirectory(dir);
+    auto files = scanDirectory(_dir);
     ASSERT_EQUALS(files.size(), expectedNumFiles);
 
     ValidateDocumentListByType(files, docs, {}, {}, FTDCValidationMode::kStrict);
@@ -467,23 +473,31 @@ TEST_F(FTDCControllerTest, TestRotate20WithoutMultiversion) {
 // Test we can start and stop the controller in quick succession, make sure it succeeds without
 // assert or fault
 TEST_F(FTDCControllerTest, TestStartStop) {
-    unittest::TempDir tempdir("metrics_testpath");
-    boost::filesystem::path dir(tempdir.path());
-
-    createDirectoryClean(dir);
-
     FTDCConfig config;
     config.enabled = false;
     config.period = Milliseconds(1);
     config.metadataCaptureFrequency = 1;
-    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
-    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
 
-    FTDCController c(dir, config, UseMultiServiceSchema{true});
+    setUpControllerAndCheckpoint(config);
 
-    c.start(getClient()->getService());
+    startController();
+    releaseCheckpointAndStopController();
+}
 
-    c.stop();
+DEATH_TEST_REGEX_F(FTDCControllerTest,
+                   LogAndTerminateWhenCollectionFails,
+                   "Fatal assertion.*9399800") {
+    FTDCConfig config;
+    config.period = Milliseconds(100);
+    setUpControllerAndCheckpoint(config);
+
+    // Remove RW permissions from the directory to force the FTDC thread to throw.
+    boost::filesystem::permissions(dir(), boost::filesystem::no_perms);
+
+    startController();
+
+    // Do a single sample collection to ensure we run through FTDCController::doLoop() and die.
+    doCollection();
 }
 
 }  // namespace
