@@ -58,7 +58,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/transaction_resources.h"
@@ -167,11 +166,6 @@ inline void waitForWriteConcern(OperationContext* opCtx,
     if (!anyReplicatedNamespace) {
         return;
     }
-
-    // Do not increase consumption metrics during wait for write concern, as in serverless this
-    // might cause a tenant to be billed for reading the oplog entry (which might be of
-    // considerable size) of another tenant.
-    ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
 
     auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 

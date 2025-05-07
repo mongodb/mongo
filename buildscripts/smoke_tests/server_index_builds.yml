@@ -51,7 +51,6 @@ suites:
     - jstests/noPassthrough/index_builds/index_build_killop_primary.js
     - jstests/noPassthrough/index_builds/index_build_killop_secondary_after_commit.js
     - jstests/noPassthrough/index_builds/index_build_killop_secondary_before_commit.js
-    - jstests/noPassthrough/index_builds/index_build_operation_metrics.js
     - jstests/noPassthrough/index_builds/index_build_out_of_order_scan.js
     - jstests/noPassthrough/index_builds/index_build_prepareUnique.js
     - jstests/noPassthrough/index_builds/index_build_restart_secondary.js

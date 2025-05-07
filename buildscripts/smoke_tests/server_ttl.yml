@@ -15,8 +15,6 @@ suites:
     - jstests/noPassthrough/ttl/ttl_expire_nan_warning_on_startup.js
     - jstests/noPassthrough/ttl/ttl_hidden_index.js
     - jstests/noPassthrough/ttl/ttl_non_int_expire_after_seconds.js
-    - jstests/noPassthrough/ttl/ttl_operation_metrics.js
-    - jstests/noPassthrough/ttl/ttl_operation_metrics_multi_dbs.js
     - jstests/noPassthrough/ttl/ttl_partial_index.js
     - jstests/noPassthrough/ttl/ttl_resharding_collection.js
     - jstests/noPassthrough/ttl/ttl_with_dropIndex.js

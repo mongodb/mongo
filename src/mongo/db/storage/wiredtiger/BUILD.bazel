@@ -109,7 +109,6 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/repl:repl_settings",
-        "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/storage:backup_block",
         "//src/mongo/db/storage:capped_snapshots",
         "//src/mongo/db/storage:execution_context",

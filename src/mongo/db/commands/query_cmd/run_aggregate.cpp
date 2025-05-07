@@ -113,7 +113,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
@@ -333,7 +332,6 @@ bool getFirstBatch(const AggExState& aggExState,
         aggregation_request_helper::kDefaultBatchSize);
 
     auto curOp = CurOp::get(opCtx);
-    ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
     bool doRegisterCursor = true;
     bool stashedResult = false;
@@ -405,7 +403,6 @@ bool getFirstBatch(const AggExState& aggExState,
         // If this executor produces a postBatchResumeToken, add it to the cursor response.
         responseBuilder.setPostBatchResumeToken(exec.getPostBatchResumeToken());
         responseBuilder.append(nextDoc);
-        docUnitsReturned.observeOne(nextDoc.objsize());
     }
 
     if (doRegisterCursor) {
@@ -422,9 +419,6 @@ bool getFirstBatch(const AggExState& aggExState,
     } else {
         curOp->debug().cursorExhausted = true;
     }
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
 
     return doRegisterCursor;
 }

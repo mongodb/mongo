@@ -64,7 +64,6 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
@@ -249,18 +248,6 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
     out->append("executionStages", stats);
 }
 
-void generateOperationMetrics(PlanExecutor* exec, BSONObjBuilder* out) {
-    if (ResourceConsumption::isMetricsProfilingEnabled()) {
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(exec->getOpCtx());
-        if (metricsCollector.hasCollectedMetrics()) {
-            BSONObjBuilder metricsBuilder(out->subobjStart("operationMetrics"));
-            auto& metrics = metricsCollector.getMetrics();
-            metrics.toBsonNonZeroFields(&metricsBuilder);
-            metricsBuilder.doneFast();
-        }
-    }
-}
-
 /**
  * Adds the "executionStats" field to out. Assumes that the PlanExecutor has already been executed
  * to the point of reaching EOF. Also assumes that verbosity >= kExecStats.
@@ -326,7 +313,6 @@ void generateExecutionInfo(PlanExecutor* exec,
         }
         allPlansBob.doneFast();
     }
-    generateOperationMetrics(exec, &execBob);
     execBob.doneFast();
 }
 

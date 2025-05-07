@@ -793,7 +793,6 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/db/sorter:sorter_gen",
         "//src/mongo/db/stats:counters.h",
-        "//src/mongo/db/stats:resource_consumption_metrics.h",
         "//src/mongo/db/storage:bson_collection_catalog_entry.h",
         "//src/mongo/db/storage:durable_catalog_entry.h",
         "//src/mongo/db/storage:index_entry_comparison.h",

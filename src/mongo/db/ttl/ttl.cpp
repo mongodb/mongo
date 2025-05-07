@@ -82,7 +82,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction_resources.h"
@@ -469,8 +468,6 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, *nss)) {
             return false;
         }
-
-        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->dbName());
 
         if (info.isClustered()) {
             const auto& collOptions = collectionPtr->getCollectionOptions();

@@ -47,9 +47,6 @@ const stages = [
 // Requires mongot
 //  ["$listSearchIndexes", db, coll.getName()],
 
-// Requires server parameter aggregateOperationResourceConsumptionMetrics
-//  ["$operationMetrics", adminDB, 1],
-
 // Agg queries containing the above stages.
 const queries =
     stages.map(([stage, db, collection]) =>

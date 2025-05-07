@@ -128,12 +128,10 @@ public:
     public:
         BSONObjCursorAppender(const bool alwaysAcceptFirstDoc,
                               CursorResponseBuilder* builder,
-                              ResourceConsumption::DocumentUnitCounter* docUnitsReturned,
                               BSONObj& pbrt,
                               bool& failedToAppend)
             : _alwaysAcceptFirstDoc{alwaysAcceptFirstDoc},
               _builder{builder},
-              _docUnitsReturned{docUnitsReturned},
               _pbrt{pbrt},
               _failedToAppend{failedToAppend} {}
 
@@ -157,7 +155,6 @@ public:
             }
 
             _builder->append(obj);
-            _docUnitsReturned->observeOne(objSize);
 
             // If this executor produces a postBatchResumeToken, store it. We will set the
             // latest valid 'pbrt' on the batch at the end of batched execution.
@@ -169,7 +166,6 @@ public:
         // State not owned by us.
         const bool _alwaysAcceptFirstDoc;
         CursorResponseBuilder* _builder;
-        ResourceConsumption::DocumentUnitCounter* _docUnitsReturned;
         BSONObj& _pbrt;
         bool& _failedToAppend;
 

@@ -71,7 +71,6 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/executor/task_executor.h"
@@ -479,14 +478,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {
             sleepmillis(100);
-        }
-
-        // Start collecting metrics for the index build. The metrics for this operation will
-        // only be aggregated globally if the node commits or aborts while it is primary.
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx.get());
-        if (ResourceConsumption::shouldCollectMetricsForDatabase(dbName) &&
-            ResourceConsumption::isMetricsCollectionEnabled()) {
-            metricsCollector.beginScopedCollecting(opCtx.get(), dbName);
         }
 
         if (indexBuildOptions.applicationMode != ApplicationMode::kStartupRepair) {

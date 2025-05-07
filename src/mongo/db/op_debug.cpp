@@ -42,7 +42,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
@@ -175,7 +174,6 @@ void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage,
 
 void OpDebug::report(OperationContext* opCtx,
                      const SingleThreadedLockStats* lockStats,
-                     const ResourceConsumption::OperationMetrics* operationMetrics,
                      const SingleThreadedStorageMetrics& storageMetrics,
                      long long prepareReadConflicts,
                      logv2::DynamicAttributes* pAttrs) const {
@@ -426,12 +424,6 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (storageStats) {
         pAttrs->add("storage", storageStats->toBSON());
-    }
-
-    if (operationMetrics) {
-        BSONObjBuilder builder;
-        operationMetrics->toBsonNonZeroFields(&builder);
-        pAttrs->add("operationMetrics", builder.obj());
     }
 
     // Always report cpuNanos in rare cases that it is zero to facilitate testing that expects this
@@ -1097,14 +1089,6 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("execStats", [](auto field, auto args, auto& b) {
         if (!args.op.execStats.isEmpty()) {
             b.append(field, args.op.execStats);
-        }
-    });
-
-    addIfNeeded("operationMetrics", [](auto field, auto args, auto& b) {
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(args.opCtx);
-        if (metricsCollector.hasCollectedMetrics()) {
-            BSONObjBuilder metricsBuilder(b.subobjStart(field));
-            metricsCollector.getMetrics().toBson(&metricsBuilder);
         }
     });
 

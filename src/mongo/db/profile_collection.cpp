@@ -63,7 +63,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -126,14 +125,6 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                               curOp->getPrepareReadConflicts(),
                               false /*omitCommand*/,
                               b);
-    }
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    if (metricsCollector.hasCollectedMetrics()) {
-        BSONObjBuilder metricsBuilder = b.subobjStart("operationMetrics");
-        const auto& metrics = metricsCollector.getMetrics();
-        metrics.toBson(&metricsBuilder);
-        metricsBuilder.done();
     }
 
     b.appendDate("ts", jsTime());

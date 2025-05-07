@@ -91,10 +91,6 @@ void SpillRecordStore::_deleteRecord(OperationContext* opCtx, const RecordId& id
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     OpStats opStats{};
     wtDeleteRecord(opCtx, wtRu, id, opStats);
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneDocWritten(_uri, opStats.oldValueLength + opStats.keyLength);
-
     _changeNumRecordsAndDataSize(-1, -opStats.oldValueLength);
 }
 
@@ -110,7 +106,6 @@ Status SpillRecordStore::_insertRecords(OperationContext* opCtx,
     auto nRecords = records->size();
     invariant(nRecords != 0);
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     int64_t totalLength = 0;
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = (*records)[i];
@@ -120,10 +115,6 @@ Status SpillRecordStore::_insertRecords(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-
-        // Increment metrics for each insert separately, as opposed to outside of the loop. The API
-        // requires that each record be accounted for separately.
-        metricsCollector.incrementOneDocWritten(_uri, opStats.newValueLength + opStats.keyLength);
     }
     _changeNumRecordsAndDataSize(nRecords, totalLength);
     return Status::OK();
@@ -140,12 +131,7 @@ Status SpillRecordStore::_updateRecord(OperationContext* opCtx,
         return status;
     }
 
-    // For updates that don't modify the document size, they should count as at least one unit, so
-    // just attribute them as 1-byte modifications for simplicity.
     auto sizeDiff = opStats.newValueLength - opStats.oldValueLength;
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
-
     _changeNumRecordsAndDataSize(0, sizeDiff);
     return Status::OK();
 }

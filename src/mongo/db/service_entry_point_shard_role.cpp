@@ -124,7 +124,6 @@
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/read_preference_metrics.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/tenant_id.h"
@@ -509,9 +508,6 @@ public:
             return Status::OK();
         }();
 
-        // Ensure the lifetime of `_scopedMetrics` ends here.
-        _scopedMetrics = boost::none;
-
         // Release the ingress admission ticket
         _admissionTicket = boost::none;
 
@@ -678,7 +674,6 @@ private:
     OperationSessionInfoFromClient _sessionOptions;
 
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
-    boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     boost::optional<rpc::ImpersonatedClientSessionGuard> _clientSessionGuard;
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
     bool _refreshedDatabase = false;
@@ -1620,12 +1615,6 @@ void ExecCommandDatabase::_initiateCommand() {
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
-
-
-    // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
-    // not contribute to resource consumption metrics.
-    const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
-    _scopedMetrics.emplace(opCtx, dbName, collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||

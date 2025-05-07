@@ -88,23 +88,12 @@ protected:
         return true;
     }
 
-    void getKey(WT_CURSOR* cursor, WT_ITEM* key, ResourceConsumption::MetricsCollector* metrics) {
+    void getKey(WT_CURSOR* cursor, WT_ITEM* key) {
         invariantWTOK(cursor->get_key(cursor, key), cursor->session);
-
-        if (metrics) {
-            metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
-        }
     }
 
-    void getKeyValue(WT_CURSOR* cursor,
-                     WT_ITEM* key,
-                     WT_ITEM* value,
-                     ResourceConsumption::MetricsCollector* metrics) {
+    void getKeyValue(WT_CURSOR* cursor, WT_ITEM* key, WT_ITEM* value) {
         invariantWTOK(cursor->get_raw_key_value(cursor, key, value), cursor->session);
-
-        if (metrics) {
-            metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
-        }
     }
 
     OperationContext* _opCtx;

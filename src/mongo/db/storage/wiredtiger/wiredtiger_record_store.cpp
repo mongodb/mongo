@@ -51,7 +51,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/damage_vector.h"
@@ -589,12 +588,6 @@ public:
         WT_ITEM value;
         invariantWTOK(_cursor->get()->get_value(_cursor->get(), &value), *_cursor->getSession());
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-
-        auto keyLength = computeRecordIdSize(id);
-        metricsCollector.incrementOneDocRead(_uri, value.size + keyLength);
-
-
         return {
             {std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
@@ -812,9 +805,6 @@ void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordI
     OpStats opStats{};
     wtDeleteRecord(opCtx, wtRu, id, opStats);
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneDocWritten(_uri, opStats.oldValueLength + opStats.keyLength);
-
     _changeNumRecordsAndDataSize(wtRu, -1, -opStats.oldValueLength);
 }
 
@@ -871,8 +861,6 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         }
     }
 
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-
     int64_t totalLength = 0;
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = (*records)[i];
@@ -889,13 +877,6 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         Status status = wtInsertRecord(opCtx, wtRu, c, record, opStats);
         if (!status.isOK()) {
             return status;
-        }
-
-        // Increment metrics for each insert separately, as opposed to outside of the loop. The API
-        // requires that each record be accounted for separately.
-        if (!_isChangeCollection) {
-            metricsCollector.incrementOneDocWritten(_uri,
-                                                    opStats.newValueLength + opStats.keyLength);
         }
     }
     _changeNumRecordsAndDataSize(wtRu, nRecords, totalLength);
@@ -921,11 +902,7 @@ Status WiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
         return status;
     }
 
-    // For updates that don't modify the document size, they should count as at least one unit, so
-    // just attribute them as 1-byte modifications for simplicity.
     auto sizeDiff = opStats.newValueLength - opStats.oldValueLength;
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
     _changeNumRecordsAndDataSize(wtRu, 0, sizeDiff);
     return Status::OK();
 }
@@ -979,11 +956,6 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContex
     invariantWTOK(c->get_value(c, &value), c->session);
 
     auto sizeDiff = static_cast<int64_t>(value.size) - static_cast<int64_t>(oldRec.size());
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-
-    // For updates that don't modify the document size, they should count as at least one unit, so
-    // just attribute them as 1-byte modifications for simplicity.
-    metricsCollector.incrementOneDocWritten(_uri, std::max((int64_t)1, std::abs(sizeDiff)));
     _changeNumRecordsAndDataSize(wtRu, 0, sizeDiff);
 
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
@@ -1792,12 +1764,6 @@ void WiredTigerRecordStoreCursorBase::init() {
     auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit());
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
-    auto metrics = &ResourceConsumption::MetricsCollector::get(_opCtx);
-
-    // Assumption: cursors are always scoped within the context of a scoped metrics collector.
-    if (metrics->isCollecting()) {
-        _metrics = metrics;
-    }
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
@@ -1887,9 +1853,6 @@ void WiredTigerRecordStoreCursorBase::checkOrder(const RecordId& id) const {
 }
 
 void WiredTigerRecordStoreCursorBase::trackReturn(const Record& record) {
-    if (_metrics) {
-        _metrics->incrementOneDocRead(_uri, record.data.size() + computeRecordIdSize(record.id));
-    }
     _lastReturnedId = record.id;
 }
 
@@ -2049,7 +2012,6 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
 
 void WiredTigerRecordStoreCursorBase::detachFromOperationContext() {
     _opCtx = nullptr;
-    _metrics = nullptr;
     if (!_saveStorageCursorOnDetachFromOperationContext) {
         _cursor = boost::none;
     }
@@ -2057,10 +2019,6 @@ void WiredTigerRecordStoreCursorBase::detachFromOperationContext() {
 
 void WiredTigerRecordStoreCursorBase::reattachToOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
-    auto metrics = &ResourceConsumption::MetricsCollector::get(opCtx);
-    if (metrics->isCollecting()) {
-        _metrics = metrics;
-    }
     // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
 }
 

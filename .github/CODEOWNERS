@@ -2415,7 +2415,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/stats/**/counters* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/stats/**/top* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/stats/**/latency_server_status_section.cpp @10gen/query-integration-observability @svc-auto-approve-bot
-/src/mongo/db/stats/**/*resource_consumption* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/stats/**/operation_latency_histogram* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/stats/**/read_preference* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/stats/**/server_read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot

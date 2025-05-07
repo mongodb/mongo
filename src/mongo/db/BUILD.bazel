@@ -1037,7 +1037,6 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/storage:execution_context",
         "//src/mongo/db/storage:prepare_conflict_tracker",
@@ -1101,7 +1100,6 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -1356,7 +1354,6 @@ mongo_cc_library(
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/stats:latency_server_stats",
-        "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/stats:serveronly_stats",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",
@@ -3196,7 +3193,6 @@ mongo_cc_library(
         "//src/mongo/db/stats:api_version_metrics",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:read_preference_metrics",
-        "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:storage_engine_common",

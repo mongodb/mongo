@@ -113,8 +113,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
                                                                   "estimatedCost",
                                                                   "estimatedCardinality",
                                                                   "totalOplogSlotDurationMicros",
-                                                                  "execStats",
-                                                                  "operationMetrics"};
+                                                                  "execStats"};
 
     for (const auto& fieldName : allowedOpDebugFields) {
         auto filterExpr = BSON(fieldName << BSON("$exists" << true));

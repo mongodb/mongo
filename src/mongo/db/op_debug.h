@@ -46,7 +46,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/duration.h"
@@ -231,7 +230,6 @@ public:
      */
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
-                const ResourceConsumption::OperationMetrics* operationMetrics,
                 const SingleThreadedStorageMetrics& storageMetrics,
                 long long prepareReadConflicts,
                 logv2::DynamicAttributes* pAttrs) const;

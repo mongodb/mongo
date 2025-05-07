@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -233,10 +232,9 @@ protected:
                           bool dupsAllowed) = 0;
 
     /**
-     * Load the key positioned by this cursor into 'key'. When metrics is provided, count the
-     * size towards resource consumption metrics.
+     * Loads the key positioned by this cursor into 'key'.
      */
-    void getKey(WT_CURSOR* cursor, WT_ITEM* key, ResourceConsumption::MetricsCollector* metrics);
+    void getKey(WT_CURSOR* cursor, WT_ITEM* key);
 
     /**
      * Checks whether the prefix key defined by 'keyString' and 'sizeWithoutRecordId' is in the

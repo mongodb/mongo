@@ -720,7 +720,6 @@ logv2::DynamicAttributes getCurOpLogAttrs(OperationContext* opCtx) {
     const auto curop = CurOp::get(opCtx);
     curop->debug().report(opCtx,
                           nullptr,
-                          nullptr,
                           curop->getOperationStorageMetrics(),
                           curop->getPrepareReadConflicts(),
                           &attr);

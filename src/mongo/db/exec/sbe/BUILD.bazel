@@ -250,7 +250,6 @@ mongo_cc_library(
         "//src/mongo/db/query:spill_util",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
-        "//src/mongo/db/stats:resource_consumption_metrics",
         "//src/mongo/db/storage:encryption_hooks",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:storage_options",

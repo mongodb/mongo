@@ -70,7 +70,6 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
-#include "mongo/db/pipeline/document_source_operation_metrics.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
 #include "mongo/db/pipeline/document_source_query_stats.h"
@@ -173,7 +172,6 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceLookUp,
                        DocumentSourceMatch,
                        DocumentSourceMerge,
-                       DocumentSourceOperationMetrics,
                        DocumentSourceOut,
                        DocumentSourcePlanCacheStats,
                        DocumentSourceQueue,

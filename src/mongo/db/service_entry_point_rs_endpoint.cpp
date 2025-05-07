@@ -59,7 +59,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_entry_point_shard_role.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"

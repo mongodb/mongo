@@ -359,7 +359,6 @@ storage_engine_integration: # authoritative: @10gen/server-storage-engine-integr
     - src/mongo/db/commands/resize_oplog* # specific files
     - src/mongo/db/op_observer/batched_write* # specific files
     - src/mongo/db/stats/storage_stats* # specific files
-    - src/mongo/db/stats/*resource_consumption* # specific files
     - src/mongo/dbtests/storage_debug_util* # specific files
 
 validate: # authoritative: @10gen/server-validate

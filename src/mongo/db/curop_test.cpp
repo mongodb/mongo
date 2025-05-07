@@ -707,15 +707,13 @@ TEST(CurOpTest, SlowLogFinishesWithDuration) {
 
     const OpDebug& opDebug = curop->debug();
     SingleThreadedLockStats lockStats;
-    ResourceConsumption::OperationMetrics opMetrics;
-    opMetrics.readMetrics.docsRead.observeOne(255);
 
     curop->ensureStarted();
     curop->done();
     curop->calculateCpuTime();
 
     auto pattrs = std::make_unique<logv2::DynamicAttributes>();
-    opDebug.report(opCtx.get(), &lockStats, &opMetrics, {}, 0, pattrs.get());
+    opDebug.report(opCtx.get(), &lockStats, {}, 0, pattrs.get());
 
     logv2::TypeErasedAttributeStorage attrs{*pattrs};
     ASSERT_GTE(attrs.size(), 1);

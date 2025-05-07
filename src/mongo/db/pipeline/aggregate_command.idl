@@ -177,9 +177,6 @@ commands:
                 - privilege: # various
                       resource_pattern: exact_namespace
                       action_type: bypassDocumentValidation
-                - privilege: # $operationMetrics
-                      resource_pattern: cluster
-                      action_type: operationMetrics
                 - privilege: # $backupCursorExtend, backupCursor
                       resource_pattern: cluster
                       action_type: fsync

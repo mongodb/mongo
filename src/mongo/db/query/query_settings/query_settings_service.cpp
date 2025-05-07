@@ -74,7 +74,6 @@ const stdx::unordered_set<StringData, StringMapHasher> rejectionIncompatibleStag
     "$listCatalog"_sd,
     "$listLocalSessions"_sd,
     "$listSearchIndexes"_sd,
-    "$operationMetrics"_sd,
 };
 
 const auto getQuerySettingsService =

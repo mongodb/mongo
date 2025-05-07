@@ -400,7 +400,6 @@ const skips = new Set([
     "$listSearchIndexes",
     "$listSessions",
     "$mergeCursors",
-    "$operationMetrics",
     "$planCacheStats",
     "$querySettings",
     "$queryStats",

@@ -101,27 +101,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "operation_resource_consumption_gen",
-    src = "operation_resource_consumption.idl",
-)
-
-mongo_cc_library(
-    name = "resource_consumption_metrics",
-    srcs = [
-        "resource_consumption_metrics.cpp",
-        ":operation_resource_consumption_gen",
-    ],
-    hdrs = [
-        "resource_consumption_metrics.h",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
 mongo_cc_library(
     name = "transaction_stats",
     srcs = [
@@ -271,7 +250,6 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":api_version_metrics",
-        ":resource_consumption_metrics",
         ":timer_stats",
         ":top",
         "//src/mongo:base",
@@ -281,20 +259,5 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/util:clock_source_mock",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "resource_consumption_metrics_test",
-    srcs = [
-        "resource_consumption_metrics_test.cpp",
-    ],
-    tags = [
-        "mongo_unittest_eighth_group",
-        "server-storage-engine-integration",
-    ],
-    deps = [
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/repl:replmocks",
     ],
 )

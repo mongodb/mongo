@@ -689,23 +689,10 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
-        auto operationMetricsPtr = [&]() -> ResourceConsumption::OperationMetrics* {
-            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-            if (metricsCollector.hasCollectedMetrics()) {
-                return &metricsCollector.getMetrics();
-            }
-            return nullptr;
-        }();
-
         const auto& storageMetrics = getOperationStorageMetrics();
 
         logv2::DynamicAttributes attr;
-        _debug.report(opCtx,
-                      &lockStats,
-                      operationMetricsPtr,
-                      storageMetrics,
-                      getPrepareReadConflicts(),
-                      &attr);
+        _debug.report(opCtx, &lockStats, storageMetrics, getPrepareReadConflicts(), &attr);
 
         LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
 

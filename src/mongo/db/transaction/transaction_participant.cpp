@@ -98,7 +98,6 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
@@ -3350,13 +3349,8 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
-    {
-        // Do not increase consumption metrics during updating session entry, as this
-        // will cause a tenant to be billed for reading or writing on session transactions table.
-        ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
-        updateSessionEntry(
-            opCtx, _sessionId(), sessionTxnRecord.toBSON(), sessionTxnRecord.getTxnNum());
-    }
+    updateSessionEntry(
+        opCtx, _sessionId(), sessionTxnRecord.toBSON(), sessionTxnRecord.getTxnNum());
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
@@ -3377,13 +3371,8 @@ void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
-    {
-        // Do not increase consumption metrics during updating session entry, as this
-        // will cause a tenant to be billed for reading or writing on session transactions table.
-        ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
-        updateSessionEntry(
-            opCtx, _sessionId(), sessionTxnRecord.toBSON(), sessionTxnRecord.getTxnNum());
-    }
+    updateSessionEntry(
+        opCtx, _sessionId(), sessionTxnRecord.toBSON(), sessionTxnRecord.getTxnNum());
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }

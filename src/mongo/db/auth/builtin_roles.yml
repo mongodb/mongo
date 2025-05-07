@@ -260,7 +260,6 @@ roles:
           - listSessions # clusterManager gets this also
           - listShards # clusterManager gets this also
           - netstat
-          - operationMetrics
           - replSetGetConfig # clusterManager gets this also
           - replSetGetStatus # clusterManager gets this also
           - serverStatus

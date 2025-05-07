@@ -80,7 +80,6 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/disk_space_util.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -2860,21 +2859,6 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         return;
     }
 
-    if (replState->isExternalAbort()) {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto& collector = ResourceConsumption::MetricsCollector::get(opCtx);
-
-        // Only report metrics for index builds on primaries. We are being aborted by an external
-        // thread, thus we can assume it is holding the RSTL while waiting for us to exit.
-        bool wasCollecting = collector.endScopedCollecting();
-        bool isPrimary = replCoord->canAcceptWritesFor_UNSAFE(
-            opCtx, {replState->dbName, replState->collectionUUID});
-        if (isPrimary && wasCollecting && ResourceConsumption::isMetricsAggregationEnabled()) {
-            ResourceConsumption::get(opCtx).merge(
-                opCtx, collector.getDbName(), collector.getMetrics());
-        }
-    }
-
     // If the index build has already been cleaned-up because it encountered an error, there is no
     // work to do. If an external abort was requested, cleanup is handled by the requester, and
     // there is nothing to do.
@@ -3225,18 +3209,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     if (IndexBuildAction::kOplogCommit == action) {
         replState->onOplogCommit(isPrimary);
     }
-
-    // While we are still holding the RSTL and before returning, ensure the metrics collected for
-    // this index build are attributed to the primary that commits or aborts the index build.
-    ScopeGuard metricsGuard([&]() {
-        auto& collector = ResourceConsumption::MetricsCollector::get(opCtx);
-        bool wasCollecting = collector.endScopedCollecting();
-        if (!isPrimary || !wasCollecting || !ResourceConsumption::isMetricsAggregationEnabled()) {
-            return;
-        }
-
-        ResourceConsumption::get(opCtx).merge(opCtx, collector.getDbName(), collector.getMetrics());
-    });
 
     // The collection object should always exist while an index build is registered.
     CollectionWriter collection(opCtx, replState->collectionUUID);
