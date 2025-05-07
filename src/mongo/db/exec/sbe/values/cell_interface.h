@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
-#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::value {
 /**

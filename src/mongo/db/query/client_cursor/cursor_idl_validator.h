@@ -28,7 +28,6 @@
  */
 
 #pragma once
-#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 
 namespace mongo {
 

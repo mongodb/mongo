@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 

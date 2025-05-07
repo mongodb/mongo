@@ -42,7 +42,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_from_accumulator_quantile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_continuous.h"

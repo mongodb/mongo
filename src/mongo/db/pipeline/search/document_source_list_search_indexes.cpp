@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
+#include "mongo/db/pipeline/search/document_source_list_search_indexes_gen.h"
 
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"

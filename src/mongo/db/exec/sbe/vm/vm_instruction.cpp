@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

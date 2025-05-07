@@ -44,23 +44,7 @@
 
 namespace mongo {
 
-class MultiPlanBucket;
-
-/**
- * This class defines tokens that each thread must obtain to attempt multiplanning, provided that
- * the MultiPlan rate limiting is enabled. If not enough tokens are available, the thread must wait
- * until either the plan is cached or tokens become available.
- */
-class MultiPlanTokens {
-public:
-    MultiPlanTokens(size_t tokensCount, boost::intrusive_ptr<MultiPlanBucket> bucket)
-        : _tokensCount(tokensCount), _bucket(bucket) {}
-    ~MultiPlanTokens();
-
-private:
-    size_t _tokensCount;
-    boost::intrusive_ptr<MultiPlanBucket> _bucket;
-};
+class MultiPlanTokens;
 
 /**
  * This class defines a bucket in the Multi Plan rate limiting algorithm. It controls number of
@@ -108,5 +92,21 @@ private:
     size_t _tokens;
     stdx::mutex _mutex;
     stdx::condition_variable_any _cv;
+};
+
+/**
+ * This class defines tokens that each thread must obtain to attempt multiplanning, provided that
+ * the MultiPlan rate limiting is enabled. If not enough tokens are available, the thread must wait
+ * until either the plan is cached or tokens become available.
+ */
+class MultiPlanTokens {
+public:
+    MultiPlanTokens(size_t tokensCount, boost::intrusive_ptr<MultiPlanBucket> bucket)
+        : _tokensCount(tokensCount), _bucket(std::move(bucket)) {}
+    ~MultiPlanTokens();
+
+private:
+    size_t _tokensCount;
+    boost::intrusive_ptr<MultiPlanBucket> _bucket;
 };
 }  // namespace mongo

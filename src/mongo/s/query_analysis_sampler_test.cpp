@@ -55,6 +55,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/stdx/future.h"

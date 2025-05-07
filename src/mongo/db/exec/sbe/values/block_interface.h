@@ -35,7 +35,6 @@
 #include <memory>
 
 #include "mongo/base/compare_numbers.h"
-#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"

@@ -42,6 +42,7 @@
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/fts/fts_matcher.h"

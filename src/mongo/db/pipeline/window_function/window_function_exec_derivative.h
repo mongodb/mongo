@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

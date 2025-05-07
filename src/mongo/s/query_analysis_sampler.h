@@ -40,7 +40,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
-#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/periodic_runner.h"

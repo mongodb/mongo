@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_types.h"

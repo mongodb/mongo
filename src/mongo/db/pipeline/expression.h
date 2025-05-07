@@ -72,7 +72,6 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/db/update/pattern_cmp.h"
 #include "mongo/db/version_context.h"

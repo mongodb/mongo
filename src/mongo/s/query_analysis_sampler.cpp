@@ -56,6 +56,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

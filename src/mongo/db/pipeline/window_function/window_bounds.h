@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/query/sort_pattern.h"
+
 namespace mongo {
 
 /**

@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"

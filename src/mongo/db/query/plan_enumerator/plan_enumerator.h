@@ -48,6 +48,7 @@
 #include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"

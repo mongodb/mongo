@@ -49,6 +49,7 @@ Checks:          '-*,
                   hicpp-static-assert,
                   hicpp-undelegated-constructor,
                   misc-definitions-in-headers,
+                  misc-header-include-cycle,
                   misc-new-delete-overloads,
                   misc-static-assert,
                   misc-unconventional-assign-operator,
@@ -137,7 +138,7 @@ Checks:          '-*,
                   -readability-simplify-subscript-expr,
                   -readability-static-accessed-through-instance,
                   -readability-string-compare,
-                  -readability-uniqueptr-delete-release
+                  -readability-uniqueptr-delete-release,
                   '
 HeaderFilterRegex: 'mongo/[-A-Za-z0-9_/]*\.(h|hpp|ipp|inl|cstruct.h|defs|def.h)'
 CheckOptions:

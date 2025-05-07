@@ -56,7 +56,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/stringify.h"

@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 
 namespace mongo {

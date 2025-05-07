@@ -210,7 +210,6 @@ mongo_cc_library(
         "//src/mongo/base:data_range_cursor.h",
         "//src/mongo/base:data_type.h",
         "//src/mongo/base:data_type_endian.h",
-        "//src/mongo/base:data_type_string_data.h",
         "//src/mongo/base:data_type_terminated.h",
         "//src/mongo/base:data_view.h",
         "//src/mongo/base:dependency_graph.h",

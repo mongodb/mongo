@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/inline_auto_update.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/assert.h"

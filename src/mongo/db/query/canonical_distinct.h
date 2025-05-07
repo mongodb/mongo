@@ -36,6 +36,7 @@
 #include <utility>
 
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

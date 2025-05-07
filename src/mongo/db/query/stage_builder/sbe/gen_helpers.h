@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"

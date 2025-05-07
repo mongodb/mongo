@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"

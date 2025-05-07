@@ -34,7 +34,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 

@@ -27,7 +27,6 @@ mongo_cc_library(
         "simple8b.h",
         "simple8b.inl",
         "simple8b_builder.h",
-        "simple8b_builder.inl",
         "simple8b_helpers.h",
         "simple8b_type_util.h",
         "//src/mongo/util:overloaded_visitor.h",

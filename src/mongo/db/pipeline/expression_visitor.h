@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression_walker.h"

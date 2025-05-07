@@ -37,8 +37,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/inline_auto_update.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

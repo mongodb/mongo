@@ -166,10 +166,24 @@ struct DataType {
     static Status makeTrivialLoadStatus(size_t sizeOfT, size_t length, size_t debug_offset);
 };
 
+template <>
+struct DataType::Handler<StringData> {
+    // Consumes all available data, producing
+    // a `StringData(ptr,length)`.
+    static Status load(StringData* sdata,
+                       const char* ptr,
+                       size_t length,
+                       size_t* advanced,
+                       std::ptrdiff_t debug_offset);
+
+    // Copies `sdata` fully into the [ptr,ptr+length) range.
+    // Does nothing and returns an Overflow status if
+    // `sdata` doesn't fit.
+    static Status store(
+        StringData sdata, char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset);
+
+    static StringData defaultConstruct() {
+        return StringData();
+    }
+};
 }  // namespace mongo
-
-// Force the visibility of the DataType::Handler specializations.
-#define MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
-#include "mongo/base/data_type_string_data.h"
-
-#undef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
