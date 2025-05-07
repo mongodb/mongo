@@ -74,6 +74,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterDoingDeletion);
 MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInDeleteRange);
 MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeRemovingRangeDeletionTask);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeSettingOrphanCountOnDocument);
 
 /**
  * Returns whether the currentCollection has the same UUID as the expectedCollectionUuid. Used to
@@ -626,6 +628,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                 return s;
             }
 
+            pauseBeforeRemovingRangeDeletionTask.pauseWhileSet();
             try {
                 removePersistentRangeDeletionTask(nss, migrationId);
             } catch (const DBException& e) {
@@ -659,10 +662,18 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto setNumOrphansOnTask = [opCtx, &store](const RangeDeletionTask& deletionTask,
                                                int64_t numOrphans) {
-        store.update(opCtx,
-                     BSON(RangeDeletionTask::kIdFieldName << deletionTask.getId()),
-                     BSON("$set" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << numOrphans)),
-                     ShardingCatalogClient::kLocalWriteConcern);
+        try {
+            store.update(
+                opCtx,
+                BSON(RangeDeletionTask::kIdFieldName << deletionTask.getId()),
+                BSON("$set" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << numOrphans)),
+                ShardingCatalogClient::kLocalWriteConcern);
+        } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+            LOGV2_DEBUG(9552800,
+                        2,
+                        "No document found while setting orphan counter on range deletion task",
+                        logAttrs(deletionTask.getNss()));
+        }
     };
 
     ScopedRangeDeleterLock rangeDeleterLock(opCtx, MODE_X);
@@ -677,27 +688,36 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
                 opCtx, deletionTask.getNss(), ChunkVersion::IGNORED(), boost::none);
             while (true) {
                 try {
-                    AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
-                    if (!collection || collection->uuid() != deletionTask.getCollectionUuid()) {
-                        // The deletion task is referring to a collection that has been dropped
-                        setNumOrphansOnTask(deletionTask, 0);
-                        return true;
-                    }
+                    return writeConflictRetry(
+                        opCtx,
+                        "setOrphanCountersOnRangeDeletionTask",
+                        NamespaceString::kRangeDeletionNamespace.ns(),
+                        [opCtx, &store, &setNumOrphansOnTask, &deletionTask] {
+                            AutoGetCollection collection(opCtx, deletionTask.getNss(), MODE_IX);
+                            pauseBeforeSettingOrphanCountOnDocument.pauseWhileSet();
+                            if (!collection ||
+                                collection->uuid() != deletionTask.getCollectionUuid()) {
+                                // The deletion task is referring to a collection that has been
+                                // dropped
+                                setNumOrphansOnTask(deletionTask, 0);
+                                return true;
+                            }
 
+                            const auto keyPattern = collection.getCollection().getShardKeyPattern();
+                            auto shardKeyIdx =
+                                findShardKeyPrefixedIndex(opCtx,
+                                                          *collection,
+                                                          collection->getIndexCatalog(),
+                                                          keyPattern,
+                                                          /*requireSingleKey=*/false);
 
-                    const auto keyPattern = collection.getCollection().getShardKeyPattern();
-                    auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                                 *collection,
-                                                                 collection->getIndexCatalog(),
-                                                                 keyPattern,
-                                                                 /*requireSingleKey=*/false);
-
-                    int64_t numOrphansInRange = [&]() -> int64_t {
-                        if (!shardKeyIdx && ShardKeyPattern(keyPattern).isHashedPattern()) {
-                            // It is allowed not to have a shard key pattern for hashed shard keys.
-                            // In that case, set the orphans counter to zero to avoid blocking
-                            // upgrade.
-                            LOGV2_DEBUG(9625200,
+                            int64_t numOrphansInRange = [&]() -> int64_t {
+                                if (!shardKeyIdx && ShardKeyPattern(keyPattern).isHashedPattern()) {
+                                    // It is allowed not to have a shard key pattern for hashed
+                                    // shard keys. In that case, set the orphans counter to zero to
+                                    // avoid blocking upgrade.
+                                    LOGV2_DEBUG(
+                                        9625200,
                                         1,
                                         "Couldn't find hashed shareded key index, setting number of"
                                         "orphaned docs to zero for this range",
@@ -705,40 +725,40 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
                                         "max"_attr = deletionTask.getRange().getMax(),
                                         "namespace"_attr = deletionTask.getNss().ns());
 
-                            return 0;
-                        }
+                                    return 0;
+                                }
 
-                        uassert(ErrorCodes::IndexNotFound,
-                                str::stream()
-                                    << "couldn't find index over shard key " << keyPattern
-                                    << " for collection " << deletionTask.getNss()
-                                    << " (uuid: " << deletionTask.getCollectionUuid() << ")",
-                                shardKeyIdx);
+                                uassert(ErrorCodes::IndexNotFound,
+                                        str::stream() << "couldn't find index over shard key "
+                                                      << keyPattern << " for collection "
+                                                      << deletionTask.getNss() << " (uuid: "
+                                                      << deletionTask.getCollectionUuid() << ")",
+                                        shardKeyIdx);
 
-                        const auto& range = deletionTask.getRange();
-                        auto forwardIdxScanner = InternalPlanner::shardKeyIndexScan(
-                            opCtx,
-                            &(*collection),
-                            *shardKeyIdx,
-                            range.getMin(),
-                            range.getMax(),
-                            BoundInclusion::kIncludeStartKeyOnly,
-                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                            InternalPlanner::FORWARD);
+                                const auto& range = deletionTask.getRange();
+                                auto forwardIdxScanner = InternalPlanner::shardKeyIndexScan(
+                                    opCtx,
+                                    &(*collection),
+                                    *shardKeyIdx,
+                                    range.getMin(),
+                                    range.getMax(),
+                                    BoundInclusion::kIncludeStartKeyOnly,
+                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                    InternalPlanner::FORWARD);
 
-                        int64_t docsInRange = 0;
-                        BSONObj indexEntry;
-                        while (forwardIdxScanner->getNext(&indexEntry, nullptr) !=
-                               PlanExecutor::IS_EOF) {
-                            ++docsInRange;
-                        }
+                                int64_t docsInRange = 0;
+                                BSONObj indexEntry;
+                                while (forwardIdxScanner->getNext(&indexEntry, nullptr) !=
+                                       PlanExecutor::IS_EOF) {
+                                    ++docsInRange;
+                                }
 
-                        return docsInRange;
-                    }();
+                                return docsInRange;
+                            }();
 
-                    setNumOrphansOnTask(deletionTask, numOrphansInRange);
-                    return true;
-
+                            setNumOrphansOnTask(deletionTask, numOrphansInRange);
+                            return true;
+                        });
                 } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
                     onShardVersionMismatchNoExcept(opCtx, e->getNss(), e->getVersionReceived())
                         .ignore();
