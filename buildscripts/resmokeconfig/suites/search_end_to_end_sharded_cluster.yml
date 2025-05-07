@@ -22,9 +22,6 @@ selector:
   - jstests/with_mongot/createSearchIndex_shell_command.js
 
 executor:
-  archive:
-    hooks:
-      - MongotHook
   config:
     shell_options:
       global_vars:
@@ -36,8 +33,6 @@ executor:
           roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
       <<: *authOptions
-  hooks:
-  - class: MongotHook
   fixture:
     class: ShardedClusterFixture
     auth_options: *authOptions

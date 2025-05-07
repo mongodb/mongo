@@ -259,6 +259,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2023
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --build-mongot
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
@@ -276,6 +277,8 @@ buildvariants:
     - amazon2023.3-large
   - name: search
   - name: search_auth
+  - name: search_end_to_end_sharded_cluster
+  - name: search_end_to_end_single_node
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: vector_search
@@ -299,6 +302,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
       --modules=
+      --build-mongot
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -318,6 +322,8 @@ buildvariants:
     - amazon2023.3-arm64-large
   - name: search
   - name: search_auth
+  - name: search_end_to_end_sharded_cluster
+  - name: search_end_to_end_single_node
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: vector_search
@@ -340,6 +346,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --build-mongot
     scons_cache_scope: shared
     scons_cache_mode: all
     has_packages: false
@@ -356,6 +363,8 @@ buildvariants:
     - amazon2-arm64-large
   - name: search
   - name: search_auth
+  - name: search_end_to_end_sharded_cluster
+  - name: search_end_to_end_single_node
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: vector_search
@@ -377,6 +386,7 @@ buildvariants:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --build-mongot
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: false
     multiversion_platform: amazon2
@@ -394,6 +404,8 @@ buildvariants:
     - amazon2-large
   - name: search
   - name: search_auth
+  - name: search_end_to_end_sharded_cluster
+  - name: search_end_to_end_single_node
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: vector_search
