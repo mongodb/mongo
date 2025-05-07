@@ -1,5 +1,5 @@
 /**
- * Test that the 'n' family of accumulators work as window functions.
+ * Test scaffolding for testing 'n' family of accumulators work as window functions.
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
 
@@ -8,8 +8,22 @@ import {
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
 
-const coll = db[jsTestName()];
-coll.drop();
+const simple = (n, input) => ({n, input: "$" + input});
+const topBottomN = (n, output) => ({n, output: "$" + output, sortBy: {[output]: 1}});
+const topBottom = (n, output) => ({output: "$" + output, sortBy: {[output]: 1}});
+
+// A map from the accumulator name to a function that ignores the parameters it doesn't need and
+// generates a valid accumulator spec.
+const nAccumulators = {
+    $minN: simple,
+    $maxN: simple,
+    $firstN: simple,
+    $lastN: simple,
+    $topN: topBottomN,
+    $bottomN: topBottomN,
+    $top: topBottom,
+    $bottom: topBottom,
+};
 
 const needsSortBy = (op) => ({
     $minN: false,
@@ -22,27 +36,14 @@ const needsSortBy = (op) => ({
     $bottom: true,
 }[op]);
 
-// A map from the accumulator name to a function that ignores the parameters it doesn't need and
-// generates a valid accumulator spec.
-const simple = (n, input) => ({n, input: "$" + input});
-const topBottomN = (n, output) => ({n, output: "$" + output, sortBy: {[output]: 1}});
-const topBottom = (n, output) => ({output: "$" + output, sortBy: {[output]: 1}});
-const nAccumulators = {
-    $minN: simple,
-    $maxN: simple,
-    $firstN: simple,
-    $lastN: simple,
-    $topN: topBottomN,
-    $bottomN: topBottomN,
-    $top: topBottom,
-    $bottom: topBottom,
-};
+export function testAccumulator(acc) {
+    const coll = db[jsTestName()];
+    coll.drop();
 
-// Create a collection of tickers and prices.
-const nDocsPerTicker = 10;
-seedWithTickerData(coll, nDocsPerTicker);
+    // Create a collection of tickers and prices.
+    const nDocsPerTicker = 10;
+    seedWithTickerData(coll, nDocsPerTicker);
 
-for (const acc of Object.keys(nAccumulators)) {
     for (const nValue of [4, 7, 12]) {
         jsTestLog("Testing accumulator " + tojson(acc) + " with 'n' set to " + tojson(nValue));
         const noValue = (acc === "$top" || acc === "$bottom") ? null : [];
