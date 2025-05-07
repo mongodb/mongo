@@ -783,7 +783,20 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
 MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() {
     // A session on secondaries should never be checked back in with a TransactionParticipant that
     // isn't prepared, aborted, or committed.
-    invariant(!_ti->isTransactionInProgress(_opCtx));
+    if (_ti->isTransactionInProgress(_opCtx)) {
+        auto state = _ti->transactionStateDescriptor(_opCtx);
+        auto txnNum = _opCtx->getTxnNumber().get_value_or(TxnNumber(-1));
+        auto txnRetries = _opCtx->getTxnRetryCounter().get_value_or(-1);
+        auto opId = _opCtx->getOpID();
+        auto sessionId = _opCtx->getClient()->session()->id();
+        auto lsid = _opCtx->getLogicalSessionId();
+        auto clientAddress = _opCtx->getClient()->clientAddress(true);
+        invariant(!_ti->isTransactionInProgress(_opCtx),
+                  str::stream() << "state: " << state << " txnNum: " << txnNum
+                                << " txnRetries: " << txnRetries << " opId: " << opId
+                                << " lsid: " << lsid << " sessionId: " << sessionId
+                                << " clientAddress: " << clientAddress);
+    }
 }
 
 MongoDOperationContextSessionWithoutOplogRead::MongoDOperationContextSessionWithoutOplogRead(

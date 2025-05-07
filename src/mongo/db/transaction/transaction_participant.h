@@ -367,7 +367,7 @@ public:
          */
         bool transactionIsOpen() const {
             return o().txnState.isOpen();
-        };
+        }
 
         bool transactionIsCommitted() const {
             return o().txnState.isCommitted();
@@ -391,6 +391,10 @@ public:
 
         bool transactionIsInRetryableWriteMode() const {
             return o().txnState.isInRetryableWriteMode();
+        }
+
+        std::string transactionStateDescriptor() const {
+            return o().txnState.toString();
         }
 
         const absl::flat_hash_set<NamespaceString>& affectedNamespaces() const {

@@ -58,6 +58,12 @@ bool MongoDSessionCatalogTransactionInterfaceImpl::isTransactionInProgress(
     return txnParticipant.transactionIsInProgress();
 }
 
+std::string MongoDSessionCatalogTransactionInterfaceImpl::transactionStateDescriptor(
+    OperationContext* opCtx) {
+    const auto participant = TransactionParticipant::get(opCtx);
+    return participant.transactionStateDescriptor();
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::refreshTransactionFromStorageIfNeeded(
     OperationContext* opCtx) {
     auto txnParticipant = TransactionParticipant::get(opCtx);

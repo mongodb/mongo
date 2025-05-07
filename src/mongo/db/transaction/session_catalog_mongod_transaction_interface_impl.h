@@ -58,6 +58,8 @@ public:
 
     bool isTransactionInProgress(OperationContext* opCtx) override;
 
+    std::string transactionStateDescriptor(OperationContext* opCtx) override;
+
     void refreshTransactionFromStorageIfNeeded(OperationContext* opCtx) override;
 
     void refreshTransactionFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx) override;

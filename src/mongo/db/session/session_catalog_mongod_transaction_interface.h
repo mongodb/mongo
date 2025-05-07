@@ -62,6 +62,12 @@ public:
      */
     virtual bool isTransactionInProgress(OperationContext* opCtx) = 0;
 
+
+    /**
+     * Gets a description of the current transaction state.
+     */
+    virtual std::string transactionStateDescriptor(OperationContext* opCtx) = 0;
+
     /**
      * Blocking method, which loads the transaction state from storage if it has been marked as
      * needing refresh.
