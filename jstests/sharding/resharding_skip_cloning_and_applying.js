@@ -9,6 +9,8 @@
  *  requires_fcv_81,
  *  # TODO (SERVER-103522): Re-enable this test.
  *  DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *  # TODO (SERVER-104862): Re-enable this test in aubsan variants.
+ *  incompatible_aubsan,
  *  ]
  */
 
