@@ -151,6 +151,10 @@ selector:
     # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.
     - jstests/core/cluster_parameters/cluster_parameter_commands.js
 
+    # Uses cluster time in the commands which produces different results in standalone
+    # and non-standalone settings.
+    - jstests/core/query/cluster_time_command_usage.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_read_preference_unchanged
