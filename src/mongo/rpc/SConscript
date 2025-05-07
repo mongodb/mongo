@@ -138,6 +138,7 @@ env.Library(
         'metadata_impersonated_user',
     ],
     source=[
+        'metadata/audit_client_attrs.cpp',
         'metadata/impersonated_user_metadata.cpp',
         'metadata/impersonated_user_metadata.idl',
     ],
