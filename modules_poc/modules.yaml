@@ -47,8 +47,7 @@ core:
     - src/mongo/db/server_lifecycle_monitor[._]*
     - src/mongo/db/service_entry_point_bm_fixture.h
     - src/mongo/db/service_entry_point_rs_endpoint.*
-    - src/mongo/db/startup_warnings_common.*
-    - src/mongo/db/startup_warnings_mongod.*
+    - src/mongo/db/startup_warnings*
     - src/mongo/db/thread_client_test.cpp
     - src/mongo/db/throw_hook_impl[._]*
     - src/mongo/db/throw_hook_options.idl
@@ -229,10 +228,18 @@ access_control:
 
 admission:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-workload-scheduling
+    jira: server-workload-scheduling
   files:
     - src/mongo/db/admission/
+    - src/mongo/db/concurrency/flow_control_ticketholder*
+
+workload_simulation:
+  meta:
+    slack: server-workload-scheduling
+    jira: server-workload-scheduling
+  files:
+    - src/mongo/tools/workload_simulation/*
 
 security:
   meta:
