@@ -7,6 +7,8 @@
  *   requires_getmore,
  *   # Runs a multi-delete which is non-retryable.
  *   requires_non_retryable_writes,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

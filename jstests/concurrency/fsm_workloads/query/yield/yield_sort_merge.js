@@ -6,7 +6,9 @@
  *
  * Other workloads that need an index { a: 1, b: 1 } can extend this.
  * @tags: [
- *   requires_getmore
+ *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -11,6 +11,8 @@
 //   requires_getmore,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";

@@ -6,6 +6,8 @@
 //   assumes_write_concern_unchanged,
 //   requires_fastcount,
 //   requires_getmore,
+//   # Unacknowledged writes are prohibited with sessions:
+//   does_not_support_retryable_writes,
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

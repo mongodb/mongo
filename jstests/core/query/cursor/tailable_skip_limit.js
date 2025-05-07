@@ -3,6 +3,8 @@
 //   requires_getmore,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 // Test that tailable cursors work correctly with skip and limit.

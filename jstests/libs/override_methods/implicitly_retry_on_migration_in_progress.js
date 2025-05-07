@@ -3,6 +3,7 @@
  * codes automatically retry.
  */
 
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 // Values in msecs.
@@ -19,7 +20,6 @@ function _runAndExhaustQueryWithRetryUponMigration(
 
     let queryResponse;
     let attempt = 0;
-    const collName = commandObj[commandName];
     const lsid = commandObj['lsid'];
     const apiVersion = commandObj['apiVersion'];
     const apiStrict = commandObj['apiStrict'];
@@ -27,10 +27,15 @@ function _runAndExhaustQueryWithRetryUponMigration(
     assert.soon(
         () => {
             attempt++;
+
             queryResponse = func.apply(conn, makeFuncArgs(commandObj));
             let latestBatchResponse = queryResponse;
+
             while (latestBatchResponse.ok === 1 && latestBatchResponse.cursor &&
                    latestBatchResponse.cursor.id != 0) {
+                const ns = queryResponse.cursor.ns;
+                const collName = getCollectionNameFromFullNamespace(ns);
+
                 // Exhaust the cursor returned by the command and return to the test a single batch
                 // containing all the results.
                 const getMoreCommandObj = {
@@ -40,6 +45,10 @@ function _runAndExhaustQueryWithRetryUponMigration(
                     apiVersion: apiVersion,
                     apiStrict: apiStrict,
                 };
+
+                // We're not propagating the `txnNumber` parameter to the getMore command because
+                // this function is never called when the query is part of a transaction.
+
                 latestBatchResponse = func.apply(conn, makeFuncArgs(getMoreCommandObj));
 
                 if (latestBatchResponse.ok === 1) {
@@ -138,10 +147,6 @@ function runCommandWithRetryUponMigration(
         return _runAndExhaustQueryWithRetryUponMigration(
             conn, commandName, commandObj, func, makeFuncArgs);
     } else {
-        // The expectation for tests running under this override method is that they cannot issue a
-        // 'getMore' request, since any cursor-generating request should be served through
-        // _runAndExhaustQueryWithRetryUponMigration().
-        assert(commandName !== 'getMore' || inTransaction, 'Unexpected getMore received');
         return _runCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs);
     }
 }

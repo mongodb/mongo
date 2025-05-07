@@ -1,6 +1,11 @@
 /*
  * Intersperses $geoNear aggregations with updates of non-geo fields to test deduplication.
- * @tags: [requires_non_retryable_writes, requires_getmore]
+ * @tags: [
+ *   requires_non_retryable_writes,
+ *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {

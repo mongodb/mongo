@@ -1,5 +1,7 @@
 // @tags: [
 //   requires_getmore,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 // Tests where the QueryOptimizerCursor enters takeover mode during a query rather than a get more.

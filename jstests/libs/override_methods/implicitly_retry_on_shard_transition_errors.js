@@ -2,6 +2,11 @@
  * Overrides runCommand to retry operations that encounter errors from removing a shard,
  * or from a config shard transitioning in and out of dedicated mode.
  */
+
+// Import override methods for retrying on chunk and collection migrations.
+// Note that shard transition requires migrations in order to be able to remove a shard.
+import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
@@ -79,11 +84,6 @@ const kCommandRetryableOnShardNotFoundError = {
         return command.shardDistribution[0].shard == "config";
     }
 };
-
-// Commands known not to work with transitions so tests can fail immediately with a clear error.
-// Empty for now.
-const kDisallowedCommandsInsideTxns = [];
-const kDisallowedCommandsOutsideTxns = ["getMore"];
 
 function matchesRetryableError(error, retryableError) {
     for (const key of Object.keys(retryableError)) {
@@ -168,17 +168,6 @@ function shouldRetry(cmdObj, res) {
 function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs) {
     let res;
     let attempt = 0;
-
-    const inTransaction = cmdObj.hasOwnProperty("autocommit");
-    const disallowedCommands =
-        inTransaction ? kDisallowedCommandsInsideTxns : kDisallowedCommandsOutsideTxns;
-
-    if (disallowedCommands.includes(cmdName)) {
-        throw new Error(`Cowardly refusing to run command ${
-            (inTransaction
-                 ? "inside"
-                 : "outside")} of transaction with a transitioning shard ${tojson(cmdObj)}`);
-    }
 
     assert.soon(
         () => {

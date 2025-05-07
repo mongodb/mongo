@@ -83,9 +83,6 @@ selector:
     - assumes_balancer_off
     # MoveCollection changes the collection uuid.
     - assumes_stable_collection_uuid
-    # This suite executes random moveCollections in the background that cause open cursors on the
-    # collection to be killed.
-    - requires_getmore
     - does_not_support_retryable_writes
     - requires_non_retryable_writes
     - assumes_stable_shard_list
@@ -103,7 +100,6 @@ executor:
     shell_options:
       eval: >-
         await import("jstests/libs/override_methods/enable_sessions.js");
-        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
       global_vars:
         TestData:

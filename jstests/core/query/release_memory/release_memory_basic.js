@@ -9,6 +9,8 @@
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
  *   uses_parallel_shell,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

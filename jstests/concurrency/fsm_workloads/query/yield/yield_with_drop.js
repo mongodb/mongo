@@ -1,7 +1,9 @@
 /**
  * Executes query operations that can yield while the source collection is dropped and recreated.
  * @tags: [
- *   requires_getmore
+ *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

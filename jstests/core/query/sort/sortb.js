@@ -2,6 +2,8 @@
 // SERVER-4716
 // @tags: [
 //   requires_getmore,
+//   # Getting 'Incomplete history detected for transaction' when this test runs with txns.
+//   does_not_support_retryable_writes,
 // ]
 
 // TODO SERVER-92452: This test fails in burn-in with the 'inMemory' engine with the 'WT_CACHE_FULL'

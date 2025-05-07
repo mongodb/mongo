@@ -4,7 +4,13 @@
 
  * TODO: SERVER-39939 - Delete this workload.
 
- * @tags: [uses_transactions, state_functions_share_transaction, requires_getmore]
+ * @tags: [
+ *   uses_transactions,
+ *   state_functions_share_transaction,
+ *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

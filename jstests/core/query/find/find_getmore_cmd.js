@@ -1,5 +1,7 @@
 // @tags: [
-//   requires_getmore
+//   requires_getmore,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 // Tests that explicitly invoke the find and getMore commands.

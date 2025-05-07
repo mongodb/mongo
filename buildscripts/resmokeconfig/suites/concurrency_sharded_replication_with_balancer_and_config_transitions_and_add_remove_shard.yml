@@ -108,8 +108,6 @@ selector:
     # performed by the ContinuousAddRemoveShard hook.
     - kills_random_sessions
 
-    # TODO SERVER-50144 Not waiting for rangeDeleter. Skip tests using getMore.
-    - requires_getmore
     # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
     # so that the whole result set is returned through a single batch
     - assumes_no_implicit_cursor_exhaustion
@@ -135,7 +133,6 @@ executor:
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
-          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true

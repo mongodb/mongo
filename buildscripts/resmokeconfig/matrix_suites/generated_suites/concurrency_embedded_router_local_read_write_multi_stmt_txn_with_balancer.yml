@@ -19,11 +19,11 @@ executor:
       eval:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
         await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
       global_vars:
         TestData:
           defaultTransactionReadConcernLevel: local
           defaultTransactionWriteConcernW: 1
-          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
           implicitlyShardOnCreateCollectionOnly: true
           runInsideTransaction: true
           runningWithBalancer: true

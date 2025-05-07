@@ -8,6 +8,8 @@
  *   requires_fcv_82,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

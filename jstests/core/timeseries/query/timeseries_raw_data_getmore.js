@@ -5,6 +5,8 @@
  *   requires_fcv_82,
  *   requires_timeseries,
  *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

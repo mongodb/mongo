@@ -13,7 +13,6 @@
  *  assumes_no_implicit_cursor_exhaustion,
  * ]
  *
- *
  */
 import {setParameterOnAllNodes} from "jstests/concurrency/fsm_workload_helpers/set_parameter.js";
 

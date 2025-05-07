@@ -2,6 +2,8 @@
 //   requires_getmore,
 //   # getMore is not causally consistent if collection is dropped.
 //   does_not_support_causal_consistency,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 let t = db.jstests_drop3;

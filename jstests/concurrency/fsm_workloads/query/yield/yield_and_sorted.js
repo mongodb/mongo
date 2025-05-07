@@ -14,6 +14,8 @@
  *   # Explain will force the query state to run outside of a transaction, and the query can
  *   # call getMore depending on the random updates.
  *   uses_getmore_outside_of_transaction,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

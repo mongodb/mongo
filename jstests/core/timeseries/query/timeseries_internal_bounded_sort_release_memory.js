@@ -9,6 +9,8 @@
  *   requires_getmore,
  *   requires_timeseries,
  *   uses_getmore_outside_of_transaction,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

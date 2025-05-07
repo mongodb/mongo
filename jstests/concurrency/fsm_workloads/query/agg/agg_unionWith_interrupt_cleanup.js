@@ -8,6 +8,8 @@
  *   # The 'killOp' state uses the killOp cmd, which is incompatible with txns, and a getMore in
  *   # same state. As a result the getMore will be run outside of a txn.
  *   uses_getmore_outside_of_transaction,
+ *   # This test relies on aggregations returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

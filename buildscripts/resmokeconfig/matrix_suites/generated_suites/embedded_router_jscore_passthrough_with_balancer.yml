@@ -80,7 +80,6 @@ selector:
     - assumes_balancer_off
     - requires_fsync
     - assumes_stable_collection_uuid
-    - requires_getmore
     - assumes_no_implicit_cursor_exhaustion
   roots:
     - jstests/core/**/*.js

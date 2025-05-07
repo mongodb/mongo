@@ -162,6 +162,18 @@ export const workerThread = (function() {
                 };
             }
 
+            if (TestData.shardsAddedRemoved) {
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+            }
+
+            if (TestData.runningWithBalancer && !TestData.shardsAddedRemoved) {
+                // Skipping the import on shard transitions because it's already imported under
+                // implicitly_retry_on_shard_transition_errors.js
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+            }
+
             if (Cluster.isReplication(args.clusterOptions)) {
                 if (args.clusterOptions.hasOwnProperty('sharded') &&
                     args.clusterOptions.sharded.hasOwnProperty('stepdownOptions') &&
@@ -194,11 +206,6 @@ export const workerThread = (function() {
                 await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
             }
 
-            if (TestData.shardsAddedRemoved) {
-                await import(
-                    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
-            }
-
             for (const workload of workloads) {
                 const {$config} = await import(workload);
                 var config = parseConfig($config);  // to normalize
@@ -220,8 +227,8 @@ export const workerThread = (function() {
 
                 // Object.extend() defines all properties added to the destination object as
                 // configurable, enumerable, and writable. To prevent workloads from changing
-                // the iterations and threadCount properties in their state functions, we redefine
-                // them here as non-configurable and non-writable.
+                // the iterations and threadCount properties in their state functions, we
+                // redefine them here as non-configurable and non-writable.
                 Object.defineProperties(data, {
                     'iterations': {configurable: false, writable: false, value: data.iterations},
                     'threadCount': {configurable: false, writable: false, value: data.threadCount}

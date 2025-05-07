@@ -13,6 +13,8 @@
  *   does_not_support_transactions,
  *   # releaseMemory needs special permission
  *   assumes_superuser_permissions,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

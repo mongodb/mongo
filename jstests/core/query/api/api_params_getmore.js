@@ -3,6 +3,8 @@
  * @tags: [
  *   requires_getmore,
  *   uses_api_parameters,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 

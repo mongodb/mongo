@@ -10,6 +10,8 @@
  *     # Overflows WT cache on in-memory variants.
  *     requires_persistence,
  *     requires_getmore,
+ *     # This test relies on query commands returning specific batch-sized responses.
+ *     assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 const collName = jsTestName();

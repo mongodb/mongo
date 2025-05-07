@@ -4,7 +4,9 @@
 //     assumes_no_implicit_collection_creation_after_drop,
 //     # Asserts on the output of listIndexes.
 //     assumes_no_implicit_index_creation,
-//     requires_getmore
+//     requires_getmore,
+//     # This test relies on listIncex command returning specific batch-sized responses.
+//     assumes_no_implicit_cursor_exhaustion,
 // ]
 
 // Basic functional tests for the listIndexes command.

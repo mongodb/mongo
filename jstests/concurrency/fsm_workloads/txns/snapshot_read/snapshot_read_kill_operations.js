@@ -2,7 +2,13 @@
  * Test a snapshot read spanning a find and getmore that runs concurrently with killSessions,
  * killOp, killCursors, and txnNumber change.
  *
- * @tags: [uses_transactions, state_functions_share_transaction, requires_getmore]
+ * @tags: [
+ *   uses_transactions,
+ *   state_functions_share_transaction,
+ *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
+ * ]
  */
 
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

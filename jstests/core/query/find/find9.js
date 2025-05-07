@@ -1,4 +1,8 @@
-// @tags: [requires_getmore]
+// @tags: [
+//     requires_getmore,
+//     # This test relies on query commands returning specific batch-sized responses.
+//     assumes_no_implicit_cursor_exhaustion,
+// ]
 
 // Test that the MaxBytesToReturnToClientAtOnce limit as set in 'kMaxBytesToReturnToClientAtOnce' is
 // enforced. The size of the result should not exceed the 'findCommandBatchSize' or this limit,

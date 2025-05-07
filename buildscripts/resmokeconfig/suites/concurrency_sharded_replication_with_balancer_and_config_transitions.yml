@@ -72,9 +72,6 @@ selector:
     - config_shard_incompatible
     - assumes_stable_shard_list
 
-    # This suite executes random moveCollections in the background that cause open cursors on the
-    # collection to be killed.
-    - requires_getmore
     # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
     # so that the whole result set is returned through a single batch
     - assumes_no_implicit_cursor_exhaustion
@@ -100,7 +97,6 @@ executor:
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
-          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true

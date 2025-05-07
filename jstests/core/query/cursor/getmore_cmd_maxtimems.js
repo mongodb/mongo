@@ -4,6 +4,8 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_capped,
 //   requires_getmore,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 // Test attaching maxTimeMS to a getMore command.

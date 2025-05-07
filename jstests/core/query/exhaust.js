@@ -3,6 +3,8 @@
 //   no_selinux,
 //   # Exhaust does not use runCommand which is required by the `simulate_atlas_proxy` override.
 //   simulate_atlas_proxy_incompatible,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 const coll = db.exhaustColl;

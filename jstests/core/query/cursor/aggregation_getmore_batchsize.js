@@ -1,4 +1,8 @@
-// @tags: [requires_getmore]
+// @tags: [
+//     requires_getmore,
+//     # This test relies on aggregate commands returning specific batch-sized responses.
+//     assumes_no_implicit_cursor_exhaustion,
+// ]
 
 // this is a simple test to make sure that batchSize gets propagated to the cursors returned
 // from the aggregate sell helper

@@ -13,6 +13,8 @@
 //   # Does not support multiplanning, because it makes explain fail
 //   does_not_support_multiplanning_single_solutions,
 //   requires_getmore,
+//   # This test relies on query commands returning specific batch-sized responses.
+//   assumes_no_implicit_cursor_exhaustion,
 // ]
 
 import "jstests/libs/query/sbe_assert_error_override.js";

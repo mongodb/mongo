@@ -16,10 +16,11 @@ executor:
     tests: true
   config:
     shell_options:
-      eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
       global_vars:
         TestData:
-          fsmPreOverridesLoadedCallback: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
           implicitlyShardOnCreateCollectionOnly: true
           runningWithBalancer: true
           runningWithCausalConsistency: true
@@ -67,7 +68,6 @@ selector:
     - requires_profiling
     - assumes_against_mongod_not_mongos
     - assumes_unsharded_collection
-    - requires_getmore
     - assumes_no_implicit_cursor_exhaustion
     - temp_disabled_embedded_router_uncategorized
   roots:

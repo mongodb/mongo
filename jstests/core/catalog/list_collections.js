@@ -239,7 +239,11 @@ jsTest.log('Test that batches are limited to ~16 MB');
         assert.commandWorked(mydb.createCollection("collection_" + i, {validator: validator}));
     }
     jsTestLog(`Done creating ${nCollections} collections`);
-    cursor = getListCollectionsCursor(mydb);
+
+    // Filter out resharding temporal collections, which may exist when the balancer is moving
+    // collections in background.
+    cursor =
+        getListCollectionsCursor(mydb, {filter: {name: {$not: {$regex: /system\.resharding/}}}});
     assert(cursor.hasNext());
     const firstBatchSize = cursor.objsLeftInBatch();
     assert.gt(firstBatchSize, 0);
@@ -249,8 +253,8 @@ jsTest.log('Test that batches are limited to ~16 MB');
         cursor.next();
     }
     assert(cursor.hasNext());
-    cursor.next();
-    assert.eq(firstBatchSize + cursor.objsLeftInBatch() + 1, nCollections);
+    const secondBatchSize = cursor.objsLeftInBatch();
+    assert.eq(firstBatchSize + secondBatchSize, nCollections);
 }
 
 //

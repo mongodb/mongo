@@ -10,6 +10,8 @@
  *   docker_incompatible,
  *   grpc_incompatible,
  *   requires_getmore,
+ *   # This test relies on query commands returning specific batch-sized responses.
+ *   assumes_no_implicit_cursor_exhaustion,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
