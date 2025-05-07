@@ -1615,6 +1615,118 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_1
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-1"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_2
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-2"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_3
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-3"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_query_shape_hash_stability_generated_test_4
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-4"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_query_shape_hash_stability_generated_test
+          should_shuffle: false
+
   ################################################
   #           Query Optimization tasks           #
   ################################################

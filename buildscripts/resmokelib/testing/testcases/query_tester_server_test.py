@@ -24,7 +24,13 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "query_tester_server_test"
 
-    def __init__(self, logger: logging.Logger, test_dir: list[str], wait_for_files: bool = True):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        test_dir: list[str],
+        wait_for_files: bool = True,
+        override: str = None,
+    ):
         """Initialize QueryTesterServerTestCase.
         test_dir: file path to a dir that contains .test files, their corresponding .results and a .coll file
             To run multiple test dirs, you would create an instance of QueryTesterServerTestCase for each one.
@@ -36,6 +42,7 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
 
         self.test_dir = test_dir[0]
         self.wait_for_files = wait_for_files
+        self.override = override
 
     def _make_process(self):
         if self.wait_for_files:
@@ -50,19 +57,22 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
             os.path.join(self.test_dir, f) for f in os.listdir(self.test_dir) if f.endswith(".test")
         ]
 
+        command = [
+            _config.DEFAULT_MONGOTEST_EXECUTABLE,
+            "--uri",
+            self.fixture.get_internal_connection_string(),
+            *[cmd for f in test_files for cmd in ("-t", f)],
+            "--drop",
+            "--load",
+            "--mode",
+            "compare",
+            "-v",
+            "--diff",
+            "plain",
+        ]
+        if self.override:
+            command = command + ["--override", self.override]
         return core.programs.generic_program(
             self.logger,
-            [
-                _config.DEFAULT_MONGOTEST_EXECUTABLE,
-                "--uri",
-                self.fixture.get_internal_connection_string(),
-                *[cmd for f in test_files for cmd in ("-t", f)],
-                "--drop",
-                "--load",
-                "--mode",
-                "compare",
-                "-v",
-                "--diff",
-                "plain",
-            ],
+            command,
         )

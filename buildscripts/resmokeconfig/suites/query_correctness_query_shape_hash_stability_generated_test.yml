@@ -1,0 +1,19 @@
+test_kind: query_tester_server_test
+description: |
+  This suite runs generated tests on the mongo server using QueryTester's mongotest binary with the
+  quertShapeHash override.
+
+selector:
+  roots:
+    - src/mongo/db/query/query_tester/tests/query-correctness-tests-*/generated_tests/*/
+  exclude_files:
+    - src/mongo/db/query/query_tester/tests/selfTests/
+executor:
+  config:
+    # Use the --override queryShapeHash option.
+    override: queryShapeHash
+  hooks:
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: MongoDFixture

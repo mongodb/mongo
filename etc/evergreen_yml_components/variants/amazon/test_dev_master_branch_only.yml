@@ -339,7 +339,7 @@ buildvariants:
     # This set of tasks includes everything from the query-alias-task-list YAML anchor,
     # along with the additional query_correctness_generated_test tasks (.query_correctness).
     tasks:
-      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2023-arm64-latest-large
