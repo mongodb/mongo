@@ -87,3 +87,35 @@ server_parameters:
             # Expects the payload to be an instance of `ConnectionListParameters`.
             override_set: true
         redact: false
+
+    ingressConnectionEstablishmentRatePerSec:
+        description: "The number of new connections that will be allowed to establish per second"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "IngressConnectionEstablishmentRatePerSecServerParameter"
+            override_set: true
+            data: double
+        default:
+            expr: std::numeric_limits<double>::max()
+        redact: false
+
+    ingressConnectionEstablishmentBurstSize:
+        description: "The maximum number of  connection establishments that will be admitted before rate-limiting kicks in (ie, the burst size of the bucket)"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "IngressConnectionEstablishmentBurstSizeServerParameter"
+            override_set: true
+            data: double
+        default:
+            expr: std::numeric_limits<double>::max()
+        redact: false
+
+    ingressConnectionEstablishmentMaxQueueDepth:
+        description: "The maximum size of the connection establishment queue, after which the server will begin rejecting new connections"
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "IngressConnectionEstablishmentMaxQueueDepthServerParameter"
+            override_set: true
+            data: std::int64_t
+        default: 0
+        redact: false
