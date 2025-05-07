@@ -256,12 +256,6 @@ buildvariants:
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
       - name: .concurrency !.auth !concurrency_replication_causal_consistency_gen !concurrency_replication_multi_stmt_txn_gen !concurrency_replication_gen !concurrency_simultaneous_replication_gen !config_fuzzer_concurrency_replication_gen !config_fuzzer_concurrency_simultaneous_replication_gen
       - name: .grpc_misc_js
-      - name: .lint
-        distros:
-          - rhel8.8-xlarge
-      - name: .clang_tidy
-        distros:
-          - rhel8.8-xxlarge
 
   - &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     <<: *linux_x86_dynamic_compile_variant_dependency
