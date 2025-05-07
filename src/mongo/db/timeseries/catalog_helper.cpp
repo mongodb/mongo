@@ -209,11 +209,12 @@ std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
         return {CollectionAcquisition(std::move(*acq)), false};
     }
 
-    uasserted(ErrorCodes::ConflictingOperationInProgress,
-              fmt::format("Exhausted rety attempts while trying to acquire collection '{}'. Number "
-                          "attempts performed {}",
-                          originNssOrUUID.toStringForErrorMsg(),
-                          kMaxAcquisitionRetryAttempts));
+    uasserted(
+        ErrorCodes::ConflictingOperationInProgress,
+        fmt::format("Exhausted retry attempts while trying to acquire collection '{}'. Number "
+                    "attempts performed {}",
+                    originNssOrUUID.toStringForErrorMsg(),
+                    kMaxAcquisitionRetryAttempts));
 }
 
 }  // namespace timeseries
