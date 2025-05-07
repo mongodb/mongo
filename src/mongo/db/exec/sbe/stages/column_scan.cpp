@@ -59,6 +59,7 @@ ColumnScanStage::RowstoreScanModeTracker::RowstoreScanModeTracker()
       _batchSize(_minBatchSize) {}
 
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
+                                 DatabaseName dbName,
                                  StringData columnIndexName,
                                  std::vector<std::string> paths,
                                  bool densePathIncludedInScan,
@@ -77,6 +78,7 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                 participateInTrialRunTracking,
                 TrialRunTrackingType::TrackReads),
       _collUuid(collectionUuid),
+      _dbName(dbName),
       _columnIndexName(columnIndexName),
       _paths(std::move(paths)),
       _includeInOutput(std::move(includeInOutput)),
@@ -97,6 +99,7 @@ std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
         filteredPaths.emplace_back(fp.pathIndex, fp.filterExpr->clone(), fp.inputSlotId);
     }
     return std::make_unique<ColumnScanStage>(_collUuid,
+                                             _dbName,
                                              _columnIndexName,
                                              _paths,
                                              _densePathIncludedInScan,
@@ -137,7 +140,7 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(6610200, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    _coll.acquireCollection(_opCtx, _collUuid);
+    _coll.acquireCollection(_opCtx, _dbName, _collUuid);
 
     auto indexCatalog = _coll.getPtr()->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _columnIndexName);
@@ -204,7 +207,7 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
         return;
     }
 
-    _coll.restoreCollection(_opCtx, _collUuid);
+    _coll.restoreCollection(_opCtx, _dbName, _collUuid);
     auto desc = _coll.getPtr()->getIndexCatalog()->findIndexByIdent(_opCtx, _columnIndexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _columnIndexName << "' dropped",
@@ -276,7 +279,7 @@ void ColumnScanStage::open(bool reOpen) {
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(
                 6610207, "ColumnScanStage is not open but have _rowStoreCursor", !_rowStoreCursor);
-            _coll.restoreCollection(_opCtx, _collUuid);
+            _coll.restoreCollection(_opCtx, _dbName, _collUuid);
         }
     }
 

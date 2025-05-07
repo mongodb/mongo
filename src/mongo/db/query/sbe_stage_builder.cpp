@@ -1173,7 +1173,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto csn = static_cast<const CountScanNode*>(root);
 
-    const auto& collection = getCurrentCollection(reqs);
+    auto collection = getCurrentCollection(reqs);
     auto indexName = csn->index.identifier.catalogName;
     auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(_state.opCtx, indexName);
     auto indexAccessMethod =
@@ -1494,8 +1494,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     }
 
+    auto coll = getCurrentCollection(reqs);
     std::unique_ptr<sbe::PlanStage> stage =
-        std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
+        std::make_unique<sbe::ColumnScanStage>(coll->uuid(),
+                                               coll->ns().dbName(),
                                                csn->indexEntry.identifier.catalogName,
                                                std::move(paths),
                                                densePathIncludeInFields,
@@ -3785,7 +3787,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto textNode = static_cast<const TextMatchNode*>(root);
-    const auto& coll = getCurrentCollection(reqs);
+    auto coll = getCurrentCollection(reqs);
     tassert(5432212, "no collection object", coll);
     tassert(6023410, "buildTextMatch() does not support kSortKey", !reqs.hasSortKeys());
     tassert(5432215,
@@ -5426,7 +5428,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return buildSearchMeta(sn, _state, _cq, &_slotIdGenerator, _env, _yieldPolicy);
     }
 
-    const auto& collection = getCurrentCollection(reqs);
+    auto collection = getCurrentCollection(reqs);
     auto expCtx = _cq.getExpCtxRaw();
 
     // Register search query parameter slots.
@@ -5673,14 +5675,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, bool> SlotBasedStageBuilder::buildVec
     }
 }
 
-const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
+CollectionPtr SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
     auto nss = reqs.getTargetNamespace();
-    const auto& coll = _collections.lookupCollection(nss);
+    const auto coll = _collections.lookupCollection(nss);
     tassert(7922500,
             str::stream() << "No collection found that matches namespace '"
                           << nss.toStringForErrorMsg() << "'",
             coll != CollectionPtr::null);
-    return coll;
+    return CollectionPtr{coll.get()};
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree

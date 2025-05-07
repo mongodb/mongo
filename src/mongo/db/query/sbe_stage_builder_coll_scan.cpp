@@ -174,6 +174,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     auto seekBranch =
         sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
                                        sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                                                  collection->ns().dbName(),
                                                                   boost::none /* recordSlot */,
                                                                   boost::none /* recordIdSlot*/,
                                                                   boost::none /* snapshotIdSlot */,
@@ -330,6 +331,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
              CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
          csn->boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly);
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                            collection->ns().dbName(),
                                             resultSlot,
                                             recordIdSlot,
                                             boost::none /* snapshotIdSlot */,
@@ -445,6 +447,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
 
     sbe::ScanCallbacks callbacks({}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                            collection->ns().dbName(),
                                             resultSlot,
                                             recordIdSlot,
                                             boost::none /* snapshotIdSlot */,
