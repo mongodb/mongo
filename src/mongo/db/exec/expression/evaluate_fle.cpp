@@ -79,15 +79,14 @@ Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Var
             "ExpressionEncStrStartsWith can't be evaluated without binary payload",
             expr.canBeEvaluated());
 
-    // Hang on to the FLE2IndexedTextEncryptedValue object, because getRawMetadataBlock
-    // returns a view on its member.
+    // Hang on to the FLE2IndexedTextEncryptedValue object, because getPrefixMetadataBlocks
+    // returns a view on its member and its lifetime must last through the completion of evaluate.
     boost::optional<FLE2IndexedTextEncryptedValue> value;
     return Value(expr.getEncryptedPredicateEvaluator().evaluate(
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
-            // TODO SERVER-104568: Implement this lambda expression's body which should extract the
-            // metadata blocks.
-            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
-            return metadataBlocks;
+            tassert(10456800, "extractMetadataBlocks should only be run once by evaluate", !value);
+            value.emplace(serverValue);
+            return value->getPrefixMetadataBlocks();
         }));
 }
 
@@ -100,16 +99,14 @@ Value evaluate(const ExpressionEncStrEndsWith& expr, const Document& root, Varia
             "ExpressionEncStrEndsWith can't be evaluated without binary payload",
             expr.canBeEvaluated());
 
-    // Note, when the below lambda is filled in, we must hang on to the
-    // FLE2IndexedTextEncryptedValue object to extend the lifetime of the serverValue beyond the
-    // scope of the lambda. This is because ConstDataRange is just a view on the original metadata
-    // block data.
+    // Hang on to the FLE2IndexedTextEncryptedValue object, because getSuffixMetadataBlocks
+    // returns a view on its member and its lifetime must last through the completion of evaluate.
+    boost::optional<FLE2IndexedTextEncryptedValue> value;
     return Value(expr.getEncryptedPredicateEvaluator().evaluate(
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
-            // TODO SERVER-101217: Implement this lambda expression's body which should extract the
-            // metadata blocks.
-            std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
-            return metadataBlocks;
+            tassert(10456801, "extractMetadataBlocks should only be run once by evaluate", !value);
+            value.emplace(serverValue);
+            return value->getSuffixMetadataBlocks();
         }));
 }
 

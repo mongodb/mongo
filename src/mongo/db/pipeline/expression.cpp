@@ -4848,8 +4848,11 @@ ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx
     auto encryptedBinDataType = getEncryptedBinDataType(value);
     if (encryptedBinDataType) {
         if (encryptedBinDataType == EncryptedBinDataType::kFLE2FindTextPayload) {
-            // TODO SERVER-104568: Parse the value as a ParsedFindTextSearchPayload, and use the
-            // server token to initiate _evaluatorV2 with the zerosTokens.
+            // Parse the value as a ParsedFindTextSearchPayload, and use the server token to
+            // initiate _evaluatorV2 with the zerosTokens.
+            auto tokens = ParsedFindTextSearchPayload(value);
+            _evaluatorV2 = EncryptedPredicateEvaluatorV2(
+                {ServerZerosEncryptionToken::deriveFrom(tokens.server)});
         } else {
             // We may encounter a kFLE2Placeholder in the case that we reparse with query analysis.
             // This happens when running in agg, as we serialize and reparse a $match during
