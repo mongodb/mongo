@@ -436,11 +436,11 @@ inline namespace literals {
  * encoding. In C++17 mode, there is nothing to do.
  */
 #if defined(__cpp_char8_t) && (__cpp_char8_t >= 201811L)
-inline auto operator"" _as_char_ptr(const char8_t* p, std::size_t s) {
+inline auto operator""_as_char_ptr(const char8_t* p, std::size_t s) {
     return static_cast<const char*>(static_cast<const void*>(p));
 }
 #else
-inline auto operator"" _as_char_ptr(const char* p, std::size_t s) {
+inline auto operator""_as_char_ptr(const char* p, std::size_t s) {
     return p;
 }
 #endif

@@ -139,7 +139,7 @@ auto multipleAttrs(Ts&&... attrs) {
 }  // namespace logv2
 
 inline namespace literals {
-constexpr logv2::detail::AttrUdl operator"" _attr(const char* name, std::size_t) {
+constexpr logv2::detail::AttrUdl operator""_attr(const char* name, std::size_t) {
     return {name};
 }
 }  // namespace literals

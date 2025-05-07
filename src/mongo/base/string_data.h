@@ -427,7 +427,7 @@ inline namespace literals {
  * Makes a constexpr StringData from a user defined literal (e.g. "hello"_sd).
  * This allows for constexpr creation of `StringData` that are known at compile time.
  */
-constexpr StringData operator"" _sd(const char* c, std::size_t len) {
+constexpr StringData operator""_sd(const char* c, std::size_t len) {
     return {c, len};
 }
 }  // namespace literals
