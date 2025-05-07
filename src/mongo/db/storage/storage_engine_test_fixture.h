@@ -122,7 +122,7 @@ public:
             collName, identName, RecordStore::Options{});
     }
 
-    Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, std::string indexName) {
+    Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, StringData indexName) {
         RecordId catalogId =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->getCatalogId();
         std::string indexIdent =
@@ -167,9 +167,9 @@ public:
     /**
      * Create an index with a key of `{<key>: 1}` and a `name` of <key>.
      */
-    Status createIndex(OperationContext* opCtx, NamespaceString collNs, std::string key) {
+    Status createIndex(OperationContext* opCtx, NamespaceString collNs, StringData key) {
         auto buildUUID = UUID::gen();
-        auto ret = startIndexBuild(opCtx, collNs, key, buildUUID);
+        auto ret = startIndexBuild(opCtx, collNs, key, buildUUID, true);
         if (!ret.isOK()) {
             return ret;
         }
@@ -180,31 +180,31 @@ public:
 
     Status startIndexBuild(OperationContext* opCtx,
                            NamespaceString collNs,
-                           std::string key,
-                           boost::optional<UUID> buildUUID) {
+                           StringData key,
+                           boost::optional<UUID> buildUUID,
+                           bool createEntry = false) {
         BSONObjBuilder builder;
-        builder.append("v", 2);
-        {
-            BSONObjBuilder keyObj;
-            builder.append("key", keyObj.append(key, 1).done());
-        }
-        BSONObj spec = builder.append("name", key).done();
+        BSONObj spec = BSON("v" << 2 << "key" << BSON(key << 1) << "name" << key);
 
         CollectionWriter writer{opCtx, collNs};
         Collection* collection = writer.getWritableCollection(opCtx);
-        auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
-
-        auto ret = collection->prepareForIndexBuild(opCtx, descriptor.get(), buildUUID);
+        IndexDescriptor descriptor(IndexNames::BTREE, spec);
+        auto ret = collection->prepareForIndexBuild(opCtx, &descriptor, buildUUID);
+        if (ret.isOK() && createEntry) {
+            collection->getIndexCatalog()->createIndexEntry(
+                opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
+        }
         return ret;
     }
 
-    void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
+    void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, StringData key) {
         CollectionWriter writer{opCtx, collNs};
         Collection* collection = writer.getWritableCollection(opCtx);
         auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
             opCtx,
             key,
             IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT(writableEntry);
         collection->indexBuildSuccess(opCtx, writableEntry);
     }
 
@@ -242,7 +242,7 @@ public:
 
 class StorageEngineTestNotEphemeral : public StorageEngineTest {
 public:
-    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)) {};
+    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)) {}
 };
 
 }  // namespace mongo

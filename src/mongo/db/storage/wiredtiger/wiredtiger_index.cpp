@@ -625,7 +625,7 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         uri,
         kMinimumIndexVersion,
         kMaximumIndexVersion);
-    if (!version.isOK()) {
+    if (version == ErrorCodes::UnsupportedFormat || version == ErrorCodes::FailedToParse) {
         Status versionStatus = version.getStatus();
         Status indexVersionStatus(ErrorCodes::UnsupportedFormat,
                                   str::stream()
@@ -634,6 +634,7 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                       << "} - version either too old or too new for this mongod.");
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
+    uassertStatusOK(version);
     _dataFormatVersion = version.getValue();
 
     _repairDataFormatVersion(ctx, uri, ident, config);
