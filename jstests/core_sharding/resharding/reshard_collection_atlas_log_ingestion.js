@@ -10,8 +10,7 @@
  *  requires_2_or_more_shards,
  *  assumes_balancer_off,
  *  # Stepdowns should be fine, but the only suites core_sharding tests run in randomize between
- *  # stepdowns, terminates, and kills. Fetching the completion logs with getLog cannot tolerate
- *  # node restarts.
+ *  # stepdowns, terminates, and kills. Failpoints and getLog cannot tolerate node restarts.
  *  does_not_support_stepdowns,
  * ]
  */
@@ -20,6 +19,7 @@ import {
     withSkipRetryOnNetworkError
 } from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
@@ -38,7 +38,7 @@ function main() {
     {
         // Success case.
         const collName = `${jsTestName()}-success`;
-        initializeCollection(collName, false);
+        initializeCollection(collName);
         const uuid = UUID();
         assert.commandWorked(runResharding(collName, uuid));
         const logs = getCompletionLogs(uuid);
@@ -48,15 +48,17 @@ function main() {
     {
         // Failure case.
         const collName = `${jsTestName()}-failed`;
-        initializeCollection(collName, true);
+        initializeCollection(collName);
         const uuid = UUID();
+        const failpoints = setFailInPhase("cloning");
         assert.commandFailed(runResharding(collName, uuid));
+        unsetFailpoints(failpoints);
         const logs = getCompletionLogs(uuid);
         verifyCompletionLogs(collName, logs, "failed");
     }
 }
 
-function initializeCollection(collName, includeDuplicateKey) {
+function initializeCollection(collName) {
     const docCount = 1000;
     const minKey = 0;
     const maxKey = docCount;
@@ -67,12 +69,6 @@ function initializeCollection(collName, includeDuplicateKey) {
     for (let i = 0; i < docCount; i++) {
         docs.push({_id: i, oldKey: i, newKey: maxKey - i});
     }
-    if (includeDuplicateKey) {
-        const firstDoc = docs[0];
-        const lastDoc = docs[docs.length - 1];
-        lastDoc._id = firstDoc._id;
-        lastDoc.newKey = firstDoc.newKey;
-    }
     assert.commandWorked(coll.insert(docs));
 }
 
@@ -80,6 +76,33 @@ function runResharding(collName, uuid) {
     jsTestLog(`Running resharding with user supplied UUID: ${tojson(uuid)}`);
     return db.adminCommand(
         {reshardCollection: `${dbName}.${collName}`, key: newShardKey, reshardingUUID: uuid});
+}
+
+function getAllReplicaSets() {
+    const topology = DiscoverTopology.findConnectedNodes(db);
+    const allReplicaSets = [];
+    allReplicaSets.push(topology.configsvr.nodes);
+    for (const shard of Object.values(topology.shards)) {
+        allReplicaSets.push(shard.nodes);
+    }
+    return allReplicaSets.map(rs => rs.map(host => new Mongo(host)));
+}
+
+function setFailInPhase(phase) {
+    const failpoints = [];
+    for (const rs of getAllReplicaSets()) {
+        failpoints.push(configureFailPointForRS(
+            rs,
+            "reshardingRecipientFailInPhase",
+            {phase, errorMessage: "reshard_collection_atlas_log_ingestion.js"}));
+    }
+    return failpoints;
+}
+
+function unsetFailpoints(failpoints) {
+    for (const failpoint of failpoints) {
+        failpoint.off();
+    }
 }
 
 function getLogs(connection) {
