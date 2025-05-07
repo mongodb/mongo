@@ -133,7 +133,8 @@ void removeCollAndChunksMetadataFromConfig(
     const CollectionType& coll,
     const WriteConcernOptions& writeConcern,
     const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor = nullptr);
+    const std::shared_ptr<executor::TaskExecutor>& executor = nullptr,
+    bool logCommitOnConfigPlacementHistory = true);
 
 /**
  * Delete the query analyzer document associated to the passed in namespace.
@@ -354,6 +355,8 @@ void sendFetchCollMetadataToShards(OperationContext* opCtx,
  */
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot);
+
+boost::optional<ShardId> pickDataBearingShard(OperationContext* opCtx, const UUID& collUuid);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

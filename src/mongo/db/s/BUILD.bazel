@@ -333,6 +333,7 @@ idl_generator(
     deps = [
         ":sharding_ddl_coordinator_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s:sharding_types_gen",
     ],
 )
 

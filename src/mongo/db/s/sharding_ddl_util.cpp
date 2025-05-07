@@ -194,15 +194,9 @@ void deleteCollection(OperationContext* opCtx,
                       const UUID& uuid,
                       const WriteConcernOptions& writeConcern,
                       const OperationSessionInfo& osi,
-                      const std::shared_ptr<executor::TaskExecutor>& executor) {
-    /* Perform a transaction to delete the collection and append a new placement entry.
-     * NOTE: deleteCollectionFn may be run on a separate thread than the one serving
-     * deleteCollection(). For this reason, all the referenced parameters have to
-     * be captured by value.
-     * TODO SERVER-75189: replace capture list with a single '&'.
-     */
-    auto transactionChain = [nss, uuid](const txn_api::TransactionClient& txnClient,
-                                        ExecutorPtr txnExec) {
+                      const std::shared_ptr<executor::TaskExecutor>& executor,
+                      bool logCommitOnConfigPlacementHistory) {
+    auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be
         // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
         // 'uuid')
@@ -227,7 +221,7 @@ void deleteCollection(OperationContext* opCtx,
                 // Skip the insertion of the placement entry if the previous statement didn't
                 // remove any document - we can deduce that the whole transaction was already
                 // committed in a previous attempt.
-                if (deleteCollResponse.getN() == 0) {
+                if (!logCommitOnConfigPlacementHistory || deleteCollResponse.getN() == 0) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
@@ -424,14 +418,14 @@ void removeQueryAnalyzerMetadata(OperationContext* opCtx,
                                str::stream() << "Failed to remove query analyzer documents");
 }
 
-void removeCollAndChunksMetadataFromConfig(
-    OperationContext* opCtx,
-    const std::shared_ptr<Shard>& configShard,
-    ShardingCatalogClient* catalogClient,
-    const CollectionType& coll,
-    const WriteConcernOptions& writeConcern,
-    const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
+void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
+                                           const std::shared_ptr<Shard>& configShard,
+                                           ShardingCatalogClient* catalogClient,
+                                           const CollectionType& coll,
+                                           const WriteConcernOptions& writeConcern,
+                                           const OperationSessionInfo& osi,
+                                           const std::shared_ptr<executor::TaskExecutor>& executor,
+                                           bool logCommitOnConfigPlacementHistory) {
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto& nss = coll.getNss();
     const auto& uuid = coll.getUuid();
@@ -444,7 +438,8 @@ void removeCollAndChunksMetadataFromConfig(
     config.placementHistory. In case this operation is run by a ddl coordinator, we can re-use the
     osi in the transaction to guarantee the replay protection.
     */
-    deleteCollection(opCtx, nss, uuid, writeConcern, osi, executor);
+    deleteCollection(
+        opCtx, nss, uuid, writeConcern, osi, executor, logCommitOnConfigPlacementHistory);
 
     deleteChunks(opCtx, configShard, uuid, writeConcern);
 
@@ -924,6 +919,22 @@ AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
 
     return AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed;
 }
+
+boost::optional<ShardId> pickDataBearingShard(OperationContext* opCtx, const UUID& collUuid) {
+    const Timestamp dummyTimestamp;
+    const OID dummyEpoch;
+    auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
+        opCtx,
+        BSON(ChunkType::collectionUUID() << collUuid) /*query*/,
+        BSON(ChunkType::min() << 1) /*sort*/,
+        1 /*limit*/,
+        nullptr /*opTime*/,
+        dummyEpoch,
+        dummyTimestamp,
+        repl::ReadConcernLevelEnum::kMajorityReadConcern));
+    return chunks.empty() ? boost::none : boost::optional<ShardId>(chunks[0].getShard());
+}
+
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

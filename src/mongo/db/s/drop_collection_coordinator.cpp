@@ -187,14 +187,14 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                     logAttrs(nss));
     }
 
-    // Force the refresh of the catalog cache to purge outdated information. Note also that this
-    // code is indirectly used to notify to secondary nodes to clear their filtering information
-    // once the data flushed to disk get replicated.
+    // Force the refresh of the filtering metadata cache to purge outdated information.
+    // The logic below will cause config.cache.collections.<nss> to be dropped and secondary nodes
+    // to clean their filtering metadata (once the flushed data get replicated).
     FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss);
     FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
 
-    // Ensures the remove of range deletions and the refresh of the catalog cache will be waited for
-    // majority at the end of the command
+    // Ensures that the removal of filtering metadata and range deletions will be waited
+    // for majority at the end of the command.
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 }
 
@@ -301,10 +301,35 @@ void DropCollectionCoordinator::_enterCriticalSection(
 void DropCollectionCoordinator::_commitDropCollection(
     OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const auto collIsSharded = bool(_doc.getCollInfo());
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
-    LOGV2_DEBUG(5390504, 2, "Dropping collection", logAttrs(nss()), "sharded"_attr = collIsSharded);
+    const auto changeStreamsNotifierShardId = [&]() {
+        if (_doc.getChangeStreamsNotifier()) {
+            return _doc.getChangeStreamsNotifier().value();
+        }
 
-    // Remove the query sampling configuration document for this collection, if it exists.
+        const auto notifierShardId = collIsSharded
+            ? sharding_ddl_util::pickDataBearingShard(opCtx, _doc.getCollInfo()->getUuid()).value()
+            : primaryShardId;
+
+        auto newDoc = _doc;
+        newDoc.setChangeStreamsNotifier(notifierShardId);
+        _updateStateDocument(opCtx, std::move(newDoc));
+
+        return notifierShardId;
+    }();
+
+    LOGV2_DEBUG(5390504,
+                2,
+                "Dropping collection",
+                logAttrs(nss()),
+                "sharded"_attr = collIsSharded,
+                "changeStreamsNotifierId"_attr = changeStreamsNotifierShardId);
+
+    // The correctness of the commit sequence depends on the execution order of the following
+    // steps:
+
+    // 1. Deletion of the collection routing table (and other metadata) from the global catalog.
     {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, nss(), session);
@@ -321,11 +346,12 @@ void DropCollectionCoordinator::_commitDropCollection(
             coll,
             defaultMajorityWriteConcernDoNotUse(),
             getNewSession(opCtx),
-            **executor);
+            **executor,
+            false /*logCommitOnConfigPlacementHistory*/);
     }
 
-    // Remove tags even if the collection is not sharded or didn't exist
     {
+        // Remove zones associated to the collection (if any).
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), session);
     }
@@ -335,40 +361,88 @@ void DropCollectionCoordinator::_commitDropCollection(
     // during the critical section.
     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
-    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-
-    // We need to send the drop to all the shards because both movePrimary and
-    // moveChunk leave garbage behind for sharded collections.
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    // Remove primary shard from participants
-    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
-                       participants.end());
-
-    {
+    // 2. Drop collection data and local catalog metadata on each shard (including non-data
+    //    bearing ones, to ensure that possible leftovers left behind by previous moveChunk/Primary
+    //    operations get cleaned up).
+    //    The change streams notifier will be the only one emitting a user-visible commit op-entry
+    //    (fromMigrate = false).
+    const auto sendParticipantCommand = [&](const std::vector<ShardId> recipients,
+                                            bool fromMigrate) {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-            opCtx,
-            nss(),
-            participants,
-            **executor,
-            session,
-            true /* fromMigrate */,
-            false /* dropSystemCollections */);
+            opCtx, nss(), recipients, **executor, session, fromMigrate, false);
+    };
+
+    auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    otherParticipants.erase(std::remove(otherParticipants.begin(),
+                                        otherParticipants.end(),
+                                        changeStreamsNotifierShardId),
+                            otherParticipants.end());
+
+    sendParticipantCommand(otherParticipants, true /*fromMigrateParam*/);
+    sendParticipantCommand({changeStreamsNotifierShardId}, false /*fromMigrateParam*/);
+
+    // 3. Insert the effects of the commit into config.placementHistory, if not already present.
+    //    The operation is performed through a transaction to ensure serialization with concurrent
+    //    resetPlacementHistory() requests.
+    if (collIsSharded) {
+        const auto insertHistoricalPlacementTxn = [&](const txn_api::TransactionClient& txnClient,
+                                                      ExecutorPtr txnExec) {
+            FindCommandRequest query(NamespaceString::kConfigsvrPlacementHistoryNamespace);
+            query.setFilter(BSON(
+                NamespacePlacementType::kNssFieldName
+                << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())));
+            query.setSort(BSON(NamespacePlacementType::kTimestampFieldName << -1));
+            query.setLimit(1);
+
+            return txnClient.exhaustiveFind(query)
+                .thenRunOn(txnExec)
+                .then([&](const std::vector<BSONObj>& match) {
+                    const auto& collUuid = _doc.getCollInfo()->getUuid();
+                    if (match.size() == 1) {
+                        const auto latestEntry = NamespacePlacementType::parse(
+                            IDLParserContext("dropCollectionLocally"), match[0]);
+                        if (latestEntry.getUuid() == collUuid && latestEntry.getShards().empty()) {
+                            BatchedCommandResponse noOpResponse;
+                            noOpResponse.setStatus(Status::OK());
+                            noOpResponse.setN(0);
+                            return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                        }
+                    }
+
+                    const auto currentTime = VectorClock::get(opCtx)->getTime();
+                    const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
+                    NamespacePlacementType placementInfo(nss(), currentTimestamp, {});
+                    placementInfo.setUuid(collUuid);
+
+                    write_ops::InsertCommandRequest insertPlacementEntry(
+                        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                        {placementInfo.toBSON()});
+                    return txnClient.runCRUDOp(insertPlacementEntry, {1});
+                })
+                .thenRunOn(txnExec)
+                .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
+                    uassertStatusOK(insertPlacementEntryResponse.toStatus());
+                })
+                .semi();
+        };
+
+        const auto session = getNewSession(opCtx);
+        auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
+                                      WriteConcernOptions::SyncMode::UNSET,
+                                      WriteConcernOptions::kNoTimeout};
+
+
+        sharding_ddl_util::runTransactionOnShardingCatalog(
+            opCtx, std::move(insertHistoricalPlacementTxn), wc, session, **executor);
     }
 
-    // The sharded collection must be dropped on the primary shard after it has been
-    // dropped on all of the other shards to ensure it can only be re-created as
-    // unsharded with a higher optime than all of the drops.
+    // 4. Generate the namespacePlacementChanged op entry to support the post-commit activity of
+    // change
+    //    stream readers.
     {
-        const auto session = getNewSession(opCtx);
-        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-            opCtx,
-            nss(),
-            {primaryShardId},
-            **executor,
-            session,
-            false /* fromMigrate */,
-            false /* dropSystemCollections */);
+        // TODO SERVER-103869 send notifyShardingEvent to changeStreamsNotifierShardId to trigger
+        // the generation of the op log entry.
     }
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());

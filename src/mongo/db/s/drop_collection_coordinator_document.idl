@@ -37,6 +37,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/sharding_types.idl"
 
 enums:
     DropCollectionCoordinatorPhase:
@@ -77,4 +78,8 @@ structs:
             collectionUUID:
                 type: uuid
                 description: "The expected UUID of the collection, only set and used in C2C replication."
+                optional: true
+            changeStreamsNotifier:
+                type: shard_id
+                description: "The identity of the Shard that will be responsible to generate the op log entries supporting change stream readers."
                 optional: true
