@@ -303,7 +303,7 @@ public:
             // TODO SERVER-102925 remove this once the RoutingContext is integrated into
             // Cluster::runAggregate() isEligibleForViewlessTimeseriesRewritesInRouter,
             // runDistinctAsAgg
-            routingCtx.onResponseReceivedForNss(nss, Status::OK());
+            routingCtx.onRequestSentForNss(nss);
 
             runDistinctAsAgg(opCtx,
                              std::move(canonicalQuery),
@@ -409,7 +409,7 @@ public:
         if (timeseries::isEligibleForViewlessTimeseriesRewritesInRouter(opCtx, cri)) {
             // TODO SERVER-102925 remove this once the RoutingContext is integrated into
             // Cluster::runAggregate()
-            routingCtx->onResponseReceivedForNss(nss, Status::OK());
+            routingCtx->onRequestSentForNss(nss);
             runDistinctAsAgg(opCtx,
                              std::move(canonicalQuery),
                              boost::none /* resolvedView */,
@@ -432,7 +432,6 @@ public:
                     true /* eligibleForSampling */);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 const auto& resolvedView = *ex.extraInfo<ResolvedView>();
-                routingCtx->onResponseReceivedForNss(nss, Status::OK());
                 runDistinctAsAgg(opCtx,
                                  std::move(canonicalQuery),
                                  resolvedView,

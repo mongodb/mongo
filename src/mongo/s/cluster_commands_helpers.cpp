@@ -382,8 +382,13 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
         readPref,
         retryPolicy);
 
-    // Get the responses.
+    if (routingCtx && !requests.empty()) {
+        // If we reach here, at least one versioned request was scheduled and sent to the shards by
+        // the ARS.
+        routingCtx->onRequestSentForNss(nss);
+    }
 
+    // Get the responses.
     std::vector<AsyncRequestsSender::Response> responses;  // Stores results by ShardId
 
     while (!ars.done()) {
@@ -396,10 +401,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
             // Check for special errors that require throwing out any accumulated results.
             auto& responseObj = response.swResponse.getValue().data;
             status = getStatusFromCommandResult(responseObj);
-
-            if (routingCtx) {
-                routingCtx->onResponseReceivedForNss(nss, status);
-            }
 
             // If we specify to throw on stale shard version errors, then we will early exit
             // from examining results. Otherwise, we will allow stale shard version errors to

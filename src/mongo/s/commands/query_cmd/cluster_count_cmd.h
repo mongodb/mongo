@@ -203,7 +203,7 @@ public:
                         &result, boost::none /*tenantId*/);
                     // TODO SERVER-102925 remove this once the RoutingContext is integrated into
                     // Cluster::runAggregate()
-                    routingCtx.onResponseReceivedForNss(nss, Status::OK());
+                    routingCtx.onRequestSentForNss(nss);
                     // We've delegated execution to agg.
                     return true;
                 }
@@ -401,7 +401,7 @@ public:
                     opCtx, bodyBuilder, countRequest, cri, nss, verbosity)) {
                 // TODO SERVER-102925 remove this once the RoutingContext is integrated into
                 // Cluster::runAggregate()
-                routingCtx.onResponseReceivedForNss(nss, Status::OK());
+                routingCtx.onRequestSentForNss(nss);
                 // We've delegated execution to agg.
                 return Status::OK();
             }

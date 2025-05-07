@@ -143,7 +143,7 @@ TEST_F(WriteOpAnalyzerTest, SingleInserts) {
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
@@ -174,8 +174,8 @@ TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
-    rtx.onResponseReceivedForNss(nss2, Status::OK());
+    rtx.onRequestSentForNss(nss);
+    rtx.onRequestSentForNss(nss2);
 }
 
 TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
@@ -206,7 +206,7 @@ TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
@@ -235,7 +235,7 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
@@ -274,7 +274,7 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
@@ -307,7 +307,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
     // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
@@ -348,7 +348,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, EqDeletes) {
@@ -375,7 +375,7 @@ TEST_F(WriteOpAnalyzerTest, EqDeletes) {
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 
@@ -401,7 +401,7 @@ TEST_F(WriteOpAnalyzerTest, RangeDeleteOnes) {
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
@@ -439,7 +439,7 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
     // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onResponseReceivedForNss(nss, Status::OK());
+    rtx.onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
@@ -477,8 +477,8 @@ TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }
 
-    rtx.onResponseReceivedForNss(kUntrackedNss, Status::OK());
-    rtx.onResponseReceivedForNss(kUnsplittableNss, Status::OK());
+    rtx.onRequestSentForNss(kUntrackedNss);
+    rtx.onRequestSentForNss(kUnsplittableNss);
 }
 
 TEST_F(WriteOpAnalyzerTest, Unsplittable) {
@@ -516,8 +516,8 @@ TEST_F(WriteOpAnalyzerTest, Unsplittable) {
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }
 
-    rtx.onResponseReceivedForNss(kUntrackedNss, Status::OK());
-    rtx.onResponseReceivedForNss(kUnsplittableNss, Status::OK());
+    rtx.onRequestSentForNss(kUntrackedNss);
+    rtx.onRequestSentForNss(kUnsplittableNss);
 }
 
 }  // namespace

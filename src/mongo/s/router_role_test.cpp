@@ -243,7 +243,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextDoesNotRetryForSubRoute
                 tries++;
                 OID epoch{OID::gen()};
                 Timestamp timestamp{1, 0};
-                routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+                routingCtx.onRequestSentForNss(_nss);
                 uasserted(StaleConfigInfo(_nss,
                                           ShardVersionFactory::make(
                                               ChunkVersion({epoch, timestamp}, {2, 0}),
@@ -271,7 +271,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetriesOnStaleConfigFor
             operationContext(), "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 if (firstTry) {
                     firstTry = false;
-                    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+                    routingCtx.onRequestSentForNss(_nss);
                     uasserted(StaleConfigInfo(_nss,
                                               ShardVersionFactory::make(
                                                   ChunkVersion({epoch, timestamp}, {2, 0}),
@@ -280,7 +280,7 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetriesOnStaleConfigFor
                                               ShardId{"0"}),
                               "StaleConfig error");
                 } else {
-                    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+                    routingCtx.onRequestSentForNss(_nss);
                     return BSONObj();
                 }
             });
@@ -361,28 +361,27 @@ TEST_F(RouterRoleTest, RoutingContextCreationAndDestruction) {
     const auto expectedCri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _nss));
 
-    const auto nssList = std::vector{_nss};
-    RoutingContext routingCtx(opCtx, nssList);
-    const auto& actualCri = routingCtx.getCollectionRoutingInfo(_nss);
+    routing_context_utils::withValidatedRoutingContext(
+        opCtx, std::vector{_nss}, [&](RoutingContext& routingCtx) {
+            const auto& actualCri = routingCtx.getCollectionRoutingInfo(_nss);
 
-    ASSERT_TRUE(actualCri.hasRoutingTable());
-    ASSERT_TRUE(actualCri.isSharded());
-    ASSERT_EQ(actualCri.getCollectionVersion(), expectedCri.getCollectionVersion());
+            ASSERT_TRUE(actualCri.hasRoutingTable());
+            ASSERT_TRUE(actualCri.isSharded());
+            ASSERT_EQ(actualCri.getCollectionVersion(), expectedCri.getCollectionVersion());
 
-    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+            routingCtx.onRequestSentForNss(_nss);
+        });
 }
 
-TEST_F(RouterRoleTest, InvalidRoutingContextDestruction) {
+DEATH_TEST_F(RouterRoleTest,
+             InvalidRoutingContextDestruction,
+             "RoutingContext ended without validating routing tables for nss") {
     const auto opCtx = operationContext();
-    startCapturingLogMessages();
-    {
-        // Create RoutingContext in scope without explicitly validating nss before destruction.
-        RoutingContext routingCtx(opCtx, std::vector{_nss});
-    }
-    stopCapturingLogMessages();
-    ASSERT_EQ(countTextFormatLogLinesContaining(
-                  "RoutingContext failed to validate routing table for all namespaces."),
-              1);
+
+    ASSERT_THROWS_CODE(routing_context_utils::withValidatedRoutingContext(
+                           opCtx, std::vector{_nss}, [&](RoutingContext& routingCtx) {}),
+                       AssertionException,
+                       10446900);
 }
 
 DEATH_TEST_F(RouterRoleTest,
@@ -390,23 +389,23 @@ DEATH_TEST_F(RouterRoleTest,
              "declared multiple times in RoutingContext") {
     const auto opCtx = operationContext();
 
-    ASSERT_THROWS_CODE(
-        [&] {
-            RoutingContext routingCtx(opCtx, std::vector{_nss, _nss});
-        }(),
-        AssertionException,
-        10292300);
+    ASSERT_THROWS_CODE(routing_context_utils::withValidatedRoutingContext(
+                           opCtx, std::vector{_nss, _nss}, [&](RoutingContext& routingCtx) {}),
+                       AssertionException,
+                       10292300);
 }
 
 TEST_F(RouterRoleTest, CannotAccessUndeclaredNssOnRoutingContext) {
     const auto opCtx = operationContext();
 
     ASSERT_THROWS_CODE(
-        [&] {
-            RoutingContext routingCtx(opCtx, std::vector{_nss});
-            const auto cri = routingCtx.getCollectionRoutingInfo(
-                NamespaceString::createNamespaceString_forTest("test.nonexistent_nss"));
-        }(),
+        routing_context_utils::withValidatedRoutingContext(
+            opCtx,
+            std::vector{_nss},
+            [&](RoutingContext& routingCtx) {
+                const auto cri = routingCtx.getCollectionRoutingInfo(
+                    NamespaceString::createNamespaceString_forTest("test.nonexistent_nss"));
+            }),
         DBException,
         10292301);
 }
@@ -419,7 +418,8 @@ TEST_F(RouterRoleTest, RoutingContextPropagatesCatalogCacheErrors) {
         auto catalogCache = Grid::get(opCtx)->catalogCache();
         catalogCache->onStaleCollectionVersion(_nss, boost::none);
 
-        RoutingContext routingCtx(opCtx, {_nss});
+        routing_context_utils::withValidatedRoutingContext(
+            opCtx, std::vector{_nss}, [&](RoutingContext& routingCtx) {});
     });
 
     onCommand([](const executor::RemoteCommandRequest& request) {
@@ -432,25 +432,27 @@ TEST_F(RouterRoleTest, RoutingContextPropagatesCatalogCacheErrors) {
 TEST_F(RouterRoleTest, RoutingContextRoutingTablesAreImmutable) {
     const auto opCtx = operationContext();
 
-    const auto nssList = std::vector{_nss};
-    RoutingContext routingCtx(opCtx, nssList);
-    const auto criA = routingCtx.getCollectionRoutingInfo(_nss);
-    const auto versionA = criA.getCollectionVersion().placementVersion();
+    routing_context_utils::withValidatedRoutingContext(
+        opCtx, std::vector{_nss}, [&](RoutingContext& routingCtx) {
+            const auto criA = routingCtx.getCollectionRoutingInfo(_nss);
+            const auto versionA = criA.getCollectionVersion().placementVersion();
 
-    // Schedule a refresh with a new placement version.
-    auto future = scheduleRoutingInfoForcedRefresh(_nss);
+            // Schedule a refresh with a new placement version.
+            auto future = scheduleRoutingInfoForcedRefresh(_nss);
 
-    mockConfigServerQueries(_nss, versionA.epoch(), versionA.getTimestamp());
+            mockConfigServerQueries(_nss, versionA.epoch(), versionA.getTimestamp());
 
-    const auto criB = *future.default_timed_get();
-    const auto versionB = criB.getCollectionVersion().placementVersion();
+            const auto criB = *future.default_timed_get();
+            const auto versionB = criB.getCollectionVersion().placementVersion();
 
-    // Routing tables have changed in the CatalogCache, but not in the RoutingContext.
-    ASSERT_NE(versionA, versionB);
-    ASSERT_EQ(routingCtx.getCollectionRoutingInfo(_nss).getCollectionVersion().placementVersion(),
-              versionA);
+            // Routing tables have changed in the CatalogCache, but not in the RoutingContext.
+            ASSERT_NE(versionA, versionB);
+            ASSERT_EQ(
+                routingCtx.getCollectionRoutingInfo(_nss).getCollectionVersion().placementVersion(),
+                versionA);
 
-    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+            routingCtx.onRequestSentForNss(_nss);
+        });
 }
 
 TEST_F(RouterRoleTest, RoutingContextCreationWithCRI) {
@@ -465,7 +467,7 @@ TEST_F(RouterRoleTest, RoutingContextCreationWithCRI) {
     ASSERT_TRUE(actualCri.isSharded());
     ASSERT_EQ(actualCri.getCollectionVersion(), cri.getCollectionVersion());
 
-    routingCtx.onResponseReceivedForNss(_nss, Status::OK());
+    routingCtx.onRequestSentForNss(_nss);
 }
 }  // namespace
 }  // namespace mongo

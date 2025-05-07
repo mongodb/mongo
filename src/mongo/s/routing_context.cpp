@@ -40,6 +40,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -67,12 +68,12 @@ RoutingContext::RoutingContext(OperationContext* opCtx,
                                const std::vector<NamespaceString>& nssList,
                                bool allowLocks)
     : _catalogCache(Grid::get(opCtx)->catalogCache()) {
-    _nssToCriMap.reserve(nssList.size());
+    _nssRoutingInfoMap.reserve(nssList.size());
 
     for (const auto& nss : nssList) {
         const auto cri = uassertStatusOK(_getCollectionRoutingInfo(opCtx, nss, allowLocks));
-        auto [it, inserted] =
-            _nssToCriMap.try_emplace(nss, std::make_pair(std::move(cri), boost::none));
+        auto [it, inserted] = _nssRoutingInfoMap.try_emplace(
+            nss, RoutingInfoEntry{std::move(cri), false /* validated */});
         tassert(10292300,
                 str::stream() << "Namespace " << nss.toStringForErrorMsg()
                               << " declared multiple times in RoutingContext",
@@ -85,8 +86,8 @@ RoutingContext::RoutingContext(
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& nssToCriMap)
     : _catalogCache(Grid::get(opCtx)->catalogCache()) {
     for (auto& [nss, cri] : nssToCriMap) {
-        auto [it, inserted] =
-            _nssToCriMap.try_emplace(nss, std::make_pair(std::move(cri), boost::none));
+        auto [it, inserted] = _nssRoutingInfoMap.try_emplace(
+            nss, RoutingInfoEntry{std::move(cri), false /* validated */});
         tassert(10402001,
                 str::stream() << "Namespace " << nss.toStringForErrorMsg()
                               << " declared multiple times in RoutingContext",
@@ -99,22 +100,23 @@ RoutingContext RoutingContext::createForTest(
     return RoutingContext(nssMap);
 }
 RoutingContext::RoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap)
-    : _nssToCriMap([nssMap = std::move(nssMap)]() {
-          NssCriMap result;
+    : _nssRoutingInfoMap([nssMap = std::move(nssMap)]() {
+          NssRoutingInfoMap result;
           for (auto&& [nss, cri] : nssMap) {
-              result.emplace(std::move(nss), std::make_pair(std::move(cri), boost::none));
+              result.emplace(std::move(nss),
+                             RoutingInfoEntry{std::move(cri), false /* validated */});
           }
           return result;
       }()) {}
 
 const CollectionRoutingInfo& RoutingContext::getCollectionRoutingInfo(
     const NamespaceString& nss) const {
-    auto it = _nssToCriMap.find(nss);
+    auto it = _nssRoutingInfoMap.find(nss);
     uassert(10292301,
             str::stream() << "Attempted to access RoutingContext for undeclared namespace "
                           << nss.toStringForErrorMsg(),
-            it != _nssToCriMap.end());
-    return it->second.first;
+            it != _nssRoutingInfoMap.end());
+    return it->second.cri;
 }
 
 StatusWith<CollectionRoutingInfo> RoutingContext::_getCollectionRoutingInfo(
@@ -126,9 +128,9 @@ StatusWith<CollectionRoutingInfo> RoutingContext::_getCollectionRoutingInfo(
     }
 }
 
-void RoutingContext::onResponseReceivedForNss(const NamespaceString& nss, const Status& status) {
-    if (auto& maybeStatus = _nssToCriMap.at(nss).second; !maybeStatus) {
-        maybeStatus = status;
+void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
+    if (auto& validated = _nssRoutingInfoMap.at(nss).validated; !validated) {
+        validated = true;
     }
 }
 
@@ -157,24 +159,19 @@ bool RoutingContext::onStaleError(const NamespaceString& nss, const Status& stat
     return false;
 }
 
-/**
- * Validate the RoutingContext on destruction to ensure that either:
- * 1. All declared namespaces have had their routing tables validated by sending a versioned
- * request to a shard. Each namespace should have a corresponding Status indicating the response
- * from the shard.
- * 2. An exception is thrown (i.e. if the collection generation has changed) and will be
- * propagated up the stack.
- *
- * It is considered a logic bug if a RoutingContext goes out of scope and neither of the above
- * are true.
- */
-RoutingContext::~RoutingContext() {
-    for (const auto& [nss, criPair] : _nssToCriMap) {
-        auto maybeStatus = criPair.second;
-        if (!maybeStatus) {
-            LOGV2_ERROR(10292801,
-                        "RoutingContext failed to validate routing table for all namespaces.",
-                        "nss"_attr = nss.toStringForErrorMsg());
+void RoutingContext::validateOnContextEnd() const {
+    for (const auto& [nss, routingInfoEntry] : _nssRoutingInfoMap) {
+        if (auto validated = routingInfoEntry.validated; !validated) {
+            if (TestingProctor::instance().isEnabled()) {
+                tasserted(10446900,
+                          str::stream()
+                              << "RoutingContext ended without validating routing tables for nss "
+                              << nss.toStringForErrorMsg());
+            } else {
+                LOGV2_ERROR(10446901,
+                            "RoutingContext ended without validating routing tables for nss.",
+                            "nss"_attr = nss.toStringForErrorMsg());
+            }
         }
     }
 }
