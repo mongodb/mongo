@@ -30,9 +30,15 @@ filters:
   - "storage_debug_util*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "dbhelper_tests.cpp":
+    approvers:
+      - 10gen/server-storage-engine-integration
   - "validate_tests.cpp":
     approvers:
       - 10gen/server-validate
+  - "deferred_writer.cpp":
+    approvers:
+      - 10gen/server-dbcheck
   - "*plan_executor*":
     approvers:
       - 10gen/query-execution

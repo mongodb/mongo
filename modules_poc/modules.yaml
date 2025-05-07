@@ -346,48 +346,89 @@ key_string: # authoritative: @10gen/server-key-string
   files:
     - src/mongo/db/storage/key_string
 
-storage_engine_integration: # authoritative: @10gen/server-storage-engine-integration
+storage_engine_api:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-rss-sydney
+    jira: RSS Sydney
   files:
-    - src/mongo/db/storage # excluding ./key_string
-    - src/mongo/db/record_id* # specific files
-    - src/mongo/db/repair* # specific files
-    - src/mongo/db/prepare_conflict_tracker* # specific files
-    - src/mongo/db/server_recovery* # specific files
-    - src/mongo/db/mongod_options_storage.idl # specific file
-    - src/mongo/db/dbhelpers* # specific files
-    - src/mongo/db/dbcommands.idl # specific file
-    - src/mongo/db/catalog/import* # specific files
-    - src/mongo/db/catalog/index_repair* # specific files
-    - src/mongo/db/commands/fsync* # specific files
-    - src/mongo/db/commands/dbcommands* # specific files
-    - src/mongo/db/commands/resize_oplog* # specific files
-    - src/mongo/db/op_observer/batched_write* # specific files
-    - src/mongo/db/stats/storage_stats* # specific files
-    - src/mongo/dbtests/storage_debug_util* # specific files
+    - src/mongo/db/repair*
+    - src/mongo/db/storage/wiredtiger
+    - src/mongo/db/storage/kv/kv_engine*
+    - src/mongo/db/storage/devnull
+    - src/mongo/db/storage/storage_engine*
+    - src/mongo/db/storage/record_store*
+    - src/mongo/db/storage/durable_catalog*
+    - src/mongo/db/storage/recovery_unit*
+    - src/mongo/db/storage/sorted_data_interface*
+    - src/mongo/db/startup_recovery*
+    - src/mongo/db/modules/enterprise/src/inmemory
 
-validate: # authoritative: @10gen/server-validate
+storage_engine_integration:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
-    - src/mongo/db/catalog/collection_validation* # specific files
-    - src/mongo/db/catalog/throttle_cursor* # specific files
-    - src/mongo/db/commands/validate.cpp # specific file
+    - src/mongo/db/storage # excluding ./key_string, ./wiredtiger, ./devnull, some of ./kv
+    - src/mongo/db/record_id*
+    - src/mongo/db/prepare_conflict_tracker*
+    - src/mongo/db/server_recovery*
+    - src/mongo/db/mongod_options_storage.idl
+    - src/mongo/db/dbhelpers*
+    - src/mongo/dbtests/dbhelper_tests.cpp
+    - src/mongo/db/dbcommands.idl
+    - src/mongo/db/catalog/import*
+    - src/mongo/db/catalog/index_repair*
+    - src/mongo/db/commands/fsync*
+    - src/mongo/db/commands/dbcommands*
+    - src/mongo/db/commands/resize_oplog*
+    - src/mongo/db/op_observer/batched_write*
+    - src/mongo/db/stats/storage_stats*
+    - src/mongo/dbtests/storage_debug_util*
+    - src/mongo/db/concurrency/exception_util*
+
+validate:
+  meta:
+    slack: server-rss-sydney
+    jira: RSS Sydney
+  files:
+    - src/mongo/db/catalog/collection_validation*
+    - src/mongo/db/catalog/throttle_cursor*
+    - src/mongo/db/commands/validate.cpp
     - src/mongo/db/validate
-    - src/mongo/dbtests/validate.cpp # specific file
+    - src/mongo/dbtests/validate_tests.cpp
 
-dbcheck: # authoritative: @10gen/server-dbcheck
+dbcheck:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-rss-sydney
+    jira: RSS Sydney
   files:
-    - src/mongo/db/catalog/health_log* # specific files
-    - src/mongo/db/commands/dbcheck* # specific files
-    - src/mongo/db/concurrency/deferred_writer* # specific files
-    - src/mongo/db/repl/dbcheck* # specific files
+    - src/mongo/db/catalog/health_log*
+    - src/mongo/db/commands/dbcheck*
+    - src/mongo/db/concurrency/deferred_writer*
+    - src/mongo/dbtests/deferred_writer.cpp
+    - src/mongo/db/repl/dbcheck*
+
+server_backup_restore:
+  meta:
+    slack: server-rss-sydney
+    jira: RSS Sydney
+  files:
+    - src/mongo/db/modules/enterprise/src/hot_backups
+    - src/mongo/db/modules/enterprise/src/live_import
+    - src/mongo/db/modules/enterprise/src/queryable
+    - src/mongo/db/modules/enterprise/src/util/document_source_visitor_registry_enterprise.h
+    - src/mongo/db/storage/backup*
+
+server_rss_sydney:
+  meta:
+    slack: server-rss-sydney
+    jira: RSS Sydney
+  files:
+    - src/mongo/db/periodic_runner_cache_pressure_rollback*
+    - src/mongo/db/catalog/collection_compact*
+    - src/mongo/db/commands/*compact*
+    - src/mongo/db/commands/dbhash*
+    - src/mongo/db/storage/compact_options*
 
 ttl: # authoritative: @10gen/server-ttl
   meta:

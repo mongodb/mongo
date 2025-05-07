@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+  - "kv_engine*":
+    approvers:
+      - 10gen/server-storage-engine-api

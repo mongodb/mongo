@@ -3,7 +3,26 @@ filters:
   - "*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "backup*":
+    approvers:
+      - 10gen/server-backup-restore
+  - "compact_options*":
+    approvers:
+      - 10gen/server-rss-sydney
+  - "storage_engine*":
+    approvers:
+      - 10gen/server-storage-engine-api
+  - "record_store*":
+    approvers:
+      - 10gen/server-storage-engine-api
+  - "recovery_unit*":
+    approvers:
+      - 10gen/server-storage-engine-api
+  - "sorted_data_interface*":
+    approvers:
+      - 10gen/server-storage-engine-api
   - "durable_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing
       - 10gen/server-storage-engine-integration
+      - 10gen/server-storage-engine-api

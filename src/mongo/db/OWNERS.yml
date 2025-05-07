@@ -125,7 +125,7 @@ filters:
       - 10gen/server-cluster-scalability
   - "repair*":
     approvers:
-      - 10gen/server-storage-engine-integration
+      - 10gen/server-storage-engine-api
   - "throw_hook*":
     approvers:
       - 10gen/server-programmability
@@ -195,7 +195,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "startup_recovery*":
     approvers:
-      - 10gen/server-storage-engine-integration
+      - 10gen/server-storage-engine-api
   - "field_ref*":
     approvers:
       - 10gen/query-optimization
