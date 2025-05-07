@@ -521,7 +521,11 @@ MongoRunner.arrOptions = function(binaryName, args) {
                 // If the value associated with the setParameter option is an object, we want
                 // to add all key-value pairs in that object as separate --setParameters.
                 Object.keys(o[k]).forEach(function(paramKey) {
-                    addOptionsToFullArgs(k, "" + paramKey + "=" + o[k][paramKey]);
+                    let value = o[k][paramKey];
+                    if (isObject(value) && !Array.isArray(value)) {
+                        value = JSON.stringify(value);
+                    }
+                    addOptionsToFullArgs(k, "" + paramKey + "=" + value);
                 });
             } else {
                 addOptionsToFullArgs(k, o[k]);

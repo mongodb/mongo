@@ -37,7 +37,7 @@
 #include "mongo/util/net/sockaddr.h"
 
 namespace mongo::transport::util {
-bool shouldOverrideMaxConns(const SockAddr& ra,
-                            const SockAddr& la,
-                            const std::vector<std::variant<CIDR, std::string>>& exemptions);
+bool isExemptedByCIDRList(const SockAddr& ra,
+                          const SockAddr& la,
+                          const std::vector<std::variant<CIDR, std::string>>& exemptions);
 }  // namespace mongo::transport::util

@@ -53,7 +53,8 @@
 namespace mongo::transport {
 namespace {
 
-thread_local decltype(ServerGlobalParams::maxConnsOverride)::Snapshot maxConnsOverride;
+thread_local decltype(ServerGlobalParams::maxIncomingConnsOverride)::Snapshot
+    maxIncomingConnsOverride;
 
 /** Some diagnostic data that we will want to log about a Client after its death. */
 struct ClientSummary {
@@ -254,9 +255,9 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
-    serverGlobalParams.maxConnsOverride.refreshSnapshot(maxConnsOverride);
+    serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
     const bool isPrivilegedSession =
-        maxConnsOverride && session->shouldOverrideMaxConns(*maxConnsOverride);
+        maxIncomingConnsOverride && session->isExemptedByCIDRList(*maxIncomingConnsOverride);
     const bool verbose = !quiet();
 
     auto service = _svcCtx->getService();

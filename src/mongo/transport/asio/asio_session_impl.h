@@ -280,7 +280,7 @@ protected:
      */
     Future<Message> sendHTTPResponse(const BatonHandle& baton = nullptr);
 
-    bool shouldOverrideMaxConns(
+    bool isExemptedByCIDRList(
         const std::vector<std::variant<CIDR, std::string>>& exemptions) const override;
 
     enum BlockingMode {
