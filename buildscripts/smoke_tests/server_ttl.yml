@@ -11,6 +11,7 @@
 suites:
   no_passthrough:
     - jstests/noPassthrough/ttl/ttlMonitorSleepSecs_parameter.js
+    - jstests/noPassthrough/ttl/ttl_batch_deletes.js
     - jstests/noPassthrough/ttl/ttl_changes_are_immediate.js
     - jstests/noPassthrough/ttl/ttl_expire_nan_warning_on_startup.js
     - jstests/noPassthrough/ttl/ttl_hidden_index.js
