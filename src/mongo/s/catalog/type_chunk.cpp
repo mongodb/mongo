@@ -224,6 +224,25 @@ ChunkRange ChunkRange::unionWith(ChunkRange const& other) const {
                       le(_maxKey, other._maxKey) ? other._maxKey : _maxKey);
 }
 
+Status ChunkRange::validate(const BSONObj& minKey, const BSONObj& maxKey) {
+    if (minKey.isEmpty()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << ChunkRange::kMinKey << " field is empty");
+    }
+
+    if (maxKey.isEmpty()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << ChunkRange::kMaxKey << " field is empty");
+    }
+
+    if (SimpleBSONObjComparator::kInstance.evaluate(minKey >= maxKey)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "min: " << minKey << " should be less than max: " << maxKey};
+    }
+
+    return Status::OK();
+}
+
 StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& source) {
     std::vector<ChunkHistory> values;
 

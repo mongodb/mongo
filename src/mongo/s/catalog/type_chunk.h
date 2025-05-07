@@ -88,6 +88,8 @@ public:
         return uassertStatusOK(fromBSON(obj));
     }
 
+    static Status validate(const BSONObj& minKey, const BSONObj& maxKey);
+
     const BSONObj& getMin() const {
         return _minKey;
     }

@@ -27,6 +27,9 @@ assert.commandWorked(coordinator.getDB("admin").adminCommand(
 let presetReshardedChunks =
     [{recipientShardId: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}];
 
+const newZoneName = 'x2';
+assert.commandWorked(mongos.adminCommand({addShardToZone: st.shard1.shardName, zone: newZoneName}));
+
 /**
  * Fail cases
  */
@@ -119,6 +122,16 @@ assert.commandFailedWithCode(mongos.adminCommand({
 }),
                              ErrorCodes.BadValue);
 
+assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCollection: ns,
+    key: {newKey: 1},
+    zones: [
+        {zone: newZoneName, min: {newKey: 'MinKey'}, max: {newKey: '0'}},
+        {zone: newZoneName, min: {newKey: '0'}, max: {field: 'MaxKey'}}
+    ]
+}),
+                             ErrorCodes.BadValue);
+
 // TODO SERVER-87189 remove this test case since a user-created unsharded collection is now always
 // tracked. A temporary db.system.resharding.collection must now exist as unsplittable as well to
 // support moveCollection.
@@ -179,8 +192,6 @@ reshardCmdTest.assertReshardCollOkWithPreset(
 
 jsTest.log("Succeed if the zone provided is assigned to a shard but not a range for the source" +
            " collection.");
-const newZoneName = 'x2';
-assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: newZoneName}));
 reshardCmdTest.assertReshardCollOk({
     reshardCollection: ns,
     key: {newKey: 1},
