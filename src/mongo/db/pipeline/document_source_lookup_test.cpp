@@ -835,6 +835,17 @@ public:
         return pipeline;
     }
 
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none,
+        bool shouldUseCollectionDefaultCollator = false) final {
+        return attachCursorSourceToPipeline(pipeline, shardTargetingPolicy, readConcern);
+    }
+
 private:
     deque<DocumentSource::GetNextResult> _mockResults;
     bool _removeLeadingQueryStages = false;

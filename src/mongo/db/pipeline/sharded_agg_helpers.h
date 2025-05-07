@@ -231,11 +231,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
  */
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommandRequest>
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+                  AggregateCommandRequest,
+                  std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
         targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
-    boost::optional<BSONObj> readConcern = boost::none);
+    boost::optional<BSONObj> readConcern = boost::none,
+    bool shouldUseCollectionDefaultCollator = false);
 
 /**
  * For a sharded or unsharded collection, establishes a remote cursor on only the specified shard,

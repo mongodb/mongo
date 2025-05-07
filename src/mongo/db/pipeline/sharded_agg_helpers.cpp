@@ -757,81 +757,34 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
     }
 }
 
-}  // namespace
+/** Check if the first stage of `pipeline` can execute without an attached cursor source. */
+bool firstStageCanExecuteWithoutCursor(const Pipeline& pipeline) {
+    boost::optional<DocumentSource*> hasFirstStage = pipeline.getSources().empty()
+        ? boost::optional<DocumentSource*>{}
+        : pipeline.getSources().front().get();
+    if (!hasFirstStage) {
+        return false;
+    }
+    const auto firstStage = *hasFirstStage;
 
-std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommandRequest>
-        targetRequest,
-    boost::optional<BSONObj> shardCursorsSortSpec,
-    ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern) {
-    auto&& [aggRequest, pipeline] = [&] {
-        return stdx::visit(
-            visit_helper::Overloaded{
-                [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
-                    return std::make_pair(
-                        AggregateCommandRequest(expCtx->ns, pipeline->serializeToBson()),
-                        std::move(pipeline));
-                },
-                [&](AggregateCommandRequest&& aggRequest) {
-                    auto rawPipeline = aggRequest.getPipeline();
-                    return std::make_pair(std::move(aggRequest),
-                                          Pipeline::parse(std::move(rawPipeline), expCtx));
-                }},
-            std::move(targetRequest));
-    }();
+    // In this helper, we expect that we are viewing the first stage of a pipeline that does
+    // not yet have a mergeCursors prepended to it.
+    tassert(8375100,
+            "Expected pipeline without a prepended mergeCursors",
+            !dynamic_cast<const DocumentSourceMergeCursors*>(firstStage));
 
-    invariant(pipeline->getSources().empty() ||
-              !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-
-    // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregateCommandRequest may not
-    // match what was set on the originating command, so copy it from the ExpressionContext.
-    aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
-
-    if (auto maxTimeMS = expCtx->opCtx->getRemainingMaxTimeMillis();
-        maxTimeMS < Microseconds::max()) {
-        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    auto constraints = firstStage->constraints();
+    if (constraints.requiresInputDocSource) {
+        return false;
     }
 
-    LiteParsedPipeline liteParsedPipeline(aggRequest);
-    auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
-    auto shardDispatchResults =
-        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
-                              hasChangeStream,
-                              startsWithDocuments,
-                              std::move(pipeline),
-                              // Even if the overall operation is an explain, callers of this
-                              // function always intend to actually execute a regular agg command
-                              // and merge the results with $mergeCursors.
-                              boost::none /*explain*/,
-                              shardTargetingPolicy,
-                              std::move(readConcern));
-
-    std::vector<ShardId> targetedShards;
-    targetedShards.reserve(shardDispatchResults.remoteCursors.size());
-    for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
-        targetedShards.emplace_back(remoteCursor->getShardId().toString());
-    }
-
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
-    if (shardDispatchResults.splitPipeline) {
-        mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
-        if (shardDispatchResults.splitPipeline->shardCursorsSortSpec) {
-            uassert(4929304, "Split pipeline provides its own sort already", !shardCursorsSortSpec);
-            shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
-        }
-    } else {
-        // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
-        // empty local pipeline which we will attach the merge cursors stage to.
-        mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
-    }
-
-    partitionAndAddMergeCursorsSource(
-        mergePipeline.get(), std::move(shardDispatchResults.remoteCursors), shardCursorsSortSpec);
-    return mergePipeline;
+    // Here we check the hostRequirment because there is at least one stage ($indexStats) which
+    // does not require input data, but is still expected to fan out and contact remote shards
+    // nonetheless.
+    return constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly;
 }
+
+}  // namespace
 
 std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1577,31 +1530,103 @@ bool checkIfMustRunOnAllShards(const NamespaceString& nss,
     return !startsWithDocuments && (nss.isCollectionlessAggregateNS() || hasChangeStream);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
-    Pipeline* ownedPipeline,
+std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCursors(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AggregateCommandRequest aggRequest,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    bool hasChangeStream,
+    bool startsWithDocuments,
     ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> shardCursorsSortSpec,
     boost::optional<BSONObj> readConcern) {
-    auto expCtx = ownedPipeline->getContext();
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                        PipelineDeleter(expCtx->opCtx));
-    boost::optional<DocumentSource*> hasFirstStage = pipeline->getSources().empty()
-        ? boost::optional<DocumentSource*>{}
-        : pipeline->getSources().front().get();
+    // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregateCommandRequest may not
+    // match what was set on the originating command, so copy it from the ExpressionContext.
+    aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
+    if (auto maxTimeMS = expCtx->opCtx->getRemainingMaxTimeMillis();
+        maxTimeMS < Microseconds::max()) {
+        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    }
 
-    if (hasFirstStage) {
-        // Make sure the first stage isn't already a $mergeCursors, and also check if it is a stage
-        // which needs to actually get a cursor attached or not.
-        const auto* firstStage = *hasFirstStage;
-        invariant(!dynamic_cast<const DocumentSourceMergeCursors*>(firstStage));
-        // Here we check the hostRequirement because there is at least one stage ($indexStats) which
-        // does not require input data, but is still expected to fan out and contact remote shards
-        // nonetheless.
-        if (auto constraints = firstStage->constraints(); !constraints.requiresInputDocSource &&
-            (constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly)) {
-            // There's no need to attach a cursor here - the first stage provides its own data and
-            // is meant to be run locally (e.g. $documents).
-            return pipeline;
+    auto shardDispatchResults =
+        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
+                              hasChangeStream,
+                              startsWithDocuments,
+                              std::move(pipeline),
+                              // Even if the overall operation is an explain, callers of this
+                              // function always intend to actually execute a regular agg command
+                              // and merge the results with $mergeCursors.
+                              boost::none /*explain*/,
+                              shardTargetingPolicy,
+                              std::move(readConcern));
+
+    std::vector<ShardId> targetedShards;
+    targetedShards.reserve(shardDispatchResults.remoteCursors.size());
+    for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
+        targetedShards.emplace_back(remoteCursor->getShardId().toString());
+    }
+
+    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
+    if (shardDispatchResults.splitPipeline) {
+        mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
+        if (shardDispatchResults.splitPipeline->shardCursorsSortSpec) {
+            uassert(4929304, "Split pipeline provides its own sort already", !shardCursorsSortSpec);
+            shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
         }
+    } else {
+        // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
+        // empty local pipeline which we will attach the merge cursors stage to.
+        mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
+    }
+
+    partitionAndAddMergeCursorsSource(
+        mergePipeline.get(), std::move(shardDispatchResults.remoteCursors), shardCursorsSortSpec);
+    return mergePipeline;
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+                  AggregateCommandRequest,
+                  std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
+        targetRequest,
+    boost::optional<BSONObj> shardCursorsSortSpec,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern,
+    bool useCollectionDefaultCollator) {
+    auto&& aggRequestPipelinePair = [&] {
+        return stdx::visit(
+            visit_helper::Overloaded{
+                [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
+                    return std::make_pair(
+                        AggregateCommandRequest(expCtx->ns, pipeline->serializeToBson()),
+                        std::move(pipeline));
+                },
+                [&](AggregateCommandRequest&& aggRequest) {
+                    auto rawPipeline = aggRequest.getPipeline();
+                    return std::make_pair(std::move(aggRequest),
+                                          Pipeline::parse(rawPipeline, expCtx));
+                },
+                [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>&&
+                        aggRequestPipelinePair) { return std::move(aggRequestPipelinePair); }},
+            std::move(targetRequest));
+    }();
+    const auto& aggRequest = aggRequestPipelinePair.first;
+    auto&& pipeline = aggRequestPipelinePair.second;
+
+    LOGV2_DEBUG(9497004,
+                5,
+                "Preparing pipeline for execution",
+                "pipeline"_attr = pipeline->serializeToBson());
+
+    tassert(9597602,
+            "Pipeline should not start with $mergeCursors",
+            pipeline->getSources().empty() ||
+                !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+
+    if (firstStageCanExecuteWithoutCursor(*pipeline)) {
+        // There's no need to attach a cursor here - the first stage provides its own data and
+        // is meant to be run locally (e.g. $documents).
+        return std::move(pipeline);
     }
 
     // Helper to decide whether we should ignore the given shardTargetingPolicy for this namespace.
@@ -1620,8 +1645,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
         auto pipelineToTarget = pipeline->clone();
 
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-            pipelineToTarget.release());
+            pipelineToTarget.release(), aggRequest, useCollectionDefaultCollator);
     }
+
+    LiteParsedPipeline liteParsedPipeline(aggRequest);
+    auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
 
     sharding::router::CollectionRouter router(expCtx->opCtx->getServiceContext(), expCtx->ns);
     return router.route(
@@ -1654,7 +1683,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                                 "comment"_attr = expCtx->opCtx->getComment());
 
                     return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                        pipelineToTarget.release());
+                        pipelineToTarget.release(), aggRequest, useCollectionDefaultCollator);
                 } catch (ExceptionFor<ErrorCodes::IllegalOperation>&) {
                     // The current node isn't the primary for or has stale information about this
                     // collection, proceed with shard targeting.
@@ -1675,12 +1704,30 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                 }
             }
 
-            return targetShardsAndAddMergeCursors(expCtx,
-                                                  std::move(pipelineToTarget),
-                                                  boost::none,
-                                                  shardTargetingPolicy,
-                                                  std::move(readConcern));
+            return dispatchTargetedPipelineAndAddMergeCursors(expCtx,
+                                                              std::move(aggRequest),
+                                                              std::move(pipelineToTarget),
+                                                              hasChangeStream,
+                                                              startsWithDocuments,
+                                                              shardTargetingPolicy,
+                                                              std::move(shardCursorsSortSpec),
+                                                              std::move(readConcern));
         });
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
+    Pipeline* ownedPipeline,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
+    auto expCtx = ownedPipeline->getContext();
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
+                                                        PipelineDeleter(expCtx->opCtx));
+    return targetShardsAndAddMergeCursors(expCtx,
+                                          std::move(pipeline),
+                                          boost::none /*shardCursorsSortSpec*/,
+                                          shardTargetingPolicy,
+                                          readConcern,
+                                          false /* shouldUseCollectionDefaultCollator */);
 }
 
 }  // namespace sharded_agg_helpers

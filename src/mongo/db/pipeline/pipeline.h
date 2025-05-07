@@ -69,11 +69,16 @@ using PipelineValidatorCallback = std::function<void(const Pipeline&)>;
 
 struct MakePipelineOptions {
     bool optimize = true;
+
     // It is assumed that the pipeline has already been optimized when we create the
     // MakePipelineOptions. If this is not the case, the caller is responsible for setting
     // alreadyOptimized to false.
     bool alreadyOptimized = true;
     bool attachCursorSource = true;
+
+    // When set to true, ensures that default collection collator will be attached to the pipeline.
+    // Needs 'attachCursorSource' set to true, in order to be applied.
+    bool useCollectionDefaultCollator = false;
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed;
     PipelineValidatorCallback validator = nullptr;
     boost::optional<BSONObj> readConcern;
@@ -163,6 +168,21 @@ public:
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        MakePipelineOptions opts = MakePipelineOptions{});
+
+    /**
+     * Creates a Pipeline from an AggregateCommandRequest. This preserves any aggregation options
+     * set on the aggRequest. The state of the returned pipeline will depend upon the supplied
+     * MakePipelineOptions:
+     * - The boolean opts.optimize determines whether the pipeline will be optimized.
+     *
+     * This function requires opts.attachCursorSource to be true.
+     * This function throws if parsing the pipeline set on aggRequest failed.
+     */
+    static std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+        AggregateCommandRequest& aggRequest,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
         MakePipelineOptions opts = MakePipelineOptions{});
 
     /**

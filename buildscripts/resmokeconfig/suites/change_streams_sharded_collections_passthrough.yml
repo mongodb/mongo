@@ -51,7 +51,6 @@ executor:
         enableTestCommands: 1
         writePeriodicNoops: 1
         periodicNoopIntervalSecs: 1
-        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
     num_shards: 2
     enable_sharding:
     - test

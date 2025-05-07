@@ -13,6 +13,7 @@
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
 load('jstests/libs/change_stream_util.js');          // For isChangeStreamsVisibilityEnabled.
+load("jstests/libs/collection_drop_recreate.js");    // For 'assertDropCollection()'.
 
 const dbName = "change_stream_rewrite_null_existence_test";
 const collName = "coll1";
@@ -22,12 +23,15 @@ if (!isChangeStreamsVisibilityEnabled(testDB)) {
     return;
 }
 
+// Ensure test collection is dropped.
+assertDropCollection(testDB, collName);
+
 // Establish a resume token at a point before anything actually happens in the test.
 const startPoint = db.getMongo().watch().getResumeToken();
 const numDocs = 8;
 
 // Generate a write workload for the change stream to consume.
-generateChangeStreamWriteWorkload(testDB, collName, numDocs);
+generateChangeStreamWriteWorkload(testDB, collName, numDocs, false /* includeInvalidatingEvents */);
 
 // Function to generate a list of all paths to be tested from those observed in the event stream.
 function traverseEvent(event, outputMap, prefixPath = "") {
@@ -85,6 +89,14 @@ function traverseEvent(event, outputMap, prefixPath = "") {
         }
     }
 }
+
+// Ensure all events are replicated and visible to the change stream.
+assert.soon(() => {
+    const allEvents = getAllChangeStreamEvents(
+        testDB, [], {fullDocument: "updateLookup", showExpandedEvents: true}, startPoint);
+    const ns = {db: dbName, coll: "view"};
+    return allEvents.some(event => event.operationType == "drop" && friendlyEqual(event.ns, ns));
+});
 
 // Obtain a list of all events that occurred during the write workload.
 const allEvents = getAllChangeStreamEvents(

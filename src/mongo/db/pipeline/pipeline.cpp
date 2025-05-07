@@ -789,11 +789,57 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
+        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
+        // attachCursorSource().
+        AggregateCommandRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
         pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            pipeline.release(), opts.shardTargetingPolicy, std::move(opts.readConcern));
+            expCtx,
+            aggRequest,
+            pipeline.release(),
+            boost::none /* shardCursorsSortSpec */,
+            opts.shardTargetingPolicy,
+            std::move(opts.readConcern),
+            opts.useCollectionDefaultCollator);
     }
 
     return pipeline;
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
+    AggregateCommandRequest& aggRequest,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<BSONObj> shardCursorsSortSpec,
+    const MakePipelineOptions opts) {
+    tassert(7393500, "AttachCursorSource must be set to true.", opts.attachCursorSource);
+
+    boost::optional<BSONObj> readConcern;
+    // If readConcern is set on opts and aggRequest, assert they are equal.
+    if (opts.readConcern && aggRequest.getReadConcern()) {
+        tassert(7393501,
+                "Read concern on aggRequest and makePipelineOpts must match.",
+                opts.readConcern->binaryEqual(*aggRequest.getReadConcern()));
+        readConcern = aggRequest.getReadConcern();
+    } else {
+        readConcern = aggRequest.getReadConcern() ? aggRequest.getReadConcern() : opts.readConcern;
+    }
+
+    auto pipeline = Pipeline::parse(aggRequest.getPipeline(), expCtx, opts.validator);
+    if (opts.optimize) {
+        pipeline->optimizePipeline();
+    }
+
+    constexpr bool alreadyOptimized = true;
+    pipeline->validateCommon(alreadyOptimized);
+    aggRequest.setPipeline(pipeline->serializeToBson());
+
+    return expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+        expCtx,
+        aggRequest,
+        pipeline.release(),
+        shardCursorsSortSpec,
+        opts.shardTargetingPolicy,
+        std::move(readConcern),
+        opts.useCollectionDefaultCollator);
 }
 
 Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
