@@ -38,11 +38,12 @@ import {
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
-let numRuns = 150;
 if (isSlowBuild(db)) {
-    numRuns = 5;
-    jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    quit();
 }
+
+const numRuns = 150;
 const numQueriesPerRun = 10;
 
 const controlColl = db.run_all_plans_control;

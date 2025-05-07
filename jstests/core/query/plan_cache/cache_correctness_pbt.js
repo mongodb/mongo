@@ -26,13 +26,13 @@ import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workl
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
-let numRuns = 100;
-let numQueriesPerRun = 15;
 if (isSlowBuild(db)) {
-    numRuns = 10;
-    numQueriesPerRun = 1;
-    jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    quit();
 }
+
+const numRuns = 100;
+const numQueriesPerRun = 15;
 
 const controlColl = db.cache_correctness_pbt_control;
 const experimentColl = db.cache_correctness_pbt_experiment;

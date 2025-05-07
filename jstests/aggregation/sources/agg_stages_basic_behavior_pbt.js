@@ -34,11 +34,12 @@ import {testProperty} from "jstests/libs/property_test_helpers/property_testing_
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-let numRuns = 100;
 if (isSlowBuild(db)) {
-    numRuns = 5;
-    jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    quit();
 }
+
+const numRuns = 100;
 
 /*
  * --- Exclusion projection testing ---

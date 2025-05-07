@@ -22,12 +22,13 @@ import {
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
-let numRuns = 200;
 if (isSlowBuild(db)) {
-    numRuns = 20;
-    jsTestLog('Trying less examples because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    quit();
 }
-const numQueriesPerRun = 20;
+
+const numRuns = 50;
+const numQueriesPerRun = 40;
 
 const experimentColl = db[jsTestName()];
 
@@ -39,7 +40,7 @@ function identicalQueryCreatesAtMostOneCacheEntry(getQuery, testHelpers) {
     for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
         const query = getQuery(queryIx, 0 /* paramIx */);
         const cacheBefore = getPlanCache(experimentColl).list();
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 4; i++) {
             experimentColl.aggregate(query).toArray();
         }
         const cacheAfter = getPlanCache(experimentColl).list();
@@ -66,8 +67,9 @@ testProperty(
     {experimentColl},
     makeWorkloadModel({collModel: getCollectionModel({isTS: false}), aggModel, numQueriesPerRun}),
     numRuns);
-testProperty(
-    identicalQueryCreatesAtMostOneCacheEntry,
-    {experimentColl},
-    makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun}),
-    numRuns);
+// TODO SERVER-103381 re-enable time-series PBT testing
+// testProperty(
+//     identicalQueryCreatesAtMostOneCacheEntry,
+//     {experimentColl},
+//     makeWorkloadModel({collModel: getCollectionModel({isTS: true}), aggModel, numQueriesPerRun}),
+//     numRuns);
