@@ -1837,6 +1837,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams_kafka/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/streams_kafka/**/* @10gen/streams-engine @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/audit/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/audit/**/* @10gen/server-security @svc-auto-approve-bot
 
