@@ -15,3 +15,9 @@ env.CppUnitTest(
     source=[],
     LIBDEPS=[],
 )
+
+env.CppUnitTest(
+    target="rate_limiter_util_test",
+    source=[],
+    LIBDEPS=[],
+)
