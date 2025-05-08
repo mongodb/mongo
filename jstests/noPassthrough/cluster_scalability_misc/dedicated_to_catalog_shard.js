@@ -70,15 +70,6 @@ const configCS = st.configRS.getURL();
 //
 {
     //
-    // Adding the config server doesn't work as it is not empty.
-    //
-    assert.commandFailedWithCode(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}),
-                                 ErrorCodes.IllegalOperation);
-
-    // Dropping user database
-    assert.commandWorked(st.configRS.getPrimary().getDB(dbName).dropDatabase());
-
-    //
     // Adding the config server as a shard works.
     //
     assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
