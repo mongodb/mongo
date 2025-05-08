@@ -261,7 +261,7 @@ commands:
               description: "Query settings for the given query"
               type: QuerySettings
               optional: true
-              stability: unstable
+              stability: internal
             writeConcern:
                 description: "A document that expresses the write concern to use with the $out or $merge stage."
                 type: WriteConcern
