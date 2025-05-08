@@ -72,7 +72,6 @@ cc_library(
         "-g2",
         "-O3",
         "-pedantic",
-        "-std=c++17",
         "-Wcast-qual",
         "-Wdelete-non-virtual-dtor",
         "-Werror=date-time",
