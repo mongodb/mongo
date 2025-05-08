@@ -29,10 +29,7 @@
 
 #include <vector>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -41,14 +38,33 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
+#include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
 namespace mongo {
 namespace {
 
-// This provides access to getExpCtx(), but we'll use a different name for this test suite.
+/**
+ * Fixture that provides expression context.
+ */
 using DocumentSourceSetWindowFieldsTest = AggregationContextFixture;
+
+/**
+ * Fixture that also provides storage engine for spilling.
+ */
+class DocumentSourceSetWindowFieldsSpillingTest : public AggregationContextFixture {
+public:
+    DocumentSourceSetWindowFieldsSpillingTest()
+        : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+              MongoDScopedGlobalServiceContextForTest::Options{}, shouldSetupTL)) {
+        getExpCtx()->setMongoProcessInterface(
+            std::make_shared<SpillingTestMongoProcessInterface>());
+    }
+};
 
 TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseInvalidArgumentTypes) {
     auto spec = BSON("$_internalSetWindowFields" << "invalid");
@@ -326,7 +342,24 @@ TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage)
     ASSERT_EQ(std::string(pipeline.back()->getSourceName()), "$_internalSetWindowFields"_sd);
 }
 
-TEST_F(DocumentSourceSetWindowFieldsTest, FailIfCannotSpillAndExceedMemoryLimit) {
+PlanSummaryStats collectPipelineStats(
+    const std::list<boost::intrusive_ptr<DocumentSource>>& pipelineStages) {
+    PlanSummaryStats stats;
+    PlanSummaryStatsVisitor visitor{stats};
+    for (const auto& stage : pipelineStages) {
+        const auto* stageStats = stage->getSpecificStats();
+        if (stageStats != nullptr) {
+            stageStats->acceptVisitor(&visitor);
+        }
+    }
+    return stats;
+}
+
+TEST_F(DocumentSourceSetWindowFieldsSpillingTest,
+       CanSpillAndFailIfCannotSpillAndExceedMemoryLimit) {
+    RAIIServerParameterControllerForTest maxMemoryBytes(
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 3000);
+
     auto wfSpec = fromjson(R"({
             $setWindowFields: {
                 sortBy: {val: 1},
@@ -343,22 +376,99 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailIfCannotSpillAndExceedMemoryLimit)
                 }
             }
         })");
-    getExpCtx()->setAllowDiskUse(false);
-    RAIIServerParameterControllerForTest maxMemoryBytes(
-        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 50);
 
-    auto pipelineStages =
-        document_source_set_window_fields::createFromBson(wfSpec.firstElement(), getExpCtx());
     std::vector<Document> docs;
-
-    // Create 100 documents. This should overflow our 50 byte limit and fail.
     for (int i = 0; i < 100; ++i) {
         docs.push_back(DOC("val" << i));
     }
+
+    for (bool allowDiskUse : {false, true}) {
+        getExpCtx()->setAllowDiskUse(allowDiskUse);
+
+        auto pipelineStages =
+            document_source_set_window_fields::createFromBson(wfSpec.firstElement(), getExpCtx());
+        auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
+        pipelineStages.push_front(source);
+        auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
+
+        auto exhaustPipeline = [&]() {
+            while (pipeline->getNext().has_value()) {
+            }
+        };
+
+        if (allowDiskUse) {
+            exhaustPipeline();
+
+            auto planSummaryStats = collectPipelineStats(pipelineStages);
+            const auto& spillingStats =
+                planSummaryStats
+                    .spillingStatsPerStage[PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS];
+            // Exact numbers of spills and bytes might differ on different platforms.
+            ASSERT_GTE(spillingStats.getSpills(), 1);
+            ASSERT_GTE(spillingStats.getSpilledRecords(), 90);
+            ASSERT_GTE(spillingStats.getSpilledBytes(), 5000);
+        } else {
+            ASSERT_THROWS_CODE(exhaustPipeline(), DBException, 5643011);
+        }
+    }
+}
+
+TEST_F(DocumentSourceSetWindowFieldsSpillingTest, CanForceSpill) {
+    auto wfSpec = fromjson(R"({
+            $setWindowFields: {
+                sortBy: {val: 1},
+                output: {
+                    sum: {
+                        $sum: "$val",
+                        "window": {
+                            "documents": [
+                                -1000,
+                                +1000
+                            ]
+                        }
+                    }
+                }
+            }
+        })");
+
+    std::vector<Document> docs;
+    for (int i = 0; i < 100; ++i) {
+        docs.push_back(DOC("val" << i));
+    }
+
+    getExpCtx()->setAllowDiskUse(true);
+
+    auto pipelineStages =
+        document_source_set_window_fields::createFromBson(wfSpec.firstElement(), getExpCtx());
     auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
     pipelineStages.push_front(source);
     auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
-    ASSERT_THROWS_CODE(pipeline->getNext(), DBException, 5643011);
+
+    int nextDocIndex = 0;
+    auto assertNextDocument = [&](const boost::optional<Document>& doc) {
+        ASSERT_TRUE(doc.has_value());
+        ASSERT_EQ(doc->getField("val").coerceToInt(), nextDocIndex++);
+        ASSERT_EQ(doc->getField("sum").coerceToInt(), 4950);
+    };
+
+    for (int i = 0; i < 20; ++i) {
+        assertNextDocument(pipeline->getNext());
+    }
+
+    pipeline->forceSpill();
+
+    while (auto next = pipeline->getNext()) {
+        assertNextDocument(next);
+    };
+    ASSERT_EQ(nextDocIndex, docs.size());
+
+    SpillingStats spillingStats =
+        collectPipelineStats(pipelineStages)
+            .spillingStatsPerStage[PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS];
+    ASSERT_EQ(spillingStats.getSpills(), 1);
+    ASSERT_EQ(spillingStats.getSpilledRecords(), 80);
+    // Exact number of bytes might differ on different platforms.
+    ASSERT_GTE(spillingStats.getSpilledBytes(), 5000);
 }
 
 TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {

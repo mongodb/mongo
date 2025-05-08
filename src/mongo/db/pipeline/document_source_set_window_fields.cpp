@@ -378,6 +378,14 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
         out["maxTotalMemoryUsageBytes"] =
             opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
         out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
+        out["spills"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
+        out["spilledDataStorageSize"] = opts.serializeLiteral(
+            static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
+        out["numBytesSpilledEstimate"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
+        out["spilledRecords"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
     }
 
     return Value(out.freezeToValue());

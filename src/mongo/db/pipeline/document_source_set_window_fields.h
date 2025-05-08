@@ -220,6 +220,10 @@ public:
         return _outputFields;
     }
 
+    void doForceSpill() override {
+        _iterator.spillToDisk();
+    }
+
 private:
     void initialize();
 
