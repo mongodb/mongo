@@ -475,6 +475,15 @@ Each of these restrictions types are considered to be satisfied when
 the client endpoint is in a range specified by either the string `CIDR`
 range, or any **one** of the elements of a list of ranges.
 
+The client endpoint that is considered when evaluating an authentication restriction
+depends on the `clientSourceAuthenticationRestrictionMode` startup server parameter.
+That parameter accepts exactly one of two possible string values; either `origin` or `peer` (default).
+When set to `peer`, the server considers the IP address of the directly-connected peer.
+When set to `origin`, the server evaluates the authentication restrictions against the
+source IP address presented in the proxy protocol header. This allows the server to enforce
+authentication restrictions against clients that connect behind proxy protocol-compliant
+load balancers.
+
 For example, a client connecting from `172.16.30.40` to a server at
 address `192.168.70.80` will satisfy (or not) the following individual rules.
 
