@@ -98,3 +98,13 @@ server_parameters:
             expr: 7 * 24 * 3600 # 1 week
         validator:
             gte: 1
+
+    autoMergerMaxTimeProcessingChunksMS:
+        description: >-
+            Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the 
+            autoMerger will spend looking for mergeable chunks.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: autoMergerMaxTimeProcessingChunksMS
+        default: 500 # 500 milliseconds
+        redact: false

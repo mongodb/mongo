@@ -32,6 +32,7 @@
 #include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/platform/mutex.h"
@@ -265,6 +266,7 @@ public:
     BSONObj serialise() const override {
         ShardSvrMergeAllChunksOnShard req(getNameSpace(), getTarget());
         req.setMaxNumberOfChunksToMerge(AutoMergerPolicy::MAX_NUMBER_OF_CHUNKS_TO_MERGE);
+        req.setMaxTimeProcessingChunksMS(autoMergerMaxTimeProcessingChunksMS.load());
         return req.toBSON({});
     }
 };

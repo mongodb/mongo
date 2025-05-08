@@ -75,6 +75,8 @@ public:
             shardSvrMergeAllChunksOnShard.setShard(shardId);
             shardSvrMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
                 req.getMaxNumberOfChunksToMerge());
+            shardSvrMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(
+                req.getMaxTimeProcessingChunksMS());
 
             auto swCommandResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,

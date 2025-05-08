@@ -119,6 +119,11 @@ commands:
                 description: "The maximum number of chunks to merge"
                 type: int
                 default: 2147483647  # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                  "The maximum time in milliseconds spent looking for mergeable chunks."
+                type: int
+                default: 2147483647  # INT_MAX
 
     _shardsvrMergeAllChunksOnShard:
         command_name: _shardsvrMergeAllChunksOnShard
@@ -135,7 +140,12 @@ commands:
                 validator:
                     callback: "ShardId::validate"
             maxNumberOfChunksToMerge:
-                description: "The maximum number of chunks to merge"
+                description: "The maximum number of chunks to merge."
+                type: int
+                default: 2147483647  # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                  "The maximum time in milliseconds spent looking for mergeable chunks."
                 type: int
                 default: 2147483647  # INT_MAX
 
@@ -155,6 +165,11 @@ commands:
                 validator:
                     callback: "ShardId::validate"
             maxNumberOfChunksToMerge:
-                description: "The maximum number of chunks to merge"
+                description: "The maximum number of chunks to merge."
+                type: int
+                default: 2147483647  # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                  "The maximum time in milliseconds spent looking for mergeable chunks."
                 type: int
                 default: 2147483647  # INT_MAX
