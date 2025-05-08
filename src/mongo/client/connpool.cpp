@@ -481,7 +481,11 @@ Milliseconds DBConnectionPool::getPoolHostConnTime_forTest(const std::string& ho
                                                            double timeout) const {
     if (TestingProctor::instance().isEnabled()) {
         stdx::lock_guard<Latch> L(_mutex);
-        return _pools.find(PoolKey(host, timeout))->second._connTime;
+        auto it = _pools.find(PoolKey(host, timeout));
+        iassert(9047201,
+                "Couldn't find a connection that matches the provided host and timeout pair!",
+                it != _pools.end());
+        return it->second._connTime;
     }
     return Milliseconds();
 }
