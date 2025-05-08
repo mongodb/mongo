@@ -243,6 +243,15 @@ structs:
                 type: resumeToken
                 optional: false
 
+    DocumentSourceChangeStreamInjectControlEventsSpec:
+        strict: true
+        description:
+            A document used to specify the $_internalChangeStreamInjectControlEvents stage of
+            an aggregation pipeline.
+        fields:
+            actions:
+                type: object_owned
+
     DocumentSourceChangeStreamAddPreImageSpec:
         strict: true
         description:

@@ -36,6 +36,7 @@
 #include <cstring>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
+#include <deque>
 #include <initializer_list>
 #include <iterator>
 #include <memory>
@@ -43,7 +44,6 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -71,6 +71,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
@@ -104,7 +105,6 @@ using namespace change_stream_test_helper;
 using boost::intrusive_ptr;
 using repl::OplogEntry;
 using repl::OpTypeEnum;
-using std::list;
 using std::string;
 using std::vector;
 
@@ -134,7 +134,7 @@ class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
     explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(nsString) {
+        : AggregationContextFixture(std::move(nsString)) {
         getExpCtx()->setMongoProcessInterface(
             std::make_unique<ExecutableStubMongoProcessInterface>());
     };
@@ -233,7 +233,7 @@ public:
     ChangeStreamStageTest() : ChangeStreamStageTest(nss) {
         // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
         getExpCtx()->setUUID(testUuid());
-    };
+    }
 
     explicit ChangeStreamStageTest(NamespaceString nsString)
         : ChangeStreamStageTestNoSetup(nsString) {
@@ -2672,6 +2672,231 @@ void validateDocumentSourceStageSerialization(
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
                       BSON(Stage::kStageName << spec.toBSON()));
+}
+
+std::pair<DocumentSourceChangeStreamInjectControlEventsSpec, BSONObj>
+buildControlEventsSpecFromBSON(const BSONObj& actions) {
+    DocumentSourceChangeStreamInjectControlEventsSpec spec;
+    spec.setActions(actions);
+    return std::make_pair(spec, BSON("" << spec.toBSON()));
+}
+
+TEST_F(ChangeStreamStageTest, DSCSInjectControlEventsStageSerialization) {
+    // No actions specified.
+    {
+        auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSONObj());
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx());
+    }
+
+    // Test some valid actions.
+    {
+        auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(
+            BSON("event1" << "transformToControlEvent" << "event2" << "injectControlEvent"));
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx());
+    }
+
+    // Test serializing for explain.
+    {
+        auto actions =
+            BSON("event1" << "transformToControlEvent" << "event2" << "injectControlEvent");
+        auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(actions);
+        auto stage = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+            stageSpecAsBSON.firstElement(), getExpCtx());
+        std::vector<Value> serialization;
+        SerializationOptions options;
+        options.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+        stage->serializeToArray(serialization, options);
+
+        ASSERT_EQ(serialization.size(), 1UL);
+        ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+
+        ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
+                          BSON("$changeStream"
+                               << BSON("stage"
+                                       << DocumentSourceChangeStreamInjectControlEvents::kStageName
+                                       << "actions" << actions)));
+    }
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DSCSInjectControlEventsStageSerializationInvalidInputType,
+                   "Tripwire assertion.*10384001") {
+    // Test invalid top-level BSON type.
+    auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSON_ARRAY(1));
+    ASSERT_THROWS_CODE(
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx()),
+        AssertionException,
+        10384001);
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DSCSInjectControlEventsStageSerializationInvalidActionInputs,
+                   "Tripwire assertion.*10384001") {
+    // Test invalid actions types.
+    {
+        for (const BSONObj& value : {BSON("" << 1234), BSON("" << true), BSONObj()}) {
+            auto [spec, stageSpecAsBSON] =
+                buildControlEventsSpecFromBSON(BSON("event" << value.firstElement()));
+            ASSERT_THROWS_CODE(validateDocumentSourceStageSerialization<
+                                   DocumentSourceChangeStreamInjectControlEvents>(
+                                   std::move(spec), stageSpecAsBSON, getExpCtx()),
+                               AssertionException,
+                               10384001);
+        }
+    }
+
+    // Test invalid actions values.
+    {
+        for (StringData value : {"", " ", "foo", "dum dee dum", "INJECTCONTROLEVENT"}) {
+            auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(BSON("event" << value));
+            ASSERT_THROWS_CODE(validateDocumentSourceStageSerialization<
+                                   DocumentSourceChangeStreamInjectControlEvents>(
+                                   std::move(spec), stageSpecAsBSON, getExpCtx()),
+                               AssertionException,
+                               10384001);
+        }
+    }
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DSCSInjectControlEventsStageSerializationDuplicateEvents,
+                   "Tripwire assertion.*10384002") {
+    // Test duplicate events in spec.
+    auto [spec, stageSpecAsBSON] = buildControlEventsSpecFromBSON(
+        BSON("event1" << "injectControlEvent" << "event1" << "transformToControlEvent"));
+    ASSERT_THROWS_CODE(
+        validateDocumentSourceStageSerialization<DocumentSourceChangeStreamInjectControlEvents>(
+            std::move(spec), stageSpecAsBSON, getExpCtx()),
+        AssertionException,
+        10384002);
+}
+
+TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrectly) {
+    auto expCtx = getExpCtx();
+
+    const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
+    const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
+
+    // Test the control events stage with different configurations.
+    for (const BSONObj& config : {
+             BSONObj(),
+             BSON("eventType1" << "injectControlEvent" << "eventType2"
+                               << "transformToControlEvent"),
+         }) {
+        auto [_, stageSpecAsBSON] = buildControlEventsSpecFromBSON(config);
+
+        auto injectControlEvents = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+            stageSpecAsBSON.firstElement(), expCtx);
+
+        std::deque<DocumentSource::GetNextResult> inputDocs = {
+            DocumentSource::GetNextResult::makePauseExecution(),
+            Document::fromBsonWithMetaData(doc1),
+            DocumentSource::GetNextResult::makePauseExecution(),
+            Document::fromBsonWithMetaData(doc2),
+            DocumentSource::GetNextResult::makeEOF(),
+        };
+
+        auto source = DocumentSourceMock::createForTest(inputDocs, expCtx);
+        injectControlEvents->setSource(source.get());
+
+        auto next = injectControlEvents->getNext();
+        ASSERT_TRUE(next.isPaused());
+
+        next = injectControlEvents->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
+
+        next = injectControlEvents->getNext();
+        ASSERT_TRUE(next.isPaused());
+
+        next = injectControlEvents->getNext();
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
+
+        next = injectControlEvents->getNext();
+        ASSERT_TRUE(next.isEOF());
+    }
+}
+
+TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly) {
+    auto expCtx = getExpCtx();
+
+    auto [_, stageSpecAsBSON] = buildControlEventsSpecFromBSON(
+        BSON("eventType1" << "injectControlEvent" << "eventType2" << "transformToControlEvent"));
+
+    auto injectControlEvents = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
+        stageSpecAsBSON.firstElement(), expCtx);
+
+    BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
+    BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
+    BSONObj doc3 = BSON("operationType" << "test3" << "baz" << "qux");
+    BSONObj ctrl1 = BSON("operationType" << "eventType1" << "value" << 1234);
+    BSONObj ctrl2 = BSON("operationType" << "eventType2" << "value" << "test");
+    BSONObj ctrl3 = BSON("operationType" << "eventType1" << "value" << BSONObj());
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document::fromBsonWithMetaData(doc1),
+        Document::fromBsonWithMetaData(ctrl1),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document::fromBsonWithMetaData(doc2),
+        Document::fromBsonWithMetaData(ctrl2),
+        Document::fromBsonWithMetaData(doc3),
+        Document::fromBsonWithMetaData(ctrl3),
+        DocumentSource::GetNextResult::makeEOF(),
+    };
+
+    auto source = DocumentSourceMock::createForTest(inputDocs, expCtx);
+    injectControlEvents->setSource(source.get());
+
+    auto next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isPaused());
+
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc1), next.getDocument());
+
+    // This document leads to injecting a follow-up control event.
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl1), next.getDocument());
+
+    // The injected control event.
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl1), next.getDocument());
+
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isPaused());
+
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc2), next.getDocument());
+
+    // This document gets transformed into a control event.
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl2), next.getDocument());
+
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(doc3), next.getDocument());
+
+    // This document leads to injecting a follow-up control event.
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl3), next.getDocument());
+
+    // The injected control event.
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isAdvancedControlDocument());
+    ASSERT_DOCUMENT_EQ(Document::fromBsonWithMetaData(ctrl3), next.getDocument());
+
+    next = injectControlEvents->getNext();
+    ASSERT_TRUE(next.isEOF());
 }
 
 TEST_F(ChangeStreamStageTest, DSCSOplogMatchStageSerialization) {

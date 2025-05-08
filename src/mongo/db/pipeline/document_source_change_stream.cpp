@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"

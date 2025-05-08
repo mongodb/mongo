@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_inject_control_events.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
@@ -138,6 +139,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceChangeStreamCheckResumability,
                        DocumentSourceChangeStreamCheckTopologyChange,
                        DocumentSourceChangeStreamHandleTopologyChange,
+                       DocumentSourceChangeStreamInjectControlEvents,
                        DocumentSourceChangeStreamTransform,
                        DocumentSourceChangeStreamUnwindTransaction,
                        DocumentSourceCollStats,

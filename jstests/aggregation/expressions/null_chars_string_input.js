@@ -362,6 +362,7 @@ const skips = new Set([
     "$_internalChangeStreamCheckResumability",
     "$_internalChangeStreamCheckTopologyChange",
     "$_internalChangeStreamHandleTopologyChange",
+    "$_internalChangeStreamInjectControlEvents",
     "$_internalChangeStreamOplogMatch",
     "$_internalChangeStreamTransform",
     "$_internalChangeStreamUnwindTransaction",

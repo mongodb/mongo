@@ -7495,6 +7495,25 @@ export const authCommandsLib = {
             ]
         },
         {
+          testname: "aggregate_$_internalChangeStreamInjectControlEvents",
+          command: {
+              aggregate: 1,
+              pipeline: [{$_internalChangeStreamInjectControlEvents: {}}],
+              cursor: {}
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: ""}, actions: ["find"]},
+                    {resource: {cluster: true}, actions: ["internal"]}
+                ],
+                expectFail: true,
+              },
+            ]
+        },
+        {
           testname: "aggregate_$_internalChangeStreamCheckTopologyChange",
           command: {
               aggregate: 1,
