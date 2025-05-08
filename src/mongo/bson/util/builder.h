@@ -818,7 +818,8 @@ public:
         const int prev = _buf.len();
         const int maxSize = 32;
         char* start = _buf.grow(maxSize);
-        int z = snprintf(start, maxSize, "%.16g", x);
+        int z = std::isnan(x) ? "nan\0"_sd.copy(start, maxSize) - 1
+                              : snprintf(start, maxSize, "%.16g", x);
         MONGO_verify(z >= 0);
         MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
