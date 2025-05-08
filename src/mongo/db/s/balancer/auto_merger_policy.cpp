@@ -63,6 +63,7 @@ void AutoMergerPolicy::disable() {
 }
 
 bool AutoMergerPolicy::isEnabled() {
+    stdx::lock_guard<Latch> lk(_mutex);
     return _enabled;
 }
 

@@ -779,7 +779,7 @@ void Balancer::_mainThread() {
                 continue;
             }
 
-            if (!_autoMergerPolicy->isEnabled() && balancerConfig->shouldBalanceForAutoMerge()) {
+            if (balancerConfig->shouldBalanceForAutoMerge()) {
                 _autoMergerPolicy->enable();
             }
 
