@@ -88,6 +88,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(hangShardRoleAfterEstablishCappedSnapshot);
+
 using TransactionResources = shard_role_details::TransactionResources;
 
 namespace {
@@ -1126,6 +1128,7 @@ void SnapshotAttempt::openStorageSnapshot() {
     for (auto& nssOrUUID : _acquisitionRequests) {
         establishCappedSnapshotIfNeeded(_opCtx, *_catalogBeforeSnapshot, nssOrUUID);
     }
+    hangShardRoleAfterEstablishCappedSnapshot.pauseWhileSet(_opCtx);
 
     if (!shard_role_details::getRecoveryUnit(_opCtx)->isActive()) {
         shard_role_details::getRecoveryUnit(_opCtx)->preallocateSnapshot();

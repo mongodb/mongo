@@ -65,7 +65,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -770,12 +769,18 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                   "Scanning collection to fix collection count",
                   logAttrs(nss),
                   "uuid"_attr = uuid.toString());
-            AutoGetCollectionForRead collToScan(opCtx, nss);
-            invariant(coll == collToScan.getCollection().get(),
+            const auto collToScan =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(nss,
+                                                               PlacementConcern::kPretendUnsharded,
+                                                               repl::ReadConcernArgs::get(opCtx),
+                                                               AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            invariant(coll == collToScan.getCollectionPtr().get(),
                       str::stream() << "Catalog returned invalid collection: "
                                     << nss.toStringForErrorMsg() << " (" << uuid.toString() << ")");
             auto exec = getCollectionScanExecutor(opCtx,
-                                                  collToScan.getCollection(),
+                                                  collToScan.getCollectionPtr(),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                   CollectionScanDirection::kForward);
             long long countFromScan = 0;

@@ -43,6 +43,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
@@ -86,10 +87,16 @@ void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(Operati
     LOGV2_INFO(6608200, "Initializing cluster server parameters from disk");
 
     auto initializeTenantParameters = [opCtx](const boost::optional<TenantId>& tenantId) {
-        AutoGetCollectionForRead coll{opCtx, NamespaceString::makeClusterParametersNSS(tenantId)};
-        if (coll.getCollection()) {
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::makeClusterParametersNSS(tenantId),
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        if (coll.exists()) {
             cluster_parameters::initializeAllTenantParametersFromCollection(
-                opCtx, *coll.getCollection().get());
+                opCtx, *coll.getCollectionPtr().get());
         }
     };
 

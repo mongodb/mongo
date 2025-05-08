@@ -55,7 +55,6 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -112,13 +111,22 @@ void CollectionTest::makeTimeseries(NamespaceString nss) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 }
 
+CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
 TEST_F(CollectionTest, CappedNotifierKillAndIsDead) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
     ASSERT_FALSE(notifier->isDead());
     notifier->kill();
     ASSERT(notifier->isDead());
@@ -128,9 +136,8 @@ TEST_F(CollectionTest, CappedNotifierTimeouts) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
     ASSERT_EQ(notifier->getVersion(), 0u);
 
     auto before = Date_t::now();
@@ -144,9 +151,8 @@ TEST_F(CollectionTest, CappedNotifierWaitAfterNotifyIsImmediate) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
 
     auto prevVersion = notifier->getVersion();
     notifier->notifyAll();
@@ -163,9 +169,8 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
     auto prevVersion = notifier->getVersion();
     auto thisVersion = prevVersion + 1;
 
@@ -189,9 +194,8 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
 TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
     auto prevVersion = notifier->getVersion();
 
     auto before = Date_t::now();
@@ -215,9 +219,8 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilInterrupt) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
     auto prevVersion = notifier->getVersion();
 
     auto& clientToInterrupt = cc();
@@ -248,27 +251,27 @@ TEST_F(CollectionTest, HaveCappedWaiters) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    ASSERT(!col->getRecordStore()->capped()->hasWaiters());
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    const auto& recordStore = coll.getCollectionPtr()->getRecordStore();
+    ASSERT(!recordStore->capped()->hasWaiters());
     {
-        auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
-        ASSERT(col->getRecordStore()->capped()->hasWaiters());
+        auto notifier = recordStore->capped()->getInsertNotifier();
+        ASSERT(recordStore->capped()->hasWaiters());
     }
-    ASSERT(!col->getRecordStore()->capped()->hasWaiters());
+    ASSERT(!recordStore->capped()->hasWaiters());
 }
 
 TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    col->getRecordStore()->capped()->notifyWaitersIfNeeded();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    const auto& recordStore = coll.getCollectionPtr()->getRecordStore();
+    recordStore->capped()->notifyWaitersIfNeeded();
     {
-        auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+        auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
         ASSERT_EQ(notifier->getVersion(), 0u);
-        col->getRecordStore()->capped()->notifyWaitersIfNeeded();
+        recordStore->capped()->notifyWaitersIfNeeded();
         ASSERT_EQ(notifier->getVersion(), 1u);
     }
 }
@@ -277,9 +280,8 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     makeCapped(nss);
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getRecordStore()->capped()->getInsertNotifier();
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    auto notifier = coll.getCollectionPtr()->getRecordStore()->capped()->getInsertNotifier();
     auto prevVersion = notifier->getVersion();
     auto thisVersion = prevVersion + 1;
 
@@ -775,9 +777,8 @@ TEST_F(CatalogTestFixture, IsNotCapped) {
     CollectionOptions options;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollectionForRead acfr(operationContext(), nss);
-    const CollectionPtr& coll = acfr.getCollection();
-    ASSERT(!coll->isCapped());
+    const auto coll = acquireCollForRead(operationContext(), nss);
+    ASSERT(!coll.getCollectionPtr()->isCapped());
 }
 
 TEST_F(CatalogTestFixture, CappedDeleteRecord) {

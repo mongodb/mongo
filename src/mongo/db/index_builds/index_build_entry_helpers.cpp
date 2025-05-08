@@ -53,7 +53,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_build_entry_gen.h"
@@ -69,7 +68,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -354,14 +352,20 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     }};
     opCtx->setEnforceConstraints(false);
 
-    AutoGetCollectionForRead collection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
+    const auto indexBuildsCollection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kIndexBuildEntryNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
 
     // Must not be interruptible. This fail point is used to test the scenario where the index
     // build's OperationContext is interrupted by an abort, which will subsequently remove index
     // build entry from the config db collection.
     hangBeforeGettingIndexBuildEntry.pauseWhileSet(Interruptible::notInterruptible());
 
-    if (!collection) {
+    if (!indexBuildsCollection.exists()) {
         str::stream ss;
         ss << "Collection not found: " << redactTenant(NamespaceString::kIndexBuildEntryNamespace);
         return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -372,8 +376,10 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // exceptions and we must protect it from unanticipated write conflicts from reads.
     bool foundObj = writeConflictRetry(
         opCtx, "getIndexBuildEntry", NamespaceString::kIndexBuildEntryNamespace, [&]() {
-            return Helpers::findOne(
-                opCtx, collection.getCollection(), BSON("_id" << indexBuildUUID), obj);
+            return Helpers::findOne(opCtx,
+                                    indexBuildsCollection.getCollectionPtr(),
+                                    BSON("_id" << indexBuildUUID),
+                                    obj);
         });
 
     if (!foundObj) {

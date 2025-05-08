@@ -89,10 +89,17 @@ public:
         remove(kTenantId);
         auto opCtx = cc().makeOperationContext();
         auto resynchronize = [opCtx = opCtx.get()](const boost::optional<TenantId>& tenantId) {
-            AutoGetCollectionForRead coll{opCtx,
-                                          NamespaceString::makeClusterParametersNSS(tenantId)};
+            const auto coll =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::makeClusterParametersNSS(tenantId),
+                                      PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+
             cluster_parameters::resynchronizeAllTenantParametersFromCollection(
-                opCtx, *coll.getCollection().get());
+                opCtx, *coll.getCollectionPtr().get());
         };
         resynchronize(boost::none);
         resynchronize(kTenantId);

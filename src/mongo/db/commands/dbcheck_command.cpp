@@ -68,7 +68,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_access_method.h"
@@ -343,17 +342,19 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 
     boost::optional<UUID> uuid;
     try {
-        AutoGetCollectionForRead agc(opCtx, nss);
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+
         uassert(ErrorCodes::NamespaceNotFound,
                 "Collection " + invocation.getColl() + " not found",
-                agc.getCollection());
-        uuid = agc->uuid();
-    } catch (const DBException& ex) {
-        // 'AutoGetCollectionForRead' fails with 'CommandNotSupportedOnView' if the namespace is
+                coll.exists());
+        uuid = coll.uuid();
+    } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>& ex) {
+        // Collection acquisition fails with 'CommandNotSupportedOnView' if the namespace is
         // referring to a view.
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                invocation.getColl() + " is a view hence 'dbcheck' is not supported.",
-                ex.code() != ErrorCodes::CommandNotSupportedOnView);
+        ex.addContext(invocation.getColl() + " is a view hence 'dbcheck' is not supported.");
         throw;
     }
 
@@ -2031,8 +2032,8 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
                                                  // updates to guarantee snapshot isolation.
                                                  PrepareConflictBehavior::kEnforce);
     } catch (const DBException& ex) {
-        // 'AutoGetCollectionForRead' fails with 'CommandNotSupportedOnView' if the namespace is
-        // referring to a view.
+        // 'DbCheckAcquisition' fails with 'CommandNotSupportedOnView' if the namespace is referring
+        // to a view.
         return ex.toStatus();
     }
 

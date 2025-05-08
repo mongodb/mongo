@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction_resources.h"
@@ -194,11 +194,17 @@ void ClusterServerParameterOpObserver::onReplicationRollback(OperationContext* o
             continue;
         }
 
-        AutoGetCollectionForRead coll{opCtx,
-                                      NamespaceString::makeClusterParametersNSS(nss.tenantId())};
-        if (coll.getCollection()) {
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(NamespaceString::makeClusterParametersNSS(nss.tenantId()),
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+
+        if (coll.exists()) {
             cluster_parameters::resynchronizeAllTenantParametersFromCollection(
-                opCtx, *coll.getCollection().get());
+                opCtx, *coll.getCollectionPtr().get());
         } else {
             cluster_parameters::clearAllTenantParameters(opCtx, nss.tenantId());
         }

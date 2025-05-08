@@ -44,7 +44,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/capped_utils.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
@@ -111,17 +110,31 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
  * Returns true if collection exists.
  */
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    return coll.exists();
 }
 
 /**
  * Returns collection options.
  */
 CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss.toStringForErrorMsg()
-                            << " because collection does not exist.";
-    return collection->getCollectionOptions();
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    ASSERT_TRUE(coll.exists()) << "Unable to get collections options for "
+                               << nss.toStringForErrorMsg()
+                               << " because collection does not exist.";
+    return coll.getCollectionPtr()->getCollectionOptions();
 }
 
 // Size of capped collection to be passed to convertToCapped() which accepts a double.

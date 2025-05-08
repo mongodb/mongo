@@ -45,8 +45,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -310,7 +308,7 @@ public:
     StatusWith<BSONObj> next();
 
 private:
-    AutoGetCollectionForRead _collToScan;
+    CollectionAcquisition _collToScan;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 

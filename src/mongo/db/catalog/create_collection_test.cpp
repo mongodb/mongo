@@ -56,7 +56,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -160,21 +159,32 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
     });
 }
 
+CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
 /**
  * Returns true if collection exists.
  */
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    return acquireCollForRead(opCtx, nss).exists();
 }
 
 /**
  * Returns collection options.
  */
 CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss.toStringForErrorMsg()
-                            << " because collection does not exist.";
-    return collection->getCollectionOptions();
+    const auto collection = acquireCollForRead(opCtx, nss);
+    ASSERT_TRUE(collection.exists())
+        << "Unable to get collections options for " << nss.toStringForErrorMsg()
+        << " because collection does not exist.";
+    return collection.getCollectionPtr()->getCollectionOptions();
 }
 
 /**
@@ -182,8 +192,8 @@ CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceS
  */
 const VirtualCollectionImpl* getVirtualCollection(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
-    AutoGetCollectionForRead collection(opCtx, nss);
-    return dynamic_cast<const VirtualCollectionImpl*>(collection.getCollection().get());
+    const auto collection = acquireCollForRead(opCtx, nss);
+    return dynamic_cast<const VirtualCollectionImpl*>(collection.getCollectionPtr().get());
 }
 
 /**
@@ -376,8 +386,8 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagNotSetIfFea
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
-    AutoGetCollectionForRead collForRead(opCtx.get(), bucketsColl);
-    ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
+    const auto collForRead = acquireCollForRead(opCtx.get(), bucketsColl);
+    ASSERT_FALSE(collForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest,
@@ -390,8 +400,8 @@ TEST_F(CreateCollectionTest,
     uassertStatusOK(createCollection(opCtx.get(), CreateCommand(curNss)));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), curNss));
-    AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
-    ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
+    const auto collForRead = acquireCollForRead(opCtx.get(), curNss);
+    ASSERT_FALSE(collForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
@@ -409,9 +419,9 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
-    AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
+    const auto bucketsCollForRead = acquireCollForRead(opCtx.get(), bucketsColl);
     // TODO(SERVER-101611): Set *timeseriesBucketingParametersHaveChanged to false on create
-    ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_FALSE(bucketsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
@@ -424,8 +434,8 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
     uassertStatusOK(createCollection(opCtx.get(), CreateCommand(curNss)));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), curNss));
-    AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
-    ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
+    const auto collForRead = acquireCollForRead(opCtx.get(), curNss);
+    ASSERT_FALSE(collForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
 
@@ -451,19 +461,28 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
         NamespaceString::createNamespaceString_forTest("myDb", "system.resharding.yay");
     auto opCtx = makeOpCtx();
 
-    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
-    BSONObj createCmdObj = BSON("create" << reshardingNss.coll() << "validator" << BSON("a" << 5));
-    ASSERT_OK(createCollection(opCtx.get(), reshardingNss.dbName(), createCmdObj));
-    ASSERT_TRUE(collectionExists(opCtx.get(), reshardingNss));
+    {
+        Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+        BSONObj createCmdObj =
+            BSON("create" << reshardingNss.coll() << "validator" << BSON("a" << 5));
+        ASSERT_OK(createCollection(opCtx.get(), reshardingNss.dbName(), createCmdObj));
+        ASSERT_TRUE(collectionExists(opCtx.get(), reshardingNss));
+    }
 
-    AutoGetCollection collection(opCtx.get(), reshardingNss, MODE_X);
+    const auto collection = acquireCollection(
+        opCtx.get(),
+        CollectionAcquisitionRequest(reshardingNss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx.get()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     WriteUnitOfWork wuow(opCtx.get());
     // Ensure a document that violates validator criteria can be inserted into the temporary
     // resharding collection.
     auto insertObj = fromjson("{'_id':2, a:1}");
     auto status = collection_internal::insertDocument(
-        opCtx.get(), *collection, InsertStatement(insertObj), nullptr, false);
+        opCtx.get(), collection.getCollectionPtr(), InsertStatement(insertObj), nullptr, false);
     ASSERT_OK(status);
 }
 

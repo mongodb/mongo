@@ -442,9 +442,15 @@ void checkTxnTable(OperationContext* opCtx,
 }
 
 CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceString& nss)
-    : _collToScan(opCtx, nss),
+    : _collToScan(
+          acquireCollection(opCtx,
+                            CollectionAcquisitionRequest(nss,
+                                                         PlacementConcern::kPretendUnsharded,
+                                                         repl::ReadConcernArgs::get(opCtx),
+                                                         AcquisitionPrerequisites::kRead),
+                            MODE_IS)),
       _exec(InternalPlanner::collectionScan(opCtx,
-                                            &_collToScan.getCollection(),
+                                            _collToScan,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             InternalPlanner::FORWARD)) {}
 
@@ -455,7 +461,7 @@ StatusWith<BSONObj> CollectionReader::next() {
     if (state == PlanExecutor::IS_EOF) {
         return {ErrorCodes::CollectionIsEmpty,
                 str::stream() << "no more documents in "
-                              << _collToScan.getNss().toStringForErrorMsg()};
+                              << _collToScan.nss().toStringForErrorMsg()};
     }
 
     // PlanExecutors that do not yield should only return ADVANCED or EOF.
@@ -566,7 +572,11 @@ void createDatabase(OperationContext* opCtx, StringData dbName) {
 }
 
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    return coll.exists();
 }
 
 void createIndex(OperationContext* opCtx,

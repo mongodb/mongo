@@ -73,7 +73,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
@@ -270,9 +269,6 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
         auto originalReadConcern =
             std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
         ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
-
-        AutoGetCollectionForRead autoRead(opCtx,
-                                          NamespaceString::kSessionTransactionsTableNamespace);
 
         BSONObjBuilder bob;
         bob.append("_id", lsid.toBSON());
@@ -659,17 +655,21 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
                 ->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, stableTimestamp);
         }
 
-        const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         const auto deadline = Date_t::now() + Milliseconds(100);
 
-        const AutoGetCollectionForReadLockFree collectionAcquisition(
-            opCtx.get(), nss, AutoGetCollection::Options{}.deadline(deadline));
+        auto collectionAcquisition = acquireCollectionMaybeLockFree(
+            opCtx.get(),
+            CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                         repl::ReadConcernArgs::get(opCtx.get()),
+                                         AcquisitionPrerequisites::kRead,
+                                         deadline));
 
-        if (!collectionAcquisition.getCollection()) {
+        if (!collectionAcquisition.exists()) {
             return boost::none;
         }
         auto exec = InternalPlanner::collectionScan(opCtx.get(),
-                                                    &collectionAcquisition.getCollection(),
+                                                    &collectionAcquisition.getCollectionPtr(),
                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                     InternalPlanner::Direction::FORWARD);
 

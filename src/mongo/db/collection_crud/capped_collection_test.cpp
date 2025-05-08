@@ -48,7 +48,6 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -163,6 +162,27 @@ Status _insertOplogBSON(OperationContext* opCtx, const CollectionPtr& coll, Reco
     return collection_internal::insertDocument(opCtx, coll, InsertStatement(obj, id), nullptr);
 }
 
+CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
+CollectionAcquisition acquireCollForReadLockFree(OperationContext* opCtx,
+                                                 const NamespaceString& nss) {
+    return acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead));
+}
+
+
 TEST_F(CappedCollectionTest, InsertOutOfOrder) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.non.oplog");
     makeCapped(nss);
@@ -176,9 +196,8 @@ TEST_F(CappedCollectionTest, InsertOutOfOrder) {
 
     {
         auto opCtx = newOperationContext();
-        AutoGetCollectionForRead acfr(opCtx.get(), nss);
-        const CollectionPtr& coll = acfr.getCollection();
-        auto cursor = coll->getCursor(opCtx.get());
+        const auto coll = acquireCollForRead(opCtx.get(), nss);
+        auto cursor = coll.getCollectionPtr()->getCursor(opCtx.get());
         ASSERT_EQ(cursor->next()->id, RecordId(1));
         ASSERT_EQ(cursor->next()->id, RecordId(2));
         ASSERT_EQ(cursor->next()->id, RecordId(3));
@@ -199,9 +218,8 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-        AutoGetCollectionForRead ac(opCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
-        auto cursor = coll->getCursor(opCtx.get());
+        const auto ac = acquireCollForRead(opCtx.get(), nss);
+        auto cursor = ac.getCollectionPtr()->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT(record);
         ASSERT_EQ(id1, record->id);
@@ -210,9 +228,8 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-        AutoGetCollectionForRead ac(opCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
-        auto cursor = coll->getCursor(opCtx.get());
+        const auto ac = acquireCollForRead(opCtx.get(), nss);
+        auto cursor = ac.getCollectionPtr()->getCursor(opCtx.get());
         auto record = cursor->seek(RecordId(id1.getLong() + 1),
                                    SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT_FALSE(record);
@@ -222,12 +239,13 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         // now we insert 2 docs, but commit the 2nd one first.
         // we make sure we can't find the 2nd until the first is committed.
         auto [earlyClient, earlyCtx] = makeClientAndCtx("earlyReader");
-        AutoGetCollectionForRead ac(earlyCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
+        const auto ac = acquireCollForRead(earlyCtx.get(), nss);
+        const CollectionPtr& coll = ac.getCollectionPtr();
 
         auto earlyCursor = coll->getCursor(earlyCtx.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
-        coll.yield();
+        auto yieldedShardRoleResources =
+            yieldTransactionResourcesFromOperationContext(earlyCtx.get());
         earlyCursor->save();
         shard_role_details::getRecoveryUnit(earlyCtx.get())->abandonSnapshot();
 
@@ -250,15 +268,16 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         }
 
         {  // Other operations should not be able to see 2nd doc until w1 commits.
-            coll.restore();
+            restoreTransactionResourcesToOperationContext(earlyCtx.get(),
+                                                          std::move(yieldedShardRoleResources));
             earlyCursor->restore();
             ASSERT(!earlyCursor->next());
         }
 
         {
             auto [c2, t2] = makeClientAndCtx("t2");
-            AutoGetCollectionForRead ac2(t2.get(), nss);
-            auto cursor = ac2.getCollection()->getCursor(t2.get());
+            const auto ac2 = acquireCollForRead(t2.get(), nss);
+            auto cursor = ac2.getCollectionPtr()->getCursor(t2.get());
             auto record = cursor->seekExact(id1);
             ASSERT(record);
             ASSERT_EQ(id1, record->id);
@@ -267,7 +286,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
         {
             auto [c2, t2] = makeClientAndCtx("t2");
-            AutoGetCollectionForRead ac2(t2.get(), nss);
+            const auto ac2 = acquireCollForRead(t2.get(), nss);
             auto cursor = coll->getCursor(t2.get());
             auto record = cursor->seek(id2, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
@@ -275,7 +294,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
         {
             auto [c2, t2] = makeClientAndCtx("t2");
-            AutoGetCollectionForRead ac2(t2.get(), nss);
+            const auto ac2 = acquireCollForRead(t2.get(), nss);
             auto cursor = coll->getCursor(t2.get());
             auto record = cursor->seek(id3, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
@@ -286,8 +305,8 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
     {  // now all 3 docs should be visible
         auto opCtx = newOperationContext();
-        AutoGetCollectionForRead ac(opCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
+        const auto ac = acquireCollForRead(opCtx.get(), nss);
+        const CollectionPtr& coll = ac.getCollectionPtr();
         auto cursor = coll->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id);
@@ -300,8 +319,8 @@ TEST_F(CappedCollectionTest, OplogOrder) {
     // the visibility rules aren't violated.
     {
         auto opCtx = newOperationContext();
-        AutoGetCollectionForRead ac(opCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
+        const auto ac = acquireCollForRead(opCtx.get(), nss);
+        const CollectionPtr& coll = ac.getCollectionPtr();
         coll->getRecordStore()->capped()->truncateAfter(
             opCtx.get(), id1, /*inclusive*/ false, [](auto _1, auto _2, auto _3) {});
     }
@@ -310,11 +329,12 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         // Now we insert 2 docs with timestamps earlier than before, but commit the 2nd one first.
         // We make sure we can't find the 2nd until the first is committed.
         auto [earlyClient, earlyCtx] = makeClientAndCtx("earlyReader");
-        AutoGetCollectionForRead ac(earlyCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
+        const auto ac = acquireCollForRead(earlyCtx.get(), nss);
+        const CollectionPtr& coll = ac.getCollectionPtr();
         auto earlyCursor = coll->getCursor(earlyCtx.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
-        coll.yield();
+        auto yieldedShardRoleResources =
+            yieldTransactionResourcesFromOperationContext(earlyCtx.get());
         earlyCursor->save();
         shard_role_details::getRecoveryUnit(earlyCtx.get())->abandonSnapshot();
 
@@ -338,12 +358,13 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         }
 
         // Other operations should not be able to see 2nd doc until w1 commits.
-        coll.restore();
+        restoreTransactionResourcesToOperationContext(earlyCtx.get(),
+                                                      std::move(yieldedShardRoleResources));
         ASSERT(earlyCursor->restore());
         ASSERT(!earlyCursor->next());
         {
             auto [c2, t2] = makeClientAndCtx("t2");
-            AutoGetCollectionForRead ac2(t2.get(), nss);
+            const auto ac2 = acquireCollForRead(t2.get(), nss);
             auto cursor = coll->getCursor(t2.get());
             auto record = cursor->seekExact(id1);
             ASSERT(record);
@@ -353,7 +374,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
         {
             auto [c2, t2] = makeClientAndCtx("t2");
-            AutoGetCollectionForRead ac2(t2.get(), nss);
+            const auto ac2 = acquireCollForRead(t2.get(), nss);
             auto cursor = coll->getCursor(t2.get());
             auto record = cursor->seek(id2, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
@@ -361,7 +382,7 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
         {
             auto [c2, t2] = makeClientAndCtx("t2");
-            AutoGetCollectionForRead ac2(t2.get(), nss);
+            const auto ac2 = acquireCollForRead(t2.get(), nss);
             auto cursor = coll->getCursor(t2.get());
             auto record = cursor->seek(id3, SeekableRecordCursor::BoundInclusion::kInclude);
             ASSERT_FALSE(record);
@@ -372,8 +393,8 @@ TEST_F(CappedCollectionTest, OplogOrder) {
 
     {  // now all 3 docs should be visible
         ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-        AutoGetCollectionForRead ac(opCtx.get(), nss);
-        const CollectionPtr& coll = ac.getCollection();
+        const auto ac = acquireCollForRead(opCtx.get(), nss);
+        const CollectionPtr& coll = ac.getCollectionPtr();
         auto cursor = coll->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id);
@@ -410,13 +431,13 @@ TEST_F(CappedCollectionTest, VisibilityAfterRestart) {
 
     const auto uncommittedId = RecordId(5);
 
-    auto fp = globalFailPointRegistry().find("hangAfterEstablishCappedSnapshot");
+    auto fp = globalFailPointRegistry().find("hangShardRoleAfterEstablishCappedSnapshot");
     fp->setMode(FailPoint::alwaysOn);
     stdx::thread concurrentReader([&] {
         // Instantiate AutoGetCollection before uncommitted write.
         auto [c2, t2] = makeClientAndCtx("t2");
-        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        auto cursor = acr.getCollection()->getCursor(t2.get());
+        const auto acr = acquireCollForReadLockFree(t2.get(), nss);
+        auto cursor = acr.getCollectionPtr()->getCursor(t2.get());
         auto record = cursor->seekExact(lastCommittedId);
         ASSERT(record);
         ASSERT_EQ(lastCommittedId, record->id);
@@ -450,8 +471,8 @@ TEST_F(CappedCollectionTest, VisibilityAfterRestart) {
     w1.commit();
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        auto cursor = acr.getCollection()->getCursor(t2.get());
+        const auto acr = acquireCollForReadLockFree(t2.get(), nss);
+        auto cursor = acr.getCollectionPtr()->getCursor(t2.get());
         auto record = cursor->seekExact(lastCommittedId);
         ASSERT(record);
         ASSERT_EQ(lastCommittedId, record->id);
@@ -504,9 +525,9 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
     // Forward, no read timestamp.
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        const auto acr = acquireCollForReadLockFree(t2.get(), nss);
         shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
-        auto cursor = acr.getCollection()->getCursor(t2.get());
+        auto cursor = acr.getCollectionPtr()->getCursor(t2.get());
         checkSeek(cursor, 1, 2, 2);
         checkSeek(cursor, 2, 2, 4);
         checkSeek(cursor, 3, 4, 4);
@@ -520,8 +541,8 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
     // Backward, no read timestamp.
     {
         auto [c2, t2] = makeClientAndCtx("t2");
-        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        auto cursor = acr.getCollection()->getCursor(t2.get(), false);
+        const auto acr = acquireCollForReadLockFree(t2.get(), nss);
+        auto cursor = acr.getCollectionPtr()->getCursor(t2.get(), false);
         checkSeek(cursor, 1, -1, -1);
         checkSeek(cursor, 2, 2, -1);
         checkSeek(cursor, 3, 2, 2);
@@ -537,9 +558,9 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
         auto [c2, t2] = makeClientAndCtx("t2");
         shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
             RecoveryUnit::ReadSource::kProvided, Timestamp(1, 6));
-        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        const auto acr = acquireCollForReadLockFree(t2.get(), nss);
         shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
-        auto cursor = acr.getCollection()->getCursor(t2.get());
+        auto cursor = acr.getCollectionPtr()->getCursor(t2.get());
         checkSeek(cursor, 1, 2, 2);
         checkSeek(cursor, 2, 2, 4);
         checkSeek(cursor, 3, 4, 4);
@@ -555,8 +576,8 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
         auto [c2, t2] = makeClientAndCtx("t2");
         shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
             RecoveryUnit::ReadSource::kProvided, Timestamp(1, 6));
-        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
-        auto cursor = acr.getCollection()->getCursor(t2.get(), false);
+        const auto acr = acquireCollForReadLockFree(t2.get(), nss);
+        auto cursor = acr.getCollectionPtr()->getCursor(t2.get(), false);
         checkSeek(cursor, 1, -1, -1);
         checkSeek(cursor, 2, 2, -1);
         checkSeek(cursor, 3, 2, 2);

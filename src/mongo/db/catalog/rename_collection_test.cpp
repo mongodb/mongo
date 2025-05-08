@@ -60,7 +60,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -419,6 +418,20 @@ void RenameCollectionTest::tearDown() {
 }
 
 /**
+ * Returns true if collection exists.
+ */
+bool _collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    return coll.exists();
+}
+
+/**
  * Creates a collection without any namespace restrictions.
  */
 void _createCollection(OperationContext* opCtx,
@@ -437,7 +450,7 @@ void _createCollection(OperationContext* opCtx,
         wuow.commit();
     });
 
-    ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    ASSERT_TRUE(_collectionExists(opCtx, nss));
 }
 
 /**
@@ -459,20 +472,21 @@ UUID _createCollectionWithUUID(OperationContext* opCtx, const NamespaceString& n
 }
 
 /**
- * Returns true if collection exists.
- */
-bool _collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
-    return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
-}
-
-/**
  * Returns collection options.
  */
 CollectionOptions _getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss.toStringForErrorMsg()
-                            << " because collection does not exist.";
-    return collection->getCollectionOptions();
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    ASSERT_TRUE(coll.exists()) << "Unable to get collections options for "
+                               << nss.toStringForErrorMsg()
+                               << " because collection does not exist.";
+    return coll.getCollectionPtr()->getCollectionOptions();
 }
 
 /**
@@ -496,9 +510,9 @@ NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& u
  * Returns true if namespace refers to a temporary collection.
  */
 bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to check if " << nss.toStringForErrorMsg()
-                            << " is a temporary collection because collection does not exist.";
+    ASSERT_TRUE(_collectionExists(opCtx, nss))
+        << "Unable to check if " << nss.toStringForErrorMsg()
+        << " is a temporary collection because collection does not exist.";
     auto options = _getCollectionOptions(opCtx, nss);
     return options.temp;
 }
@@ -529,7 +543,7 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
         wuow.commit();
     });
 
-    ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    ASSERT_TRUE(_collectionExists(opCtx, nss));
 }
 
 /**

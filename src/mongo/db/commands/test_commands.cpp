@@ -283,9 +283,12 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
-        AutoGetCollection autoColl(opCtx, fullNs, MODE_IS);
-        uassert(7927100, "Could not find a collection with the requested namespace", autoColl);
-        auto output = autoColl->timeseriesBucketingParametersHaveChanged();
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, fullNs, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        uassert(7927100, "Could not find a collection with the requested namespace", coll.exists());
+        auto output = coll.getCollectionPtr()->timeseriesBucketingParametersHaveChanged();
         if (output) {
             result.append("changed", *output);
         }
@@ -344,13 +347,19 @@ std::string TestingDurableHistoryPin::getName() {
 }
 
 boost::optional<Timestamp> TestingDurableHistoryPin::calculatePin(OperationContext* opCtx) {
-    AutoGetCollectionForRead autoColl(opCtx, NamespaceString::kDurableHistoryTestNamespace);
-    if (!autoColl) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kDurableHistoryTestNamespace,
+                                     PlacementConcern::kPretendUnsharded,
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    if (!coll.exists()) {
         return boost::none;
     }
 
     Timestamp ret = Timestamp::max();
-    auto cursor = autoColl->getCursor(opCtx);
+    auto cursor = coll.getCollectionPtr()->getCursor(opCtx);
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         const BSONObj obj = doc.value().data.toBson();
         const Timestamp ts = obj["pinTs"].timestamp();

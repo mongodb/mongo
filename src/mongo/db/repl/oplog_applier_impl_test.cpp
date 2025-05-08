@@ -153,6 +153,16 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
 };
 
+CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
 template <typename T, bool enable>
 class SetSteadyStateConstraints : public T {
 protected:
@@ -1274,7 +1284,7 @@ TEST_F(OplogApplierImplTest,
     ASSERT_OK(
         oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, &pathInfo, dataIsConsistent));
     // Collection should be created after applyOplogEntryOrGroupedInserts() processes operation.
-    ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
+    ASSERT_TRUE(acquireCollForRead(_opCtx.get(), nss).exists());
 }
 
 TEST_F(OplogApplierImplTest,
@@ -4057,7 +4067,7 @@ TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissing
 
     // Since the document was missing when we cloned data from the sync source, the collection
     // referenced by the failed operation should not be automatically created.
-    ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
+    ASSERT_FALSE(acquireCollForRead(_opCtx.get(), nss).exists());
 }
 
 TEST_F(OplogApplierImplTest,
@@ -4126,7 +4136,7 @@ TEST_F(OplogApplierImplTest,
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, collectionReader.next().getStatus());
 
     // 'badNss' collection should not be implicitly created while attempting to create an index.
-    ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), badNss).getCollection());
+    ASSERT_FALSE(acquireCollForRead(_opCtx.get(), badNss).exists());
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
@@ -4875,7 +4885,7 @@ TEST_F(OplogApplierImplTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnS
     sessionInfo.setTxnNumber(3);
     auto date = Date_t::now();
     auto uuid = [&] {
-        return AutoGetCollectionForRead(_opCtx.get(), nss()).getCollection()->uuid();
+        return acquireCollForRead(_opCtx.get(), nss()).uuid();
     }();
 
     repl::OpTime retryableInsertOpTime(Timestamp(1, 0), 1);
@@ -4945,7 +4955,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnS
     sessionInfo.setTxnNumber(3);
     auto date = Date_t::now();
     auto uuid = [&] {
-        return AutoGetCollectionForRead(_opCtx.get(), nss()).getCollection()->uuid();
+        return acquireCollForRead(_opCtx.get(), nss()).uuid();
     }();
 
     repl::OpTime txnInsertOpTime(Timestamp(1, 0), 1);
@@ -5020,13 +5030,13 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT(client.runCommand(ns2.dbName(), BSON("create" << ns2.coll()), result));
     ASSERT(client.runCommand(ns3.dbName(), BSON("create" << ns3.coll()), result));
     auto uuid0 = [&] {
-        return AutoGetCollectionForRead(_opCtx.get(), ns0).getCollection()->uuid();
+        return acquireCollForRead(_opCtx.get(), ns0).uuid();
     }();
     auto uuid1 = [&] {
-        return AutoGetCollectionForRead(_opCtx.get(), ns1).getCollection()->uuid();
+        return acquireCollForRead(_opCtx.get(), ns1).uuid();
     }();
     auto uuid2 = [&] {
-        return AutoGetCollectionForRead(_opCtx.get(), ns2).getCollection()->uuid();
+        return acquireCollForRead(_opCtx.get(), ns2).uuid();
     }();
 
     // Entries with a session id and a txnNumber update the transaction table.

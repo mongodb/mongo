@@ -55,12 +55,10 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -170,11 +168,6 @@ public:
         _opCtx = operationContext();
         _svcCtx = _opCtx->getServiceContext();
 
-        {
-            Lock::GlobalWrite lk(_opCtx);
-            OldClientContext ctx(_opCtx, NamespaceString::kRsOplogNamespace);
-        }
-
         for (const auto& shardId : kTwoShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
                 uassertStatusOK(shardRegistry()->getShard(operationContext(), shardId))
@@ -264,8 +257,14 @@ public:
 
     BSONObj queryCollection(NamespaceString nss, const BSONObj& query) {
         BSONObj ret;
-        ASSERT_TRUE(Helpers::findOne(
-            _opCtx, AutoGetCollectionForRead(_opCtx, nss).getCollection(), query, ret))
+        const auto coll = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        ASSERT_TRUE(Helpers::findOne(_opCtx, coll.getCollectionPtr(), query, ret))
             << "Query: " << query;
         return ret;
     }
