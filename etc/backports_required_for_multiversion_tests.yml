@@ -436,6 +436,8 @@ last-continuous:
       ticket: SERVER-97229
     - test_file: jstests/sharding/check_metadata_consistency.js
       ticket: SERVER-102084
+    - test_file: jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
+      ticket: SERVER-102312
   suites: null
 last-lts:
   all:
@@ -927,4 +929,6 @@ last-lts:
       ticket: SERVER-97229
     - test_file: jstests/sharding/check_metadata_consistency.js
       ticket: SERVER-102084
+    - test_file: jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
+      ticket: SERVER-102312
   suites: null
