@@ -98,6 +98,8 @@ buildvariants:
   expansions:
     <<: *linux-arm64-dynamic-enterprise-compile-expansions
     clang_tidy_toolchain: v4
+    build_mongot: true
+    download_mongot_release: true
     compile_variant: *amazon-linux2-arm64-dynamic-compile
   tasks:
     - name: compile_ninja_quick_TG
@@ -254,12 +256,12 @@ buildvariants:
   run_on:
   - amazon2023.3-small
   expansions:
+    build_mongot: true
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2023
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --build-mongot
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
@@ -295,6 +297,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-small
   expansions:
+    build_mongot: true
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2023
@@ -302,7 +305,6 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
       --modules=
-      --build-mongot
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
@@ -341,12 +343,12 @@ buildvariants:
   - amazon2-arm64-small
   stepback: true
   expansions:
+    build_mongot: true
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --build-mongot
     scons_cache_scope: shared
     scons_cache_mode: all
     has_packages: false
@@ -381,12 +383,12 @@ buildvariants:
   run_on:
   - amazon2-large
   expansions:
+    build_mongot: true
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --build-mongot
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: false
     multiversion_platform: amazon2
