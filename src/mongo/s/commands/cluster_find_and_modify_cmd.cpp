@@ -668,10 +668,10 @@ private:
             auto commitResponse =
                 documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
-            uassertStatusOK(getStatusFromCommandResult(commitResponse));
             if (auto wcErrorElem = commitResponse["writeConcernError"]) {
                 appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
             }
+            uassertStatusOK(getStatusFromCommandResult(commitResponse));
         } catch (DBException& e) {
             if (e.code() != ErrorCodes::DuplicateKey ||
                 (e.code() == ErrorCodes::DuplicateKey &&
