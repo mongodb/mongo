@@ -63,6 +63,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/set_cluster_server_parameter_router_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -109,27 +110,6 @@ void setClusterParameterImplShard(OperationContext* opCtx,
     invocation.invoke(opCtx, request, clusterParameterTime, previousTime, kMajorityWriteConcern);
 }
 
-void setClusterParameterImplRouter(OperationContext* opCtx,
-                                   const SetClusterParameter& request,
-                                   boost::optional<Timestamp>,
-                                   boost::optional<LogicalTime> previousTime) {
-
-    hangInSetClusterParameterFailPointCheck(request);
-    ConfigsvrSetClusterParameter configsvrSetClusterParameter(request.getCommandParameter());
-    configsvrSetClusterParameter.setDbName(request.getDbName());
-    configsvrSetClusterParameter.setPreviousTime(previousTime);
-
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-    const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        configsvrSetClusterParameter.toBSON(),
-        Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
-}
 }  // namespace
 
 SetClusterParameterImplFn getSetClusterParameterImpl(Service* service) {
