@@ -100,7 +100,7 @@ MONGO_FAIL_POINT_DEFINE(simulateCatalogTopLevelMetadataInconsistency);
 long long getNumDocs(OperationContext* opCtx, const Collection* localColl) {
     // Since users are advised to delete empty misplaced collections, rely on isEmpty
     // that is safe because the implementation guards against SERVER-24266.
-    if (AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS); localColl->isEmpty(opCtx)) {
+    if (AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS); ac->isEmpty(opCtx)) {
         return 0;
     }
     DBDirectClient client(opCtx);
