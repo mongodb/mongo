@@ -4,7 +4,7 @@
 
 This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owners/) and [chromium](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/code_reviews.md) OWNERS files.
 
-`version` is the current version of the `OWNERS.yml` file format. This should always be 1.0.0.
+`version` is the current version of the `OWNERS.yml` file format. The latest version is `2.0.0`. For previous versions, see the [changelog](#owners-changelog).
 
 `aliases` point to yaml files files that list aliases that can be used in this OWNERS.yml file.
 
@@ -19,7 +19,7 @@ This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owne
 ### Example file
 
 ```yaml
-version: 1.0.0 # Should always be 1.0.0
+version: 2.0.0 # corresponds to the owners.yml version you are using
 aliases:
   # Contains the markdown-approvers alias
   - //buildscripts/resmokelib/devprod_correctness_aliases.yml
@@ -33,16 +33,39 @@ filters: # List of all filters
       emeritus_approvers: # This list is just for historical reference
         - userB
       owning_team: "10gen/devprod-correctness" # The team which owns the matching files. These folks are not required approvers that will block a PR.
-  - "*.md":
+  - "/*": # Select all files in the current directory (not recursive)
+    approvers: # Anyone on this list can approve PRs
+      - devprod-correctness # alias for a group of users
+  - "*.md": # Select all markdown files in the current directory (not recursive)
     approvers:
       - markdown-approvers
+  - "**/*.py": # Select all python files (will apply recursively)
+    approvers:
+      - python-approvers
+  - "config.txt": # Select the config.txt file in the current directory (not recursive)
+    approvers:
+      - config-approvers
+  - "**/BUILD.bazel": # Select all BUILD.bazel files (will apply recursively)
+    approvers:
+      - bazel-approvers
 options: # All options for this file
   no_parent_owners: false # See above for no_parent_owners. Defaulted to false so this line is not needed.
 ```
 
+### Filter examples
+
+- `*` All files in the current directory and subdirectories
+- `/*` All files in the current directory (not including subdirectories)
+- `*.py` All python in the current directory (not including sub-directories)
+- `/*.py` (same as above, but explicitly defines the current directory)
+- `**/*.py` All python in the current directory and subdirectories
+- `/**/*.py` (same as above, but explicitly defines the current directory)
+- `BUILD.bazel` The `BUILD.bazel` file in the currently directory (not including subdirectories)
+- `**/BUILD.bazel` The `BUILD.bazel` file in the current directory and subdirectories
+
 ### Aliases Yaml File Format
 
-`version` is the current version of the aliases file format. This should always be 1.0.0.
+`version` is the current version of the aliases file format. This should always be `1.0.0`.
 
 `aliases` are a list of group names. Each group name must have one or more reviewers. Reviewers should be github usernames.
 
@@ -61,14 +84,14 @@ aliases:
 a/b/c/OWNERS.yml
 
 ```yaml
-version: 1.0.0
+version: 2.0.0
 aliases:
   - //aliases.yml
 filters:
-  - "*.py":
+  - "**/*.py":
     approvers:
       - teamC
-  - "*.md":
+  - "**/*.md":
     approvers:
       - teamMD
 ```
@@ -76,14 +99,14 @@ filters:
 a/b/OWNERS.yml
 
 ```yaml
-version: 1.0.0
+version: 2.0.0
 aliases:
   - //aliases.yml
 filters:
-  - "*.json":
+  - "**/*.json":
     approvers:
       - teamB
-  - "*.py":
+  - "**/*.py":
     approvers:
       - teamPY
 options:
@@ -93,14 +116,14 @@ options:
 a/OWNERS.yml
 
 ```yaml
-version: 1.0.0
+version: 2.0.0
 aliases:
   - //aliases.yml
 filters:
   - "*":
     approvers:
       - teamA
-  - "*.yaml":
+  - "**/*.yaml":
     approvers:
       - teamYAML
 ```
@@ -112,3 +135,13 @@ If someone changes `a/b/c/file.py` the owner resolution will select teamC since 
 ### Example 2
 
 If someone changes `a/b/c/file.yaml` the owner resolution will not find a team. The first file searched is `a/b/c/OWNERS.yml`. No filters match file.yaml. Next we search in `a/b/OWNERS.yml`. No filters match there either. We stop searching up because `no_parent_owners` is set to true.
+
+## OWNERS Changelog
+
+### v2.0.0
+
+See the [previous version](https://github.com/10gen/mongo/blob/79590effe86c471cc15d91c6785599ec2085d7c0/docs/owners/owners_format.md) of this documentation for details on v1.0.0.
+
+Patterns without a slash are no longer prepended with `**/` to make them apply recursively. If you want your pattern you apply recursively you must add the `**/` yourself now.
+
+The `*` pattern is now resolved as the directory name to ensure it applies recursively by default. You can use the `/*` pattern to only match inside the current directory.

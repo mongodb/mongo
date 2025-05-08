@@ -1,6 +1,6 @@
 # TODO: This is a really loose alias for a lot of files.
 # TODO(SERVER-89644): Tighten this up as we decide more the split between the teams.
-version: 1.0.0
+version: 2.0.0
 filters:
   - "*":
     approvers:

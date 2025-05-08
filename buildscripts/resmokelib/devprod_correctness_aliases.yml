@@ -1,8 +1,0 @@
-version: 1.0.0
-aliases:
-  devprod-correctness:
-    - mikhail.shchatko@mongodb.com
-    - juan.gu@mongodb.com
-    - alex.neben@mongodb.com
-    - trevor.guidry@mongodb.com
-    - steve.gross@mongodb.com

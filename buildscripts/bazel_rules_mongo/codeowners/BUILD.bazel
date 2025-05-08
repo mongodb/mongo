@@ -4,6 +4,8 @@ py_binary(
     name = "codeowners",
     srcs = [
         "codeowners_generate.py",
+        "parsers/owners_v1.py",
+        "parsers/owners_v2.py",
         "validate_codeowners.py",
         "//utils:evergreen_git.py",
     ],
@@ -31,6 +33,8 @@ py_binary(
     name = "codeowners_add_auto_approver",
     srcs = [
         "codeowners_generate.py",
+        "parsers/owners_v1.py",
+        "parsers/owners_v2.py",
         "validate_codeowners.py",
         "//utils:evergreen_git.py",
     ],

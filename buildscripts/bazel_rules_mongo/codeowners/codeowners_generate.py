@@ -1,88 +1,23 @@
 import argparse
 import difflib
-import glob
 import os
-import pathlib
 import subprocess
 import sys
 import tempfile
-from functools import cache, lru_cache
+from functools import cache
 from typing import Set
 
 import yaml
+from codeowners.parsers import owners_v1, owners_v2
 from codeowners.validate_codeowners import run_validator
 from utils import evergreen_git
 
 OWNERS_FILE_NAME = "OWNERS"
 OWNERS_FILE_EXTENSIONS = (".yml", ".yaml")
-
-
-@cache
-def should_add_auto_approver() -> bool:
-    env_opt = os.environ.get("ADD_AUTO_APPROVE_USER")
-    if env_opt and env_opt.lower() == "true":
-        return True
-    return False
-
-
-def add_pattern(output_lines: list[str], pattern: str, owners: set[str]) -> None:
-    if owners:
-        output_lines.append(f"{pattern} {' '.join(sorted(owners))}")
-    else:
-        output_lines.append(pattern)
-
-
-def add_owner_line(output_lines: list[str], directory: str, pattern: str, owners: set[str]) -> None:
-    # ensure the path is correct and consistent on all platforms
-    directory = pathlib.PurePath(directory).as_posix()
-
-    if directory == ".":
-        # we are in the root dir and can directly pass the pattern
-        parsed_pattern = pattern
-    elif not pattern:
-        # If there is no pattern add the directory as the pattern.
-        parsed_pattern = f"/{directory}/"
-    elif "/" in pattern:
-        # if the pattern contains a slash the pattern should be treated as relative to the
-        # directory it came from.
-        if pattern.startswith("/"):
-            parsed_pattern = f"/{directory}{pattern}"
-        else:
-            parsed_pattern = f"/{directory}/{pattern}"
-    else:
-        parsed_pattern = f"/{directory}/**/{pattern}"
-
-    test_pattern = (
-        f".{parsed_pattern}" if parsed_pattern.startswith("/") else f"./**/{parsed_pattern}"
-    )
-
-    # ensure at least one file patches the pattern.
-    first_file_found = glob.iglob(test_pattern, recursive=True)
-    if all(False for _ in first_file_found):
-        raise (RuntimeError(f"Can not find any files that match pattern: `{pattern}`"))
-
-    add_pattern(output_lines, parsed_pattern, owners)
-
-
-@lru_cache(maxsize=None)
-def process_alias_import(path: str) -> dict[str, list[str]]:
-    if not path.startswith("//"):
-        raise RuntimeError(
-            f"Alias file paths must start with // and be relative to the repo root: {path}"
-        )
-
-    # remove // from beginning of path
-    parsed_path = path[2::]
-
-    if not os.path.exists(parsed_path):
-        raise RuntimeError(f"Could not find alias file {path}")
-
-    with open(parsed_path, "r") as file:
-        contents = yaml.safe_load(file)
-        assert "version" in contents, f"Version not found in {path}"
-        assert "aliases" in contents, f"Alias not found in {path}"
-        assert contents["version"] == "1.0.0", f"Invalid version in {path}"
-        return contents["aliases"]
+parsers = {
+    "1.0.0": owners_v1.OwnersParserV1(),
+    "2.0.0": owners_v2.OwnersParserV2(),
+}
 
 
 def process_owners_file(output_lines: list[str], directory: str) -> None:
@@ -104,64 +39,10 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
     with open(owners_file_path, "r") as file:
         contents = yaml.safe_load(file)
         assert "version" in contents, f"Version not found in {owners_file_path}"
-        assert contents["version"] == "1.0.0", f"Invalid version in {owners_file_path}"
-        no_parent_owners = False
-        if "options" in contents:
-            options = contents["options"]
-            no_parent_owners = "no_parent_owners" in options and options["no_parent_owners"]
-
-        if no_parent_owners:
-            # Specfying no owners will ensure that no file in this directory has an owner unless it
-            # matches one of the later patterns in the file.
-            add_owner_line(output_lines, directory, pattern="*", owners=None)
-
-        aliases = {}
-        if "aliases" in contents:
-            for alias_file in contents["aliases"]:
-                aliases.update(process_alias_import(alias_file))
-        if "filters" in contents:
-            filters = contents["filters"]
-            for _filter in filters:
-                assert (
-                    "approvers" in _filter
-                ), f"Filter in {owners_file_path} does not have approvers."
-                approvers = _filter["approvers"]
-                del _filter["approvers"]
-                if "metadata" in _filter:
-                    del _filter["metadata"]
-
-                # the last key remaining should be the pattern for the filter
-                assert len(_filter) == 1, f"Filter in {owners_file_path} has incorrect values."
-                pattern = next(iter(_filter))
-                owners: set[str] = set()
-
-                def process_owner(owner: str):
-                    if "@" in owner:
-                        # approver is email, just add as is
-                        if not owner.endswith("@mongodb.com"):
-                            raise RuntimeError("Any emails specified must be a mongodb.com email.")
-                        owners.add(owner)
-                    else:
-                        # approver is github username, need to prefix with @
-                        owners.add(f"@{owner}")
-
-                NOOWNERS_NAME = "NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01"
-                if NOOWNERS_NAME in approvers:
-                    assert (
-                        len(approvers) == 1
-                    ), f"{NOOWNERS_NAME} must be the only approver when it is used."
-                else:
-                    for approver in approvers:
-                        if approver in aliases:
-                            for member in aliases[approver]:
-                                process_owner(member)
-                        else:
-                            process_owner(approver)
-                    # Add the auto revert bot
-                    if should_add_auto_approver():
-                        process_owner("svc-auto-approve-bot")
-
-                add_owner_line(output_lines, directory, pattern, owners)
+        assert contents["version"] in parsers, f"Unsupported version in {owners_file_path}"
+        parser = parsers[contents["version"]]
+        owners_lines = parser.parse(directory, owners_file_path, contents)
+        output_lines.extend(owners_lines)
     output_lines.append("")
 
 
@@ -288,7 +169,7 @@ def check_orphaned_files(
         return 0
 
     print("The following files lost ownership with CODEOWNERS changes:", file=sys.stderr)
-    for file in unowned_files_difference:
+    for file in sorted(unowned_files_difference):
         print(f"- {file}", file=sys.stderr)
 
     return 1
