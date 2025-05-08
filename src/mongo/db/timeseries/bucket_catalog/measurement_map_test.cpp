@@ -46,129 +46,214 @@ public:
 protected:
     tracking::Context trackingContext;
     MeasurementMap measurementMap;
+    static constexpr StringData _metaField = "meta";
+    static constexpr StringData _timeField = "time";
+    static constexpr StringData _metaValue = "a";
 };
 
-BSONObj genBucketDoc(int timestampSecondsField) {
-    std::string seconds = std::to_string(timestampSecondsField);
-    BSONObj bucketDocDataFields = fromjson(
-        R"({"data":{"time":{"0":{"$date":"2022-06-06T15:34:" + seconds + ".000Z"},
-                            "1":{"$date":"2022-06-06T15:34:" + seconds + ".000Z"},
-                            "2":{"$date":"2022-06-06T15:34:" + seconds + ".000Z"}},
-                    "a":{"0":1,"1":2,"2":3},
-                    "b":{"0":1,"1":2,"2":3}}})");
-    return bucketDocDataFields;
-}
-
-BSONObj genBucketDoc() {
-    BSONObj bucketDocDataFields = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1},
-                    "b":{"0":1}})");
-    return bucketDocDataFields;
-}
-
-void genMeasurement(std::vector<BSONElement>& elems) {
-    BSONObj bucketDocDataFields = genBucketDoc().getOwned();
-    for (auto dataField : bucketDocDataFields) {
-        elems.push_back(dataField);
-    }
-}
-
-std::vector<BSONElement> genMeasurementsFromObj(BSONObj obj) {
-    std::vector<BSONElement> elems;
-    for (auto& dataField : obj) {
-        elems.push_back(dataField);
-    }
-    return elems;
-}
-
-std::vector<BSONElement> genMeasurementFieldsFromObj(BSONObj obj) {
-    std::vector<BSONElement> elems;
-    for (auto& dataField : obj) {
-        elems.push_back(dataField);
-    }
-    return elems;
-}
-
-std::vector<BSONElement> genMessyMeasurements() {
-    std::vector<BSONElement> elems;
-    BSONObj bucketDocDataFields = genBucketDoc();
-    for (auto& dataField : bucketDocDataFields) {
-        elems.push_back(dataField);
-    }
-    return elems;
-}
-
-TEST_F(MeasurementMapTest, IterationBasic) {
-    std::vector<BSONElement> elems;
-
+TEST_F(MeasurementMapTest, IterationBasicWithoutMeta) {
     // Insert measurement 1.
-    BSONObj m1_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z")));
-    elems.emplace_back(m1_time.getField("time"));
-    BSONObj m1_a = BSON("a" << BSON("0" << "1"));
-    elems.emplace_back(m1_a.getField("a"));
-    measurementMap.insertOne(elems);
-
-    elems.clear();
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1"));                                 // 'a'
+    measurementMap.insertOne(m1, /*metaField=*/boost::none);
 
     // Insert measurement 2.
-    BSONObj m2_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z")));
-    elems.emplace_back(m2_time.getField("time"));
-    BSONObj m2_a = BSON("a" << BSON("0" << "5"));
-    elems.emplace_back(m2_a.getField("a"));
-    measurementMap.insertOne(elems);
+    const BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "5"));                                 // 'a'
+    measurementMap.insertOne(m2, /*metaField=*/boost::none);
+
+    // Two distinct fields: 'a' and '_timeField'.
+    invariant(measurementMap.numFields() == 2);
+}
+
+TEST_F(MeasurementMapTest, IterationBasicWithMeta) {
+    // Insert measurement 1.
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << _metaField << _metaValue);                                // '_metaField'
+    measurementMap.insertOne(m1, _metaField);
+
+    // Insert measurement 2.
+    const BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << _metaField << _metaValue                                  // '_metaField'
+                        << "a" << BSON("0" << "5"));                                 // 'a'
+    measurementMap.insertOne(m2, _metaField);
+
+    // Two distinct fields: 'a' and '_timeField'. We shouldn't include '_metaField'.
+    invariant(measurementMap.numFields() == 2);
+}
+
+TEST_F(MeasurementMapTest, IterationBasicWithMixed) {
+    // Insert measurement 1.
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << _metaField << _metaValue                                  // '_metaField'
+                        << "a" << BSON("0" << "1"));                                 // 'a'
+    measurementMap.insertOne(m1, _metaField);
+
+    // Insert measurement 2. Doesn't have a '_metaField' field.
+    const BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "5"));                                 // 'a'
+    measurementMap.insertOne(m2, _metaField);
+
+    // Two distinct fields: 'a' and '_timeField'. We shouldn't include '_metaField'.
     invariant(measurementMap.numFields() == 2);
 }
 
 TEST_F(MeasurementMapTest, FillSkipsDifferentField) {
-    const BSONObj bucketDoc = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1},
-                    "b":{"0":1}})");
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
 
-    const BSONObj bucketDoc2 = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:31.000Z"}},
-                    "a":{"0":1},
-                    "b":{"0":1}})");
+    const BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
 
-    const BSONObj bucketDocNewField = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:32.000Z"}},
-                    "c":{"4":5}})");
+    const BSONObj mWithNewField =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:32.000Z"))  // '_timeField'
+                        << "c" << BSON("4" << "5"));                                 // 'c'
 
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc2));
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocNewField));
+    measurementMap.insertOne(m1, /*metaField=*/boost::none);
+    measurementMap.insertOne(m2, /*metaField=*/boost::none);
+    measurementMap.insertOne(mWithNewField, /*metaField=*/boost::none);
+    invariant(measurementMap.numFields() == 4);
+}
+
+TEST_F(MeasurementMapTest, FillSkipsDifferentFieldWithMeta) {
+    const BSONObj m1 =
+        BSON(_metaField << _metaValue  // '_metaField'
+                        << _timeField
+                        << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
+
+    const BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1")                                   // 'b'
+                        << _metaField << _metaValue);                                // '_metaField'
+
+    const BSONObj mWithNewField =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:32.000Z"))  // '_timeField'
+                        << "c" << BSON("4" << "5"));                                 // 'c'
+
+    measurementMap.insertOne(m1, _metaField);
+    measurementMap.insertOne(m2, _metaField);
+    measurementMap.insertOne(mWithNewField, _metaField);
     invariant(measurementMap.numFields() == 4);
 }
 
 TEST_F(MeasurementMapTest, FillSkipsAddField) {
-    const BSONObj bucketDoc = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1},
-                    "b":{"0":1}})");
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
 
-    const BSONObj bucketDocWithField = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:35.000Z"}},
-                    "a":{"0":4},
-                    "b":{"0":1},
-                    "c":{"0":1}})");
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocWithField));
+    const BSONObj mWithNewField =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:35.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "4")                                   // 'a'
+                        << "b" << BSON("0" << "1")                                   // 'b'
+                        << "c" << BSON("0" << "1"));                                 // 'c'
+
+    measurementMap.insertOne(m1, /*metaField=*/boost::none);
+    measurementMap.insertOne(mWithNewField, /*metaField=*/boost::none);
+    invariant(measurementMap.numFields() == 4);
+}
+
+TEST_F(MeasurementMapTest, FillSkipsAddFieldWithMeta) {
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << _metaField << _metaValue                                  // '_metaField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
+
+    const BSONObj mWithNewField =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:35.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "4")                                   // 'a'
+                        << "b" << BSON("0" << "1")                                   // 'b'
+                        << "c" << BSON("0" << "1")                                   // 'c'
+                        << _metaField << _metaValue);                                // '_metaField'
+
+    measurementMap.insertOne(m1, _metaField);
+    measurementMap.insertOne(mWithNewField, _metaField);
     invariant(measurementMap.numFields() == 4);
 }
 
 TEST_F(MeasurementMapTest, FillSkipsRemoveField) {
-    const BSONObj bucketDoc = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1},
-                    "b":{"0":1}})");
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
 
-    const BSONObj bucketDocWithoutField = fromjson(
-        R"({"time":{"0":{"$date":"2022-06-06T15:34:35.000Z"}},
-                    "a":{"0":4}})");
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDoc));
-    measurementMap.insertOne(genMeasurementFieldsFromObj(bucketDocWithoutField));
+    const BSONObj mWithoutField =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "4"));                                 // 'a'
+
+    measurementMap.insertOne(m1, /*metaField=*/boost::none);
+    measurementMap.insertOne(mWithoutField, /*metaField=*/boost::none);
     invariant(measurementMap.numFields() == 3);
+}
+
+TEST_F(MeasurementMapTest, FillSkipsRemoveFieldWithMeta) {
+    const BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << _metaField << _metaValue                                  // '_metaField'
+                        << "a" << BSON("0" << "1")                                   // 'a'
+                        << "b" << BSON("0" << "1"));                                 // 'b'
+
+    const BSONObj mWithoutField =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << _metaField << _metaValue                                  // '_metaField'
+                        << "a" << BSON("0" << "4"));                                 // 'a'
+
+    measurementMap.insertOne(m1, _metaField);
+    measurementMap.insertOne(mWithoutField, _metaField);
+    invariant(measurementMap.numFields() == 3);
+}
+
+TEST_F(MeasurementMapTest, ContainsField) {
+    // Insert measurement 1.
+    BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "1"));                                 // 'a'
+    measurementMap.insertOne(m1, /*metaField=*/boost::none);
+
+    // Insert measurement 2.
+    BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "5"));                                 // 'a'
+    measurementMap.insertOne(m2, /*metaField=*/boost::none);
+
+    invariant(measurementMap.containsField("a"));
+    invariant(!measurementMap.containsField("b"));
+}
+
+TEST_F(MeasurementMapTest, ContainsFieldDoesNotContainMeta) {
+    // Insert measurement 1.
+    BSONObj m1 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z"))  // '_timeField'
+                        << _metaField << _metaValue                                  // '_metaField'
+                        << "a" << BSON("0" << "1"));                                 // 'a'
+    measurementMap.insertOne(m1, _metaField);
+
+    // Insert measurement 2.
+    BSONObj m2 =
+        BSON(_timeField << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z"))  // '_timeField'
+                        << "a" << BSON("0" << "5")                                   // 'a'
+                        << _metaField << _metaValue);                                // '_metaField'
+
+    measurementMap.insertOne(m2, _metaField);
+
+    invariant(measurementMap.containsField("a"));
+    invariant(!measurementMap.containsField("b"));
+    invariant(!measurementMap.containsField(_metaField));
 }
 
 TEST_F(MeasurementMapTest, InitBuilders) {
@@ -206,7 +291,7 @@ TEST_F(MeasurementMapTest, InitBuilders) {
     f2Column.append(f2m3.firstElement());
     BSONBinData f2Binary = f2Column.finalize();
 
-    dataBuilder.append("time", timeBinary);
+    dataBuilder.append(_timeField, timeBinary);
     dataBuilder.append("a", f1Binary);
     dataBuilder.append("b", f2Binary);
 
@@ -215,30 +300,7 @@ TEST_F(MeasurementMapTest, InitBuilders) {
 }
 
 DEATH_TEST_REGEX_F(MeasurementMapTest, GetTimeForNonexistentField, "Invariant failure.*") {
-    measurementMap.timeOfLastMeasurement("time");
-}
-
-TEST_F(MeasurementMapTest, ContainsField) {
-    std::vector<BSONElement> elems;
-
-    // Insert measurement 1.
-    BSONObj m1_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:30.000Z")));
-    elems.emplace_back(m1_time.getField("time"));
-    BSONObj m1_a = BSON("a" << BSON("0" << "1"));
-    elems.emplace_back(m1_a.getField("a"));
-    measurementMap.insertOne(elems);
-
-    elems.clear();
-
-    // Insert measurement 2.
-    BSONObj m2_time = BSON("time" << BSON("0" << BSON("$date" << "2022-06-06T15:34:31.000Z")));
-    elems.emplace_back(m2_time.getField("time"));
-    BSONObj m2_a = BSON("a" << BSON("0" << "5"));
-    elems.emplace_back(m2_a.getField("a"));
-    measurementMap.insertOne(elems);
-
-    invariant(measurementMap.containsField("a"));
-    invariant(!measurementMap.containsField("b"));
+    measurementMap.timeOfLastMeasurement(_timeField);
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

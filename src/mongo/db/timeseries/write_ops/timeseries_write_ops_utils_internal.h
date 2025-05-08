@@ -156,8 +156,7 @@ makeModificationOp(const OID& bucketId,
 mongo::write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    bool changedToUnsorted,
-    const std::vector<details::Measurement>& sortedMeasurements);
+    bool changedToUnsorted);
 
 mongo::write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
     OperationContext* opCtx,
@@ -182,12 +181,5 @@ void makeWriteRequestFromBatch(OperationContext* opCtx,
                                const NamespaceString& bucketsNs,
                                std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
                                std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps);
-
-/**
- * Returns collection of measurements sorted on time field.
- * Filters out meta field from input and does not include it in output.
- */
-std::vector<details::Measurement> sortMeasurementsOnTimeField(
-    std::shared_ptr<bucket_catalog::WriteBatch> batch);
 
 }  // namespace mongo::timeseries::write_ops_utils
