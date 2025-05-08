@@ -70,7 +70,7 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassertStatusOK(dropCollectionIfUUIDNotMatching(
-                opCtx, ns(), request().getExpectedCollectionUUID()));
+                opCtx, ns(), request().getExpectedCollectionUUID(), true /* fromMigrate */));
 
             WriteConcernResult ignoreResult;
             auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -128,7 +128,7 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassertStatusOK(dropCollectionIfUUIDNotMatching(
-                opCtx, ns(), request().getExpectedCollectionUUID()));
+                opCtx, ns(), request().getExpectedCollectionUUID(), true /* fromMigrate */));
         }
 
     private:
