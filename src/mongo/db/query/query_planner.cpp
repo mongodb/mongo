@@ -1603,7 +1603,7 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
         return statusWithMultiPlanSolns.getStatus();
     }
 
-    auto cbrMode = query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
+    auto cbrMode = params.planRankerMode;
     EstimateMap estimates;
     const auto& collInfo = params.mainCollectionInfo;
     tassert(9969001, "CBR received incomplete catalog statistics", collInfo.collStats != nullptr);
@@ -2049,8 +2049,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             // considering any plan that's a collscan.
             invariant(branchResult->solutions.empty());
 
-            if (query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
-                QueryPlanRankerModeEnum::kMultiPlanning) {
+            auto cbrMode = params.planRankerMode;
+            if (cbrMode != QueryPlanRankerModeEnum::kMultiPlanning) {
                 auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
                     *branchResult->canonicalQuery, params, samplingEstimator);
                 if (!statusWithCBRSolns.isOK()) {

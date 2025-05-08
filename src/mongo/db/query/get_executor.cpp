@@ -452,7 +452,7 @@ public:
 
         std::vector<std::unique_ptr<QuerySolution>> solutions;
         QueryPlanner::CostBasedRankerResult cbrResult;
-        auto rankerMode = _cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
+        auto rankerMode = _plannerParams->planRankerMode;
         if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
             using namespace cost_based_ranker;
             std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
@@ -1296,6 +1296,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 .collections = collections,
                 .plannerOptions = options,
                 .traversalPreference = traversalPreference,
+                .planRankerMode =
+                    canonicalQuery->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
             });
     };
 
@@ -1736,6 +1738,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             .opCtx = opCtx,
             .canonicalQuery = *cq,
             .collections = collections,
+            .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
     ClassicPrepareExecutionHelper helper{
         opCtx, collections, std::move(ws), cq.get(), policy, std::move(plannerParams)};
@@ -1910,6 +1913,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             .opCtx = opCtx,
             .canonicalQuery = *cq,
             .collections = collections,
+            .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         })};
 
     ScopedDebugInfo queryPlannerParams(
@@ -2017,6 +2021,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
             .canonicalQuery = *cq,
             .collections = collections,
             .plannerOptions = plannerOptions,
+            .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
     ClassicPrepareExecutionHelper helper{
         opCtx, collections, std::move(ws), cq.get(), yieldPolicy, std::move(plannerParams)};
