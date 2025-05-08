@@ -50,6 +50,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
+#if defined(__s390__) || defined(__s390x__) || defined(__zarch__)
+#define MONGO_S390 1
+#endif
 
 namespace mongo {
 
@@ -106,6 +109,12 @@ void assertAndRemoveSuffix(StringData& v, StringData suffix) {
     ASSERT(pos != v.npos) << fmt::format("expected to find '{}' in '{}'", suffix, v);
     v.remove_suffix(v.size() - pos);
 }
+
+// On our current version of libunwind, unw_get_proc_name() is failing
+// consistently on s390. This isn't a problem for our production stack
+// traces, as falling back to dladdr() works. It does, however, break
+// these libunwind-specific tests.
+#ifndef MONGO_S390
 
 TEST(Unwind, Demangled) {
     std::string stacktrace;
@@ -173,6 +182,8 @@ TEST(Unwind, Linkage) {
         remainder.remove_prefix(pos);
     }
 }
+
+#endif  // MONGO_S390
 
 }  // namespace unwind_test_detail
 }  // namespace mongo
