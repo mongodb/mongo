@@ -1,6 +1,3 @@
-
-// These variables are globally accessed
-// eslint-disable-next-line no-var
 var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoProgramNoConnect,
     myPort;
 
@@ -9,17 +6,17 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
 const SIGTERM = 15;
 
-let shellVersion = version;
+var shellVersion = version;
 
 // Record the exit codes of mongod and mongos processes that crashed during startup keyed by
 // port. This map is cleared when MongoRunner._startWithArgs and MongoRunner.stopMongod/s are
 // called.
-let serverExitCodeMap = {};
-let grpcToMongoRpcPortMap = {};
+var serverExitCodeMap = {};
+var grpcToMongoRpcPortMap = {};
 
-let _parsePath = function() {
-    let dbpath = "";
-    for (let i = 0; i < arguments.length; ++i)
+var _parsePath = function() {
+    var dbpath = "";
+    for (var i = 0; i < arguments.length; ++i)
         if (arguments[i] == "--dbpath")
             dbpath = arguments[i + 1];
 
@@ -29,23 +26,23 @@ let _parsePath = function() {
     return dbpath;
 };
 
-let createMongoArgs = function(binaryName, args) {
+var createMongoArgs = function(binaryName, args) {
     if (!Array.isArray(args)) {
         throw new Error("The second argument to createMongoArgs must be an array");
     }
 
-    let fullArgs = [binaryName];
+    var fullArgs = [binaryName];
 
     if (args.length == 1 && isObject(args[0])) {
-        let o = args[0];
-        for (let k in o) {
+        var o = args[0];
+        for (var k in o) {
             if (o.hasOwnProperty(k)) {
                 if (k == "v" && isNumber(o[k])) {
-                    let n = o[k];
+                    var n = o[k];
                     if (n > 0) {
                         if (n > 10)
                             n = 10;
-                        let temp = "-";
+                        var temp = "-";
                         while (n-- > 0)
                             temp += "v";
                         fullArgs.push(temp);
@@ -58,7 +55,7 @@ let createMongoArgs = function(binaryName, args) {
             }
         }
     } else {
-        for (let i = 0; i < args.length; i++)
+        for (var i = 0; i < args.length; i++)
             fullArgs.push(args[i]);
     }
 
@@ -99,10 +96,10 @@ MongoRunner.getMongoShellPath = function() {
 };
 
 MongoRunner.parsePort = function() {
-    let port = "";
+    var port = "";
     const portKey = jsTestOptions().shellGRPC ? "--grpcPort" : "--port";
 
-    for (let i = 0; i < arguments.length; ++i) {
+    for (var i = 0; i < arguments.length; ++i) {
         if (arguments[i] == portKey) {
             port = arguments[i + 1];
         }
@@ -217,9 +214,9 @@ MongoRunner.runHangAnalyzer.disable = function() {
  * "3.2" -> [ "3", "2" ]
  * 3 -> exception: versions must have at least two components.
  */
-let convertVersionStringToArray = function(versionString) {
+var convertVersionStringToArray = function(versionString) {
     assert("" !== versionString, "Version strings must not be empty");
-    let versionArray = versionString.split('.');
+    var versionArray = versionString.split('.');
 
     assert.gt(versionArray.length,
               1,
@@ -232,7 +229,7 @@ let convertVersionStringToArray = function(versionString) {
  * Returns an integer
  * This function will not work if the minor version is greater than or equal to 10
  */
-let convertVersionStringToInteger = function(versionString) {
+var convertVersionStringToInteger = function(versionString) {
     const [major, minor, point] = _convertVersionToIntegerArray(versionString);
     assert(
         minor < 10,
@@ -248,13 +245,13 @@ let convertVersionStringToInteger = function(versionString) {
  * 3.2 -> 3.2
  * 3 -> exception: versions must have at least two components.
  */
-let extractMajorVersionFromVersionString = function(versionString) {
+var extractMajorVersionFromVersionString = function(versionString) {
     return convertVersionStringToArray(versionString).slice(0, 2).join('.');
 };
 
 // These patterns allow substituting the binary versions used for each version string to support
 // the dev/stable MongoDB release cycle.
-let fcvConstants = getFCVConstants();
+var fcvConstants = getFCVConstants();
 
 MongoRunner.binVersionSubs = [
     new MongoRunner.VersionSub("latest", shellVersion()),
@@ -275,8 +272,8 @@ MongoRunner.getBinVersionFor = function(version) {
         version = "latest";
 
     // See if this version is affected by version substitutions
-    for (let i = 0; i < MongoRunner.binVersionSubs.length; i++) {
-        let sub = MongoRunner.binVersionSubs[i];
+    for (var i = 0; i < MongoRunner.binVersionSubs.length; i++) {
+        var sub = MongoRunner.binVersionSubs[i];
         if (sub.pattern == version) {
             return sub.version;
         }
@@ -325,18 +322,18 @@ MongoRunner.compareBinVersions = function(versionA, versionB) {
     versionA.push(...versionA.pop().split("-"));
     versionB.push(...versionB.pop().split("-"));
 
-    let elementsToCompare = Math.min(versionA.length, versionB.length);
+    var elementsToCompare = Math.min(versionA.length, versionB.length);
 
-    for (let i = 0; i < elementsToCompare; ++i) {
-        let elementA = versionA[i];
-        let elementB = versionB[i];
+    for (var i = 0; i < elementsToCompare; ++i) {
+        var elementA = versionA[i];
+        var elementB = versionB[i];
 
         if (elementA === elementB) {
             continue;
         }
 
-        let numA = parseInt(elementA);
-        let numB = parseInt(elementB);
+        var numA = parseInt(elementA);
+        var numB = parseInt(elementB);
 
         assert(!isNaN(numA) && !isNaN(numB),
                `Cannot compare non-equal non-numeric versions. ${elementA}, ${elementB}`);
@@ -385,7 +382,7 @@ MongoRunner.toRealPath = function(path, pathOpts) {
     pathOpts = pathOpts || {};
     path = path.replace(/\$dataPath/g, MongoRunner.dataPath);
     path = path.replace(/\$dataDir/g, MongoRunner.dataDir);
-    for (let key in pathOpts) {
+    for (var key in pathOpts) {
         path = path.replace(RegExp("\\$" + RegExp.escape(key), "g"), pathOpts[key]);
     }
 
@@ -435,7 +432,7 @@ MongoRunner.versionIterator = function(arr, isRandom) {
         isRandom = false;
 
     // Starting pos
-    let i = isRandom ? parseInt(Random.rand() * arr.length) : 0;
+    var i = isRandom ? parseInt(Random.rand() * arr.length) : 0;
 
     return new MongoRunner.versionIterator.iterator(i, arr);
 };
@@ -473,12 +470,12 @@ MongoRunner.versionIterator.iterator = function(i, arr) {
  *   to the binary.
  */
 MongoRunner.arrOptions = function(binaryName, args) {
-    let fullArgs = [""];
+    var fullArgs = [""];
 
     // isObject returns true even if "args" is an array, so the else branch of this statement is
     // dead code.  See SERVER-14220.
     if (isObject(args) || (args.length == 1 && isObject(args[0]))) {
-        let o = isObject(args) ? args : args[0];
+        var o = isObject(args) ? args : args[0];
 
         // If we've specified a particular binary version, use that
         if (o.binVersion && o.binVersion != "" && o.binVersion != shellVersion()) {
@@ -488,14 +485,14 @@ MongoRunner.arrOptions = function(binaryName, args) {
         }
 
         // Manage legacy options
-        let isValidOptionForBinary = function(option, value) {
+        var isValidOptionForBinary = function(option, value) {
             if (!o.binVersion)
                 return true;
 
             return true;
         };
 
-        let addOptionsToFullArgs = function(k, v) {
+        var addOptionsToFullArgs = function(k, v) {
             if (v === undefined || v === null)
                 return;
 
@@ -506,18 +503,18 @@ MongoRunner.arrOptions = function(binaryName, args) {
             }
         };
 
-        for (let k in o) {
+        for (var k in o) {
             // Make sure our logical option should be added to the array of options
             if (!o.hasOwnProperty(k) || k in MongoRunner.logicalOptions ||
                 !isValidOptionForBinary(k, o[k]))
                 continue;
 
             if ((k == "v" || k == "verbose") && isNumber(o[k])) {
-                let n = o[k];
+                var n = o[k];
                 if (n > 0) {
                     if (n > 10)
                         n = 10;
-                    let temp = "-";
+                    var temp = "-";
                     while (n-- > 0)
                         temp += "v";
                     fullArgs.push(temp);
@@ -537,7 +534,7 @@ MongoRunner.arrOptions = function(binaryName, args) {
             }
         }
     } else {
-        for (let i = 0; i < args.length; i++)
+        for (var i = 0; i < args.length; i++)
             fullArgs.push(args[i]);
     }
 
@@ -546,10 +543,10 @@ MongoRunner.arrOptions = function(binaryName, args) {
 };
 
 MongoRunner.arrToOpts = function(arr) {
-    let opts = {};
-    for (let i = 1; i < arr.length; i++) {
+    var opts = {};
+    for (var i = 1; i < arr.length; i++) {
         if (arr[i].startsWith("-")) {
-            let opt = arr[i].replace(/^-/, "").replace(/^-/, "");
+            var opt = arr[i].replace(/^-/, "").replace(/^-/, "");
 
             if (arr.length > i + 1 && !arr[i + 1].startsWith("-")) {
                 opts[opt] = arr[i + 1];
@@ -571,7 +568,7 @@ MongoRunner.savedOptions = {};
 
 MongoRunner.mongoOptions = function(opts) {
     // Don't remember waitForConnect
-    let waitForConnect = opts.waitForConnect;
+    var waitForConnect = opts.waitForConnect;
     delete opts.waitForConnect;
 
     // If we're a mongo object
@@ -662,7 +659,7 @@ MongoRunner.mongoOptions = function(opts) {
     opts.pathOpts =
         Object.merge(opts.pathOpts || {}, {port: "" + opts.port, runId: "" + opts.runId});
 
-    let shouldRemember =
+    var shouldRemember =
         (!opts.restart && !opts.noRemember) || (opts.restart && opts.appendOptions);
     if (shouldRemember) {
         MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
@@ -683,8 +680,8 @@ MongoRunner.mongoOptions = function(opts) {
 
 // Returns an array of integers representing the version provided.
 // Ex: "3.3.12" => [3, 3, 12]
-let _convertVersionToIntegerArray = function(version) {
-    let versionParts =
+var _convertVersionToIntegerArray = function(version) {
+    var versionParts =
         convertVersionStringToArray(version).slice(0, 3).map(part => parseInt(part, 10));
     if (versionParts.length === 2) {
         versionParts.push(Infinity);
@@ -693,13 +690,13 @@ let _convertVersionToIntegerArray = function(version) {
 };
 
 // Returns if version2 is equal to, or came after, version 1.
-let _isMongodVersionEqualOrAfter = function(version1, version2) {
+var _isMongodVersionEqualOrAfter = function(version1, version2) {
     if (version2 === "latest") {
         return true;
     }
 
-    let versionParts1 = _convertVersionToIntegerArray(version1);
-    let versionParts2 = _convertVersionToIntegerArray(version2);
+    var versionParts1 = _convertVersionToIntegerArray(version1);
+    var versionParts2 = _convertVersionToIntegerArray(version2);
     if (versionParts2[0] > versionParts1[0] ||
         (versionParts2[0] === versionParts1[0] && versionParts2[1] > versionParts1[1]) ||
         (versionParts2[0] === versionParts1[0] && versionParts2[1] === versionParts1[1] &&
@@ -712,10 +709,10 @@ let _isMongodVersionEqualOrAfter = function(version1, version2) {
 
 // Removes a setParameter parameter from mongods or mongoses running a version that won't recognize
 // them.
-let _removeSetParameterIfBeforeVersion = function(
+var _removeSetParameterIfBeforeVersion = function(
     opts, parameterName, requiredVersion, isMongos = false) {
-    let processString = isMongos ? "mongos" : "mongod";
-    let versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
+    var processString = isMongos ? "mongos" : "mongod";
+    var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
                              _isMongodVersionEqualOrAfter(requiredVersion, opts.binVersion));
     if (!versionCompatible && opts.setParameter && opts.setParameter[parameterName] != undefined) {
         print("Removing '" + parameterName + "' setParameter with value " +
@@ -905,7 +902,7 @@ MongoRunner.mongosOptions = function(opts) {
         opts.logpath = opts.logFile;
     }
 
-    let testOptions = jsTestOptions();
+    var testOptions = jsTestOptions();
     if (testOptions.keyFile && !opts.keyFile) {
         opts.keyFile = testOptions.keyFile;
     }
@@ -974,11 +971,11 @@ MongoRunner.runningChildPids = function() {
  */
 MongoRunner.runMongod = function(opts) {
     opts = opts || {};
-    let env = undefined;
-    let useHostName = true;
-    let runId = null;
-    let waitForConnect = true;
-    let fullOptions = opts;
+    var env = undefined;
+    var useHostName = true;
+    var runId = null;
+    var waitForConnect = true;
+    var fullOptions = opts;
 
     if (isObject(opts)) {
         opts = MongoRunner.mongodOptions(opts);
@@ -1020,7 +1017,7 @@ MongoRunner.runMongod = function(opts) {
         opts = MongoRunner.arrOptions("mongod", opts);
     }
 
-    let mongod = MongoRunner._startWithArgs(opts, env, waitForConnect);
+    var mongod = MongoRunner._startWithArgs(opts, env, waitForConnect);
     if (!mongod) {
         return null;
     }
@@ -1052,11 +1049,11 @@ MongoRunner.getMongosName = function(port, useHostName) {
 MongoRunner.runMongos = function(opts) {
     opts = opts || {};
 
-    let env = undefined;
-    let useHostName = false;
-    let runId = null;
-    let waitForConnect = true;
-    let fullOptions = opts;
+    var env = undefined;
+    var useHostName = false;
+    var runId = null;
+    var waitForConnect = true;
+    var fullOptions = opts;
 
     if (isObject(opts)) {
         opts = MongoRunner.mongosOptions(opts);
@@ -1069,7 +1066,7 @@ MongoRunner.runMongos = function(opts) {
         opts = MongoRunner.arrOptions("mongos", opts);
     }
 
-    let mongos = MongoRunner._startWithArgs(opts, env, waitForConnect);
+    var mongos = MongoRunner._startWithArgs(opts, env, waitForConnect);
     if (!mongos) {
         return null;
     }
@@ -1146,7 +1143,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {};
  * Note: The auth option is required in a authenticated mongod running in Windows since
  *  it uses the shutdown command, which requires admin credentials.
  */
-let stopMongoProgram = function(conn, signal, opts, waitpid) {
+var stopMongoProgram = function(conn, signal, opts, waitpid) {
     if (!conn.pid) {
         throw new Error("first arg must have a `pid` property; " +
                         "it is usually the object returned from MongoRunner.runMongod/s");
@@ -1172,7 +1169,7 @@ let stopMongoProgram = function(conn, signal, opts, waitpid) {
         throw new Error('Must wait for process to exit if it is expected to exit uncleanly');
     }
 
-    let port = parseInt(conn.port);
+    var port = parseInt(conn.port);
 
     if (grpcToMongoRpcPortMap[port]) {
         port = grpcToMongoRpcPortMap[port];
@@ -1180,7 +1177,7 @@ let stopMongoProgram = function(conn, signal, opts, waitpid) {
 
     // If the return code is in the serverExitCodeMap, it means the server crashed on startup.
     // We just use the recorded return code instead of stopping the program.
-    let returnCode;
+    var returnCode;
     if (serverExitCodeMap.hasOwnProperty(port)) {
         returnCode = serverExitCodeMap[port];
         delete serverExitCodeMap[port];
@@ -1189,7 +1186,7 @@ let stopMongoProgram = function(conn, signal, opts, waitpid) {
         // We skip calling the callback function when the expected return code of
         // the mongod process is non-zero since it's likely the process has already exited.
 
-        let skipValidation = false;
+        var skipValidation = false;
         if (opts.skipValidation) {
             skipValidation = true;
         }
@@ -1221,7 +1218,7 @@ MongoRunner.stopMongos = stopMongoProgram;
 // Given a test name figures out a directory for that test to use for dump files and makes sure
 // that directory exists and is empty.
 MongoRunner.getAndPrepareDumpDirectory = function(testName) {
-    let dir = MongoRunner.dataPath + testName + "_external/";
+    var dir = MongoRunner.dataPath + testName + "_external/";
     resetDbpath(dir);
     return dir;
 };
@@ -1230,10 +1227,10 @@ MongoRunner.getAndPrepareDumpDirectory = function(testName) {
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
 // var conn = _startMongodEmpty("--port", 30000, "--dbpath", "asdf");
-let _startMongodEmpty = function() {
-    let args = createMongoArgs("mongod", Array.from(arguments));
+var _startMongodEmpty = function() {
+    var args = createMongoArgs("mongod", Array.from(arguments));
 
-    let dbpath = _parsePath.apply(null, args);
+    var dbpath = _parsePath.apply(null, args);
     resetDbpath(dbpath);
 
     return startMongoProgram.apply(null, args);
@@ -1584,14 +1581,14 @@ function appendSetParameterArgs(argArray) {
  * @returns a new Mongo connection object, or null if the process gracefully terminated.
  */
 MongoRunner.awaitConnection = function({pid, port} = {}) {
-    let conn = null;
+    var conn = null;
     assert.soon(function() {
         try {
             conn = new Mongo("127.0.0.1:" + port);
             conn.pid = pid;
             return true;
         } catch (e) {
-            let res = checkProgram(pid);
+            var res = checkProgram(pid);
             if (!res.alive) {
                 print("mongo program was not running at " + port +
                       ", process ended with exit code: " + res.exitCode);
@@ -1624,8 +1621,8 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
            "runMongo*() cannot be used with a fuzzed configuration, use standalone.py instead.");
 
     argArray = appendSetParameterArgs(argArray);
-    let port = MongoRunner.parsePort.apply(null, argArray);
-    let pid = -1;
+    var port = MongoRunner.parsePort.apply(null, argArray);
+    var pid = -1;
 
     if (jsTest.options().mozJSGCZeal) {
         if (env === undefined) {
@@ -1661,23 +1658,23 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
  * command line arguments to the program.
  */
 startMongoProgram = function() {
-    let port = MongoRunner.parsePort.apply(null, arguments);
+    var port = MongoRunner.parsePort.apply(null, arguments);
 
     // Enable test commands.
     // TODO: Make this work better with multi-version testing so that we can support
     // enabling this on 2.4 when testing 2.6
-    let args = Array.from(arguments);
+    var args = Array.from(arguments);
     args = appendSetParameterArgs(args);
-    let pid = _startMongoProgram.apply(null, args);
+    var pid = _startMongoProgram.apply(null, args);
 
-    let m;
+    var m;
     assert.soon(function() {
         try {
             m = new Mongo("127.0.0.1:" + port);
             m.pid = pid;
             return true;
         } catch (e) {
-            let res = checkProgram(pid);
+            var res = checkProgram(pid);
             if (!res.alive) {
                 print("Could not start mongo program at " + port +
                       ", process ended with exit code: " + res.exitCode);
@@ -1695,7 +1692,7 @@ startMongoProgram = function() {
 function _getMongoProgramArguments(args) {
     args = Array.from(args);
     appendSetParameterArgs(args);
-    let progName = args[0];
+    var progName = args[0];
 
     const separator = _isWindows() ? '\\' : '/';
     progName = progName.split(separator).pop();

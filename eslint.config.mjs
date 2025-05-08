@@ -389,11 +389,4 @@ export default [
             "mongodb/no-tojson-fn": 0,
         },
     },
-    {
-        // Shell-specific: extra strict!
-        files: ["src/mongo/shell/**"],
-        rules: {
-            "no-var": 2,
-        },
-    },
 ];

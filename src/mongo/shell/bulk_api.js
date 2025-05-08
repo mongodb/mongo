@@ -1,23 +1,23 @@
 //
 // Scope for the function
 //
-let _bulk_api_module = (function() {
+var _bulk_api_module = (function() {
     // Batch types
-    let NONE = 0;
-    let INSERT = 1;
-    let UPDATE = 2;
-    let REMOVE = 3;
+    var NONE = 0;
+    var INSERT = 1;
+    var UPDATE = 2;
+    var REMOVE = 3;
 
     // Error codes
-    let UNKNOWN_ERROR = 8;
-    let WRITE_CONCERN_FAILED = 64;
-    let UNKNOWN_REPL_WRITE_CONCERN = 79;
-    let NOT_MASTER = 10107;
+    var UNKNOWN_ERROR = 8;
+    var WRITE_CONCERN_FAILED = 64;
+    var UNKNOWN_REPL_WRITE_CONCERN = 79;
+    var NOT_MASTER = 10107;
 
     /**
      * Helper function to define properties
      */
-    let defineReadOnlyProperty = function(self, name, value) {
+    var defineReadOnlyProperty = function(self, name, value) {
         Object.defineProperty(self, name, {
             enumerable: true,
             get: function() {
@@ -35,14 +35,14 @@ let _bulk_api_module = (function() {
      *
      * Accepts { w : x, j : x, wtimeout : x, fsync: x } or w, wtimeout, j
      */
-    let WriteConcern = function(wValue, wTimeout, jValue) {
+    var WriteConcern = function(wValue, wTimeout, jValue) {
         if (!(this instanceof WriteConcern)) {
-            let writeConcern = Object.create(WriteConcern.prototype);
+            var writeConcern = Object.create(WriteConcern.prototype);
             WriteConcern.apply(writeConcern, arguments);
             return writeConcern;
         }
 
-        let opts = {};
+        var opts = {};
         if (typeof wValue == 'object') {
             if (arguments.length == 1)
                 opts = Object.merge(wValue);
@@ -103,7 +103,7 @@ let _bulk_api_module = (function() {
      * singleBatchType is passed in on bulk operations consisting of a single batch and
      * are used to filter the WriteResult to only include relevant result fields.
      */
-    let WriteResult = function(bulkResult, singleBatchType, writeConcern) {
+    var WriteResult = function(bulkResult, singleBatchType, writeConcern) {
         if (!(this instanceof WriteResult))
             return new WriteResult(bulkResult, singleBatchType, writeConcern);
 
@@ -162,7 +162,7 @@ let _bulk_api_module = (function() {
          * @return {string}
          */
         this.tojson = function(indent, nolint) {
-            let result = {};
+            var result = {};
 
             if (singleBatchType == INSERT) {
                 result.nInserted = this.nInserted;
@@ -217,7 +217,7 @@ let _bulk_api_module = (function() {
     /**
      * Wraps the result for the commands
      */
-    let BulkWriteResult = function(bulkResult, singleBatchType, writeConcern) {
+    var BulkWriteResult = function(bulkResult, singleBatchType, writeConcern) {
         if (!(this instanceof BulkWriteResult) && !(this instanceof BulkWriteError))
             return new BulkWriteResult(bulkResult, singleBatchType, writeConcern);
 
@@ -277,9 +277,9 @@ let _bulk_api_module = (function() {
                 return bulkResult.writeConcernErrors[0];
             } else {
                 // Combine the errors
-                let errmsg = "";
-                for (let i = 0; i < bulkResult.writeConcernErrors.length; i++) {
-                    let err = bulkResult.writeConcernErrors[i];
+                var errmsg = "";
+                for (var i = 0; i < bulkResult.writeConcernErrors.length; i++) {
+                    var err = bulkResult.writeConcernErrors[i];
                     errmsg = errmsg + err.errmsg;
                     // TODO: Something better
                     if (i != bulkResult.writeConcernErrors.length - 1) {
@@ -317,15 +317,15 @@ let _bulk_api_module = (function() {
         this.toError = function() {
             if (this.hasErrors()) {
                 // Create a combined error message
-                let message = "";
-                let numWriteErrors = this.getWriteErrorCount();
+                var message = "";
+                var numWriteErrors = this.getWriteErrorCount();
                 if (numWriteErrors == 1) {
                     message += "write error at item " + this.getWriteErrors()[0].index;
                 } else if (numWriteErrors > 1) {
                     message += numWriteErrors + " write errors";
                 }
 
-                let hasWCError = this.hasWriteConcernError();
+                var hasWCError = this.hasWriteConcernError();
                 if (numWriteErrors > 0 && hasWCError) {
                     message += " and ";
                 }
@@ -354,7 +354,7 @@ let _bulk_api_module = (function() {
     /**
      * Represents a bulk write error, identical to a BulkWriteResult but thrown
      */
-    const BulkWriteError = function(bulkResult, singleBatchType, writeConcern, message) {
+    var BulkWriteError = function(bulkResult, singleBatchType, writeConcern, message) {
         if (!(this instanceof BulkWriteError))
             return new BulkWriteError(bulkResult, singleBatchType, writeConcern, message);
 
@@ -380,7 +380,7 @@ let _bulk_api_module = (function() {
     BulkWriteError.prototype = Object.create(Error.prototype);
     BulkWriteError.prototype.constructor = BulkWriteError;
 
-    let getEmptyBulkResult = function() {
+    var getEmptyBulkResult = function() {
         return {
             writeErrors: [],
             writeConcernErrors: [],
@@ -396,7 +396,7 @@ let _bulk_api_module = (function() {
     /**
      * Wraps a command error
      */
-    const WriteCommandError = function(commandError) {
+    var WriteCommandError = function(commandError) {
         if (!(this instanceof WriteCommandError))
             return new WriteCommandError(commandError);
 
@@ -433,7 +433,7 @@ let _bulk_api_module = (function() {
     /**
      * Wraps an error for a single write
      */
-    let WriteError = function(err) {
+    var WriteError = function(err) {
         if (!(this instanceof WriteError))
             return new WriteError(err);
 
@@ -477,7 +477,7 @@ let _bulk_api_module = (function() {
     /**
      * Wraps a write concern error
      */
-    const WriteConcernError = function(err) {
+    var WriteConcernError = function(err) {
         if (!(this instanceof WriteConcernError))
             return new WriteConcernError(err);
 
@@ -513,7 +513,7 @@ let _bulk_api_module = (function() {
      * Keeps the state of an unordered batch so we can rewrite the results
      * correctly after command execution
      */
-    let Batch = function(batchType, originalZeroIndex) {
+    var Batch = function(batchType, originalZeroIndex) {
         this.originalZeroIndex = originalZeroIndex;
         this.batchType = batchType;
         this.operations = [];
@@ -522,37 +522,37 @@ let _bulk_api_module = (function() {
     /***********************************************************
      * Wraps the operations done for the batch
      ***********************************************************/
-    let Bulk = function(collection, ordered) {
-        let self = this;
-        let coll = collection;
-        let executed = false;
+    var Bulk = function(collection, ordered) {
+        var self = this;
+        var coll = collection;
+        var executed = false;
 
         // Set max byte size
-        let maxBatchSizeBytes = 1024 * 1024 * 16;
-        let maxNumberOfDocsInBatch = 1000;
-        let idFieldOverhead = Object.bsonsize({_id: ObjectId()}) - Object.bsonsize({});
-        let writeConcern = null;
-        let rawData = null;
-        let letParams = null;
-        let currentOp;
+        var maxBatchSizeBytes = 1024 * 1024 * 16;
+        var maxNumberOfDocsInBatch = 1000;
+        var idFieldOverhead = Object.bsonsize({_id: ObjectId()}) - Object.bsonsize({});
+        var writeConcern = null;
+        var rawData = null;
+        var letParams = null;
+        var currentOp;
 
         // Final results
-        let bulkResult = getEmptyBulkResult();
+        var bulkResult = getEmptyBulkResult();
 
         // Current batch
-        let currentBatch = null;
-        let currentIndex = 0;
-        let currentBatchSize = 0;
-        let currentBatchSizeBytes = 0;
-        let batches = [];
+        var currentBatch = null;
+        var currentIndex = 0;
+        var currentBatchSize = 0;
+        var currentBatchSizeBytes = 0;
+        var batches = [];
 
-        let defineBatchTypeCounter = function(self, name, type) {
+        var defineBatchTypeCounter = function(self, name, type) {
             Object.defineProperty(self, name, {
                 enumerable: true,
                 get: function() {
-                    let counter = 0;
+                    var counter = 0;
 
-                    for (let i = 0; i < batches.length; i++) {
+                    for (var i = 0; i < batches.length; i++) {
                         if (batches[i].batchType == type) {
                             counter += batches[i].operations.length;
                         }
@@ -589,7 +589,7 @@ let _bulk_api_module = (function() {
             return batches;
         };
 
-        let finalizeBatch = function(newDocType) {
+        var finalizeBatch = function(newDocType) {
             // Save the batch to the execution stack
             batches.push(currentBatch);
 
@@ -602,12 +602,12 @@ let _bulk_api_module = (function() {
         };
 
         // Add to internal list of documents
-        let addToOperationsList = function(docType, document) {
+        var addToOperationsList = function(docType, document) {
             if (Array.isArray(document))
                 throw Error("operation passed in cannot be an Array");
 
             // Get the bsonSize
-            let bsonSize = Object.bsonsize(document);
+            var bsonSize = Object.bsonsize(document);
 
             // If an _id will be added to the insert, adjust the bsonSize
             if (docType === INSERT && documentNeedsId(document)) {
@@ -638,7 +638,7 @@ let _bulk_api_module = (function() {
          * @param obj {Object} the document to check if an _id is present
          * @returns true if the document needs an _id and false otherwise
          */
-        let documentNeedsId = function(obj) {
+        var documentNeedsId = function(obj) {
             return typeof (obj._id) == "undefined" && !Array.isArray(obj);
         };
 
@@ -646,11 +646,11 @@ let _bulk_api_module = (function() {
          * @return {Object} a new document with an _id: ObjectId if _id is not present.
          *     Otherwise, returns the same object passed.
          */
-        let addIdIfNeeded = function(obj) {
+        var addIdIfNeeded = function(obj) {
             if (documentNeedsId(obj)) {
-                let tmp = obj;  // don't want to modify input
+                var tmp = obj;  // don't want to modify input
                 obj = {_id: new ObjectId()};
-                for (let key in tmp) {
+                for (var key in tmp) {
                     obj[key] = tmp[key];
                 }
             }
@@ -669,12 +669,12 @@ let _bulk_api_module = (function() {
 
         //
         // Find based operations
-        const findOperations = {
+        var findOperations = {
             update: function(updateDocument) {
                 // Set the top value for the update 0 = multi true, 1 = multi false
-                let upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
+                var upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
                 // Establish the update command
-                let document =
+                var document =
                     {q: currentOp.selector, u: updateDocument, multi: true, upsert: upsert};
 
                 // Copy over the hint, if we have one.
@@ -700,9 +700,9 @@ let _bulk_api_module = (function() {
 
             updateOne: function(updateDocument) {
                 // Set the top value for the update 0 = multi true, 1 = multi false
-                let upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
+                var upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
                 // Establish the update command
-                let document =
+                var document =
                     {q: currentOp.selector, u: updateDocument, multi: false, upsert: upsert};
 
                 // Copy over the sort, if we have one.
@@ -757,7 +757,7 @@ let _bulk_api_module = (function() {
 
             removeOne: function() {
                 // Establish the removeOne command
-                let document = {q: currentOp.selector, limit: 1};
+                var document = {q: currentOp.selector, limit: 1};
 
                 // Copy over the collation, if we have one.
                 if (currentOp.hasOwnProperty('collation')) {
@@ -772,7 +772,7 @@ let _bulk_api_module = (function() {
 
             remove: function() {
                 // Establish the remove command
-                let document = {q: currentOp.selector, limit: 0};
+                var document = {q: currentOp.selector, limit: 0};
 
                 // Copy over the collation, if we have one.
                 if (currentOp.hasOwnProperty('collation')) {
@@ -818,7 +818,7 @@ let _bulk_api_module = (function() {
 
         //
         // Merge write command result into aggregated results object
-        let mergeBatchResults = function(batch, bulkResult, result) {
+        var mergeBatchResults = function(batch, bulkResult, result) {
             // If we have an insert Batch type
             if (batch.batchType == INSERT) {
                 bulkResult.nInserted = bulkResult.nInserted + result.n;
@@ -829,13 +829,13 @@ let _bulk_api_module = (function() {
                 bulkResult.nRemoved = bulkResult.nRemoved + result.n;
             }
 
-            let nUpserted = 0;
+            var nUpserted = 0;
 
             // We have an array of upserted values, we need to rewrite the indexes
             if (Array.isArray(result.upserted)) {
                 nUpserted = result.upserted.length;
 
-                for (let i = 0; i < result.upserted.length; i++) {
+                for (var i = 0; i < result.upserted.length; i++) {
                     bulkResult.upserted.push({
                         index: result.upserted[i].index + batch.originalZeroIndex,
                         _id: result.upserted[i]._id
@@ -859,14 +859,14 @@ let _bulk_api_module = (function() {
             }
 
             if (Array.isArray(result.writeErrors)) {
-                for (let i = 0; i < result.writeErrors.length; i++) {
-                    let writeError = {
+                for (var i = 0; i < result.writeErrors.length; i++) {
+                    var writeError = {
                         index: batch.originalZeroIndex + result.writeErrors[i].index,
                         code: result.writeErrors[i].code,
                         errmsg: result.writeErrors[i].errmsg,
                         op: batch.operations[result.writeErrors[i].index]
                     };
-                    let errInfo = result.writeErrors[i].errInfo;
+                    var errInfo = result.writeErrors[i].errInfo;
                     if (errInfo) {
                         writeError['errInfo'] = errInfo;
                     }
@@ -882,14 +882,14 @@ let _bulk_api_module = (function() {
 
         //
         // Constructs the write batch command.
-        let buildBatchCmd = function(batch) {
-            let cmd = null;
+        var buildBatchCmd = function(batch) {
+            var cmd = null;
 
             // Generate the right update
             if (batch.batchType == UPDATE) {
                 cmd = {update: coll.getName(), updates: batch.operations, ordered: ordered};
             } else if (batch.batchType == INSERT) {
-                let transformedInserts = [];
+                var transformedInserts = [];
                 batch.operations.forEach(function(insertDoc) {
                     transformedInserts.push(addIdIfNeeded(insertDoc));
                 });
@@ -932,9 +932,9 @@ let _bulk_api_module = (function() {
 
         //
         // Execute the batch
-        let executeBatch = function(batch) {
-            let result = null;
-            let cmd = buildBatchCmd(batch);
+        var executeBatch = function(batch) {
+            var result = null;
+            var cmd = buildBatchCmd(batch);
 
             // Run the command (may throw)
             result = collection.runCommand(cmd);
@@ -963,10 +963,10 @@ let _bulk_api_module = (function() {
                 batches.push(currentBatch);
 
             // Total number of batches to execute
-            let totalNumberToExecute = batches.length;
+            var totalNumberToExecute = batches.length;
 
             // Execute all the batches
-            for (let i = 0; i < batches.length; i++) {
+            for (var i = 0; i < batches.length; i++) {
                 // Execute the batch
                 executeBatch(batches[i]);
 
@@ -1008,8 +1008,8 @@ let _bulk_api_module = (function() {
                 throw Error("Explained bulk operations must consist of exactly 1 batch");
             }
 
-            let explainBatch = batches[0];
-            let writeCmd = buildBatchCmd(explainBatch);
+            var explainBatch = batches[0];
+            var writeCmd = buildBatchCmd(explainBatch);
             return {"explain": writeCmd, "verbosity": verbosity};
         };
     };

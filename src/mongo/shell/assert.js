@@ -163,7 +163,7 @@ assert = (function() {
         return fullMessage;
     }
 
-    let assert = function(value, msg, attr) {
+    var assert = function(value, msg, attr) {
         if (arguments.length > 3) {
             _doassert("Too many parameters to assert().");
         }

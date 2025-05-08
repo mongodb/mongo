@@ -3,8 +3,8 @@
 // normally.
 //
 
-let Explainable = (function() {
-    let parseVerbosity = function(verbosity) {
+var Explainable = (function() {
+    var parseVerbosity = function(verbosity) {
         // Truthy non-strings are interpreted as "allPlansExecution" verbosity.
         if (verbosity && (typeof verbosity !== "string")) {
             return "allPlansExecution";
@@ -20,7 +20,7 @@ let Explainable = (function() {
         return verbosity;
     };
 
-    let throwOrReturn = function(explainResult) {
+    var throwOrReturn = function(explainResult) {
         if (("ok" in explainResult && !explainResult.ok) || explainResult.$err) {
             throw _getErrorWithCode(explainResult, "explain failed: " + tojson(explainResult));
         }
@@ -28,8 +28,8 @@ let Explainable = (function() {
         return explainResult;
     };
 
-    let buildExplainCmd = function(innerCmd, verbosity) {
-        let explainCmd = {"explain": innerCmd, "verbosity": verbosity};
+    var buildExplainCmd = function(innerCmd, verbosity) {
+        var explainCmd = {"explain": innerCmd, "verbosity": verbosity};
         // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
         // of explainCmd so that it has the intended effect.
         if (innerCmd.hasOwnProperty("maxTimeMS")) {
@@ -137,19 +137,19 @@ let Explainable = (function() {
          * to the server.
          */
         this.find = function() {
-            let cursor = this._collection.find.apply(this._collection, arguments);
+            var cursor = this._collection.find.apply(this._collection, arguments);
             return new DBExplainQuery(cursor, this._verbosity);
         };
 
         this.findAndModify = function(params) {
-            let famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
-            let explainCmd = buildExplainCmd(famCmd, this._verbosity);
-            let explainResult = this._collection.runReadCommand(explainCmd);
+            var famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
+            var explainCmd = buildExplainCmd(famCmd, this._verbosity);
+            var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
 
         this.distinct = function(keyString, query, options) {
-            let distinctCmd = {
+            var distinctCmd = {
                 distinct: this._collection.getName(),
                 key: keyString,
                 query: query || {}
@@ -168,25 +168,25 @@ let Explainable = (function() {
                 distinctCmd.rawData = options.rawData;
             }
 
-            let explainCmd = buildExplainCmd(distinctCmd, this._verbosity);
-            let explainResult = this._collection.runReadCommand(explainCmd);
+            var explainCmd = buildExplainCmd(distinctCmd, this._verbosity);
+            var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
 
         this.remove = function() {
-            let parsed = this._collection._parseRemove.apply(this._collection, arguments);
-            let query = parsed.query;
-            let justOne = parsed.justOne;
-            let collation = parsed.collation;
-            let rawData = parsed.rawData;
+            var parsed = this._collection._parseRemove.apply(this._collection, arguments);
+            var query = parsed.query;
+            var justOne = parsed.justOne;
+            var collation = parsed.collation;
+            var rawData = parsed.rawData;
 
-            let bulk = this._collection.initializeOrderedBulkOp();
+            var bulk = this._collection.initializeOrderedBulkOp();
 
             if (rawData) {
                 bulk.setRawData(rawData);
             }
 
-            let removeOp = bulk.find(query);
+            var removeOp = bulk.find(query);
 
             if (collation) {
                 removeOp.collation(collation);
@@ -198,29 +198,29 @@ let Explainable = (function() {
                 removeOp.remove();
             }
 
-            let explainCmd = bulk.convertToExplainCmd(this._verbosity);
-            let explainResult = this._collection.runCommand(explainCmd);
+            var explainCmd = bulk.convertToExplainCmd(this._verbosity);
+            var explainResult = this._collection.runCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
 
         this.update = function() {
-            let parsed = this._collection._parseUpdate.apply(this._collection, arguments);
-            let query = parsed.query;
-            let updateSpec = parsed.updateSpec;
-            let upsert = parsed.upsert;
-            let multi = parsed.multi;
-            let collation = parsed.collation;
-            let arrayFilters = parsed.arrayFilters;
-            let hint = parsed.hint;
-            let rawData = parsed.rawData;
+            var parsed = this._collection._parseUpdate.apply(this._collection, arguments);
+            var query = parsed.query;
+            var updateSpec = parsed.updateSpec;
+            var upsert = parsed.upsert;
+            var multi = parsed.multi;
+            var collation = parsed.collation;
+            var arrayFilters = parsed.arrayFilters;
+            var hint = parsed.hint;
+            var rawData = parsed.rawData;
 
-            let bulk = this._collection.initializeOrderedBulkOp();
+            var bulk = this._collection.initializeOrderedBulkOp();
 
             if (rawData) {
                 bulk.setRawData(rawData);
             }
 
-            let updateOp = bulk.find(query);
+            var updateOp = bulk.find(query);
 
             if (hint) {
                 updateOp.hint(hint);
@@ -244,8 +244,8 @@ let Explainable = (function() {
                 updateOp.updateOne(updateSpec);
             }
 
-            let explainCmd = bulk.convertToExplainCmd(this._verbosity);
-            let explainResult = this._collection.runCommand(explainCmd);
+            var explainCmd = bulk.convertToExplainCmd(this._verbosity);
+            var explainResult = this._collection.runCommand(explainCmd);
             return throwOrReturn(explainResult);
         };
 
@@ -382,7 +382,7 @@ let Explain = (function() {
         // callback is executed last on the root.
         function walkTree(root, callbackFn) {
             if ("inputStages" in root) {
-                for (let i = 0; i < root.inputStages.length; i++) {
+                for (var i = 0; i < root.inputStages.length; i++) {
                     walkTree(root.inputStages[i], callbackFn);
                 }
             }

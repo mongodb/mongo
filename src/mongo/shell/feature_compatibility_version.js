@@ -10,15 +10,15 @@
  * multiple times.
  */
 
-let fcvConstants = getFCVConstants();
+var fcvConstants = getFCVConstants();
 
-let latestFCV = fcvConstants.latest;
-let lastContinuousFCV = fcvConstants.lastContinuous;
-let lastLTSFCV = fcvConstants.lastLTS;
+var latestFCV = fcvConstants.latest;
+var lastContinuousFCV = fcvConstants.lastContinuous;
+var lastLTSFCV = fcvConstants.lastLTS;
 // The number of versions since the last-lts version. When numVersionsSinceLastLTS = 1,
 // lastContinuousFCV is equal to lastLTSFCV. This is used to calculate the expected minWireVersion
 // in jstests that use the lastLTSFCV.
-let numVersionsSinceLastLTS = fcvConstants.numSinceLastLTS;
+var numVersionsSinceLastLTS = fcvConstants.numSinceLastLTS;
 
 /**
  * Returns the FCV associated with a binary version.

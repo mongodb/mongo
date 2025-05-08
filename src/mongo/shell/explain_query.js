@@ -3,7 +3,7 @@
 // an "explainable cursor". Explains of .find() operations run through this abstraction.
 //
 
-let DBExplainQuery = (function() {
+var DBExplainQuery = (function() {
     //
     // Private methods.
     //
@@ -39,7 +39,7 @@ let DBExplainQuery = (function() {
         // DBQuery.
         //
 
-        let delegationFuncNames = [
+        var delegationFuncNames = [
             "addOption",
             "allowDiskUse",
             "batchSize",
@@ -58,7 +58,7 @@ let DBExplainQuery = (function() {
         ];
 
         // Generate the delegation methods from the list of their names.
-        let that = this;
+        var that = this;
         delegationFuncNames.forEach(function(name) {
             that[name] = createDelegationFunc(that, that._query, name);
         });
@@ -86,7 +86,7 @@ let DBExplainQuery = (function() {
 
             // Convert this explain query into an explain command, and send the command to
             // the server.
-            let innerCmd;
+            var innerCmd;
             if (this._isCount) {
                 // True means to always apply the skip and limit values.
                 innerCmd = this._query._convertToCountCmd(this._applySkipLimit);
@@ -94,7 +94,7 @@ let DBExplainQuery = (function() {
                 innerCmd = this._query._convertToCommand();
             }
 
-            let explainCmd = {explain: innerCmd};
+            var explainCmd = {explain: innerCmd};
             explainCmd["verbosity"] = this._verbosity;
 
             // If "maxTimeMS" or "$readPreference" are  set on 'innerCmd', they need to be
@@ -106,8 +106,8 @@ let DBExplainQuery = (function() {
                 explainCmd["$readPreference"] = innerCmd["$readPreference"];
             }
 
-            let explainDb = this._query._db;
-            let explainResult = explainDb.runReadCommand(explainCmd, null, this._query._options);
+            var explainDb = this._query._db;
+            var explainResult = explainDb.runReadCommand(explainCmd, null, this._query._options);
 
             return Explainable.throwOrReturn(explainResult);
         };
@@ -145,7 +145,7 @@ let DBExplainQuery = (function() {
          * print the result of running the explain.
          */
         this.shellPrint = function() {
-            let result = this.finish();
+            var result = this.finish();
             return tojson(result);
         };
 

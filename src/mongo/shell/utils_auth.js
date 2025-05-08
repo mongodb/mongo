@@ -1,4 +1,4 @@
-let authutil;
+var authutil;
 
 (function() {
 assert(!authutil);
@@ -8,12 +8,12 @@ authutil = {};
  * Logs out all connections "conn" from database "dbname".
  */
 authutil.logout = function(conn, dbname) {
-    let i;
+    var i;
     if (null == conn.length) {
         conn = [conn];
     }
     for (i = 0; i < conn.length; ++i) {
-        let curDB = new DB(conn[i], dbname);
+        var curDB = new DB(conn[i], dbname);
         curDB.logout();
     }
 };
@@ -25,7 +25,7 @@ authutil.logout = function(conn, dbname) {
  * in "conns" in the logged-out-of-dbName state.
  */
 authutil.assertAuthenticate = function(conns, dbName, authParams) {
-    let conn, i, ex, ex2;
+    var conn, i, ex, ex2;
     if (conns.length == null)
         conns = [conns];
 
@@ -56,7 +56,7 @@ authutil.assertAuthenticate = function(conns, dbName, authParams) {
  * Raises in exception if any of the authentications succeed.
  */
 authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
-    let conn, i;
+    var conn, i;
     if (conns.length == null)
         conns = [conns];
 
@@ -79,7 +79,7 @@ authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
  * user.
  */
 authutil.asCluster = function(conn, keyfile, action) {
-    let ex;
+    var ex;
 
     // put a connection in an array for uniform processing.
     let connArray = conn;

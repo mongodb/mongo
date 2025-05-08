@@ -174,12 +174,12 @@ Mongo.prototype.runCommand = function(dbname, cmd, options) {
  * Returns all log components and current verbosity values
  */
 Mongo.prototype.getLogComponents = function(driverSession = this._getDefaultSession()) {
-    let cmdObj = {getParameter: 1, logComponentVerbosity: 1};
+    var cmdObj = {getParameter: 1, logComponentVerbosity: 1};
     if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
         cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
     }
 
-    let res = this.adminCommand(cmdObj);
+    var res = this.adminCommand(cmdObj);
     if (!res.ok)
         throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
     return res.logComponentVerbosity;
@@ -197,22 +197,22 @@ Mongo.prototype.setLogLevel = function(
     } else if (component !== undefined) {
         throw Error("setLogLevel component must be a string:" + tojson(component));
     }
-    let vDoc = {verbosity: logLevel};
+    var vDoc = {verbosity: logLevel};
 
     // nest vDoc
-    for (let key, obj; componentNames.length > 0;) {
+    for (var key, obj; componentNames.length > 0;) {
         obj = {};
         key = componentNames.pop();
         obj[key] = vDoc;
         vDoc = obj;
     }
 
-    let cmdObj = {setParameter: 1, logComponentVerbosity: vDoc};
+    var cmdObj = {setParameter: 1, logComponentVerbosity: vDoc};
     if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
         cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
     }
 
-    let res = this.adminCommand(cmdObj);
+    var res = this.adminCommand(cmdObj);
     if (!res.ok)
         throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
     return res;
@@ -225,11 +225,11 @@ Mongo.prototype.getDBNames = function() {
 };
 
 Mongo.prototype.getCollection = function(ns) {
-    let idx = ns.indexOf(".");
+    var idx = ns.indexOf(".");
     if (idx < 0)
         throw Error("need . in ns");
-    let db = ns.substring(0, idx);
-    let c = ns.substring(idx + 1);
+    var db = ns.substring(0, idx);
+    var c = ns.substring(idx + 1);
     return this.getDB(db).getCollection(c);
 };
 
@@ -325,7 +325,7 @@ globalThis.connect = function(url, user, pass, apiParameters) {
     //                                  or "hostName/databaseName"
     //                                  or "databaseName"
     //                                  or full mongo uri.
-    let urlType = typeof url;
+    var urlType = typeof url;
     if (urlType == "undefined") {
         throw Error("Missing connection string");
     }
@@ -354,18 +354,17 @@ globalThis.connect = function(url, user, pass, apiParameters) {
         }
     }
 
-    let atPos = url.indexOf("@");
-    let protocolPos = url.indexOf("://");
-    let safeURL = url;
+    var atPos = url.indexOf("@");
+    var protocolPos = url.indexOf("://");
+    var safeURL = url;
     if (atPos != -1 && protocolPos != -1) {
         safeURL = url.substring(0, protocolPos + 3) + url.substring(atPos + 1);
     }
     chatty("connecting to: " + safeURL);
-    let m;
     try {
-        m = new Mongo(url, undefined /* encryptedDBClientCallback */, apiParameters);
+        var m = new Mongo(url, undefined /* encryptedDBClientCallback */, apiParameters);
     } catch (e) {
-        let dest;
+        var dest;
         if (url.indexOf(".query.mongodb.net") != -1) {
             dest = "MongoDB Atlas Data Lake";
         } else if (url.indexOf(".mongodb.net") != -1) {
@@ -379,8 +378,7 @@ globalThis.connect = function(url, user, pass, apiParameters) {
 
         throw e;
     }
-    // This variable is globally accessed
-    var db = m.getDB(m.defaultDB);  // eslint-disable-line no-var
+    var db = m.getDB(m.defaultDB);
 
     if (user && pass) {
         if (!db.auth(user, pass)) {
@@ -399,10 +397,10 @@ globalThis.connect = function(url, user, pass, apiParameters) {
     TestData = Object.merge(originalTestData, {disableImplicitSessions: true});
     try {
         // Check server version
-        let serverVersion = db.version();
+        var serverVersion = db.version();
         chatty("MongoDB server version: " + serverVersion);
 
-        let shellVersion = version();
+        var shellVersion = version();
         if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
             chatty("WARNING: shell and server versions do not match");
         }

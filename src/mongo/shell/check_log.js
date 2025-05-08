@@ -2,7 +2,7 @@
  * Helper functions which connect to a server or reads a log file, and check its logs for particular
  * strings.
  */
-let checkLog;
+var checkLog;
 
 (function() {
 "use strict";

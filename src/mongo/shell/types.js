@@ -29,9 +29,9 @@ if (typeof (Timestamp) != "undefined") {
 }
 
 Date.timeFunc = function(theFunc, numTimes) {
-    let start = new Date();
+    var start = new Date();
     numTimes = numTimes || 1;
-    for (let i = 0; i < numTimes; i++) {
+    for (var i = 0; i < numTimes; i++) {
         theFunc.apply(null, Array.from(arguments).slice(2));
     }
 
@@ -56,18 +56,18 @@ Date.prototype.tojson = function() {
         throw e;
     }
 
-    let UTC = 'UTC';
-    let year = this['get' + UTC + 'FullYear']().zeroPad(4);
-    let month = (this['get' + UTC + 'Month']() + 1).zeroPad(2);
-    let date = this['get' + UTC + 'Date']().zeroPad(2);
-    let hour = this['get' + UTC + 'Hours']().zeroPad(2);
-    let minute = this['get' + UTC + 'Minutes']().zeroPad(2);
-    let sec = this['get' + UTC + 'Seconds']().zeroPad(2);
+    var UTC = 'UTC';
+    var year = this['get' + UTC + 'FullYear']().zeroPad(4);
+    var month = (this['get' + UTC + 'Month']() + 1).zeroPad(2);
+    var date = this['get' + UTC + 'Date']().zeroPad(2);
+    var hour = this['get' + UTC + 'Hours']().zeroPad(2);
+    var minute = this['get' + UTC + 'Minutes']().zeroPad(2);
+    var sec = this['get' + UTC + 'Seconds']().zeroPad(2);
 
     if (this['get' + UTC + 'Milliseconds']())
         sec += '.' + this['get' + UTC + 'Milliseconds']().zeroPad(3);
 
-    let ofs = 'Z';
+    var ofs = 'Z';
     // // print a non-UTC time
     // var ofsmin = this.getTimezoneOffset();
     // if (ofsmin != 0){
@@ -84,31 +84,31 @@ ISODate = function(isoDateStr) {
     if (!isoDateStr)
         return new Date();
 
-    let isoDateRegex =
+    var isoDateRegex =
         /^(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?$/;
-    let res = isoDateRegex.exec(isoDateStr);
+    var res = isoDateRegex.exec(isoDateStr);
 
     if (!res)
         throw Error("invalid ISO date: " + isoDateStr);
 
-    let year = parseInt(res[1], 10);
-    let month = (parseInt(res[2], 10)) - 1;
-    let date = parseInt(res[3], 10);
-    let hour = parseInt(res[5], 10) || 0;
-    let min = parseInt(res[7], 10) || 0;
-    let sec = parseInt((res[9] && res[9].substr(0, 2)), 10) || 0;
-    let ms = Math.round((parseFloat(res[10]) || 0) * 1000);
+    var year = parseInt(res[1], 10);
+    var month = (parseInt(res[2], 10)) - 1;
+    var date = parseInt(res[3], 10);
+    var hour = parseInt(res[5], 10) || 0;
+    var min = parseInt(res[7], 10) || 0;
+    var sec = parseInt((res[9] && res[9].substr(0, 2)), 10) || 0;
+    var ms = Math.round((parseFloat(res[10]) || 0) * 1000);
 
-    let dateTime = new Date();
+    var dateTime = new Date();
 
     dateTime.setUTCFullYear(year, month, date);
     dateTime.setUTCHours(hour);
     dateTime.setUTCMinutes(min);
     dateTime.setUTCSeconds(sec);
-    let time = dateTime.setUTCMilliseconds(ms);
+    var time = dateTime.setUTCMilliseconds(ms);
 
     if (res[11] && res[11] != 'Z') {
-        let ofs = 0;
+        var ofs = 0;
         ofs += (parseInt(res[13], 10) || 0) * 60 * 60 * 1000;  // hours
         ofs += (parseInt(res[14], 10) || 0) * 60 * 1000;       // mins
         if (res[12] == '+')                                    // if ahead subtract
@@ -144,7 +144,7 @@ Array.contains = function(a, x) {
         throw new Error("The first argument to Array.contains must be an array");
     }
 
-    for (let i = 0; i < a.length; i++) {
+    for (var i = 0; i < a.length; i++) {
         if (a[i] == x)
             return true;
     }
@@ -156,9 +156,9 @@ Array.unique = function(a) {
         throw new Error("The first argument to Array.unique must be an array");
     }
 
-    let u = [];
-    for (let i = 0; i < a.length; i++) {
-        let o = a[i];
+    var u = [];
+    for (var i = 0; i < a.length; i++) {
+        var o = a[i];
         if (!Array.contains(u, o)) {
             u.push(o);
         }
@@ -171,9 +171,9 @@ Array.shuffle = function(arr) {
         throw new Error("The first argument to Array.shuffle must be an array");
     }
 
-    for (let i = 0; i < arr.length - 1; i++) {
-        let pos = i + Random.randInt(arr.length - i);
-        let save = arr[i];
+    for (var i = 0; i < arr.length - 1; i++) {
+        var pos = i + Random.randInt(arr.length - i);
+        var save = arr[i];
         arr[i] = arr[pos];
         arr[pos] = save;
     }
@@ -200,7 +200,7 @@ Array.tojson = function(a, indent, nolint, depth, sortKeys) {
         nolint = true;
         indent = "";
     }
-    let elementSeparator = nolint ? " " : "\n";
+    var elementSeparator = nolint ? " " : "\n";
 
     if (!indent)
         indent = "";
@@ -211,13 +211,13 @@ Array.tojson = function(a, indent, nolint, depth, sortKeys) {
         return "[ ]";
     }
 
-    let s = "[" + elementSeparator;
+    var s = "[" + elementSeparator;
 
     // add to indent if we are pretty
     if (!nolint)
         indent += "\t";
 
-    for (let i = 0; i < a.length; i++) {
+    for (var i = 0; i < a.length; i++) {
         s += indent + tojson(a[i], indent, nolint, depth + 1, sortKeys);
         if (i < a.length - 1) {
             s += "," + elementSeparator;
@@ -251,9 +251,9 @@ Array.fetchRefs = function(arr, coll) {
         throw new Error("The first argument to Array.fetchRefs must be an array");
     }
 
-    let n = [];
-    for (let i = 0; i < arr.length; i++) {
-        let z = arr[i];
+    var n = [];
+    for (var i = 0; i < arr.length; i++) {
+        var z = arr[i];
         if (coll && coll != z.getCollection())
             continue;
         n.push(z.fetch());
@@ -268,8 +268,8 @@ Array.sum = function(arr) {
 
     if (arr.length == 0)
         return null;
-    let s = arr[0];
-    for (let i = 1; i < arr.length; i++)
+    var s = arr[0];
+    for (var i = 1; i < arr.length; i++)
         s += arr[i];
     return s;
 };
@@ -289,10 +289,10 @@ Array.stdDev = function(arr) {
         throw new Error("The first argument to Array.stdDev must be an array");
     }
 
-    let avg = Array.avg(arr);
-    let sum = 0;
+    var avg = Array.avg(arr);
+    var sum = 0;
 
-    for (let i = 0; i < arr.length; i++) {
+    for (var i = 0; i < arr.length; i++) {
         sum += Math.pow(arr[i] - avg, 2);
     }
 
@@ -301,8 +301,8 @@ Array.stdDev = function(arr) {
 
 // Object
 Object.extend = function(dst, src, deep) {
-    for (let k in src) {
-        let v = src[k];
+    for (var k in src) {
+        var v = src[k];
         if (deep && typeof (v) == "object" && v !== null) {
             if (v.constructor === ObjectId) {  // convert ObjectId properly
                 eval("v = " + tojson(v));
@@ -320,7 +320,7 @@ Object.extend = function(dst, src, deep) {
 };
 
 Object.merge = function(dst, src, deep) {
-    let clone = Object.extend({}, dst, deep);
+    var clone = Object.extend({}, dst, deep);
     return Object.extend(clone, src, deep);
 };
 
@@ -355,8 +355,8 @@ Object.deepMerge = function(...objects) {
 };
 
 Object.keySet = function(o) {
-    let ret = new Array();
-    for (let i in o) {
+    var ret = new Array();
+    for (var i in o) {
         if (!(i in o.__proto__ && o[i] === o.__proto__[i])) {
             ret.push(i);
         }
@@ -412,8 +412,8 @@ if (!String.prototype.includes) {
 String.prototype.pad = function(length, right, chr) {
     if (typeof chr == 'undefined')
         chr = ' ';
-    let str = this;
-    for (let i = length - str.length; i > 0; i--) {
+    var str = this;
+    for (var i = length - str.length; i > 0; i--) {
         if (right) {
             str = str + chr;
         } else {
@@ -511,7 +511,7 @@ ObjectId.fromDate = function(source) {
         throw Error("date missing or undefined");
     }
 
-    let sourceDate;
+    var sourceDate;
 
     // Extract Date from input.
     // If input is a string, assume ISO date string and
@@ -523,13 +523,13 @@ ObjectId.fromDate = function(source) {
     }
 
     // Convert date object to seconds since Unix epoch.
-    let seconds = Math.floor(sourceDate.getTime() / 1000);
+    var seconds = Math.floor(sourceDate.getTime() / 1000);
 
     // Generate hex timestamp with padding.
-    let hexTimestamp = seconds.toString(16).pad(8, false, '0') + "0000000000000000";
+    var hexTimestamp = seconds.toString(16).pad(8, false, '0') + "0000000000000000";
 
     // Create an ObjectId with hex timestamp.
-    let objectId = ObjectId(hexTimestamp);
+    var objectId = ObjectId(hexTimestamp);
 
     return objectId;
 };
@@ -569,7 +569,7 @@ if (typeof (DBRef) != "undefined") {
     DBRef.prototype.fetch = function() {
         assert(this.$ref, "need a ns");
         assert(this.$id, "need an id");
-        let coll = this.$db ? globalThis.db.getSiblingDB(this.$db).getCollection(this.$ref)
+        var coll = this.$db ? globalThis.db.getSiblingDB(this.$db).getCollection(this.$ref)
                             : globalThis.db[this.$ref];
         return coll.findOne({_id: this.$id});
     };
@@ -639,21 +639,20 @@ BSONAwareMap.hash = function(val) {
         case 'date':
             return val.toString();
         case 'object':
-        case 'array': {
-            let s = "";
-            for (let k in val) {
+        case 'array':
+            var s = "";
+            for (var k in val) {
                 s += k + val[k];
             }
             return s;
-        }
     }
 
     throw Error("can't hash : " + typeof (val));
 };
 
 BSONAwareMap.prototype.put = function(key, value) {
-    let o = this._get(key);
-    let old = o.value;
+    var o = this._get(key);
+    var old = o.value;
     o.value = value;
     return old;
 };
@@ -663,25 +662,25 @@ BSONAwareMap.prototype.get = function(key) {
 };
 
 BSONAwareMap.prototype._get = function(key) {
-    let h = BSONAwareMap.hash(key);
-    let a = this._data[h];
+    var h = BSONAwareMap.hash(key);
+    var a = this._data[h];
     if (!a) {
         a = [];
         this._data[h] = a;
     }
-    for (let i = 0; i < a.length; i++) {
+    for (var i = 0; i < a.length; i++) {
         if (friendlyEqual(key, a[i].key)) {
             return a[i];
         }
     }
-    let o = {key: key, value: null};
+    var o = {key: key, value: null};
     a.push(o);
     return o;
 };
 
 BSONAwareMap.prototype.values = function() {
-    let all = [];
-    for (let k in this._data) {
+    var all = [];
+    for (var k in this._data) {
         this._data[k].forEach(function(z) {
             all.push(z.value);
         });
@@ -736,7 +735,7 @@ tojson = function(x, indent, nolint, depth, sortKeys) {
         case "boolean":
             return "" + x;
         case "object": {
-            let s = tojsonObject(x, indent, nolint, depth, sortKeys);
+            var s = tojsonObject(x, indent, nolint, depth, sortKeys);
             if ((nolint == null || nolint == true) && s.length < 80 &&
                 (indent == null || indent.length == 0)) {
                 s = s.replace(/[\t\r\n]+/gm, " ");
@@ -767,8 +766,8 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
         nolint = true;
         indent = "";
     }
-    let lineEnding = nolint ? " " : "\n";
-    let tabSpace = nolint ? "" : "\t";
+    var lineEnding = nolint ? " " : "\n";
+    var tabSpace = nolint ? "" : "\t";
     assert.eq((typeof x), "object", "tojsonObject needs object, not [" + (typeof x) + "]");
 
     if (!indent)
@@ -798,24 +797,24 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
         return "[Object]";
     }
 
-    let s = "{" + lineEnding;
+    var s = "{" + lineEnding;
 
     // push one level of indent
     indent += tabSpace;
 
-    let keys = x;
+    var keys = x;
     if (typeof (x._simpleKeys) == "function")
         keys = x._simpleKeys();
     let keyNames = [];
-    for (let k in keys) {
+    for (var k in keys) {
         keyNames.push(k);
     }
     if (sortKeys)
         keyNames.sort();
 
-    let fieldStrings = [];
+    var fieldStrings = [];
     for (const k of keyNames) {
-        let val = x[k];
+        var val = x[k];
 
         // skip internal DB types to avoid issues with interceptors
         if (typeof DB != 'undefined' && val == DB.prototype)

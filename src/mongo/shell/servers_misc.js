@@ -14,7 +14,7 @@ ToolTest = function(name, extraOptions) {
 ToolTest.prototype.startDB = function(coll) {
     assert(!this.m, "db already running");
 
-    let options = {port: this.port, dbpath: this.dbpath, bind_ip: "127.0.0.1"};
+    var options = {port: this.port, dbpath: this.dbpath, bind_ip: "127.0.0.1"};
 
     Object.extend(options, this.options);
 
@@ -36,12 +36,12 @@ ToolTest.prototype.stop = function() {
 };
 
 ToolTest.prototype.runTool = function() {
-    let a = ["mongo" + arguments[0]];
+    var a = ["mongo" + arguments[0]];
 
-    let hasdbpath = false;
-    let hasDialTimeout = false;
+    var hasdbpath = false;
+    var hasDialTimeout = false;
 
-    for (let i = 1; i < arguments.length; i++) {
+    for (var i = 1; i < arguments.length; i++) {
         a.push(arguments[i]);
         if (arguments[i] === "--dbpath")
             hasdbpath = true;
@@ -65,7 +65,7 @@ ToolTest.prototype.runTool = function() {
 /**
  * Returns a port number that has not been given out to any other caller from the same mongo shell.
  */
-let allocatePort;
+var allocatePort;
 
 /**
  * Resets the range of ports which have already been given out to callers of allocatePort().
@@ -75,18 +75,18 @@ let allocatePort;
  * function should take care to ensure MongoDB deployments started earlier have been terminated and
  * won't be reused.
  */
-let resetAllocatedPorts;
+var resetAllocatedPorts;
 
-let uncheckedParallelShellPids;
+var uncheckedParallelShellPids;
 
-let startParallelShell;
+var startParallelShell;
 
 (function() {
 // Defer initializing these variables until the first call, as TestData attributes may be
 // initialized as part of the --eval argument (e.g. by resmoke.py), which will not be evaluated
 // until after this has loaded.
-let maxPort;
-let nextPort;
+var maxPort;
+var nextPort;
 
 allocatePort = function() {
     // The default port was chosen in an attempt to have a large number of unassigned ports that
@@ -105,14 +105,14 @@ resetAllocatedPorts = function() {
     maxPort = nextPort = undefined;
 };
 
-let parallelShellPids = [];
+var parallelShellPids = [];
 uncheckedParallelShellPidsString = function() {
     return parallelShellPids.join(", ");
 };
 
 startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
-    let shellPath = MongoRunner.getMongoShellPath();
-    let args = [shellPath];
+    var shellPath = MongoRunner.getMongoShellPath();
+    var args = [shellPath];
 
     if (typeof globalThis.db === "object") {
         if (!port) {
@@ -121,7 +121,7 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
         } else {
             // Strip port numbers from connect string.
             const uri = new MongoURI(globalThis.db.getMongo().host);
-            let connString = uri.servers
+            var connString = uri.servers
                                  .map(function(server) {
                                      return server.host;
                                  })
@@ -165,7 +165,7 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
     args.push(...optionArgs);
     args.push("--eval", jsCode);
 
-    let pid = startMongoProgramNoConnect.apply(null, args);
+    var pid = startMongoProgramNoConnect.apply(null, args);
     parallelShellPids.push(pid);
 
     // Returns a function that when called waits for the parallel shell to exit and returns the exit
@@ -180,8 +180,8 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
                 throw new Error("options cannot be null");
             }
         }
-        let exitCode = waitProgram(pid);
-        let pidIndex = parallelShellPids.indexOf(pid);
+        var exitCode = waitProgram(pid);
+        var pidIndex = parallelShellPids.indexOf(pid);
         parallelShellPids.splice(pidIndex);
         if (arguments.length === 0 || options.checkExitSuccess) {
             assert.eq(0, exitCode, "encountered an error in the parallel shell");
@@ -196,13 +196,12 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
  * the same mongo shell.
  */
 allocatePorts = function(numPorts) {
-    let ports = [];
-    for (let i = 0; i < numPorts; i++) {
+    var ports = [];
+    for (var i = 0; i < numPorts; i++) {
         ports.push(allocatePort());
     }
 
     return ports;
 };
 
-// This variable is globally accessed
-var testingReplication = false;  // eslint-disable-line no-var
+var testingReplication = false;

@@ -4,9 +4,6 @@
  * Roughly follows the driver sessions spec:
  * https://github.com/mongodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
  */
-
-// These variables are globally accessed
-// eslint-disable-next-line no-var
 var {
     DriverSession,
     SessionOptions,
@@ -841,7 +838,7 @@ var {
     };
 
     function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
-        let driverSessionConstructor = function(client, options = defaultOptions) {
+        var driverSessionConstructor = function(client, options = defaultOptions) {
             const sessionAwareClient = new SessionAwareClient(client);
 
             let _options = options;
