@@ -352,7 +352,11 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
     // Different types on root is not allowed
     if (type != _is.referenceSubObjType) {
         _flushSubObjMode();
-        _startDetermineSubObjReference(obj, type);
+        if (numElements == 0) {
+            _is.regular.append(elem);
+        } else {
+            _startDetermineSubObjReference(obj, type);
+        }
         return *this;
     }
 
