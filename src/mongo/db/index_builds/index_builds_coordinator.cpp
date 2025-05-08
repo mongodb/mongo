@@ -1375,20 +1375,6 @@ void IndexBuildsCoordinator::abortAllIndexBuildsWithReason(OperationContext* opC
     _abortAllIndexBuildsWithReason(opCtx, IndexBuildAction::kPrimaryAbort, reason);
 }
 
-void IndexBuildsCoordinator::setNewIndexBuildsBlocked(const bool newValue,
-                                                      boost::optional<std::string> reason) {
-    stdx::unique_lock<stdx::mutex> lk(_newIndexBuildsBlockedMutex);
-    invariant(newValue != _newIndexBuildsBlocked);
-    invariant((newValue && reason) || (!newValue && !reason));
-
-    _newIndexBuildsBlocked = newValue;
-    _blockReason = reason;
-
-    if (!_newIndexBuildsBlocked) {
-        _newIndexBuildsBlockedCV.notify_all();
-    }
-}
-
 bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
                                              const UUID& collectionUUID,
                                              const std::vector<std::string>& indexNames) const {
@@ -2237,34 +2223,6 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     invariant(collWriter);
     const auto protocol = IndexBuildProtocol::kTwoPhase;
     return _startIndexBuildForRecovery(opCtx, collWriter, specs, buildUUID, protocol);
-}
-
-void IndexBuildsCoordinator::_waitIfNewIndexBuildsBlocked(OperationContext* opCtx,
-                                                          const UUID& collectionUUID,
-                                                          const std::vector<BSONObj>& specs,
-                                                          const UUID& buildUUID) {
-    stdx::unique_lock<stdx::mutex> lk(_newIndexBuildsBlockedMutex);
-    bool messageLogged = false;
-
-    opCtx->waitForConditionOrInterrupt(_newIndexBuildsBlockedCV, lk, [&] {
-        if (_newIndexBuildsBlocked && !messageLogged) {
-            LOGV2(7738700,
-                  "Index build: new index builds are blocked, waiting",
-                  "reason"_attr = *_blockReason,
-                  "indexSpecs"_attr = specs,
-                  "buildUUID"_attr = buildUUID,
-                  "collectionUUID"_attr = collectionUUID);
-            messageLogged = true;
-        }
-        return !_newIndexBuildsBlocked;
-    });
-    if (messageLogged) {
-        LOGV2(7738701,
-              "Index build: new index builds unblocked, continuing",
-              "indexSpecs"_attr = specs,
-              "buildUUID"_attr = buildUUID,
-              "collectionUUID"_attr = collectionUUID);
-    }
 }
 
 StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiveWithTimeout(
