@@ -111,12 +111,14 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     if (phase == IndexBuildPhaseEnum::kBulkLoad) {
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
         // before shutdown and recreate it.
+        auto collectionOptions = collection->getCollectionOptions();
         auto status = DurableCatalog::get(opCtx)->dropAndRecreateIndexIdentForResume(
             opCtx,
             collection->ns(),
-            collection->getCollectionOptions(),
+            collection->uuid(),
+            writableEntry->getIdent(),
             writableEntry->descriptor()->toIndexConfig(),
-            writableEntry->getIdent());
+            collectionOptions.indexOptionDefaults.getStorageEngine());
         if (!status.isOK())
             return status;
     }

@@ -1692,7 +1692,12 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
         });
 
     return durableCatalog->createIndex(
-        opCtx, getCatalogId(), ns(), getCollectionOptions(), spec->toIndexConfig());
+        opCtx,
+        getCatalogId(),
+        ns(),
+        uuid(),
+        spec->toIndexConfig(),
+        getCollectionOptions().indexOptionDefaults.getStorageEngine());
 }
 
 boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) const {

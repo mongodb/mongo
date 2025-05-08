@@ -183,8 +183,9 @@ public:
     Status createIndex(OperationContext* opCtx,
                        const RecordId& catalogId,
                        const NamespaceString& nss,
-                       const CollectionOptions& collOptions,
-                       const IndexConfig& indexConfig);
+                       const UUID& uuid,
+                       const IndexConfig& indexConfig,
+                       const boost::optional<BSONObj>& storageEngineIndexOptions);
 
     /**
      * Import a collection by inserting the given metadata into the durable catalog and instructing
@@ -233,11 +234,13 @@ public:
     /**
      * Drops the provided ident and recreates it as empty for use in resuming an index build.
      */
-    Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const CollectionOptions& collOptions,
-                                              const IndexConfig& indexConfig,
-                                              StringData ident);
+    Status dropAndRecreateIndexIdentForResume(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const UUID& uuid,
+        StringData ident,
+        const IndexConfig& indexConfig,
+        const boost::optional<BSONObj>& storageEngineIndexOptions);
 
     void getReadyIndexes(OperationContext* opCtx, RecordId catalogId, StringSet* names) const;
 

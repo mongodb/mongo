@@ -495,18 +495,17 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
 Status DurableCatalog::createIndex(OperationContext* opCtx,
                                    const RecordId& catalogId,
                                    const NamespaceString& nss,
-                                   const CollectionOptions& collOptions,
-                                   const IndexConfig& indexConfig) {
+                                   const UUID& uuid,
+                                   const IndexConfig& indexConfig,
+                                   const boost::optional<BSONObj>& storageEngineIndexOptions) {
     std::string ident = getIndexIdent(opCtx, catalogId, indexConfig.indexName);
 
-    invariant(collOptions.uuid);
-    Status status =
-        _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
-                                           nss,
-                                           *collOptions.uuid,
-                                           ident,
-                                           indexConfig,
-                                           collOptions.indexOptionDefaults.getStorageEngine());
+    Status status = _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
+                                                       nss,
+                                                       uuid,
+                                                       ident,
+                                                       indexConfig,
+                                                       storageEngineIndexOptions);
     if (status.isOK()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
@@ -653,23 +652,24 @@ Status DurableCatalog::dropCollection(OperationContext* opCtx, const RecordId& c
     return Status::OK();
 }
 
-Status DurableCatalog::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const CollectionOptions& collOptions,
-                                                          const IndexConfig& indexConfig,
-                                                          StringData ident) {
+Status DurableCatalog::dropAndRecreateIndexIdentForResume(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    StringData ident,
+    const IndexConfig& indexConfig,
+    const boost::optional<BSONObj>& storageEngineIndexOptions) {
     auto status =
         _engine->dropSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx), ident);
     if (!status.isOK())
         return status;
 
-    invariant(collOptions.uuid);
     status = _engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
                                                 nss,
-                                                *collOptions.uuid,
+                                                uuid,
                                                 ident,
                                                 indexConfig,
-                                                collOptions.indexOptionDefaults.getStorageEngine());
+                                                storageEngineIndexOptions);
 
     return status;
 }
