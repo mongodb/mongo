@@ -453,6 +453,13 @@ def get_args(distros, arch_choices):
         required=True,
         type=lambda x: is_valid_file(parser, x),
     )
+    parser.add_argument(
+        "-c",
+        "--crypt_spec",
+        help="use the crypt spec to build the requested package",
+        required=False,
+        action="store_true",
+    )
 
     args = parser.parse_args()
 

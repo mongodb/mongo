@@ -59,6 +59,45 @@ class EnterpriseSpec(packager.Spec):
         else:
             return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
 
+    def move_required_contents(self):
+        """Move the required contents to the current working directory.
+
+        Below in the for loop it's the required list of files that needs
+        to be moved from the extracted tarball to the current working
+        directory. The root path of the tarball content starts with
+        mongodb-linux-<suffix> so we glob since the suffix of the root path
+        is not a fixed text.
+        """
+        release_dir = glob("mongodb-linux-*")[0]
+        for release_file in (
+            "bin",
+            "LICENSE-Enterprise.txt",
+            "README",
+            "THIRD-PARTY-NOTICES",
+            "MPL-2",
+        ):
+            os.rename("%s/%s" % (release_dir, release_file), release_file)
+        os.rmdir(release_dir)
+
+
+class EnterpriseCryptSpec(EnterpriseSpec):
+    """EnterpriseCryptSpec class."""
+
+    def suffix(self):
+        """Suffix."""
+        if int(self.ver.split(".")[1]) == 0:
+            return "-enterprise-crypt-v1"
+        return "-enterprise-unstable-crypt-v1"
+
+    def move_required_contents(self):
+        """Move the required contents to the current working directory
+
+        The files that were extracted from the tarball file are already
+        in the current working directory. It does not have a mongodb-linux-...
+        as the root content of the tarball file is flat.
+        """
+        pass
+
 
 class EnterpriseDistro(packager.Distro):
     """EnterpriseDistro class."""
@@ -174,7 +213,7 @@ def main():
 
     args = packager.get_args(distros, ARCH_CHOICES)
 
-    spec = EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
+    spec = get_enterprise_spec(args)
 
     oldcwd = os.getcwd()
     srcdir = oldcwd + "/../"
@@ -211,6 +250,13 @@ def main():
         os.chdir(oldcwd)
 
 
+def get_enterprise_spec(args):
+    """Get the EnterpriseSpec."""
+    if args.crypt_spec:
+        return EnterpriseCryptSpec(args.server_version, args.metadata_gitspec, args.release_number)
+    return EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
+
+
 def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for this package."""
     return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
@@ -236,7 +282,7 @@ def setupdir(distro, build_os, arch, spec):
 
 def unpack_binaries_into(build_os, arch, spec, where):
     """Unpack the tarfile for (build_os, arch, spec) into directory where."""
-    rootdir = os.getcwd()
+    root_dir = os.getcwd()
     packager.ensure_dir(where)
     # Note: POSIX tar doesn't require support for gtar's "-C" option,
     # and Python's tarfile module prior to Python 2.7 doesn't have the
@@ -244,22 +290,13 @@ def unpack_binaries_into(build_os, arch, spec, where):
     # thing and chdir into where and run tar there.
     os.chdir(where)
     try:
-        packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
-        release_dir = glob("mongodb-linux-*")[0]
-        for releasefile in (
-            "bin",
-            "LICENSE-Enterprise.txt",
-            "README",
-            "THIRD-PARTY-NOTICES",
-            "MPL-2",
-        ):
-            os.rename("%s/%s" % (release_dir, releasefile), releasefile)
-        os.rmdir(release_dir)
+        packager.sysassert(["tar", "xvzf", root_dir + "/" + tarfile(build_os, arch, spec)])
+        spec.move_required_contents()
     except Exception:
         exc = sys.exc_info()[1]
-        os.chdir(rootdir)
+        os.chdir(root_dir)
         raise exc
-    os.chdir(rootdir)
+    os.chdir(root_dir)
 
 
 def make_package(distro, build_os, arch, spec, srcdir):
