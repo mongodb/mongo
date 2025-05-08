@@ -396,6 +396,8 @@ last-continuous:
       ticket: SERVER-100299
     - test_file: jstests/core/index/express_pbt.js
       ticket: SERVER-102693
+    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
+      ticket: SERVER-99773
   suites: null
 last-lts:
   all:
@@ -841,4 +843,6 @@ last-lts:
       ticket: SERVER-100299
     - test_file: jstests/core/index/express_pbt.js
       ticket: SERVER-102693
+    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
+      ticket: SERVER-99773
   suites: null
