@@ -78,9 +78,9 @@ private:
 
     void _verifyInput() const;
 
-    void _checkExistingDataOnShard(OperationContext* opCtx,
-                                   RemoteCommandTargeter& targeter,
-                                   std::shared_ptr<executor::TaskExecutor> executor) const;
+    bool _isPristineReplicaset(OperationContext* opCtx,
+                               RemoteCommandTargeter& targeter,
+                               std::shared_ptr<executor::TaskExecutor> executor) const;
 
     RemoteCommandTargeter& _getTargeter(OperationContext* opCtx);
 

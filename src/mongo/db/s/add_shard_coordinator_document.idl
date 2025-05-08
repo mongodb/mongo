@@ -74,9 +74,17 @@ structs:
                 optional: true
             originalUserWriteBlockingLevel:
                 type: int
-                description: "Original user write blocking level of the replica set being added to a sharded cluster that has to be restored after an unsuccessful addShard"
+                description: >
+                    "Original user write blocking level of the replica set being added to a sharded
+                    cluster that has to be restored after an unsuccessful addShard"
                 optional: true
             apiParams:
                 type: object
                 description: "The API parameter attached to the config server command"
                 optional: true
+            isPromotion:
+                type: bool
+                description: >
+                    "Specifies if the operation is adding a clean shard or a promotion of a
+                    replicaset"
+                default: false
