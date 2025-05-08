@@ -82,23 +82,15 @@ protected:
 
     const CollatorInterface* _getCollator(const NamespaceString& ns) const;
 
-    // _generateMeasurement enables us to generate measurements with
-    // a string-component meta field type, where string-component meta field types are defined in
-    // '_stringComponentBSONTypes'.
+    // _generateMeasurement enables the user to generate a BSONObjBuilder with the input type and
+    // timeValue. It is the caller's responsibility to use .obj() from the returned BSONObjBuilder
+    // to use the BSONObj measurement.
+    //
+    // This variant of _generateMeasurement gives default values for each input 'type'.
     //
     // There are simplifications with the Array, Object, RegEx, DBRef, and CodeWScope
     // BSONTypes (we use the 'metaValue' in a String component of the BSONElement rather than
     // configuring the entire BSONType output).
-    //
-    // We invariant if type is not a member of '_stringComponentBSONTypes'.
-    // This function is used as a helper to in _generateMeasurement.
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        StringData metaValue) const;
-
-    // _generateMeasurement enables the user to generate a BSONObjBuilder with the input type and
-    // timeValue. It is the caller's responsibility to use .obj() from the returned BSONObjBuilder
-    // to use the BSONObj measurement.
     //
     // Set timeValue to boost::none to generate a malformed measurement.
     BSONObjBuilder _generateMeasurement(boost::optional<BSONType> type,
@@ -106,41 +98,8 @@ protected:
 
     // We don't supply defaults for these type-specific function declarations because we provide the
     // defaults in the generic _generateMeasurement above.
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        Date_t metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        Timestamp metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        int metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        long long metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        Decimal128 metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        double metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        OID metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        bool metaValue) const;
-
-    BSONObjBuilder _generateMeasurement(BSONType type,
-                                        boost::optional<Date_t> timeValue,
-                                        const BSONBinData& binData) const;
+    BSONObjBuilder _generateMeasurement(const boost::optional<BSONObj>& metaValue,
+                                        boost::optional<Date_t> timeValue = Date_t::now()) const;
 
     bucket_catalog::Bucket* _generateBucketWithBatch(const NamespaceString& ns,
                                                      const UUID& collectionUUID,
@@ -183,38 +142,62 @@ protected:
         const std::vector<std::pair<std::vector<BSONObj>, bucket_catalog::RolloverReason>>&
             measurementsAndRolloverReasons);
 
+    /*
+     * Creates 'numBuckets' buckets that are full (gTimeseriesBucketMaxCount measurements) with the
+     * measurement having the 'metaValue' field.
+     * Non-meta field measurements can be created by passing in boost::none for 'metaValueType'.
+     */
+    absl::InlinedVector<bucket_catalog::Bucket*, 8> _createFullBuckets(
+        const NamespaceString& ns,
+        const UUID& collectionUUID,
+        size_t numBuckets,
+        boost::optional<BSONObj> metaValue,
+        boost::optional<BSONType> metaValueType);
+
     struct MeasurementsWithRolloverReasonOptions {
         const bucket_catalog::RolloverReason reason;
         size_t numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount);
         size_t idxWithDiffMeasurement = static_cast<size_t>(numMeasurements - 1);
-        boost::optional<StringData> metaValue = _metaValue;
-        BSONType metaValueType = String;
         Date_t timeValue = Date_t::now();
+        boost::optional<BSONObj> metaValue = boost::none;
+        boost::optional<BSONType> metaValueType = String;
     };
 
     // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that
     // have the input RolloverReason. Input conditions: numMeasurements is the number of
     // measurements that should be returned in the measurement vector.
     // Default: gTimeseriesBucketMaxCount
-    // 1 <= numMeasurements <= gTimeseriesBucketMaxCount    if kNone
-    // 2 <= numMeasurements <= gTimeseriesBucketMaxCount    if kSchemaChange,
-    //                                                      kTimeForward,
-    //                                                      kTimeBackward
-    // cannot set numMeasurements                           otherwise
+    // 1 <= 'numMeasurements' <= gTimeseriesBucketMaxCount    if kNone
+    // 2 <= 'numMeasurements' <= gTimeseriesBucketMaxCount    if kSchemaChange,
+    //                                                           kTimeForward,
+    //                                                           kTimeBackward
+    // cannot set 'numMeasurements'                           otherwise
     //
-    // idxWithDiffMeasurement is the index where we change the record in a measurement vector to
+    // 'idxWithDiffMeasurement' is the index where we change the record in a measurement vector to
     // simulate a specific rollover reason. This is only used for kSchemaChange, kTimeForward,
     // kTimeBackward.
     // Default: numMeasurements - 1
-    // 1 <= idxWithDiffMeasurement <= numMeasurements       if kSchemaChange,
-    //                                                         kTimeForward,
-    //                                                         kTimeBackward
-    // cannot set idxWithDiffMeasurement                    otherwise
+    // 1 <= 'idxWithDiffMeasurement' <= numMeasurements       if kSchemaChange,
+    //                                                           kTimeForward,
+    //                                                           kTimeBackward
+    // cannot set 'idxWithDiffMeasurement'                    otherwise
     //
-    // metaValue and timeValue are what we set as the meta value and time value for a measurement,
-    // and have the defaults _metaValue and Date_t::now() respectively.
+    // 'metaValue' and 'timeValue' are what we set as the meta value and time value for a
+    // measurement.
+    // The default metaValue is set to being a String _metaValue: {_metaField: _metaValue}. Passing
+    // in a 'metaValue' takes precedence over passing in a 'metaValueType'.
+    // If we pass in a 'metaValue', we will choose generating the measurement with that meta value.
+    // over the default meta value for the input 'metaValueType'.The 'metaValue' passed in must be a
+    // well-formed BSONObj that has the following structure:
+    // {_metaField << metaValue}
+    // Notably, 'metaValue' must have a field _metaField and only one field. We will invariant
+    // otherwise.
+    // To form a measurement without a meta value, you must set 'metaValueType' = boost::none.
+    // As mentioned above, if you specify a 'metaValue' with 'metaValueType' == boost::none, the
+    // 'metaValue' will take precedence of being set as the meta value.s
+    // The default 'timeValue' is Date_t::now().
     std::vector<BSONObj> _generateMeasurementsWithRolloverReason(
-        const MeasurementsWithRolloverReasonOptions& options) const;
+        const MeasurementsWithRolloverReasonOptions& options);
 
     uint64_t _getStorageCacheSizeBytes() const;
 
@@ -284,5 +267,29 @@ protected:
     UUID _uuidNoMeta = UUID::gen();
 
     BSONObj _measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
+
+    BSONObj _undefinedMeta = BSON(_metaField << BSONUndefined);
+    BSONObj _minKeyMeta = BSON(_metaField << MINKEY);
+    BSONObj _maxKeyMeta = BSON(_metaField << MAXKEY);
+    BSONObj _nullMeta = BSON(_metaField << BSONNULL);
+    BSONObj _eooMeta = BSON(_metaField << BSONObj());
+    StatusWith<Date_t> date = dateFromISOString("2022-06-06T15:34:00.000Z");
+    BSONObj _dateMeta = BSON(_metaField << date.getValue());
+    BSONObj _bsonTimestampMeta = BSON(_metaField << Timestamp(1, 2));
+    BSONObj _intMeta = BSON(_metaField << 365);
+    BSONObj _longMeta = BSON(_metaField << static_cast<long long>(0x0123456789abcdefll));
+    BSONObj _decimalMeta = BSON(_metaField << Decimal128("0.30"));
+    BSONObj _doubleMeta = BSON(_metaField << 1.5);
+    BSONObj _oidMeta = BSON(_metaField << OID("dbdbdbdbdbdbdbdbdbdbdbdb"));
+    BSONObj _boolMeta = BSON(_metaField << true);
+    BSONObj _binDataMeta = BSON(_metaField << BSONBinData("", 0, BinDataGeneral));
+    BSONObj _objMeta = BSON(_metaField << BSON("0" << _metaValue));
+    BSONObj _arrayMeta = BSON(_metaField << BSONArray(BSON("0" << _metaValue)));
+    BSONObj _regexMeta = BSON(_metaField << BSONRegEx(_metaValue, _metaValue));
+    BSONObj _dbRefMeta = BSON(_metaField << BSONDBRef(_metaValue, OID("dbdbdbdbdbdbdbdbdbdbdbdb")));
+    BSONObj _codeMeta = BSON(_metaField << BSONCode(_metaValue));
+    BSONObj _symbolMeta = BSON(_metaField << BSONSymbol(_metaValue));
+    BSONObj _codeWScopeMeta = BSON(_metaField << BSONCodeWScope(_metaValue, BSON("x" << 1)));
+    BSONObj _stringMeta = BSON(_metaField << _metaValue);
 };
 }  // namespace mongo::timeseries

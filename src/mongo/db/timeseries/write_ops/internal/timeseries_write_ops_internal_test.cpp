@@ -97,9 +97,8 @@ protected:
         const std::vector<BSONObj>& batchOfMeasurements,
         const std::vector<size_t>& numWriteBatches) const;
 
-    template <typename T>
     void _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        BSONType type, std::vector<T> metaValues) const;
+        BSONType type, std::vector<BSONObj> metaValues) const;
 
     void _testStageInsertBatchWithoutMetaFieldInCollWithMetaField(
         const NamespaceString& ns,
@@ -228,14 +227,17 @@ template <typename T>
 void TimeseriesWriteOpsInternalTest::
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
         BSONType type, std::vector<T> metaValues) const {
+    BSONObj meta0 = BSON(_metaField << metaValues[0]);
+    BSONObj meta1 = BSON(_metaField << metaValues[1]);
+    BSONObj meta2 = BSON(_metaField << metaValues[2]);
     std::vector<BSONObj> userMeasurementsBatch{
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(101), metaValues[1]).obj(),
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(104), metaValues[2]).obj(),
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(105), metaValues[0]).obj(),
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(107), metaValues[0]).obj(),
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(103), metaValues[1]).obj(),
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(102), metaValues[2]).obj(),
-        _generateMeasurement(type, Date_t::fromMillisSinceEpoch(106), metaValues[0]).obj(),
+        _generateMeasurement(meta1, Date_t::fromMillisSinceEpoch(101)).obj(),
+        _generateMeasurement(meta2, Date_t::fromMillisSinceEpoch(104)).obj(),
+        _generateMeasurement(meta0, Date_t::fromMillisSinceEpoch(105)).obj(),
+        _generateMeasurement(meta0, Date_t::fromMillisSinceEpoch(107)).obj(),
+        _generateMeasurement(meta1, Date_t::fromMillisSinceEpoch(103)).obj(),
+        _generateMeasurement(meta2, Date_t::fromMillisSinceEpoch(102)).obj(),
+        _generateMeasurement(meta0, Date_t::fromMillisSinceEpoch(106)).obj(),
     };
     stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
         metaFieldMetadataToCorrectIndexOrderMap;
@@ -337,10 +339,9 @@ void TimeseriesWriteOpsInternalTest::
 // non-constant BSONType.
 // We assert if the BSONType is non-constant and we don't have a metaValues vector.
 // We assert if metaValues.size() != 2.
-template <typename T>
 void TimeseriesWriteOpsInternalTest::
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        const BSONType type, std::vector<T> metaValues) const {
+        const BSONType type, const std::vector<BSONObj> metaValues) const {
     auto isConstantBSONType =
         (std::find(_constantBSONTypes.begin(), _constantBSONTypes.end(), type) !=
          _constantBSONTypes.end());
@@ -349,19 +350,19 @@ void TimeseriesWriteOpsInternalTest::
     ASSERT(isConstantBSONType || metaValues.size() == 2);
     auto measurement1 = (isConstantBSONType)
         ? _generateMeasurement(type, Date_t::fromMillisSinceEpoch(105)).obj()
-        : _generateMeasurement(type, Date_t::fromMillisSinceEpoch(105), metaValues[0]).obj();
+        : _generateMeasurement(metaValues[0], Date_t::fromMillisSinceEpoch(105)).obj();
     auto measurement2 = (isConstantBSONType)
         ? _generateMeasurement(type, boost::none).obj()
-        : _generateMeasurement(type, boost::none, metaValues[0]).obj();
+        : _generateMeasurement(metaValues[0], boost::none).obj();
     auto measurement3 = (isConstantBSONType)
         ? _generateMeasurement(type, boost::none).obj()
-        : _generateMeasurement(type, boost::none, metaValues[0]).obj();
+        : _generateMeasurement(metaValues[0], boost::none).obj();
     auto measurement4 = (isConstantBSONType)
         ? _generateMeasurement(type, Date_t::fromMillisSinceEpoch(103)).obj()
-        : _generateMeasurement(type, Date_t::fromMillisSinceEpoch(103), metaValues[1]).obj();
+        : _generateMeasurement(metaValues[1], Date_t::fromMillisSinceEpoch(103)).obj();
     auto measurement5 = (isConstantBSONType)
         ? _generateMeasurement(type, Date_t::fromMillisSinceEpoch(101)).obj()
-        : _generateMeasurement(type, Date_t::fromMillisSinceEpoch(101), metaValues[0]).obj();
+        : _generateMeasurement(metaValues[0], Date_t::fromMillisSinceEpoch(101)).obj();
     std::vector<BSONObj> userMeasurementsBatch{
         measurement1, measurement2, measurement3, measurement4, measurement5};
     stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
@@ -645,26 +646,37 @@ TEST_F(TimeseriesWriteOpsInternalTest,
        BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes1) {
     std::vector<BSONObj> userMeasurementsBatch{
         _generateMeasurement(jstOID, Date_t::fromMillisSinceEpoch(113)).obj(),
-        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(105), _metaValue).obj(),
-        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(107), _metaValue).obj(),
-        _generateMeasurement(DBRef, Date_t::fromMillisSinceEpoch(103), _metaValue2).obj(),
+        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(105)).obj(),
+        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(107)).obj(),
+        _generateMeasurement(
+            BSON(_metaField << BSONDBRef(_metaValue2, OID("dbdbdbdbdbdbdbdbdbdbdbdb"))),
+            Date_t::fromMillisSinceEpoch(103))
+            .obj(),
         _generateMeasurement(jstOID, Date_t::fromMillisSinceEpoch(104)).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(102), _metaValue3).obj(),
+        _generateMeasurement(BSON(_metaField << _metaValue3), Date_t::fromMillisSinceEpoch(102))
+            .obj(),
         _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(109)).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(108), _metaValue).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(111), _metaValue).obj(),
+        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(108)).obj(),
+        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(111)).obj(),
         _generateMeasurement(BinData, Date_t::fromMillisSinceEpoch(204)).obj(),
-        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(200), _metaValue2).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(101), _metaValue3).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(121), _metaValue3).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(65), _metaValue).obj(),
-        _generateMeasurement(DBRef, Date_t::fromMillisSinceEpoch(400), _metaValue2).obj(),
+        _generateMeasurement(BSON(_metaField << BSONCode(_metaValue2)),
+                             Date_t::fromMillisSinceEpoch(200))
+            .obj(),
+        _generateMeasurement(BSON(_metaField << _metaValue3), Date_t::fromMillisSinceEpoch(101))
+            .obj(),
+        _generateMeasurement(BSON(_metaField << _metaValue3), Date_t::fromMillisSinceEpoch(121))
+            .obj(),
+        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(65)).obj(),
+        _generateMeasurement(
+            BSON(_metaField << BSONDBRef(_metaValue2, OID("dbdbdbdbdbdbdbdbdbdbdbdb"))),
+            Date_t::fromMillisSinceEpoch(400))
+            .obj(),
         _generateMeasurement(MinKey, Date_t::fromMillisSinceEpoch(250)).obj(),
         _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(108)).obj(),
         _generateMeasurement(MaxKey, Date_t::fromMillisSinceEpoch(231)).obj(),
         _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(107)).obj(),
-        _generateMeasurement(
-            BinData, Date_t::fromMillisSinceEpoch(204), BSONBinData("", 1, BinDataGeneral))
+        _generateMeasurement(BSON(_metaField << BSONBinData("", 1, BinDataGeneral)),
+                             Date_t::fromMillisSinceEpoch(204))
             .obj(),
     };
     stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
@@ -710,19 +722,33 @@ TEST_F(TimeseriesWriteOpsInternalTest,
 TEST_F(TimeseriesWriteOpsInternalTest,
        BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes2) {
     std::vector<BSONObj> userMeasurementsBatch{
-        _generateMeasurement(Symbol, Date_t::fromMillisSinceEpoch(382), _metaValue2).obj(),
-        _generateMeasurement(CodeWScope, Date_t::fromMillisSinceEpoch(493), _metaValue2).obj(),
+        _generateMeasurement(BSON(_metaField << BSONSymbol(_metaValue2)),
+                             Date_t::fromMillisSinceEpoch(382))
+            .obj(),
+        _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue2, BSON("x" << 1))),
+                             Date_t::fromMillisSinceEpoch(493))
+            .obj(),
         _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(212)).obj(),
-        _generateMeasurement(Symbol, Date_t::fromMillisSinceEpoch(284), _metaValue2).obj(),
-        _generateMeasurement(CodeWScope, Date_t::fromMillisSinceEpoch(958), _metaValue2).obj(),
+        _generateMeasurement(BSON(_metaField << BSONSymbol(_metaValue2)),
+                             Date_t::fromMillisSinceEpoch(284))
+            .obj(),
+        _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue2, BSON("x" << 1))),
+                             Date_t::fromMillisSinceEpoch(958))
+            .obj(),
         _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(103)).obj(),
-        _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(492), _metaValue2).obj(),
+        _generateMeasurement(BSON(_metaField << BSON("0" << _metaValue2)),
+                             Date_t::fromMillisSinceEpoch(492))
+            .obj(),
         _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(365)).obj(),
         _generateMeasurement(jstNULL, Date_t::fromMillisSinceEpoch(590)).obj(),
         _generateMeasurement(Array, Date_t::fromMillisSinceEpoch(204)).obj(),
         _generateMeasurement(jstNULL, Date_t::fromMillisSinceEpoch(58)).obj(),
-        _generateMeasurement(CodeWScope, Date_t::fromMillisSinceEpoch(93), _metaValue3).obj(),
-        _generateMeasurement(CodeWScope, Date_t::fromMillisSinceEpoch(304), _metaValue3).obj(),
+        _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue3, BSON("x" << 1))),
+                             Date_t::fromMillisSinceEpoch(93))
+            .obj(),
+        _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue3, BSON("x" << 1))),
+                             Date_t::fromMillisSinceEpoch(304))
+            .obj(),
         _generateMeasurement(jstNULL, Date_t::fromMillisSinceEpoch(384)).obj(),
         _generateMeasurement(CodeWScope, Date_t::fromMillisSinceEpoch(888)).obj(),
         _generateMeasurement(Array, Date_t::fromMillisSinceEpoch(764)).obj(),
@@ -767,22 +793,24 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         _generateMeasurement(RegEx, Date_t::fromMillisSinceEpoch(105)).obj(),
         _generateMeasurement(RegEx, Date_t::fromMillisSinceEpoch(107)).obj(),
         _generateMeasurement(Undefined, Date_t::fromMillisSinceEpoch(103)).obj(),
-        _generateMeasurement(Bool, Date_t::fromMillisSinceEpoch(104), true).obj(),
-        _generateMeasurement(Bool, Date_t::fromMillisSinceEpoch(102), true).obj(),
-        _generateMeasurement(Bool, Date_t::fromMillisSinceEpoch(104), false).obj(),
-        _generateMeasurement(Bool, Date_t::fromMillisSinceEpoch(102), false).obj(),
+        _generateMeasurement(BSON(_metaField << true), Date_t::fromMillisSinceEpoch(104)).obj(),
+        _generateMeasurement(BSON(_metaField << true), Date_t::fromMillisSinceEpoch(102)).obj(),
+        _generateMeasurement(BSON(_metaField << false), Date_t::fromMillisSinceEpoch(104)).obj(),
+        _generateMeasurement(BSON(_metaField << false), Date_t::fromMillisSinceEpoch(102)).obj(),
         _generateMeasurement(Undefined, Date_t::fromMillisSinceEpoch(102)).obj(),
         _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(109)).obj(),
         _generateMeasurement(NumberInt, Date_t::fromMillisSinceEpoch(108)).obj(),
         _generateMeasurement(NumberInt, Date_t::fromMillisSinceEpoch(111)).obj(),
-        _generateMeasurement(NumberDouble, Date_t::fromMillisSinceEpoch(204), 2.3).obj(),
+        _generateMeasurement(BSON(_metaField << 2.3), Date_t::fromMillisSinceEpoch(204)).obj(),
         _generateMeasurement(NumberLong, Date_t::fromMillisSinceEpoch(200)).obj(),
-        _generateMeasurement(NumberDouble, Date_t::fromMillisSinceEpoch(101), 2.1).obj(),
-        _generateMeasurement(NumberDouble, Date_t::fromMillisSinceEpoch(121), 2.3).obj(),
+        _generateMeasurement(BSON(_metaField << 2.1), Date_t::fromMillisSinceEpoch(101)).obj(),
+        _generateMeasurement(BSON(_metaField << 2.3), Date_t::fromMillisSinceEpoch(121)).obj(),
         _generateMeasurement(Date, Date_t::fromMillisSinceEpoch(65)).obj(),
-        _generateMeasurement(NumberDecimal, Date_t::fromMillisSinceEpoch(400), Decimal128("0.4"))
+        _generateMeasurement(BSON(_metaField << Decimal128("0.4")),
+                             Date_t::fromMillisSinceEpoch(400))
             .obj(),
-        _generateMeasurement(NumberDecimal, Date_t::fromMillisSinceEpoch(400), Decimal128("0.3"))
+        _generateMeasurement(BSON(_metaField << Decimal128("0.3")),
+                             Date_t::fromMillisSinceEpoch(400))
             .obj(),
         _generateMeasurement(RegEx, Date_t::fromMillisSinceEpoch(108)).obj(),
         _generateMeasurement(bsonTimestamp, Date_t::fromMillisSinceEpoch(231)).obj(),
@@ -858,7 +886,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
 TEST_F(TimeseriesWriteOpsInternalTest,
        BuildBatchedInsertContextsWithConstantBSONTypeMetaReportsMalformedMeasurements) {
     for (BSONType type : _constantBSONTypes) {
-        std::vector<StringData> emptyMetaValues{};
+        std::vector<BSONObj> emptyMetaValues{};
         _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(type, emptyMetaValues);
     }
 }
@@ -867,28 +895,37 @@ TEST_F(TimeseriesWriteOpsInternalTest,
        BuildBatchedInsertContextsWithNonConstantBSONTypeMetaReportsMalformedMeasurements) {
     // For non-string component meta field types, we directly have to declare two meta values.
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        bsonTimestamp, std::vector<Timestamp>{Timestamp(1, 2), Timestamp(2, 3)});
-    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(NumberInt,
-                                                                         std::vector<int>{1, 2});
+        bsonTimestamp,
+        std::vector<BSONObj>{BSON(_metaField << Timestamp(1, 2)),
+                             BSON(_metaField << Timestamp(2, 3))});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberLong, std::vector<long long>{0x0123456789abcdefll, 0x0123456789abcdeell});
+        NumberInt, std::vector<BSONObj>{BSON(_metaField << 1), BSON(_metaField << 2)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberDecimal, std::vector<Decimal128>{Decimal128("1.45"), Decimal128("0.987")});
+        NumberLong,
+        std::vector<BSONObj>{BSON(_metaField << 0x0123456789abcdefll),
+                             BSON(_metaField << 0x0123456789abcdeell)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberDouble, std::vector<double>{1.4, 8.6});
+        NumberDecimal,
+        std::vector<BSONObj>{BSON(_metaField << Decimal128("1.45")),
+                             BSON(_metaField << Decimal128("0.987"))});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        jstOID, std::vector<OID>{OID("649f0704230f18da067519c4"), OID("64a33d9cdf56a62781061048")});
+        NumberDouble, std::vector<BSONObj>{BSON(_metaField << 1.4), BSON(_metaField << 8.6)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        Bool, std::vector<bool>{true, false});
+        jstOID,
+        std::vector<BSONObj>{BSON(_metaField << OID("649f0704230f18da067519c4")),
+                             BSON(_metaField << OID("64a33d9cdf56a62781061048"))});
+    _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
+        Bool, std::vector<BSONObj>{BSON(_metaField << true), BSON(_metaField << false)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
         BinData,
-        std::vector<BSONBinData>{BSONBinData("", 0, BinDataGeneral),
-                                 BSONBinData("\x69\xb7", 2, BinDataGeneral)});
+        std::vector<BSONObj>{BSON(_metaField << BSONBinData("", 0, BinDataGeneral)),
+                             BSON(_metaField << BSONBinData("\x69\xb7", 2, BinDataGeneral))});
 
     // For string component meta field types, we can don't need to directly declare the values; we
     // can just use two different strings.
     for (BSONType type : _stringComponentBSONTypes) {
-        std::vector<StringData> stringMetaValues{_metaValue, _metaValue2};
+        std::vector<BSONObj> stringMetaValues{BSON(_metaField << _metaValue),
+                                              BSON(_metaField << _metaValue2)};
         _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(type,
                                                                              stringMetaValues);
     }
@@ -936,7 +973,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchFillsUpSingleBucketWithMe
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchFillsUpSingleBucketWithoutMetaField) {
     std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCountNoMetaField =
         _generateMeasurementsWithRolloverReason(
-            {.reason = bucket_catalog::RolloverReason::kNone, .metaValue = boost::none});
+            {.reason = bucket_catalog::RolloverReason::kNone, .metaValueType = boost::none});
     std::vector<size_t> numWriteBatches{1};
 
     // Inserting a batch of measurements without meta field values into a collection without a
@@ -970,7 +1007,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonCoun
     auto batchOfMeasurementsWithCountNoMetaField = _generateMeasurementsWithRolloverReason(
         {.reason = bucket_catalog::RolloverReason::kCount,
          .numMeasurements = static_cast<size_t>(2 * gTimeseriesBucketMaxCount),
-         .metaValue = boost::none});
+         .metaValueType = boost::none});
 
     // batchOfMeasurements will be 2 * gTimeseriesBucketMaxCount measurements with all the
     // measurements having the same meta field and time, which means we should have two buckets.
@@ -991,7 +1028,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
        StageInsertBatchHandlesRolloverReasonTimeForwardWithMetaField) {
     // Max bucket size with only the last measurement having kTimeForward.
     auto batchOfMeasurementsWithTimeForwardAtEnd = _generateMeasurementsWithRolloverReason(
-        {.reason = bucket_catalog::RolloverReason::kTimeForward, .metaValue = _metaValue});
+        {.reason = bucket_catalog::RolloverReason::kTimeForward});
 
     // The last measurement in batchOfMeasurementsWithTimeForwardAtEnd will have a timestamp outside
     // of the bucket range encompassing the previous measurements, which means that this
@@ -1010,7 +1047,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         _generateMeasurementsWithRolloverReason(
             {.reason = bucket_catalog::RolloverReason::kTimeForward,
              .idxWithDiffMeasurement = 1,
-             .metaValue = boost::none});
+             .metaValueType = boost::none});
 
     // The last measurement in batchOfMeasurementsWithTimeForwardAtEnd will have a timestamp outside
     // of the bucket range encompassing the previous measurements, which means that this
@@ -1030,7 +1067,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         {.reason = bucket_catalog::RolloverReason::kTimeForward,
          .numMeasurements = 50,
          .idxWithDiffMeasurement = 25,
-         .metaValue = boost::none});
+         .metaValueType = boost::none});
 
     // Inserting a batch of measurements without meta field values into a collection with a meta
     // field.
@@ -1042,7 +1079,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
        StageInsertBatchHandlesRolloverReasonSchemaChangeWithMetaField) {
     // Max bucket size with only the last measurement having kSchemaChange.
     auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
-        {.reason = bucket_catalog::RolloverReason::kSchemaChange, .metaValue = _metaValue});
+        {.reason = bucket_catalog::RolloverReason::kSchemaChange});
 
     // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather than
     // a string for field "deathGrips", which means this measurement will be in a different
@@ -1061,7 +1098,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         _generateMeasurementsWithRolloverReason(
             {.reason = bucket_catalog::RolloverReason::kSchemaChange,
              .idxWithDiffMeasurement = 1,
-             .metaValue = boost::none});
+             .metaValueType = boost::none});
 
     // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather than
     // a string for field "deathGrips", which means this measurement will be in a different
@@ -1081,7 +1118,7 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         {.reason = bucket_catalog::RolloverReason::kSchemaChange,
          .numMeasurements = 50,
          .idxWithDiffMeasurement = 25,
-         .metaValue = boost::none});
+         .metaValueType = boost::none});
 
     // Inserting a batch of measurements without meta field values into a collection with a meta
     // field.
@@ -1103,7 +1140,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonSize
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverReasonSizeWithoutMetaField) {
     auto batchOfMeasurementsWithSizeNoMetaField = _generateMeasurementsWithRolloverReason(
-        {.reason = bucket_catalog::RolloverReason::kSize, .metaValue = boost::none});
+        {.reason = bucket_catalog::RolloverReason::kSize, .metaValueType = boost::none});
 
     // The last measurement will exceed the size that the bucket can store, which will mean it
     // should be in a different bucket.
@@ -1146,7 +1183,8 @@ TEST_F(TimeseriesWriteOpsInternalTest,
     _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
     std::vector<BSONObj> batchOfMeasurementsWithCachePressureNoMetaField =
         _generateMeasurementsWithRolloverReason(
-            {.reason = bucket_catalog::RolloverReason::kCachePressure, .metaValue = boost::none});
+            {.reason = bucket_catalog::RolloverReason::kCachePressure,
+             .metaValueType = boost::none});
 
     // The last measurement will exceed the size that the bucket can store. Coupled with the lowered
     // cache size, we will trigger kCachePressure, so the measurement will be in a different bucket.
@@ -1215,19 +1253,19 @@ TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverMixed) {
 TEST_F(TimeseriesWriteOpsInternalTest, StageInsertBatchHandlesRolloverMixedWithNoMeta) {
     auto batchOfMeasurementsWithSize =
         _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kSize,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = Date_t::now()});
+                                                 .timeValue = Date_t::now(),
+                                                 .metaValueType = boost::none});
 
     std::vector<BSONObj> batchOfMeasurements =
         _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kNone,
                                                  .numMeasurements = 50,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = Date_t::now() + Seconds(1)});
+                                                 .timeValue = Date_t::now() + Seconds(1),
+                                                 .metaValueType = boost::none});
 
     auto batchOfMeasurementsWithSchemaChange = _generateMeasurementsWithRolloverReason(
         {.reason = bucket_catalog::RolloverReason::kSchemaChange,
-         .metaValue = boost::none,
-         .timeValue = Date_t::now() + Seconds(2)});
+         .timeValue = Date_t::now() + Seconds(2),
+         .metaValueType = boost::none});
 
     std::vector<BSONObj> mixedRolloverReasonsMeasurements =
         _getFlattenedVector(std::vector<std::vector<BSONObj>>{

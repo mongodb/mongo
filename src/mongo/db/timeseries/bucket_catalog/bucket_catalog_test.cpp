@@ -3117,7 +3117,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketFillsUpSingleBucketW
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketFillsUpSingleBucketWithoutMetaField) {
     std::vector<BSONObj> batchOfMeasurementsTimeseriesBucketMaxCount =
         _generateMeasurementsWithRolloverReason(
-            {.reason = RolloverReason::kNone, .metaValue = boost::none});
+            {.reason = RolloverReason::kNone, .metaValueType = boost::none});
     std::vector<size_t> curBatchedInsertContextsIndex{0};
     std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount)};
 
@@ -3167,7 +3167,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverCount
     std::vector<BSONObj> batchOfMeasurementsWithCount = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kCount,
          .numMeasurements = static_cast<size_t>(2 * gTimeseriesBucketMaxCount),
-         .metaValue = boost::none});
+         .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatch{static_cast<size_t>(gTimeseriesBucketMaxCount),
                                                     static_cast<size_t>(gTimeseriesBucketMaxCount)};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
@@ -3199,9 +3199,7 @@ TEST_F(BucketCatalogTest,
     // measurement will be in a different bucket.
     // Max bucket count with only the last measurement having kTimeForward.
     std::vector<BSONObj> batchOfMeasurementsWithTimeForwardAtEnd =
-        _generateMeasurementsWithRolloverReason(
-            {.reason = RolloverReason::kTimeForward, .metaValue = _metaValue});
-
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward});
 
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     std::vector<size_t> numMeasurementsInWriteBatchAtEnd{
@@ -3222,7 +3220,7 @@ TEST_F(BucketCatalogTest,
     auto batchOfMeasurementsWithTimeForwardAfterFirstMeasurement =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .idxWithDiffMeasurement = 1,
-                                                 .metaValue = boost::none});
+                                                 .metaValueType = boost::none});
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
         1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
@@ -3243,7 +3241,7 @@ TEST_F(BucketCatalogTest,
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .numMeasurements = 50,
                                                  .idxWithDiffMeasurement = 25,
-                                                 .metaValue = boost::none});
+                                                 .metaValueType = boost::none});
 
     // Inserting a batch of measurements without meta field values into a collection with a meta
     // field.
@@ -3262,8 +3260,8 @@ TEST_F(BucketCatalogTest,
     // than a string for field "deathGrips", which means this measurement will be in a different
     // bucket.
     // Max bucket count with only the last measurement having kSchemaChange.
-    auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kSchemaChange, .metaValue = _metaValue});
+    auto batchOfMeasurementsWithSchemaChangeAtEnd =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange});
 
     // Inserting a batch of measurements with meta field values into a collection with a meta field.
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
@@ -3283,7 +3281,7 @@ TEST_F(BucketCatalogTest,
     auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
                                                  .idxWithDiffMeasurement = 1,
-                                                 .metaValue = boost::none});
+                                                 .metaValueType = boost::none});
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
         1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
@@ -3303,7 +3301,7 @@ TEST_F(BucketCatalogTest,
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
                                                  .numMeasurements = 50,
                                                  .idxWithDiffMeasurement = 25,
-                                                 .metaValue = boost::none});
+                                                 .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatchInMiddle{25, 25};
 
     // Inserting a batch of measurements without meta field values into a collection with a meta
@@ -3338,7 +3336,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverSizeW
     // The last measurement will exceed the size that the bucket can store. We will trigger kSize,
     // so the measurement will be in a different bucket.
     std::vector<BSONObj> batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kSize, .metaValue = boost::none});
+        {.reason = RolloverReason::kSize, .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatch{124, 1};
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
 
@@ -3399,7 +3397,7 @@ TEST_F(BucketCatalogTest,
     std::vector<size_t> currBatchedInsertContextsIndex{0, 0};
     std::vector<BSONObj> batchOfMeasurementsWithCachePressure =
         _generateMeasurementsWithRolloverReason(
-            {.reason = RolloverReason::kCachePressure, .metaValue = boost::none});
+            {.reason = RolloverReason::kCachePressure, .metaValueType = boost::none});
 
     // Inserting a batch of measurements without meta field values into a collection without a meta
     // field.
@@ -3493,20 +3491,22 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
 }
 
 TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixedWithNoMeta) {
-    auto batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kSize, .metaValue = boost::none, .timeValue = Date_t::now()});
+    auto batchOfMeasurementsWithSize =
+        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSize,
+                                                 .timeValue = Date_t::now(),
+                                                 .metaValueType = boost::none});
 
     std::vector<BSONObj> batchOfMeasurements =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
                                                  .numMeasurements = 50,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = Date_t::now() + Seconds(1)});
+                                                 .timeValue = Date_t::now() + Seconds(1),
+                                                 .metaValueType = boost::none});
 
     auto batchOfMeasurementsWithTimeForward =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .idxWithDiffMeasurement = 1,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = Date_t::now() + Seconds(2)});
+                                                 .timeValue = Date_t::now() + Seconds(2),
+                                                 .metaValueType = boost::none});
 
     std::vector<BSONObj> mixedRolloverReasonsMeasurements =
         _getFlattenedVector(std::vector<std::vector<BSONObj>>{
@@ -3653,7 +3653,7 @@ TEST_F(
 TEST_F(BucketCatalogTest,
        StageInsertBatchIntoEligibleBucketWithPartiallyFilledBucketFillsUpSingleBucketWithoutMeta) {
     std::vector<BSONObj> batchOfMeasurementsOne = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kNone, .numMeasurements = 1, .metaValue = boost::none});
+        {.reason = RolloverReason::kNone, .numMeasurements = 1, .metaValueType = boost::none});
     std::vector<size_t> curBatchedInsertContextsIndex{0};
     std::vector<size_t> numMeasurementsInWriteBatch{1};
 
@@ -3722,7 +3722,7 @@ TEST_F(BucketCatalogTest,
     std::vector<BSONObj> batchOfMeasurementsWithCount = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kCount,
          .numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount + 1),
-         .metaValue = boost::none});
+         .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatch{
         0, static_cast<size_t>(gTimeseriesBucketMaxCount - 5), 6};
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0, 0};
@@ -3768,7 +3768,6 @@ TEST_F(BucketCatalogTest,
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .numMeasurements = 12,
                                                  .idxWithDiffMeasurement = 11,
-                                                 .metaValue = _metaValue,
                                                  .timeValue = Date_t::fromMillisSinceEpoch(100)});
     std::vector<size_t> numMeasurementsInWriteBatch{1, 10, 1};
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0, 0};
@@ -3776,17 +3775,14 @@ TEST_F(BucketCatalogTest,
     auto nonTimeForwardBucketVec1 = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kNone,
          .numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount - 1),
-         .metaValue = _metaValue,
          .timeValue = (Date_t::fromMillisSinceEpoch(100))});
     auto nonTimeForwardBucketVec2 =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
                                                  .numMeasurements = 5,
-                                                 .metaValue = _metaValue,
                                                  .timeValue = (Date_t::fromMillisSinceEpoch(100))});
     auto timeForwardBucketVec = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kNone,
          .numMeasurements = 1,
-         .metaValue = _metaValue,
          .timeValue = (Date_t::fromMillisSinceEpoch(100) + Hours(2))});
 
     std::vector<std::pair<std::vector<BSONObj>, RolloverReason>> measurementsAndRolloverReason;
@@ -3818,8 +3814,8 @@ TEST_F(
             {.reason = RolloverReason::kTimeForward,
              .numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount),
              .idxWithDiffMeasurement = 1,
-             .metaValue = boost::none,
-             .timeValue = Date_t::fromMillisSinceEpoch(100)});
+             .timeValue = Date_t::fromMillisSinceEpoch(100),
+             .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatchAfterFirstMeasurement{
         1, static_cast<size_t>(gTimeseriesBucketMaxCount - 1)};
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0};
@@ -3827,12 +3823,10 @@ TEST_F(
     auto nonTimeForwardBucketVec = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kNone,
          .numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount - 1),
-         .metaValue = _metaValue,
          .timeValue = (Date_t::fromMillisSinceEpoch(100))});
     auto timeForwardBucketVec = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kNone,
          .numMeasurements = 1,
-         .metaValue = _metaValue,
          .timeValue = (Date_t::fromMillisSinceEpoch(100) + Hours(2))});
     std::vector<std::pair<std::vector<BSONObj>, RolloverReason>> measurementsAndRolloverReason;
     measurementsAndRolloverReason.insert(
@@ -3859,18 +3853,16 @@ TEST_F(
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kTimeForward,
                                                  .numMeasurements = 50,
                                                  .idxWithDiffMeasurement = 25,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = Date_t::fromMillisSinceEpoch(100)});
+                                                 .timeValue = Date_t::fromMillisSinceEpoch(100),
+                                                 .metaValueType = boost::none});
 
     nonTimeForwardBucketVec =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
                                                  .numMeasurements = 50,
-                                                 .metaValue = _metaValue,
                                                  .timeValue = (Date_t::fromMillisSinceEpoch(100))});
     timeForwardBucketVec = _generateMeasurementsWithRolloverReason(
         {.reason = RolloverReason::kNone,
          .numMeasurements = static_cast<size_t>(gTimeseriesBucketMaxCount - 50),
-         .metaValue = _metaValue,
          .timeValue = (Date_t::fromMillisSinceEpoch(100) + Hours(2))});
     measurementsAndRolloverReason.clear();
     measurementsAndRolloverReason.insert(
@@ -3897,7 +3889,7 @@ TEST_F(
     Date_t timeValue = Date_t::now();
     // Max bucket size with only the last measurement having kSchemaChange.
     auto batchOfMeasurementsWithSchemaChangeAtEnd = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kSchemaChange, .metaValue = _metaValue, .timeValue = timeValue});
+        {.reason = RolloverReason::kSchemaChange, .timeValue = timeValue});
 
     // The last measurement in batchOfMeasurementsWithSchemaChangeAtEnd will have a int rather
     // than a string for field "deathGrips", which means this measurement will be in a different
@@ -3906,11 +3898,8 @@ TEST_F(
     std::vector<size_t> numMeasurementsInWriteBatchAtEnd{
         static_cast<size_t>(gTimeseriesBucketMaxCount - 1), 1};
 
-    auto nonSchemaChangeBucketVec =
-        _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
-                                                 .numMeasurements = 1,
-                                                 .metaValue = _metaValue,
-                                                 .timeValue = timeValue});
+    auto nonSchemaChangeBucketVec = _generateMeasurementsWithRolloverReason(
+        {.reason = RolloverReason::kNone, .numMeasurements = 1, .timeValue = timeValue});
     std::vector<BSONObj> schemaChangeVec;
     for (size_t i = 0; i < static_cast<size_t>(gTimeseriesBucketMaxCount - 2); i++) {
         schemaChangeVec.emplace_back(
@@ -3944,8 +3933,8 @@ TEST_F(
     auto batchOfMeasurementsWithSchemaChangeAfterFirstMeasurement =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
                                                  .idxWithDiffMeasurement = 1,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = timeValue});
+                                                 .timeValue = timeValue,
+                                                 .metaValueType = boost::none});
 
 
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0};
@@ -3955,8 +3944,8 @@ TEST_F(
     auto nonSchemaChangeBucketVec =
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kNone,
                                                  .numMeasurements = 50,
-                                                 .metaValue = boost::none,
-                                                 .timeValue = timeValue});
+                                                 .timeValue = timeValue,
+                                                 .metaValueType = boost::none});
     std::vector<BSONObj> schemaChangeVec{BSON(_timeField << timeValue << "deathGrips" << 100)};
     std::vector<std::pair<std::vector<BSONObj>, RolloverReason>> measurementsAndRolloverReason;
 
@@ -3981,7 +3970,7 @@ TEST_F(
         _generateMeasurementsWithRolloverReason({.reason = RolloverReason::kSchemaChange,
                                                  .numMeasurements = 50,
                                                  .idxWithDiffMeasurement = 25,
-                                                 .metaValue = boost::none});
+                                                 .metaValueType = boost::none});
 
     schemaChangeVec.clear();
     for (size_t i = 0; i < static_cast<size_t>(gTimeseriesBucketMaxCount - 25); i++) {
@@ -4041,7 +4030,7 @@ TEST_F(
     // The last measurement will exceed the size that the bucket can store. We will trigger kSize,
     // so the measurement will be in a different bucket.
     std::vector<BSONObj> batchOfMeasurementsWithSize = _generateMeasurementsWithRolloverReason(
-        {.reason = RolloverReason::kSize, .metaValue = boost::none});
+        {.reason = RolloverReason::kSize, .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatch{124, 1};
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0};
 
@@ -4123,7 +4112,7 @@ TEST_F(
     // storageCacheSizeBytes.
     std::vector<BSONObj> batchOfMeasurementsWithCachePressure =
         _generateMeasurementsWithRolloverReason(
-            {.reason = RolloverReason::kCachePressure, .metaValue = boost::none});
+            {.reason = RolloverReason::kCachePressure, .metaValueType = boost::none});
     std::vector<size_t> numMeasurementsInWriteBatch{3, 1};
     std::vector<size_t> curBatchedInsertContextsIndex{0, 0};
 
