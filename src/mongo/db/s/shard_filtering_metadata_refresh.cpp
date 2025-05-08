@@ -764,10 +764,10 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             // refresh is in progress or can start (would require to exclusive lock the DSS).
             // Therefore, the database version can be accessed safely.
 
-            const auto wantedVersion = (*scopedDsr)->getDbVersion();
-            if (receivedDbVersion <= wantedVersion) {
-                // No need to refresh the database metadata as the wanted version is newer
-                // than the one received.
+            const auto dbMetadata = (*scopedDsr)->getCurrentMetadataIfKnown();
+            if (dbMetadata && receivedDbVersion <= dbMetadata->getVersion()) {
+                // No need to refresh the database metadata as the wanted version is newer than the
+                // one received.
                 return;
             }
         }
@@ -857,7 +857,7 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
         // it (would require to exclusive lock the DSS). Therefore, the database version can be
         // accessed safely.
 
-        const auto wantedVersion = (*scopedDsr)->getDbVersion();
+        const auto dbMetadata = (*scopedDsr)->getCurrentMetadataIfKnown();
 
         // If shards are the authoritative source for database metadata, at this stage this node
         // has waited until the received version's optime and that any necessary critical section
@@ -873,19 +873,21 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
 
         uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, boost::none),
                 str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
-                wantedVersion);
+                dbMetadata);
 
-        tassert(StaleDbRoutingVersion(dbName, receivedDbVersion, *wantedVersion),
+        const auto wantedVersion = dbMetadata->getVersion();
+
+        tassert(StaleDbRoutingVersion(dbName, receivedDbVersion, wantedVersion),
                 str::stream() << "Version mismatch for the database: "
                               << dbName.toStringForErrorMsg()
                               << ". Shard is authoritative and we have waited long enough for it "
                                  "to catch up. It can't have a version behind the routers anymore.",
-                receivedDbVersion <= *wantedVersion);
+                receivedDbVersion <= wantedVersion);
 
-        uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, *wantedVersion),
+        uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, wantedVersion),
                 str::stream() << "Version mismatch for the database "
                               << dbName.toStringForErrorMsg(),
-                receivedDbVersion == *wantedVersion);
+                receivedDbVersion == wantedVersion);
 
         break;
     }

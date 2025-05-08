@@ -170,18 +170,19 @@ void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx,
                 !critSecSignal);
     }
 
-    const auto wantedVersion = getDbVersion();
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, boost::none),
             str::stream() << "No cached info for the database " << _dbName.toStringForErrorMsg(),
-            wantedVersion);
+            _dbInfo);
 
-    uassert(StaleDbRoutingVersion(_dbName, receivedVersion, *wantedVersion),
+    const auto wantedVersion = _dbInfo->getVersion();
+
+    uassert(StaleDbRoutingVersion(_dbName, receivedVersion, wantedVersion),
             str::stream() << "Version mismatch for the database " << _dbName.toStringForErrorMsg(),
-            receivedVersion == *wantedVersion);
+            receivedVersion == wantedVersion);
 
     // Check placement conflicts for multi-document transactions.
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    checkPlacementConflictTimestamp(atClusterTime, receivedVersion, _dbName, *wantedVersion);
+    checkPlacementConflictTimestamp(atClusterTime, receivedVersion, _dbName, wantedVersion);
 }
 
 void DatabaseShardingRuntime::assertIsPrimaryShardForDb(OperationContext* opCtx) const {
@@ -243,14 +244,6 @@ void DatabaseShardingRuntime::clearDbInfo() {
     LOGV2(10003602, "Clearing this node's cached database info", logAttrs(_dbName));
 
     _dbInfo = boost::none;
-}
-
-boost::optional<DatabaseVersion> DatabaseShardingRuntime::getDbVersion() const {
-    return _dbInfo ? boost::optional<DatabaseVersion>(_dbInfo->getVersion()) : boost::none;
-}
-
-boost::optional<ShardId> DatabaseShardingRuntime::getDbPrimaryShard() const {
-    return _dbInfo ? boost::optional<ShardId>(_dbInfo->getPrimary()) : boost::none;
 }
 
 void DatabaseShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {

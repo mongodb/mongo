@@ -126,23 +126,6 @@ public:
      * otherwise.
      */
     virtual bool isMovePrimaryInProgress() const = 0;
-
-    /**
-     * Returns the name of the database related to the current sharding state.
-     */
-    virtual const DatabaseName& getDbName() const = 0;
-
-    /**
-     * Returns this node's cached  database version if the database info is cached, otherwise it
-     * returns `boost::none`.
-     */
-    virtual boost::optional<DatabaseVersion> getDbVersion() const = 0;
-
-    /**
-     * Returns this node's cached primary shard if the database info is cached, otherwise it returns
-     * `boost::none`.
-     */
-    virtual boost::optional<ShardId> getDbPrimaryShard() const = 0;
 };
 
 

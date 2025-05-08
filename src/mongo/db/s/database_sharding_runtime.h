@@ -128,13 +128,12 @@ public:
         return _movePrimaryInProgress;
     }
 
-    const DatabaseName& getDbName() const override {
-        return _dbName;
+    /**
+     * Returns this node's cached database metadata if set, otherwise it returns `boost::none`.
+     */
+    boost::optional<DatabaseType> getCurrentMetadataIfKnown() const {
+        return _dbInfo;
     }
-
-    boost::optional<DatabaseVersion> getDbVersion() const override;
-
-    boost::optional<ShardId> getDbPrimaryShard() const override;
 
     /**
      * Sets this node's cached database info.

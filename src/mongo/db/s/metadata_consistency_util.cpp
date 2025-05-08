@@ -61,6 +61,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
@@ -432,25 +433,30 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     const ShardId& primaryShard) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
-    const auto dbVersionInCache = [&]() {
-        const auto scopedDss = DatabaseShardingState::acquire(opCtx, dbName);
-        return scopedDss->getDbVersion();
+    const auto dbMetadata = [&]() {
+        const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
+        return scopedDsr->getCurrentMetadataIfKnown();
     }();
 
-    if (!dbVersionInCache) {
+    if (!dbMetadata) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalogCache,
             MissingDatabaseMetadataInShardCatalogCacheDetails{
                 dbName, primaryShard, dbVersionInGlobalCatalog}));
-    } else if (dbVersionInGlobalCatalog != *dbVersionInCache ||
-               dbVersionInShardCatalog != *dbVersionInCache) {
+        return inconsistencies;
+    }
+
+    const auto dbVersionInCache = dbMetadata->getVersion();
+
+    if (dbVersionInGlobalCatalog != dbVersionInCache ||
+        dbVersionInShardCatalog != dbVersionInCache) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardCatalogCache,
             InconsistentDatabaseVersionInShardCatalogCacheDetails{dbName,
                                                                   primaryShard,
                                                                   dbVersionInGlobalCatalog,
                                                                   dbVersionInShardCatalog,
-                                                                  *dbVersionInCache}));
+                                                                  dbVersionInCache}));
     }
 
     return inconsistencies;

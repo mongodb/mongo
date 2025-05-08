@@ -46,7 +46,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
@@ -98,17 +98,19 @@ public:
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            const auto dbName = _targetDb();
+            const auto dbMetadata = [&] {
+                const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, _targetDb());
+                return scopedDsr->getCurrentMetadataIfKnown();
+            }();
 
-            const auto scopedDss = DatabaseShardingState::acquire(opCtx, dbName);
-
-            BSONObj versionObj;
-            if (const auto dbVersion = scopedDss->getDbVersion()) {
-                versionObj = dbVersion->toBSON();
+            if (!dbMetadata) {
+                result->getBodyBuilder().append("dbVersion", BSONObj());
+                return;
             }
-            result->getBodyBuilder().append("dbVersion", versionObj);
 
-            if (ShardingState::get(opCtx)->shardId() == scopedDss->getDbPrimaryShard()) {
+            result->getBodyBuilder().append("dbVersion", dbMetadata->getVersion().toBSON());
+
+            if (ShardingState::get(opCtx)->shardId() == dbMetadata->getPrimary()) {
                 result->getBodyBuilder().append("isPrimaryShardForDb", true);
             }
         }
