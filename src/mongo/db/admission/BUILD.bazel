@@ -124,6 +124,22 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "rate_limiter",
+    srcs = [
+        "rate_limiter.cpp",
+    ],
+    hdrs = [
+        "rate_limiter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/third_party/folly:folly_token_bucket",
+    ],
+)
+
 idl_generator(
     name = "flow_control_parameters_gen",
     src = "flow_control_parameters.idl",
@@ -200,6 +216,21 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
         "//src/mongo/util:mock_periodic_runner",
         "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rate_limiter_util_test",
+    srcs = [
+        "rate_limiter_util_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_second_group",
+        "server-workload-scheduling",
+    ],
+    deps = [
+        ":rate_limiter",
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )
 
