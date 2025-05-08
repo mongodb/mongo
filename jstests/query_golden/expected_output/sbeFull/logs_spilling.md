@@ -233,7 +233,43 @@
 }
 ```
 
-## 11. SetWindowFields
+## 11. HashLookupUnwind
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "logs_spilling_md_locations",
+			"localField" : "locationName",
+			"foreignField" : "name",
+			"as" : "location"
+		}
+	},
+	{
+		"$unwind" : "$location"
+	},
+	{
+		"$project" : {
+			"locationName" : false,
+			"location.extra" : false,
+			"location.coordinates" : false,
+			"colors" : false
+		}
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"hashLookupSpilledBytes" : "X",
+	"hashLookupSpilledDataStorageSize" : "X",
+	"hashLookupSpilledRecords" : 6,
+	"hashLookupSpills" : 6,
+	"usedDisk" : true
+}
+```
+
+## 12. SetWindowFields
 ### Pipeline
 ```json
 [

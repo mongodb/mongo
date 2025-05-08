@@ -110,10 +110,6 @@ public:
     PlanState getNext() final;
     void close() final;
 
-    void doForceSpill() final {
-        _hashTable.forceSpill();
-    };
-
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
@@ -201,5 +197,9 @@ private:
 
     // LookupHashTable instance holding the inner collection.
     LookupHashTable _hashTable;
+
+    void doForceSpill() final {
+        _hashTable.forceSpill();
+    };
 };  // class HashLookupStage
 }  // namespace mongo::sbe

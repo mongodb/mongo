@@ -12,6 +12,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const conn = MongoRunner.runMongod();
@@ -207,6 +208,39 @@ coll.aggregate(
     {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
+
+assert.commandWorked(testDB.adminCommand({
+    setParameter: 1,
+    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
+}));
+assert.commandWorked(testDB.adminCommand(
+    {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}));
+
+function checkHashLookup(pipeline) {
+    // HashLookup spills only in SBE
+    const explain = coll.explain().aggregate(pipeline);
+    if (getAggPlanStages(explain, "EQ_LOOKUP_UNWIND").length > 0 ||
+        getAggPlanStages(explain, "EQ_LOOKUP").length > 0) {
+        coll.aggregate(pipeline, {allowDiskUse: true});
+        const profileObj = getLatestProfilerEntry(testDB);
+        assert.eq(profileObj.usedDisk, true, tojson(profileObj));
+        assert.gt(profileObj.hashLookupSpills, 0, tojson(profileObj));
+        assert.gt(profileObj.hashLookupSpilledBytes, 0, tojson(profileObj));
+        assert.gt(profileObj.hashLookupSpilledRecords, 0, tojson(profileObj));
+        assert.gt(profileObj.hashLookupSpilledDataStorageSize, 0, tojson(profileObj));
+    }
+}
+
+const lookupPipeline =
+    [{$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "same"}}];
+checkHashLookup(lookupPipeline);
+
+const lookupUnwindPipeline = [
+    {$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "same"}},
+    {$unwind: "$same"},
+    {$project: {same: 1}}
+];
+checkHashLookup(lookupUnwindPipeline);
 
 //
 // Test that aggregate command fails when 'allowDiskUse:false' because of insufficient available

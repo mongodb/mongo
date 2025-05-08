@@ -50,6 +50,7 @@ selector:
     # Time-outs waiting for the response to a ServerStatus request because
     # the node in init sync state ignores it and never responds to it.
     - jstests/core/query/release_memory/hash_lookup.js
+    - jstests/core/query/release_memory/hash_lookup_unwind.js
     - jstests/core/query/release_memory/group.js
     - jstests/core/query/release_memory/set_window_fields.js
     - jstests/core/query/release_memory/sort.js

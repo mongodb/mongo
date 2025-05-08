@@ -186,6 +186,60 @@ outputPipelineAndSlowQueryLog(
 students.drop();
 people.drop();
 
+section("HashLookupUnwind");
+
+const locations = db[jsTestName() + "_locations"];
+locations.drop();
+const animals = db[jsTestName() + "_animals"];
+animals.drop();
+
+const locationsDocs = [
+    {
+        name: "doghouse",
+        coordinates: [25.0, 60.0],
+        extra: {breeds: ["terrier", "dachshund", "bulldog"]}
+    },
+    {
+        _id: "bullpen",
+        coordinates: [-25.0, -60.0],
+        extra: {breeds: "Scottish Highland", feeling: "bullish"}
+    },
+    {
+        name: "volcano",  // no animals are in this location, so no $lookup matches
+        coordinates: [-1111.0, 2222.0],
+        extra: {breeds: "basalt", feeling: "hot"}
+    }
+];
+const animasDocs = [
+    {_id: "dog", locationName: "doghouse", colors: ["chartreuse", "taupe"]},
+    {_id: "bull", locationId: "bullpen", colors: ["red", "blue"]},
+    {_id: "trout", colors: ["mauve"]},  // no "locationId" field, so no $lookup matches
+];
+
+assert.commandWorked(locations.insertMany(locationsDocs));
+assert.commandWorked(animals.insertMany(animasDocs));
+
+outputPipelineAndSlowQueryLog(
+    animals,
+    [
+        {
+            $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"}
+        },
+        {$unwind: "$location"},
+        {
+            $project: {
+                locationName: false,
+                "location.extra": false,
+                "location.coordinates": false,
+                "colors": false
+            }
+        },
+    ],
+    "$lookup-$unwind");
+
+locations.drop();
+animals.drop();
+
 saveParameterToRestore("internalDocumentSourceSetWindowFieldsMaxMemoryBytes");
 section("SetWindowFields");
 

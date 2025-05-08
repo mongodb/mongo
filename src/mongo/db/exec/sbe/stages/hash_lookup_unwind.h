@@ -173,5 +173,9 @@ private:
     LookupHashTable _hashTable;
     // Tracks whether we are already processing an outer key.
     bool _outerKeyOpen{false};
+
+    void doForceSpill() final {
+        _hashTable.forceSpill();
+    };
 };  // class HashLookupUnwindStage
 }  // namespace mongo::sbe
