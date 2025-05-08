@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import cache, cached_property
 from glob import glob
 from pathlib import Path  # if you haven't already done so
-from typing import Literal, NoReturn
+from typing import Literal, NamedTuple, NoReturn
 
 import codeowners
 import pyzstd
@@ -855,6 +855,65 @@ def dump_list() -> None:
         print(line)
 
 
+def validate_modules() -> bool:
+    def glob_is_prefix(short: str, long: str):
+        # Simplistic but good enough for now. In particular, I want to make sure we would
+        # catch things like "foo*" and "*bar*" both matching "foobar".
+        assert len(short) <= len(long)  # argument are sorted by length before calling
+        if short == long:
+            return False  # duplicates are treated as errors
+        if long.startswith(short):
+            return True  # foo and foo/ are prefixes of foo/bar
+        if short.endswith("*") and long.startswith(short[:-1]):
+            return True  # foo* is a prefix of foo/bar and foobar
+        return False
+
+    class Info(NamedTuple):
+        mod: str
+        glob: str
+
+    info_for_line = {
+        info[3]: Info(
+            mod=info[2][0][1].removeprefix("@10gen/"),
+            glob=info[1][1:],
+        )
+        for info in modules.paths
+    }
+    seen_lines = set[int]()
+
+    failed = False
+    for path in glob_paths():
+        matches = list(modules.matching_lines(path))
+        for match in matches:
+            seen_lines.add(match[1])
+
+        if len(matches) <= 1:
+            continue
+
+        infos = sorted((info_for_line[match[1]] for match in matches), key=lambda i: len(i.glob))
+        for i in range(0, len(infos)):
+            for j in range(i, len(infos)):
+                a = infos[i]
+                b = infos[j]
+                if a.mod != b.mod and not glob_is_prefix(a.glob, b.glob):
+                    perr(
+                        f"Error: {path} matches multiple globs that are neither prefixes nor same module:"
+                    )
+                    for info in infos:
+                        perr(f"  {info.glob}  ({info.mod})")
+                    failed = True
+                    break
+            else:
+                continue
+            break  # break out of outer loop
+
+    for line, info in info_for_line.items():
+        if line not in seen_lines:
+            perr(f"Error: glob '{info.glob}' in module {info.mod} doesn't match any files")
+            failed = True
+    return failed
+
+
 def parseTU(args: list[str] | str):
     if not Config.loaded:
         Config.set_compatibility_check(False)
@@ -947,13 +1006,16 @@ def main():
     if len(args) == 0:
         perr_exit("invalid number of arguments")
 
-    if args == ["--dump-modules"]:
-        dump_modules()
-        sys.exit()
-
-    if args == ["--dump-modules-list"]:
-        dump_list()
-        sys.exit()
+    if len(args) == 1 and args[0].startswith("--"):
+        match args[0]:
+            case "--dump-modules":
+                sys.exit(dump_modules())
+            case "--dump-modules-list":
+                sys.exit(dump_list())
+            case "--validate-modules":
+                sys.exit(validate_modules())
+            case unknown:
+                sys.exit(f"unknown flag {unknown}")
 
     tu = parseTU(args)
 

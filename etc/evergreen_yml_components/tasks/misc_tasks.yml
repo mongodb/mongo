@@ -1088,6 +1088,15 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "validate-modules-yaml"
+            - "modules_poc/mod_scanner.py"
+            - "--validate-modules"
       - func: "bazel compile"
         vars:
           targets: //src/mongo/...

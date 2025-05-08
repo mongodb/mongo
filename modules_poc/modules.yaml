@@ -125,7 +125,7 @@ core.commands:
     - src/mongo/db/commands/test_commands[._]*
     - src/mongo/db/commands/generic.*
     - src/mongo/db/commands/generic_servers.*
-    - src/mongo/db/commmands/parameters.*
+    - src/mongo/db/commands/parameters.*
     - src/mongo/s/request_types/wait_for_fail_point.idl
     - src/mongo/s/commands/cluster_build_info.cpp
     - src/mongo/s/commands/cluster_kill_op.cpp
@@ -213,13 +213,6 @@ replication:
     - src/mongo/db/op_observer/fcv_op_observer* # specific files
     - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
 
-storage_engine:
-  meta:
-    slack: TODO
-    jira: TODO
-  files:
-    - src/third_party/wiredtiger/
-
 access_control:
   meta:
     slack: TODO
@@ -291,7 +284,7 @@ networking:
     slack: TODO
     jira: TODO
   files:
-    - src/mongo/db/rpc/
+    - src/mongo/rpc/
     - src/mongo/util/net
     - src/mongo/transport
 
@@ -332,7 +325,7 @@ index_builds: # authoritative: @10gen/server-index-builds
     jira: Storage Execution
   files:
     - src/mongo/db/index_builds
-    - src/mongo/db/index/index_access_methods*
+    - src/mongo/db/index/index_access_method*
     - src/mongo/db/catalog/index_key_validate*
     - src/mongo/db/catalog/index_spec_validate*
     - src/mongo/db/commands/create_indexes*
@@ -372,7 +365,6 @@ storage_engine_integration:
   files:
     - src/mongo/db/storage # excluding ./key_string, ./wiredtiger, ./devnull, some of ./kv
     - src/mongo/db/record_id*
-    - src/mongo/db/prepare_conflict_tracker*
     - src/mongo/db/server_recovery*
     - src/mongo/db/mongod_options_storage.idl
     - src/mongo/db/dbhelpers*
@@ -394,7 +386,6 @@ validate:
     slack: server-rss-sydney
     jira: RSS Sydney
   files:
-    - src/mongo/db/catalog/collection_validation*
     - src/mongo/db/catalog/throttle_cursor*
     - src/mongo/db/commands/validate.cpp
     - src/mongo/db/validate
