@@ -433,8 +433,8 @@ ttl: # authoritative: @10gen/server-ttl
 
 tracking_allocators: # authoritative: @10gen/server-tracking-allocators
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/util/tracking
 
