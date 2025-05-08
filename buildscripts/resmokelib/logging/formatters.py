@@ -104,7 +104,7 @@ class JsonLogFormatter(TimestampFormatter):
         return json.dumps(formatted_message)
 
 
-class EvergreenLogFormatter(logging.Formatter):
+class EvergreenLogFormatter(TimestampFormatter):
     """Log line formatter for Evergreen log messages.
 
     See `https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Task-Output-Directory#test-logs`
