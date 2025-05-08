@@ -51,19 +51,5 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
                                              const RecordId& justInserted,
                                              OpDebug* opDebug);
 
-/**
- * This function starts its own WUOW to truncate documents newer than the document at 'end' from the
- * capped collection.
- *
- * @param inclusive - Truncate 'end' as well iff true
- *
- * The caller should hold a collection X lock and ensure there are no index builds in progress on
- * the collection.
- */
-void cappedTruncateAfter(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const RecordId& end,
-                         bool inclusive);
-
 }  // namespace collection_internal
 }  // namespace mongo

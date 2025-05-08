@@ -83,8 +83,7 @@ public:
             catalog->lookupCollectionByNamespace(opCtx, NamespaceString::kRsOplogNamespace);
         if (oplogCollection) {
             // In certain modes, like read-only, no truncate markers are created.
-            if (auto truncateMarkers =
-                    oplogCollection->getRecordStore()->oplog()->getCollectionTruncateMarkers()) {
+            if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
                 builder.append("totalTimeProcessingMicros",
                                truncateMarkers->getCreationProcessingTime().count());
                 builder.append("processingMethod",
@@ -137,7 +136,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.
-        oplogTruncateMarkers = rs->oplog()->getCollectionTruncateMarkers();
+        oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
         invariant(oplogTruncateMarkers);
     }
 

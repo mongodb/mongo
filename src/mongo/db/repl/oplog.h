@@ -108,6 +108,13 @@ public:
 };
 
 namespace repl {
+namespace internal {
+Status insertDocumentsForOplog(OperationContext* opCtx,
+                               const CollectionPtr& oplogCollection,
+                               std::vector<Record>* records,
+                               const std::vector<Timestamp>& timestamps);
+}  // namespace internal
+
 class ReplSettings;
 
 struct OplogLink {

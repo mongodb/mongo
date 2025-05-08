@@ -57,6 +57,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
 #include "mongo/db/client.h"
@@ -87,6 +88,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -812,8 +814,8 @@ bool CollectionImpl::isCappedAndNeedsDelete(OperationContext* opCtx) const {
         return false;
     }
 
-    if (getRecordStore()->oplog() && getRecordStore()->oplog()->selfManagedTruncation()) {
-        // Storage engines can choose to manage oplog truncation internally.
+    if (getRecordStore()->oplog()) {
+        // Oplog truncation is managed through OplogTruncateMarkers.
         return false;
     }
 
@@ -1030,6 +1032,9 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
         Status status = _shared->_recordStore->oplog()->updateSize(*newCappedSize);
         if (!status.isOK()) {
             return status;
+        }
+        if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
+            truncateMarkers->adjust(*newCappedSize);
         }
     }
 
@@ -1291,6 +1296,11 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     auto status = _shared->_recordStore->truncate(opCtx);
     if (!status.isOK())
         return status;
+    if (ns().isOplog()) {
+        if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
+            truncateMarkers->clearMarkersOnCommit(opCtx);
+        }
+    }
 
     // 4) re-create indexes
     for (size_t i = 0; i < indexSpecs.size(); i++) {

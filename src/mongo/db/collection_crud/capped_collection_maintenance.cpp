@@ -278,29 +278,5 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     wuow.commit();
 }
 
-void cappedTruncateAfter(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const RecordId& end,
-                         bool inclusive) {
-    invariant(
-        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
-    invariant(collection->isCapped());
-    invariant(collection->getIndexCatalog()->numIndexesInProgress() == 0);
-
-    collection->getRecordStore()->capped()->truncateAfter(
-        opCtx, end, inclusive, [&](OperationContext* opCtx, const RecordId& loc, RecordData data) {
-            BSONObj doc = data.releaseToBson();
-            int64_t* const nullKeysDeleted = nullptr;
-            collection->getIndexCatalog()->unindexRecord(
-                opCtx, collection, doc, loc, false, nullKeysDeleted);
-
-            // We are not capturing and reporting to OpDebug the 'keysDeleted' by unindexRecord().
-            // It is questionable whether reporting will add diagnostic value to users and may
-            // instead be confusing as it depends on our internal capped collection document removal
-            // strategy. We can consider adding either keysDeleted or a new metric reporting
-            // document removal if justified by user demand.
-        });
-}
-
 }  // namespace collection_internal
 }  // namespace mongo

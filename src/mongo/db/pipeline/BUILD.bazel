@@ -147,7 +147,6 @@ mongo_cc_library(
         "//src/mongo/db:catalog_raii.h",
         "//src/mongo/db:db_raii.h",
         "//src/mongo/db:read_concern.h",
-        "//src/mongo/db/catalog:local_oplog_info.h",
         "//src/mongo/db/exec:exclusion_projection_executor.h",
         "//src/mongo/db/exec:fastpath_projection_node.h",
         "//src/mongo/db/exec:projection_executor.h",
@@ -184,6 +183,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/catalog:local_oplog_info",
         "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats:query_stats_parse",

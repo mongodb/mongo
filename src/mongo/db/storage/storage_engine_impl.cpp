@@ -1064,10 +1064,6 @@ bool StorageEngineImpl::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
 }
 
-bool StorageEngineImpl::supportsOplogTruncateMarkers() const {
-    return _engine->supportsOplogTruncateMarkers();
-}
-
 void StorageEngineImpl::clearDropPendingState(OperationContext* opCtx) {
     _dropPendingIdentReaper.clearDropPendingState(opCtx);
 }

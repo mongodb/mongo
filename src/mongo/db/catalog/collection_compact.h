@@ -31,10 +31,10 @@
 
 #include <cstdint>
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/record_store.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/compact_options.h"
 
 namespace mongo {
 

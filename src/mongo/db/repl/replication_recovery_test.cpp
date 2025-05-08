@@ -408,7 +408,7 @@ void _setUpOplog(OperationContext* opCtx, StorageInterface* storage, std::vector
             opCtx, oplogNs, _makeInsertOplogEntry(ts), OpTime::kUninitializedTerm));
     }
     if (!timestamps.empty()) {
-        // Use the highest inserted timestamp to update oplog visibilty so that all of the inserted
+        // Use the highest inserted timestamp to update oplog visibility so that all of the inserted
         // oplog entries are visible.
         storage->oplogDiskLocRegister(opCtx, Timestamp(timestamps.back(), timestamps.back()), true);
     }

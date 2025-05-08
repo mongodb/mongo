@@ -33,9 +33,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
@@ -85,11 +85,30 @@ Status insertDocsToOplogAndChangeCollections(OperationContext* opCtx,
         if (!oplogColl) {
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
         }
-        auto status = collection_internal::insertDocuments(
-            opCtx, oplogColl, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
+
+        const size_t count = std::distance(begin, end);
+        std::vector<Record> records;
+        records.reserve(count);
+        std::vector<Timestamp> timestamps;
+        timestamps.reserve(count);
+        for (auto it = begin; it != end; it++) {
+            const auto& doc = it->doc;
+            records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize())});
+            timestamps.emplace_back(it->oplogSlot.getTimestamp());
+        }
+
+        auto status = internal::insertDocumentsForOplog(opCtx, oplogColl, &records, timestamps);
         if (!status.isOK()) {
             return status;
         }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(opCtx,
+                                                               oplogColl,
+                                                               begin,
+                                                               end,
+                                                               /*recordIds=*/{},
+                                                               /*fromMigrate=*/
+                                                               std::vector(count, false),
+                                                               /*defaultFromMigrate=*/false);
         observer->onWriteOplogCollection(begin, end);
     }
 

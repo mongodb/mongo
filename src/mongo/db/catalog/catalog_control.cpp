@@ -201,6 +201,10 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     LOGV2(20271, "closeCatalog: closing all databases");
     databaseHolder->closeAll(opCtx);
 
+    if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
+        truncateMarkers->kill();
+    }
+
     CollectionCatalog::write(opCtx, [opCtx](CollectionCatalog& catalog) {
         catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
     });

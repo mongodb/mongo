@@ -928,8 +928,15 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                                                        truncateAfterOplogEntryTs);
         }
     }
-    oplogCollection->getRecordStore()->capped()->truncateAfter(
-        opCtx, truncateAfterRecordId, false /*inclusive*/, nullptr /* aboutToDelete callback */);
+    RecordStore::Capped::TruncateAfterResult result =
+        oplogCollection->getRecordStore()->capped()->truncateAfter(
+            opCtx, truncateAfterRecordId, false /*inclusive*/);
+    if (result.recordsRemoved > 0) {
+        if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
+            truncateMarkers->updateMarkersAfterCappedTruncateAfter(
+                result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
+        }
+    }
 
     LOGV2(21554,
           "Replication recovery oplog truncation finished",

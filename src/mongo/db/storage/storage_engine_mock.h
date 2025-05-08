@@ -110,9 +110,6 @@ public:
     bool supportsReadConcernSnapshot() const final {
         return false;
     }
-    bool supportsOplogTruncateMarkers() const final {
-        return false;
-    }
     void clearDropPendingState(OperationContext* opCtx) final {}
     StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) final {
         fassertFailed(40547);

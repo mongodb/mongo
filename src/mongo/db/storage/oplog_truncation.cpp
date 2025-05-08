@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/oplog_truncation.h"
 
+#include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -42,7 +43,7 @@ namespace mongo::oplog_truncation {
 RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayTruncateUpTo) {
     RecordId highestTruncated;
     for (auto getNextMarker = true; getNextMarker;) {
-        auto truncateMarkers = oplog.oplog()->getCollectionTruncateMarkers();
+        auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
         auto truncateMarker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx);
         if (!truncateMarker) {
             break;

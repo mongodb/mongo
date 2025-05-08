@@ -195,10 +195,7 @@ TEST(RecordStoreTest, SeekOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        rs->capped()->truncateAfter(opCtx.get(),
-                                    RecordId(2, 2),
-                                    false /* inclusive */,
-                                    nullptr /* aboutToDelete callback */);  // no-op
+        rs->capped()->truncateAfter(opCtx.get(), RecordId(2, 2), false /* inclusive */);
     }
 
     {
@@ -428,8 +425,7 @@ TEST(RecordStoreTest, OplogOrder) {
     {
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
-        rs->capped()->truncateAfter(
-            opCtx.get(), id1, false /* inclusive */, nullptr /* aboutToDelete callback */);
+        rs->capped()->truncateAfter(opCtx.get(), id1, false /* inclusive */);
     }
 
     {

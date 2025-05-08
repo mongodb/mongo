@@ -28,6 +28,7 @@
  */
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/s/sharding_index_catalog_cache.h"

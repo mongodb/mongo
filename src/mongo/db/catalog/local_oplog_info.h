@@ -35,11 +35,10 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/timer.h"
 
@@ -120,13 +119,13 @@ public:
     LocalOplogInfo() = default;
 
     RecordStore* getRecordStore() const;
-    void setRecordStore(RecordStore* rs);
+    void setRecordStore(OperationContext* opCtx, RecordStore* rs);
     void resetRecordStore();
 
     /**
      * Sets the global Timestamp to be 'newTime'.
      */
-    void setNewTimestamp(ServiceContext* opCtx, const Timestamp& newTime);
+    void setNewTimestamp(ServiceContext* service, const Timestamp& newTime);
 
     /**
      * Allocates optimes for new entries in the oplog. Returns the new optimes in a vector along
@@ -134,11 +133,21 @@ public:
      */
     std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
 
+    /**
+     * Returns a shared reference to the oplog truncate markers to allow the caller to wait
+     * for a deletion request.
+     */
+    std::shared_ptr<OplogTruncateMarkers> getTruncateMarkers() const;
+
 private:
     // The "oplog" record store pointer is always valid (or null) because an operation must take
     // the global exclusive lock to set the pointer to null when the RecordStore instance is
     // destroyed. See "oplogCheckCloseDatabase".
     RecordStore* _rs = nullptr;
+
+    // Stores truncate markers for this oplog, can be nullptr e.g. when
+    // the server is read-only.
+    std::shared_ptr<OplogTruncateMarkers> _truncateMarkers;
 
     // Synchronizes the section where a new Timestamp is generated and when it is registered in the
     // storage engine.

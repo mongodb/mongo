@@ -82,7 +82,7 @@ public:
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
     /**
-     * Create an oplog record store without setting truncate markers or starting the oplog manager.
+     * Create an oplog record store without starting the oplog manager.
      */
     std::unique_ptr<RecordStore> newOplogRecordStoreNoInit();
 

@@ -244,16 +244,18 @@ public:
     }
 
 private:
-    void _truncateAfter(OperationContext*,
-                        const RecordId&,
-                        bool inclusive,
-                        const AboutToDeleteRecordCallback&) override {}
+    TruncateAfterResult _truncateAfter(OperationContext*,
+                                       const RecordId&,
+                                       bool inclusive) override {
+        return {};
+    }
 };
 
 class DevNullRecordStore::Oplog final : public DevNullRecordStore::Capped,
                                         public RecordStore::Oplog {
 public:
-    Oplog(UUID uuid, StringData ident) : DevNullRecordStore::Capped(uuid, ident, KeyFormat::Long) {}
+    Oplog(UUID uuid, StringData ident, int64_t maxSize)
+        : DevNullRecordStore::Capped(uuid, ident, KeyFormat::Long), _maxSize(maxSize) {}
 
     RecordStore::Capped* capped() override {
         return this;
@@ -263,16 +265,13 @@ public:
         return this;
     }
 
-    bool selfManagedTruncation() const override {
-        return false;
-    }
-
     Status updateSize(long long size) override {
+        _maxSize = size;
         return Status::OK();
     }
 
-    const OplogData* getOplogData() const override {
-        return nullptr;
+    int64_t getMaxSize() const override {
+        return _maxSize;
     }
 
     std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
@@ -288,9 +287,8 @@ public:
         return Status::OK();
     }
 
-    std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() override {
-        return nullptr;
-    }
+private:
+    int64_t _maxSize;
 };
 
 class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
@@ -401,7 +399,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
     if (ident == "_mdb_catalog") {
         return std::make_unique<EphemeralForTestRecordStore>(uuid, ident, &_catalogInfo);
     } else if (options.isOplog) {
-        return std::make_unique<DevNullRecordStore::Oplog>(*uuid, ident);
+        return std::make_unique<DevNullRecordStore::Oplog>(*uuid, ident, options.oplogMaxSize);
     } else if (options.isCapped) {
         return std::make_unique<DevNullRecordStore::Capped>(uuid, ident, options.keyFormat);
     }

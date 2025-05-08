@@ -81,8 +81,6 @@
 
 namespace mongo {
 
-class OplogData;
-class OplogTruncateMarkers;
 class RecoveryUnit;
 class SpillKVEngine;
 class WiredTigerConnection;
@@ -217,14 +215,6 @@ protected:
     StatusWith<int64_t> wtCompact(OperationContext* opCtx,
                                   WiredTigerRecoveryUnitBase& wtRu,
                                   const CompactOptions& options);
-
-    /**
-     * Enforces any record size restrictions when updating records e.g. the RecordStore for oplog
-     * could enforce that an update does not change the size of the record.
-     */
-    virtual Status _checkUpdateSize(int64_t oldSize, int64_t newSize) {
-        return Status::OK();
-    }
 
     const std::string _uri;
     const uint64_t _tableId;  // not persisted
@@ -420,16 +410,9 @@ public:
     RecordStore::Capped* capped() override;
 
 private:
-    void _truncateAfter(OperationContext*,
-                        const RecordId&,
-                        bool inclusive,
-                        const AboutToDeleteRecordCallback&) override;
+    TruncateAfterResult _truncateAfter(OperationContext*, const RecordId&, bool inclusive) override;
 
-    virtual void _handleTruncateAfter(WiredTigerRecoveryUnit&,
-                                      const RecordId& lastKeptId,
-                                      const RecordId& firstRemovedId,
-                                      int64_t recordsRemoved,
-                                      int64_t bytesRemoved);
+    virtual void _handleTruncateAfter(WiredTigerRecoveryUnit&, const RecordId& lastKeptId);
 };
 
 class WiredTigerRecordStore::Oplog final : public WiredTigerRecordStore::Capped,
@@ -461,11 +444,9 @@ public:
 
     RecordStore::Oplog* oplog() override;
 
-    bool selfManagedTruncation() const override;
-
-    std::shared_ptr<CollectionTruncateMarkers> getCollectionTruncateMarkers() override;
-
     Status updateSize(long long size) override;
+
+    int64_t getMaxSize() const override;
 
     std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
                                                        bool forward) const override;
@@ -474,26 +455,14 @@ public:
 
     StatusWith<Timestamp> getEarliestTimestamp(RecoveryUnit&) override;
 
-    const OplogData* getOplogData() const override;
-
-    void setTruncateMarkers(std::shared_ptr<OplogTruncateMarkers> markers);
-
 private:
     Status _insertRecords(OperationContext*,
                           std::vector<Record>*,
                           const std::vector<Timestamp>&) override;
 
-    Status _truncate(OperationContext*) override;
+    void _handleTruncateAfter(WiredTigerRecoveryUnit&, const RecordId& lastKeptId) override;
 
-    Status _checkUpdateSize(int64_t oldSize, int64_t newSize) override;
-
-    void _handleTruncateAfter(WiredTigerRecoveryUnit&,
-                              const RecordId& lastKeptId,
-                              const RecordId& firstRemovedId,
-                              int64_t recordsRemoved,
-                              int64_t bytesRemoved) override;
-
-    std::unique_ptr<OplogData> _oplog;
+    AtomicWord<int64_t> _maxSize;
 };
 
 class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {

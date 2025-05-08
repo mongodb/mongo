@@ -172,8 +172,6 @@ public:
 
     bool supportsReadConcernSnapshot() const final;
 
-    bool supportsOplogTruncateMarkers() const final;
-
     void clearDropPendingState(OperationContext* opCtx) final;
 
     SnapshotManager* getSnapshotManager() const final;

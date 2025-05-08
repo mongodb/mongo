@@ -137,16 +137,12 @@ public:
 
     void notifyWaitersIfNeeded() final;
 
-    void truncateAfter(OperationContext*,
-                       const RecordId&,
-                       bool inclusive,
-                       const AboutToDeleteRecordCallback&) final;
+    TruncateAfterResult truncateAfter(OperationContext*, const RecordId&, bool inclusive) final;
 
 private:
-    virtual void _truncateAfter(OperationContext*,
-                                const RecordId&,
-                                bool inclusive,
-                                const AboutToDeleteRecordCallback&) = 0;
+    virtual TruncateAfterResult _truncateAfter(OperationContext*,
+                                               const RecordId&,
+                                               bool inclusive) = 0;
 
     std::shared_ptr<CappedInsertNotifier> _cappedInsertNotifier;
 };

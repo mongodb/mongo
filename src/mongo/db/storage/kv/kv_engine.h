@@ -463,13 +463,6 @@ public:
     }
 
     /**
-     * See `StorageEngine::supportsOplogTruncateMarkers`
-     */
-    virtual bool supportsOplogTruncateMarkers() const {
-        return false;
-    }
-
-    /**
      * Methods to access the storage engine's timestamps.
      */
     virtual Timestamp getCheckpointTimestamp() const {

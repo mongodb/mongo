@@ -46,7 +46,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/collection_crud/collection_write_path.h"

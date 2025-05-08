@@ -48,7 +48,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -102,8 +101,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto oplog = static_cast<WiredTigerRecordStore::Oplog*>(ret.get());
-    oplog->setTruncateMarkers(
-        OplogTruncateMarkers::createOplogTruncateMarkers(opCtx.get(), *_engine, *oplog));
     _engine->getOplogManager()->start(opCtx.get(), *_engine, *oplog);
     return ret;
 }

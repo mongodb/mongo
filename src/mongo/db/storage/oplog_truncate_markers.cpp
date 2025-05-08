@@ -48,10 +48,8 @@ const double kNumMSInHour = 1000 * 60 * 60;
 }
 
 std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateMarkers(
-    OperationContext* opCtx, const KVEngine& engine, RecordStore& rs) {
-    auto oplogData = rs.oplog()->getOplogData();
-    invariant(oplogData);
-    long long maxSize = oplogData->getMaxSize();
+    OperationContext* opCtx, RecordStore& rs) {
+    long long maxSize = rs.oplog()->getMaxSize();
     invariant(maxSize > 0);
     invariant(rs.keyFormat() == KeyFormat::Long);
 
@@ -98,8 +96,7 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createOplogTruncateM
                                                   minBytesPerTruncateMarker,
                                                   initialSetOfMarkers.timeTaken,
                                                   initialSetOfMarkers.methodUsed,
-                                                  *oplogData,
-                                                  engine);
+                                                  *rs.oplog());
 }
 
 OplogTruncateMarkers::OplogTruncateMarkers(
@@ -109,16 +106,14 @@ OplogTruncateMarkers::OplogTruncateMarkers(
     int64_t minBytesPerMarker,
     Microseconds totalTimeSpentBuilding,
     CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
-    const OplogData& oplogData,
-    const KVEngine& engine)
+    const RecordStore::Oplog& oplog)
     : CollectionTruncateMarkers(std::move(markers),
                                 partialMarkerRecords,
                                 partialMarkerBytes,
                                 minBytesPerMarker,
                                 totalTimeSpentBuilding,
                                 creationMethod),
-      _oplogData(oplogData),
-      _engine(engine) {}
+      _oplog(oplog) {}
 
 bool OplogTruncateMarkers::isDead() {
     stdx::lock_guard<stdx::mutex> lk(_reclaimMutex);
@@ -212,7 +207,7 @@ bool OplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {
     }
 
     // check that oplog truncate markers is at capacity
-    if (totalBytes <= _oplogData.getMaxSize()) {
+    if (totalBytes <= _oplog.getMaxSize()) {
         return false;
     }
 
@@ -220,7 +215,7 @@ bool OplogTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {
 
     // The pinned oplog is inside the earliest marker, so we cannot remove the marker range.
     if (static_cast<std::uint64_t>(truncateMarker.lastRecord.getLong()) >=
-        _engine.getPinnedOplog().asULL()) {
+        opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog().asULL()) {
         return false;
     }
 

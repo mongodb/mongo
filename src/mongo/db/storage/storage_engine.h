@@ -568,13 +568,6 @@ public:
     virtual bool supportsReadConcernSnapshot() const = 0;
 
     /**
-     * Returns true if the storage engine uses oplog truncate markers to more finely control
-     * deletion of oplog history, instead of the standard capped collection controls on
-     * the oplog collection size.
-     */
-    virtual bool supportsOplogTruncateMarkers() const = 0;
-
-    /**
      * Returns a set of drop pending idents inside the storage engine.
      */
     virtual std::set<std::string> getDropPendingIdents() const = 0;

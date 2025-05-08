@@ -155,10 +155,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void cappedTruncateAfter(OperationContext* opCtx, const RecordId& end, bool inclusive) const {
-        MONGO_UNREACHABLE;
-    }
-
     Validator parseValidator(
         OperationContext* opCtx,
         const BSONObj& validator,

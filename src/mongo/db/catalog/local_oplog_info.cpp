@@ -43,11 +43,11 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 
 
@@ -83,12 +83,24 @@ RecordStore* LocalOplogInfo::getRecordStore() const {
     return _rs;
 }
 
-void LocalOplogInfo::setRecordStore(RecordStore* rs) {
+void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
     _rs = rs;
+    // If the server was started in read-only mode or if we are restoring the node, skip
+    // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
+    // in this instance.
+    bool needsTruncateMarkers = opCtx->getServiceContext()->userWritesAllowed() &&
+        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling();
+    if (needsTruncateMarkers) {
+        _truncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
+    }
 }
 
 void LocalOplogInfo::resetRecordStore() {
     _rs = nullptr;
+}
+
+std::shared_ptr<OplogTruncateMarkers> LocalOplogInfo::getTruncateMarkers() const {
+    return _truncateMarkers;
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {

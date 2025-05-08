@@ -385,6 +385,10 @@ Status dropCollectionsWithPrefix(OperationContext* opCtx,
 }
 
 void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* service) {
+    if (auto truncateMarkers = LocalOplogInfo::get(service)->getTruncateMarkers()) {
+        truncateMarkers->kill();
+    }
+
     // SERVER-103812 Shut down JournalFlusher before closing CollectionCatalog
     StorageControl::stopStorageControls(
         service,

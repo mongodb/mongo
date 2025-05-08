@@ -431,12 +431,10 @@ idl_generator(
 mongo_cc_library(
     name = "oplog_truncate_markers",
     srcs = [
-        "oplog_data.cpp",
         "oplog_truncate_marker_parameters_gen",
         "oplog_truncate_markers.cpp",
     ],
     hdrs = [
-        "oplog_data.h",
         "oplog_truncate_markers.h",
         "//src/mongo/db/storage/kv:kv_engine.h",
     ],
@@ -599,7 +597,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "record_store_tests",
     srcs = [
-        "oplog_truncation_test.cpp",
         "record_store_test_basic.cpp",
         "record_store_test_datafor.cpp",
         "record_store_test_datasize.cpp",
@@ -615,7 +612,6 @@ mongo_cc_library(
         "record_store_test_updatewithdamages.cpp",
     ],
     deps = [
-        ":oplog_truncation",
         ":record_store_test_harness",
         ":storage_options",
         "//src/mongo/db:record_id_helpers",
@@ -742,6 +738,19 @@ mongo_cc_unit_test(
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:periodic_runner_factory",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_truncation_test",
+    srcs = [
+        "oplog_truncation_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
+        "//src/mongo/db/repl:replication_recovery",
+        "//src/mongo/db/repl:storage_interface",
     ],
 )
 

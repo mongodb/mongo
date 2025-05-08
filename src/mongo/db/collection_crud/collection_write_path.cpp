@@ -704,6 +704,12 @@ void updateDocument(OperationContext* opCtx,
         invariant(!(args->retryableWrite && setNeedsRetryImageOplogField));
     }
 
+    if (collection->ns().isOplog()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot change the size of a document in the oplog",
+                !LocalOplogInfo::get(opCtx)->getTruncateMarkers() ||
+                    oldDoc.value().objsize() == newDoc.objsize());
+    }
     uassertStatusOK(collection->getRecordStore()->updateRecord(
         opCtx, oldLocation, newDoc.objdata(), newDoc.objsize()));
 
