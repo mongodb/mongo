@@ -170,6 +170,10 @@ var {
             "group",
         ]);
 
+        const kAggStagesThatNotSupportReadConcern = new Set([
+            "$listClusterCatalog",
+        ]);
+
         this.canUseReadConcern = function(driverSession, cmdObj) {
             // Always attach the readConcern to the first statement of the transaction, whether it
             // is a read or a write.
@@ -181,6 +185,15 @@ var {
 
             if (!kCommandsThatSupportReadConcern.has(cmdName)) {
                 return false;
+            }
+
+            if (cmdName === "aggregate" && cmdObj.pipeline && Array.isArray(cmdObj.pipeline) &&
+                cmdObj.pipeline.length !== 0) {
+                const stages =
+                    cmdObj.pipeline.map(obj => obj instanceof Object ? Object.keys(obj)[0] : "");
+                if (stages.some((stage) => kAggStagesThatNotSupportReadConcern.has(stage))) {
+                    return false;
+                }
             }
 
             if (cmdName === "explain") {

@@ -104,8 +104,8 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
-            // TODO (SERVER-97061): Update this once we support snapshot read concern on
-            // $listClusterCatalog.
+            // The listCollections command that runs under the hood only accepts 'local' read
+            // concern.
             return onlyReadConcernLocalSupported(kStageNameInternal, level, isImplicitDefault);
         }
 

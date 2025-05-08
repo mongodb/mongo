@@ -4,14 +4,12 @@
  * @tags: [
  *    # TODO (SERVER-98652) Remove once $listClusterCatalog is introduced in v8.0
  *    requires_fcv_81,
- *    # $listClusterCatalog only supports local read concern.
- *    # TODO (SERVER-98658) Reconsider this tag after resolving this ticket.
- *    assumes_read_concern_unchanged,
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
  *    # Avoid implicitly sharding a collection.
- *    assumes_no_implicit_collection_creation_on_get_collection
+ *    assumes_no_implicit_collection_creation_on_get_collection,
+ *    requires_getmore,
  * ]
  */
 

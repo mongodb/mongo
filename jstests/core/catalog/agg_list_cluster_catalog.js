@@ -4,9 +4,6 @@
  * @tags: [
  *    # TODO (SERVER-98651) remove the tag as part of this ticket.
  *    requires_fcv_81,
- *    # $listClusterCatalog only supports local read concern.
- *    # TODO (SERVER-98658) Reconsider this tag after resolving this ticket.
- *    assumes_read_concern_unchanged,
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
@@ -14,6 +11,7 @@
  *    # None of them can read at a provided timestamp, therefore this test cannot run in a suite
  *    # that can change a collection's incarnation.
  *    assumes_stable_collection_uuid,
+ *    requires_getmore,
  * ]
  */
 
