@@ -487,7 +487,7 @@ public:
      */
     template <class Buffer>
     requires Appendable<Buffer>
-    void decompress(Buffer& buffer) const;
+    inline void decompress(Buffer& buffer) const;
 
     /**
      * Wrapper that expects the caller to define a Materializer and

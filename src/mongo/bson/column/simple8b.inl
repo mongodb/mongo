@@ -793,13 +793,15 @@ T decodeLastSlot(uint64_t encoded) {
     return 0;
 }
 
+#pragma warning(push)
+#pragma warning(disable : 4141)
 // Decodes and visits all slots in simple8b block.
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
-inline size_t decodeAndVisit(uint64_t encoded,
-                             uint64_t* prevNonRLE,
-                             const Visit& visit,
-                             const VisitZero& visitZero,
-                             const VisitMissing& visitMissing) {
+MONGO_COMPILER_ALWAYS_INLINE inline size_t decodeAndVisit(uint64_t encoded,
+                                                          uint64_t* prevNonRLE,
+                                                          const Visit& visit,
+                                                          const VisitZero& visitZero,
+                                                          const VisitMissing& visitMissing) {
     auto selector = encoded & simple8b_internal::kBaseSelectorMask;
     if (selector != simple8b_internal::kRleSelector) {
         *prevNonRLE = encoded;
@@ -958,6 +960,7 @@ inline size_t decodeAndVisit(uint64_t encoded,
             break;
     }
 }
+#pragma warning(pop)
 
 // Decodes and sums all slots in simple8b block, writes last encountered non-rle block in
 // 'prevNonRLE'.
@@ -1192,12 +1195,12 @@ T decodeAndPrefixSum(uint64_t encoded, T& prefix, uint64_t* prevNonRLE) {
 }  // namespace
 
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
-inline size_t visitAll(const char* buffer,
-                       size_t size,
-                       uint64_t& prevNonRLE,
-                       const Visit& visit,
-                       const VisitZero& visitZero,
-                       const VisitMissing& visitMissing) {
+MONGO_COMPILER_ALWAYS_INLINE size_t visitAll(const char* buffer,
+                                             size_t size,
+                                             uint64_t& prevNonRLE,
+                                             const Visit& visit,
+                                             const VisitZero& visitZero,
+                                             const VisitMissing& visitMissing) {
     size_t numVisited = 0;
     invariant(size % 8 == 0);
     const char* end = buffer + size;

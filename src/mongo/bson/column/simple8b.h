@@ -367,14 +367,17 @@ inline size_t visitAll(const char* buffer,
                        const VisitZero& visitZero,
                        const VisitMissing& visitMissing);
 
+#pragma warning(push)
+#pragma warning(disable : 4141)
 template <typename T, typename Visit, typename VisitMissing>
-inline size_t visitAll(const char* buffer,
-                       size_t size,
-                       uint64_t& prevNonRLE,
-                       const Visit& visit,
-                       const VisitMissing& visitMissing) {
+MONGO_COMPILER_ALWAYS_INLINE inline size_t visitAll(const char* buffer,
+                                                    size_t size,
+                                                    uint64_t& prevNonRLE,
+                                                    const Visit& visit,
+                                                    const VisitMissing& visitMissing) {
     return visitAll<T>(buffer, size, prevNonRLE, visit, [&visit]() { visit(0); }, visitMissing);
 }
+#pragma warning(pop)
 
 /**
  * Returns the total number of values over multiple Simple8b blocks including missing values.
