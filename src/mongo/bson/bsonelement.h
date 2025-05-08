@@ -41,7 +41,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
@@ -57,7 +56,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/strnlen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -89,6 +87,13 @@ class LegacyStrictGenerator;
 */
 class BSONElement {
 public:
+    /**
+     * Helper tag to create a BSONElement with a known field name length.
+     */
+    struct TrustedInitTag {
+        explicit constexpr TrustedInitTag() = default;
+    };
+
     // Declared in bsonobj_comparator_interface.h.
     class ComparatorInterface;
 
@@ -337,7 +342,11 @@ public:
     }
 
     StringData fieldNameStringData() const {
-        return StringData(fieldName(), eoo() ? 0 : fieldNameSize() - 1);
+        // if this dassert fails, someone passed bad arguments to the TrustedInit ctor.
+        // TODO SERVER-104738: delete this check once the 'dassert' in TrustedInitTag ctor is
+        // enabled.
+        dassert(bool(eoo()) != bool(fieldNameSize()));
+        return StringData(fieldName(), _fieldNameSize ? _fieldNameSize - 1 : 0);
     }
 
     /**
@@ -874,11 +883,15 @@ public:
 
     /**
      * Construct a BSONElement where you already know the length of the name.
-     * The fieldNameSize includes the null terminator.
+     * The fieldNameSize must match 'BSONElement(d).fieldNameSize()'. In particular,
+     * - it includes the NUL terminator
+     * - 'fieldNameSize == 0' iff *d == EOO
      */
-    struct TrustedInitTag {};
     constexpr BSONElement(const char* d, int fieldNameSize, TrustedInitTag)
-        : _data(d), _fieldNameSize(fieldNameSize) {}
+        : _data(d), _fieldNameSize(fieldNameSize) {
+        // TODO SERVER-104738: enable validation here once all callers have been adjusted/fixed.
+        // dassert(bool(eoo()) != bool(fieldNameSize()));
+    }
 
     std::string _asCode() const;
 

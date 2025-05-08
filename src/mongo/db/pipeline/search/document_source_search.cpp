@@ -42,12 +42,26 @@
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/platform/compiler.h"
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 using std::list;
+
+namespace {
+/** Helper written in a particular redundant way to work around a GCC false-positive warning. */
+StringData removePrefixWorkaround(StringData key, StringData pre) {
+    MONGO_COMPILER_DIAGNOSTIC_PUSH
+    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Warray-bounds")
+    if (!key.starts_with(pre))
+        return key;
+    key.remove_prefix(pre.size());
+    MONGO_COMPILER_DIAGNOSTIC_POP
+    return key;
+}
+}  // namespace
 
 REGISTER_DOCUMENT_SOURCE(search,
                          LiteParsedSearchStage::parse,
@@ -241,9 +255,7 @@ void DocumentSourceSearch::validateSortSpec(boost::optional<BSONObj> sortSpec) {
         // to only contain top-level fields (no nested objects).
         for (auto&& k : *sortSpec) {
             auto key = k.fieldNameStringData();
-            if (key.startsWith(mongot_cursor::kSearchSortValuesFieldPrefix)) {
-                key = key.substr(mongot_cursor::kSearchSortValuesFieldPrefix.size());
-            }
+            key = removePrefixWorkaround(key, mongot_cursor::kSearchSortValuesFieldPrefix);
             tassert(7320404,
                     fmt::format("planShardedSearch returned sortSpec with key containing a dot: {}",
                                 key),
