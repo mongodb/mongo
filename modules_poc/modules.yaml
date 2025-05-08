@@ -208,7 +208,8 @@ replication:
   files:
     - src/mongo/db/repl/ # excluding ./dbcheck*
     - src/mongo/db/transaction/
-    - src/mongo/db/op_observer/op_observer_impl* # specific files
+    - src/mongo/db/op_observer/op_observer*
+    - src/mongo/db/op_observer/operation_logger*
     - src/mongo/db/op_observer/fcv_op_observer* # specific files
     - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
 
@@ -296,53 +297,54 @@ networking:
 
 timeseries_bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/db/timeseries/bucket_catalog
 
 collection_write_path: # authoritative: @10gen/server-collection-write-path
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/db/collection_crud
     - src/mongo/db/timeseries # excluding ./bucket_catalog
-    - src/mongo/db/commands/collection_to_capped* # specific files
+    - src/mongo/db/commands/collection_to_capped*
 
 bsoncolumn: # authoritative: @10gen/server-bsoncolumn
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/bson/util/bsonobj_traversal.h
     - src/mongo/bson/column
 
 external_sorter: # authoritative: @10gen/server-external-sorter
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/db/sorter
 
 index_builds: # authoritative: @10gen/server-index-builds
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/db/index_builds
-    - src/mongo/db/index/index_access_methods* # specific files
-    - src/mongo/db/catalog/index_key_validate* # specific files
-    - src/mongo/db/catalog/index_spec_validate* # specific files
-    - src/mongo/db/commands/create_indexes* # specific files
-    - src/mongo/db/commands/set_index_commit_quorum* # specific files
-    - src/mongo/db/commands/vote*index_build* # specific files
-    - src/mongo/dbtests/indexupdatetests.cpp # specific file
+    - src/mongo/db/index/index_access_methods*
+    - src/mongo/db/catalog/index_key_validate*
+    - src/mongo/db/catalog/index_spec_validate*
+    - src/mongo/db/commands/create_indexes*
+    - src/mongo/db/commands/set_index_commit_quorum*
+    - src/mongo/db/commands/vote*index_build*
+    - src/mongo/dbtests/index_builds/*
+    - src/mongo/dbtests/indexupdatetests.cpp
 
 key_string: # authoritative: @10gen/server-key-string
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/db/storage/key_string
 
@@ -374,17 +376,18 @@ storage_engine_integration:
     - src/mongo/db/server_recovery*
     - src/mongo/db/mongod_options_storage.idl
     - src/mongo/db/dbhelpers*
-    - src/mongo/dbtests/dbhelper_tests.cpp
     - src/mongo/db/dbcommands.idl
     - src/mongo/db/catalog/import*
     - src/mongo/db/catalog/index_repair*
     - src/mongo/db/commands/fsync*
     - src/mongo/db/commands/dbcommands*
     - src/mongo/db/commands/resize_oplog*
+    - src/mongo/db/concurrency/exception_util*
     - src/mongo/db/op_observer/batched_write*
     - src/mongo/db/stats/storage_stats*
+    - src/mongo/dbtests/dbhelper_tests.cpp
+    - src/mongo/dbtests/dbtests*
     - src/mongo/dbtests/storage_debug_util*
-    - src/mongo/db/concurrency/exception_util*
 
 validate:
   meta:
@@ -432,8 +435,8 @@ server_rss_sydney:
 
 ttl: # authoritative: @10gen/server-ttl
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-storage-execution
+    jira: Storage Execution
   files:
     - src/mongo/db/ttl
 

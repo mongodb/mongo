@@ -8,9 +8,6 @@ filters:
       - 10gen/server-storage-engine-integration
   - "op_observer*":
     approvers:
-      - 10gen/server-collection-write-path
-  - "op_observer_impl*":
-    approvers:
       - 10gen/server-oplog
   - "fcv_op_observer*":
     approvers:
@@ -20,4 +17,4 @@ filters:
       - 10gen/server-replication
   - operation_logger*:
     approvers:
-      - 10gen/server-collection-write-path
+      - 10gen/server-oplog

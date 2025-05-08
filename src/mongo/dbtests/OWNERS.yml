@@ -89,4 +89,4 @@ filters:
       - 10gen/server-recovery
   - "dbtests*":
     approvers:
-      - 10gen/server-collection-write-path
+      - 10gen/server-storage-engine-integration
