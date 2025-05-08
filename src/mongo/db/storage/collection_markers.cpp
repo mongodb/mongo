@@ -47,7 +47,7 @@ CollectionTruncateMarkers::CollectionTruncateMarkers(CollectionTruncateMarkers&&
 
     _currentRecords.store(other._currentRecords.swap(0));
     _currentBytes.store(other._currentBytes.swap(0));
-    _minBytesPerMarker = other._minBytesPerMarker;
+    _minBytesPerMarker.store(other._minBytesPerMarker.swap(0));
     _markers = std::move(other._markers);
     _isDead = other._isDead;
 }
@@ -141,7 +141,7 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(OperationContext* opCtx,
         return;
     }
 
-    if (_currentBytes.load() < _minBytesPerMarker) {
+    if (_currentBytes.load() < _minBytesPerMarker.load()) {
         // Must have raced to create a new marker, someone else already triggered it.
         return;
     }
@@ -182,7 +182,8 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
 
         collectionMarkers->_currentRecords.addAndFetch(countInserted);
         int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-        if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
+        if (wallTime != Date_t() &&
+            newCurrentBytes >= collectionMarkers->_minBytesPerMarker.load()) {
             // When other transactions commit concurrently, an uninitialized wallTime may delay
             // the creation of a new marker. This delay is limited to the number of concurrently
             // running transactions, so the size difference should be inconsequential.
@@ -235,7 +236,7 @@ void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
 
     stdx::lock_guard<Latch> lk(_markersMutex);
 
-    _minBytesPerMarker = size;
+    _minBytesPerMarker.store(size);
 }
 
 
@@ -520,7 +521,8 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
         collectionMarkers->_replaceNewHighestMarkingIfNecessary(recordId, wallTime);
         collectionMarkers->_currentRecords.addAndFetch(countInserted);
         int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-        if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
+        if (wallTime != Date_t() &&
+            newCurrentBytes >= collectionMarkers->_minBytesPerMarker.load()) {
             // When other transactions commit concurrently, an uninitialized wallTime may delay
             // the creation of a new marker. This delay is limited to the number of concurrently
             // running transactions, so the size difference should be inconsequential.
