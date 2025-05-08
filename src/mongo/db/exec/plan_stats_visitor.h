@@ -90,6 +90,7 @@ struct EofStats;
 struct DocumentSourceIdLookupStats;
 struct DocumentSourceGraphLookupStats;
 struct DocumentSourceBucketAutoStats;
+struct DocumentSourceSetWindowFieldsStats;
 
 /**
  * Visitor pattern for PlanStageStats.
@@ -164,6 +165,8 @@ public:
         tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, DocumentSourceBucketAutoStats> stats) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceSetWindowFieldsStats> stats) = 0;
 };
 
 /**
@@ -230,6 +233,8 @@ struct PlanStatsVisitorBase : public PlanStatsVisitor<IsConst> {
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceGraphLookupStats> stats) override {
     }
     void visit(tree_walker::MaybeConstPtr<IsConst, DocumentSourceBucketAutoStats> stats) override {}
+    void visit(
+        tree_walker::MaybeConstPtr<IsConst, DocumentSourceSetWindowFieldsStats> stats) override {}
 };
 
 using PlanStatsMutableVisitor = PlanStatsVisitor<false>;

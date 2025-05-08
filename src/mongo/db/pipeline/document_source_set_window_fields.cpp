@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <algorithm>
-#include <array>
 #include <iterator>
 
 #include <boost/move/utility_core.hpp>
@@ -561,6 +560,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         if (!inMemoryLimit && _memoryTracker.allowDiskUse()) {
             // Attempt to spill where possible.
             _iterator.spillToDisk();
+            _stats.spillingStats = _iterator.getSpillingStats();
         }
         if (!_memoryTracker.withinMemoryLimit()) {
             _iterator.finalize();
@@ -585,6 +585,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         case PartitionIterator::AdvanceResult::kEOF:
             _eof = true;
             _iterator.finalize();
+            _stats.spillingStats = _iterator.getSpillingStats();
             break;
     }
 
@@ -593,6 +594,11 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         pExpCtx, std::move(projSpec));
 
     return projExec->applyProjection(*curDoc);
+}
+
+void DocumentSourceInternalSetWindowFields::doDispose() {
+    _iterator.finalize();
+    _stats.spillingStats = _iterator.getSpillingStats();
 }
 
 }  // namespace mongo

@@ -233,3 +233,73 @@
 }
 ```
 
+## 11. SetWindowFields
+### Pipeline
+```json
+[
+	{
+		"$setWindowFields" : {
+			"partitionBy" : "$a",
+			"sortBy" : {
+				"b" : 1
+			},
+			"output" : {
+				"sum" : {
+					"$sum" : "$b"
+				}
+			}
+		}
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"setWindowFieldsSpilledBytes" : "X",
+	"setWindowFieldsSpilledDataStorageSize" : "X",
+	"setWindowFieldsSpilledRecords" : 4,
+	"setWindowFieldsSpills" : 4,
+	"sortSpilledBytes" : "X",
+	"sortSpilledDataStorageSize" : "X",
+	"sortSpilledRecords" : 13,
+	"sortSpills" : 7,
+	"usedDisk" : true
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$setWindowFields" : {
+			"partitionBy" : "$a",
+			"sortBy" : {
+				"b" : 1
+			},
+			"output" : {
+				"sum" : {
+					"$sum" : "$b"
+				}
+			}
+		}
+	},
+	{
+		"$limit" : 1
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"setWindowFieldsSpilledBytes" : "X",
+	"setWindowFieldsSpilledDataStorageSize" : "X",
+	"setWindowFieldsSpilledRecords" : 3,
+	"setWindowFieldsSpills" : 3,
+	"sortSpilledBytes" : "X",
+	"sortSpilledDataStorageSize" : "X",
+	"sortSpilledRecords" : 13,
+	"sortSpills" : 7,
+	"usedDisk" : true
+}
+```
+

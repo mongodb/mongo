@@ -1401,4 +1401,24 @@ struct DocumentSourceBucketAutoStats : public SpecificStats {
     SpillingStats spillingStats;
 };
 
+struct DocumentSourceSetWindowFieldsStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const override {
+        return std::make_unique<DocumentSourceSetWindowFieldsStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    SpillingStats spillingStats;
+};
+
 }  // namespace mongo

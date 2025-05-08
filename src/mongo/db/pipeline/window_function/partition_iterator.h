@@ -148,6 +148,10 @@ public:
         return _cache.usedDisk();
     }
 
+    const SpillingStats& getSpillingStats() const {
+        return _cache.getSpillingStats();
+    }
+
     /**
      * Clean up all memory associated with the partition iterator. All calls requesting documents
      * are invalid after calling this.

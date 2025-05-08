@@ -132,6 +132,13 @@ public:
                 stats->spillingStats);
         }
     }
+    void visit(tree_walker::MaybeConstPtr<true, DocumentSourceSetWindowFieldsStats> stats) final {
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS]
+                .accumulate(stats->spillingStats);
+        }
+    }
 
 private:
     /**

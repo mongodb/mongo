@@ -128,7 +128,6 @@ public:
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(outputPaths), {}};
     }
 
-
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return StageConstraints(StreamType::kBlocking,
                                 PositionRequirement::kNone,
@@ -190,6 +189,8 @@ public:
 
     DocumentSource::GetNextResult doGetNext() override;
 
+    void doDispose() override;
+
     void setSource(Stage* source) final {
         pSource = source;
         _iterator.setSource(source);
@@ -198,6 +199,10 @@ public:
     bool usedDisk() final {
         return _iterator.usedDisk();
     };
+
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
+    }
 
     SbeCompatibility sbeCompatibility() const {
         return _sbeCompatibility;
@@ -234,6 +239,8 @@ private:
     // Used by the failpoint to determine when to spill to disk.
     int32_t _numDocsProcessed = 0;
     SbeCompatibility _sbeCompatibility = SbeCompatibility::noRequirements;
+
+    DocumentSourceSetWindowFieldsStats _stats;
 };
 
 }  // namespace mongo

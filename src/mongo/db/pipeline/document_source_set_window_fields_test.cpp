@@ -41,9 +41,9 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-
 namespace mongo {
 namespace {
 
@@ -260,7 +260,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnShiftOperator) {
 TEST_F(DocumentSourceSetWindowFieldsTest, PartitionOutputIsCorrect) {
     auto spec = fromjson(  // NOLINT
         R"({
-            "$setWindowFields": { 
+            "$setWindowFields": {
                 "sortBy": { "num": 1 },
                 "output": {
                     "sum": {
@@ -344,7 +344,9 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailIfCannotSpillAndExceedMemoryLimit)
             }
         })");
     getExpCtx()->setAllowDiskUse(false);
-    internalDocumentSourceSetWindowFieldsMaxMemoryBytes.store(50);
+    RAIIServerParameterControllerForTest maxMemoryBytes(
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 50);
+
     auto pipelineStages =
         document_source_set_window_fields::createFromBson(wfSpec.firstElement(), getExpCtx());
     std::vector<Document> docs;
@@ -357,9 +359,6 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailIfCannotSpillAndExceedMemoryLimit)
     pipelineStages.push_front(source);
     auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
     ASSERT_THROWS_CODE(pipeline->getNext(), DBException, 5643011);
-
-    // Reset to default for future tests.
-    internalDocumentSourceSetWindowFieldsMaxMemoryBytes.store(100 * 1024 * 1024);
 }
 
 TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {
@@ -369,7 +368,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {
 
     auto spec = fromjson(  // NOLINT
         R"({
-            $setWindowFields: { 
+            $setWindowFields: {
                 sortBy: { "obj.num": 1 },
                 output: {
                     "obj.str": {
