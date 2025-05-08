@@ -66,32 +66,34 @@ public:
             const auto nss = ns();
             const auto& req = request();
 
-            RoutingContext routingCtx(opCtx, {nss});
+            return routing_context_utils::withValidatedRoutingContext(
+                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                    BSONObj filteredCmdObj =
+                        CommandHelpers::filterCommandRequestForPassthrough(req.toBSON());
 
-            BSONObj filteredCmdObj =
-                CommandHelpers::filterCommandRequestForPassthrough(req.toBSON());
+                    // autoSplitVector is allowed to run on a sharded cluster only if the range
+                    // requested belongs to one shard. We target the shard owning the input min
+                    // chunk and we let the targetted shard figure whether the range is fully owned
+                    // by itself. In case the constraint is not respected we will get a
+                    // InvalidOptions as part of the response.
+                    auto response = scatterGatherVersionedTargetByRoutingTable(
+                                        opCtx,
+                                        nss,
+                                        routingCtx,
+                                        filteredCmdObj,
+                                        ReadPreferenceSetting::get(opCtx),
+                                        Shard::RetryPolicy::kIdempotent,
+                                        req.getMin(),
+                                        {} /*collation*/,
+                                        boost::none /*letParameters*/,
+                                        boost::none /*runtimeConstants*/)
+                                        .front();
 
-            // autoSplitVector is allowed to run on a sharded cluster only if the range requested
-            // belongs to one shard. We target the shard owning the input min chunk and we let the
-            // targetted shard figure whether the range is fully owned by itself. In case the
-            // constraint is not respected we will get a InvalidOptions as part of the response.
-            auto response =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss,
-                                                           routingCtx,
-                                                           filteredCmdObj,
-                                                           ReadPreferenceSetting::get(opCtx),
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           req.getMin(),
-                                                           {} /*collation*/,
-                                                           boost::none /*letParameters*/,
-                                                           boost::none /*runtimeConstants*/)
-                    .front();
-
-            auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
-            uassertStatusOK(status);
-            return AutoSplitVectorResponse::parse(IDLParserContext(""),
-                                                  response.swResponse.getValue().data);
+                    auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+                    uassertStatusOK(status);
+                    return AutoSplitVectorResponse::parse(IDLParserContext(""),
+                                                          response.swResponse.getValue().data);
+                });
         }
 
     private:

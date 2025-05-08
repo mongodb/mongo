@@ -97,43 +97,46 @@ public:
             auto& cmd = request();
             const auto& nss = ns();
 
-            RoutingContext routingCtx{opCtx, {nss}};
-
             setReadWriteConcern(opCtx, cmd, this);
-            auto shardResults = scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                nss,
-                routingCtx,
-                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
-                ReadPreferenceSetting::get(opCtx),
-                Shard::RetryPolicy::kIdempotent,
-                {} /*query*/,
-                {} /*collation*/,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/);
 
-            std::int64_t size = 0;
-            std::int64_t numObjects = 0;
-            std::int64_t millis = 0;
+            return routing_context_utils::withValidatedRoutingContext(
+                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                    auto shardResults = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        nss,
+                        routingCtx,
+                        CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent,
+                        {} /*query*/,
+                        {} /*collation*/,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
 
-            for (const auto& shardResult : shardResults) {
-                const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
-                uassertStatusOK(shardResponse.status);
+                    std::int64_t size = 0;
+                    std::int64_t numObjects = 0;
+                    std::int64_t millis = 0;
 
-                const auto& res = shardResponse.data;
-                uassertStatusOK(getStatusFromCommandResult(res));
+                    for (const auto& shardResult : shardResults) {
+                        const auto shardResponse =
+                            uassertStatusOK(std::move(shardResult.swResponse));
+                        uassertStatusOK(shardResponse.status);
 
-                auto parsedResponse = Reply::parse(IDLParserContext{"dataSize"}, res);
-                size += parsedResponse.getSize();
-                numObjects += parsedResponse.getNumObjects();
-                millis += parsedResponse.getMillis();
-            }
+                        const auto& res = shardResponse.data;
+                        uassertStatusOK(getStatusFromCommandResult(res));
 
-            Reply reply;
-            reply.setSize(size);
-            reply.setNumObjects(numObjects);
-            reply.setMillis(millis);
-            return reply;
+                        auto parsedResponse = Reply::parse(IDLParserContext{"dataSize"}, res);
+                        size += parsedResponse.getSize();
+                        numObjects += parsedResponse.getNumObjects();
+                        millis += parsedResponse.getMillis();
+                    }
+
+                    Reply reply;
+                    reply.setSize(size);
+                    reply.setNumObjects(numObjects);
+                    reply.setMillis(millis);
+                    return reply;
+                });
         }
     };
 

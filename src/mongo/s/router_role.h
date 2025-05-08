@@ -152,7 +152,8 @@ public:
             // CannotRefreshDueToLocksHeld if the entry is not already cached.
             const auto allowLocks = opCtx->inMultiDocumentTransaction();
             RoutingContext routingCtx(opCtx, {_targetedNamespaces.front()}, allowLocks);
-            return callbackFn(opCtx, routingCtx);
+            return routing_context_utils::runAndValidate(
+                routingCtx, [&](RoutingContext& ctx) { return callbackFn(opCtx, ctx); });
         });
     }
 

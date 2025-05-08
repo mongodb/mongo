@@ -181,8 +181,22 @@ public:
             RoutingContext routingCtx(opCtx, {nss});
             const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-            // Create an RAII object that prints the collection's shard key in the case of a tassert
-            // or crash.
+            {
+                // This scope is used to end the use of the builder whether or not we convert to a
+                // view-less timeseries aggregate request.
+                auto aggResult = BSONObjBuilder{};
+
+                if (convertAndRunAggregateIfViewlessTimeseries(
+                        opCtx, aggResult, countRequest, cri, nss)) {
+                    ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
+                        &result, boost::none /*tenantId*/);
+                    // We've delegated execution to agg.
+                    return true;
+                }
+            }
+
+            // Create an RAII object that prints the collection's shard key in the case of a
+            // tassert or crash.
             ScopedDebugInfo shardKeyDiagnostics(
                 "ShardKeyDiagnostics",
                 diagnostic_printers::ShardKeyDiagnosticPrinter{
@@ -190,24 +204,6 @@ public:
                                     : BSONObj()});
 
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
-
-            {
-                // This scope is used to end the use of the builder
-                // whether or not we convert to a view-less timeseries
-                // aggregate request.
-                auto aggResult = BSONObjBuilder{};
-
-                if (convertAndRunAggregateIfViewlessTimeseries(
-                        opCtx, aggResult, countRequest, cri, nss)) {
-                    ViewResponseFormatter{aggResult.obj()}.appendAsCountResponse(
-                        &result, boost::none /*tenantId*/);
-                    // TODO SERVER-102925 remove this once the RoutingContext is integrated into
-                    // Cluster::runAggregate()
-                    routingCtx.onRequestSentForNss(nss);
-                    // We've delegated execution to agg.
-                    return true;
-                }
-            }
 
             if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
                 processFLECountS(opCtx, nss, countRequest);
@@ -222,8 +218,8 @@ public:
                                                              boost::none /*letParameters*/,
                                                              boost::none /*runtimeConstants*/);
 
-            // Create an RAII object that prints useful information about the ExpressionContext in
-            // the case of a tassert or crash.
+            // Create an RAII object that prints useful information about the
+            // ExpressionContext in the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
                 "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
@@ -245,27 +241,27 @@ public:
             }
 
             // We only need to factor in the skip value when sending to the shards if we
-            // have a value for limit, otherwise, we apply it only once we have collected all
-            // counts.
+            // have a value for limit, otherwise, we apply it only once we have collected
+            // all counts.
             if (countRequest.getLimit() && countRequest.getSkip()) {
                 const auto limit = countRequest.getLimit().value();
                 const auto skip = countRequest.getSkip().value();
                 if (limit != 0) {
                     std::int64_t sum = 0;
                     uassert(ErrorCodes::Overflow,
-                            str::stream()
-                                << "Overflow on the count command: The sum of the limit and skip "
-                                   "fields must fit into a long integer. Limit: "
-                                << limit << "   Skip: " << skip,
+                            str::stream() << "Overflow on the count command: The sum of "
+                                             "the limit and skip "
+                                             "fields must fit into a long integer. Limit: "
+                                          << limit << "   Skip: " << skip,
                             !overflow::add(limit, skip, &sum));
                     countRequest.setLimit(sum);
                 }
             }
             countRequest.setSkip(boost::none);
 
-            // The includeQueryStatsMetrics field is not supported on mongos for the count command,
-            // so we do not need to check the value on the original request when updating
-            // requestQueryStats here.
+            // The includeQueryStatsMetrics field is not supported on mongos for the count
+            // command, so we do not need to check the value on the original request when
+            // updating requestQueryStats here.
             requestQueryStats = query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
 
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
@@ -281,6 +277,8 @@ public:
                 countRequest.getQuery(),
                 collation,
                 true /*eligibleForSampling*/);
+
+            routingCtx.validateOnContextEnd();
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
             auto countRequest =
@@ -382,108 +380,114 @@ public:
             return exceptionToStatus();
         }
 
-        RoutingContext routingCtx(opCtx, {nss});
-        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+        return routing_context_utils::withValidatedRoutingContext(
+            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-        // Create an RAII object that prints the collection's shard key in the case of a tassert
-        // or crash.
-        ScopedDebugInfo shardKeyDiagnostics(
-            "ShardKeyDiagnostics",
-            diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
+                // Create an RAII object that prints the collection's shard key in the case of a
+                // tassert or crash.
+                ScopedDebugInfo shardKeyDiagnostics(
+                    "ShardKeyDiagnostics",
+                    diagnostic_printers::ShardKeyDiagnosticPrinter{
+                        cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
+                                        : BSONObj()});
 
-        {
-            // This scope is used to end the use of the builder
-            // whether or not we convert to a view-less timeseries
-            // aggregate request.
-            auto bodyBuilder = result->getBodyBuilder();
-            if (convertAndRunAggregateIfViewlessTimeseries(
-                    opCtx, bodyBuilder, countRequest, cri, nss, verbosity)) {
-                // TODO SERVER-102925 remove this once the RoutingContext is integrated into
-                // Cluster::runAggregate()
-                routingCtx.onRequestSentForNss(nss);
-                // We've delegated execution to agg.
-                return Status::OK();
-            }
-        }
+                {
+                    // This scope is used to end the use of the builder whether or not we convert to
+                    // a view-less timeseries aggregate request.
+                    auto bodyBuilder = result->getBodyBuilder();
+                    if (convertAndRunAggregateIfViewlessTimeseries(
+                            opCtx, bodyBuilder, countRequest, cri, nss, verbosity)) {
+                        // TODO SERVER-102925 remove this once the RoutingContext is integrated into
+                        // Cluster::runAggregate()
+                        routingCtx.onRequestSentForNss(nss);
+                        // We've delegated execution to agg.
+                        return Status::OK();
+                    }
+                }
 
-        // If the command has encryptionInformation, rewrite the query as necessary.
-        if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
-            processFLECountS(opCtx, nss, countRequest);
-        }
+                // If the command has encryptionInformation, rewrite the query as necessary.
+                if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
+                    processFLECountS(opCtx, nss, countRequest);
+                }
 
-        BSONObj targetingQuery = countRequest.getQuery();
-        BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
+                BSONObj targetingQuery = countRequest.getQuery();
+                BSONObj targetingCollation = countRequest.getCollation().value_or(BSONObj());
 
-        auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nss);
-        auto numShards =
-            getTargetedShardsForQuery(expCtx, cri, targetingQuery, targetingCollation).size();
-        auto userLimit = countRequest.getLimit();
-        auto userSkip = countRequest.getSkip();
-        if (numShards > 1) {
-            // If there is a limit, we forward the sum of the limit and skip.
-            auto swNewLimit =
-                addLimitAndSkipForShards(countRequest.getLimit(), countRequest.getSkip());
-            if (!swNewLimit.isOK()) {
-                return swNewLimit.getStatus();
-            }
-            countRequest.setLimit(swNewLimit.getValue());
-            countRequest.setSkip(boost::none);
-        }
+                auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, nss);
+                auto numShards =
+                    getTargetedShardsForQuery(expCtx, cri, targetingQuery, targetingCollation)
+                        .size();
+                auto userLimit = countRequest.getLimit();
+                auto userSkip = countRequest.getSkip();
+                if (numShards > 1) {
+                    // If there is a limit, we forward the sum of the limit and skip.
+                    auto swNewLimit =
+                        addLimitAndSkipForShards(countRequest.getLimit(), countRequest.getSkip());
+                    if (!swNewLimit.isOK()) {
+                        return swNewLimit.getStatus();
+                    }
+                    countRequest.setLimit(swNewLimit.getValue());
+                    countRequest.setSkip(boost::none);
+                }
 
-        const auto explainCmd = ClusterExplain::wrapAsExplain(countRequest.toBSON(), verbosity);
+                const auto explainCmd =
+                    ClusterExplain::wrapAsExplain(countRequest.toBSON(), verbosity);
 
-        // We will time how long it takes to run the commands on the shards
-        Timer timer;
+                // We will time how long it takes to run the commands on the shards
+                Timer timer;
 
-        std::vector<AsyncRequestsSender::Response> shardResponses;
-        try {
-            shardResponses =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss,
-                                                           routingCtx,
-                                                           explainCmd,
-                                                           ReadPreferenceSetting::get(opCtx),
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           targetingQuery,
-                                                           targetingCollation,
-                                                           boost::none /*letParameters*/,
-                                                           boost::none /*runtimeConstants*/);
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
-            try {
-                countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
-            } catch (...) {
-                return exceptionToStatus();
-            }
-            auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
-                countRequest, true /* hasExplain */);
-            auto bodyBuilder = result->getBodyBuilder();
-            // An empty PrivilegeVector is acceptable because these privileges are only checked
-            // on getMore and explain will not open a cursor.
-            return ClusterAggregate::retryOnViewError(opCtx,
-                                                      aggRequestOnView,
-                                                      *ex.extraInfo<ResolvedView>(),
-                                                      nss,
-                                                      PrivilegeVector(),
-                                                      verbosity,
-                                                      &bodyBuilder);
-        }
+                std::vector<AsyncRequestsSender::Response> shardResponses;
+                try {
+                    shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        nss,
+                        routingCtx,
+                        explainCmd,
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent,
+                        targetingQuery,
+                        targetingCollation,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
+                } catch (
+                    const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+                    CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
+                    try {
+                        countRequest =
+                            CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+                    } catch (...) {
+                        return exceptionToStatus();
+                    }
+                    auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
+                        countRequest, true /* hasExplain */);
+                    auto bodyBuilder = result->getBodyBuilder();
+                    // An empty PrivilegeVector is acceptable because these privileges are only
+                    // checked on getMore and explain will not open a cursor.
+                    return ClusterAggregate::retryOnViewError(opCtx,
+                                                              aggRequestOnView,
+                                                              *ex.extraInfo<ResolvedView>(),
+                                                              nss,
+                                                              PrivilegeVector(),
+                                                              verbosity,
+                                                              &bodyBuilder);
+                }
 
-        long long millisElapsed = timer.millis();
+                long long millisElapsed = timer.millis();
 
-        const char* mongosStageName =
-            ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
+                const char* mongosStageName =
+                    ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
-        auto bodyBuilder = result->getBodyBuilder();
-        return ClusterExplain::buildExplainResult(expCtx,
-                                                  shardResponses,
-                                                  mongosStageName,
-                                                  millisElapsed,
-                                                  originalCmdObj,
-                                                  &bodyBuilder,
-                                                  userLimit,
-                                                  userSkip);
+                auto bodyBuilder = result->getBodyBuilder();
+                return ClusterExplain::buildExplainResult(expCtx,
+                                                          shardResponses,
+                                                          mongosStageName,
+                                                          millisElapsed,
+                                                          originalCmdObj,
+                                                          &bodyBuilder,
+                                                          userLimit,
+                                                          userSkip);
+            });
     }
 
 private:

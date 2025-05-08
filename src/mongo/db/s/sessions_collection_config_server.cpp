@@ -160,19 +160,20 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
 
             // TODO SERVER-104347 Acquire CollectionRoutingInfo through RoutingContext only and
             // remove direct CatalogCache access in the check above.
-            RoutingContext routingCtx(opCtx, {{nss, cri}});
-
-            return scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                nss,
-                routingCtx,
-                SessionsCollection::generateCreateIndexesCmd(),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kNoRetry,
-                BSONObj() /*query*/,
-                BSONObj() /*collation*/,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/);
+            return routing_context_utils::withValidatedRoutingContext(
+                opCtx, {{nss, cri}}, [&](RoutingContext& routingCtx) {
+                    return scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        nss,
+                        routingCtx,
+                        SessionsCollection::generateCreateIndexesCmd(),
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kNoRetry,
+                        BSONObj() /*query*/,
+                        BSONObj() /*collation*/,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
+                });
         });
 
     for (auto& shardResult : shardResults) {

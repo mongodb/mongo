@@ -96,6 +96,13 @@ public:
     bool onStaleError(const NamespaceString& nss, const Status& status);
 
     /**
+     * By default, the RoutingContext should be validated by running validateOnContextEnd() at the
+     * end of a routing operation. This sets _skipValidation to true if it is not a correctness bug
+     * for the RoutingContext to terminate without sending a request to a shard.
+     */
+    void skipValidation();
+
+    /**
      * Validate the RoutingContext prior to destruction to ensure that either:
      * 1. All declared namespaces have had their routing tables validated by sending a versioned
      * request to a shard. Each namespace should have a corresponding Status value recording this.
@@ -103,7 +110,7 @@ public:
      * propagated up the stack.
      *
      * It is considered a logic bug if a RoutingContext goes out of scope and neither of the above
-     * are true.
+     * are true, unless skipValidation() is explicitly set.
      */
     void validateOnContextEnd() const;
 
@@ -122,6 +129,10 @@ private:
 
     using NssRoutingInfoMap = stdx::unordered_map<NamespaceString, RoutingInfoEntry>;
     NssRoutingInfoMap _nssRoutingInfoMap;
+
+    // If set, skip validation prior to destruction that the RoutingContext has had its routing
+    // tables validated by sending a versioned request to a shard
+    bool _skipValidation = false;
 };
 
 namespace routing_context_utils {

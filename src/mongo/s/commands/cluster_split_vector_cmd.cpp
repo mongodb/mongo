@@ -114,43 +114,45 @@ public:
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.dbName() == dbName);
 
-        RoutingContext routingCtx(opCtx, {nss});
+        return routing_context_utils::withValidatedRoutingContext(
+            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                BSONObj min = cmdObj.getObjectField("min");
+                BSONObj max = cmdObj.getObjectField("max");
+                BSONObj keyPattern = cmdObj.getObjectField("keyPattern");
 
-        BSONObj min = cmdObj.getObjectField("min");
-        BSONObj max = cmdObj.getObjectField("max");
-        BSONObj keyPattern = cmdObj.getObjectField("keyPattern");
+                BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+                // splitVector is allowed to run on a sharded cluster only if the range requested
+                // belongs to one shard. We target the shard owning the input min chunk and we let
+                // the targetted shard figure whether the range is fully owned by itself. In case
+                // the constraint is not respected we will get a InvalidOptions as part of the
+                // response.
+                auto query = [&]() {
+                    if (!min.isEmpty()) {
+                        return min;
+                    }
+                    // if no min is passed as input, we assume it's the global min of the keyPattern
+                    // passed as input
+                    return KeyPattern::fromBSON(keyPattern).globalMin();
+                }();
+                auto response =
+                    scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                               nss,
+                                                               routingCtx,
+                                                               filteredCmdObj,
+                                                               ReadPreferenceSetting::get(opCtx),
+                                                               Shard::RetryPolicy::kIdempotent,
+                                                               query,
+                                                               {} /*collation*/,
+                                                               boost::none /*letParameters*/,
+                                                               boost::none /*runtimeConstants*/)
+                        .front();
 
-        BSONObj filteredCmdObj = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
-        // splitVector is allowed to run on a sharded cluster only if the range requested
-        // belongs to one shard. We target the shard owning the input min chunk and we let the
-        // targetted shard figure whether the range is fully owned by itself. In case the
-        // constraint is not respected we will get a InvalidOptions as part of the response.
-        auto query = [&]() {
-            if (!min.isEmpty()) {
-                return min;
-            }
-            // if no min is passed as input, we assume it's the global min of the keyPattern
-            // passed as input
-            return KeyPattern::fromBSON(keyPattern).globalMin();
-        }();
-        auto response =
-            scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                       nss,
-                                                       routingCtx,
-                                                       filteredCmdObj,
-                                                       ReadPreferenceSetting::get(opCtx),
-                                                       Shard::RetryPolicy::kIdempotent,
-                                                       query,
-                                                       {} /*collation*/,
-                                                       boost::none /*letParameters*/,
-                                                       boost::none /*runtimeConstants*/)
-                .front();
-
-        auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
-        uassertStatusOK(status);
-        result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(
-            std::move(response.swResponse.getValue().data)));
-        return true;
+                auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+                uassertStatusOK(status);
+                result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(
+                    std::move(response.swResponse.getValue().data)));
+                return true;
+            });
     }
 };
 MONGO_REGISTER_COMMAND(SplitVectorCmd).forRouter();

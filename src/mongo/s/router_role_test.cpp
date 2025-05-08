@@ -243,7 +243,6 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextDoesNotRetryForSubRoute
                 tries++;
                 OID epoch{OID::gen()};
                 Timestamp timestamp{1, 0};
-                routingCtx.onRequestSentForNss(_nss);
                 uasserted(StaleConfigInfo(_nss,
                                           ShardVersionFactory::make(
                                               ChunkVersion({epoch, timestamp}, {2, 0}),
@@ -271,7 +270,6 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetriesOnStaleConfigFor
             operationContext(), "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
                 if (firstTry) {
                     firstTry = false;
-                    routingCtx.onRequestSentForNss(_nss);
                     uasserted(StaleConfigInfo(_nss,
                                               ShardVersionFactory::make(
                                                   ChunkVersion({epoch, timestamp}, {2, 0}),

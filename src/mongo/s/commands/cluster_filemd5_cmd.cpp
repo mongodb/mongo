@@ -125,105 +125,113 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        RoutingContext routingCtx(opCtx, {nss});
+        return routing_context_utils::withValidatedRoutingContext(
+            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
+                    auto shardResults = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        nss,
+                        routingCtx,
+                        cmdObj,
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent,
+                        routingQuery,
+                        CollationSpec::kSimpleSpec,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
+                    invariant(shardResults.size() == 1);
+                    const auto shardResponse =
+                        uassertStatusOK(std::move(shardResults[0].swResponse));
+                    uassertStatusOK(shardResponse.status);
 
-        const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
-            auto shardResults =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss,
-                                                           routingCtx,
-                                                           cmdObj,
-                                                           ReadPreferenceSetting::get(opCtx),
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           routingQuery,
-                                                           CollationSpec::kSimpleSpec,
-                                                           boost::none /*letParameters*/,
-                                                           boost::none /*runtimeConstants*/);
-            invariant(shardResults.size() == 1);
-            const auto shardResponse = uassertStatusOK(std::move(shardResults[0].swResponse));
-            uassertStatusOK(shardResponse.status);
+                    const auto& res = shardResponse.data;
+                    uassertStatusOK(getStatusFromCommandResult(res));
 
-            const auto& res = shardResponse.data;
-            uassertStatusOK(getStatusFromCommandResult(res));
+                    return res;
+                };
 
-            return res;
-        };
+                // If the collection is not sharded, or is sharded only on the 'files_id' field, we
+                // only need to target a single shard, because the files' chunks can only be
+                // contained in a single sharded chunk
+                const auto& cm = routingCtx.getCollectionRoutingInfo(nss).getChunkManager();
+                if (!cm.isSharded() ||
+                    SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
+                                                                BSON("files_id" << 1))) {
+                    CommandHelpers::filterCommandReplyForPassthrough(
+                        callShardFn(applyReadWriteConcern(
+                                        opCtx,
+                                        this,
+                                        CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                                    BSON("files_id" << cmdObj.firstElement())),
+                        &result);
+                    return true;
+                }
 
-        // If the collection is not sharded, or is sharded only on the 'files_id' field, we only
-        // need to target a single shard, because the files' chunks can only be contained in a
-        // single sharded chunk
-        const auto& cm = routingCtx.getCollectionRoutingInfo(nss).getChunkManager();
-        if (!cm.isSharded() ||
-            SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
-                                                        BSON("files_id" << 1))) {
-            CommandHelpers::filterCommandReplyForPassthrough(
-                callShardFn(
-                    applyReadWriteConcern(
-                        opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-                    BSON("files_id" << cmdObj.firstElement())),
-                &result);
-            return true;
-        }
+                // Since the filemd5 command is tailored specifically for GridFS, there is no need
+                // to support arbitrary shard keys
+                uassert(ErrorCodes::IllegalOperation,
+                        "The GridFS fs.chunks collection must be sharded on either {files_id:1} or "
+                        "{files_id:1, n:1}",
+                        SimpleBSONObjComparator::kInstance.evaluate(
+                            cm.getShardKeyPattern().toBSON() == BSON("files_id" << 1 << "n" << 1)));
 
-        // Since the filemd5 command is tailored specifically for GridFS, there is no need to
-        // support arbitrary shard keys
-        uassert(ErrorCodes::IllegalOperation,
-                "The GridFS fs.chunks collection must be sharded on either {files_id:1} or "
-                "{files_id:1, n:1}",
-                SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
-                                                            BSON("files_id" << 1 << "n" << 1)));
+                // Theory of operation:
+                //
+                // Starting with n=0, send filemd5 command to shard with that chunk (gridfs chunk
+                // not sharding chunk). That shard will then compute a partial md5 state (passed in
+                // the "md5state" field) for all contiguous chunks that it contains. When it runs
+                // out or hits a discontinuity (eg [1,2,7]) it returns what it has done so far. This
+                // is repeated as long as we keep getting more chunks. The end condition is when we
+                // go to look for chunk n and it doesn't exist. This means that the file's last
+                // chunk is n-1, so we return the computed md5 results.
 
-        // Theory of operation:
-        //
-        // Starting with n=0, send filemd5 command to shard with that chunk (gridfs chunk not
-        // sharding chunk). That shard will then compute a partial md5 state (passed in the
-        // "md5state" field) for all contiguous chunks that it contains. When it runs out or hits a
-        // discontinuity (eg [1,2,7]) it returns what it has done so far. This is repeated as long
-        // as we keep getting more chunks. The end condition is when we go to look for chunk n and
-        // it doesn't exist. This means that the file's last chunk is n-1, so we return the computed
-        // md5 results.
+                int numGridFSChunksProcessed = 0;
+                BSONObj lastResult;
 
-        int numGridFSChunksProcessed = 0;
-        BSONObj lastResult;
+                while (true) {
+                    const auto res = callShardFn(
+                        [&] {
+                            BSONObjBuilder bb(applyReadWriteConcern(
+                                opCtx,
+                                this,
+                                CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
+                            bb.append("partialOk", true);
+                            bb.append("startAt", numGridFSChunksProcessed);
+                            if (!lastResult.isEmpty()) {
+                                bb.append(lastResult["md5state"]);
+                            }
+                            return bb.obj();
+                        }(),
+                        BSON("files_id" << cmdObj.firstElement() << "n"
+                                        << numGridFSChunksProcessed));
 
-        while (true) {
-            const auto res = callShardFn(
-                [&] {
-                    BSONObjBuilder bb(applyReadWriteConcern(
-                        opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
-                    bb.append("partialOk", true);
-                    bb.append("startAt", numGridFSChunksProcessed);
-                    if (!lastResult.isEmpty()) {
-                        bb.append(lastResult["md5state"]);
+                    uassert(16246,
+                            str::stream()
+                                << "Shard for database " << nss.dbName().toStringForErrorMsg()
+                                << " is too old to support GridFS sharded by {files_id:1, n:1}",
+                            res.hasField("md5state"));
+
+                    lastResult = res;
+
+                    const int numChunks = res["numChunks"].numberInt();
+
+                    if (numGridFSChunksProcessed == numChunks) {
+                        // No new data means we've reached the end of the file
+                        CommandHelpers::filterCommandReplyForPassthrough(res, &result);
+                        return true;
                     }
-                    return bb.obj();
-                }(),
-                BSON("files_id" << cmdObj.firstElement() << "n" << numGridFSChunksProcessed));
 
-            uassert(16246,
-                    str::stream() << "Shard for database " << nss.dbName().toStringForErrorMsg()
-                                  << " is too old to support GridFS sharded by {files_id:1, n:1}",
-                    res.hasField("md5state"));
+                    uassert(ErrorCodes::InternalError,
+                            str::stream()
+                                << "Command returned numChunks of " << numChunks
+                                << " which is less than the number of chunks processes so far "
+                                << numGridFSChunksProcessed,
+                            numChunks > numGridFSChunksProcessed);
+                    numGridFSChunksProcessed = numChunks;
+                }
 
-            lastResult = res;
-
-            const int numChunks = res["numChunks"].numberInt();
-
-            if (numGridFSChunksProcessed == numChunks) {
-                // No new data means we've reached the end of the file
-                CommandHelpers::filterCommandReplyForPassthrough(res, &result);
-                return true;
-            }
-
-            uassert(ErrorCodes::InternalError,
-                    str::stream() << "Command returned numChunks of " << numChunks
-                                  << " which is less than the number of chunks processes so far "
-                                  << numGridFSChunksProcessed,
-                    numChunks > numGridFSChunksProcessed);
-            numGridFSChunksProcessed = numChunks;
-        }
-
-        MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE;
+            });
     }
 };
 MONGO_REGISTER_COMMAND(FileMD5Cmd).forRouter();

@@ -159,7 +159,15 @@ bool RoutingContext::onStaleError(const NamespaceString& nss, const Status& stat
     return false;
 }
 
+void RoutingContext::skipValidation() {
+    _skipValidation = true;
+}
+
 void RoutingContext::validateOnContextEnd() const {
+    if (_skipValidation) {
+        return;
+    }
+
     for (const auto& [nss, routingInfoEntry] : _nssRoutingInfoMap) {
         if (auto validated = routingInfoEntry.validated; !validated) {
             if (TestingProctor::instance().isEnabled()) {

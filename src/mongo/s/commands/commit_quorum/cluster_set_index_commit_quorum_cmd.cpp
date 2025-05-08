@@ -123,30 +123,33 @@ public:
         LOGV2_DEBUG(
             22757, 1, "setIndexCommitQuorum", logAttrs(nss), "command"_attr = redact(cmdObj));
 
-        RoutingContext routingCtx(opCtx, {nss});
-        auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
-            opCtx,
-            nss,
-            routingCtx,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNotIdempotent,
-            BSONObj() /*query*/,
-            BSONObj() /*collation*/,
-            boost::none /*letParameters*/,
-            boost::none /*runtimeConstants*/);
+        return routing_context_utils::withValidatedRoutingContext(
+            opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                    opCtx,
+                    nss,
+                    routingCtx,
+                    applyReadWriteConcern(
+                        opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                    ReadPreferenceSetting::get(opCtx),
+                    Shard::RetryPolicy::kNotIdempotent,
+                    BSONObj() /*query*/,
+                    BSONObj() /*collation*/,
+                    boost::none /*letParameters*/,
+                    boost::none /*runtimeConstants*/);
 
-        std::string errmsg;
-        const bool ok =
-            appendRawResponses(opCtx, &errmsg, &result, std::move(shardResponses)).responseOK;
-        CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
+                std::string errmsg;
+                const bool ok =
+                    appendRawResponses(opCtx, &errmsg, &result, std::move(shardResponses))
+                        .responseOK;
+                CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
 
-        if (ok) {
-            LOGV2(5688700, "Index commit quorums set", logAttrs(nss));
-        }
+                if (ok) {
+                    LOGV2(5688700, "Index commit quorums set", logAttrs(nss));
+                }
 
-        return ok;
+                return ok;
+            });
     }
 };
 MONGO_REGISTER_COMMAND(SetIndexCommitQuorumCommand).forRouter();
