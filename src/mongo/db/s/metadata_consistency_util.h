@@ -38,7 +38,6 @@
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/shard_id.h"
@@ -123,14 +122,16 @@ std::vector<MetadataInconsistencyItem> checkCollectionOptionsConsistencyAcrossSh
     const std::vector<CollectionType>& collections);
 
 /**
- * Check different types of inconsistencies from a given set of chunks owned by a collection.
+ * Check different types of inconsistencies from the chunks persisted in 'config.chunks' of the
+ * given collection.
  *
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
+ *
+ * This method can only be called from the config server.
  */
 std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* opCtx,
-                                                              const CollectionType& collection,
-                                                              const std::vector<ChunkType>& chunks);
+                                                              const CollectionType& collection);
 
 /**
  * Check different types of inconsistencies from a given set of zones owned by a collection.

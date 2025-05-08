@@ -75,7 +75,7 @@ protected:
     std::shared_ptr<RemoteCommandTargeterMock> configTargeterMock();
 
     const HostAndPort kConfigHostAndPort{"dummy", 123};
-    const ShardId kMyShardName{"myShardName"};
+    ShardId kMyShardName{"myShardName"};
 
     service_context_test::ShardRoleOverride _shardRole;
 
