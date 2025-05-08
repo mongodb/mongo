@@ -284,6 +284,11 @@ function analyzeRandomShardKeys(dbName, collName) {
                        `since the collection has been dropped: ${tojsononeline(e)}`);
             return;
         }
+        if (e.code == ErrorCodes.ObjectIsBusy) {
+            jsTest.log(`Skip analyzing shard keys for ${ns}` +
+                       `since the storage is busy: ${tojsononeline(e)}`);
+            return;
+        }
         throw e;
     }
 
