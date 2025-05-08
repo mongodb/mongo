@@ -160,6 +160,20 @@ pipeline = TimeseriesAggTests.generateOutPipeline(
 assert.throwsWithCode(() => inColl.aggregate(pipeline), 7406103);
 assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7406103);
 
+// Tests that an error is raised if the user provides a 'time' field that contains an embedded null
+// byte.
+pipeline = TimeseriesAggTests.generateOutPipeline(
+    targetCollName, dbName, {timeField: "invalid_\x00_time", metaField: "tags"});
+assert.throwsWithCode(() => inColl.aggregate(pipeline), ErrorCodes.BadValue);
+assert.throwsWithCode(() => observerInColl.aggregate(pipeline), ErrorCodes.BadValue);
+
+// Tests that an error is raised if the user provides a 'meta' field that contains an embedded null
+// byte.
+pipeline = TimeseriesAggTests.generateOutPipeline(
+    targetCollName, dbName, {timeField: "time", metaField: "invalid_\x00_meta"});
+assert.throwsWithCode(() => inColl.aggregate(pipeline), ErrorCodes.BadValue);
+assert.throwsWithCode(() => observerInColl.aggregate(pipeline), ErrorCodes.BadValue);
+
 // Tests that an error is raised if a conflicting view exists.
 if (!FixtureHelpers.isMongos(testDB)) {  // can not shard a view.
     assert.commandWorked(testDB.createCollection("view_out", {viewOn: "out"}));
