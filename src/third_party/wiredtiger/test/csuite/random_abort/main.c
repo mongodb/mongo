@@ -814,8 +814,9 @@ main(int argc, char *argv[])
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
 
-    /* Copy the data to the home directory for debugging purposes given its absolute path */
-    testutil_copy_data();
+    if (!verify_only)
+        /* Copy the data to the home directory for debugging purposes. */
+        testutil_copy_data();
 
     /*
      * Clear the cache, if we are using LazyFS. Do this after we save the data for debugging

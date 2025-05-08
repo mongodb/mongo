@@ -47,13 +47,13 @@ __wti_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
     WT_RELEASE_BARRIER();
 
     /* Create the cache. */
-    WT_RET(__wti_cache_create(session, cfg));
+    WT_RET(__wt_cache_create(session, cfg));
 
     /* Initialize eviction. */
     WT_RET(__wt_evict_create(session, cfg));
 
     /* Create shared cache.*/
-    WT_RET(__wti_conn_cache_pool_create(session, cfg));
+    WT_RET(__wt_cache_pool_create(session, cfg));
 
     /* Initialize transaction support. */
     WT_RET(__wt_txn_global_init(session, cfg));
@@ -137,13 +137,13 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wti_conn_remove_storage_source(session));
 
     /* Disconnect from shared cache - must be before cache destroy. */
-    WT_TRET(__wti_conn_cache_pool_destroy(session));
+    WT_TRET(__wt_cache_pool_destroy(session));
 
     /* Destroy Eviction. */
     WT_TRET(__wt_evict_destroy(session));
 
     /* Discard the cache. */
-    WT_TRET(__wti_cache_destroy(session));
+    WT_TRET(__wt_cache_destroy(session));
 
     /* Discard transaction state. */
     __wt_txn_global_destroy(session);

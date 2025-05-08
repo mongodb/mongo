@@ -30,7 +30,7 @@ arch_doc_pages = [
         ['WT_CACHE', 'WT_CACHE_POOL', 'WT_COL', 'WT_COL_RLE', 'WT_INSERT', 'WT_PAGE',
          'WT_PAGE_MODIFY', 'WT_REF', 'WT_ROW', 'WT_UPDATE'],
         ['src/include/btmem.h', 'src/include/cache.h', 'src/include/cache_inline.h',
-         'src/conn/conn_cache.c', 'src/conn/conn_cache_pool.c']),
+         'src/cache/cache.c', 'src/cache/cache_pool.c']),
     ArchDocPage('arch-checkpoint',
         ['WT_CONNECTION'],
         ['src/block/block_ckpt.c', 'src/block/block_ckpt_scan.c',

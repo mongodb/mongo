@@ -326,11 +326,11 @@ __conn_cache_pool_open(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wti_conn_cache_pool_create --
+ * __wt_cache_pool_create --
  *     Create shared cache.
  */
 int
-__wti_conn_cache_pool_create(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_cache_pool_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -354,12 +354,12 @@ __wti_conn_cache_pool_create(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wti_conn_cache_pool_destroy --
+ * __wt_cache_pool_destroy --
  *     Remove our resources from the shared cache pool. Remove the cache pool if we were the last
  *     connection.
  */
 int
-__wti_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
+__wt_cache_pool_destroy(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CACHE_POOL *cp;

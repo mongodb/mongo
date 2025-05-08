@@ -1700,9 +1700,6 @@ main(int argc, char *argv[])
         if (chdir(home) != 0)
             testutil_die(errno, "parent chdir: %s", home);
 
-        /* Copy the data to a separate folder for debugging purpose. */
-        testutil_copy_data_opt(BACKUP_BASE);
-
         /* Now do the actual recovery and verification. */
         ret = recover_and_verify(0, 0);
     }

@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wti_cache_config --
+ * __wt_cache_config --
  *     Configure or reconfigure the current cache and shared cache.
  */
 int
-__wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+__wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
@@ -32,7 +32,7 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     /* Cleanup if reconfiguring */
     if (reconfig && was_shared && !now_shared)
         /* Remove ourselves from the pool if necessary */
-        WT_RET(__wti_conn_cache_pool_destroy(session));
+        WT_RET(__wt_cache_pool_destroy(session));
     else if (reconfig && !was_shared && now_shared)
         /*
          * Cache size will now be managed by the cache pool - the start size always needs to be zero
@@ -56,31 +56,31 @@ __wti_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 }
 
 /*
- * __wti_cache_create --
+ * __wt_cache_create --
  *     Create the underlying cache.
  */
 int
-__wti_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_ASSERT(session, S2C(session)->cache == NULL);
     WT_RET(__wt_calloc_one(session, &S2C(session)->cache));
 
     /* Use a common routine for run-time configuration options. */
-    WT_RET(__wti_cache_config(session, cfg, false));
+    WT_RET(__wt_cache_config(session, cfg, false));
 
     /*
      * We get/set some values in the cache statistics (rather than have two copies), configure them.
      */
-    __wti_cache_stats_update(session);
+    __wt_cache_stats_update(session);
     return (0);
 }
 
 /*
- * __wti_cache_stats_update --
+ * __wt_cache_stats_update --
  *     Update the cache statistics for return to the application.
  */
 void
-__wti_cache_stats_update(WT_SESSION_IMPL *session)
+__wt_cache_stats_update(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -129,11 +129,11 @@ __wti_cache_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wti_cache_destroy --
+ * __wt_cache_destroy --
  *     Discard the underlying cache.
  */
 int
-__wti_cache_destroy(WT_SESSION_IMPL *session)
+__wt_cache_destroy(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
