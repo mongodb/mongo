@@ -46,6 +46,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.*", "factor": 0.27},
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
     ],
     "enterprise-rhel8-debug-tsan-all-feature-flags": [
         # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
@@ -64,7 +65,11 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
     ],
     "rhel8-debug-aubsan-all-feature-flags": [
-        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25},
+        {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
+    ],
+    "rhel8-debug-aubsan": [
+        {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
     ],
     "enterprise-rhel-8-64-bit-dynamic-debug-mode": [
         {"task": "aggregation_one_shard_sharded_collections", "factor": 0.25},
