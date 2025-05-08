@@ -1223,6 +1223,11 @@ export function getEngine(explain) {
     return sbePlans.length == 0 ? "classic" : "sbe";
 }
 
+export function getWarnings(explain) {
+    return getQueryPlanners(explain).flatMap(queryPlanner =>
+                                                 getNestedProperties(queryPlanner, "warning"));
+}
+
 /**
  * Asserts that a pipeline runs with the engine that is passed in as a parameter.
  */

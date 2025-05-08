@@ -81,16 +81,32 @@ public:
                                   PlanSummaryStats* statsOut) const override;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
 
-protected:
-    static boost::optional<BSONObj> buildExecPlanDebugInfo(
-        const sbe::PlanStage* root, const stage_builder::PlanStageData* data) {
-        if (root && data) {
-            return BSON("slots" << data->debugString() << "stages"
-                                << sbe::DebugPrinter().print(*root));
+    static BSONObj buildExecPlanDebugInfo(const sbe::PlanStage* root,
+                                          const stage_builder::PlanStageData* data,
+                                          size_t lengthCap) {
+        tassert(10111200, "encountered unexpected missing sbe plan stage root", root);
+        tassert(10111201, "encountered unexpected missing sbe plan stage data", data);
+        BSONObjBuilder bob;
+        std::string slots = data->debugString(lengthCap);
+        if (static_cast<size_t>(bob.len()) + slots.size() > lengthCap) {
+            bob.append("warning", "exceeded explain BSON size cap");
+            return bob.obj();
         }
-        return boost::none;
+        bob.append("slots", slots);
+        if (static_cast<size_t>(bob.len()) >= lengthCap) {
+            bob.append("warning", "exceeded explain BSON size cap");
+            return bob.obj();
+        }
+        std::string stages = sbe::DebugPrinter().print(*root);
+        if (static_cast<size_t>(bob.len()) + stages.size() > lengthCap) {
+            bob.append("warning", "exceeded explain BSON size cap");
+            return bob.obj();
+        }
+        bob.append("stages", stages);
+        return bob.obj();
     }
 
+protected:
     boost::optional<BSONArray> buildRemotePlanInfo() const;
 
     // These fields are are owned elsewhere (e.g. the PlanExecutor or CandidatePlan).

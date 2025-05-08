@@ -448,7 +448,8 @@ void statsToBSON(const sbe::PlanStageStats* stats,
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
     const sbe::PlanStageStats& stats,
-    const boost::optional<BSONObj>& execPlanDebugInfo,
+    const sbe::PlanStage* sbePlanStageRoot,
+    const stage_builder::PlanStageData* sbePlanStageData,
     const boost::optional<std::string>& planSummary,
     const boost::optional<BSONObj>& queryParams,
     const boost::optional<BSONArray>& remotePlanInfo,
@@ -475,7 +476,6 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         statsToBSON(solution->root(), &bob, &bob);
     }
 
-    tassert(9258810, "encountered unexpected missing BSONObj", execPlanDebugInfo);
     BSONObjBuilder plan;
     if (planSummary) {
         plan.append("planSummary", *planSummary);
@@ -484,7 +484,20 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     plan.append("isCached", isCached);
     plan.append("queryPlan", bob.obj());
 
-    plan.append("slotBasedPlan", *execPlanDebugInfo);
+    int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
+
+    if (plan.len() > explainThresholdBytes) {
+        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+    } else {
+        BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
+            sbePlanStageRoot, sbePlanStageData, explainThresholdBytes - plan.len() /*lengthCap*/
+        );
+        if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
+            plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+        } else {
+            plan.append("slotBasedPlan", execPlanDebugInfo);
+        }
+    }
     if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
         plan.append("remotePlans", *remotePlanInfo);
     }
@@ -580,7 +593,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
 
     return buildPlanStatsDetails(_solution,
                                  *stats,
-                                 buildExecPlanDebugInfo(_root, _rootData),
+                                 _root,
+                                 _rootData,
                                  boost::none /* planSummary */,
                                  boost::none /* queryParams */,
                                  buildRemotePlanInfo(),

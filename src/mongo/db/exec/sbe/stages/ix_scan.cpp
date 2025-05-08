@@ -343,7 +343,6 @@ std::unique_ptr<PlanStageStats> IndexScanStageBase::getStats(bool includeDebugIn
     ret->specific = std::make_unique<IndexScanStats>(_specificStats);
 
     if (includeDebugInfo) {
-        DebugPrinter printer;
         BSONObjBuilder bob;
         bob.append("indexName", _indexName);
         bob.appendNumber("keysExamined", static_cast<long long>(_specificStats.keysExamined));

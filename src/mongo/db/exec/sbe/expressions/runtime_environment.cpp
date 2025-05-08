@@ -155,7 +155,8 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopyForParallelUse()
     return makeCopy();
 }
 
-void RuntimeEnvironment::debugString(StringBuilder* builder) const {
+void RuntimeEnvironment::debugString(StringBuilder* builder,
+                                     boost::optional<size_t> lengthCap /*= boost::none*/) const {
     using namespace std::literals;
 
     value::SlotMap<StringData> slotName;
@@ -170,24 +171,40 @@ void RuntimeEnvironment::debugString(StringBuilder* builder) const {
     }
     std::sort(slots.begin(), slots.end());
 
-    *builder << "env: { ";
+    StringBuilder tmp;
+
+    tmp << "env: { ";
+    if (lengthCap.has_value() && static_cast<size_t>(builder->len() + tmp.len()) > lengthCap) {
+        return;
+    }
+    *builder << tmp.stringData();
+    tmp.reset();
     bool first = true;
     for (auto slot : slots) {
         if (first) {
             first = false;
         } else {
-            *builder << ", ";
+            tmp << ", ";
         }
 
         std::stringstream ss;
         ss << _accessors.at(slot).getViewOfValue();
 
-        *builder << "s" << slot << " = " << ss.str();
+        tmp << "s" << slot << " = " << ss.str();
 
         if (auto it = slotName.find(slot); it != slotName.end()) {
-            *builder << " (" << it->second << ")";
+            tmp << " (" << it->second << ")";
         }
+
+        if (lengthCap.has_value() && static_cast<size_t>(builder->len() + tmp.len()) > lengthCap) {
+            // Truncate this slot's string for explain.
+            *builder << "...";
+            return;
+        }
+        *builder << tmp.stringData();
+        tmp.reset();
     }
+    // Deliberately add the closing curly brace, even if it exceeds lengthCap.
     *builder << " }";
 }
 
