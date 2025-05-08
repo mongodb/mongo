@@ -77,6 +77,9 @@ void NamespaceMetadataChangeNotifications::_unregisterNotificationToken(
     }
 
     auto mapIt = _notificationsList.find(token->nss);
+    if (mapIt == _notificationsList.end()) {
+        return;
+    }
     auto& notifList = mapIt->second;
     notifList.erase(*token->itToErase);
 
