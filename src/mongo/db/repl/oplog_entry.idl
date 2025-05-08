@@ -98,6 +98,8 @@ enums:
             kModifyCollectionShardingIndexCatalog: "modifyCollectionShardingIndexCatalog"
             kCreateDatabaseMetadata: "createDatabaseMetadata"
             kDropDatabaseMetadata: "dropDatabaseMetadata"
+            kPromoteToTransitionalShardedCluster: "promoteToTransitionalShardedCluster"
+            kPromoteToFullShardedCluster: "promoteToFullShardedCluster"
 
 types:
     zeroOneManyStmtId:
