@@ -540,10 +540,11 @@ void executeUntilFirstBatch(const AggExState& aggExState,
         const auto& planExplainer = exec->getPlanExplainer();
         if (const auto& coll = aggCatalogState.getPrimaryCollection()) {
             auto& debugInfo = CurOp::get(aggExState.getOpCtx())->debug();
-            CollectionIndexUsageTrackerDecoration::get(coll.get())
-                .recordCollectionIndexUsage(debugInfo.collectionScans,
-                                            debugInfo.collectionScansNonTailable,
-                                            debugInfo.indexesUsed);
+            CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+                coll.get(),
+                debugInfo.collectionScans,
+                debugInfo.collectionScansNonTailable,
+                debugInfo.indexesUsed);
         }
         // For SBE pushed down pipelines, we may need to report stats saved for secondary
         // collections separately.
@@ -552,10 +553,11 @@ void executeUntilFirstBatch(const AggExState& aggExState,
             if (coll) {
                 PlanSummaryStats secondaryStats;
                 planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
-                CollectionIndexUsageTrackerDecoration::get(coll.get())
-                    .recordCollectionIndexUsage(secondaryStats.collectionScans,
-                                                secondaryStats.collectionScansNonTailable,
-                                                secondaryStats.indexesUsed);
+                CollectionIndexUsageTrackerDecoration::recordCollectionIndexUsage(
+                    coll.get(),
+                    secondaryStats.collectionScans,
+                    secondaryStats.collectionScansNonTailable,
+                    secondaryStats.indexesUsed);
             }
         }
     }
