@@ -252,6 +252,16 @@ transactions:
     - src/mongo/db/s/*txn*
     - src/mongo/s/*transaction*
 
+recovery:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*replication_recovery*
+    - src/mongo/db/repl/*rollback*
+    - src/mongo/db/modules/enterprise/src/magic_restore
+    - src/mongo/dbtests/rollbacktests.cpp
+
 access_control:
   meta:
     slack: TODO
