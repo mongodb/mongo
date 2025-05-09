@@ -114,6 +114,7 @@ MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeDDLLock);
 MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterDDLLock);
 
 MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeEstablishCursors);
+MONGO_FAIL_POINT_DEFINE(throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors);
 MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterEstablishCursors);
 
 constexpr StringData kDDLLockReason = "checkMetadataConsistency"_sd;
@@ -227,6 +228,27 @@ public:
         }
 
     private:
+        template <typename Callback>
+        decltype(auto) _runWithDbMetadaLockDeadline(OperationContext* opCtx,
+                                                    Milliseconds timeout,
+                                                    const NamespaceString& nss,
+                                                    Callback&& cb) {
+            const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+            const auto deadline = now + timeout;
+            try {
+                return opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, cb);
+            } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+                if (now >= deadline) {
+                    uasserted(9944001,
+                              str::stream()
+                                  << "Exceeded maximum time " << timeout
+                                  << " while processing namespace " << nss.toStringForErrorMsg());
+                }
+                throw;
+            }
+        }
+
         Response _runClusterLevel(OperationContext* opCtx, const NamespaceString& nss) {
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << Request::kCommandName
@@ -246,40 +268,53 @@ public:
                                                       boost::none /* shardVersion */,
                                                       db.getVersion() /* databaseVersion */);
 
-                auto checkMetadataForDb = [&]() {
-                    try {
-                        hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
-                        DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
-                        tassert(9504001,
+                auto dbCheckWithDeadlineIfSet = [&] {
+                    auto checkMetadataForDb = [&]() {
+                        try {
+                            hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
+                            DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                                opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
+                            tassert(
+                                9504001,
                                 "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                                 !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
 
-                        auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
-                        cursors.insert(cursors.end(),
-                                       std::make_move_iterator(dbCursors.begin()),
-                                       std::make_move_iterator(dbCursors.end()));
-                        return Status::OK();
-                    } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-                        // Receiving a StaleDbVersion is because of one of these scenarios:
-                        // - A movePrimary is changing the db primary shard.
-                        // - The database is being dropped.
-                        // - This shard doesn't know about the existence of the db.
-                        LOGV2_DEBUG(8840400,
-                                    1,
-                                    "Received StaleDbVersion error while trying to run database "
-                                    "metadata checks",
-                                    logAttrs(dbNss.dbName()),
-                                    "error"_attr = redact(ex));
-                        return ex.toStatus();
+                            auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
+                            cursors.insert(cursors.end(),
+                                           std::make_move_iterator(dbCursors.begin()),
+                                           std::make_move_iterator(dbCursors.end()));
+                            return Status::OK();
+                        } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+                            // Receiving a StaleDbVersion is because of one of these scenarios:
+                            // - A movePrimary is changing the db primary shard.
+                            // - The database is being dropped.
+                            // - This shard doesn't know about the existence of the db.
+                            LOGV2_DEBUG(
+                                8840400,
+                                1,
+                                "Received StaleDbVersion error while trying to run database "
+                                "metadata checks",
+                                logAttrs(dbNss.dbName()),
+                                "error"_attr = redact(ex));
+                            return ex.toStatus();
+                        }
+                    };
+
+                    if (request().getDbMetadataLockMaxTimeMS().is_initialized()) {
+                        const auto timeout =
+                            Milliseconds(request().getDbMetadataLockMaxTimeMS().value());
+                        return _runWithDbMetadaLockDeadline(
+                            opCtx, timeout, dbNss, checkMetadataForDb);
+                    } else {
+                        return checkMetadataForDb();
                     }
                 };
 
                 bool skippedMetadataChecks = false;
-                auto status = checkMetadataForDb();
+                const auto status = dbCheckWithDeadlineIfSet();
                 if (!status.isOK()) {
                     auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
-                    if (extraInfo->getVersionWanted()) {
+                    if (!extraInfo || extraInfo->getVersionWanted()) {
                         // In case there is a wanted shard version means that the metadata is stale
                         // and we are going to skip the checks.
                         skippedMetadataChecks = true;
@@ -289,7 +324,7 @@ public:
                         (void)onDbVersionMismatchNoExcept(
                             opCtx, dbNss.dbName(), extraInfo->getVersionReceived());
 
-                        skippedMetadataChecks = !checkMetadataForDb().isOK();
+                        skippedMetadataChecks = !dbCheckWithDeadlineIfSet().isOK();
                     }
                 }
 
@@ -308,13 +343,23 @@ public:
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
             auto dbCursors = [&]() {
-                hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
-                DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                    opCtx, nss.dbName(), kDDLLockReason, MODE_S};
-                tassert(9504002,
-                        "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
-                        !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
-                return _establishCursorOnParticipants(opCtx, nss);
+                auto establishDBCursors = [&]() {
+                    hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
+                    DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                        opCtx, nss.dbName(), kDDLLockReason, MODE_S};
+                    tassert(9504002,
+                            "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
+                            !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
+                    return _establishCursorOnParticipants(opCtx, nss);
+                };
+
+                if (request().getDbMetadataLockMaxTimeMS().is_initialized()) {
+                    const auto timeout =
+                        Milliseconds(request().getDbMetadataLockMaxTimeMS().value());
+                    return _runWithDbMetadaLockDeadline(opCtx, timeout, nss, establishDBCursors);
+                } else {
+                    return establishDBCursors();
+                }
             }();
 
             return _mergeCursors(opCtx, nss, std::move(dbCursors));
@@ -341,6 +386,12 @@ public:
         std::vector<RemoteCursor> _establishCursorOnParticipants(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
             hangShardCheckMetadataBeforeEstablishCursors.pauseWhileSet();
+            if (throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors.shouldFail()) {
+                uasserted(ErrorCodes::ExceededTimeLimit,
+                          str::stream() << "Timing out before establishing cursors on "
+                                           "checkMetadataConsistency for nss "
+                                        << nss.toStringForErrorMsg());
+            }
 
             // Shard requests
             const auto shardOpKey = UUID::gen();
