@@ -88,7 +88,7 @@ class CursorResponse;
  *
  * Does not throw exceptions.
  */
-class AsyncResultsMerger {
+class AsyncResultsMerger : public std::enable_shared_from_this<AsyncResultsMerger> {
     AsyncResultsMerger(const AsyncResultsMerger&) = delete;
     AsyncResultsMerger& operator=(const AsyncResultsMerger&) = delete;
 
@@ -101,6 +101,9 @@ public:
     static const BSONObj kWholeSortKeySortPattern;
 
     /**
+     * Factory function to create an 'AsyncResultsMerger' instance. Calling this method is the only
+     * allowed way to create an 'AsyncResultsMerger'.
+     *
      * Takes ownership of the cursors from ClusterClientCursorParams by storing their cursorIds and
      * the hosts on which they exist in _remotes.
      *
@@ -114,15 +117,16 @@ public:
      * detachFromOperationContext() before deleting 'opCtx', and call reattachToOperationContext()
      * with a new, valid OperationContext before the next use.
      */
-    AsyncResultsMerger(OperationContext* opCtx,
-                       std::shared_ptr<executor::TaskExecutor> executor,
-                       AsyncResultsMergerParams params);
+    static std::shared_ptr<AsyncResultsMerger> create(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        AsyncResultsMergerParams params);
 
     /**
      * In order to be destroyed, either the ARM must have been kill()'ed or all cursors must have
      * been exhausted. This is so that any unexhausted cursors are cleaned up by the ARM.
      */
-    ~AsyncResultsMerger();
+    virtual ~AsyncResultsMerger();
 
     /**
      * Returns a const reference to the parameters.
@@ -282,6 +286,14 @@ public:
     query_stats::DataBearingNodeMetrics takeMetrics();
 
 private:
+    /**
+     * Constructor is private. All 'AsyncResultsMerger' objects are supposed to be created via the
+     * static 'create()' factory function.
+     */
+    AsyncResultsMerger(OperationContext* opCtx,
+                       std::shared_ptr<executor::TaskExecutor> executor,
+                       AsyncResultsMergerParams params);
+
     /**
      * Contains the original response received by the shard. This is necessary for processing
      * additional transaction participants.

@@ -1553,8 +1553,7 @@ DEATH_TEST_REGEX_F(
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
@@ -1583,8 +1582,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_TRUE(arm->ready());
@@ -1615,8 +1613,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1640,8 +1637,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1718,8 +1714,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1809,8 +1804,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     // We have no results to return, so the ARM is not ready.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1881,8 +1875,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     // We have no results to return, so the ARM is not ready.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -2337,8 +2330,7 @@ TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
 
         auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
         params.setRequestQueryStatsFromRemotes(requestParams);
-        auto arm =
-            std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+        auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
         // Schedule the request for the getMore.
         auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -2396,8 +2388,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
     cursors.push_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, id, {})));
     params.setRemotes(std::move(cursors));
-    auto arm =
-        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
 
     // Schedule the request for a getMore.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
