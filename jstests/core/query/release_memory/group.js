@@ -19,8 +19,9 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode
@@ -53,10 +54,12 @@ const classicMemorySizeInitialValue = getServerParameter(classicMemorySizeKnob);
 setServerParameter(sbeIncreasedSpillingKnob, "never");
 setServerParameter(classicIncreasedSpillingKnob, false);
 
-const coll = db[jsTestName()];
-assert(coll.drop());
+const collFew = db[jsTestName() + "_few"];
+assert(collFew.drop());
+const collMany = db[jsTestName() + "_many"];
+assert(collMany.drop());
 
-const docs = [
+const fewDocs = [
     {"_id": 1, "item": "a", "price": 10, "quantity": 2, "date": ISODate("2014-01-01T08:00:00Z")},
     {"_id": 2, "item": "b", "price": 20, "quantity": 1, "date": ISODate("2014-02-03T09:00:00Z")},
     {"_id": 3, "item": "a", "price": 5, "quantity": 5, "date": ISODate("2014-02-03T09:05:00Z")},
@@ -73,7 +76,26 @@ const docs = [
     {"_id": 14, "item": "i", "price": 40, "quantity": 7, "date": ISODate("2014-04-26T15:00:00Z")},
     {"_id": 15, "item": "j", "price": 35, "quantity": 1, "date": ISODate("2014-05-02T16:00:00Z")},
 ];
-assert.commandWorked(coll.insertMany(docs));
+assert.commandWorked(collFew.insertMany(fewDocs));
+
+let manyDocs = [];
+for (let i = 0; i <= 200; i++) {
+    // Create item key with some duplicates:
+    // - 80% of documents have unique items (128+ distinct items)
+    // - 20% of documents reuse existing items to test grouping behavior
+    const itemChar = (i % 5 === 0)
+        ? String.fromCharCode(96 + (i % 26) + 1)    // Creates duplicates from a-z
+        : String.fromCharCode(96 + (i % 220) + 1);  // Still ensures 200+ distinct items
+
+    manyDocs.push({
+        "_id": i,
+        "item": itemChar,
+        "price": Math.floor(Math.random() * 100),
+        "quantity": Math.floor(Math.random() * 20),
+        "date": new Date(2014, Math.floor(i % 12), Math.floor((i % 28) + 1))
+    });
+}
+assert.commandWorked(collMany.insertMany(manyDocs));
 
 const pipeline = [{
     $group: {
@@ -83,102 +105,112 @@ const pipeline = [{
     }
 }];
 
-// ToDo: Remove the mergeCursors on SERVER-104522
-const explain = coll.explain().aggregate(pipeline);
-if (hasMergeCursors(explain)) {
-    jsTest.log(`Skipping test. Pipeline has $mergeCursors but spilling on mongos is not allowed`);
-    quit();
+for (const coll of [collFew, collMany]) {
+    // TODO(SERVER-104522) Remove the mergeCursors
+    const explain = coll.explain().aggregate(pipeline);
+    if (hasMergeCursors(explain)) {
+        jsTest.log(
+            `Skipping test. Pipeline has $mergeCursors but spilling on mongos is not allowed`);
+        quit();
+    }
+
+    // Get all the results to use as a reference. Set 'allowDiskUse' to false to disable increased
+    // spilling in debug builds.
+    const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();
+
+    {
+        jsTest.log(`Running no spill in first batch`);
+
+        setServerParameter(sbeMemorySizeKnob, 100 * 1024 * 1024);
+        setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
+        let initialSpillCount = getSpillCounter();
+
+        // Retrieve the first batch without spilling.
+        jsTest.log.info("Running pipeline: ", pipeline[0]);
+
+        const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
+        const newSpillCount = getSpillCounter();
+        assert.eq(newSpillCount, initialSpillCount);
+        initialSpillCount = newSpillCount;
+
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        // In a timeseries collection, in sbe, all records are consumed in the first batch (up to
+        // kBlockOutSize = 128) and there is nothing to spill.
+        const willNotSpill = isTimeSeriesCollection(db, coll.getName()) &&
+            expectedResults.length <= 128 && getEngine(explain) === "sbe";
+        if (willNotSpill) {
+            assert.eq(initialSpillCount, getSpillCounter());
+        } else {
+            assert.lt(initialSpillCount, getSpillCounter());
+        }
+
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
+        assertArrayEq({actual: results, expected: expectedResults});
+
+        setServerParameter(sbeMemorySizeKnob, sbeMemorySizeInitialValue);
+        setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
+    }
+
+    // Run query with increased spilling to spill while creating the first batch.
+    {
+        jsTest.log(`Running spill in first batch`);
+        setServerParameter(sbeMemorySizeKnob, 1);
+        setServerParameter(classicMemorySizeKnob, 1);
+        let initialSpillCount = getSpillCounter();
+
+        // Retrieve the first batch.
+        jsTest.log.info("Running pipeline: ", pipeline[0]);
+
+        const cursor = coll.aggregate(pipeline, {allowDiskUse: true, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
+        const newSpillCount = getSpillCounter();
+        assert.lt(initialSpillCount, newSpillCount);
+        initialSpillCount = newSpillCount;
+
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        assert.eq(initialSpillCount, newSpillCount);
+
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
+        assertArrayEq({actual: results, expected: expectedResults});
+
+        setServerParameter(sbeMemorySizeKnob, sbeMemorySizeInitialValue);
+        setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
+    }
+
+    // Disallow spilling in group
+    {
+        jsTest.log(`Running releaseMemory with no allowDiskUse`);
+
+        // Retrieve the first batch without spilling.
+        jsTest.log.info("Running pipeline: ", pipeline[0]);
+        const cursor = coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
+
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assertReleaseMemoryFailedWithCode(
+            releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
+        assertArrayEq({actual: results, expected: expectedResults});
+    }
 }
-
-// Get all the results to use as a reference. Set 'allowDiskUse' to false to disable increased
-// spilling in debug builds.
-const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();
-
-{
-    jsTest.log(`Running no spill in first batch`);
-
-    setServerParameter(sbeMemorySizeKnob, 100 * 1024 * 1024);
-    setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
-    let initialSpillCount = getSpillCounter();
-
-    // Retrieve the first batch without spilling.
-    jsTest.log.info("Running pipeline: ", pipeline[0]);
-
-    const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
-    const newSpillCount = getSpillCounter();
-    assert.eq(newSpillCount, initialSpillCount);
-    initialSpillCount = newSpillCount;
-
-    // Release memory (i.e., spill)
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-    assert.lt(initialSpillCount, getSpillCounter());
-
-    jsTest.log.info("Running getMore");
-    const results = cursor.toArray();
-    assertArrayEq({actual: results, expected: expectedResults});
-
-    setServerParameter(sbeMemorySizeKnob, sbeMemorySizeInitialValue);
-    setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
-}
-
-// Run query with increased spilling to spill while creating the first batch.
-{
-    jsTest.log(`Running spill in first batch`);
-    setServerParameter(sbeMemorySizeKnob, 1);
-    setServerParameter(classicMemorySizeKnob, 1);
-    let initialSpillCount = getSpillCounter();
-
-    // Retrieve the first batch.
-    jsTest.log.info("Running pipeline: ", pipeline[0]);
-
-    const cursor = coll.aggregate(pipeline, {allowDiskUse: true, cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
-    const newSpillCount = getSpillCounter();
-    assert.lt(initialSpillCount, newSpillCount);
-    initialSpillCount = newSpillCount;
-
-    // Release memory (i.e., spill)
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-    assert.eq(initialSpillCount, newSpillCount);
-
-    jsTest.log.info("Running getMore");
-    const results = cursor.toArray();
-    assertArrayEq({actual: results, expected: expectedResults});
-
-    setServerParameter(sbeMemorySizeKnob, sbeMemorySizeInitialValue);
-    setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
-}
-
-// Disallow spilling in group
-{
-    jsTest.log(`Running releaseMemory with no allowDiskUse`);
-
-    // Retrieve the first batch without spilling.
-    jsTest.log.info("Running pipeline: ", pipeline[0]);
-    const cursor = coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
-
-    // Release memory (i.e., spill)
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-
-    jsTest.log.info("Running getMore");
-    const results = cursor.toArray();
-    assertArrayEq({actual: results, expected: expectedResults});
-}
-
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);
 setServerParameter(classicIncreasedSpillingKnob, classicIncreasedSpillingInitialValue);

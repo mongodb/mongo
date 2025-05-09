@@ -207,6 +207,7 @@ void HashAggBaseStage<Derived>::spill() {
     }
 
     _ht->clear();
+    _htIt = _ht->end();
 
     auto storageSizeBeforeSpillUpdate =
         static_cast<Derived*>(this)->getHashAggStats()->spillingStats.getSpilledDataStorageSize();

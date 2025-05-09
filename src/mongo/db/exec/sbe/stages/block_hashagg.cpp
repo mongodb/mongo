@@ -872,6 +872,9 @@ PlanState BlockHashAggStage::getNext() {
         }
 
         if (_htIt == _ht->end()) {
+            // All records have been processed.
+            _ht->clear();
+            _htIt = _ht->end();
             _done = true;
             if (numRows == 0) {
                 return trackPlanState(PlanState::IS_EOF);
