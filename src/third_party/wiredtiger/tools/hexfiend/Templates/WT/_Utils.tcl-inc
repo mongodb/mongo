@@ -14,6 +14,8 @@ proc globals {args} {
 }
 
 proc main_guard {body} {
+    global errorInfo
+    set errorInfo "(no error)"
     if [catch {
         uplevel 1 $body
     }] {
@@ -22,9 +24,11 @@ proc main_guard {body} {
 }
 
 proc main_guard2 {body args} {
+  global errorInfo
+  set errorInfo "(no error)"
   parseIfOkErrArgs "" default
   set err [catch { uplevel 1 $body; return 1 }]
-  if {$err eq "" || !$err} {
+  if {$err eq "" || $err != 1} {
     if {$ifOk ne ""} { return [uplevel 1 $ifOk] } else { return 1 }
   } else {
     if {$ifErr eq "default"} {

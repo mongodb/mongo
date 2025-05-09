@@ -14,13 +14,14 @@ include "WT/_intpack.tcl-inc"
 
 # __wt_log_record , __wt_log_desc @ 0x10
 
+set log_record_flags 0
 proc log_record {} {
-  globals WT_LOG_*
+  globals WT_LOG_* log_record_flags
   ssection -collapsed __wt_log_record {
     #uint32 len         ;# Record length including hdr
     xentry -var len { uint32 }
     uint32 -hex checksum
-    xentry flags { format_bits [uint16] $WT_LOG_RECORD_f }
+    xentry flags { format_bits [set log_record_flags [uint16]] $WT_LOG_RECORD_f }
     bytes 2 unused
     uint32 mem_len     ;# Uncompressed len if needed
     # uint8 record[0]
@@ -40,18 +41,30 @@ proc log_desc {} {
 
 proc read_record {name} {
   globals WT_LOG* WT_TXN_*
+  set ret 1
   ssection -collapsed $name {
     # __log_open_verify
     # __txn_printlog
     set _start [pos]
     set len [log_record]
     set desc "\[[xd $len]\]"
-    if {$len < 16} { sectionname "record:end"; error "end" }
+    if {$len < 16} { sectionname "record:end"; set ret 0; return 0; }
     ssection record {
-      xentry -varname rectype_fmt rectype {
-        format_enum [set rectype [vuint]] $WT_LOGREC_n
+      global log_record_flags
+      if {$log_record_flags & $WT_LOG_RECORD_COMPRESSED} {
+        set rectype -1
+        set rectype_shortfmt "compressed (?)"
+        set desc "compressed"
+        sectionvalue "compressed data"
+        # pad $_start $len
+        bytes [remaining $_start $len] "compressed data"
+        gotoend $_start $len
+      } else {
+        xentry -varname rectype_fmt rectype {
+          format_enum [set rectype [vuint]] $WT_LOGREC_n
+        }
+        set rectype_shortfmt [strcut $rectype_fmt WT_LOGREC_]
       }
-      set rectype_shortfmt [strcut $rectype_fmt WT_LOGREC_]
       sectionname "record:$rectype_shortfmt"
 
       if {[catch {
@@ -61,8 +74,12 @@ proc read_record {name} {
             # __wt_log_recover_system -> __wt_logop_prev_lsn_unpack -> __wt_struct_unpack(fmt="IIII") -> __wt_struct_unpackv(fmt="IIII")
             set desc [strcut [xentry optype { format_enum [unpack_I] $WT_LOGOP_n }] WT_LOGOP_]
             append desc " sz:[xentry size { unpack_I }]"
-            append desc " f:[xentry -var file { unpack_I }]"
-            append desc " off:[xentry -var offset { unpack_I }]"
+            if {[peek uint8]} {
+              append desc " f:[xentry -var file { unpack_I }]"
+              if {[peek uint8]} {
+                append desc " off:[xentry -var offset { unpack_I }]"
+              }
+            }
             sectionvalue $desc
           }
           $WT_LOGREC_CHECKPOINT {
@@ -70,9 +87,15 @@ proc read_record {name} {
             set desc [strcut [xentry optype { format_enum [unpack_I] $WT_LOGOP_n }] WT_LOGOP_]
             append desc " sz:[xentry size { unpack_I }]"
             append desc " f:[xentry -var file { unpack_I }]"
-            append desc " off:[xentry -var offset { unpack_I }]"
-            append desc " nsn:[xentry -var nsnapshot { unpack_I }]"
-            append desc " sn:[xentry -var snapshot { unpack_i }]"
+            if {[peek uint8]} {
+              append desc " off:[xentry -var offset { unpack_I }]"
+              if {[peek uint8]} {
+                append desc " nsn:[xentry -var nsnapshot { unpack_I }]"
+                if {[peek uint8]} {
+                  append desc " sn:[xentry -var snapshot { unpack_i }]"
+                }
+              }
+            }
             sectionvalue $desc
           }
           $WT_LOGREC_COMMIT {
@@ -130,7 +153,7 @@ proc read_record {name} {
                       #xentry key { unpack_U_ascii }
                       #set key [unpack_size_key key]
                       # last 'u' goes as 'U' with the remaining size
-                      xentry key { unpack_u_ascii [remaining $_opstart $opsize] }
+                      set key [xentry key { unpack_u_ascii [remaining $_opstart $opsize] }]
                       sectionvalue "$optype_fmt $key"
                     }
                     $WT_LOGOP_ROW_TRUNCATE {
@@ -172,8 +195,13 @@ proc read_record {name} {
           default {}
         }
       }]} {
-        append desc " -incomplete-"
+        global errorInfo
+        append desc " -incomplete- $errorInfo"
       }
+    } || {
+      global errorInfo
+      set desc "ERROR:$errorInfo"
+      set rectype_shortfmt "ERROR"
     }
     sectionname "$name:$rectype_shortfmt"
     sectionvalue "$desc"
@@ -181,7 +209,7 @@ proc read_record {name} {
     #pad $_start $len
     gotoend $_start $len
   }
-  return 1
+  return $ret
 }
 
 main_guard2 {
@@ -192,10 +220,10 @@ main_guard2 {
     pad $_start $len
   }
 
-  read_record system_record
-
-  while {![end]} {
-    read_record record
+  if {![end]} {
+    read_record system_record
   }
+
+  while {![end] && [read_record record]} {}
 }
 

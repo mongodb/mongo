@@ -142,6 +142,7 @@ proc unpack_key {size} {
   if {[catch {
     set intval [xentry varint unpack_uint]
   }] || [pos] - $startpos != $size} {
+    global ssOk errorInfo; set ssOk 1; set errorInfo "(no error)"
     goto $startpos
     return [ascii $size str]
   }
