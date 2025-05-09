@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,27 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <string>
-#include <utility>
+namespace mongo::query_settings {
+namespace {
+const auto dependenciesDecoration = ServiceContext::declareDecoration<ServiceDependencies>();
+}  // namespace
 
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-
-namespace mongo {
-
-using SetClusterParameterImplFn = void (*)(OperationContext*,
-                                           const SetClusterParameter&,
-                                           boost::optional<Timestamp>,
-                                           boost::optional<LogicalTime>);
-
-SetClusterParameterImplFn getSetClusterParameterImpl(Service* service);
-
-SetClusterParameterImplFn getSetClusterParameterImpl(OperationContext* ctx);
-}  // namespace mongo
+ServiceDependencies& getServiceDependencies(ServiceContext* serviceContext) {
+    return dependenciesDecoration(serviceContext);
+}
+}  // namespace mongo::query_settings

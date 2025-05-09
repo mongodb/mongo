@@ -77,7 +77,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/profile_filter_impl.h"
-#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -128,7 +127,6 @@
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sessions_collection_sharded.h"
-#include "mongo/s/set_cluster_server_parameter_router_impl.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/transaction_router.h"
@@ -785,7 +783,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ReadWriteConcernDefaults::create(serviceContext->getService(ClusterRole::RouterServer),
                                      readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
-    query_settings::initializeForRouter(serviceContext, setClusterParameterImplRouter);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();

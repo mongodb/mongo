@@ -38,12 +38,14 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 
@@ -388,8 +390,8 @@ void sanitizeKeyPatternIndexHints(QueryShapeConfiguration& queryShapeItem) {
 
 class QuerySettingsRouterService : public QuerySettingsService {
 public:
-    QuerySettingsRouterService(SetClusterParameterImplFn fn)
-        : QuerySettingsService(), _setClusterParameterFn(fn) {}
+    explicit QuerySettingsRouterService(SetClusterParameterFn fn)
+        : _setClusterParameterFn(std::move(fn)) {}
 
     QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
         const boost::optional<TenantId>& tenantId) const final {
@@ -502,12 +504,13 @@ public:
 
 private:
     QuerySettingsManager _manager;
-    SetClusterParameterImplFn _setClusterParameterFn;
+    SetClusterParameterFn _setClusterParameterFn;
 };
 
 class QuerySettingsShardService : public QuerySettingsRouterService {
 public:
-    QuerySettingsShardService(SetClusterParameterImplFn fn) : QuerySettingsRouterService(fn) {}
+    explicit QuerySettingsShardService(SetClusterParameterFn fn)
+        : QuerySettingsRouterService(std::move(fn)) {}
 
     QuerySettings lookupQuerySettingsWithRejectionCheck(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -571,13 +574,13 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
 }
 
 void initializeForRouter(ServiceContext* serviceContext,
-                         SetClusterParameterImplFn setClusterParameterImplFn) {
+                         SetClusterParameterFn setClusterParameterImplFn) {
     getQuerySettingsService(serviceContext) =
         std::make_unique<QuerySettingsRouterService>(setClusterParameterImplFn);
 }
 
 void initializeForShard(ServiceContext* serviceContext,
-                        SetClusterParameterImplFn setClusterParameterImplFn) {
+                        SetClusterParameterFn setClusterParameterImplFn) {
     getQuerySettingsService(serviceContext) =
         std::make_unique<QuerySettingsShardService>(setClusterParameterImplFn);
 }
@@ -730,4 +733,24 @@ void QuerySettingsService::sanitizeQuerySettingsHints(
         return false;
     });
 }
+
+namespace {
+ServiceContext::ConstructorActionRegisterer querySettingsServiceRegisterer(
+    "QuerySettingsService",
+    {},
+    [](ServiceContext* serviceContext) {
+        invariant(serviceContext);
+        auto& dependencies = getServiceDependencies(serviceContext);
+        auto role = serverGlobalParams.clusterRole;
+        if (role.hasExclusively(ClusterRole::RouterServer)) {
+            initializeForRouter(serviceContext, dependencies.setClusterParameterRouter);
+        } else {
+            initializeForShard(serviceContext,
+                               role.has(ClusterRole::ConfigServer)
+                                   ? dependencies.setClusterParameterConfigsvr
+                                   : dependencies.setClusterParameterReplSet);
+        }
+    },
+    {});
+}  // namespace
 }  // namespace mongo::query_settings

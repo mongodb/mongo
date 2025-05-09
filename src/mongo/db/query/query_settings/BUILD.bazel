@@ -34,6 +34,7 @@ mongo_cc_library(
         "query_framework_serialization.h",
     ],
     deps = [
+        ":query_settings_service_dependencies",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
@@ -50,6 +51,20 @@ idl_generator(
         "//src/mongo/db/query:query_feature_flags_gen",
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_settings_service_dependencies",
+    srcs = [
+        "query_settings_service_dependencies.cpp",
+    ],
+    hdrs = [
+        "query_settings_service_dependencies.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:cluster_server_parameter_cmds_idl",
     ],
 )
 

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/set_cluster_parameter_replset_impl.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -34,47 +35,26 @@
 #include <string>
 #include <utility>
 
-#include "mongo/db/commands/set_cluster_parameter_command_impl.h"
-
 #include "mongo/base/error_codes.h"
-#include "mongo/base/shim.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/set_cluster_server_parameter_router_impl.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
-const auto setClusterParameterImplDecoration =
-    Service::declareDecoration<SetClusterParameterImplFn>();
 
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -86,10 +66,21 @@ void hangInSetClusterParameterFailPointCheck(const SetClusterParameter& request)
     }
 }
 
-void setClusterParameterImplShard(OperationContext* opCtx,
-                                  const SetClusterParameter& request,
-                                  boost::optional<Timestamp> clusterParameterTime,
-                                  boost::optional<LogicalTime> previousTime) {
+ServiceContext::ConstructorActionRegisterer setClusterParameterReplSetRegisterer(
+    "SetClusterParameterReplset",
+    {},
+    {"QuerySettingsService"},
+    [](ServiceContext* serviceContext) {
+        query_settings::getServiceDependencies(serviceContext).setClusterParameterReplSet =
+            setClusterParameterImplReplicaSetOrStandalone;
+    },
+    {});
+}  // namespace
+
+void setClusterParameterImplReplicaSetOrStandalone(OperationContext* opCtx,
+                                                   const SetClusterParameter& request,
+                                                   boost::optional<Timestamp> clusterParameterTime,
+                                                   boost::optional<LogicalTime> previousTime) {
     uassert(ErrorCodes::ErrorCodes::NotImplemented,
             "setClusterParameter can only run on mongos in sharded clusters",
             (serverGlobalParams.clusterRole.has(ClusterRole::None)));
@@ -110,33 +101,4 @@ void setClusterParameterImplShard(OperationContext* opCtx,
     invocation.invoke(opCtx, request, clusterParameterTime, previousTime, kMajorityWriteConcern);
 }
 
-}  // namespace
-
-SetClusterParameterImplFn getSetClusterParameterImpl(Service* service) {
-    auto fn = setClusterParameterImplDecoration(service);
-    invariant(fn);
-    return fn;
-}
-
-SetClusterParameterImplFn getSetClusterParameterImpl(OperationContext* ctx) {
-    return getSetClusterParameterImpl(ctx->getService());
-}
-
-namespace {
-ServiceContext::ConstructorActionRegisterer setParameterImplRegisterer(
-    "setClusterParameterImpl-registerer",
-    {},
-    [](ServiceContext* serviceContext) {
-        invariant(serviceContext);
-        auto routerService = serviceContext->getService(ClusterRole::RouterServer);
-        if (routerService) {
-            setClusterParameterImplDecoration(routerService) = &setClusterParameterImplRouter;
-        }
-        auto shardService = serviceContext->getService(ClusterRole::ShardServer);
-        if (shardService) {
-            setClusterParameterImplDecoration(shardService) = &setClusterParameterImplShard;
-        }
-    },
-    {});
-}  // namespace
 }  // namespace mongo

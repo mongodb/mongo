@@ -131,6 +131,7 @@ mongo_cc_library(
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
         "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/query_settings:query_settings_service_dependencies",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/session:logical_session_id_helpers",

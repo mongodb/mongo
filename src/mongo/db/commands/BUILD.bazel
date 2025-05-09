@@ -1217,17 +1217,17 @@ mongo_cc_library(
 mongo_cc_library(
     name = "set_cluster_parameter_impl",
     srcs = [
-        "set_cluster_parameter_command_impl.cpp",
+        "set_cluster_parameter_replset_impl.cpp",
     ],
     hdrs = [
-        "set_cluster_parameter_command_impl.h",
+        "set_cluster_parameter_replset_impl.h",
     ],
     deps = [
         ":cluster_server_parameter_commands_invocation",
         ":mongod_fcv",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:server_feature_flags",
-        "//src/mongo/s:grid",
+        "//src/mongo/db/query/query_settings:query_settings_service_dependencies",
     ],
 )
 

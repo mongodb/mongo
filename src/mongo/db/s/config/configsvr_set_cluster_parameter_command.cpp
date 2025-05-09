@@ -28,69 +28,34 @@
  */
 
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <string>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/commands/set_cluster_parameter_invocation.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/config/configsvr_coordinator.h"
-#include "mongo/db/s/config/configsvr_coordinator_gen.h"
-#include "mongo/db/s/config/configsvr_coordinator_service.h"
-#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
-#include "mongo/db/s/config/set_cluster_parameter_coordinator_document_gen.h"
+#include "mongo/db/s/config/set_cluster_parameter_configsvr_impl.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/future.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 namespace {
-
-StringData getParameterName(const BSONObj& command) {
-    return command.firstElement().fieldName();
-}
-
-Status allowedToEnable(const BSONObj& command) {
-    auto name = getParameterName(command);
-    if (name == "pauseMigrationsDuringMultiUpdates" &&
-        !migration_blocking_operation::gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
-             .isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return Status{
-            ErrorCodes::IllegalOperation,
-            "Unable to enable pauseMigrationsDuringMultiUpdates cluster parameter because "
-            "pauseMigrationsDuringMultiUpdatesAvailable feature flag is not enabled."};
-    }
-    return Status::OK();
-}
-
 class ConfigsvrSetClusterParameterCommand final
     : public TypedCommand<ConfigsvrSetClusterParameterCommand> {
 public:
@@ -101,56 +66,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << Request::kCommandName << " can only be run on config servers",
-                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-            const auto setClusterParameterCoordinator = [&]() {
-                // configsvrSetClusterParameter must serialize against
-                // setFeatureCompatibilityVersion.
-                FixedFCVRegion fcvRegion(opCtx);
-
-                std::unique_ptr<ServerParameterService> sps =
-                    std::make_unique<ClusterParameterService>();
-                DBDirectClient dbClient(opCtx);
-                ClusterParameterDBClientService dbService(dbClient);
-                BSONObj cmdParamObj = request().getCommandParameter();
-                StringData parameterName = getParameterName(cmdParamObj);
-                ServerParameter* serverParameter = sps->get(parameterName);
-
-                uassertStatusOK(allowedToEnable(cmdParamObj));
-
-                SetClusterParameterInvocation invocation{std::move(sps), dbService};
-
-                auto tenantId = request().getDbName().tenantId();
-                invocation.normalizeParameter(opCtx,
-                                              cmdParamObj,
-                                              boost::none /* clusterParameterTime */,
-                                              boost::none /* previousTime */,
-                                              serverParameter,
-                                              tenantId,
-                                              false /* skipValidation */);
-
-                SetClusterParameterCoordinatorDocument coordinatorDoc;
-                ConfigsvrCoordinatorId cid(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
-                cid.setSubId(tenantId ? tenantId->toString() : "");
-                coordinatorDoc.setConfigsvrCoordinatorMetadata({cid});
-                coordinatorDoc.setParameter(cmdParamObj);
-                coordinatorDoc.setTenantId(tenantId);
-                coordinatorDoc.setPreviousTime(request().getPreviousTime());
-                coordinatorDoc.setCompatibleWithTopologyChange(
-                    request().get_compatibleWithTopologyChange());
-
-                const auto service = ConfigsvrCoordinatorService::getService(opCtx);
-                return dynamic_pointer_cast<SetClusterParameterCoordinator>(
-                    service->getOrCreateService(opCtx, coordinatorDoc.toBSON()));
-            }();
-
-            setClusterParameterCoordinator->getCompletionFuture().get(opCtx);
-
-            // If the coordinator detected an unexpected concurrent update, report the error.
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    "encountered concurrent cluster parameter update operations, please try again",
-                    !setClusterParameterCoordinator->detectedConcurrentUpdate());
+            _configsvrSetClusterParameterCmdHandler(opCtx, request());
         }
 
     private:
