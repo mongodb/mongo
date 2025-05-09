@@ -305,7 +305,6 @@ possible. Code should not look like it's doing something special when it isn't.
 
 Some examples of "noise" syntax:
 
-- Using `virtual` on a function that's already marked `override` or `final` (see
 - Redundantly marking members and bases as `public`, `protected` or `private`,
   etc when they already are.
 - Marking a function decl to be `extern` (they're already extern).
@@ -835,9 +834,10 @@ newCode = `load("${overridesFile}"); (${jsCode})();`;
 
 ### Copyright Notices
 
-- All new open source C++ files added to the MongoDB code base should use the following
-  copyright notice and SSPL license language, substituting the current year for
-  `YYYY` as appropriate:
+- All new C++ files added to the MongoDB code base that will be upstreamed for
+  public consumption (such as anything upstreamed to `mongodb/mongo`) should
+  use the following copyright notice and SSPL license language, substituting
+  the current year for `YYYY` as appropriate:
 
 ```c++
 /**
