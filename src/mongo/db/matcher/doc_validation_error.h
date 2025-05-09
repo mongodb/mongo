@@ -53,7 +53,9 @@ public:
     static constexpr auto code = ErrorCodes::DocumentValidationFailure;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
     explicit DocumentValidationFailureInfo(const BSONObj& err) : _details(err.getOwned()) {
-        invariant(!err.isEmpty());
+        tassert(9740340,
+                "Cannot construct 'DocumentValidationFailureInfo' with non-empty error",
+                !err.isEmpty());
     }
     const BSONObj& getDetails() const;
     void serialize(BSONObjBuilder* bob) const override;
