@@ -289,7 +289,7 @@ workload_simulation:
     slack: server-workload-scheduling
     jira: server-workload-scheduling
   files:
-    - src/mongo/tools/workload_simulation/*
+    - src/mongo/tools/workload_simulation/
 
 security:
   meta:
