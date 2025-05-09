@@ -207,11 +207,31 @@ replication:
     jira: TODO
   files:
     - src/mongo/db/repl/ # excluding ./dbcheck*
-    - src/mongo/db/transaction/
-    - src/mongo/db/op_observer/op_observer*
-    - src/mongo/db/op_observer/operation_logger*
+    - src/mongo/db/op_observer/op_observer_impl* # specific files
     - src/mongo/db/op_observer/fcv_op_observer* # specific files
     - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
+
+replication_coordinator:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*replication_coordinator*
+    - src/mongo/db/repl/*external_state*
+    - src/mongo/db/repl/*heartbeat*
+    - src/mongo/db/repl/*topology_coordinator*
+
+transactions:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/transaction/
+    - src/mongo/db/*transaction*
+    - src/mongo/db/*txn*
+    - src/mongo/db/s/*transaction*
+    - src/mongo/db/s/*txn*
+    - src/mongo/s/*transaction*
 
 access_control:
   meta:
