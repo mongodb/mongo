@@ -22,6 +22,10 @@ export const $config = (function() {
                 index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL}
             });
             assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.ConflictingOperationInProgress]);
+            // Check that we are returning {ok: 1} rather than {ok: true}
+            if (res.ok) {
+                assert(res.ok === 1);
+            }
             // only assert if new expireAfterSeconds differs from old one
             if (res.ok === 1 && res.hasOwnProperty('expireAfterSeconds_new')) {
                 assert.eq(res.expireAfterSeconds_new, newTTL);
