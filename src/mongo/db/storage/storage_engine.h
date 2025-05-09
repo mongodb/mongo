@@ -106,10 +106,13 @@ public:
         /**
          * Return a new instance of the StorageEngine. Caller owns the returned pointer.
          */
-        virtual std::unique_ptr<StorageEngine> create(
-            OperationContext* opCtx,
-            const StorageGlobalParams& params,
-            const StorageEngineLockFile* lockFile) const = 0;
+        virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                                      const StorageGlobalParams& params,
+                                                      const StorageEngineLockFile* lockFile,
+                                                      bool isReplSet,
+                                                      bool shouldSkipOplogSampling,
+                                                      bool shouldRecoverFromOplogAsStandalone,
+                                                      bool inStandaloneMode) const = 0;
 
         /**
          * Returns the name of the storage engine.

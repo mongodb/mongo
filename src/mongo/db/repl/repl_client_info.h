@@ -93,6 +93,12 @@ public:
     }
 
     /**
+     * Resets the last op set explicitly flag on this client.
+     * Used for tests only.
+     */
+    void clearLastOpSetFlag(OperationContext* opCtx);
+
+    /**
      * Use this to set the LastOp to the latest known OpTime in the oplog. On primary, The OpTime
      * used consists of the timestamp of the latest oplog entry on disk and the current term. On
      * secondaries, lastAppliedOpTime is used. Using lastAppliedOpTime on secondaries is the desired

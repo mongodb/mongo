@@ -47,6 +47,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -123,12 +124,17 @@ private:
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = 1;
         wtConfig.extraOpenOptions = "log=(file_max=1m,prealloc=false)";
-        auto kv = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
-                                                       _dbpath.path(),
-                                                       _cs.get(),
-                                                       std::move(wtConfig),
-                                                       false,
-                                                       _forRepair);
+        auto kv = std::make_unique<WiredTigerKVEngine>(
+            std::string{kWiredTigerEngineName},
+            _dbpath.path(),
+            _cs.get(),
+            std::move(wtConfig),
+            false,
+            _forRepair,
+            getGlobalReplSettings().isReplSet(),
+            repl::ReplSettings::shouldSkipOplogSampling(),
+            repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
+            getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
 
         auto client = _svcCtx->getService()->makeClient("opCtx");
         auto opCtx = client->makeOperationContext();
@@ -680,28 +686,28 @@ TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
 
     // (Generic FCV reference): When FCV is kLatest, no downgrade is necessary.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
+    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false, /*isReplset=*/true));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 
     // (Generic FCV reference): When FCV is kLastContinuous or kLastLTS, a downgrade may be needed.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastContinuous);
-    ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
+    ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false, /*isReplset=*/true));
     ASSERT_EQ(WiredTigerFileVersion::kLastContinuousWTRelease, version.getDowngradeString());
 
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
-    ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
+    ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false, /*isReplset=*/true));
     ASSERT_EQ(WiredTigerFileVersion::kLastLTSWTRelease, version.getDowngradeString());
 
     // (Generic FCV reference): While we're in a semi-downgraded state, we shouldn't try downgrading
     // the WiredTiger compatibility version.
     serverGlobalParams.mutableFCV.setVersion(
         multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous);
-    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
+    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false, /*isReplset=*/true));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 
     serverGlobalParams.mutableFCV.setVersion(
         multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
-    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
+    ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false, /*isReplset=*/true));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 }
 

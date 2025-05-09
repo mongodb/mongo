@@ -44,6 +44,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -69,12 +70,17 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
     wtConfig.cacheSizeMB = 1;
     wtConfig.extraOpenOptions = _testLoggingSettings(extraStrings.toString());
-    _engine = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
-                                                   _dbpath.path(),
-                                                   &_cs,
-                                                   std::move(wtConfig),
-                                                   false,
-                                                   false);
+    _engine = std::make_unique<WiredTigerKVEngine>(
+        std::string{kWiredTigerEngineName},
+        _dbpath.path(),
+        &_cs,
+        std::move(wtConfig),
+        false,
+        false,
+        getGlobalReplSettings().isReplSet(),
+        repl::ReplSettings::shouldSkipOplogSampling(),
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
+        getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
 
     repl::ReplicationCoordinator::set(
         serviceContext(),
@@ -101,7 +107,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto oplog = static_cast<WiredTigerRecordStore::Oplog*>(ret.get());
-    _engine->getOplogManager()->start(opCtx.get(), *_engine, *oplog);
+    _engine->getOplogManager()->start(
+        opCtx.get(), *_engine, *oplog, getGlobalReplSettings().isReplSet());
     return ret;
 }
 

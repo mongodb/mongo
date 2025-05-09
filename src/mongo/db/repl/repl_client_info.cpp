@@ -70,6 +70,10 @@ void ReplClientInfo::setLastOp(OperationContext* opCtx, const OpTime& ot) {
     lastOpInfo(opCtx).lastOpSetExplicitly = true;
 }
 
+void ReplClientInfo::clearLastOpSetFlag(OperationContext* opCtx) {
+    lastOpInfo(opCtx).lastOpSetExplicitly = false;
+}
+
 void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
     if (replCoord->getSettings().isReplSet() && opCtx->writesAreReplicated()) {

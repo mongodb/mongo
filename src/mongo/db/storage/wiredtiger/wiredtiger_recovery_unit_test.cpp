@@ -48,6 +48,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -81,12 +82,6 @@ public:
     WiredTigerRecoveryUnitHarnessHelper() : _dbpath("wt_test") {
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = 1;
-        _engine = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
-                                                       _dbpath.path(),
-                                                       &_cs,
-                                                       std::move(wtConfig),
-                                                       false,
-                                                       false);
 
         // Use a replica set so that writes to replicated collections are not journaled and thus
         // retain their timestamps.
@@ -96,6 +91,19 @@ public:
         repl::ReplicationCoordinator::set(getGlobalServiceContext(),
                                           std::make_unique<repl::ReplicationCoordinatorMock>(
                                               getGlobalServiceContext(), replSettings));
+
+        _engine = std::make_unique<WiredTigerKVEngine>(
+            std::string{kWiredTigerEngineName},
+            _dbpath.path(),
+            &_cs,
+            std::move(wtConfig),
+            false,
+            false,
+            getGlobalReplSettings().isReplSet(),
+            repl::ReplSettings::shouldSkipOplogSampling(),
+            repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
+            getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
+
         _engine->notifyStorageStartupRecoveryComplete();
     }
 
