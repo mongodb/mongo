@@ -57,9 +57,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     print("Skip retrying addShard after getting an error " + tojsononeline(e));
                     return true;
                 }
-                if (e.code == ErrorCodes.WriteConflict ||
-                    e.code == ErrorCodes.FailedToSatisfyReadPreference) {
-                    // TODO (SERVER-82909): Investigate why addShard can fail with WriteConflict.
+                if (e.code == ErrorCodes.FailedToSatisfyReadPreference) {
                     // TODO (SERVER-82901): Investigate why addShard can fail with
                     // FailedToSatisfyReadPreference when it gets interrupted.
                     print("Retrying addShard after getting an error " + tojsononeline(e));
