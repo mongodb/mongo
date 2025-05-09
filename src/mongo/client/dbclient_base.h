@@ -587,12 +587,13 @@ public:
      * Counts number of objects in collection ns that match the query criteria specified.
      * Throws UserAssertion if database returns an error.
      */
-    virtual long long count(NamespaceStringOrUUID nsOrUuid,
-                            const BSONObj& query = BSONObj(),
-                            int options = 0,
-                            int limit = 0,
-                            int skip = 0,
-                            boost::optional<repl::ReadConcernArgs> readConcern = boost::none);
+    virtual long long count(
+        const NamespaceStringOrUUID& nsOrUuid,
+        const BSONObj& query = BSONObj(),
+        int options = 0,
+        int limit = 0,
+        int skip = 0,
+        const boost::optional<repl::ReadConcernArgs>& readConcern = boost::none);
 
     /**
      * Executes an acknowledged command to insert a vector of documents.
@@ -711,12 +712,12 @@ protected:
      */
     bool isNotPrimaryErrorString(const BSONElement& e);
 
-    BSONObj _countCmd(NamespaceStringOrUUID nsOrUuid,
+    BSONObj _countCmd(const NamespaceStringOrUUID& nsOrUuid,
                       const BSONObj& query,
                       int options,
                       int limit,
                       int skip,
-                      boost::optional<repl::ReadConcernArgs> readConcern);
+                      const boost::optional<repl::ReadConcernArgs>& readConcern);
 
     virtual void _auth(const BSONObj& params);
 

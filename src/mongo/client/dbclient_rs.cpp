@@ -646,7 +646,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     // the current one and release it back to the pool.
     resetSecondaryOkConn();
 
-    _lastReadPref = readPref;
+    _lastReadPref = std::move(readPref);
     _lastSecondaryOkHost = selectedNode;
 
     // Primary connection is special because it is the only connection that is

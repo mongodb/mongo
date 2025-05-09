@@ -96,7 +96,7 @@ DBClientConnection::DBClientConnection(bool autoReconnect,
                                        MongoURI uri,
                                        const HandshakeValidationHook& hook,
                                        const ClientAPIVersionParameters* apiParameters)
-    : DBClientSession(autoReconnect, soTimeout, uri, hook, apiParameters),
+    : DBClientSession(autoReconnect, soTimeout, std::move(uri), hook, apiParameters),
       _autoReconnectBackoff(Seconds(1), Seconds(2)) {
     _numConnections.fetchAndAdd(1);
 }

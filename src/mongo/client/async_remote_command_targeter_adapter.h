@@ -55,9 +55,9 @@ namespace async_rpc {
  */
 class AsyncRemoteCommandTargeterAdapter : public Targeter {
 public:
-    AsyncRemoteCommandTargeterAdapter(ReadPreferenceSetting readPref,
+    AsyncRemoteCommandTargeterAdapter(const ReadPreferenceSetting& readPref,
                                       std::shared_ptr<RemoteCommandTargeter> targeter)
-        : _readPref(readPref), _targeter(targeter) {}
+        : _readPref(readPref), _targeter(std::move(targeter)) {}
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) final {
         return _targeter->findHosts(_readPref, t);

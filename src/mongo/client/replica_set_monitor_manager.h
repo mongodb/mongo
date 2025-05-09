@@ -90,7 +90,7 @@ class ReplicaSetMonitorConnectionManager : public executor::EgressConnectionClos
 
 public:
     ReplicaSetMonitorConnectionManager(std::shared_ptr<executor::NetworkInterface> network)
-        : _network(network) {}
+        : _network(std::move(network)) {}
 
     void dropConnections(const HostAndPort& hostAndPort) override;
 

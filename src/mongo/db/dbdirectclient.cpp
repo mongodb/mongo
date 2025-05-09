@@ -237,12 +237,12 @@ write_ops::DeleteCommandReply DBDirectClient::remove(
     return DeleteOp::parseResponse(response->getCommandReply());
 }
 
-long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
+long long DBDirectClient::count(const NamespaceStringOrUUID& nsOrUuid,
                                 const BSONObj& query,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<repl::ReadConcernArgs> readConcern) {
+                                const boost::optional<repl::ReadConcernArgs>& readConcern) {
     invariant(!readConcern,
               "passing readConcern to DBDirectClient functions is not supported as it has to use "
               "the parent operation's readConcern");

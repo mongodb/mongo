@@ -48,9 +48,9 @@
 
 namespace mongo {
 
-void DependencyGraph::addNode(std::string name,
-                              std::vector<std::string> prerequisites,
-                              std::vector<std::string> dependents,
+void DependencyGraph::addNode(const std::string& name,
+                              const std::vector<std::string>& prerequisites,
+                              const std::vector<std::string>& dependents,
                               std::unique_ptr<Payload> payload) {
     if (!payload) {
         struct DummyPayload : Payload {};

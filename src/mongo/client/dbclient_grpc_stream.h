@@ -58,7 +58,7 @@ public:
                        MongoURI uri = {},
                        const HandshakeValidationHook& hook = HandshakeValidationHook(),
                        const ClientAPIVersionParameters* apiParameters = nullptr)
-        : DBClientSession(_autoReconnect, so_timeout, uri, hook, apiParameters),
+        : DBClientSession(_autoReconnect, so_timeout, std::move(uri), hook, apiParameters),
           _authToken{std::move(authToken)} {}
 
     ~DBClientGRPCStream() override;

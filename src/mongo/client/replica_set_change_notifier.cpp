@@ -45,7 +45,7 @@ void ReplicaSetChangeNotifier::_addListener(std::shared_ptr<Listener> listener) 
     stdx::lock_guard lk(_mutex);
 
     listener->init(this);
-    _listeners.push_back(listener);
+    _listeners.push_back(std::move(listener));
 }
 
 void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) {

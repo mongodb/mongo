@@ -2576,6 +2576,7 @@ void BSONColumnBuilder<Allocator>::_flushSubObjMode() {
         }
     };
     std::vector<HeapElement> heap;
+    heap.reserve(interleaved.subobjStates.size());
     for (uint32_t i = 0; i < interleaved.subobjStates.size(); ++i) {
         heap.emplace_back(i);
     }

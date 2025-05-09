@@ -373,8 +373,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _ns(nsOrUuid.isNamespaceString() ? nsOrUuid.nss() : NamespaceString{nsOrUuid.dbName()}),
       _cursorId(cursorId),
       _isExhaust(isExhaust),
-      _operationTime(operationTime),
-      _postBatchResumeToken(postBatchResumeToken),
+      _operationTime(std::move(operationTime)),
+      _postBatchResumeToken(std::move(postBatchResumeToken)),
       _keepCursorOpen(keepCursorOpen) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,

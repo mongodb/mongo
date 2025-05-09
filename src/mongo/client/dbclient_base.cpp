@@ -275,13 +275,13 @@ bool DBClientBase::runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& 
     return std::get<0>(res);
 }
 
-long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
+long long DBClientBase::count(const NamespaceStringOrUUID& nsOrUuid,
                               const BSONObj& query,
                               int options,
                               int limit,
                               int skip,
-                              boost::optional<repl::ReadConcernArgs> readConcern) {
-    auto dbName = nsOrUuid.dbName();
+                              const boost::optional<repl::ReadConcernArgs>& readConcern) {
+    const auto& dbName = nsOrUuid.dbName();
 
     BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcern);
     BSONObj res;
@@ -293,12 +293,12 @@ long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
     return res["n"].numberLong();
 }
 
-BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
+BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID& nsOrUuid,
                                 const BSONObj& query,
                                 int options,
                                 int limit,
                                 int skip,
-                                boost::optional<repl::ReadConcernArgs> readConcern) {
+                                const boost::optional<repl::ReadConcernArgs>& readConcern) {
     BSONObjBuilder b;
     if (nsOrUuid.isUUID()) {
         const auto uuid = nsOrUuid.uuid();
@@ -782,7 +782,7 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
                                                 const BSONObj& cmd,
                                                 int options) {
     list<BSONObj> specs;
-    auto dbName = nsOrUuid.dbName();
+    const auto& dbName = nsOrUuid.dbName();
 
     BSONObj res;
     if (runCommand(dbName, cmd, res, options)) {

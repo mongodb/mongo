@@ -116,7 +116,7 @@ void ReplicaSetMonitorManagerStats::leaveHello(Microseconds latency) {
 
 ReplicaSetMonitorStats::ReplicaSetMonitorStats(
     std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats)
-    : _managerStats(managerStats) {}
+    : _managerStats(std::move(managerStats)) {}
 
 void ReplicaSetMonitorStats::_enterGetHostAndRefresh() {
     _getHostAndRefreshTotal.increment(1);
