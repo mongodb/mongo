@@ -334,7 +334,8 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
     // Restore the current timestamp read source after fetching transaction history, which may
     // change our ReadSource.
-    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    ReadSourceScope readSourceScope(
+        opCtx, RecoveryUnit::ReadSource::kNoTimestamp, boost::none, true /* waitForOplog */);
     auto originalReadConcern =
         std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
     ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
@@ -3470,6 +3471,13 @@ TransactionParticipant::Participant::checkStatementExecutedAndFetchOplogEntry(
     // Use a SideTransactionBlock since it is illegal to scan the oplog while in a write unit of
     // work.
     TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+    // Before opening the storage snapshot (and before scanning the oplog), wait for all
+    // earlier oplog writes to be visible. This is necessary because the transaction history
+    // iterator will not be able to abandon the storage snapshot and wait.
+    auto storageInterface = repl::StorageInterface::get(opCtx);
+    storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+
     TransactionHistoryIterator txnIter(*stmtOpTime);
     while (txnIter.hasNext()) {
         const auto entry = txnIter.next(opCtx);

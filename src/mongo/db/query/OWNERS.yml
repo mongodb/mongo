@@ -191,6 +191,9 @@ filters:
   - "*yield_policy*":
     approvers:
       - 10gen/query-execution-yielding
+  - "oplog_wait_config.h":
+    approvers:
+      - 10gen/query-execution-yielding
   - "*plan_executor*":
     approvers:
       - 10gen/query-execution-classic

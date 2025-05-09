@@ -327,6 +327,7 @@ mongo_cc_library(
         "yield_policy_callbacks_impl.cpp",
     ],
     hdrs = [
+        "oplog_wait_config.h",
         "plan_executor.h",
         "plan_yield_policy_remote_cursor.h",
         "yield_policy_callbacks_impl.h",

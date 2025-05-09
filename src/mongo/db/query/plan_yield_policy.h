@@ -235,7 +235,8 @@ public:
      */
     virtual Status yieldOrInterrupt(OperationContext* opCtx,
                                     const std::function<void()>& whileYieldingFn,
-                                    RestoreContext::RestoreType restoreType);
+                                    RestoreContext::RestoreType restoreType,
+                                    const std::function<void()>& afterSnapshotAbandonFn = nullptr);
 
     /**
      * All calls to shouldYieldOrInterrupt() will return true until the next call to
@@ -325,9 +326,11 @@ private:
      */
     void performYield(OperationContext* opCtx,
                       const Yieldable& yieldable,
-                      std::function<void()> whileYieldingFn);
+                      std::function<void()> whileYieldingFn,
+                      std::function<void()> afterSnapshotAbandonFn);
     void performYieldWithAcquisitions(OperationContext* opCtx,
-                                      std::function<void()> whileYieldingFn);
+                                      std::function<void()> whileYieldingFn,
+                                      std::function<void()> afterSnapshotAbandonFn);
 
     const YieldPolicy _policy;
     std::variant<const Yieldable*, YieldThroughAcquisitions> _yieldable;

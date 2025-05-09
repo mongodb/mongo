@@ -694,8 +694,9 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     // visibility timestamp to be updated, it would wait for a replication batch that would never
     // complete because it couldn't reacquire its own lock, the global lock held by the waiting
     // reader.
-    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-        opCtx, DatabaseName::kAdmin);
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx);
+    return replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin) &&
+        replCoord->getSettings().isReplSet();
 }
 
 }  // namespace mongo

@@ -140,8 +140,18 @@ repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
  */
 class OneOffRead {
 public:
-    OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
+    OneOffRead(OperationContext* opCtx, const Timestamp& ts, bool waitForOplog = false)
+        : _opCtx(opCtx) {
         shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+        if (waitForOplog) {
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+            // Oplog should be available in this test.
+            invariant(oplogInfo);
+            storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx,
+                                                                   oplogInfo->getRecordStore());
+        }
         if (ts.isNull()) {
             shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
                 RecoveryUnit::ReadSource::kNoTimestamp);
@@ -276,7 +286,7 @@ public:
     }
 
     BSONObj queryOplog(const BSONObj& query) {
-        OneOffRead oor(_opCtx, Timestamp::min());
+        OneOffRead oor(_opCtx, Timestamp::min(), true);
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
     }
 
@@ -293,7 +303,7 @@ public:
     }
 
     int itcount(NamespaceString nss, BSONObj filter = BSONObj()) {
-        OneOffRead oof(_opCtx, Timestamp::min());
+        OneOffRead oof(_opCtx, Timestamp::min(), nss.isOplog());
 
         DBDirectClient client(_opCtx);
         FindCommandRequest findRequest{nss};

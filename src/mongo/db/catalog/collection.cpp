@@ -101,12 +101,6 @@ ConsistentCollection::ConsistentCollection(OperationContext* opCtx, const Collec
     if (!coll) {
         return;
     }
-    // TODO SERVER-94787: We currently special case the oplog due to CollectionScan abandoning the
-    // snapshot in order to wait for earlier oplog writes. This should go away once the ticket is
-    // fixed.
-    if (coll->ns().isOplog()) {
-        return;
-    }
     // If the collection is locked then it is safe to assume it is consistent with the snapshot
     // since no modifications can happen to it while we hold the lock or we're the ones making them.
     // We do not proceed with the safety check.

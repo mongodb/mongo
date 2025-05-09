@@ -2075,6 +2075,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/wildcard_test_utils.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/mock_yield_policies.h @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/query/**/*yield_policy* @10gen/query-execution-yielding @svc-auto-approve-bot
+/src/mongo/db/query/**/oplog_wait_config.h @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/query/**/*plan_executor* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_insert_listener* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/query/**/sbe* @10gen/query-execution-sbe @svc-auto-approve-bot

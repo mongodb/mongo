@@ -523,6 +523,12 @@ protected:
     }
 
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+        // Oplog should be available in this test.
+        invariant(oplogInfo);
+        storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogInfo->getRecordStore());
         DBDirectClient client(opCtx);
 
         FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
@@ -539,6 +545,12 @@ protected:
                                                                    Timestamp ts) {
         std::vector<repl::DurableOplogEntry> result;
 
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+        // Oplog should be available in this test.
+        invariant(oplogInfo);
+        storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogInfo->getRecordStore());
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
         store.forEach(opCtx, BSON("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
             result.emplace_back(

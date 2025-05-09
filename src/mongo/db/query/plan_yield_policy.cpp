@@ -119,7 +119,8 @@ void PlanYieldPolicy::resetTimer() {
 
 Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                                          const std::function<void()>& whileYieldingFn,
-                                         RestoreContext::RestoreType restoreType) {
+                                         RestoreContext::RestoreType restoreType,
+                                         const std::function<void()>& afterSnapshotAbandonFn) {
     invariant(opCtx);
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
@@ -155,9 +156,12 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 // snapshot.
                 invariant(!opCtx->isLockFreeReadsOp());
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+                if (afterSnapshotAbandonFn) {
+                    afterSnapshotAbandonFn();
+                }
             } else {
                 if (usesCollectionAcquisitions()) {
-                    performYieldWithAcquisitions(opCtx, whileYieldingFn);
+                    performYieldWithAcquisitions(opCtx, whileYieldingFn, afterSnapshotAbandonFn);
                 } else {
                     const Yieldable* yieldablePtr = get<const Yieldable*>(yieldable);
                     tassert(9762900,
@@ -165,7 +169,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                                 << "no yieldable object available for yield policy "
                                 << serializeYieldPolicy(getPolicy()) << " in attempt " << attempt,
                             yieldablePtr);
-                    performYield(opCtx, *yieldablePtr, whileYieldingFn);
+                    performYield(opCtx, *yieldablePtr, whileYieldingFn, afterSnapshotAbandonFn);
                 }
             }
 
@@ -194,7 +198,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
 void PlanYieldPolicy::performYield(OperationContext* opCtx,
                                    const Yieldable& yieldable,
-                                   std::function<void()> whileYieldingFn) {
+                                   std::function<void()> whileYieldingFn,
+                                   std::function<void()> afterSnapshotAbandonFn) {
     // Things have to happen here in a specific order:
     //   * Release 'yieldable'.
     //   * Abandon the current storage engine snapshot.
@@ -220,6 +225,11 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
         opCtx->checkForInterrupt();  // throws
     }
 
+    // After we've abandoned our snapshot, perform any work before releasing locks.
+    if (afterSnapshotAbandonFn) {
+        afterSnapshotAbandonFn();
+    }
+
     Locker* locker = shard_role_details::getLocker(opCtx);
     Locker::LockSnapshot snapshot;
     locker->saveLockStateAndUnlock(&snapshot);
@@ -241,7 +251,8 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
 }
 
 void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
-                                                   std::function<void()> whileYieldingFn) {
+                                                   std::function<void()> whileYieldingFn,
+                                                   std::function<void()> afterSnapshotAbandonFn) {
     // Things have to happen here in a specific order:
     //   * Remove all references to the CollectionPtrs to avoid holding stale references.
     //   * Abandon the current storage engine snapshot.
@@ -262,6 +273,11 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     // query execution. Yield points and interrupt points are one and the same.
     if (getPolicy() == PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
         opCtx->checkForInterrupt();  // throws
+    }
+
+    // After we've abandoned our snapshot, perform any work before yielding transaction resources.
+    if (afterSnapshotAbandonFn) {
+        afterSnapshotAbandonFn();
     }
 
     auto yieldedTransactionResources =

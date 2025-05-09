@@ -198,6 +198,14 @@ public:
 
     repl::OplogEntry getOplog(OperationContext* opCtx, const repl::OpTime& opTime) {
         DBDirectClient client(opCtx);
+
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+        // Oplog should be available in this test.
+        invariant(oplogInfo);
+        storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogInfo->getRecordStore());
+
         auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace, opTime.asQuery());
 
         ASSERT_FALSE(oplogBSON.isEmpty());
@@ -2327,6 +2335,12 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    LocalOplogInfo* oplogInfo = LocalOplogInfo::get(opCtx);
+
+    // Oplog should be available in this test.
+    invariant(oplogInfo);
+    storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogInfo->getRecordStore());
     TransactionHistoryIterator historyIter(txnParticipant.getLastWriteOpTime());
 
     ASSERT_TRUE(historyIter.hasNext());
