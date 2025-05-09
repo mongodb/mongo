@@ -12,6 +12,7 @@ OS_NORMALIZE_MAP = {
     "mac os x": "macos",
     "linux": "linux",
     "windows": "windows",
+    "windows server 2022": "windows",
 }
 
 ARCH_TO_PLATFORM_MAP = {
