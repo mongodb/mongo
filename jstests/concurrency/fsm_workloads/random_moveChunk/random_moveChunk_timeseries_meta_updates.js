@@ -9,6 +9,8 @@
  *  requires_fcv_51,
  *  # TODO SERVER-93382 investigate excessive resource usage under TSAN.
  *  tsan_incompatible,
+ *  # TODO SERVER-104916 review the following tag
+ *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

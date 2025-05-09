@@ -1,0 +1,47 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_replication_viewless_timeseries.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config: {}
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagCreateViewlessTimeseriesCollections: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+    num_nodes: 3
+  hooks:
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_sharding
+    - viewless_timeseries_incompatible
+    - does_not_support_viewless_timeseries_yet
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
+    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+test_kind: fsm_workload_test

@@ -1,0 +1,68 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_sharded_replication_viewless_timeseries.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          implicitlyShardOnCreateCollectionOnly: true
+          runningWithBalancer: false
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagCreateViewlessTimeseriesCollections: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagCreateViewlessTimeseriesCollections: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    num_mongos: 2
+    num_rs_nodes_per_shard: 3
+    num_shards: 2
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+  hooks:
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_replication
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_on
+    - requires_profiling
+    - assumes_unsharded_collection
+    - viewless_timeseries_incompatible
+    - does_not_support_viewless_timeseries_yet
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
+    - jstests/concurrency/fsm_workloads/**/*timeseries*.js
+test_kind: fsm_workload_test

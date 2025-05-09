@@ -51,6 +51,7 @@ selector:
     - assumes_no_track_upon_creation
     - creates_unspittable_collections_on_specific_shards
     - viewless_timeseries_incompatible
+    - does_not_support_viewless_timeseries_yet
   roots:
     - jstests/core/timeseries/ddl/timeseries_collation.js
     - jstests/core/timeseries/ddl/timeseries_compact.js

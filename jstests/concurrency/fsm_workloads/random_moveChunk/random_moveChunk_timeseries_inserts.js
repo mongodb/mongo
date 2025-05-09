@@ -9,6 +9,8 @@
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
  *  requires_fcv_51,
+ *  # TODO SERVER-104916 review the following tag
+ *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -47,6 +47,7 @@ selector:
     - requires_profiling
     - requires_capped
     - viewless_timeseries_incompatible
+    - does_not_support_viewless_timeseries_yet
   roots:
     - jstests/core/timeseries/ddl/timeseries_collation.js
     - jstests/core/timeseries/ddl/timeseries_compact.js

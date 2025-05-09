@@ -12,6 +12,13 @@
         mongos_options:
           set_parameters:
             featureFlagCreateViewlessTimeseriesCollections: 1
+- name: all_concurrency_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
+        - jstests/concurrency/fsm_workloads/**/*timeseries*.js
 - name: all_timeseries_tests_selector
   value:
     selector:
@@ -81,3 +88,4 @@
   value:
     exclude_with_any_tags:
       - viewless_timeseries_incompatible
+      - does_not_support_viewless_timeseries_yet

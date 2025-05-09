@@ -12,6 +12,8 @@
  *   requires_timeseries,
  *   requires_non_retryable_writes,
  *   requires_fcv_70,
+ *   # TODO SERVER-104916 review the following tag
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

@@ -8,7 +8,9 @@
  *   # Timeseries do not support multi-document transactions with inserts.
  *   does_not_support_transactions,
  *   # Kill operations do not propagate for writes on mongos.
- *   assumes_unsharded_collection
+ *   assumes_unsharded_collection,
+ *   # TODO SERVER-104916 review the following tag
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

@@ -9,6 +9,8 @@
  *   # Time-series findAndModify does not support retryable writes.
  *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
+ *   # TODO SERVER-104916 review the following tag
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 

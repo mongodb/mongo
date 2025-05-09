@@ -16,6 +16,8 @@
  *   command_not_supported_in_serverless,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
+ *   # TODO SERVER-104916 review the following tag
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

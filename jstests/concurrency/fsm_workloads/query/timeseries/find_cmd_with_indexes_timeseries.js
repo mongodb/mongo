@@ -11,7 +11,9 @@
  * @tags: [
  *   requires_timeseries,
  *   # Cannot create indexes on a non-empty timeseries collection during a transaction.
- *   does_not_support_transactions
+ *   does_not_support_transactions,
+ *   # TODO SERVER-104916 review the following tag
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 export const $config = (function() {

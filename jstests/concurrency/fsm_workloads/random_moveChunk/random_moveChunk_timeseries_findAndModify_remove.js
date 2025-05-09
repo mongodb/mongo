@@ -12,6 +12,8 @@
  *  # TemporarilyUnavailable retries, especially if temporarilyUnavailableMaxRetries is set to a low
  *  # value.
  *  does_not_support_config_fuzzer,
+ *  # TODO SERVER-104916 review the following tag
+ *  does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

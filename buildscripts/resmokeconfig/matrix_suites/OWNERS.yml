@@ -1,3 +1,7 @@
 version: 1.0.0
 options:
   no_parent_owners: true
+filters:
+  - "generated_suites/*viewless_timeseries.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing

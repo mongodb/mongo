@@ -9,6 +9,8 @@
  *   requires_replication,
  *   requires_timeseries,
  *   uses_ttl,
+ *   # TODO SERVER-104916 review the following tag
+ *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
