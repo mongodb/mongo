@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/rpc/metadata/audit_client_attrs.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
@@ -56,6 +57,10 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
             metadata.setRoles(authMetadata->getRoles());
             setImpersonatedUserMetadata(metadata);
         }
+    }
+
+    if (auto auditClientAttrs = rpc::AuditClientAttrs::get(opCtx->getClient())) {
+        setAuditClientMetadata(std::move(auditClientAttrs));
     }
 
     setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
@@ -86,6 +91,10 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
             AuthorizationSession::get(client)->setImpersonatedUserData(username,
                                                                        authMetadata.getRoles());
         }
+    }
+
+    if (const auto& optAuditClientMetadata = getAuditClientMetadata()) {
+        rpc::AuditClientAttrs::set(client, optAuditClientMetadata.value());
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());

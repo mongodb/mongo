@@ -61,6 +61,10 @@ public:
         return _proxies;
     }
 
+    // Allows this type to be used in IDL and converted directly to/from BSON in commands.
+    static AuditClientAttrs parseFromBSON(BSONObj obj);
+    BSONObj serialize() const;
+
 private:
     HostAndPort _local;
     HostAndPort _remote;
