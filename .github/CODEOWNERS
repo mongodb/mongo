@@ -1636,6 +1636,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/killcursors* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/map_reduce* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/mr_* @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/commands/query_cmd/**/release_memory_cmd.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/update_metrics.* @10gen/query-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
