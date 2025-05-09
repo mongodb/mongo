@@ -459,53 +459,40 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
 
 class WiredTigerRecordStore::RandomCursor final : public RecordCursor {
 public:
-    RandomCursor(OperationContext* opCtx, const WiredTigerRecordStore& rs, StringData config)
+    RandomCursor(OperationContext* opCtx, const WiredTigerRecordStore& rs)
         : _cursor(nullptr),
           _keyFormat(rs._keyFormat),
           _uri(rs._uri),
           _opCtx(opCtx),
-          _config(config.toString() + ",next_random") {
+          _tableId(rs._tableId) {
         restore();
     }
 
-    ~RandomCursor() override {
-        if (_cursor) {
-            // On destruction, we must always handle freeing the underlying raw WT_CURSOR pointer.
-            _saveStorageCursorOnDetachFromOperationContext = false;
-
-            // Shutdown does not wait for any threads running queries to be interrupted and exit.
-            // In addition, the RandomCursor destructor doesn't hold any global lock so we need to
-            // check if the server is shutting down to avoid calling into the storage engine, whose
-            // connection may have already been closed.
-            Status interruptStatus = _opCtx->checkForInterruptNoAssert();
-            if (interruptStatus.code() == ErrorCodes::InterruptedAtShutdown) {
-                return;
-            }
-
-            detachFromOperationContext();
-        }
-    }
+    ~RandomCursor() override = default;
 
     boost::optional<Record> next() final {
-        int advanceRet =
-            wiredTigerPrepareConflictRetry(_opCtx, [&] { return _cursor->next(_cursor); });
+        int advanceRet = wiredTigerPrepareConflictRetry(
+            _opCtx, [&] { return _cursor->get()->next(_cursor->get()); });
         if (advanceRet == WT_NOTFOUND)
             return {};
-        invariantWTOK(advanceRet, _cursor->session);
+        invariantWTOK(advanceRet, _cursor->getSession()->getSession());
 
         RecordId id;
         if (_keyFormat == KeyFormat::String) {
             WT_ITEM item;
-            invariantWTOK(_cursor->get_key(_cursor, &item), _cursor->session);
+            invariantWTOK(_cursor->get()->get_key(_cursor->get(), &item),
+                          _cursor->getSession()->getSession());
             id = RecordId(static_cast<const char*>(item.data), item.size);
         } else {
             int64_t key;
-            invariantWTOK(_cursor->get_key(_cursor, &key), _cursor->session);
+            invariantWTOK(_cursor->get()->get_key(_cursor->get(), &key),
+                          _cursor->getSession()->getSession());
             id = RecordId(key);
         }
 
         WT_ITEM value;
-        invariantWTOK(_cursor->get_value(_cursor, &value), _cursor->session);
+        invariantWTOK(_cursor->get()->get_value(_cursor->get(), &value),
+                      _cursor->getSession()->getSession());
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
 
@@ -519,27 +506,17 @@ public:
 
     void save() final {
         if (_cursor) {
-            invariantWTOK(WT_READ_CHECK(_cursor->reset(_cursor)), _cursor->session);
+            invariantWTOK(WT_READ_CHECK(_cursor->get()->reset(_cursor->get())),
+                          _cursor->getSession()->getSession());
         }
     }
 
     bool restore(bool tolerateCappedRepositioning = true) final {
-        // We can't use the CursorCache since this cursor needs a special config string.
-        WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
+        WiredTigerRecoveryUnit* wtRu = WiredTigerRecoveryUnit::get(_opCtx);
 
         if (!_cursor) {
-            auto status = wtRCToStatus(
-                session->open_cursor(session, _uri.c_str(), nullptr, _config.c_str(), &_cursor),
-                session);
-            if (status == ErrorCodes::ObjectIsBusy) {
-                // This can happen if you try to open a cursor on the oplog table and a verify is
-                // currently running on it.
-                uasserted(
-                    4820000,
-                    "Failed to open a cursor on a collection because it was locked by WiredTiger.");
-            }
-            invariantStatusOK(status);
-            invariant(_cursor);
+            _cursor = std::make_unique<WiredTigerCursor>(
+                *wtRu, _uri, _tableId, /*allowOverwrite=*/false, /*random=*/true);
         }
         return true;
     }
@@ -547,9 +524,8 @@ public:
     void detachFromOperationContext() final {
         invariant(_opCtx);
         _opCtx = nullptr;
-        if (_cursor && !_saveStorageCursorOnDetachFromOperationContext) {
-            invariantWTOK(_cursor->close(_cursor), _cursor->session);
-            _cursor = nullptr;
+        if (!_saveStorageCursorOnDetachFromOperationContext) {
+            _cursor.reset();
         }
     }
 
@@ -563,11 +539,11 @@ public:
     }
 
 private:
-    WT_CURSOR* _cursor;
+    std::unique_ptr<WiredTigerCursor> _cursor;
     KeyFormat _keyFormat;
     const std::string _uri;
     OperationContext* _opCtx;
-    const std::string _config;
+    const uint64_t _tableId;
     bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
@@ -1559,7 +1535,7 @@ void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
 
 std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
     OperationContext* opCtx) const {
-    return std::make_unique<RandomCursor>(opCtx, *this, "");
+    return std::make_unique<RandomCursor>(opCtx, *this);
 }
 
 Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
