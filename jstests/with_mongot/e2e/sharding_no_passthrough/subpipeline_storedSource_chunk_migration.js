@@ -4,9 +4,8 @@
  * even though it will not need to read from mongot (since the stored source documents come from
  * mongot).
  *
- * This test is only run in the search_end_to_end_sharded_cluster_unsharded_collections suite
- * since it requires beginning with unsharded collections and then manually triggering the chunk
- * migration.
+ * This test is only run in the mongot_e2e_sharded_cluster suite since it requires beginning with
+ * unsharded collections and then manually triggering the chunk migration.
  *
  * @tags: [ requires_sharding, assumes_unsharded_collection ]
  */

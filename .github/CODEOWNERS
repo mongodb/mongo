@@ -120,6 +120,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/fcv* @10gen/server-fcv @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/jstestfuzz_replication* @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/magic_restore* @10gen/server-recovery @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/mongot* @10gen/query-integration-search @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/multiversion* @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/replica_sets* @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot

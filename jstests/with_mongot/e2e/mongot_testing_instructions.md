@@ -106,13 +106,13 @@ To create a new search integration test, add a jstest to **jstests/with_mongot/e
 
 ######
 
-    buildscripts/resmoke.py run --suites=search_end_to_end_single_node
+    buildscripts/resmoke.py run --suites=mongot_e2e_single_node
 
 **To run your test as a sharded cluster:**
 
 ######
 
-    buildscripts/resmoke.py run --suites=search_end_to_end_sharded_cluster
+    buildscripts/resmoke.py run --suites=mongot_e2e_sharded_cluster
 
 To note, until SERVER-86616 is completed, your test will have to follow a particular order:
 

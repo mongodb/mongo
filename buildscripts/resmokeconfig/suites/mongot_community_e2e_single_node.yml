@@ -12,7 +12,7 @@ config_variables:
 test_kind: js_test
 
 description: |
-  This suite is identical to search_end_to_end_single_node in all ways except that mongod will
+  This suite is identical to mongot_e2e_single_node in all ways except that mongod will
   speak gRPC to mongot instead of MongoRPC, and it will not do SASL authentication between mongod
   and mongot.
 

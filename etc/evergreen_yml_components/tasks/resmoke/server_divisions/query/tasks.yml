@@ -1268,7 +1268,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
-    name: search_end_to_end_sharded_cluster
+    name: mongot_e2e_sharded_collections
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1277,7 +1277,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
-        "search_e2e_tests",
+        "mongot_e2e_tests",
       ]
     commands:
       - func: "do setup"
@@ -1285,7 +1285,7 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
-    name: search_end_to_end_single_node
+    name: mongot_e2e_single_node
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1294,26 +1294,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
-        "search_e2e_tests",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "get mongot version"
-      - func: "run tests"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *task_template
-    name: search_end_to_end_single_shard
-    tags:
-      [
-        "assigned_to_jira_team_server_query_integration",
-        "default",
-        "incompatible_windows",
-        "incompatible_mac",
-        "incompatible_ppc",
-        "incompatible_s390x",
-        "search_e2e_tests",
+        "mongot_e2e_tests",
       ]
     commands:
       - func: "do setup"
@@ -1323,7 +1304,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
-    name: search_end_to_end_sharded_cluster_unsharded_collections
+    name: mongot_e2e_single_shard
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1332,7 +1313,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
-        "search_e2e_tests",
+        "mongot_e2e_tests",
       ]
     commands:
       - func: "do setup"
@@ -1342,7 +1323,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
-    name: search_community_end_to_end_sharded_cluster
+    name: mongot_e2e_sharded_cluster
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1351,7 +1332,26 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
-        "search_e2e_tests",
+        "mongot_e2e_tests",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: mongot_community_e2e_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
       ]
     commands:
       - func: "do setup"
@@ -1359,7 +1359,7 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
-    name: search_community_end_to_end_single_node
+    name: mongot_community_e2e_single_node
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1368,7 +1368,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
-        "search_e2e_tests",
+        "mongot_e2e_tests",
       ]
     commands:
       - func: "do setup"

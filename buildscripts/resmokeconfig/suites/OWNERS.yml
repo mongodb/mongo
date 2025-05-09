@@ -101,6 +101,9 @@ filters:
   - "magic_restore*":
     approvers:
       - 10gen/server-recovery
+  - "mongot*":
+    approvers:
+      - 10gen/query-integration-search
   - "multiversion*":
     approvers:
       - 10gen/server-jstest-infra
