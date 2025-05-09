@@ -158,6 +158,10 @@ query:
     jira: TODO
   files:
     - src/mongo/db/aggregated_index_usage_tracker*
+    - src/mongo/db/api_parameters*
+    - src/mongo/db/field_ref*
+    - src/mongo/db/traffic_*
+    - src/mongo/db/validate_api_parameters*
     - src/mongo/db/bulk_write_shard_test.cpp
     - src/mongo/db/collection_index_usage_tracker*
     - src/mongo/db/commands/filemd5_cmd.cpp # TODO SERVER-88071: Deprecate/remove this command.
@@ -197,11 +201,14 @@ query:
     - src/mongo/dbtests/counttests.cpp
     - src/mongo/dbtests/documentsourcetests.cpp
     - src/mongo/dbtests/extensions_callback_real_test.cpp
+    - src/mongo/dbtests/insert_test.cpp
+    - src/mongo/dbtests/plan_ranking.cpp
     - src/mongo/dbtests/jstests.cpp
     - src/mongo/dbtests/matchertests.cpp
     - src/mongo/dbtests/plan_executor_invalidation_test.cpp
     - src/mongo/dbtests/query*
     - src/mongo/dbtests/updatetests.cpp
+    - src/mongo/replay
     - src/mongo/scripting/
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/util/safe_num*
