@@ -215,18 +215,18 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
 }
 
 template <typename T>
-void ValuePrinter<T>::writeStringDataToStream(StringData sd, bool isJavaScript) {
-    if (!isJavaScript) {
+void ValuePrinter<T>::writeStringDataToStream(StringData sd, bool addQuotes) {
+    if (addQuotes) {
         stream << '"';
     }
     if (sd.size() <= options.stringMaxDisplayLength()) {
         stream << sd;
-        if (!isJavaScript) {
+        if (addQuotes) {
             stream << '"';
         }
     } else {
         stream << sd.substr(0, options.stringMaxDisplayLength());
-        if (!isJavaScript) {
+        if (addQuotes) {
             stream << "\"...";
         } else {
             stream << "...";
@@ -243,7 +243,7 @@ void ValuePrinter<T>::writeArrayToStream(TypeTags tag, Value val, size_t depth) 
         while (iter < options.arrayObjectOrNestingMaxDepth() &&
                depth < options.arrayObjectOrNestingMaxDepth()) {
             auto [aeTag, aeVal] = ae.getViewOfValue();
-            if (aeTag == TypeTags::Array || aeTag == TypeTags::Object) {
+            if (value::isContainer(aeTag)) {
                 ++depth;
             }
             writeValueToStream(aeTag, aeVal, depth);
@@ -282,7 +282,7 @@ void ValuePrinter<T>::writeSortedArraySetToStream(TypeTags tag, Value val, size_
         while (iter < options.arrayObjectOrNestingMaxDepth() &&
                depth < options.arrayObjectOrNestingMaxDepth()) {
             auto [aeTag, aeVal] = *it;
-            if (aeTag == TypeTags::Array || aeTag == TypeTags::Object) {
+            if (value::isContainer(aeTag)) {
                 ++depth;
             }
             writeValueToStream(aeTag, aeVal, depth);
@@ -311,7 +311,7 @@ void ValuePrinter<T>::writeObjectToStream(TypeTags tag, Value val, size_t depth)
                depth < options.arrayObjectOrNestingMaxDepth()) {
             stream << "\"" << oe.getFieldName() << "\" : ";
             auto [oeTag, oeVal] = oe.getViewOfValue();
-            if (oeTag == TypeTags::Array || oeTag == TypeTags::Object) {
+            if (value::isContainer(oeTag)) {
                 ++depth;
             }
             writeValueToStream(oeTag, oeVal, depth);
@@ -343,16 +343,16 @@ void ValuePrinter<T>::writeMultiMapToStream(TypeTags tag, Value val, size_t dept
 
     auto multiMap = getMultiMapView(val);
 
-    auto first = true;
-    size_t iter = 0;
+
+    size_t valueIndex = 0;
     for (const auto& [key, value] : multiMap->values()) {
-        if (first) {
-            first = false;
-        } else {
+        if (valueIndex != 0) {
             stream << ", ";
         }
+        valueIndex++;
 
-        if (depth > options.arrayObjectOrNestingMaxDepth()) {
+        if (valueIndex > options.arrayObjectOrNestingMaxDepth() ||
+            depth > options.arrayObjectOrNestingMaxDepth()) {
             stream << "...";
             break;
         }
@@ -361,21 +361,18 @@ void ValuePrinter<T>::writeMultiMapToStream(TypeTags tag, Value val, size_t dept
         auto valueDepth = depth;
 
         stream << "{k : ";
-        if (value::isArray(key.first) || value::isObject(key.first)) {
+        if (value::isContainer(key.first)) {
             keyDepth++;
             depth = keyDepth;
         }
         writeValueToStream(key.first, key.second, keyDepth);
-        iter++;
 
         stream << ", v : ";
-
-        if (value::isArray(value.first) || value::isObject(value.first)) {
+        if (value::isContainer(value.first)) {
             valueDepth++;
             depth = valueDepth;
         }
         writeValueToStream(value.first, value.second, valueDepth);
-        iter++;
 
         stream << "}";
     }
@@ -543,7 +540,9 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         case TypeTags::keyString: {
             auto ks = getKeyString(val);
-            stream << "KS(" << hexblob::encode(ks->getKeyStringView()) << ")";
+            stream << "KS(";
+            writeStringDataToStream(hexblob::encode(ks->getKeyStringView()), false /*addQuotes*/);
+            stream << ")";
             break;
         }
         case TypeTags::Timestamp: {
@@ -558,7 +557,9 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         }
         case TypeTags::RecordId:
-            stream << "RecordId(" << getRecordIdView(val)->toString() << ")";
+            stream << "RecordId(";
+            writeStringDataToStream(getRecordIdView(val)->toString(), false /*addQuotes*/);
+            stream << ")";
             break;
         case TypeTags::collator:
             writeCollatorToStream(getCollatorView(val));
@@ -569,7 +570,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         }
         case TypeTags::bsonJavascript:
             stream << "Javascript(";
-            writeStringDataToStream(getStringView(TypeTags::StringBig, val), true);
+            writeStringDataToStream(getStringView(TypeTags::StringBig, val), false /*addQuotes*/);
             stream << ")";
             break;
         case TypeTags::bsonDBPointer: {
