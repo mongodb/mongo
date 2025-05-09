@@ -157,20 +157,31 @@ query:
     slack: TODO
     jira: TODO
   files:
+    - src/mongo/db/aggregated_index_usage_tracker*
+    - src/mongo/db/bulk_write_shard_test.cpp
+    - src/mongo/db/collection_index_usage_tracker*
+    - src/mongo/db/commands/filemd5_cmd.cpp # TODO SERVER-88071: Deprecate/remove this command.
     - src/mongo/db/commands/profile*
+    - src/mongo/db/commands/sysprofile*
     - src/mongo/db/commands/query_cmd/
     - src/mongo/db/commands/server_status*
     - src/mongo/db/commands/set_profiling_*
     - src/mongo/db/commands/shardsvr_resolve_view_command*
     - src/mongo/db/commands/top_command*
     - src/mongo/db/exec/
+    - src/mongo/db/change_collection*
+    - src/mongo/db/change_stream*
+    - src/mongo/db/op_observer/change_stream_pre_images_op_observer*
+    - src/mongo/db/set_change_stream*
     - src/mongo/db/fle_*
     - src/mongo/db/curop*
     - src/mongo/db/fts/
     - src/mongo/db/geo/
+    - src/mongo/db/index_names*
     - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
     - src/mongo/db/matcher/
     - src/mongo/db/memory_tracking/
+    - src/mongo/db/multi_key_path_tracker*
     - src/mongo/db/modules/enterprise/src/fle/query_analysis
     - src/mongo/db/op_debug*
     - src/mongo/db/pipeline/
@@ -180,9 +191,17 @@ query:
     - src/mongo/db/s/*query*analyzer* # note the filename pattern
     - src/mongo/db/stats/
     - src/mongo/db/update/
+    - src/mongo/db/update_index_data*
     - src/mongo/db/views/
+    - src/mongo/db/yieldable.h
+    - src/mongo/dbtests/counttests.cpp
+    - src/mongo/dbtests/documentsourcetests.cpp
     - src/mongo/dbtests/extensions_callback_real_test.cpp
     - src/mongo/dbtests/jstests.cpp
+    - src/mongo/dbtests/matchertests.cpp
+    - src/mongo/dbtests/plan_executor_invalidation_test.cpp
+    - src/mongo/dbtests/query*
+    - src/mongo/dbtests/updatetests.cpp
     - src/mongo/scripting/
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/util/safe_num*
