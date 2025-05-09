@@ -48,6 +48,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -74,7 +75,6 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
-
 namespace mongo {
 
 // TODO (SERVER-74481): Define these functions in the nested `sharding_ddl_util` namespace when the
@@ -100,7 +100,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
     const std::vector<ShardId>& shardIds,
-    bool ignoreResponses = false) {
+    bool throwOnError = true) {
     if (shardIds.size() == 0) {
         return {};
     }
@@ -113,58 +113,68 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     originalOpts->genericArgs.setMayBypassWriteBlocking(
         WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 
-    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
-    auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
+    if (throwOnError) {
+        std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>>
+            futures;
+        auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
 
-    CancellationSource cancelSource(originalOpts->token);
+        CancellationSource cancelSource(originalOpts->token);
 
-    for (size_t i = 0; i < shardIds.size(); ++i) {
-        ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
-        std::unique_ptr<async_rpc::Targeter> targeter =
-            std::make_unique<async_rpc::ShardIdTargeter>(
-                originalOpts->exec, opCtx, shardIds[i], readPref);
-        bool startTransaction = originalOpts->genericArgs.getStartTransaction()
-            ? *originalOpts->genericArgs.getStartTransaction()
-            : false;
-        auto retryPolicy = std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
-            Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
-        auto opts =
-            std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->exec,
-                                                                      cancelSource.token(),
-                                                                      originalOpts->cmd,
-                                                                      originalOpts->genericArgs,
-                                                                      retryPolicy);
-        futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
-        (*indexToShardId)[i] = shardIds[i];
+        for (size_t i = 0; i < shardIds.size(); ++i) {
+            ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
+            std::unique_ptr<async_rpc::Targeter> targeter =
+                std::make_unique<async_rpc::ShardIdTargeter>(
+                    originalOpts->exec, opCtx, shardIds[i], readPref);
+            bool startTransaction = originalOpts->genericArgs.getStartTransaction()
+                ? *originalOpts->genericArgs.getStartTransaction()
+                : false;
+            auto retryPolicy =
+                std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
+                    Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
+            auto opts =
+                std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->exec,
+                                                                          cancelSource.token(),
+                                                                          originalOpts->cmd,
+                                                                          originalOpts->genericArgs,
+                                                                          retryPolicy);
+            futures.push_back(
+                async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
+            (*indexToShardId)[i] = shardIds[i];
+        }
+
+        auto responses =
+            async_rpc::getAllResponsesOrFirstErrorWithCancellation<
+                AsyncRequestsSender::Response,
+                async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
+                std::move(futures),
+                cancelSource,
+                [indexToShardId](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
+                                 size_t index) -> AsyncRequestsSender::Response {
+                    BSONObjBuilder replyBob;
+                    reply.response.serialize(&replyBob);
+                    reply.genericReplyFields.serialize(&replyBob);
+                    return AsyncRequestsSender::Response{
+                        (*indexToShardId)[index],
+                        executor::RemoteCommandOnAnyResponse(
+                            reply.targetUsed, replyBob.obj(), reply.elapsed)};
+                })
+                .getNoThrow();
+
+        if (auto status = responses.getStatus(); status != Status::OK()) {
+            uassertStatusOK(async_rpc::unpackRPCStatus(status));
+        }
+
+        return responses.getValue();
+    } else {
+        BSONObjBuilder authenticatedCommand(originalOpts->cmd.toBSON({}));
+        originalOpts->genericArgs.serialize(&authenticatedCommand);
+        return sharding_util::sendCommandToShards(opCtx,
+                                                  originalOpts->cmd.getDbName(),
+                                                  authenticatedCommand.obj(),
+                                                  shardIds,
+                                                  originalOpts->exec,
+                                                  false);
     }
-
-    auto responses =
-        async_rpc::getAllResponsesOrFirstErrorWithCancellation<
-            AsyncRequestsSender::Response,
-            async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
-            std::move(futures),
-            cancelSource,
-            [indexToShardId](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
-                             size_t index) -> AsyncRequestsSender::Response {
-                BSONObjBuilder replyBob;
-                reply.response.serialize(&replyBob);
-                reply.genericReplyFields.serialize(&replyBob);
-                return AsyncRequestsSender::Response{
-                    (*indexToShardId)[index],
-                    executor::RemoteCommandOnAnyResponse(
-                        reply.targetUsed, replyBob.obj(), reply.elapsed)};
-            })
-            .getNoThrow();
-
-    if (ignoreResponses) {
-        return {};
-    }
-
-    if (auto status = responses.getStatus(); status != Status::OK()) {
-        uassertStatusOK(async_rpc::unpackRPCStatus(status));
-    }
-
-    return responses.getValue();
 }
 
 /**
