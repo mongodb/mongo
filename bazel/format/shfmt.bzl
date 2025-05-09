@@ -1,7 +1,7 @@
 """Repository rules for shfmt binary download"""
 
 load("//bazel:utils.bzl", "retry_download")
-load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_MAP")
+load("@bazel_rules_mongo//utils:platforms_normalize.bzl", "ARCH_NORMALIZE_MAP", "OS_NORMALIZE_MAP")
 
 URLS_MAP = {
     "linux_aarch64": {
@@ -33,8 +33,11 @@ def _shfmt_download(ctx):
     Args:
         ctx: Repository context.
     """
-    platform_info = URLS_MAP["{os}_{arch}".format(os = ctx.os.name, arch = ctx.os.arch)]
-    print(platform_info)
+    os = ctx.os.name
+    arch = ctx.os.arch
+    os_constraint = OS_NORMALIZE_MAP[os]
+    arch_constraint = ARCH_NORMALIZE_MAP[arch]
+    platform_info = URLS_MAP["{os}_{arch}".format(os = os_constraint, arch = arch_constraint)]
     ctx.report_progress("downloading shfmt")
     retry_download(
         ctx = ctx,

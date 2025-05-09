@@ -176,10 +176,6 @@ setup_pigz(
     name = "pigz",
 )
 
-load("//bazel/format:shfmt.bzl", "shfmt")
-
-shfmt()
-
 # This repository is normally created by db-contrib-tool or manually extracting the binaries at the proper location
 new_local_repository(
     name = "mongot_localdev",
@@ -212,3 +208,7 @@ poetry(
     lockfile = "@bazel_rules_mongo//:poetry.lock",
     pyproject = "@bazel_rules_mongo//:pyproject.toml",
 )
+
+load("//bazel/format:shfmt.bzl", "shfmt")
+
+shfmt()
