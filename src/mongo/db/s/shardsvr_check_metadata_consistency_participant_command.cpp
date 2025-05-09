@@ -131,8 +131,23 @@ public:
             const auto configsvrCollections =
                 getCollectionsListFromConfigServer(opCtx, nss, commandLevel);
 
-            auto inconsistencies = checkCollectionMetadataConsistency(
-                opCtx, nss, commandLevel, shardId, primaryShardId, configsvrCollections);
+            const auto checkRangeDeletionIndexes =
+                request().getCommonFields().getCheckRangeDeletionIndexes();
+            uassert(ErrorCodes::InvalidOptions,
+                    "Range deletion missing shard key index inconsistency check is not supported "
+                    "with the current FCV. Upgrade to the highest FCV for performing the check.",
+                    !checkRangeDeletionIndexes ||
+                        feature_flags::gCheckRangeDeletionsWithMissingShardKeyIndex.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+            auto inconsistencies = checkCollectionMetadataConsistency(opCtx,
+                                                                      nss,
+                                                                      commandLevel,
+                                                                      shardId,
+                                                                      primaryShardId,
+                                                                      configsvrCollections,
+                                                                      checkRangeDeletionIndexes);
 
             // If this is the primary shard of the db coordinate index check across shards
             const auto optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
@@ -245,7 +260,8 @@ public:
             const MetadataConsistencyCommandLevelEnum& commandLevel,
             const ShardId& shardId,
             const ShardId& primaryShardId,
-            const std::vector<mongo::CollectionType>& shardingCatalogCollections) {
+            const std::vector<mongo::CollectionType>& shardingCatalogCollections,
+            const bool checkRangeDeletionIndexes) {
             std::vector<CollectionPtr> localCatalogCollections;
             auto collCatalogSnapshot = [&] {
                 switch (commandLevel) {
@@ -325,7 +341,8 @@ public:
                 shardId,
                 primaryShardId,
                 shardingCatalogCollections,
-                localCatalogCollections);
+                localCatalogCollections,
+                checkRangeDeletionIndexes);
         }
 
         NamespaceString ns() const override {

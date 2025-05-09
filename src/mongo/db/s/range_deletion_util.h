@@ -60,6 +60,14 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                                      const BSONObj& keyPattern,
                                                      const ChunkRange& range);
 
+
+/**
+ * Check if there is at least one range deletion task for the specified collection.
+ */
+bool hasAtLeastOneRangeDeletionTaskForCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const UUID& collectionUuid);
+
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`
  * - Associates tasks to the target collection

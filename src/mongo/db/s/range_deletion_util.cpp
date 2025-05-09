@@ -437,6 +437,32 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
     return std::make_pair(totalNumDeleted, totalBytesDeleted);
 }
 
+bool hasAtLeastOneRangeDeletionTaskForCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const UUID& collectionUuid) {
+    // Get the number of outstanding range deletion tasks on the given collection
+    try {
+        // Check in memory via the range deleter service if possible to avoid reading from disk
+        auto rds = RangeDeleterService::get(opCtx);
+        return rds->getNumRangeDeletionTasksForCollection(collectionUuid);
+    } catch (const ExceptionFor<ErrorCodes::NotYetInitialized>&) {
+        // If the range deleter service is not yet up, as might be the case after a step up, fall
+        // back to reading the range deletion documents from disk
+        LOGV2_DEBUG(9931402,
+                    2,
+                    "Range deletion service is not initialized yet. Falling back to reading range "
+                    "deletion documents from disk.",
+                    logAttrs(nss),
+                    "collectionUUID"_attr = collectionUuid);
+        DBDirectClient dbClient(opCtx);
+        const auto query = BSON(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid);
+        return dbClient.count(NamespaceString::kRangeDeletionNamespace,
+                              query,
+                              0 /* options */,
+                              1 /* limit */) > 0;
+    }
+}
+
 void snapshotRangeDeletionsForRename(OperationContext* opCtx,
                                      const NamespaceString& fromNss,
                                      const NamespaceString& toNss) {

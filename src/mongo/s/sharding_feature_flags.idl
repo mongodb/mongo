@@ -216,6 +216,13 @@ feature_flags:
         version: 8.2
         shouldBeFCVGated: true
         enable_on_transitional_fcv: true
+    # TODO (SERVER-104536): remove this feature flag once 9.0 becomes LTS.
+    featureFlagCheckRangeDeletionsWithMissingShardKeyIndex:
+        description: "Feature flag to enable detecting an inconsistency when a collection has an outstanding range deletion without a supporting shard key index during CheckMetadataConsistency."
+        cpp_varname: feature_flags::gCheckRangeDeletionsWithMissingShardKeyIndex
+        default: true
+        version: 8.2
+        shouldBeFCVGated: true
     # TODO (SERVER-103838): remove feature once 9.0 becomes LTS.
     featureFlagPersistRecipientPlacementInfoInMigrationRecoveryDoc:
         description:

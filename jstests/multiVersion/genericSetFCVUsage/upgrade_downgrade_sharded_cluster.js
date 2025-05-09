@@ -12,6 +12,7 @@
 
 import "jstests/multiVersion/libs/multi_cluster.js";
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
@@ -68,6 +69,27 @@ function checkConfigAndShardsFCV(expectedFCV) {
     }
 }
 
+function checkRangeDeletionMetadataConsistency() {
+    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0,
+                                            "CheckRangeDeletionsWithMissingShardKeyIndex")) {
+        return;
+    }
+    jsTest.log("Executing checkRangeDeletionMetadataConsistency");
+
+    const dbName = "checkMetadataConsistencyTest";
+
+    // Create database for checkMetadataConsistency
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
+    // Check that the command fails
+    assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(
+                                     {checkMetadataConsistency: 1, 'checkRangeDeletionIndexes': 1}),
+                                 ErrorCodes.InvalidOptions);
+
+    st.s.getDB(dbName).dropDatabase();
+}
+
 function checkClusterBeforeUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
 }
@@ -78,6 +100,11 @@ function checkClusterAfterFCVUpgrade(fcv) {
 
 function checkClusterAfterBinaryDowngrade(fcv) {
     checkConfigAndShardsFCV(fcv);
+}
+
+function checkClusterAfterFCVDowngrade(fcv) {
+    checkConfigAndShardsFCV(fcv);
+    checkRangeDeletionMetadataConsistency();
 }
 
 for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
@@ -107,6 +134,8 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     jsTest.log('Downgrading FCV to ' + oldVersion);
     assert.commandWorked(
         st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion, confirm: true}));
+
+    checkClusterAfterFCVDowngrade(oldVersion);
 
     jsTest.log('Downgrading binaries to version ' + oldVersion);
     st.downgradeCluster(oldVersion);

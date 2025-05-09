@@ -62,6 +62,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_runtime.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
@@ -72,6 +73,7 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -124,20 +126,41 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const BSONObj& shardKey,
                                         const CollectionPtr& localColl,
-                                        std::vector<MetadataInconsistencyItem>& inconsistencies) {
+                                        std::vector<MetadataInconsistencyItem>& inconsistencies,
+                                        const bool checkRangeDeletionIndexes) {
     const auto performChecks = [&](const CollectionPtr& localColl,
                                    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-        // Check that the collection has an index that supports the shard key. If so, check that
-        // exists an index that supports the shard key and is not multikey. We allow users to drop
-        // hashed shard key indexes, and therefore we don't require hashed shard keys to have a
-        // supporting index.
-        if (!ShardKeyPattern(shardKey).isHashedPattern() &&
-            !findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
+        // We allow users to drop hashed shard key indexes, and therefore we don't require hashed
+        // shard keys to have a supporting index.
+        if (!ShardKeyPattern(shardKey).isHashedPattern()) {
             inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kMissingShardKeyIndex,
                 MissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
         }
     };
+
+    // Check that the collection has an index that supports the shard key. The
+    // checkMetadataConsistency function is executed under the database DDL lock, ensuring any
+    // create collection operations, which run under the collection DDL lock, are serialized with
+    // this check. Manual creation of a supportive shard key index (the operation does not run under
+    // the DDL lock) immediately after the check below is not considered. As a result, this scenario
+    // will lead to reporting an inconsistency.
+    if (findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
+        return;
+    }
+
+    // If the checkRangeDeletionIndexes flag is set, perform an additional check to detect
+    // inconsistencies in cases where a collection has an outstanding range deletion without
+    // a supporting shard key index.
+    if (checkRangeDeletionIndexes) {
+        bool hasRangeDeletionTasks = rangedeletionutil::hasAtLeastOneRangeDeletionTaskForCollection(
+            opCtx, localColl->ns(), localColl->uuid());
+        if (hasRangeDeletionTasks) {
+            inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+                MetadataInconsistencyTypeEnum::kRangeDeletionMissingShardKeyIndex,
+                RangeDeletionMissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
+        }
+    }
 
     std::vector<MetadataInconsistencyItem> tmpInconsistencies;
 
@@ -200,7 +223,8 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     const NamespaceString& nss,
     const ShardId& shardId,
     const CollectionType& catalogColl,
-    const CollectionPtr& localColl) {
+    const CollectionPtr& localColl,
+    const bool checkRangeDeletionIndexes) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
 
     const auto& catalogUUID = catalogColl.getUuid();
@@ -277,8 +301,13 @@ std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
     // the shard key for unsplittable collections.
     const bool isSharded = !catalogColl.getUnsplittable();
     if (catalogUUID == localUUID && isSharded) {
-        _checkShardKeyIndexInconsistencies(
-            opCtx, nss, shardId, catalogColl.getKeyPattern().toBSON(), localColl, inconsistencies);
+        _checkShardKeyIndexInconsistencies(opCtx,
+                                           nss,
+                                           shardId,
+                                           catalogColl.getKeyPattern().toBSON(),
+                                           localColl,
+                                           inconsistencies,
+                                           checkRangeDeletionIndexes);
     }
 
     return inconsistencies;
@@ -649,7 +678,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
-    const std::vector<CollectionPtr>& localCatalogCollections) {
+    const std::vector<CollectionPtr>& localCatalogCollections,
+    const bool checkRangeDeletionIndexes) {
 
     std::vector<MetadataInconsistencyItem> inconsistencies;
     auto itLocalCollections = localCatalogCollections.begin();
@@ -676,8 +706,13 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
         } else if (isCollectionOnBothCatalogs) {
             // Case where we have found same collection in the catalog client than in the local
             // catalog.
-            auto inconsistenciesBetweenBothCatalogs = _checkInconsistenciesBetweenBothCatalogs(
-                opCtx, localNss, shardId, *itCatalogCollections, localColl);
+            auto inconsistenciesBetweenBothCatalogs =
+                _checkInconsistenciesBetweenBothCatalogs(opCtx,
+                                                         localNss,
+                                                         shardId,
+                                                         *itCatalogCollections,
+                                                         localColl,
+                                                         checkRangeDeletionIndexes);
             inconsistencies.insert(
                 inconsistencies.end(),
                 std::make_move_iterator(inconsistenciesBetweenBothCatalogs.begin()),

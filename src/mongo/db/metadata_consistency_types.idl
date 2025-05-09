@@ -49,6 +49,7 @@ enums:
             kMissingLocalCollection: "MissingLocalCollection"
             kMissingRoutingTable: "MissingRoutingTable"
             kMissingShardKeyIndex: "MissingShardKeyIndex"
+            kRangeDeletionMissingShardKeyIndex: "RangeDeletionMissingShardKeyIndex"
             kRoutingTableMissingMaxKey: "RoutingTableMissingMaxKey"
             kRoutingTableMissingMinKey: "RoutingTableMissingMinKey"
             kRoutingTableRangeGap: "RoutingTableRangeGap"
@@ -78,6 +79,7 @@ enums:
             kMissingLocalCollection: "Collection registered on the sharding catalog not found on the given shards"
             kMissingRoutingTable: "Found sharded collection without any chunk"
             kMissingShardKeyIndex: "Found sharded collection without a shard key index"
+            kRangeDeletionMissingShardKeyIndex: "Found sharded collection with an outstanding range deletion task without a shard key index"
             kRoutingTableMissingMaxKey: "Routing table has a gap because last chunk boundary does not reach MaxKey"
             kRoutingTableMissingMinKey: "Routing table has a gap because first chunk does not start from MinKey"
             kRoutingTableRangeGap: "Found a gap between two consecutive chunks"
@@ -190,6 +192,21 @@ structs:
             shard:
                 type: shard_id
                 description: "The shard where the missing shard key index inconsistency has been found."
+            shardKey:
+                type: object
+                description: "The shard key of the collection."
+
+    RangeDeletionMissingShardKeyIndexDetails:
+        description: "Details about a range deletion with missing shard key index inconsistency."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the collection that has an outstanding range deletion without a supporting shard key index."
+            shard:
+                type: shard_id
+                description: "The shard where the range deletion with missing shard key index inconsistency has been found."
             shardKey:
                 type: object
                 description: "The shard key of the collection."
@@ -525,3 +542,7 @@ structs:
                 type: exactInt64
                 validator: {gte: 0, lte: 2147483647} # [0, 2^31 - 1]
                 optional: true
+            checkRangeDeletionIndexes:
+                description: "Check that in the presence of outstanding range deletion tasks a shard key index must exists"
+                type: safeBool
+                default: false

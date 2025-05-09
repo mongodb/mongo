@@ -374,7 +374,12 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
 
     // Catch the inconsistency.
     const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
-        opCtx, _shardId, _shardId, {configColl}, localCatalogCollections);
+        opCtx,
+        _shardId,
+        _shardId,
+        {configColl},
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/);
     assertCollectionOptionsMismatchInconsistencyFound(
         inconsistencies,
         BSON("capped" << true),
@@ -419,7 +424,12 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
 
         // Check the inconsistencies.
         const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
-            opCtx, _shardId, _shardId, {configColl}, localCatalogCollections);
+            opCtx,
+            _shardId,
+            _shardId,
+            {configColl},
+            localCatalogCollections,
+            false /*checkRangeDeletionIndexes*/);
 
         if (expectInconsistencies) {
             BSONObj collationLocalCatalog =
@@ -500,7 +510,12 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
             // Check the inconsistencies.
             const auto inconsistencies =
                 metadata_consistency_util::checkCollectionMetadataConsistency(
-                    opCtx, _shardId, _shardId, {configColl}, localCatalogCollections);
+                    opCtx,
+                    _shardId,
+                    _shardId,
+                    {configColl},
+                    localCatalogCollections,
+                    false /*checkRangeDeletionIndexes*/);
 
             if (expectInconsistencies) {
                 const BSONObj& localCatalogBSON =

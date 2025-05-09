@@ -9,6 +9,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Configure initial sharding cluster
 const st = new ShardingTest({});
@@ -239,6 +240,115 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     db.dropDatabase();
     assertNoInconsistencies();
 })();
+
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingShardKeyIndex")) {
+    (function testRangeDeletionWithMissingRangedShardKeyInconsistency() {
+        jsTest.log("Executing testRangeDeletionWithMissingRangedShardKeyInconsistency");
+        // Check inconsistencies in case one shard does not own a chunk but has an outstanding range
+        // deletion, and one shard own two chunks with no outstanding range deletions
+
+        const db = getNewDb();
+        const dbName = db.getName();
+        const kSourceCollName = "coll";
+        const ns = dbName + "." + kSourceCollName;
+
+        // Enable the range deletion indexes checks
+        const checkOptions = {'checkRangeDeletionIndexes': 1};
+
+        // Enforce dbPrimary to be shard0 (first chunk is on shard0 is granted)
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
+        st.shardColl(
+            kSourceCollName, {skey: 1}, {skey: 0}, {skey: 1}, dbName, true /* waitForDelete */);
+
+        // Suspend range deletions
+        let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
+
+        // Move one chunk to create an orphaned range on shard0 (donor)
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: {skey: -10}, to: st.shard1.shardName}));
+
+        // Connect directly to shards to bypass the mongos checks for dropping shard key indexes
+        assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: 1}));
+        assert.commandWorked(st.shard1.getDB(dbName).coll.dropIndex({skey: 1}));
+        assert.commandWorked(st.s.getDB(dbName).coll.insert({skey: -10}));
+        assert.commandWorked(st.s.getDB(dbName).coll.insert({skey: 10}));
+
+        // Check inconsistencies
+        let inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
+        assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+        const incTypes = inconsistencies.map(inconsistency => inconsistency.type);
+        const correctIncTypes = incTypes.includes("MissingShardKeyIndex") &&
+            incTypes.includes("RangeDeletionMissingShardKeyIndex");
+        assert.eq(true, correctIncTypes, tojson(inconsistencies));
+
+        // Clean up the database to pass the hooks that detect inconsistencies
+        db.dropDatabase();
+        assertNoInconsistencies();
+
+        // Turn off fail point
+        suspendRangeDeletionShard0.off();
+    })();
+
+    (function testRangeDeletionWithMissingHashedShardKeyInconsistency() {
+        jsTest.log("Executing testRangeDeletionWithMissingHashedShardKeyInconsistency");
+
+        const db = getNewDb();
+        const dbName = db.getName();
+        const kSourceCollName = "coll";
+        const ns = dbName + "." + kSourceCollName;
+
+        // Enable the range deletion indexes checks
+        const checkOptions = {'checkRangeDeletionIndexes': 1};
+
+        st.shardColl(kSourceCollName, {skey: "hashed"}, false, false, dbName, false);
+
+        // Insert some documents into the collection
+        const numDocs = 100;
+        let bulk = db.getCollection(kSourceCollName).initializeUnorderedBulkOp();
+        for (let i = 0; i < numDocs; i++) {
+            bulk.insert({skey: i});
+        }
+        assert.commandWorked(bulk.execute());
+
+        // Check inconsistencies in case one shard owns a chunk and has a outstanding range
+        // deletion, and one shard owns two chunks and has no outstanding range deletions
+        let suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
+        let chunk0 =
+            findChunksUtil.findOneChunkByNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName});
+        assert.commandWorked(db.adminCommand({split: ns, bounds: [chunk0.min, chunk0.max]}));
+        let halfChunk =
+            findChunksUtil.findOneChunkByNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName});
+        assert.commandWorked(db.adminCommand(
+            {moveChunk: ns, bounds: [halfChunk.min, halfChunk.max], to: st.shard1.shardName}));
+        assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: "hashed"}));
+
+        let inc0 = db.checkMetadataConsistency(checkOptions).toArray();
+        assert.eq(1, inc0.length, tojson(inc0));
+        assert.eq("RangeDeletionMissingShardKeyIndex", inc0[0].type, tojson(inc0[0]));
+
+        // Check inconsistencies in case one shard does not own chunks and has outstanding range
+        // deletions, and one shard owns two chunks and has no outstanding range deletions
+        assert.commandWorked(st.shard0.getDB(dbName).coll.createIndex({skey: "hashed"}));
+        halfChunk =
+            findChunksUtil.findOneChunkByNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName});
+        assert.commandWorked(db.adminCommand(
+            {moveChunk: ns, bounds: [halfChunk.min, halfChunk.max], to: st.shard1.shardName}));
+        assert.commandWorked(st.shard0.getDB(dbName).coll.dropIndex({skey: "hashed"}));
+
+        let inc1 = db.checkMetadataConsistency(checkOptions).toArray();
+        assert.eq(1, inc1.length, tojson(inc1));
+        assert.eq("RangeDeletionMissingShardKeyIndex", inc1[0].type, tojson(inc1[0]));
+
+        // Clean up the database to pass the hooks that detect inconsistencies
+        db.dropDatabase();
+        assertNoInconsistencies();
+
+        // Turn off fail point
+        suspendRangeDeletionShard0.off();
+    })();
+}
 
 (function testMissingIndex() {
     jsTest.log("Executing testMissingIndex");

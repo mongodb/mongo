@@ -85,7 +85,9 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
                                                   long long batchSize);
 /**
  * Returns a list of inconsistencies between the collections' metadata on the shard and the
- * collections' metadata in the config server.
+ * collections' metadata in the config server. Setting the parameter checkRangeDeletionIndexes
+ * to true activates an optional check to identify inconsistencies when a collection has an
+ * outstanding range deletion without a supporting shard key index.
  *
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
@@ -95,7 +97,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
-    const std::vector<CollectionPtr>& localCatalogCollections);
+    const std::vector<CollectionPtr>& localCatalogCollections,
+    bool checkRangeDeletionIndexes);
 
 /**
  * For every collection, check that all the shards currently owning chunks for that collection have
