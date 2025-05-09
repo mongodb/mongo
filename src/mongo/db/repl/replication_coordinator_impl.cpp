@@ -6191,16 +6191,13 @@ void _handleBeforeFetchingConfig(const BSONObj& customArgs,
 
 Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                                       ReplSetHeartbeatResponse* response) {
-    {
-        stdx::lock_guard<Latch> lock(_mutex);
-        if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-            return Status(ErrorCodes::NotYetInitialized,
-                          "Received heartbeat while still initializing replication system");
-        }
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+        return Status(ErrorCodes::NotYetInitialized,
+                      "Received heartbeat while still initializing replication system");
     }
 
     Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
-    stdx::lock_guard<Latch> lk(_mutex);
 
     auto rsc = _rsConfig.getConfig(lk);
 
