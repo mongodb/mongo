@@ -395,8 +395,6 @@ last-continuous:
     ticket: SERVER-100489
   - test_file: jstests/core/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
-  - test_file: jstests/core/elem_match_index_diff_types.js
-    ticket: SERVER-92806
   suites: null
 last-lts:
   all:
@@ -840,6 +838,4 @@ last-lts:
     ticket: SERVER-100489
   - test_file: jstests/core/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
-  - test_file: jstests/core/elem_match_index_diff_types.js
-    ticket: SERVER-92806
   suites: null
