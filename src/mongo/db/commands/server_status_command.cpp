@@ -139,7 +139,7 @@ public:
         auto uptime = clock->now() - _started;
         result.append("uptimeMillis", durationCount<Milliseconds>(uptime));
         result.append("uptimeEstimate", durationCount<Seconds>(uptime));
-        result.appendDate("localTime", jsTime());
+        result.appendDate("localTime", Date_t::now());
 
         timeBuilder.appendNumber("after basic",
                                  durationCount<Milliseconds>(clock->now() - runStart));

@@ -395,7 +395,7 @@ ExitCode initializeTransportLayer(ServiceContext* serviceContext, BSONObjBuilder
 void logStartup(OperationContext* opCtx) {
     BSONObjBuilder toLog;
     std::stringstream id;
-    id << getHostNameCached() << "-" << jsTime().asInt64();
+    id << getHostNameCached() << "-" << Date_t::now().asInt64();
     toLog.append("_id", id.str());
     toLog.append("hostname", getHostNameCached());
 

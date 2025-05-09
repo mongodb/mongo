@@ -1317,9 +1317,9 @@ public:
 class DateNowBuilder {
 public:
     void run() {
-        Date_t before = jsTime();
+        Date_t before = Date_t::now();
         BSONObj o = BSON("now" << DATENOW);
-        Date_t after = jsTime();
+        Date_t after = Date_t::now();
 
         ASSERT(validateBSON(o).isOK());
 

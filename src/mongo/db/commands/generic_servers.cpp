@@ -182,7 +182,7 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
     ProcessInfo p;
 
     HostInfoSystemReply system;
-    system.setCurrentTime(jsTime());
+    system.setCurrentTime(Date_t::now());
     system.setHostname(prettyHostName(opCtx->getClient()->getLocalPort()));
     system.setCpuAddrSize(static_cast<int>(p.getAddrSize()));
     system.setMemSizeMB(static_cast<long>(p.getSystemMemSizeMB()));

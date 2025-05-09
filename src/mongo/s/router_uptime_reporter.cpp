@@ -91,7 +91,7 @@ void reportStatus(OperationContext* opCtx,
     MongosType mType;
     mType.setName(instanceId);
     mType.setCreated(created);
-    mType.setPing(jsTime());
+    mType.setPing(Date_t::now());
     mType.setUptime(upTimeTimer.seconds());
     // balancer is never active in the router. Here for backwards compatibility only.
     mType.setWaiting(true);
@@ -130,7 +130,7 @@ RouterUptimeReporter& RouterUptimeReporter::get(ServiceContext* serviceContext) 
 void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
     invariant(!_thread.joinable());
 
-    Date_t created = jsTime();
+    Date_t created = Date_t::now();
 
     _thread = stdx::thread([serviceContext, created] {
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.

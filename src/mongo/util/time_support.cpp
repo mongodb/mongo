@@ -116,10 +116,6 @@ bool Date_t::isFormattable() const {
 }
 
 
-// jsTime_virtual_skew is just for testing. a test command manipulates it.
-long long jsTime_virtual_skew = 0;
-thread_local long long jsTime_virtual_thread_skew = 0;
-
 void time_t_to_Struct(time_t t, struct tm* buf, bool local) {
     bool itWorked;
 #if defined(_WIN32)
@@ -579,28 +575,6 @@ int Backoff::getNextSleepMillis(long long lastSleepMillis,
         lastSleepMillis = std::min(lastSleepMillis * 2, _maxSleepMillis);
 
     return lastSleepMillis;
-}
-
-// DO NOT TOUCH except for testing
-void jsTimeVirtualSkew(long long skew) {
-    jsTime_virtual_skew = skew;
-}
-long long getJSTimeVirtualSkew() {
-    return jsTime_virtual_skew;
-}
-
-void jsTimeVirtualThreadSkew(long long skew) {
-    jsTime_virtual_thread_skew = skew;
-}
-
-long long getJSTimeVirtualThreadSkew() {
-    return jsTime_virtual_thread_skew;
-}
-
-/** Date_t is milliseconds since epoch */
-Date_t jsTime() {
-    return Date_t::now() + Milliseconds(getJSTimeVirtualThreadSkew()) +
-        Milliseconds(getJSTimeVirtualSkew());
 }
 
 #ifdef _WIN32  // no gettimeofday on windows

@@ -1383,7 +1383,7 @@ constexpr inline GenOIDLabeler GENOID;
 */
 struct DateNowLabeler {
     friend BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& valueStream, DateNowLabeler) {
-        return valueStream.builder().appendDate(valueStream.consumeFieldName(), jsTime());
+        return valueStream.builder().appendDate(valueStream.consumeFieldName(), Date_t::now());
     }
 };
 constexpr inline DateNowLabeler DATENOW;

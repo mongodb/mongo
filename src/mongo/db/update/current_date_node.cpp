@@ -52,7 +52,7 @@ constexpr StringData kTimestamp = "timestamp"_sd;
 
 void setValue(ServiceContext* service, mutablebson::Element* element, bool typeIsDate) {
     if (typeIsDate) {
-        invariant(element->setValueDate(mongo::jsTime()));
+        invariant(element->setValueDate(mongo::Date_t::now()));
     } else {
         invariant(element->setValueTimestamp(
             VectorClockMutable::get(service)->tickClusterTime(1).asTimestamp()));

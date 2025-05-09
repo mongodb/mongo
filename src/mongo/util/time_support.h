@@ -361,15 +361,6 @@ private:
     unsigned long long _lastErrorTimeMillis;
 };
 
-// DO NOT TOUCH except for testing
-void jsTimeVirtualSkew(long long skew);
-
-void jsTimeVirtualThreadSkew(long long skew);
-long long getJSTimeVirtualThreadSkew();
-
-/** Date_t is milliseconds since epoch */
-Date_t jsTime();
-
 unsigned long long curTimeMicros64();
 unsigned long long curTimeMillis64();
 

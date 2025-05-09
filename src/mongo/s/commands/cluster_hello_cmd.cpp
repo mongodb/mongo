@@ -264,7 +264,7 @@ public:
                             static_cast<long long>(MaxMessageSizeBytes));
         result.appendNumber(HelloCommandReply::kMaxWriteBatchSizeFieldName,
                             static_cast<long long>(write_ops::kMaxWriteBatchSize));
-        result.appendDate(HelloCommandReply::kLocalTimeFieldName, jsTime());
+        result.appendDate(HelloCommandReply::kLocalTimeFieldName, Date_t::now());
         result.append(HelloCommandReply::kLogicalSessionTimeoutMinutesFieldName,
                       localLogicalSessionTimeoutMinutes);
         result.appendNumber(HelloCommandReply::kConnectionIdFieldName,

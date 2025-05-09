@@ -129,7 +129,7 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
 
     builder.append(
         "host", prettyHostNameAndPort(expCtx->getOperationContext()->getClient()->getLocalPort()));
-    builder.appendDate("localTime", jsTime());
+    builder.appendDate("localTime", Date_t::now());
 
     if (spec.getOperationStats()) {
         // operationStats is only allowed when featureFlagCursorBasedTop is enabled.

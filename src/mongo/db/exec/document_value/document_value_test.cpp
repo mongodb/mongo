@@ -750,7 +750,7 @@ public:
         append("oid", OID());
         append("true", true);
         append("false", false);
-        append("date", jsTime());
+        append("date", Date_t::now());
         append("null", BSONNULL);
         append("regex", BSONRegEx(".*"));
         append("regexFlags", BSONRegEx(".*", "i"));

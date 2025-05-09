@@ -127,7 +127,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                               b);
     }
 
-    b.appendDate("ts", jsTime());
+    b.appendDate("ts", Date_t::now());
     b.append("client", opCtx->getClient()->clientAddress());
 
     if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {

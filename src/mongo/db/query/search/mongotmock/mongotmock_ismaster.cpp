@@ -83,7 +83,7 @@ public:
         result.appendBool("ismongot", true);
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", static_cast<long long>(MaxMessageSizeBytes));
-        result.appendDate("localTime", jsTime());
+        result.appendDate("localTime", Date_t::now());
 
         auto wireSpec = WireSpec::getWireSpec(opCtx->getServiceContext()).get();
         result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
