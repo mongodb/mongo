@@ -3,6 +3,8 @@
  * @tags: [
  *    assumes_unsharded_collection,
  *    requires_fcv_63,
+ *   # During fcv upgrade/downgrade the engine might not be what we expect.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

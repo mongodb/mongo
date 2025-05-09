@@ -4,6 +4,8 @@
  * @tags: [
  *   # Multiple servers can mess up the plan cache list.
  *   assumes_standalone_mongod,
+ *   # During fcv upgrade/downgrade the engine might not be what we expect.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";

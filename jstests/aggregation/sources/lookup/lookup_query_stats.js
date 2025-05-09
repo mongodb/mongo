@@ -11,7 +11,9 @@
  *     assumes_read_concern_unchanged,
  *     assumes_against_mongod_not_mongos,
  *     does_not_support_repeated_reads,
- *     requires_pipeline_optimization
+ *     requires_pipeline_optimization,
+ *     # During fcv upgrade/downgrade the engine might not be what we expect.
+ *     cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";

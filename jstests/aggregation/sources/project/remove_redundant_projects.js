@@ -3,6 +3,8 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
+//   # During fcv upgrade/downgrade the engine might not be what we expect.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 import {
     documentEq,

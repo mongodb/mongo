@@ -6,7 +6,9 @@
  *   requires_fcv_63,
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # During fcv upgrade/downgrade the engine might not be what we expect.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";

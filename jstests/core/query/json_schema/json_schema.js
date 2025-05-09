@@ -3,6 +3,8 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_non_retryable_commands,
 //   requires_getmore,
+//   # During fcv upgrade/downgrade the engine might not be what we expect.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 
 /**

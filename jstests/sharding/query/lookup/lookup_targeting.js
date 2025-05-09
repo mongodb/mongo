@@ -14,6 +14,8 @@
  *   # and this throws off the assumptions the test makes about SBE pushdown being enabled on all
  *   # nodes
  *   multiversion_incompatible,
+ *   # During fcv upgrade/downgrade the engine might not be what we expect.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 
@@ -772,7 +774,7 @@ shardTargetingTest.assertShardTargeting({
 });
 
 // Make sure the shard that is going to execute the nested $lookup has up-to-date routing info.
-db.getCollection(kShardedColl1Name).aggregate([ 
+db.getCollection(kShardedColl1Name).aggregate([
     {$lookup: {from: kShardedColl2Name, as: "out", pipeline: [
         {$lookup: {from: kUnsplittable1CollName, as: "out", pipeline: []}},
     ]}}

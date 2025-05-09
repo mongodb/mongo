@@ -7,6 +7,8 @@
 //   requires_pipeline_optimization,
 //   # Implicit index creation may change the plan/engine used.
 //   assumes_no_implicit_index_creation,
+//   # During fcv upgrade/downgrade the engine might not be what we expect.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";

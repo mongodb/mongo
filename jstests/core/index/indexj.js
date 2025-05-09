@@ -10,6 +10,8 @@
 //   # This test assumes that either SBE or classic is fully enabled and that we're not running in
 //   # a mixed version cluster.
 //   requires_fcv_63,
+//   # During fcv upgrade/downgrade the engine might not be what we expect.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";

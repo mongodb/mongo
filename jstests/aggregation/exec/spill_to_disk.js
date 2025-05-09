@@ -12,6 +12,8 @@
 //   requires_pipeline_optimization,
 //   requires_persistence,
 //   not_allowed_with_signed_security_token,
+//   # During fcv upgrade/downgrade the engine might not be what we expect.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 import "jstests/libs/query/sbe_assert_error_override.js";
 
