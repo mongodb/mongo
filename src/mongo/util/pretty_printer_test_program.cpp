@@ -67,6 +67,44 @@ private:
 };
 const unsigned testClass::static_member(128);
 
+struct NonEmptyHash {
+    std::size_t operator()(const std::string& key) const {
+        return 0;
+    }
+
+    int x = 0;
+};
+
+struct NonEmptyMapEq {
+    // This using directive activates heterogeneous lookup in the hash table
+    using is_transparent = void;
+
+    bool operator()(std::string lhs, std::string rhs) const {
+        return true;
+    }
+
+    int x = 0;
+};
+
+template <typename T>
+class NonEmptyAlloc {
+public:
+    using value_type = T;
+
+    NonEmptyAlloc() = default;
+
+    template <typename U>
+    constexpr NonEmptyAlloc(const NonEmptyAlloc<U>&) noexcept {}
+
+    T* allocate(std::size_t n) {
+        return nullptr;
+    }
+
+    void deallocate(T* p, std::size_t n) noexcept {}
+
+    int x = 0;
+};
+
 auto intVec = MyDecorable::declareDecoration<std::vector<int>>();
 auto str1 = MyDecorable::declareDecoration<std::string>();
 auto str2 = MyDecorable::declareDecoration<std::string>();
@@ -107,6 +145,14 @@ int clang_optnone main(int argc, char** argv) {
 
     mongo::StringSet strSet;
     strSet.insert("a");
+
+    absl::flat_hash_set<std::string, NonEmptyHash, mongo::StringMapEq> checkNonEmptyHash;
+    absl::flat_hash_set<std::string, mongo::StringMapHasher, NonEmptyMapEq> checkNonEmptyEq;
+    absl::flat_hash_set<std::string,
+                        mongo::StringMapHasher,
+                        mongo::StringMapEq,
+                        NonEmptyAlloc<std::string>>
+        checkNonEmptyAlloc;
 
     mongo::breakpoint();
 

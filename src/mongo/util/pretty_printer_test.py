@@ -54,8 +54,15 @@ def test_string_map():
     search(r'absl::flat_hash_map.*2 elems', int_map_results)
     search(r'\["a"\] = 1', int_map_results)
     search(r'\["b"\] = 1', int_map_results)
-    search(r'absl::flat_hash_map.*1 elems.*\{\["a"\] = "a_value"\}', gdb.execute('print strMap', to_string=True))
-    search(r'absl::flat_hash_set.*1 elems.*\{"a"\}', gdb.execute('print strSet', to_string=True))
+    search(
+        r'absl::flat_hash_map.*1 elems.*\{\["a"\] = "a_value"\}',
+        gdb.execute("print strMap", to_string=True),
+    )
+    search(r'absl::flat_hash_set.*1 elems.*\{"a"\}', gdb.execute("print strSet", to_string=True))
+    # Non empty Hash, Eq, or Alloc functors should pretty print without issues.
+    search(r"absl::flat_hash_set.*0 elems", gdb.execute("print checkNonEmptyHash", to_string=True))
+    search(r"absl::flat_hash_set.*0 elems", gdb.execute("print checkNonEmptyEq", to_string=True))
+    search(r"absl::flat_hash_set.*0 elems", gdb.execute("print checkNonEmptyAlloc", to_string=True))
 
 if __name__ == '__main__':
     try:
