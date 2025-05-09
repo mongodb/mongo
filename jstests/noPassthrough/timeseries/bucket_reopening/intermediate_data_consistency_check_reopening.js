@@ -46,6 +46,8 @@ function testIntegrityCheck(turnFailpointOn) {
     assert.commandWorked(coll.insert(measurements[1]));
 
     let stats = assert.commandWorked(coll.stats());
+    assert.eq(stats.timeseries.numBucketsFrozen, 0, tojson(stats.timeseries));
+    assert.eq(stats.timeseries.numBucketsFetched, 0, tojson(stats.timeseries));
     assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
 
     if (turnFailpointOn) {
@@ -57,7 +59,6 @@ function testIntegrityCheck(turnFailpointOn) {
         // reopened. We should try to insert into this bucket, but then fail when we try to add
         // on to it because of the failpoint. After the check fails we should freeze the first
         // bucket and insert into a new bucket C.
-        // TODO(SERVER-102482): Add below.
         // We won't close bucket A due to reopening because it is marked with a rolloverReason
         // before we try to load it into the bucket catalog. We will roll it over when we are
         // attempting to find open buckets because it is marked with a rollover reason.
@@ -68,13 +69,10 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketInserts, 3, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
-        // TODO(SERVER-102482): Un-comment checks with numBucketsClosedDueToReopening,
-        // numBucketsClosedDueToTimeForward, and numBucketsArchivedDueToTimeBackward.
-        // assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
-        // assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1,
-        // tojson(stats.timeseries));
-        // assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1,
-        // tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
 
         // Insert fourth measurement.
         assert.commandWorked(coll.insert(measurements[3]));
@@ -86,14 +84,10 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketInserts, 4, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
-        // TODO(SERVER-102482): Un-comment checks with numBucketsClosedDueToReopening,
-        // numBucketsClosedDueToTimeForward, and numBucketsArchivedDueToTimeBackward.
-        //
-        // assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
-        // assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1,
-        // tojson(stats.timeseries));
-        // assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 2,
-        // tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward, 2, tojson(stats.timeseries));
     } else {
         // Insert third measurement.
         assert.commandWorked(coll.insert(measurements[2]));
@@ -103,16 +97,13 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFrozen, 0, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketInserts, 2, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
-        // TODO(SERVER-102482): Un-comment checks with numBucketsClosedDueToReopening,
-        // numBucketsClosedDueToTimeForward, and numBucketsArchivedDueToTimeBackward.
-        // assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
-        //
+        assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
+
         // We won't close bucket A due to reopening because it is marked with a rolloverReason
         // before we try to load it into the bucket catalog.
-        // assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 0,
-        // tojson(stats.timeseries));
-        // assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1,
-        // tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 0, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
 
         // Insert fourth measurement.
         assert.commandWorked(coll.insert(measurements[3]));
@@ -120,23 +111,18 @@ function testIntegrityCheck(turnFailpointOn) {
         stats = assert.commandWorked(coll.stats());
         assert.eq(stats.timeseries.numBucketsReopened, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFrozen, 0, tojson(stats.timeseries));
-        // TODO(SERVER-102482): Un-comment check with numBucketsClosedDueToReopening.
-        // The current write path will 3 numBucketInserts because we will open a new bucket as we
-        // don't leave the soft-closed bucket from measurement 3.
-        // assert.eq(stats.timeseries.numBucketInserts, 2, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketInserts, 2, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
-        // TODO(SERVER-102482): Un-comment checks with numBucketsClosedDueToReopening,
-        // numBucketsClosedDueToTimeForward, and numBucketsArchivedDueToTimeBackward.
-        // assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
-        //
-        // We will re-open and use bucket A for measurement 4.
-        // assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 0,
-        // tojson(stats.timeseries));
-        // assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1,
-        // tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
+
+        // We will use bucket B which was marked with roll-over reason "TimeForward" for
+        // measurement 4.
+        assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
+        assert.eq(
+            stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
     }
 }
 
 testIntegrityCheck(/*turnFailpointOn=*/ false);
-testIntegrityCheck(/*turnFailPointOn=*/ true);
+testIntegrityCheck(/*turnFailpointOn=*/ true);
 rst.stopSet();
