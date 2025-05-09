@@ -286,6 +286,7 @@ void ObjectIdDistribution::init(DatasetDescriptorNew*, std::mt19937_64& gen) {
     // those integers to create N ObjectIds.
     std::vector<uint32_t> tmpRandSet;
     std::uniform_int_distribution<uint32_t> uniformDist{0, std::numeric_limits<uint32_t>::max()};
+    tmpRandSet.reserve(_ndv * 3);
     for (size_t i = 0; i < _ndv * 3; ++i) {
         tmpRandSet.push_back(uniformDist(gen));
     }

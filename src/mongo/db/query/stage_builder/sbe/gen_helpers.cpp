@@ -968,6 +968,7 @@ std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
 
 std::vector<ProjectNode> cloneProjectNodes(const std::vector<ProjectNode>& nodes) {
     std::vector<ProjectNode> clonedNodes;
+    clonedNodes.reserve(nodes.size());
     for (const auto& node : nodes) {
         clonedNodes.emplace_back(node.clone());
     }

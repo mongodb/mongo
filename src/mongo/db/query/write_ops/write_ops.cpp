@@ -149,7 +149,7 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
             write_ops::kStmtIdSize + kPerElementOverhead;
     }
 
-    if (auto stmtIds = base.getStmtIds(); stmtIds) {
+    if (const auto& stmtIds = base.getStmtIds(); stmtIds) {
         estSize += write_ops::WriteCommandRequestBase::kStmtIdsFieldName.size();
         estSize += static_cast<int>(BSONObj::kMinBSONLength);
         estSize +=
@@ -163,12 +163,12 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
             kBoolSize + kPerElementOverhead;
     }
 
-    if (auto collUUID = base.getCollectionUUID(); collUUID) {
+    if (const auto& collUUID = base.getCollectionUUID(); collUUID) {
         estSize += write_ops::WriteCommandRequestBase::kCollectionUUIDFieldName.size() + kUUIDSize +
             kPerElementOverhead;
     }
 
-    if (auto encryptionInfo = base.getEncryptionInformation(); encryptionInfo) {
+    if (const auto& encryptionInfo = base.getEncryptionInformation(); encryptionInfo) {
         estSize += write_ops::WriteCommandRequestBase::kEncryptionInformationFieldName.size() +
             encryptionInfo->toBSON().objsize() + kPerElementOverhead;
     }
@@ -179,12 +179,12 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
             kBoolSize + kPerElementOverhead;
     }
 
-    if (auto query = base.getOriginalQuery(); query) {
+    if (const auto& query = base.getOriginalQuery(); query) {
         estSize += write_ops::WriteCommandRequestBase::kOriginalQueryFieldName.size() +
             query->objsize() + kPerElementOverhead;
     }
 
-    if (auto originalCollation = base.getOriginalCollation(); originalCollation) {
+    if (const auto& originalCollation = base.getOriginalCollation(); originalCollation) {
         estSize += write_ops::WriteCommandRequestBase::kOriginalCollationFieldName.size() +
             originalCollation->objsize() + kPerElementOverhead;
     }
@@ -617,13 +617,13 @@ int getUpdateHeaderSizeEstimate(const UpdateCommandRequest& updateReq) {
         static_cast<int>(BSONObj::kMinBSONLength);
 
     // Handle legacy runtime constants.
-    if (auto runtimeConstants = updateReq.getLegacyRuntimeConstants();
+    if (const auto& runtimeConstants = updateReq.getLegacyRuntimeConstants();
         runtimeConstants.has_value()) {
         size += estimateRuntimeConstantsSize(*runtimeConstants);
     }
 
     // Handle let parameters.
-    if (auto let = updateReq.getLet(); let.has_value()) {
+    if (const auto& let = updateReq.getLet(); let.has_value()) {
         size += write_ops::UpdateCommandRequest::kLetFieldName.size() + let->objsize() +
             kPerElementOverhead;
     }
@@ -641,13 +641,13 @@ int getDeleteHeaderSizeEstimate(const DeleteCommandRequest& deleteReq) {
         static_cast<int>(BSONObj::kMinBSONLength);
 
     // Handle legacy runtime constants.
-    if (auto runtimeConstants = deleteReq.getLegacyRuntimeConstants();
+    if (const auto& runtimeConstants = deleteReq.getLegacyRuntimeConstants();
         runtimeConstants.has_value()) {
         size += estimateRuntimeConstantsSize(*runtimeConstants);
     }
 
     // Handle let parameters.
-    if (auto let = deleteReq.getLet(); let.has_value()) {
+    if (const auto& let = deleteReq.getLet(); let.has_value()) {
         size += write_ops::UpdateCommandRequest::kLetFieldName.size() + let->objsize() +
             kPerElementOverhead;
     }

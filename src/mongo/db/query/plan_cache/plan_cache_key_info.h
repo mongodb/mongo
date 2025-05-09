@@ -48,7 +48,7 @@ namespace mongo {
 class PlanCacheKeyInfo {
 public:
     PlanCacheKeyInfo(CanonicalQuery::QueryShapeString shapeString,
-                     std::string indexabilityString,
+                     const std::string& indexabilityString,
                      query_settings::QuerySettings querySettings)
         : _lengthOfQueryShape{shapeString.size()}, _querySettings{std::move(querySettings)} {
         _key = std::move(shapeString);

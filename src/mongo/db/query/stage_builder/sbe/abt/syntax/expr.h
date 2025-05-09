@@ -438,7 +438,7 @@ class MultiLet final : public ABTOpDynamicArity<0>, public ExpressionSyntaxSort 
 
 public:
     MultiLet(std::vector<ProjectionName> names, ABTVector exprs)
-        : Base(std::move(exprs)), _varNames(names) {
+        : Base(std::move(exprs)), _varNames(std::move(names)) {
         for (auto&& a : nodes()) {
             assertExprSort(a);
         }

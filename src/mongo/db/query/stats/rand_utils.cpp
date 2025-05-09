@@ -69,7 +69,7 @@ DatasetDescriptor::DatasetDescriptor(const DataTypeDistribution& dataTypeDistrib
       _uniformIntDist{minInt, maxInt},
       _arrNDV(arrNDV),
       _uniformArrSizeDist{minArrLen, maxArrLen},
-      _nestedDataDescriptor(nestedDataDescriptor) {
+      _nestedDataDescriptor(std::move(nestedDataDescriptor)) {
     uassert(6660520, "Maximum integer number must be >= the minimum one.", (maxInt >= minInt));
     uassert(6660521, "Maximum string size must be >= the minimum one.", (maxStrLen >= minStrLen));
     uassert(6660522,
@@ -78,7 +78,7 @@ DatasetDescriptor::DatasetDescriptor(const DataTypeDistribution& dataTypeDistrib
     uassert(6660523,
             "Nested arrays requires sensible array lengths",
             !_nestedDataDescriptor || maxArrLen >= minArrLen);
-    uassert(6660524, "Recursive descriptors are not allowed.", nestedDataDescriptor.get() != this);
+    uassert(6660524, "Recursive descriptors are not allowed.", _nestedDataDescriptor.get() != this);
     uassert(6660525,
             "reuseScalarsRatio is a probability, must be in [0, 1].",
             reuseScalarsRatio >= 0 && reuseScalarsRatio <= 1.0);
@@ -317,7 +317,7 @@ std::vector<SBEValue> genFixedValueArray(size_t nElems,
 
     for (size_t i = 0; i < std::round(nElems * strRatio); ++i) {
         size_t idx = i % stringSet.size();
-        const auto randStr = stringSet[idx];
+        const auto& randStr = stringSet[idx];
         const auto [tag, val] = value::makeNewString(randStr);
         values.emplace_back(tag, val);
     }
@@ -353,7 +353,7 @@ std::vector<SBEValue> genRandomValueArray(size_t nElems,
     std::uniform_int_distribution<size_t> idxDistr{0, stringSet.size() - 1};
     for (size_t i = 0; i < std::round(nElems * strRatio); ++i) {
         size_t idx = idxDistr(gen);
-        const auto randStr = stringSet[idx];
+        const auto& randStr = stringSet[idx];
         const auto [tag, val] = value::makeNewString(randStr);
         randValues.emplace_back(tag, val);
     }

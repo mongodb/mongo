@@ -1071,7 +1071,7 @@ OrderedIntervalList openOil(std::string fieldName) {
     BSONObjBuilder bob;
     bob.appendMinKey("");
     bob.appendMaxKey("");
-    out.name = fieldName;
+    out.name = std::move(fieldName);
     out.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
     return out;
@@ -1139,7 +1139,7 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     }
 
     auto res = conjCard(selOffset, _inputCard);
-    for (const auto& sel : residualSels) {
+    for (auto& sel : residualSels) {
         _conjSels.emplace_back(std::move(sel));
     }
     return res;

@@ -150,7 +150,7 @@ struct DepsTracker {
      * TruncateToRootLevel::yes requires all dependencies to be top-level.
      * The example above would return ["a", "c"]
      */
-    static OrderedPathSet simplifyDependencies(OrderedPathSet dependencies,
+    static OrderedPathSet simplifyDependencies(const OrderedPathSet& dependencies,
                                                TruncateToRootLevel truncation);
 
     /**

@@ -52,8 +52,12 @@ std::unique_ptr<PlanYieldPolicyRemoteCursor> PlanYieldPolicyRemoteCursor::make(
         yieldable = &collections.getMainCollection();
     }
 
-    auto yieldPolicy = std::unique_ptr<PlanYieldPolicyRemoteCursor>(new PlanYieldPolicyRemoteCursor(
-        opCtx, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(nss), exec));
+    auto yieldPolicy = std::unique_ptr<PlanYieldPolicyRemoteCursor>(
+        new PlanYieldPolicyRemoteCursor(opCtx,
+                                        policy,
+                                        yieldable,
+                                        std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)),
+                                        exec));
     return yieldPolicy;
 }
 

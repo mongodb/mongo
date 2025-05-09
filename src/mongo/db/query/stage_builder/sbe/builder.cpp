@@ -1829,7 +1829,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
 
     // Define a lambda for creating a SortedMergeStage.
     auto makeSortedMergeStage = [&](sbe::PlanStage::Vector inputStages,
-                                    std::vector<SbSlotVector> inputSlots) {
+                                    const std::vector<SbSlotVector>& inputSlots) {
         return b.makeSortedMerge(std::move(inputStages), inputSlots, keys, std::move(dirs));
     };
 
@@ -3124,7 +3124,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOr(const QuerySol
 
     // Define a lambda for creating a UnionStage.
     auto makeUnionStage = [&](sbe::PlanStage::Vector inputStages,
-                              std::vector<SbSlotVector> inputSlots) {
+                              const std::vector<SbSlotVector>& inputSlots) {
         return b.makeUnion(std::move(inputStages), inputSlots);
     };
 
@@ -3520,7 +3520,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::makeUnionForTailableCo
 
     // Define a lambda for creating a UnionStage.
     auto makeUnionStage = [&](sbe::PlanStage::Vector inputStages,
-                              std::vector<SbSlotVector> inputSlots) {
+                              const std::vector<SbSlotVector>& inputSlots) {
         return b.makeUnion(std::move(inputStages), inputSlots);
     };
 
@@ -4719,6 +4719,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildWindow(const Quer
         SbBuilder b(_state, windowNode->nodeId());
 
         std::vector<ProjectNode> nodes;
+        nodes.reserve(windowFields.size());
         for (size_t i = 0; i < windowFields.size(); ++i) {
             nodes.emplace_back(SbExpr{windowFinalSlots[i]});
         }

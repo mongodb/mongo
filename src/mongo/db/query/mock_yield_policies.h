@@ -73,7 +73,7 @@ public:
     }
 
     Status yieldOrInterrupt(OperationContext*,
-                            std::function<void()> whileYieldingFn,
+                            const std::function<void()>& whileYieldingFn,
                             RestoreContext::RestoreType restoreType) override {
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
@@ -95,7 +95,7 @@ public:
     }
 
     Status yieldOrInterrupt(OperationContext*,
-                            std::function<void()> whileYieldingFn,
+                            const std::function<void()>& whileYieldingFn,
                             RestoreContext::RestoreType restoreType) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
     }
@@ -118,7 +118,7 @@ public:
     }
 
     Status yieldOrInterrupt(OperationContext*,
-                            std::function<void()> whileYieldingFn,
+                            const std::function<void()>& whileYieldingFn,
                             RestoreContext::RestoreType restoreType) override {
         MONGO_UNREACHABLE;
     }

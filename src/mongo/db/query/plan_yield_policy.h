@@ -234,7 +234,7 @@ public:
      * been relinquished.
      */
     virtual Status yieldOrInterrupt(OperationContext* opCtx,
-                                    std::function<void()> whileYieldingFn,
+                                    const std::function<void()>& whileYieldingFn,
                                     RestoreContext::RestoreType restoreType);
 
     /**

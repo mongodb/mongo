@@ -73,8 +73,8 @@ void assertLanguageFeatureIsAllowed(
             break;
         }
         case AllowedWithApiStrict::kConditionally: {
-            if (auto callback = conditionalCallback) {
-                (*callback)(apiParameters);
+            if (conditionalCallback) {
+                (*conditionalCallback)(apiParameters);
             }
             break;
         }

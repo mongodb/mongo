@@ -81,6 +81,7 @@ BatchedCommandGenerator makeUpdateCommandGenerator() {
 std::vector<write_ops::UpdateOpEntry> constructUpdateEntries(
     MongoProcessInterface::BatchedObjects&& batch, UpsertType upsert, bool multi) {
     std::vector<write_ops::UpdateOpEntry> updateEntries;
+    updateEntries.reserve(batch.size());
     for (auto&& obj : batch) {
         write_ops::UpdateOpEntry entry;
         auto&& [q, u, c] = obj;

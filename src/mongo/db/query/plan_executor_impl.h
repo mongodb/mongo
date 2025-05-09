@@ -248,7 +248,8 @@ private:
     bool _handleEOFAndExit(PlanStage::StageState code,
                            std::unique_ptr<insert_listener::Notifier>& notifier);
 
-    MONGO_COMPILER_ALWAYS_INLINE void _checkIfMustYield(std::function<void()> whileYieldingFn) {
+    MONGO_COMPILER_ALWAYS_INLINE void _checkIfMustYield(
+        const std::function<void()>& whileYieldingFn) {
         // These are the conditions which can cause us to yield:
         //   1) The yield policy's timer elapsed, or
         //   2) some stage requested a yield, or

@@ -66,7 +66,7 @@ void invokeCallbackOnTrailingValue(const Value& value, std::function<void(const 
     }
 }
 
-void visitAllValuesAtPathHelper(Document doc,
+void visitAllValuesAtPathHelper(const Document& doc,
                                 const FieldPath& path,
                                 size_t fieldPathIndex,
                                 std::function<void(const Value&)> callback) {

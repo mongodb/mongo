@@ -549,6 +549,7 @@ void buildLogicalExpression(abt::Operations op,
     // Move the children's outputs off of the matchStack into a vector in preparation for
     // calling makeBooleanOpTree().
     std::vector<SbExpr> exprs;
+    exprs.reserve(numChildren);
     for (size_t i = 0; i < numChildren; ++i) {
         exprs.emplace_back(frame.popExpr());
     }
@@ -838,6 +839,7 @@ public:
         // Move the children's outputs off of the expr stack into a vector in preparation for
         // calling makeBooleanOpTree().
         std::vector<SbExpr> exprs;
+        exprs.reserve(numChildren);
         for (size_t i = 0; i < numChildren; ++i) {
             exprs.emplace_back(_context->topFrame().popExpr());
         }

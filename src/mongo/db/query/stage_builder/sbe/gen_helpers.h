@@ -726,6 +726,7 @@ public:
 
     static std::vector<Type> getNodeTypes(const std::vector<ProjectNode>& nodes) {
         std::vector<Type> nodeTypes;
+        nodeTypes.reserve(nodes.size());
         for (const auto& node : nodes) {
             nodeTypes.emplace_back(node.type());
         }

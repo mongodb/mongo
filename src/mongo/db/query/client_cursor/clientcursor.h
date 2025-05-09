@@ -239,7 +239,7 @@ public:
         _metrics.incrementNreturned(n);
     }
 
-    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
+    void incrementCursorMetrics(const OpDebug::AdditiveMetrics& newMetrics) {
         _metrics.add(newMetrics);
         if (!_firstResponseExecutionTime) {
             _firstResponseExecutionTime = _metrics.executionTime;

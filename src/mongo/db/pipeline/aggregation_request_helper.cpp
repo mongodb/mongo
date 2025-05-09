@@ -154,7 +154,7 @@ void validate(const AggregateCommandRequest& aggregate,
                           << " must be set for non-oplog namespace",
             !hasRequestResumeToken || !nss.isOplog());
     if (hasRequestResumeToken) {
-        auto hintElem = aggregate.getHint();
+        const auto& hintElem = aggregate.getHint();
         uassert(ErrorCodes::BadValue,
                 "hint must be {$natural:1} if 'requestResumeToken' is enabled",
                 hintElem.has_value() &&

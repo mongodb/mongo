@@ -118,7 +118,7 @@ void PlanYieldPolicy::resetTimer() {
 }
 
 Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
-                                         std::function<void()> whileYieldingFn,
+                                         const std::function<void()>& whileYieldingFn,
                                          RestoreContext::RestoreType restoreType) {
     invariant(opCtx);
 

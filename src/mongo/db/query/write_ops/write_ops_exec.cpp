@@ -2211,7 +2211,7 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
         return false;
     }
 
-    auto keyPattern = errorInfo.getKeyPattern();
+    const auto& keyPattern = errorInfo.getKeyPattern();
     if (equalities.size() != static_cast<size_t>(keyPattern.nFields())) {
         return false;
     }
@@ -2233,7 +2233,7 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
         }
     }
 
-    auto keyValue = errorInfo.getDuplicatedKeyValue();
+    const auto& keyValue = errorInfo.getDuplicatedKeyValue();
 
     BSONObjIterator keyPatternIter(keyPattern);
     BSONObjIterator keyValueIter(keyValue);

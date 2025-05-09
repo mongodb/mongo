@@ -131,7 +131,7 @@ inline auto end(const ASTNode& node) {
 
 class MatchExpressionASTNode final : public ASTNode {
 public:
-    MatchExpressionASTNode(CopyableMatchExpression matchExpr) : _matchExpr{matchExpr} {}
+    MatchExpressionASTNode(const CopyableMatchExpression& matchExpr) : _matchExpr{matchExpr} {}
 
     MatchExpressionASTNode(const MatchExpressionASTNode& other)
         : ASTNode{other}, _matchExpr{other._matchExpr} {}
@@ -357,7 +357,7 @@ public:
 
 class ExpressionASTNode final : public ASTNode {
 public:
-    ExpressionASTNode(boost::intrusive_ptr<Expression> expr) : _expr(expr) {}
+    ExpressionASTNode(boost::intrusive_ptr<Expression> expr) : _expr(std::move(expr)) {}
     ExpressionASTNode(const ExpressionASTNode& other) : ASTNode(other) {
         BSONObjBuilder bob;
         bob << "" << other._expr->serialize();

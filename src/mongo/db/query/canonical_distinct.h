@@ -95,7 +95,7 @@ public:
         return _projSpec;
     }
 
-    void setProjectionSpec(const BSONObj& projSpec) {
+    void setProjectionSpec(BSONObj projSpec) {
         _projSpec = std::move(projSpec);
     }
 

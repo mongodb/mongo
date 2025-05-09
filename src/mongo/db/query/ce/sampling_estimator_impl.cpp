@@ -135,6 +135,7 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
 std::vector<BSONObj> SamplingEstimatorImpl::getIndexKeys(const IndexBounds& bounds,
                                                          const BSONObj& doc) {
     std::vector<const char*> fieldNames;
+    fieldNames.reserve(bounds.fields.size());
     for (size_t i = 0; i < bounds.fields.size(); ++i) {
         fieldNames.push_back(bounds.fields[i].name.c_str());
     }
@@ -517,6 +518,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateKeysScanned(
     const std::vector<const IndexBounds*>& bounds) const {
     std::vector<CardinalityEstimate> estimates;
+    estimates.reserve(bounds.size());
     for (size_t i = 0; i < bounds.size(); i++) {
         estimates.push_back(estimateKeysScanned(*bounds[i]));
     }
@@ -530,6 +532,7 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateRIDs(
     tassert(9942301,
             "bounds and expressions should have equal size.",
             expressions.size() == bounds.size());
+    estimates.reserve(bounds.size());
     for (size_t i = 0; i < bounds.size(); i++) {
         estimates.push_back(estimateRIDs(*bounds[i], expressions[i]));
     }

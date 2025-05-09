@@ -98,7 +98,7 @@ void addReplaceRootForDistinct(BSONArrayBuilder* pipelineBuilder, const FieldPat
 
 std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
                                                    const DistinctCommandRequest& distinct) {
-    auto collation = distinct.getCollation();
+    const auto& collation = distinct.getCollation();
 
     if (!collation || collation->isEmpty()) {
         return nullptr;
@@ -216,7 +216,7 @@ StatusWith<BSONObj> asAggregation(const CanonicalQuery& query) {
         aggregationBuilder.append(query_request_helper::cmdOptionMaxTimeMS, maxTimeMS);
     }
 
-    if (auto rc = findCommand.getReadConcern(); rc && !rc->isEmpty()) {
+    if (const auto& rc = findCommand.getReadConcern(); rc && !rc->isEmpty()) {
         aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, rc->toBSONInner());
     }
 

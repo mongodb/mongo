@@ -1472,12 +1472,14 @@ boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>&&
         expressionsWithChildrenInPlace) {
     std::vector<boost::intrusive_ptr<Expression>> children;
-    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>> expressions;
+    children.reserve(expressionsWithChildrenInPlace.size());
     for (auto& [unused, expression] : expressionsWithChildrenInPlace)
         // These 'push_back's must complete before we insert references to the 'children' vector
         // into the 'expressions' vector since 'push_back' invalidates references.
         children.push_back(std::move(expression));
     std::vector<boost::intrusive_ptr<Expression>>::size_type index = 0;
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>> expressions;
+    expressions.reserve(expressionsWithChildrenInPlace.size());
     for (auto& [fieldName, unused] : expressionsWithChildrenInPlace) {
         expressions.emplace_back(fieldName, children[index]);
         ++index;
@@ -1690,7 +1692,7 @@ Value ExpressionFieldPath::evaluate(const Document& root, Variables* variables) 
 
 namespace {
 // Shared among expressions that need to serialize dotted paths and redact the path components.
-auto getPrefixAndPath(FieldPath path) {
+auto getPrefixAndPath(const FieldPath& path) {
     if (path.getFieldName(0) == "CURRENT" && path.getPathLength() > 1) {
         // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
         return std::make_pair(std::string("$"), path.tail());

@@ -193,12 +193,13 @@ public:
     /*
      * Returns a list of all open cursors for the given session.
      */
-    stdx::unordered_set<CursorId> getCursorsForSession(LogicalSessionId lsid) const;
+    stdx::unordered_set<CursorId> getCursorsForSession(const LogicalSessionId& lsid) const;
 
     /*
      * Returns a list of all open cursors for the given set of OperationKeys.
      */
-    stdx::unordered_set<CursorId> getCursorsForOpKeys(std::vector<OperationKey>) const;
+    stdx::unordered_set<CursorId> getCursorsForOpKeys(
+        const std::vector<OperationKey>& opKeys) const;
 
     /**
      * Returns the number of ClientCursors currently registered.

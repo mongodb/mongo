@@ -37,7 +37,7 @@ namespace mongo {
  * becomes   : {$or: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
  */
 template <typename... Args>
-inline BSONFieldValue<BSONArray> OR(Args... args) {
+inline BSONFieldValue<BSONArray> OR(Args&&... args) {
     return {"$or", (BSONArrayBuilder{}.lvalue() << ... << args).arr()};
 }
 
@@ -46,7 +46,7 @@ inline BSONFieldValue<BSONArray> OR(Args... args) {
  * becomes   : {$and: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
  */
 template <typename... Args>
-inline BSONFieldValue<BSONArray> AND(Args... args) {
+inline BSONFieldValue<BSONArray> AND(Args&&... args) {
     return {"$and", (BSONArrayBuilder{}.lvalue() << ... << args).arr()};
 }
 
@@ -55,7 +55,7 @@ inline BSONFieldValue<BSONArray> AND(Args... args) {
  * becomes   : {$nor: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
  */
 template <typename... Args>
-inline BSONFieldValue<BSONArray> NOR(Args... args) {
+inline BSONFieldValue<BSONArray> NOR(Args&&... args) {
     return {"$nor", (BSONArrayBuilder{}.lvalue() << ... << args).arr()};
 }
 

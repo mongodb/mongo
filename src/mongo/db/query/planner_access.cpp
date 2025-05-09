@@ -547,7 +547,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     int direction,
     const MatchExpression* root) {
     // The following are expensive to look up, so only do it once for each.
-    const mongo::NamespaceString nss = query.nss();
+    const NamespaceString& nss = query.nss();
     const bool isOplog = nss.isOplog();
     const bool isChangeCollection = nss.isChangeCollection();
 

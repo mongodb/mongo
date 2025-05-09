@@ -425,7 +425,7 @@ private:
     }
 
     template <typename OutputStream>
-    static auto insertString(OutputStream& os, std::string str) {
+    static auto insertString(OutputStream& os, const std::string& str) {
         if (str.length() == 0) {
             return Status{ErrorCodes::Error{7340200}, "Cannot append empty string"};
         }

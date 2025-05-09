@@ -374,7 +374,7 @@ public:
         _params.resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
-    void addResolvedNamespace(NamespaceString nss, const ResolvedNamespace& resolvedNs) {
+    void addResolvedNamespace(const NamespaceString& nss, const ResolvedNamespace& resolvedNs) {
         auto it = _params.resolvedNamespaces.find(nss);
 
         // Assert that the resolved namespace we are adding either doesn't exist in the map or we
@@ -1203,7 +1203,7 @@ protected:
         }
 
         void setCollator(std::shared_ptr<CollatorInterface> collator) {
-            _ptr = collator;
+            _ptr = std::move(collator);
             // If we are manually setting the collator, we shouldn't ignore it.
             _ignore = false;
         }

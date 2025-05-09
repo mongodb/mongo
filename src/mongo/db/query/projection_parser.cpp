@@ -393,10 +393,7 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
 /**
  * Treats the given element as an inclusion projection, and update the tree as necessary.
  */
-void parseInclusion(ParseContext* ctx,
-                    BSONElement elem,
-                    ProjectionPathASTNode* parent,
-                    boost::optional<FieldPath> fullPathToParent) {
+void parseInclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* parent) {
     // There are special rules about _id being included. _id may be included in both inclusion and
     // exclusion projections.
     const bool isTopLevelIdProjection = elem.fieldNameStringData() == "_id" && parent->isRoot();
@@ -466,7 +463,7 @@ void parseInclusion(ParseContext* ctx,
 }
 
 /**
- * Treates the given element as an exclusion projection and updates the tree as necessary.
+ * Treats the given element as an exclusion projection and updates the tree as necessary.
  */
 void parseExclusion(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* parent) {
     invariant(!elem.trueValue());
@@ -509,7 +506,7 @@ void parseLiteral(ParseContext* ctx, BSONElement elem, ProjectionPathASTNode* pa
 // Mutually recursive with parseSubObject().
 void parseElement(ParseContext* ctx,
                   BSONElement elem,
-                  boost::optional<FieldPath> fullPathToParent,
+                  const boost::optional<FieldPath>& fullPathToParent,
                   ProjectionPathASTNode* parent);
 
 /**
@@ -519,7 +516,7 @@ void parseElement(ParseContext* ctx,
  */
 void parseSubObject(ParseContext* ctx,
                     StringData objFieldName,
-                    boost::optional<FieldPath> fullPathToParent,
+                    const boost::optional<FieldPath>& fullPathToParent,
                     const BSONObj& obj,
                     ProjectionPathASTNode* parent) {
     uassert(
@@ -562,9 +559,15 @@ void parseSubObject(ParseContext* ctx,
         addNodeAtPath(parent, path, std::move(ownedChild));
     }
 
-    const FieldPath fullPathToNewParent = fullPathToParent ? fullPathToParent->concat(path) : path;
-    for (auto&& elem : obj) {
-        parseElement(ctx, elem, fullPathToNewParent, newParent);
+    auto parseObjectElements = [&](FieldPath path) {
+        for (auto&& elem : obj) {
+            parseElement(ctx, elem, path, newParent);
+        }
+    };
+    if (fullPathToParent) {
+        parseObjectElements(fullPathToParent->concat(path));
+    } else {
+        parseObjectElements(path);
     }
 }
 
@@ -574,7 +577,7 @@ void parseSubObject(ParseContext* ctx,
  */
 void parseElement(ParseContext* ctx,
                   BSONElement elem,
-                  boost::optional<FieldPath> fullPathToParent,
+                  const boost::optional<FieldPath>& fullPathToParent,
                   ProjectionPathASTNode* parent) {
     const bool hasPositional = hasPositionalOperator(elem.fieldNameStringData());
 
@@ -614,7 +617,7 @@ void parseElement(ParseContext* ctx,
                    ProjectionPolicies::ComputedFieldsPolicy::kOnlyComputedFields &&
                isInclusionOrExclusionType(elem.type())) {
         if (elem.trueValue()) {
-            parseInclusion(ctx, elem, parent, fullPathToParent);
+            parseInclusion(ctx, elem, parent);
         } else {
             uassert(31395, "positional projection cannot be used with exclusion", !hasPositional);
             parseExclusion(ctx, elem, parent);
@@ -640,7 +643,7 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     ProjectionPathASTNode root;
 
-    ParseContext ctx{expCtx, query, queryObj, obj, policies};
+    ParseContext ctx{std::move(expCtx), query, queryObj, obj, policies};
 
     // $addFields is treated as a projection that has only computed fields.
     if (policies.computedFieldsPolicy ==

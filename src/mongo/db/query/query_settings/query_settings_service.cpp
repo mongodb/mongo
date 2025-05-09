@@ -87,7 +87,7 @@ MONGO_FAIL_POINT_DEFINE(allowAllSetQuerySettings);
  * If the pipeline starts with a "system"/administrative document source to which query settings
  * should not be applied, return the relevant stage name.
  */
-boost::optional<std::string> getStageExemptedFromRejection(const std::vector<BSONObj> pipeline) {
+boost::optional<std::string> getStageExemptedFromRejection(const std::vector<BSONObj>& pipeline) {
     if (pipeline.empty()) {
         return boost::none;
     }
@@ -99,7 +99,7 @@ boost::optional<std::string> getStageExemptedFromRejection(const std::vector<BSO
 
     // Currently, all "system" queries are always the first stage in a pipeline.
     std::string firstStageName{pipeline.at(0).firstElementFieldName()};
-    return {firstStageName};
+    return {std::move(firstStageName)};
 }
 
 void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,

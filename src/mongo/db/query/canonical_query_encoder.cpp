@@ -824,7 +824,7 @@ void encodeFindCommandRequest(const CanonicalQuery& cq, BufBuilder* bufBuilder) 
     // Read concern "available" results in SBE plans that do not perform shard filtering, so it must
     // be encoded differently from other read concerns.
     bool isAvailableReadConcern{false};
-    if (const auto readConcern = findCommand.getReadConcern()) {
+    if (const auto& readConcern = findCommand.getReadConcern()) {
         isAvailableReadConcern =
             readConcern->getLevel() == repl::ReadConcernLevel::kAvailableReadConcern;
     }
@@ -1144,7 +1144,7 @@ private:
         SerializationOptions opts;
         opts.inMatchExprSortAndDedupElements = false;
 
-        encodeHelper(expr->getSerializedRightHandSide(std::move(opts)));
+        encodeHelper(expr->getSerializedRightHandSide(opts));
     }
 
     /**
@@ -1157,7 +1157,7 @@ private:
         encodeHelper(expr->serialize());
     }
 
-    void encodeHelper(BSONObj toEncode) {
+    void encodeHelper(const BSONObj& toEncode) {
         tassert(6142102, "expected object to encode to be non-empty", !toEncode.isEmpty());
         BSONObjIterator objIter{toEncode};
         BSONElement firstElem = objIter.next();

@@ -151,8 +151,8 @@ CollectionScanParams createCollectionScanParams(
             ResumeScanPoint{*resumeAfterRecordId, false /* tolerateKeyNotFound */};
     }
 
-    params.minRecord = minRecord;
-    params.maxRecord = maxRecord;
+    params.minRecord = std::move(minRecord);
+    params.maxRecord = std::move(maxRecord);
     if (InternalPlanner::FORWARD == direction) {
         params.direction = CollectionScanParams::FORWARD;
     } else {
@@ -215,8 +215,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                                      &collectionPtr,
                                                      direction,
                                                      resumeAfterRecordId,
-                                                     minRecord,
-                                                     maxRecord,
+                                                     std::move(minRecord),
+                                                     std::move(maxRecord),
                                                      boundInclusion,
                                                      shouldReturnEofOnFilterMismatch);
 
@@ -292,8 +292,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      &collectionPtr,
                                                      direction,
                                                      boost::none /* resumeAfterId */,
-                                                     minRecord,
-                                                     maxRecord,
+                                                     std::move(minRecord),
+                                                     std::move(maxRecord),
                                                      boundInclusion,
                                                      shouldReturnEofOnFilterMismatch);
 

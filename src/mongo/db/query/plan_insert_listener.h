@@ -76,7 +76,7 @@ public:
 class LocalCappedInsertNotifier final : public Notifier {
 public:
     LocalCappedInsertNotifier(std::shared_ptr<CappedInsertNotifier> notifier)
-        : _notifier(notifier) {}
+        : _notifier(std::move(notifier)) {}
 
     void prepareForWait(OperationContext* opCtx) final {
         invariant(_notifier);

@@ -555,7 +555,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionCo
     return ExpressionContextBuilder{}
         .opCtx(opCtx)
         .ns(nss)
-        .letParameters(shapifiedLet)
+        .letParameters(std::move(shapifiedLet))
         .blankExpressionContext(true)
         .build();
 }
@@ -599,7 +599,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                       .ifrContext(_params.ifrContext)
                       .collator(std::move(collator))
                       .mongoProcessInterface(_params.mongoProcessInterface)
-                      .ns(ns)
+                      .ns(std::move(ns))
                       .resolvedNamespace(_params.resolvedNamespaces)
                       .mayDbProfile(_params.mayDbProfile)
                       .fromRouter(_params.fromRouter)

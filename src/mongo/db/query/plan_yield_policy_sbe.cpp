@@ -52,7 +52,7 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
                 internalQueryExecYieldIterations.load(),
                 Milliseconds{internalQueryExecYieldPeriodMS.load()},
                 yieldable,
-                std::make_unique<YieldPolicyCallbacksImpl>(nss));
+                std::make_unique<YieldPolicyCallbacksImpl>(std::move(nss)));
 }
 
 std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(

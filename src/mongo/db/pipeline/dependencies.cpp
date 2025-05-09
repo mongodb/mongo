@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-OrderedPathSet DepsTracker::simplifyDependencies(OrderedPathSet dependencies,
+OrderedPathSet DepsTracker::simplifyDependencies(const OrderedPathSet& dependencies,
                                                  TruncateToRootLevel truncateToRootLevel) {
     // The key operation here is folding dependencies into ancestor dependencies, wherever possible.
     // This is assisted by a special sort in OrderedPathSet that treats '.'

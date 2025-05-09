@@ -231,6 +231,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
 
     // Get stat trees from each plan.
     std::vector<std::unique_ptr<PlanStageStats>> statTrees;
+    statTrees.reserve(candidates.size());
     for (size_t i = 0; i < candidates.size(); ++i) {
         statTrees.push_back(candidates[i].root->getStats());
     }

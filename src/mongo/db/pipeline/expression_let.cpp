@@ -137,6 +137,7 @@ boost::intrusive_ptr<Expression> ExpressionLet::create(
     VariablesParseState vpsSub(vpsIn);  // vpsSub gets our vars, vpsIn doesn't.
     VariableMap vars;
     std::vector<boost::intrusive_ptr<Expression>> children;
+    children.reserve(letVariables.size());
     for (auto&& [varName, expr] : letVariables) {
         children.push_back(std::move(expr));
     }
