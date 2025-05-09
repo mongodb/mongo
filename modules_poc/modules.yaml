@@ -252,6 +252,8 @@ transactions:
     slack: server-replication
     jira: Replication
   files:
+    - src/mongo/db/commands/*transaction*
+    - src/mongo/db/commands/*txn*
     - src/mongo/db/transaction/
     - src/mongo/db/*transaction*
     - src/mongo/db/*txn*

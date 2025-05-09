@@ -193,3 +193,9 @@ filters:
   - "shardsvr_resolve_view_command*":
     approvers:
       - 10gen/query-integration-search
+  - "*transaction*":
+    approvers:
+      - 10gen/server-transactions
+  - "*txn*":
+    approvers:
+      - 10gen/server-transactions
