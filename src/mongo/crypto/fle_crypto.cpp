@@ -4216,10 +4216,13 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
         edc = EDCDerivedFromDataToken{suffixTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{suffixTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{suffixTokens->getServerDerivedToken().asPrfBlock()};
+    } else if (substringTokens) {
+        edc = EDCDerivedFromDataToken{substringTokens->getEdcDerivedToken().asPrfBlock()};
+        esc = ESCDerivedFromDataToken{substringTokens->getEscDerivedToken().asPrfBlock()};
+        server = ServerDerivedFromDataToken{substringTokens->getServerDerivedToken().asPrfBlock()};
     }
 
     // TODO SERVER-102560: set edc, esc, server for exact tokens.
-    // TODO SERVER-102091: set edc, esc, server for substring tokens.
 
     maxCounter = payload.getMaxCounter();
 }
