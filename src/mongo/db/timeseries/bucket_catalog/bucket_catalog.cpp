@@ -187,19 +187,6 @@ BatchedInsertContext::BatchedInsertContext(
       stats(stats),
       measurementsTimesAndIndices(measurementsTimesAndIndices) {};
 
-BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
-    auto const& stripe = *catalog.stripes[internal::getStripeNumber(catalog, bucketId)];
-    stdx::lock_guard stripeLock{stripe.mutex};
-
-    const Bucket* bucket =
-        internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, bucketId);
-    if (!bucket) {
-        return {};
-    }
-
-    return bucket->key.metadata.toBSON();
-}
-
 uint64_t getMemoryUsage(const BucketCatalog& catalog) {
 #ifndef MONGO_CONFIG_DEBUG_BUILD
     return catalog.trackingContexts.global.allocated();

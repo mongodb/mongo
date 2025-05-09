@@ -228,16 +228,6 @@ public:
 };
 
 /**
- * Returns the metadata for the given bucket in the following format:
- *     {<metadata field name>: <value>}
- * All measurements in the given bucket share same metadata value.
- *
- * Returns an empty document if the given bucket cannot be found or if this time-series collection
- * was not created with a metadata field name.
- */
-BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId);
-
-/**
  * Returns the memory usage of the bucket catalog across all stripes from the approximated memory
  * usage, and the tracked memory usage from the tracking::Allocator.
  */

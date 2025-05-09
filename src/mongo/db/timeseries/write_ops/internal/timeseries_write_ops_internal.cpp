@@ -70,7 +70,6 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 
 using TimeseriesBatches =
     std::vector<std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>>;
-using TimeseriesStmtIds = timeseries::TimeseriesStmtIds;
 
 struct TimeseriesSingleWriteResult {
     StatusWith<SingleWriteResult> result;
@@ -113,7 +112,7 @@ TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
 }
 
 boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailPoint(
-    const BSONObj& metadata) {
+    const bucket_catalog::BucketMetadata& metadata) {
     bool canContinue = true;
     if (MONGO_unlikely(failUnorderedTimeseriesInsert.shouldFail(
             [&metadata, &canContinue](const BSONObj& data) {
@@ -121,7 +120,7 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
                 if (auto continueElem = data["canContinue"]) {
                     canContinue = data["canContinue"].trueValue();
                 }
-                return comp.compare(data["metadata"], metadata.firstElement()) == 0;
+                return comp.compare(data["metadata"], metadata.element()) == 0;
             }))) {
         return std::make_pair(Status(ErrorCodes::FailPointEnabled,
                                      "Failed unordered time-series insert due to "
@@ -195,31 +194,29 @@ void filterOutExecutedMeasurements(OperationContext* opCtx,
 }
 
 /**
- * Same as above, but expects StmtId's in WriteBatch.
+ * Writes a new time-series bucket to storage.
  */
 TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const BSONObj& metadata,
     const mongo::write_ops::InsertCommandRequest& request,
     std::shared_ptr<bucket_catalog::WriteBatch> batch) {
-    if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
+    if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(batch->bucketKey.metadata)) {
         return {status->first, status->second};
     }
     return getTimeseriesSingleWriteResult(
-        write_ops_exec::performInserts(
-            opCtx,
-            write_ops_utils::makeTimeseriesInsertOpFromBatch(batch, nss, metadata),
-            OperationSource::kTimeseriesInsert),
+        write_ops_exec::performInserts(opCtx,
+                                       write_ops_utils::makeTimeseriesInsertOpFromBatch(batch, nss),
+                                       OperationSource::kTimeseriesInsert),
         request);
 }
 
 /**
- * Returns the status and whether the request can continue.
+ * Persists an update to storage of an existing time-series bucket.
  */
 TimeseriesSingleWriteResult performTimeseriesUpdate(
     OperationContext* opCtx,
-    const BSONObj& metadata,
+    const bucket_catalog::BucketMetadata& metadata,
     const mongo::write_ops::UpdateCommandRequest& op,
     const mongo::write_ops::InsertCommandRequest& request) {
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
@@ -383,15 +380,14 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         }
 
         for (auto& batch : batches) {
-            auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
             auto prepareCommitStatus =
                 bucket_catalog::prepareCommit(bucketCatalog, batch, collator);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return false;
             }
-            write_ops_utils::makeWriteRequestFromBatch(
-                opCtx, batch, metadata, nss, &insertOps, &updateOps);
+
+            write_ops_utils::makeWriteRequestFromBatch(opCtx, batch, nss, &insertOps, &updateOps);
         }
 
         hangTimeseriesInsertBeforeWrite.pauseWhileSet();
@@ -1012,7 +1008,6 @@ commit_result::Result commitTimeseriesBucketForBatch(
     hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
-    auto metadata = getMetadata(bucketCatalog, batch->bucketId);
 
     // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
     // Collection instances remain valid, and the collator is not invalidated.
@@ -1054,7 +1049,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
-        const auto output = performTimeseriesInsertFromBatch(opCtx, nss, metadata, request, batch);
+        const auto output = performTimeseriesInsertFromBatch(opCtx, nss, request, batch);
         auto insertStatus = output.result.getStatus();
 
         if (!insertStatus.isOK()) {
@@ -1076,7 +1071,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
     } else {
         auto op = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(opCtx, batch, nss);
 
-        auto const output = performTimeseriesUpdate(opCtx, metadata, op, request);
+        auto const output = performTimeseriesUpdate(opCtx, batch->bucketKey.metadata, op, request);
         auto updateStatus = output.result.getStatus();
 
         if ((updateStatus.isOK() && output.result.getValue().getNModified() != 1) ||

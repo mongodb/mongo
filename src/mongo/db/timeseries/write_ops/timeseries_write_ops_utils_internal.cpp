@@ -378,7 +378,6 @@ BSONObj makeBSONColumnDocDiff(
 
 BSONObj makeTimeseriesInsertCompressedBucketDocument(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const BSONObj& metadata,
     const std::vector<
         std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>&
         intermediates) {
@@ -395,7 +394,7 @@ BSONObj makeTimeseriesInsertCompressedBucketDocument(
                                     static_cast<int32_t>(batch->measurements.size()));
     }
 
-    auto metadataElem = metadata.firstElement();
+    auto metadataElem = batch->bucketKey.metadata.element();
     if (metadataElem) {
         insertBuilder.appendAs(metadataElem, kBucketMetaFieldName);
     }
@@ -441,21 +440,18 @@ void isMeasurementsSortedOnTime(std::shared_ptr<bucket_catalog::WriteBatch> batc
 
 void makeWriteRequestFromBatch(OperationContext* opCtx,
                                std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                               const BSONObj& metadata,
                                const NamespaceString& bucketsNs,
                                std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
                                std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps) {
     if (batch->numPreviouslyCommittedMeasurements == 0) {
-        insertOps->push_back(makeTimeseriesInsertOpFromBatch(batch, bucketsNs, metadata));
+        insertOps->push_back(makeTimeseriesInsertOpFromBatch(batch, bucketsNs));
         return;
     }
     updateOps->push_back(makeTimeseriesCompressedDiffUpdateOpFromBatch(opCtx, batch, bucketsNs));
 }
 
 mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const NamespaceString& bucketsNs,
-    const BSONObj& metadata) {
+    std::shared_ptr<bucket_catalog::WriteBatch> batch, const NamespaceString& bucketsNs) {
     invariant(!batch->isReopened);
     BSONObj bucketToInsert;
     BucketDocument bucketDoc;
@@ -471,7 +467,7 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
     int32_t compressedSizeDelta;
     auto intermediates = batch->measurementMap.intermediate(compressedSizeDelta);
     batch->sizes.uncommittedVerifiedSize = compressedSizeDelta;
-    bucketToInsert = makeTimeseriesInsertCompressedBucketDocument(batch, metadata, intermediates);
+    bucketToInsert = makeTimeseriesInsertCompressedBucketDocument(batch, intermediates);
 
     // Extra verification that the insert op decompresses to the same values put in.
     if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
@@ -483,70 +479,6 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(batch->stmtIds)));
     op.setCollectionUUID(batch->bucketId.collectionUUID);
     return op;
-}
-
-mongo::write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
-    OperationContext* opCtx,
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const BSONObj& metadata) {
-    BSONObjBuilder updateBuilder;
-    {
-        if (!batch->min.isEmpty() || !batch->max.isEmpty()) {
-            BSONObjBuilder controlBuilder(updateBuilder.subobjStart(kControlFieldNameDocDiff));
-            if (!batch->min.isEmpty()) {
-                controlBuilder.append(kMinFieldNameDocDiff, batch->min);
-            }
-            if (!batch->max.isEmpty()) {
-                controlBuilder.append(kMaxFieldNameDocDiff, batch->max);
-            }
-        }
-    }
-    {  // doc_diff::kSubDiffSectionFieldPrefix + <field name> => {<index_0>: ..., <index_1>:}
-        StringDataMap<BSONObjBuilder> dataFieldBuilders;
-        auto metadataElem = metadata.firstElement();
-        DecimalCounter<uint32_t> count(batch->numPreviouslyCommittedMeasurements);
-        for (const auto& doc : batch->measurements) {
-            for (const auto& elem : doc) {
-                auto key = elem.fieldNameStringData();
-                if (metadataElem && key == metadataElem.fieldNameStringData()) {
-                    continue;
-                }
-                auto& builder = dataFieldBuilders[key];
-                builder.appendAs(elem, count);
-            }
-            ++count;
-        }
-
-        BSONObjBuilder dataBuilder(updateBuilder.subobjStart(kDataFieldNameDocDiff));
-        BSONObjBuilder newDataFieldsBuilder;
-        for (auto& pair : dataFieldBuilders) {
-            // Existing 'data' fields with measurements require different treatment from fields
-            // not observed before (missing from control.min and control.max).
-            if (batch->newFieldNamesToBeInserted.count(pair.first)) {
-                newDataFieldsBuilder.append(pair.first, pair.second.obj());
-            }
-        }
-        auto newDataFields = newDataFieldsBuilder.obj();
-        if (!newDataFields.isEmpty()) {
-            dataBuilder.append(doc_diff::kInsertSectionFieldName, newDataFields);
-        }
-        for (auto& pair : dataFieldBuilders) {
-            // Existing 'data' fields with measurements require different treatment from fields
-            // not observed before (missing from control.min and control.max).
-            if (!batch->newFieldNamesToBeInserted.count(pair.first)) {
-                dataBuilder.append(doc_diff::kSubDiffSectionFieldPrefix + pair.first.toString(),
-                                   BSON(doc_diff::kInsertSectionFieldName << pair.second.obj()));
-            }
-        }
-    }
-    mongo::write_ops::UpdateModification::DiffOptions options;
-    mongo::write_ops::UpdateModification u(
-        updateBuilder.obj(), mongo::write_ops::UpdateModification::DeltaTag{}, options);
-    auto oid = batch->bucketId.oid;
-    mongo::write_ops::UpdateOpEntry update(BSON("_id" << oid), std::move(u));
-    invariant(!update.getMulti(), oid.toString());
-    invariant(!update.getUpsert(), oid.toString());
-    return update;
 }
 
 std::variant<mongo::write_ops::UpdateCommandRequest, mongo::write_ops::DeleteCommandRequest>

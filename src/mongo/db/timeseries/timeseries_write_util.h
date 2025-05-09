@@ -76,8 +76,6 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const TimeseriesOptions& options,
                            const StringDataComparator* comparator);
 
-using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
-
 /**
  * Retrieves the opTime and electionId according to the current replication mode.
  */

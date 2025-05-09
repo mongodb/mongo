@@ -114,6 +114,8 @@ protected:
 
     BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
 
+    BSONObj _getMetadata(BucketCatalog& catalog, const BucketId& bucketId);
+
     RolloverReason _rolloverReason(const std::shared_ptr<WriteBatch>& batch);
 
     void _testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
@@ -273,12 +275,8 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
         << batch->toBSON();
     std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
     std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
-    write_ops_utils::makeWriteRequestFromBatch(_opCtx,
-                                               batch,
-                                               getMetadata(*_bucketCatalog, batch->bucketId),
-                                               ns.makeTimeseriesBucketsNamespace(),
-                                               &insertOps,
-                                               &updateOps);
+    write_ops_utils::makeWriteRequestFromBatch(
+        _opCtx, batch, ns.makeTimeseriesBucketsNamespace(), &insertOps, &updateOps);
     finish(*_bucketCatalog, batch);
 }
 
@@ -409,6 +407,19 @@ BSONObj BucketCatalogTest::_getCompressedBucketDoc(const BSONObj& bucketDoc) {
                                                          _ns1,
                                                          /*validateDecompression*/ true);
     return compressionResult.compressedBucket.value();
+}
+
+BSONObj BucketCatalogTest::_getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
+    auto const& stripe = *catalog.stripes[internal::getStripeNumber(catalog, bucketId)];
+    stdx::lock_guard stripeLock{stripe.mutex};
+
+    const Bucket* bucket =
+        internal::findBucket(catalog.bucketStateRegistry, stripe, stripeLock, bucketId);
+    if (!bucket) {
+        return {};
+    }
+
+    return bucket->key.metadata.toBSON();
 }
 
 StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket(
@@ -800,14 +811,6 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     ASSERT_OK(getWriteBatchStatus(*batch2));
 }
 
-TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
-    auto batch = _insertOneWithoutReopening(
-        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    auto bucketId = batch->bucketId;
-    abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
-    ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, bucketId));
-}
-
 TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
     auto batch1 =
         _insertOneWithoutReopening(_opCtx,
@@ -830,10 +833,10 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
     ASSERT_NE(batch2, batch3);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"), getMetadata(*_bucketCatalog, batch1->bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"), _getMetadata(*_bucketCatalog, batch1->bucketId));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
-                      getMetadata(*_bucketCatalog, batch2->bucketId));
-    ASSERT(getMetadata(*_bucketCatalog, batch3->bucketId).isEmpty());
+                      _getMetadata(*_bucketCatalog, batch2->bucketId));
+    ASSERT(_getMetadata(*_bucketCatalog, batch3->bucketId).isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
@@ -1018,10 +1021,8 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
-    (void)write_ops_utils::makeTimeseriesInsertOpFromBatch(
-        batch1,
-        _ns1.makeTimeseriesBucketsNamespace(),
-        getMetadata(*_bucketCatalog, batch1->bucketId));
+    (void)write_ops_utils::makeTimeseriesInsertOpFromBatch(batch1,
+                                                           _ns1.makeTimeseriesBucketsNamespace());
     finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
 
@@ -1033,7 +1034,7 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDoc) {
     auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _nsNoMeta, _uuidNoMeta, BSON(_timeField << Date_t::now()));
 
-    ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, batch->bucketId));
+    ASSERT_BSONOBJ_EQ(BSONObj(), _getMetadata(*_bucketCatalog, batch->bucketId));
 
     _commit(_nsNoMeta, batch, 0);
 }
@@ -1332,10 +1333,8 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT_EQ(batch2->newFieldNamesToBeInserted.size(), 1) << batch2->toBSON();
     ASSERT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField) << batch2->toBSON();
-    (void)write_ops_utils::makeTimeseriesInsertOpFromBatch(
-        batch2,
-        _ns1.makeTimeseriesBucketsNamespace(),
-        getMetadata(*_bucketCatalog, batch2->bucketId));
+    (void)write_ops_utils::makeTimeseriesInsertOpFromBatch(batch2,
+                                                           _ns1.makeTimeseriesBucketsNamespace());
     finish(*_bucketCatalog, batch2);
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already

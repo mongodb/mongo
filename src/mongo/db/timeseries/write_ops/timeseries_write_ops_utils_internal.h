@@ -62,8 +62,6 @@ struct BucketDocument {
     bool compressionFailed = false;
 };
 
-using TimeseriesStmtIds = stdx::unordered_map<bucket_catalog::WriteBatch*, std::vector<StmtId>>;
-
 inline NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
     return nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
 }
@@ -105,7 +103,6 @@ BSONObj makeBSONColumnDocDiff(
 
 BSONObj makeTimeseriesInsertCompressedBucketDocument(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const BSONObj& metadata,
     const std::vector<
         std::pair<StringData, BSONColumnBuilder<tracking::Allocator<void>>::BinaryDiff>>&
         intermediates);
@@ -120,8 +117,7 @@ mongo::write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<
  */
 mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
-    const NamespaceString& bucketsNs,
-    const BSONObj& metadata);
+    const NamespaceString& bucketsNs);
 
 /**
  * Builds update command request, as above, but expects StmtId's in WriteBatch.
@@ -130,14 +126,6 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOpFromB
     OperationContext* opCtx,
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs);
-
-/**
- * Builds the delta update oplog entry from a time-series insert write batch.
- */
-mongo::write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
-    OperationContext* opCtx,
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const BSONObj& metadata);
 
 /**
  * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns
@@ -177,7 +165,6 @@ mongo::write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
  */
 void makeWriteRequestFromBatch(OperationContext* opCtx,
                                std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                               const BSONObj& metadata,
                                const NamespaceString& bucketsNs,
                                std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
                                std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps);

@@ -331,7 +331,6 @@ void commitTimeseriesBucketsAtomically(
         auto& mainBucketCatalog =
             bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
         for (auto batch : batchesToCommit) {
-            auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketId);
             auto prepareCommitStatus =
                 prepareCommit(sideBucketCatalog, batch, coll->getDefaultCollator());
             if (!prepareCommitStatus.isOK()) {
@@ -340,7 +339,7 @@ void commitTimeseriesBucketsAtomically(
             }
 
             write_ops_utils::makeWriteRequestFromBatch(
-                opCtx, batch, metadata, bucketsNs, &insertOps, &updateOps);
+                opCtx, batch, bucketsNs, &insertOps, &updateOps);
 
             // Starts tracking the newly inserted bucket in the main bucket catalog as a direct
             // write to prevent other writers from modifying it.
