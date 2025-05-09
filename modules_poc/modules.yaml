@@ -311,21 +311,80 @@ data_movement:
     - src/mongo/db/s/migration* # note the filename pattern
     - src/mongo/db/s/resharding
 
-logging:
+observability:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/operation_cpu_timer*
+    - src/mongo/db/process_health/
+    - src/mongo/watchdog/
+
+observability.logging:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
   files:
     - src/mongo/logv2/
 
+observability.tracing:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/tracing/
+    - src/mongo/util/tracing_support*
+
+observability.ftdc:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/ftdc/
+
 networking:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-networking-observability
+    jira: Networking & Observability
   files:
+    - src/mongo/client/
+    - src/mongo/executor/async_rpc*
+    - src/mongo/executor/async_client*
+    - src/mongo/executor/connection_pool*
+    - src/mongo/executor/connection_metrics.h
+    - src/mongo/executor/network*
+    - src/mongo/executor/remote_command*
+    - src/mongo/executor/test_network*
+    - src/mongo/executor/mock_network*
+    - src/mongo/executor/mock_async_rpc*
+    - src/mongo/executor/pooled_async_client_factory.h
+    - src/mongo/executor/egress_*
+
+networking.core:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/dbmessage*
+    - src/mongo/db/op_msg*
+    - src/mongo/db/wire_version*
     - src/mongo/rpc/
-    - src/mongo/util/net
-    - src/mongo/transport
+    - src/mongo/transport/
+    - src/mongo/util/net/
+
+networking.mirrored_reads:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/mirror*
+
+networking.mongo_bridge:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/tools/mongobridge_tool/
 
 timeseries_bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
   meta:
