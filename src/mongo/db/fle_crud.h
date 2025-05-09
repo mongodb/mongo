@@ -516,26 +516,32 @@ using ProcessFindAndModifyCallback =
                             FLEQueryInterface* queryImpl,
                             const write_ops::FindAndModifyCommandRequest& findAndModifyRequest)>;
 
+// Callback function invoked when a write concern error occurs in addition to a command error.
+using ErrorWithWriteConcernErrorCallback = std::function<void(const WriteConcernErrorDetail&)>;
+
 template <typename ReplyType>
 StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
     GetTxnCallback getTxns,
-    ProcessFindAndModifyCallback<ReplyType> processCallback = processFindAndModify);
+    ProcessFindAndModifyCallback<ReplyType> processCallback = processFindAndModify,
+    ErrorWithWriteConcernErrorCallback wceCallback = nullptr);
 
 extern template StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>>
 processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
     GetTxnCallback getTxns,
-    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandReply> processCallback);
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandReply> processCallback,
+    ErrorWithWriteConcernErrorCallback wceCallback);
 
 extern template StatusWith<std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>>
 processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest,
     GetTxnCallback getTxns,
-    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandRequest> processCallback);
+    ProcessFindAndModifyCallback<write_ops::FindAndModifyCommandRequest> processCallback,
+    ErrorWithWriteConcernErrorCallback wceCallback);
 
 write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest,
