@@ -363,7 +363,7 @@ some reasonable presets of "seconds", "minutes" and "hours".
 | ----------- | ----------------------- | ---------------------- |
 | _Seconds_   | 60 (1 minute)           | 3,600 (1 hour)         |
 | _Minutes_   | 3,600 (1 hour)          | 86,400 (1 day)         |
-| _Hours_     | 86,400 (1 day)          | 2,559,200 (30 days)    |
+| _Hours_     | 86,400 (1 day)          | 2,592,000 (30 days)    |
 
 Chart sources: [bucketRoundingSeconds](https://github.com/10gen/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L368-L381) and [bucketMaxSpanSeconds](https://github.com/10gen/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L259-L273).
 
@@ -448,6 +448,29 @@ is calculated using the [Timeseries Tracking Allocator](https://github.com/10gen
 
 When bucket compression fails, we will fail the insert prompting the user to retry the write and "freeze"
 the bucket that we failed to compress. Once a bucket is frozen, we will no longer attempt to write to it.
+
+### Stripes
+
+The bucket catalog uses the concept of lock striping to provide efficient parallelism and synchronization across
+CRUD operations to buckets in the bucket catalog. The potentially very large number of meta values (thousands or millions)
+in the time-series collection are hashed down to a hard-coded number of 32 stripes. Each meta value will always map to the
+same stripe. This hash function is opaque to the user, and not configurable.
+
+Performing a time-series write, beginning in 8.2+, acquires the stripe lock 3 times for each write to the collection, once for
+each phase described above in [Errors When Staging and Committing Measurements](#Errors-When-Staging-and-Committing-Measurements).
+
+<img width="1364" alt="bucket_catalog_stripe" src="https://github.com/user-attachments/assets/c6016335-34e3-4f62-b46a-0f0a970f2c05" />
+
+Recall that each bucket contains up to [timeseriesBucketMaxCount](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/timeseries.idl#L58) (1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket
+catalog maintains an invariant of at most 1 open bucket per unique meta value. This diagram shows
+how measurements map to each open bucket, which map to a specific stripe. The hashing function may not distribute the
+client's writes to stripes evenly, but on the whole there is a good chance that stripe contention won't be a bottleneck since
+there are often more or the same number of stripes to cores on the database server. And note that certain stripes may be hot
+if the workload accesses many buckets (meta values) that map to the same stripe. In 8.2+, while holding the stripe lock during
+a write, only a small amount of work is done intentionally. This has lessened the impact of stripe contention.
+
+The [Stripe](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L152-L186) struct stores most of the core components of the [Bucket Catalog](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L198-L228). The structures within it generally compose
+the memory usage of the Bucket Catalog (see: [bucket_catalog::getMemoryUsage](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L203-L219)).
 
 # References
 
