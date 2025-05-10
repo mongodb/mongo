@@ -66,11 +66,16 @@ def get_remote_branch_ref(repo: Repo, branch: str = None) -> str:
 
     # pick a remote from a mongodb org
     picked_remote = get_mongodb_remote(repo)
-    picked_remote.fetch()
-    # find the latest commit on the remote branch to check for a valid merge-base with the current branch
+
+    # Get latest head of remote branch
     remote_branch = repo.refs[f"{picked_remote.name}/{branch}"]
-    diff_commit = repo.git.execute(["git", "merge-base", remote_branch.commit.hexsha, "HEAD"])
-    return diff_commit
+    remote_head = remote_branch.commit
+
+    # Get the current HEAD commit
+    local_head = repo.head.commit
+
+    # Return the best common ancestor commit between current head and remote repo
+    return repo.git.merge_base(local_head.hexsha, remote_head.hexsha)
 
 
 def get_new_files(expansions_file: str = None, branch: str = None) -> List[str]:
