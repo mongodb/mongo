@@ -278,7 +278,12 @@ class HangAnalyzer(Subcommand):
             if sys.platform in ["win32", "cygwin"]:
                 self.root_logger.info("Windows Distribution: %s", platform.win32_ver())
             else:
-                self.root_logger.info("Linux Distribution: %s", distro.linux_distribution())
+                self.root_logger.info(
+                    "Linux Distribution: %s %s (%s)",
+                    distro.name(),
+                    distro.version(),
+                    distro.codename(),
+                )
 
         except AttributeError:
             self.root_logger.warning("Cannot determine Linux distro since Python is too old")
@@ -320,7 +325,7 @@ class HangAnalyzerPlugin(PluginInterface):
             default="contains",
             help="Type of match for process names (-p & -g), specify 'contains', or"
             " 'exact'. Note that the process name match performs the following"
-            " conversions: change all process names to lowecase, strip off the file"
+            " conversions: change all process names to lowercase, strip off the file"
             " extension, like '.exe' on Windows. Default is 'contains'.",
         )
         parser.add_argument(
