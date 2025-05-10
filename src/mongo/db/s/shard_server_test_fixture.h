@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/s/client/shard.h"
 #include <memory>
 #include <string>
 
@@ -98,11 +97,6 @@ protected:
 };
 
 class ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture {
-public:
-    ShardServerTestFixtureWithCatalogCacheMock() : ShardServerTestFixture() {}
-    ShardServerTestFixtureWithCatalogCacheMock(Options options)
-        : ShardServerTestFixture(std::move(options)) {}
-
 protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();

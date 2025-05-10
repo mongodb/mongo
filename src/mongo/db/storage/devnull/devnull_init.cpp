@@ -50,11 +50,7 @@ class DevNullStorageEngineFactory : public StorageEngine::Factory {
 public:
     std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
                                           const StorageGlobalParams& params,
-                                          const StorageEngineLockFile* lockFile,
-                                          bool isReplSet,
-                                          bool shouldSkipOplogSampling,
-                                          bool shouldRecoverFromOplogAsStandalone,
-                                          bool inStandaloneMode) const override {
+                                          const StorageEngineLockFile* lockFile) const override {
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;

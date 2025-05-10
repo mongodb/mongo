@@ -111,7 +111,7 @@ struct WiredTigerFileVersion {
     inline static const std::string kLatestWTRelease = "compatibility=(release=10.0)";
 
     StartupVersion _startupVersion;
-    bool shouldDowngrade(bool hasRecoveryTimestamp, bool isReplSet);
+    bool shouldDowngrade(bool hasRecoveryTimestamp);
     std::string getDowngradeString();
 };
 
@@ -297,11 +297,7 @@ public:
                        ClockSource* cs,
                        WiredTigerConfig wtConfig,
                        bool ephemeral,
-                       bool repair,
-                       bool isReplSet,
-                       bool shouldSkipOplogSampling,
-                       bool shouldRecoverFromOplogAsStandalone,
-                       bool inStandaloneMode);
+                       bool repair);
 
     ~WiredTigerKVEngine() override;
 
@@ -843,12 +839,6 @@ private:
     // Prevents a database's directory from being deleted concurrently with creation (necessary for
     // --directoryPerDb).
     stdx::mutex _directoryModificationMutex;
-
-    // Replication settings, passed in from constructor to avoid dependency on repl
-    bool _isReplSet;
-    bool _shouldSkipOplogSampling;
-    bool _shouldRecoverFromOplogAsStandalone;
-    bool _inStandaloneMode;
 };
 
 /**

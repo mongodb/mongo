@@ -325,8 +325,7 @@ private:
 
 class TxnParticipantTest : public MockReplCoordServerFixture {
 protected:
-    TxnParticipantTest(Options options = {})
-        : MockReplCoordServerFixture(options.useReplSettings(true)) {}
+    TxnParticipantTest(Options options = {}) : MockReplCoordServerFixture(std::move(options)) {}
 
     void setUp() override {
         repl::ReplSettings replSettings;
@@ -341,10 +340,6 @@ protected:
             service,
             std::make_unique<MongoDSessionCatalog>(
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
-
-        opObserverRegistry()->addObserver(
-            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
         mongoDSessionCatalog->onStepUp(opCtx());
 
@@ -5121,7 +5116,6 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
 }
 
 TEST_F(TxnParticipantTest, PrepareTransactionAsSecondarySetsThePrepareOpTime) {
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
     const auto prepareOpTime = repl::OpTime({3, 2}, 0);
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -5144,7 +5138,6 @@ TEST_F(TxnParticipantTest, PrepareTransactionAsSecondarySetsThePrepareOpTime) {
 }
 
 TEST_F(TxnParticipantTest, CommitPreparedTransactionAsSecondarySetsTheFinishOpTime) {
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
     const auto prepareOpTime = repl::OpTime({3, 2}, 0);
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -5170,7 +5163,6 @@ TEST_F(TxnParticipantTest, CommitPreparedTransactionAsSecondarySetsTheFinishOpTi
 DEATH_TEST_F(TxnParticipantTest,
              CommitPreparedTransactionAsSecondaryWithNullCommitOplogEntryOpTimeShouldFail,
              "invariant") {
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
     const auto prepareOpTime = repl::OpTime({3, 2}, 0);
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -5194,7 +5186,6 @@ DEATH_TEST_F(TxnParticipantTest,
 DEATH_TEST_F(TxnParticipantTest,
              CommitPreparedTransactionAsPrimaryWithNonNullCommitOplogEntryOpTimeShouldFail,
              "invariant") {
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
     const auto prepareOpTime = repl::OpTime({3, 2}, 0);
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -5413,7 +5404,6 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortAfterPrepare) {
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
 
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
     const auto prepareOpTime = repl::OpTime({3, 2}, 0);
     txnParticipant.prepareTransaction(opCtx(), prepareOpTime);
     const auto exitPrepareFuture = txnParticipant.onExitPrepare();
@@ -5444,7 +5434,6 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnCommitAfterPrepare) {
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
 
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
     const auto prepareOpTime = repl::OpTime({3, 2}, 0);
     const auto [prepareTimestamp, namespaces] =
         txnParticipant.prepareTransaction(opCtx(), prepareOpTime);
@@ -6824,6 +6813,8 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     OperationContext* opCtx = this->opCtx();
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
+    opObserverRegistry()->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
     OpDebug* const nullOpDbg = nullptr;
 
@@ -6938,7 +6929,6 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
                                   userColl->getCollection(),
                                   InsertStatement(BSON("_id" << 1 << "value" << 1)),
                                   nullOpDbg));
-        wuow.commit();
     }
 
     // Assert that the TxnParticipant for the split sessions are in the "aborted prepared
@@ -7002,6 +6992,8 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     OperationContext* opCtx = this->opCtx();
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
+    opObserverRegistry()->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
     OpDebug* const nullOpDbg = nullptr;
 
@@ -7011,8 +7003,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx)->updateTerm(opCtx, 1));
 
     // Bump the logical clock for easier visual cues.
-    const Timestamp startTs =
-        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp().getTimestamp() + 100;
+    const Timestamp startTs(100, 1);
     auto oplogInfo = LocalOplogInfo::get(opCtx);
     oplogInfo->setNewTimestamp(opCtx->getServiceContext(), startTs);
     opCtx->getServiceContext()->getStorageEngine()->setInitialDataTimestamp(startTs);
@@ -7314,8 +7305,6 @@ TEST_F(TxnParticipantTest, LastOpSetWhenUnstashingForAlreadyAbortedTxn) {
 
 TEST_F(TxnParticipantTest, LastOpNotSetWhenUnstashingForNonAbort) {
     // Test that non-abort commands do not set lastOp when unstashing.
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOp();
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).clearLastOpSetFlag(opCtx());
     const auto lsid = makeLogicalSessionIdWithTxnUUIDForTest();
     opCtx()->setLogicalSessionId(lsid);
     auto sessionCheckout = checkOutSession();

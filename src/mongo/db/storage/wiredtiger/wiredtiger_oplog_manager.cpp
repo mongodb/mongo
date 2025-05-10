@@ -35,6 +35,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -59,8 +60,7 @@ constexpr int kDelayMillis = 100;
 
 void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const KVEngine& engine,
-                                   RecordStore& oplog,
-                                   bool isReplSet) {
+                                   RecordStore& oplog) {
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
         oplog.getCursor(opCtx, false /* false = reverse cursor */);
@@ -76,7 +76,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                     1,
                     "Initializing the oplog read timestamp (oplog visibility).",
                     "oplogReadTimestamp"_attr = topOfOplogTimestamp);
-    } else if (isReplSet) {
+    } else if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
         // Avoid setting oplog visibility to 0. That means "everything is visible".
         setOplogReadTimestamp(Timestamp(StorageEngine::kMinimumTimestamp));
     } else {

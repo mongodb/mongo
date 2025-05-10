@@ -45,9 +45,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -183,25 +181,13 @@ StorageEngine::LastShutdownState initializeStorageEngine(
                                        startupTimeElapsedBuilder);
         if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
             auto storageEngine = std::unique_ptr<StorageEngine>(
-                factory->create(opCtx,
-                                storageGlobalParams,
-                                lockFile ? &*lockFile : nullptr,
-                                getGlobalReplSettings().isReplSet(),
-                                repl::ReplSettings::shouldSkipOplogSampling(),
-                                repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-                                getReplSetMemberInStandaloneMode(getGlobalServiceContext())));
+                factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
             service->setStorageEngine(std::move(storageEngine));
         } else {
             auto storageEngineChangeContext = StorageEngineChangeContext::get(service);
             auto lk = storageEngineChangeContext->killOpsForStorageEngineChange(service);
             auto storageEngine = std::unique_ptr<StorageEngine>(
-                factory->create(opCtx,
-                                storageGlobalParams,
-                                lockFile ? &*lockFile : nullptr,
-                                getGlobalReplSettings().isReplSet(),
-                                repl::ReplSettings::shouldSkipOplogSampling(),
-                                repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-                                getReplSetMemberInStandaloneMode(getGlobalServiceContext())));
+                factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
             storageEngineChangeContext->changeStorageEngine(
                 service, std::move(lk), std::move(storageEngine));
         }
