@@ -78,7 +78,8 @@ runInitialSyncTest();
 x509_options1 = Object.merge(common_options, {clusterAuthMode: "x509"});
 x509_options2 = Object.merge(common_options,
                              {tlsClusterFile: "jstests/libs/smoke.pem", clusterAuthMode: "x509"});
-var replTest = new ReplSetTest({nodes: {node0: x509_options1, node1: x509_options2}});
+var replTest =
+    new ReplSetTest({nodes: {node0: x509_options1, node1: x509_options2}, timeoutMS: 500});
 
 // We don't want to invoke the hang analyzer because we
 // expect this test to fail by timing out
