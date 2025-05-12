@@ -2301,6 +2301,7 @@ static inline uint64_t __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline uint64_t __wt_txn_oldest_id(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline void __wt_atomic_decrement_if_positive(uint32_t *valuep);
 static inline void __wt_btree_disable_bulk(WT_SESSION_IMPL *session);
 static inline void __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf);
 static inline void __wt_cache_decr_check_size(
