@@ -744,6 +744,12 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
                                 recipientFields.getDonorShards()});
     }
 
+    if (coordinatorState == CoordinatorStateEnum::kBlockingWrites) {
+        if (_dataReplication) {
+            _dataReplication->onEnteringCriticalSection();
+        }
+    }
+
     if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }

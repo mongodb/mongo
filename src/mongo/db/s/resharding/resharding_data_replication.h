@@ -129,6 +129,11 @@ public:
     virtual void startOplogApplication() = 0;
 
     /**
+     * Notifies the data replication machinery that the critical section has started.
+     */
+    virtual void onEnteringCriticalSection() = 0;
+
+    /**
      * Returns a future that becomes ready when either
      *   (a) the recipient has finished cloning both the collection being resharded and the
      *       config.transactions records from before the resharding operation started, or
@@ -188,6 +193,8 @@ public:
         const mongo::Date_t& startConfigTxnCloneTime) override;
 
     void startOplogApplication() override;
+
+    void onEnteringCriticalSection() override;
 
     SharedSemiFuture<void> awaitCloningDone() override;
 
