@@ -1120,7 +1120,7 @@ bool BulkWriteOp::isFinished() const {
     for (auto& writeOp : _writeOps) {
         if (writeOp.getWriteState() < WriteOpState_Completed) {
             return false;
-        } else if (ordered && writeOp.getWriteState() == WriteOpState_Error) {
+        } else if ((ordered || _inTransaction) && writeOp.getWriteState() == WriteOpState_Error) {
             return true;
         }
     }
@@ -1167,8 +1167,8 @@ void BulkWriteOp::noteErrorForRemainingWrites(const Status& status) {
             const auto opIdx = writeOp.getWriteItem().getItemIndex();
             writeOp.setOpError(write_ops::WriteError(opIdx, status));
 
-            // Only return the first error if we are ordered.
-            if (ordered)
+            // Only return the first error if we are ordered or are within a transaction.
+            if (ordered || _inTransaction)
                 break;
         }
     }
@@ -1371,7 +1371,9 @@ void BulkWriteOp::noteChildBatchResponse(
     //           ^               ^                  ^               ^
     // Only moving forward in replies when we see a matching write op.
     int replyIndex = -1;
-    bool ordered = _clientRequest.getOrdered();
+    // A batch will fail on an error if the request was sent with ordered:true or we are executing
+    // the request within a transaction.
+    bool batchWillContinue = !_clientRequest.getOrdered() && !_inTransaction;
     boost::optional<write_ops::WriteError> lastError;
     for (int writeOpIdx = 0; writeOpIdx < (int)targetedBatch.getWrites().size(); ++writeOpIdx) {
         const auto& write = targetedBatch.getWrites()[writeOpIdx];
@@ -1400,7 +1402,7 @@ void BulkWriteOp::noteChildBatchResponse(
         // remaining operations to have been executed. For that reason we reset them here so they
         // may be retargeted and retried if the error we saw is one we can retry after (e.g.
         // StaleConfig.).
-        if (ordered && lastError) {
+        if (!batchWillContinue && lastError) {
             tassert(8266002,
                     "bulkWrite should not see replies after an error when ordered:true",
                     replyIndex >= (int)replyItems.size());
@@ -1418,12 +1420,13 @@ void BulkWriteOp::noteChildBatchResponse(
         // staleness/cache busy error is received the size of replyItems will be <= the size of the
         // number of operations. When this is the case, we treat all the remaining operations which
         // may not have a replyItem as having failed due to the same cause.
-        if (!ordered && lastError &&
+        bool isStaleError = lastError &&
             (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
              ErrorCodes::isStaleShardVersionError(lastError->getStatus()) ||
              lastError->getStatus().code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
-             lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection) &&
-            (replyIndex == (int)replyItems.size())) {
+             lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection);
+
+        if (batchWillContinue && isStaleError && (replyIndex == (int)replyItems.size())) {
             // Decrement the replyIndex so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
             LOGV2_DEBUG(7695304,
@@ -1466,7 +1469,11 @@ void BulkWriteOp::noteChildBatchResponse(
             continue;
         }
 
-        _approximateSize += reply.getApproximateSize();
+        // A staleness error will end up being retried by mongos so we should not consider this
+        // result final and count towards the maximum size limit for a response.
+        if (!isStaleError) {
+            _approximateSize += reply.getApproximateSize();
+        }
 
         if (shouldDeferWriteWithoutShardKeyReponse) {
             if (!_deferredResponses) {
@@ -1600,7 +1607,8 @@ void BulkWriteOp::processLocalChildBatchError(const TargetedWriteBatch& batch,
 void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
                                       const Status& status) {
     // Treat an error to get a batch response as failures of the contained write(s).
-    const int numErrors = _clientRequest.getOrdered() ? 1 : targetedBatch.getWrites().size();
+    const int numErrors =
+        (_clientRequest.getOrdered() || _inTransaction) ? 1 : targetedBatch.getWrites().size();
     auto emulatedReply =
         createEmulatedErrorReply(status, numErrors, _clientRequest.getDbName().tenantId());
 
@@ -1754,8 +1762,8 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
             // accidentally count the same error multiple times. At this point in the execution we
             // have already resolved any repeat errors.
             summary.nErrors++;
-            // Only return the first error if we are ordered.
-            if (ordered)
+            // Only return the first error if we are ordered or are in a transaction.
+            if (ordered || _inTransaction)
                 break;
         }
     }
