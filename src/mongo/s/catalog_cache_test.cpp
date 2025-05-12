@@ -291,18 +291,54 @@ TEST_F(CatalogCacheTest, GetDatabaseDrop) {
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, swDatabase.getStatus());
 }
 
-TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
+TEST_F(CatalogCacheTest, AdvanceTimeInStoreForSingleDbOnShardRemoval) {
+    // Put initial metadata in the local cache.
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     loadDatabases({DatabaseType(kDbName, kShards[0], dbVersion)});
 
-    _catalogCache->invalidateEntriesThatReferenceShard(kShards[0]);
+    _catalogCache->advanceTimeInStoreForEntriesThatReferenceShard(kShards[0]);
+
+    // Put the new metadata in the loader.
     _catalogCacheLoader->setDatabaseRefreshReturnValue(
         DatabaseType(kDbName, kShards[1], dbVersion));
+
+    // Refresh the local cache.
     const auto swDatabase = _catalogCache->getDatabase(operationContext(), kDbName);
 
     ASSERT_OK(swDatabase.getStatus());
-    auto cachedDb = swDatabase.getValue();
+    const auto cachedDb = swDatabase.getValue();
     ASSERT_EQ(cachedDb->getPrimary(), kShards[1]);
+}
+
+TEST_F(CatalogCacheTest, AdvanceTimeInStoreForSingleCollectionOnShardRemoval) {
+    // Put initial metadata in the local cache.
+    const auto initDbVer = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const auto initDbEntry = DatabaseType(kNss.dbName(), kShards[0], initDbVer);
+    loadDatabases({initDbEntry});
+    const auto initCollVer =
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}),
+                                  boost::optional<CollectionIndexes>(boost::none));
+    loadCollection(initCollVer);
+
+    _catalogCache->advanceTimeInStoreForEntriesThatReferenceShard(kShards[0]);
+
+    // Put the new metadata in the loader.
+    const auto newDbEntry = initDbEntry;
+    auto newCollVer = initCollVer;
+    newCollVer.placementVersion().incMajor();
+    const auto newCollEntry = makeCollectionType(newCollVer);
+    const auto newChunkEntries = makeChunks(newCollVer.placementVersion());
+
+    _catalogCacheLoader->setDatabaseRefreshReturnValue(newDbEntry);
+    _catalogCacheLoader->setCollectionRefreshReturnValue(newCollEntry);
+    _catalogCacheLoader->setChunkRefreshReturnValue(newChunkEntries);
+
+    // Refresh the local cache.
+    const auto swColl = _catalogCache->getCollectionRoutingInfo(operationContext(), kNss);
+
+    ASSERT_OK(swColl.getStatus());
+    auto cachedColl = swColl.getValue();
+    ASSERT_EQ(newCollVer, cachedColl.getCollectionVersion());
 }
 
 TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
