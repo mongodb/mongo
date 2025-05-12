@@ -872,6 +872,7 @@ mongo_cc_unit_test(
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_solution_test.cpp",
+        "query_utils_test.cpp",
         "record_id_range_test.cpp",
         "sort_pattern_test.cpp",
         "view_response_formatter_test.cpp",
