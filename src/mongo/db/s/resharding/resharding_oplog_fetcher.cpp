@@ -445,7 +445,8 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
         aggRequest.setReadConcern(readConcernArgs);
     }
 
-    auto readPref = _inCriticalSection.load()
+    auto readPref = _inCriticalSection.load() &&
+            resharding::gReshardingOplogFetcherTargetPrimaryDuringCriticalSection.load()
         ? ReadPreferenceSetting{ReadPreference::PrimaryOnly}
         : ReadPreferenceSetting{ReadPreference::Nearest,
                                 ReadPreferenceSetting::kMinimalMaxStalenessValue};
@@ -623,7 +624,8 @@ void ReshardingOplogFetcher::onEnteringCriticalSection() {
     _inCriticalSection.store(true);
     stdx::lock_guard lk(_mutex);
     // Stop consuming the current aggregation and start a new one.
-    if (_aggCancelSource) {
+    if (resharding::gReshardingOplogFetcherTargetPrimaryDuringCriticalSection.load() &&
+        _aggCancelSource) {
         _aggCancelSource->cancel();
     }
 }
