@@ -153,7 +153,7 @@ private:
      * Checks if any document sources remain in the merge pipeline.
      */
     bool _mergePipeHasNext() const {
-        return !_splitPipeline.mergePipeline->getSources().empty();
+        return !_splitPipeline.mergePipeline->empty();
     }
 
     /**
@@ -303,7 +303,7 @@ private:
 
         tassert(5363800,
                 "Expected non-empty shardPipe consisting of at least a $sort stage",
-                !_splitPipeline.shardsPipeline->getSources().empty());
+                !_splitPipeline.shardsPipeline->empty());
         if (!dynamic_cast<DocumentSourceSort*>(
                 _splitPipeline.shardsPipeline->getSources().back().get())) {
             // Expected last stage on the shards to be a $sort.
@@ -339,8 +339,7 @@ private:
      * generated per-shard, so we don't need to preserve this sort order at the merge stage.
      */
     void _moveGroupFollowingSortFromMergerToShards() {
-        if (_splitPipeline.shardsPipeline->getSources().empty() ||
-            _splitPipeline.mergePipeline->getSources().empty()) {
+        if (_splitPipeline.shardsPipeline->empty() || _splitPipeline.mergePipeline->empty()) {
             return;
         }
 
@@ -374,7 +373,7 @@ private:
      * unwind.
      */
     void _moveFinalUnwindFromShardsToMerger() {
-        while (!_splitPipeline.shardsPipeline->getSources().empty() &&
+        while (!_splitPipeline.shardsPipeline->empty() &&
                dynamic_cast<DocumentSourceUnwind*>(
                    _splitPipeline.shardsPipeline->getSources().back().get())) {
             _splitPipeline.mergePipeline->addInitialSource(

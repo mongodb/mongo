@@ -595,7 +595,7 @@ bool findSbeCompatibleStagesForPushdown(
 }  // namespace
 
 void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery) {
-    if (!pipeline || pipeline->getSources().empty()) {
+    if (!pipeline || pipeline->empty()) {
         return;
     }
 
@@ -617,7 +617,7 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
     tassert(9298700,
             "attachPipelineStages() must not be called multiple times on a query",
             canonicalQuery->cqPipeline().empty());
-    if (!pipeline || pipeline->getSources().empty()) {
+    if (!pipeline || pipeline->empty()) {
         return;
     }
 

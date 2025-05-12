@@ -45,7 +45,7 @@ protected:
     void verify(const BSONObj& groupSpec, const std::vector<BSONObj>& expectedOptimizedPipeline) {
         auto pipeline = Pipeline::parse(makeVector(groupSpec), getExpCtx());
 
-        ASSERT_EQ(pipeline->getSources().size(), 1U);
+        ASSERT_EQ(pipeline->size(), 1U);
 
         pipeline->optimizePipeline();
 

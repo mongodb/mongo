@@ -480,6 +480,14 @@ public:
         return _sources;
     }
 
+    MONGO_COMPILER_ALWAYS_INLINE SourceContainer::size_type size() const {
+        return _sources.size();
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE bool empty() const {
+        return _sources.empty();
+    }
+
     /**
      * Stitch together the source pointers by calling setSource() for each source in 'container'.
      * This function must be called any time the order of stages within the container changes, e.g.

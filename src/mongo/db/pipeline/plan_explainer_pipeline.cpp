@@ -79,7 +79,7 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
 PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     // TODO SERVER-49808: Report execution stats for the pipeline.
-    if (_pipeline->getSources().empty()) {
+    if (_pipeline->empty()) {
         return {};
     }
 

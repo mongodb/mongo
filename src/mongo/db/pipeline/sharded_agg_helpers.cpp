@@ -504,13 +504,10 @@ boost::optional<CollectionRoutingInfo> getCollectionRoutingInfoForTargeting(
 
 /** Check if the first stage of `pipeline` can execute without an attached cursor source. */
 bool firstStageCanExecuteWithoutCursor(const Pipeline& pipeline) {
-    boost::optional<DocumentSource*> hasFirstStage = pipeline.getSources().empty()
-        ? boost::optional<DocumentSource*>{}
-        : pipeline.getSources().front().get();
-    if (!hasFirstStage) {
+    if (pipeline.empty()) {
         return false;
     }
-    const auto firstStage = *hasFirstStage;
+    const auto firstStage = pipeline.getSources().front().get();
 
     // In this helper, we expect that we are viewing the first stage of a pipeline that does
     // not yet have a mergeCursors prepended to it.
@@ -688,7 +685,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    if (mergePipeline->getSources().empty()) {
+    if (mergePipeline->empty()) {
         return boost::none;
     }
 
@@ -1487,7 +1484,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
     // The pipeline is going to be explained on the shards, and we don't want to send a
     // mergeCursors stage.
-    invariant(pipeline->getSources().empty() ||
+    invariant(pipeline->empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
     invariant(expCtx->getExplain());
 
@@ -1673,7 +1670,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
     tassert(9597602,
             "Pipeline should not start with $mergeCursors",
-            pipeline->getSources().empty() ||
+            pipeline->empty() ||
                 !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
     if (isRequiredToReadLocalData(shardTargetingPolicy, expCtx->getNamespaceString())) {

@@ -246,14 +246,14 @@ bool hasReferenceToSearchMeta(const DocumentSource& ds) {
 }
 
 bool isSearchPipeline(const Pipeline* pipeline) {
-    if (!pipeline || pipeline->getSources().empty()) {
+    if (!pipeline || pipeline->empty()) {
         return false;
     }
     return isSearchStage(pipeline->peekFront());
 }
 
 bool isSearchMetaPipeline(const Pipeline* pipeline) {
-    if (!pipeline || pipeline->getSources().empty()) {
+    if (!pipeline || pipeline->empty()) {
         return false;
     }
     return isSearchMetaStage(pipeline->peekFront());
@@ -300,7 +300,7 @@ bool isStoredSource(const Pipeline* pipeline) {
 }
 
 bool isMongotPipeline(const Pipeline* pipeline) {
-    if (!pipeline || pipeline->getSources().empty()) {
+    if (!pipeline || pipeline->empty()) {
         return false;
     }
     return isMongotStage(pipeline->peekFront());

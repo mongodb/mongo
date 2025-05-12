@@ -647,7 +647,7 @@ DocumentSourceGroupBase::pipelineDependentDistributedPlanLogic(
     }
 
     // TODO SERVER-97135: Refactor so we can remove the following check.
-    auto mergeStage = ctx.pipelineSuffix.getSources().empty()
+    auto mergeStage = ctx.pipelineSuffix.empty()
         ? nullptr
         : dynamic_cast<DocumentSourceMerge*>(ctx.pipelineSuffix.getSources().back().get());
     if (mergeStage) {

@@ -216,8 +216,8 @@ public:
         size_t mergePipelineSize,
         const BSONObj& shardCursorSortSpec) {
         // Verify that we've split the pipeline at the SplitPipeline stage, not on the deferred.
-        ASSERT_EQ(splitPipeline.shardsPipeline->getSources().size(), shardsPipelineSize);
-        ASSERT_EQ(splitPipeline.mergePipeline->getSources().size(), mergePipelineSize);
+        ASSERT_EQ(splitPipeline.shardsPipeline->size(), shardsPipelineSize);
+        ASSERT_EQ(splitPipeline.mergePipeline->size(), mergePipelineSize);
 
         // Verify the sort is correct.
         ASSERT(splitPipeline.shardCursorsSortSpec);

@@ -295,7 +295,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
 
-    while (!firstInputPipeline->getSources().empty()) {
+    while (!firstInputPipeline->empty()) {
         // These stages are being copied over from the original pipeline.
         outputStages.push_back(firstInputPipeline->popFront());
     }

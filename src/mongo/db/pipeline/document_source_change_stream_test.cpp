@@ -455,7 +455,7 @@ public:
      */
     void assertStagesNameOrder(std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                const std::vector<std::string> expectedStages) {
-        ASSERT_EQ(pipeline->getSources().size(), expectedStages.size());
+        ASSERT_EQ(pipeline->size(), expectedStages.size());
 
         auto stagesItr = pipeline->getSources().cbegin();
         auto expectedStagesItr = expectedStages.cbegin();

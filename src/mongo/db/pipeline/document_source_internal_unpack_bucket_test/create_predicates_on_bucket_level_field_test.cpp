@@ -73,7 +73,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     const auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -95,7 +95,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     const auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -117,7 +117,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     const auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -139,7 +139,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     const auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -161,7 +161,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     const auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -184,7 +184,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     const auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -232,7 +232,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // existing $expr rewrite optimizations.
     Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -259,7 +259,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // existing $expr rewrite optimizations.
     Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -286,7 +286,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // existing $expr rewrite optimizations.
     Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -310,7 +310,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // existing $expr rewrite optimizations.
     Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -334,7 +334,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     // existing $expr rewrite optimizations.
     Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -357,7 +357,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -382,7 +382,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -401,7 +401,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -428,7 +428,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -456,7 +456,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -492,7 +492,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -511,7 +511,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -534,7 +534,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -575,10 +575,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         "{$_internalUnpackBucket: {exclude: [], timeField: 'time', bucketMaxSpanSeconds: 3600}}");
     auto matchObj = fromjson("{$match: {$and: [{b: {$gt: 1}}, {a: {$ne: 5}}]}}");
     auto pipeline = Pipeline::parse(makeVector(unpackBucketObj, matchObj), getExpCtx());
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     // To get the optimized $match from the pipeline, we have to serialize with explain.
     auto stages = pipeline->writeExplainOps(SerializationOptions{
@@ -603,10 +603,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto matchObj =
         fromjson("{$match: {$and: [{b: {$gte: 2}}, {$and: [{c: {$gt: 1}}, {a: {$lt: 5}}]}]}}");
     auto pipeline = Pipeline::parse(makeVector(unpackBucketObj, matchObj), getExpCtx());
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto stages = pipeline->serializeToBson();
     ASSERT_EQ(stages.size(), 2U);
@@ -638,7 +638,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -657,7 +657,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -676,7 +676,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -695,7 +695,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -715,7 +715,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -735,7 +735,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -767,7 +767,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 3U);
+    ASSERT_EQ(pipeline->size(), 3U);
 
     auto matchStage = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -786,7 +786,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         getExpCtx());
     auto& container = pipeline->getSources();
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
@@ -867,7 +867,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // advantage of the existing $expr rewrite optimizations.
             Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto unpackStage =
@@ -928,7 +928,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // advantage of the existing $expr rewrite optimizations.
             Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto unpackStage =
@@ -981,7 +981,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // advantage of the existing $expr rewrite optimizations.
             Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto unpackStage =
@@ -1046,7 +1046,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // advantage of the existing $expr rewrite optimizations.
             Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto unpackStage =
@@ -1099,7 +1099,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             // advantage of the existing $expr rewrite optimizations.
             Pipeline::optimizeEndOfPipeline(container.begin(), &container);
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto unpackStage =
@@ -1145,7 +1145,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         for (auto& pipeline : pipelines) {
             auto& container = pipeline->getSources();
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto predicate =
@@ -1168,7 +1168,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         for (auto& pipeline : pipelines) {
             auto& container = pipeline->getSources();
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto predicate =
@@ -1190,7 +1190,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         for (auto& pipeline : pipelines) {
             auto& container = pipeline->getSources();
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto predicate =
@@ -1213,7 +1213,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         for (auto& pipeline : pipelines) {
             auto& container = pipeline->getSources();
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto predicate =
@@ -1236,7 +1236,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         for (auto& pipeline : pipelines) {
             auto& container = pipeline->getSources();
 
-            ASSERT_EQ(pipeline->getSources().size(), 2U);
+            ASSERT_EQ(pipeline->size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
             auto predicate =

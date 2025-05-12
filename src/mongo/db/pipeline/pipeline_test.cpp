@@ -3584,7 +3584,7 @@ private:
 TEST_F(ChangeStreamPipelineOptimizationTest, ChangeStreamLookUpSize) {
     auto pipeline = makePipeline(
         {changestreamStage("{fullDocument: 'updateLookup', showExpandedEvents: true}")});
-    ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
+    ASSERT_EQ(pipeline->size(), getChangeStreamStageSize());
 
     // Make sure the change lookup is at the end.
     assertStageAtPos<DocumentSourceChangeStreamAddPostImage>(pipeline->getSources(), -1 /* pos */);
@@ -3619,7 +3619,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest, FullDocumentBeforeChangeLookupSize)
     // filters out newly added events.
     auto pipeline = makePipeline(
         {changestreamStage("{fullDocumentBeforeChange: 'required', showExpandedEvents: true}")});
-    ASSERT_EQ(pipeline->getSources().size(), getChangeStreamStageSize());
+    ASSERT_EQ(pipeline->size(), getChangeStreamStageSize());
 
     // Make sure the pre-image lookup is at the end.
     assertStageAtPos<DocumentSourceChangeStreamAddPreImage>(pipeline->getSources(), -1 /* pos */);

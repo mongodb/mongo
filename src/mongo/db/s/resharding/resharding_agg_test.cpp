@@ -692,7 +692,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxn) {
     if (debug) {
         std::cout << "Pipeline stages:" << std::endl;
         // This is can be changed to process a prefix of the pipeline for debugging.
-        const std::size_t numStagesToKeep = pipeline->getSources().size();
+        const std::size_t numStagesToKeep = pipeline->size();
         pipeline->getSources().resize(numStagesToKeep);
         auto bsonPipeline = pipeline->serializeToBson();
         for (std::size_t idx = 0; idx < bsonPipeline.size(); ++idx) {

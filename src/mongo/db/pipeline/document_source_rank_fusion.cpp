@@ -499,7 +499,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
             makeSureSortKeyIsOutput(pipeline->getSources());
 
 
-            while (!pipeline->getSources().empty()) {
+            while (!pipeline->empty()) {
                 outputStages.push_back(pipeline->popFront());
             }
             auto firstPipelineStages = buildFirstPipelineStages(name,

@@ -165,10 +165,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->serialize();
     ASSERT_EQ(2u, serialized.size());
@@ -181,10 +181,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->writeExplainOps(kExplain);
     ASSERT_EQ(1u, serialized.size());
@@ -198,10 +198,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesAllHostsSuccessfullyAfterAbso
         kAllHostsTrueSpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->serialize();
     ASSERT_EQ(2u, serialized.size());
@@ -216,10 +216,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest,
         kAllHostsTrueSpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
 
     auto serialized = pipeline->writeExplainOps(kExplain);
     ASSERT_EQ(1u, serialized.size());
@@ -232,10 +232,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch)
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(1u, pipeline->getSources().size());
+    ASSERT_EQ(1u, pipeline->size());
     auto serialized = redactToArray(*pipeline->getSources().front());
     ASSERT_EQ(2u, serialized.size());
 

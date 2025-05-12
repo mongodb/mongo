@@ -189,7 +189,7 @@ public:
     }
 
     bool hasNonEmptyPipeline() const {
-        return _pipeline && !_pipeline->getSources().empty();
+        return _pipeline && !_pipeline->empty();
     }
 
     const Pipeline& getPipeline() const {

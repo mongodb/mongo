@@ -1129,7 +1129,7 @@ public:
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->getOperationContext()));
 
-        while (_removeLeadingQueryStages && !pipeline->getSources().empty()) {
+        while (_removeLeadingQueryStages && !pipeline->empty()) {
             if (pipeline->popFrontWithName("$match") || pipeline->popFrontWithName("$sort") ||
                 pipeline->popFrontWithName("$project")) {
                 continue;

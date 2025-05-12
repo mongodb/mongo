@@ -57,7 +57,7 @@ TEST_F(OptimizePipeline, MixedMatchPushedDown) {
     auto pipeline = Pipeline::parse(
         makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$lte: 4}}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -86,7 +86,7 @@ TEST_F(OptimizePipeline, MetaMatchPushedDown) {
         "bucketMaxSpanSeconds: 3600}}");
     auto pipeline =
         Pipeline::parse(makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0}}}")), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -113,7 +113,7 @@ TEST_F(OptimizePipeline, MixedMatchOr) {
         "  ]}"
         "]}}");
     auto pipeline = Pipeline::parse(makeVector(unpack, match), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -155,7 +155,7 @@ TEST_F(OptimizePipeline, MixedMatchOnlyMetaMatchPushedDown) {
         makeVector(unpack,
                    fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$type: \"string\"}}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -181,7 +181,7 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
                                                fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}}}"),
                                                fromjson("{$match: {a: {$lte: 4}}}")),
                                     getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -212,7 +212,7 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
                                                fromjson("{$sort: {a: 1}}"),
                                                fromjson("{$match: {a: {$lte: 4}}}")),
                                     getExpCtx());
-    ASSERT_EQ(4u, pipeline->getSources().size());
+    ASSERT_EQ(4u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -241,7 +241,7 @@ TEST_F(OptimizePipeline, MetaMatchThenCountPushedDown) {
                    fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
                    fromjson("{$count: 'foo'}")),
         getExpCtx());
-    ASSERT_EQ(4u, pipeline->getSources().size());  // $count is expanded into $group and $project.
+    ASSERT_EQ(4u, pipeline->size());  // $count is expanded into $group and $project.
 
     pipeline->optimizePipeline();
 
@@ -266,7 +266,7 @@ TEST_F(OptimizePipeline, SortThenMetaMatchPushedDown) {
                                                fromjson("{$sort: {myMeta: -1}}"),
                                                fromjson("{$match: {myMeta: {$eq: 'abc'}}}")),
                                     getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -287,7 +287,7 @@ TEST_F(OptimizePipeline, SortThenMixedMatchPushedDown) {
                                    fromjson("{$sort: {myMeta: -1}}"),
                                    fromjson("{$match: {a: {$gte: 5}, myMeta: {$eq: 'abc'}}}")),
                         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -321,7 +321,7 @@ TEST_F(OptimizePipeline, MetaMatchThenSortPushedDown) {
                                                fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
                                                fromjson("{$sort: {myMeta: -1}}")),
                                     getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -340,7 +340,7 @@ TEST_F(OptimizePipeline, MetaMatchThenProjectPushedDown) {
                    fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
                    fromjson("{$project: {x: 0}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -360,7 +360,7 @@ TEST_F(OptimizePipeline, MixedMatchThenProjectPushedDown) {
                    fromjson("{$match: {myMeta: {$eq: 'abc'}, a: {$lte: 4}}}"),
                    fromjson("{$project: {x: 1}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -391,7 +391,7 @@ TEST_F(OptimizePipeline, ProjectThenMetaMatchPushedDown) {
                    fromjson("{$project: {x: 0}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -411,7 +411,7 @@ TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
                    fromjson("{$project: {a: 1, myMeta: 1, x: 1}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}, a: {$lte: 4}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -444,7 +444,7 @@ TEST_F(OptimizePipeline, ProjectWithRenameThenMixedMatchPushedDown) {
                    fromjson("{$project: {myMeta: '$y', a: 1}}"),
                    fromjson("{$match: {myMeta: {$gte: 'abc'}, a: {$lte: 4}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -476,7 +476,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDown) {
                    fromjson("{$project: {y: '$myMeta'}}"),
                    fromjson("{$match: {y: {$gte: 'abc'}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -500,7 +500,7 @@ TEST_F(OptimizePipeline, ComputedMetaProjectPushedDown) {
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {a: {$sum: ['$myMeta.a', '$myMeta.b']}}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -521,7 +521,7 @@ TEST_F(OptimizePipeline, ComputedShadowingMetaProjectPushedDown) {
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: {$sum: ['$myMeta.a', '$myMeta.b']}}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -543,7 +543,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDownWithoutReorder) {
                    fromjson("{$project: {myMeta: {$sum: ['$myMeta.a', '$myMeta.b']}}}"),
                    fromjson("{$match: {myMeta: {$gte: 'abc'}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -567,7 +567,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenMatchPushedDown) {
                    fromjson("{$project: {y: {$sum: ['$myMeta.a', '$myMeta.b']}}}"),
                    fromjson("{$match: {y: {$gt: 'abc'}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -591,7 +591,7 @@ TEST_F(OptimizePipeline, MetaSortThenProjectPushedDown) {
                    fromjson("{$sort: {myMeta: -1}}"),
                    fromjson("{$project: {myMeta: 1, x: 1}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -612,7 +612,7 @@ TEST_F(OptimizePipeline, ProjectThenMetaSortPushedDown) {
                    fromjson("{$project: {myMeta: 1, x: 1}}"),
                    fromjson("{$sort: {myMeta: -1}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -633,7 +633,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenSortPushedDown) {
                    fromjson("{$project: {myMeta: '$myMeta.a'}}"),
                    fromjson("{$sort: {myMeta: 1}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -658,7 +658,7 @@ TEST_F(OptimizePipeline, ExclusionProjectThenMatchPushDown) {
                    fromjson("{$project: {'myMeta.a': 0}}"),
                    fromjson("{$match: {'myMeta.b': {$lt: 10}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -679,7 +679,7 @@ TEST_F(OptimizePipeline, ExclusionProjectThenProjectPushDown) {
                    fromjson("{$project: {myMeta: 0}}"),
                    fromjson("{$project: {myMeta: 1, a: 1, _id: 0}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -701,7 +701,7 @@ TEST_F(OptimizePipeline, ProjectThenExclusionProjectPushDown) {
                    fromjson("{$project: {myMeta: 1, _id: 0}}"),
                    fromjson("{$project: {myMeta: 0}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -723,7 +723,7 @@ TEST_F(OptimizePipeline, ComputedProjectThenProjectPushDown) {
                    fromjson("{$project: {myMeta: '$myMeta.a'}}"),
                    fromjson("{$project: {myMeta: 0}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -747,7 +747,7 @@ TEST_F(OptimizePipeline, DoubleInclusionMetaProjectPushDown) {
                    fromjson("{$project: {myMeta: 1, _id: 0}}"),
                    fromjson("{$project: {_id: 0, time: 1}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
     auto serialized = pipeline->serializeToBson();
@@ -767,7 +767,7 @@ TEST_F(OptimizePipeline, ExcludeMetaProjectPushDown) {
         "'myMeta', bucketMaxSpanSeconds: 3600}}");
     auto pipeline = Pipeline::parse(
         makeVector(unpackSpec, fromjson("{$project: {_id: 0, time: 1}}")), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
     auto serialized = pipeline->serializeToBson();
@@ -784,7 +784,7 @@ TEST_F(OptimizePipeline, AddFieldsOfShadowingMetaPushedDown) {
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$addFields: {myMeta: '$myMeta.a'}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -804,7 +804,7 @@ TEST_F(OptimizePipeline, AddFieldsOfComputedMetaPushedDown) {
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$addFields: {a: '$myMeta.a'}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -825,7 +825,7 @@ TEST_F(OptimizePipeline, AddFieldsThenSortPushedDown) {
                    fromjson("{$addFields: {myMeta: '$myMeta.a'}}"),
                    fromjson("{$sort: {myMeta: 1}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -1042,7 +1042,7 @@ TEST_F(OptimizePipeline, MatchWithGeoWithinOnMeasurementsPushedDownUsingInternal
                             "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
         getExpCtx());
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     pipeline->optimizePipeline();
 
@@ -1073,7 +1073,7 @@ TEST_F(OptimizePipeline, MatchWithGeoWithinOnMetaFieldIsPushedDown) {
                             "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
         getExpCtx());
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     pipeline->optimizePipeline();
 
@@ -1099,7 +1099,7 @@ TEST_F(OptimizePipeline,
                             "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
         getExpCtx());
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     pipeline->optimizePipeline();
 
@@ -1130,7 +1130,7 @@ TEST_F(OptimizePipeline, MatchWithGeoIntersectsOnMetaFieldIsPushedDown) {
                      "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
         getExpCtx());
 
-    ASSERT_EQ(pipeline->getSources().size(), 2U);
+    ASSERT_EQ(pipeline->size(), 2U);
 
     pipeline->optimizePipeline();
 
@@ -1162,7 +1162,7 @@ TEST_F(OptimizePipeline, StreamingGroupIsEnabledWhenPossible) {
                                                groupSpecObj),
                                     getExpCtx());
 
-    ASSERT_EQ(pipeline->getSources().size(), 4U);
+    ASSERT_EQ(pipeline->size(), 4U);
 
     pipeline->optimizePipeline();
 
@@ -1191,7 +1191,7 @@ TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
                    groupSpecObj),
         getExpCtx());
 
-    ASSERT_EQ(pipeline->getSources().size(), 4U);
+    ASSERT_EQ(pipeline->size(), 4U);
 
     pipeline->optimizePipeline();
 
@@ -1208,7 +1208,7 @@ TEST_F(OptimizePipeline, ComputedMetaProjFieldsAreNotInInclusionProjection) {
                 "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['time', 'y']}}"),
             fromjson("{$project: {time: 1, x: 1}}")),
         getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    ASSERT_EQ(2u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -1231,7 +1231,7 @@ TEST_F(OptimizePipeline, ComputedMetaProjectFieldsAfterInclusionGetsAddedToInclu
                    fromjson("{$project: {myMeta: 1}}"),
                    fromjson("{$addFields: {newMeta: {$toUpper : '$myMeta'}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 
@@ -1256,7 +1256,7 @@ TEST_F(OptimizePipeline, ShadowingMetaProjectFieldsAfterInclusionGetsAddedToIncl
                    // The new 'myMeta' shadows the original 'myMeta'.
                    fromjson("{$addFields: {myMeta: {$toUpper : '$myMeta'}}}")),
         getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
+    ASSERT_EQ(3u, pipeline->size());
 
     pipeline->optimizePipeline();
 

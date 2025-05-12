@@ -180,7 +180,7 @@ inline auto makeAdditionalChildren(
         }
 
         if (lookupSource->hasPipeline() &&
-            lookupSource->getResolvedIntrospectionPipeline().getSources().size() > 0) {
+            lookupSource->getResolvedIntrospectionPipeline().size() > 0) {
             auto [child, offTheEndReshaper] = makeTreeWithOffTheEndStage(
                 initialStageContents, lookupSource->getResolvedIntrospectionPipeline(), propagator);
             offTheEndContents.push_back(std::move(offTheEndReshaper(child.get().contents)));
@@ -264,8 +264,7 @@ inline void walk(Stage<T>* stage,
         walk(stage->principalChild.get(), sourceIter, zipper);
 
     if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter); lookupSource &&
-        lookupSource->hasPipeline() &&
-        !lookupSource->getResolvedIntrospectionPipeline().getSources().empty()) {
+        lookupSource->hasPipeline() && !lookupSource->getResolvedIntrospectionPipeline().empty()) {
         auto iter = lookupSource->getResolvedIntrospectionPipeline().getSources().begin();
         // The pipeline's schema child is always contained at the last element of the vector for
         // lookup.
@@ -318,7 +317,7 @@ inline std::pair<boost::optional<Stage<T>>, T> makeTree(
     const std::function<T(const T&, const std::vector<T>&, const DocumentSource&)>& propagator) {
     // For empty pipelines, there's no Stage<T> to return and the output schema is the same as the
     // input schema.
-    if (pipeline.getSources().empty()) {
+    if (pipeline.empty()) {
         return std::pair(
             boost::none,
             findStageContents(pipeline.getContext()->getNamespaceString(), initialStageContents));
