@@ -402,6 +402,15 @@ function isIxscan(db, root) {
 }
 
 /**
+ * Returns true if the BSON representation of a plan rooted at 'winningPlan' is using
+ * an index scan, and false otherwise.
+ */
+function isIxscanMultikey(winningPlan) {
+    let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
+    return ixscanStage && ixscanStage.isMultiKey;
+}
+
+/**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * the idhack fast path, and false otherwise.
  */
