@@ -180,7 +180,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
 
         auto parsedShardResponse = ShardsvrReshardingOperationTimeResponse::parse(
             IDLParserContext("CoordinatorCommitMonitor"), shardResponse.data);
-        auto remainingTime = parsedShardResponse.getRemainingMillis();
+        auto remainingTime = parsedShardResponse.getRecipientRemainingMillis();
 
         // If any recipient omits the "remainingMillis" field of the response then
         // we cannot conclude that it is safe to begin the critical section.

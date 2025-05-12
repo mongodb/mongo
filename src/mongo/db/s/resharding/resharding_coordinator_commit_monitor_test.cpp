@@ -232,7 +232,7 @@ void CoordinatorCommitMonitorTest::mockCommandForRecipients(Milliseconds remaini
         }
 
         ShardsvrReshardingOperationTimeResponse response;
-        response.setRemainingMillis(remainingOperationTime);
+        response.setRecipientRemainingMillis(remainingOperationTime);
         return response.toBSON();
     };
 
@@ -260,7 +260,7 @@ void CoordinatorCommitMonitorTest::mockOmitRemainingMillisForOneRecipient() {
             }
             ShardsvrReshardingOperationTimeResponse response;
             auto threshold = Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load());
-            response.setRemainingMillis(threshold - Milliseconds(1));
+            response.setRecipientRemainingMillis(threshold - Milliseconds(1));
             return response.toBSON();
         });
     }
@@ -280,9 +280,9 @@ void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients
         ShardsvrReshardingOperationTimeResponse response;
         if (useMin) {
             useMin = false;
-            response.setRemainingMillis(remainingOperationTimes.min);
+            response.setRecipientRemainingMillis(remainingOperationTimes.min);
         } else {
-            response.setRemainingMillis(remainingOperationTimes.max);
+            response.setRecipientRemainingMillis(remainingOperationTimes.max);
         }
         return response.toBSON();
     };
@@ -307,7 +307,7 @@ void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients
             }
 
             ShardsvrReshardingOperationTimeResponse response;
-            response.setRemainingMillis(remainingOperationTimes[i]);
+            response.setRecipientRemainingMillis(remainingOperationTimes[i]);
             response.setMajorityReplicationLagMillis(replicationLags[i]);
             return response.toBSON();
         });

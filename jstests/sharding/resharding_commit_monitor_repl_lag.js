@@ -1,121 +1,140 @@
 /**
- * Tests that the _shardsvrReshardingOperationTime command returns the majority replication lag.
+ * Tests that the _shardsvrReshardingOperationTime command is supported on both donor and
+ * recipient shard. Checks that it returns "majorityReplicationLagMillis" whether the shard is a
+ * donor or recipient and only returns "elapsedMillis" and "remainingMillis" if the shard is a
+ * recipient.
+ *
+ * This test cannot be run in config shard suites since it involves introducing replication lag
+ * on all shards, and having replication lag on the config shard can cause various reads against
+ * the sharding metadata collection to fail with timeout errors.
+ * @tags: [
+ *   config_shard_incompatible
+ * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from 'jstests/libs/shardingtest.js';
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
-import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
-function waitUntilReshardingInitialized(recipientPrimary, ns) {
-    assert.soon(() => {
-        const currentOp = recipientPrimary.getDB("admin")
-                              .aggregate([
-                                  {$currentOp: {allUsers: true}},
-                                  {$match: {type: "op", "originatingCommand.reshardCollection": ns}}
-                              ])
-                              .toArray();
-        return currentOp.length > 0;
-    });
+function validateShardsvrReshardingOperationTimeResponse(res, isRecipient) {
+    assert.eq(res.hasOwnProperty("majorityReplicationLagMillis"), true, res);
+    assert.eq(res.hasOwnProperty("elapsedMillis"), isRecipient, res);
+    assert.eq(res.hasOwnProperty("remainingMillis"), isRecipient, res);
 }
 
-const reshardingTest = new ReshardingTest({
-    numDonors: 1,
-    numRecipients: 1,
-    // Make the fixture start 3-node shards.
-    enableElections: true,
-    // Disallow chaining to force both secondaries to sync from the primary. One of the test cases
-    // below disables replication on one of the secondaries, with chaining that would effectively
-    // disable replication on both secondaries, causing the test case to to fail since writeConcern
-    // of w: 2 is unsatisfiable.
-    chainingAllowed: false,
+function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {isRecipient}) {
+    const primary = participantRst.getPrimary();
+
+    jsTest.log("Test the case where there is no replication lag on " + participantRst.name);
+    participantRst.awaitReplication();
+    const res0 = assert.commandWorked(
+        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+    validateShardsvrReshardingOperationTimeResponse(res0, isRecipient);
+    assert(res0.majorityReplicationLagMillis, 0, res0);
+
+    jsTest.log("Test the case where there is replication lag on only one secondary on " +
+               participantRst.name);
+    stopServerReplication(participantRst.getSecondaries()[0]);
+    const sleepMillis1 = 100;
+    sleep(sleepMillis1);
+    // Perform a write and and wait for it to replicate to the other secondary.
+    assert.commandWorked(
+        primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 2}}));
+    const res1 = assert.commandWorked(
+        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+    validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
+    assert(res1.majorityReplicationLagMillis, 0, res1);
+
+    jsTest.log("Test the case where there is replication lag on both secondaries on " +
+               participantRst.name);
+    stopServerReplication(participantRst.getSecondaries()[1]);
+    const sleepMillis2 = 200;
+    sleep(sleepMillis2);
+    // Perform a write and and don't wait for it to replicate to secondaries since replication
+    // has been paused on both secondaries.
+    assert.commandWorked(
+        primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}));
+    const res2 = assert.commandWorked(
+        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+    validateShardsvrReshardingOperationTimeResponse(res2, isRecipient);
+    assert.gte(res2.majorityReplicationLagMillis, sleepMillis2, {res2});
+
+    jsTest.log("Test the case where there is replication lag on only one secondary again on " +
+               participantRst.name);
+    // Unpause replication on one of the secondaries. The majority replication lag should become
+    // 0 eventually.
+    restartServerReplication(participantRst.getSecondaries()[0]);
+    assert.soon(() => {
+        const res3 = assert.commandWorked(
+            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        validateShardsvrReshardingOperationTimeResponse(res3, isRecipient);
+        return res3.majorityReplicationLagMillis == 0;
+    });
+
+    restartServerReplication(participantRst.getSecondaries()[1]);
+}
+
+const st = new ShardingTest({
+    shards: 3,
+    rs: {
+        nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+        // Disallow chaining to force both secondaries to sync from the primary. One
+        // of the test cases below disables replication on one of the secondaries,
+        // with chaining that would effectively disable replication on both
+        // secondaries, causing the test case to to fail since writeConcern of w:
+        // majority is unsatisfiable.
+        settings: {chainingAllowed: false},
+    }
 });
-reshardingTest.setup();
 
-const donorShardNames = reshardingTest.donorShardNames;
-const recipientShardNames = reshardingTest.recipientShardNames;
-
-// Set up the collection to reshard.
-const dbName0 = "testDb0";
-const collName0 = "testColl0";
-const ns0 = dbName0 + "." + collName0;
-const coll0 = reshardingTest.createShardedCollection({
-    ns: ns0,
-    shardKeyPattern: {oldKey: 1},
-    chunks: [
-        {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
-        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[0]},
+// Set up the collection to reshard with the following participants.
+// - shard0 is a donor but not a recipient.
+// - shard1 is both a donor and a recipient.
+// - shard2 is a recipient but not a donor.
+const reshardingDbName = 'testDb';
+const reshardingCollName = 'testColl';
+const reshardingNs = reshardingDbName + '.' + reshardingCollName;
+const reshardingColl = st.s.getCollection(reshardingNs);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: reshardingDbName, primaryShard: st.shard1.shardName}));
+CreateShardedCollectionUtil.shardCollectionWithChunks(
+    reshardingColl,
+    {oldKey: 1},
+    [
+        {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: st.shard0.shardName},
+        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: st.shard1.shardName}
     ],
-});
-assert.commandWorked(coll0.insert([
+    {} /* collOpts */);
+assert.commandWorked(reshardingColl.insert([
     {_id: -1, oldKey: -10, newKey: 10},
     {_id: 1, oldKey: 10, newKey: -10},
 ]));
 
-// Set up the collection to write to in order to introduce replication lag on the recipient shard.
-const dbName1 = "testDb1";
-const collName1 = "testColl1";
-const ns1 = dbName1 + "." + collName1;
-assert.commandWorked(reshardingTest._st.s.adminCommand(
-    {enableSharding: dbName1, primaryShard: recipientShardNames[0]}));
-const coll1 = reshardingTest._st.s.getCollection(ns1);
-assert.commandWorked(coll1.insert([
-    {_id: -1},
-    {_id: 1},
-]));
-
-reshardingTest.withReshardingInBackground(
-    {
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [
-            {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
-        ],
-    },
-    () => {
-        const recipient0RS = reshardingTest.getReplSetForShard(recipientShardNames[0]);
-        const recipient0Primary = recipient0RS.getPrimary();
-        waitUntilReshardingInitialized(recipient0Primary, ns0);
-
-        jsTest.log("Test the case where there is no replication lag");
-        recipient0RS.awaitReplication();
-        const res0 = assert.commandWorked(
-            recipient0Primary.adminCommand({_shardsvrReshardingOperationTime: ns0}));
-        assert(res0.hasOwnProperty("majorityReplicationLagMillis"), res0);
-        assert(res0.majorityReplicationLagMillis, 0, res0);
-
-        jsTest.log("Test the case where there is replication lag on only one secondary");
-        stopServerReplication(recipient0RS.getSecondaries()[0]);
-        const sleepMillis1 = 100;
-        sleep(sleepMillis1);
-        // Perform a write and and wait for it to replicate to the other secondary.
-        assert.commandWorked(coll1.insert([{_id: -2}], {writeConcern: {w: 2}}));
-        const res1 = assert.commandWorked(
-            recipient0Primary.adminCommand({_shardsvrReshardingOperationTime: ns0}));
-        assert(res1.hasOwnProperty("majorityReplicationLagMillis"), res1);
-        assert(res1.majorityReplicationLagMillis, 0, res1);
-
-        jsTest.log("Test the case where there is replication lag on both secondaries");
-        stopServerReplication(recipient0RS.getSecondaries()[1]);
-        const sleepMillis2 = 200;
-        sleep(sleepMillis2);
-        // Perform a write and and don't wait for it to replicate to secondaries since replication
-        // has been paused on both secondaries.
-        assert.commandWorked(coll1.insert([{_id: 2}], {writeConcern: {w: 1}}));
-        const res2 = assert.commandWorked(
-            recipient0Primary.adminCommand({_shardsvrReshardingOperationTime: ns0}));
-        assert(res2.hasOwnProperty("majorityReplicationLagMillis"), res2);
-        assert.gte(res2.majorityReplicationLagMillis, sleepMillis2, {res2});
-
-        jsTest.log("Test the case where there is replication lag on only one secondary again");
-        // Unpause replication on one of the secondaries. The majority replication lag should become
-        // 0 eventually.
-        restartServerReplication(recipient0RS.getSecondaries()[0]);
-        assert.soon(() => {
-            const res3 = assert.commandWorked(
-                recipient0Primary.adminCommand({_shardsvrReshardingOperationTime: ns0}));
-            assert(res3.hasOwnProperty("majorityReplicationLagMillis"), res2);
-            return res3.majorityReplicationLagMillis == 0;
-        });
-
-        restartServerReplication(recipient0RS.getSecondaries()[1]);
+function runReshardCollection(host, ns, recipientShardName0, recipientShardName1) {
+    const mongos = new Mongo(host);
+    return mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        _presetReshardedChunks: [
+            {min: {newKey: MinKey}, max: {newKey: 0}, recipientShardId: recipientShardName0},
+            {min: {newKey: 0}, max: {newKey: MaxKey}, recipientShardId: recipientShardName1},
+        ]
     });
+}
+const reshardThread = new Thread(
+    runReshardCollection, st.s.host, reshardingNs, st.shard1.shardName, st.shard2.shardName);
 
-reshardingTest.teardown();
+const fp =
+    configureFailPoint(st.configRS.getPrimary(), 'reshardingPauseCoordinatorBeforeBlockingWrites');
+reshardThread.start();
+fp.wait();
+
+testShardsvrReshardingOperationTimeCmd(reshardingNs, st.rs0, {isRecipient: false});
+testShardsvrReshardingOperationTimeCmd(reshardingNs, st.rs1, {isRecipient: true});
+testShardsvrReshardingOperationTimeCmd(reshardingNs, st.rs2, {isRecipient: true});
+
+fp.off();
+assert.commandWorked(reshardThread.returnData());
+
+st.stop();
