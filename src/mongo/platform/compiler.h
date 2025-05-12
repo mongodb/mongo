@@ -157,7 +157,7 @@
  */
 #define MONGO_COMPILER_ALWAYS_INLINE MONGO_COMPILER_ALWAYS_INLINE_
 #if defined(_MSC_VER)
-#define MONGO_COMPILER_ALWAYS_INLINE_ __forceinline
+#define MONGO_COMPILER_ALWAYS_INLINE_ [[msvc::forceinline]]
 #elif MONGO_COMPILER_HAS_ATTRIBUTE(gnu::always_inline)
 #define MONGO_COMPILER_ALWAYS_INLINE_ [[gnu::always_inline]]
 #else

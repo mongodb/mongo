@@ -793,8 +793,6 @@ T decodeLastSlot(uint64_t encoded) {
     return 0;
 }
 
-#pragma warning(push)
-#pragma warning(disable : 4141)
 // Decodes and visits all slots in simple8b block.
 template <typename T, typename Visit, typename VisitZero, typename VisitMissing>
 MONGO_COMPILER_ALWAYS_INLINE inline size_t decodeAndVisit(uint64_t encoded,
@@ -960,7 +958,6 @@ MONGO_COMPILER_ALWAYS_INLINE inline size_t decodeAndVisit(uint64_t encoded,
             break;
     }
 }
-#pragma warning(pop)
 
 // Decodes and sums all slots in simple8b block, writes last encountered non-rle block in
 // 'prevNonRLE'.
