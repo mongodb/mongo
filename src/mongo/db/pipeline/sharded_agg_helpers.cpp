@@ -809,7 +809,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
         // write concern. The write concern should only be applied when there are writes performed
         // to avoid mistakenly waiting for writes which didn't happen.
         const auto& shardsPipe = splitPipeline.shardsPipeline->getSources();
-        if (!std::any_of(shardsPipe.begin(), shardsPipe.end(), [](const auto& stage) {
+        if (!std::any_of(shardsPipe.cbegin(), shardsPipe.cend(), [](const auto& stage) {
                 return stage->constraints().writesPersistentData();
             })) {
             targetedCmd[WriteConcernOptions::kWriteConcernField] = Value();

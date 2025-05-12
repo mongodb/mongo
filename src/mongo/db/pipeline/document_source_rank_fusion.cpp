@@ -96,7 +96,7 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
         DocumentSourceVectorSearch::kStageName,
         DocumentSourceSearch::kStageName,
         DocumentSourceGeoNear::kStageName};
-    auto sources = pipeline.getSources();
+    const auto& sources = pipeline.getSources();
 
     static const std::string rankPipelineMsg =
         "All subpipelines to the $rankFusion stage must begin with one of $search, "
@@ -113,7 +113,7 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
                             });
     uassert(9191100, rankPipelineMsg, isRankedPipeline);
 
-    std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+    for (const auto& stage : sources) {
         if (stage->getSourceName() == DocumentSourceGeoNear::kStageName) {
             uassert(9191101,
                     str::stream() << "$geoNear can be used in a $rankFusion subpipeline but not "
@@ -137,7 +137,7 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
                                      "stages that retrieve, limit, or order documents are allowed.",
                     stage->constraints().noFieldModifications);
         }
-    });
+    }
 }
 
 auto makeSureSortKeyIsOutput(const auto& stageList) {

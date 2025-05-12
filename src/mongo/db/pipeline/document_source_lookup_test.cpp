@@ -494,7 +494,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwind)
 
     auto sourceContainers = pipeline->getSources();
     ASSERT_EQ(sourceContainers.size(), 1);
-    auto iter = sourceContainers.begin();
+    auto iter = sourceContainers.cbegin();
     ASSERT(typeid(DocumentSourceLookUp) == typeid(**iter));
 
     auto lookup = boost::dynamic_pointer_cast<DocumentSourceLookUp>((*iter));
@@ -562,7 +562,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
 
     auto sourceContainers = pipeline->getSources();
     ASSERT_EQ(sourceContainers.size(), 1);
-    auto iter = sourceContainers.begin();
+    auto iter = sourceContainers.cbegin();
     ASSERT(typeid(DocumentSourceLookUp) == typeid(**iter));
 
     auto lookup = boost::dynamic_pointer_cast<DocumentSourceLookUp>((*iter));
@@ -635,7 +635,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
 
     auto sourceContainers = pipeline->getSources();
     ASSERT_EQ(sourceContainers.size(), 1);
-    auto iter = sourceContainers.begin();
+    auto iter = sourceContainers.cbegin();
     ASSERT(typeid(DocumentSourceLookUp) == typeid(**iter));
 
     auto lookup = boost::dynamic_pointer_cast<DocumentSourceLookUp>((*iter));
@@ -1406,11 +1406,11 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    auto sources = subPipeline->getSources();
+    const auto& sources = subPipeline->getSources();
     ASSERT_GTE(sources.size(), 2u);
 
     // The first source is our mock data source, and the second should be the $match expression.
-    auto secondSource = *(++sources.begin());
+    auto secondSource = *(++sources.cbegin());
     auto& matchSource = dynamic_cast<const DocumentSourceMatch&>(*secondSource);
 
     // Ensure that the '$$var' in the embedded expression got optimized to ExpressionConstant.

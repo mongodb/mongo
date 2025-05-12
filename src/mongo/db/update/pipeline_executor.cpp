@@ -92,7 +92,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     _expCtx->stopExpressionCounters();
 
     // Validate the update pipeline.
-    for (auto&& stage : _pipeline->getSources()) {
+    for (const auto& stage : _pipeline->getSources()) {
         auto stageConstraints = stage->constraints();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << stage->getSourceName()

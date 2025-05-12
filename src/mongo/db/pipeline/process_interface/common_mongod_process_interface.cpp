@@ -595,7 +595,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(expCtx->getOperationContext()));
 
-    Pipeline::SourceContainer& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     boost::optional<DocumentSource*> firstStage =
         sources.empty() ? boost::optional<DocumentSource*>{} : sources.front().get();
     tassert(10287400,

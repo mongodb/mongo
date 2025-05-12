@@ -59,14 +59,14 @@ std::string PlanExplainerPipeline::getPlanSummary() const {
 void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
     tassert(9378603, "Encountered unexpected nullptr for PlanSummaryStats", statsOut);
 
-    auto source_it = _pipeline->getSources().begin();
+    auto source_it = _pipeline->getSources().cbegin();
     if (auto docSourceCursor = dynamic_cast<DocumentSourceCursor*>(source_it->get())) {
         *statsOut = docSourceCursor->getPlanSummaryStats();
         ++source_it;
     };
 
     PlanSummaryStatsVisitor visitor(*statsOut);
-    std::for_each(source_it, _pipeline->getSources().end(), [&](const auto& source) {
+    std::for_each(source_it, _pipeline->getSources().cend(), [&](const auto& source) {
         statsOut->usedDisk = statsOut->usedDisk || source->usedDisk();
         if (auto specificStats = source->getSpecificStats()) {
             specificStats->acceptVisitor(&visitor);
@@ -84,7 +84,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     }
 
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().begin()->get())) {
+            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().cbegin()->get())) {
         if (auto explainer = docSourceCursor->getPlanExplainer()) {
             return explainer->getWinningPlanStats(verbosity);
         }

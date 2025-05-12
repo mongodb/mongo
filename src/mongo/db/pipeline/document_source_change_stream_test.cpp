@@ -457,8 +457,8 @@ public:
                                const std::vector<std::string> expectedStages) {
         ASSERT_EQ(pipeline->getSources().size(), expectedStages.size());
 
-        auto stagesItr = pipeline->getSources().begin();
-        auto expectedStagesItr = expectedStages.begin();
+        auto stagesItr = pipeline->getSources().cbegin();
+        auto expectedStagesItr = expectedStages.cbegin();
 
         while (expectedStagesItr != expectedStages.end()) {
             ASSERT_EQ(*expectedStagesItr, stagesItr->get()->getSourceName());

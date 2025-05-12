@@ -54,9 +54,9 @@ namespace {
  */
 auto cloneEachOne(std::list<boost::intrusive_ptr<DocumentSource>> stages, const auto& expCtx) {
     std::list<boost::intrusive_ptr<DocumentSource>> cloned;
-    std::for_each(stages.begin(), stages.end(), [&](const auto& stage) {
+    for (const auto& stage : stages) {
         cloned.push_back(stage->clone(expCtx));
-    });
+    }
     return cloned;
 }
 }  // namespace

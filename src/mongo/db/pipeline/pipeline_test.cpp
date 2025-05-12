@@ -6393,7 +6393,7 @@ TEST_F(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
         // Tracking backwards.
         auto pipeline =
             makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
-        auto stages = pipeline->getSources();
+        const auto& stages = pipeline->getSources();
         auto renames = semantic_analysis::renamedPaths(stages.crbegin(), stages.crend(), {"c"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
@@ -6404,7 +6404,7 @@ TEST_F(PipelineRenameTracking, ReportsNewNameAcrossMultipleRenames) {
         // Tracking forwards.
         auto pipeline =
             makePipeline({mockStage(), RenamesAToB::create(expCtx), RenamesBToC::create(expCtx)});
-        auto stages = pipeline->getSources();
+        const auto& stages = pipeline->getSources();
         auto renames = semantic_analysis::renamedPaths(stages.cbegin(), stages.cend(), {"a"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;

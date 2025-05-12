@@ -71,7 +71,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                             "'time', bucketMaxSpanSeconds: 3600}}"),
                                    fromjson("{$match: {a: {$gt: 1}}}")),
                         getExpCtx());
-    auto& container = pipeline->getSources();
+    const auto& container = pipeline->getSources();
 
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -93,7 +93,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                             "'time', bucketMaxSpanSeconds: 3600}}"),
                                    fromjson("{$match: {a: {$gte: 1}}}")),
                         getExpCtx());
-    auto& container = pipeline->getSources();
+    const auto& container = pipeline->getSources();
 
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -115,7 +115,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                             "'time', bucketMaxSpanSeconds: 3600}}"),
                                    fromjson("{$match: {a: {$lt: 1}}}")),
                         getExpCtx());
-    auto& container = pipeline->getSources();
+    const auto& container = pipeline->getSources();
 
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -137,7 +137,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                             "'time', bucketMaxSpanSeconds: 3600}}"),
                                    fromjson("{$match: {a: {$lte: 1}}}")),
                         getExpCtx());
-    auto& container = pipeline->getSources();
+    const auto& container = pipeline->getSources();
 
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -159,7 +159,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                             "'time', bucketMaxSpanSeconds: 3600}}"),
                                    fromjson("{$match: {a: {$eq: 1}}}")),
                         getExpCtx());
-    auto& container = pipeline->getSources();
+    const auto& container = pipeline->getSources();
 
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -182,7 +182,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                             "'time', bucketMaxSpanSeconds: 3600}}"),
                                    fromjson("{$match: {a: {$in: [1, 2]}}}")),
                         getExpCtx());
-    auto& container = pipeline->getSources();
+    const auto& container = pipeline->getSources();
 
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 

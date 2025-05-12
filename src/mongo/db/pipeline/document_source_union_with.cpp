@@ -76,13 +76,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     std::vector<BSONObj> currentPipeline,
     NamespaceString userNss) {
     auto validatorCallback = [](const Pipeline& pipeline) {
-        const auto& sources = pipeline.getSources();
-        std::for_each(sources.begin(), sources.end(), [](auto& src) {
+        for (const auto& src : pipeline.getSources()) {
             uassert(31441,
                     str::stream() << src->getSourceName()
                                   << " is not allowed within a $unionWith's sub-pipeline",
                     src->constraints().isAllowedInUnionPipeline());
-        });
+        }
     };
 
     MakePipelineOptions opts;

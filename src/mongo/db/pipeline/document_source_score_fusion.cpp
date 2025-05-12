@@ -327,7 +327,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
  * allowed.
  */
 static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
-    auto sources = pipeline.getSources();
+    const auto& sources = pipeline.getSources();
 
     static const std::string scorePipelineMsg =
         "All subpipelines to the $scoreFusion stage must begin with one of $search, "
@@ -338,7 +338,7 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
 
     uassert(9402500, scorePipelineMsg, hybrid_scoring_util::isScoredPipeline(pipeline));
 
-    std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+    for (const auto& stage : sources) {
         if (stage->getSourceName() == DocumentSourceSearch::kStageName) {
             uassert(
                 9402501,
@@ -355,7 +355,7 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
                                      "stages that retrieve, limit, or order documents are allowed.",
                     stage->constraints().noFieldModifications);
         }
-    });
+    }
 }
 
 /**

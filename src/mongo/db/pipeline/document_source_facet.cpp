@@ -284,7 +284,7 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState state) co
     // will be the $facet's final HostTypeRequirement.
     for (auto fi = _facets.begin(); fi != _facets.end() && host != kDefinitiveHost; fi++) {
         const auto& sources = fi->pipeline->getSources();
-        for (auto si = sources.begin(); si != sources.end() && host != kDefinitiveHost; si++) {
+        for (auto si = sources.cbegin(); si != sources.cend() && host != kDefinitiveHost; si++) {
             const auto subConstraints = (*si)->constraints(state);
             const auto hostReq = subConstraints.resolvedHostTypeRequirement(pExpCtx);
 
@@ -372,8 +372,8 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
 
         auto pipeline =
             Pipeline::parseFacetPipeline(rawFacet.second, expCtx, [](const Pipeline& pipeline) {
-                auto sources = pipeline.getSources();
-                std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+                const auto& sources = pipeline.getSources();
+                for (auto& stage : sources) {
                     auto stageConstraints = stage->constraints();
                     if (!stageConstraints.isAllowedInsideFacetStage()) {
                         uasserted(40600,
@@ -385,7 +385,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
                     invariant(stageConstraints.requiredPosition ==
                               StageConstraints::PositionRequirement::kNone);
                     invariant(!stageConstraints.isIndependentOfAnyCollection);
-                });
+                }
             });
 
         // These checks potentially require that we check the catalog to determine where our data

@@ -61,14 +61,14 @@ bool isScoredPipeline(const Pipeline& pipeline) {
     // desugared by this point.
     static const std::set<StringData> implicitlyScoredStages{DocumentSourceVectorSearch::kStageName,
                                                              DocumentSourceSearch::kStageName};
-    auto sources = pipeline.getSources();
+    const auto& sources = pipeline.getSources();
     if (sources.empty()) {
         return false;
     }
 
     auto firstStageName = sources.front()->getSourceName();
     return implicitlyScoredStages.contains(firstStageName) ||
-        std::any_of(sources.begin(), sources.end(), isScoreStage);
+        std::any_of(sources.cbegin(), sources.cend(), isScoreStage);
 }
 
 double getPipelineWeight(const StringMap<double>& weights, const std::string& pipelineName) {

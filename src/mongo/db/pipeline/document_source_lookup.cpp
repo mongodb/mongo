@@ -119,13 +119,12 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const BSONArray& valu
 }
 
 void lookupPipeValidator(const Pipeline& pipeline) {
-    const auto& sources = pipeline.getSources();
-    std::for_each(sources.begin(), sources.end(), [](auto& src) {
+    for (const auto& src : pipeline.getSources()) {
         uassert(51047,
                 str::stream() << src->getSourceName()
                               << " is not allowed within a $lookup's sub-pipeline",
                 src->constraints().isAllowedInLookupPipeline());
-    });
+    }
 }
 
 // Parses $lookup 'from' field. The 'from' field must be a string or one of the following
@@ -1466,7 +1465,7 @@ bool DocumentSourceLookUp::validateOperationContext(const OperationContext* opCt
 
     if (_pipeline) {
         const auto& sources = _pipeline->getSources();
-        return std::all_of(sources.begin(), sources.end(), [opCtx](const auto& s) {
+        return std::all_of(sources.cbegin(), sources.cend(), [opCtx](const auto& s) {
             return s->validateOperationContext(opCtx);
         });
     }

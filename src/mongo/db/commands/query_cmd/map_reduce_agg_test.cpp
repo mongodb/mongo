@@ -88,7 +88,7 @@ TEST(MapReduceAggTest, testBasicTranslate) {
                                 MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(3u, sources.size());
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
@@ -106,7 +106,7 @@ TEST(MapReduceAggTest, testSortWithoutLimit) {
     mr.setSort(BSON("foo" << 1));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(4u, sources.size());
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceSort) == typeid(**iter));
@@ -128,7 +128,7 @@ TEST(MapReduceAggTest, testSortWithLimit) {
     mr.setLimit(23);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
 
     // Even though we specify a limit, there will only be 4 stages since the optimizer should
     // merge $sort and $limit.
@@ -152,7 +152,7 @@ TEST(MapReduceAggTest, testLimitNoSort) {
     mr.setLimit(23);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(4u, sources.size());
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
@@ -176,9 +176,9 @@ TEST(MapReduceAggTest, testFeatureLadenTranslate) {
         boost::make_optional(MapReduceJavascriptCodeOrNull{finalizeJavascript.toString()}));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(7u, sources.size());
-    auto iter = sources.begin();
+    auto iter = sources.cbegin();
     ASSERT(typeid(DocumentSourceMatch) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceSort) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
@@ -197,9 +197,9 @@ TEST(MapReduceAggTest, testOutMergeTranslate) {
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Merge, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(sources.size(), 4u);
-    auto iter = sources.begin();
+    auto iter = sources.cbegin();
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter++));
@@ -217,9 +217,9 @@ TEST(MapReduceAggTest, testOutReduceTranslate) {
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Reduce, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(sources.size(), 4u);
-    auto iter = sources.begin();
+    auto iter = sources.cbegin();
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter++));
@@ -239,9 +239,9 @@ TEST(MapReduceAggTest, testOutSameCollection) {
         MapReduceOutOptions{boost::make_optional("db"s), "coll", OutputType::Replace, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
-    auto& sources = pipeline->getSources();
+    const auto& sources = pipeline->getSources();
     ASSERT_EQ(sources.size(), 4u);
-    auto iter = sources.begin();
+    auto iter = sources.cbegin();
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceUnwind) == typeid(**iter++));
     ASSERT(typeid(DocumentSourceGroup) == typeid(**iter++));

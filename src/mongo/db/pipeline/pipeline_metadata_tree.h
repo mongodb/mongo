@@ -265,7 +265,7 @@ inline void walk(Stage<T>* stage,
 
     if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter); lookupSource &&
         lookupSource->hasPipeline() &&
-        lookupSource->getResolvedIntrospectionPipeline().getSources().size() > 0) {
+        !lookupSource->getResolvedIntrospectionPipeline().getSources().empty()) {
         auto iter = lookupSource->getResolvedIntrospectionPipeline().getSources().begin();
         // The pipeline's schema child is always contained at the last element of the vector for
         // lookup.

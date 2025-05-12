@@ -60,8 +60,8 @@ boost::optional<BSONObj> getOwnedOrNone(boost::optional<BSONObj> obj) {
  * obviously unnecessary $limit to a shard's pipeline.
  */
 boost::optional<long long> getPipelineLimit(Pipeline* pipeline) {
-    for (auto source_it = pipeline->getSources().rbegin();
-         source_it != pipeline->getSources().rend();
+    for (auto source_it = pipeline->getSources().crbegin();
+         source_it != pipeline->getSources().crend();
          ++source_it) {
         const auto source = source_it->get();
 
