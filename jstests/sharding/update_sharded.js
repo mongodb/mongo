@@ -159,7 +159,7 @@ for (let i = 0; i < 2; i++) {
             assert.commandWorked(coll.update({key: {$gt: 0}}, {$set: {x: 1}}, {multi: false}));
         }
     }
-    // Note: {key:-1} and {key:-2} fall on shard0 for both hashed and ascending shardkeys.
+    // Note: {key:-1} and {key:-2} fall on the same shard for both hashed and ascending shardkeys.
     assert.commandWorked(
         coll.update({$or: [{key: -1}, {key: -2}]}, {$set: {x: 1}}, {multi: false}));
     assert.commandWorked(
@@ -176,8 +176,9 @@ for (let i = 0; i < 2; i++) {
         assert.commandFailedWithCode(
             coll.update({key: {$gt: MinKey}}, {$set: {x: 1}}, {multi: false}),
             ErrorCodes.InvalidOptions);
+        // {key: -5} and {key: 5} fall on different shards for both hashed and ranged shard keys.
         assert.commandFailedWithCode(
-            coll.update({$or: [{key: -10}, {key: 10}]}, {$set: {x: 1}}, {multi: false}),
+            coll.update({$or: [{key: -5}, {key: 5}]}, {$set: {x: 1}}, {multi: false}),
             ErrorCodes.InvalidOptions);
     }
 

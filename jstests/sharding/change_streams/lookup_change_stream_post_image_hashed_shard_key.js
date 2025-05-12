@@ -7,6 +7,7 @@
 // ]
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -32,6 +33,29 @@ assert.commandWorked(
 assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}));
 
+// Make sure all negative min-bound chunks are on shard 0 and all positive min-bound chunks are on
+// shard 1.
+let chunks =
+    findChunksUtil.findChunksByNs(mongosDB.getSiblingDB("config"), mongosColl.getFullName())
+        .toArray();
+chunks.forEach((chunk) => {
+    if (bsonWoCompare(chunk.min, {shardKey: 0}) < 0) {
+        // Make sure the negative chunks are on shard 0.
+        assert.commandWorked(mongosDB.adminCommand({
+            moveChunk: mongosColl.getFullName(),
+            bounds: [chunk.min, chunk.max],
+            to: st.shard0.shardName
+        }));
+    } else {
+        // Make sure the positive chunks are on shard 1.
+        assert.commandWorked(mongosDB.adminCommand({
+            moveChunk: mongosColl.getFullName(),
+            bounds: [chunk.min, chunk.max],
+            to: st.shard1.shardName
+        }));
+    }
+});
+
 // TODO SERVER-81884: update once 8.0 becomes last LTS.
 if (!FeatureFlagUtil.isPresentAndEnabled(mongosDB,
                                          "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
@@ -45,19 +69,17 @@ if (!FeatureFlagUtil.isPresentAndEnabled(mongosDB,
     }));
 }
 
-// Make sure the negative chunk is on shard 0.
-assert.commandWorked(mongosDB.adminCommand({
-    moveChunk: mongosColl.getFullName(),
-    bounds: [{shardKey: MinKey}, {shardKey: NumberLong("0")}],
-    to: st.rs0.getURL()
-}));
-
-// Make sure the positive chunk is on shard 1.
-assert.commandWorked(mongosDB.adminCommand({
-    moveChunk: mongosColl.getFullName(),
-    bounds: [{shardKey: NumberLong("0")}, {shardKey: MaxKey}],
-    to: st.rs1.getURL()
-}));
+// Double check that the chunk placement is as we expect it to be.
+let postFixupChunks =
+    findChunksUtil.findChunksByNs(mongosDB.getSiblingDB("config"), mongosColl.getFullName())
+        .toArray();
+assert.eq(postFixupChunks.length, 2);
+assert.eq(postFixupChunks[0].min, {shardKey: MinKey});
+assert.eq(postFixupChunks[0].max, {shardKey: NumberLong("0")});
+assert.eq(postFixupChunks[0].shard, st.shard0.shardName);
+assert.eq(postFixupChunks[1].min, {shardKey: NumberLong("0")});
+assert.eq(postFixupChunks[1].max, {shardKey: MaxKey});
+assert.eq(postFixupChunks[1].shard, st.shard1.shardName);
 
 assert.soon(() => {
     let lastInserted = -1;

@@ -356,13 +356,6 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
     const std::vector<ShardId>& allShardIds) {
     invariant(!allShardIds.empty());
 
-    size_t numInitialChunksPerShard = 1;
-    // TODO SERVER-81884: update once 8.0 becomes last LTS.
-    if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        numInitialChunksPerShard = 2;
-    }
-
     std::vector<BSONObj> finalSplitPoints;
 
     // Make sure points are unique and ordered
@@ -385,8 +378,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
         const BSONObj min = (i == 0) ? keyPattern.globalMin() : finalSplitPoints[i - 1];
         const BSONObj max =
             (i < finalSplitPoints.size()) ? finalSplitPoints[i] : keyPattern.globalMax();
-        // TODO SERVER-81884: simplify once numInitialChunksPerShard is always 1
-        const ShardId shardId = allShardIds[(i / numInitialChunksPerShard) % allShardIds.size()];
+        const ShardId shardId = allShardIds[i % allShardIds.size()];
 
         appendChunk(params, min, max, &version, shardId, &chunks);
     }

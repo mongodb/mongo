@@ -30,6 +30,19 @@ function findOplogOperationForBatchedVectoredInserts(shard, query) {
     return oplogDocs[0].o.applyOps[0];
 }
 
+/*
+ * Moves chunks so that the documents in the test are on the same shard.
+ */
+function ensureChunkPlacement(mongosConn, nss, docPlacement, docChunks) {
+    if (docPlacement[0].shardName == docPlacement[1].shardName) {
+        // Chunks are placed correctly, nothing to do.
+        return;
+    }
+    // Move chunk 1 to meet chunk 2
+    assert.commandWorked(mongosConn.adminCommand(
+        {moveChunk: nss, bounds: docChunks[0], to: docPlacement[1].shardName}));
+}
+
 let st = new ShardingTest({shards: 2});
 let dbName = "test";
 let collName = "user";
@@ -53,8 +66,9 @@ if (isBatchingVectoredInserts) {
 }
 
 // TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB,
-                                        "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+let oneChunkFeatureFlag = FeatureFlagUtil.isPresentAndEnabled(
+    testDB, "OneChunkPerShardEmptyCollectionWithHashedShardKey");
+if (oneChunkFeatureFlag) {
     // Docs are expected to go to the same shards but different chunks.
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(10)}}));
     if (isBatchingVectoredInserts) {
@@ -64,26 +78,42 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB,
 }
 
 let docs = [{x: -1000}, {x: 10}];
-let shards = [];
-let docChunkBounds = [];
 
-let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
-let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
+function getDocLocations(st, configDB, ns, docs) {
+    let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
+    let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
+    let shards = [];
+    let docChunkBounds = [];
 
-docs.forEach(function(doc) {
-    let hashDoc = {x: convertShardKeyToHashed(doc.x)};
+    docs.forEach(function(doc) {
+        let hashDoc = {x: convertShardKeyToHashed(doc.x)};
 
-    // Check that chunks for the doc and its hash are different.
-    let originalShardBoundsPair =
-        chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, doc);
-    let hashShardBoundsPair =
-        chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, hashDoc);
-    assert.neq(originalShardBoundsPair.bounds, hashShardBoundsPair.bounds);
+        // Check that chunks for the doc and its hash are different.
+        let originalShardBoundsPair =
+            chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, doc);
+        let hashShardBoundsPair =
+            chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, hashDoc);
+        assert.neq(originalShardBoundsPair.bounds, hashShardBoundsPair.bounds);
 
-    shards.push(hashShardBoundsPair.shard);
-    docChunkBounds.push(hashShardBoundsPair.bounds);
-});
+        shards.push(hashShardBoundsPair.shard);
+        docChunkBounds.push(hashShardBoundsPair.bounds);
+    });
+    return {shards: shards, bounds: docChunkBounds};
+}
 
+let res = getDocLocations(st, configDB, ns, docs);
+let shards = res.shards;
+let docChunkBounds = res.bounds;
+
+if (!oneChunkFeatureFlag) {
+    // Since we now assign chunks in a round robin fashion, we may need to move chunks so that the
+    // docs are on the same shard.
+    ensureChunkPlacement(st.s, ns, shards, docChunkBounds);
+    // Recalculate placement
+    res = getDocLocations(st, configDB, ns, docs);
+    shards = res.shards;
+    docChunkBounds = res.bounds;
+}
 assert.eq(shards[0], shards[1]);
 assert.neq(docChunkBounds[0], docChunkBounds[1]);
 

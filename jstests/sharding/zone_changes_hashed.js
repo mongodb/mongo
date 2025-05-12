@@ -13,6 +13,24 @@ import {
 } from "jstests/sharding/libs/zone_changes_util.js";
 
 /**
+ * Moves chunks so that there are an equal number of contiguous chunks on each shard.
+ */
+function moveChunksToFormContiguousRanges(st, ns) {
+    let chunkDocs =
+        findChunksUtil.findChunksByNs(st.s.getDB("config"), ns).sort({min: 1}).toArray();
+    let shards = st.s.getDB("config").getCollection("shards").find().toArray();
+    let chunksPerShard = Math.floor(chunkDocs.length / shards.length);
+    for (let i = 0; i < chunkDocs.length; i++) {
+        let chunk = chunkDocs[i];
+        let shardIndex = Math.floor(i / chunksPerShard);
+        let shardName = shards[shardIndex]._id;
+        jsTest.log("Moving chunk " + tojson(chunk) + " to shard " + shardName);
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, bounds: [chunk.min, chunk.max], to: shardName}));
+    }
+}
+
+/**
  * Adds each shard to the corresponding zone in zoneTags, and makes the zone range equal
  * to the chunk range of the shard. Assumes that there are no chunk holes on each shard.
  */
@@ -53,6 +71,7 @@ function findHighestChunkBounds(chunkBounds) {
 }
 
 const st = new ShardingTest({shards: 3, other: {chunkSize: 1}});
+st.stopBalancer();
 let primaryShard = st.shard0;
 let dbName = "test";
 let testDB = st.s.getDB(dbName);
@@ -88,9 +107,13 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB,
     assert.commandWorked(
         st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[5].x)}}));
 }
+// Make sure chunks on each shard are contiguous
+moveChunksToFormContiguousRanges(st, ns);
+
 assert.commandWorked(coll.insert(docs));
 
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
+jsTest.log("Found chunks: " + tojson(chunkDocs));
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 let docChunkBounds = [];

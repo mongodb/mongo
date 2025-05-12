@@ -297,14 +297,19 @@ commands.push({
         db.adminCommand({enablesharding: db.toString()});
         assert.commandWorked(db.foo.createIndex({_id: "hashed"}));
         st.shardColl(db.foo, {_id: "hashed"}, false);
-        coll.insert({x: -3, tags: ["a", "b"]});
+        // When targeting 2 shards, the updates/inserts done by the merge into the output collection
+        // are targeted separately. This means that if the command targeting one shard returns the
+        // write concern error before the other operation has time to run, we will interrupt that
+        // command and not perform the updates/inserts on the second shard. Since this complicates
+        // the after test checks, we only insert documents with tags that will target shard rs0.
+        coll.insert({x: -3, tags: ["h", "b"]});
         coll.insert({x: -7, tags: ["b", "c"]});
-        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 23, tags: ["c", "h"]});
         coll.insert({x: 27, tags: ["b", "c"]});
     },
     confirmFunc: function(writesExpected = true) {
         if (writesExpected) {
-            assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(db.foo.findOne({_id: 'h'}).value, 2);
             assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
             assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
             db.foo.drop();
@@ -348,14 +353,19 @@ commands.push({
         shardCollectionWithChunks(st, coll);
         assert.commandWorked(db.foo.createIndex({_id: "hashed"}));
         st.shardColl(db.foo, {_id: "hashed"}, false);
-        coll.insert({x: -3, tags: ["a", "b"]});
+        // When targeting 2 shards, the updates/inserts done by the merge into the output collection
+        // are targeted separately. This means that if the command targeting one shard returns the
+        // write concern error before the other operation has time to run, we will interrupt that
+        // command and not perform the updates/inserts on the second shard. Since this complicates
+        // the after test checks, we only insert documents with tags that will target shard rs0.
+        coll.insert({x: -3, tags: ["h", "b"]});
         coll.insert({x: -7, tags: ["b", "c"]});
-        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 23, tags: ["c", "h"]});
         coll.insert({x: 27, tags: ["b", "c"]});
     },
     confirmFunc: function(writesExpected = true) {
         if (writesExpected) {
-            assert.eq(db.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(db.foo.findOne({_id: 'h'}).value, 2);
             assert.eq(db.foo.findOne({_id: 'b'}).value, 3);
             assert.eq(db.foo.findOne({_id: 'c'}).value, 3);
             db.foo.drop();
@@ -436,15 +446,20 @@ commands.push({
         otherDB.adminCommand({enablesharding: otherDB.toString()});
         assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
         st.shardColl(otherDB.foo, {_id: "hashed"}, false);
-        coll.insert({x: -3, tags: ["a", "b"]});
+        // When targeting 2 shards, the updates/inserts done by the merge into the output collection
+        // are targeted separately. This means that if the command targeting one shard returns the
+        // write concern error before the other operation has time to run, we will interrupt that
+        // command and not perform the updates/inserts on the second shard. Since this complicates
+        // the after test checks, we only insert documents with tags that will target shard rs0.
+        coll.insert({x: -3, tags: ["h", "b"]});
         coll.insert({x: -7, tags: ["b", "c"]});
-        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 23, tags: ["c", "h"]});
         coll.insert({x: 27, tags: ["b", "c"]});
     },
     confirmFunc: function(writesExpected = true) {
         const otherDB = db.getSiblingDB("other");
         if (writesExpected) {
-            assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(otherDB.foo.findOne({_id: 'h'}).value, 2);
             assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
             assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
             otherDB.foo.drop();
@@ -470,15 +485,20 @@ commands.push({
         otherDB.createCollection("foo");
         assert.commandWorked(otherDB.foo.createIndex({_id: "hashed"}));
         st.shardColl(otherDB.foo, {_id: "hashed"}, false);
-        coll.insert({x: -3, tags: ["a", "b"]});
+        // When targeting 2 shards, the updates/inserts done by the merge into the output collection
+        // are targeted separately. This means that if the command targeting one shard returns the
+        // write concern error before the other operation has time to run, we will interrupt that
+        // command and not perform the updates/inserts on the second shard. Since this complicates
+        // the after test checks, we only insert documents with tags that will target shard rs0.
+        coll.insert({x: -3, tags: ["h", "b"]});
         coll.insert({x: -7, tags: ["b", "c"]});
-        coll.insert({x: 23, tags: ["c", "a"]});
+        coll.insert({x: 23, tags: ["c", "h"]});
         coll.insert({x: 27, tags: ["b", "c"]});
     },
     confirmFunc: function(writesExpected = true) {
         const otherDB = db.getSiblingDB("other");
         if (writesExpected) {
-            assert.eq(otherDB.foo.findOne({_id: 'a'}).value, 2);
+            assert.eq(otherDB.foo.findOne({_id: 'h'}).value, 2);
             assert.eq(otherDB.foo.findOne({_id: 'b'}).value, 3);
             assert.eq(otherDB.foo.findOne({_id: 'c'}).value, 3);
             otherDB.foo.drop();
