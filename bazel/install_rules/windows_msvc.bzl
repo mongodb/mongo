@@ -1,17 +1,22 @@
+load(
+    "//bazel/toolchains/cc/mongo_windows:windows_cc_configure.bzl",
+    "find_vc_path",
+    "get_vc_redist_version",
+)
+
 def find_windows_msvc(ctx):
-    command = [
-        "vswhere",
-        "-latest",
-        "-property",
-        "installationPath",
-    ]
-    result = ctx.execute(command, quiet = True)
-    if result.return_code == 0:
-        installation_path = result.stdout.strip()
-        ctx.symlink(installation_path + "/VC/Redist/MSVC", "msvc")
-        ctx.file(
-            "BUILD.bazel",
-            """
+    vc_path = find_vc_path(ctx)
+    if vc_path == None:
+        fail("Failed to locate Visual Studio. Make sure you are on Windows and have Visual Studio installed.")
+
+    redist_version = get_vc_redist_version(ctx)
+    if redist_version == None:
+        fail("Failed to locate a redistribution version from Visual Studio")
+
+    ctx.symlink(vc_path + "/Redist/MSVC/" + redist_version, "msvc")
+    ctx.file(
+        "BUILD.bazel",
+        """
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
@@ -30,12 +35,9 @@ filegroup(
     }),
 )
 """,
-        )
-    else:
-        fail("Failed to locate Visual Studio using vswhere: " + result.stderr + ". Make sure you are on Windows and have Visual Studio installed.")
+    )
     return None
 
 windows_msvc = repository_rule(
     implementation = find_windows_msvc,
-    environ = ["VCINSTALLDIR"],
 )

@@ -48,7 +48,6 @@ mongo_msi(
         "ICE30",
     ],
     mongo_version = "MONGO_VERSION",
-    msvc_version = "MSVC_VERSION",
     target_compatible_with = select({
         "@platforms//os:windows": [],
         "//conditions:default": ["@platforms//:incompatible"],

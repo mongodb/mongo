@@ -40,13 +40,9 @@ def mongo_msi_impl(ctx):
             candle_arguments.append("-dCustomActionDll=" + file.path)
 
     # pass in merge module if needed
-    msvc_version = ctx.attr.msvc_version
-    if msvc_version in ctx.var:
-        msvc_version = ctx.var[msvc_version]
-    msvc_version = "_VC" + msvc_version.replace(".", "") + "_"
     if ctx.attr.use_merge_modules:
         for file in ctx.attr._merge_modules.files.to_list():
-            if file.basename.find("CRT") > -1 and file.basename.find(ctx.attr.arch) > -1 and file.basename.find(msvc_version) > -1:
+            if file.basename.find("CRT") > -1 and file.basename.find(ctx.attr.arch) > -1:
                 candle_in.append(file)
                 candle_arguments.append("-dMergeModulesBasePath=" + file.dirname)
                 candle_arguments.append("-dMergeModuleFileCRT=" + file.basename)
@@ -138,7 +134,6 @@ mongo_msi = rule(
         "custom_action": attr.label(allow_files = [".dll"]),
         "extensions": attr.string_list(allow_empty = True),
         "mongo_version": attr.string(mandatory = True),
-        "msvc_version": attr.string(mandatory = False),
         "use_merge_modules": attr.bool(default = False),
         "wix_vars": attr.string_dict(allow_empty = True),
         "light_sice": attr.string_list(allow_empty = True),
