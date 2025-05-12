@@ -233,6 +233,15 @@ public:
                                       std::string* source);
 
     /**
+     * Adds the History Store Statistics to the provided BSON Object builder.
+     *
+     * Returns true if statistics can be safely collected and false otherwise.
+     */
+    static bool historyStoreStatistics(WiredTigerKVEngine* engine,
+                                       WiredTigerSession& session,
+                                       BSONObjBuilder& bob);
+
+    /**
      * Reads contents of table using URI and exports all keys to BSON as string elements.
      * Additional, adds 'uri' field to output document. A filter can be specified to skip desired
      * fields.

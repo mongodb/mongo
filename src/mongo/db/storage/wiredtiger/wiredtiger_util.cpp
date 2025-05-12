@@ -1109,6 +1109,28 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     return Status::OK();
 }
 
+bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine* engine,
+                                            WiredTigerSession& session,
+                                            BSONObjBuilder& bob) {
+    // History Storage does not exists on the in Memory storage.
+    if (engine->isEphemeral()) {
+        return false;
+    }
+
+    WT_SESSION* s = session.getSession();
+    invariant(s);
+
+    const auto historyStorageStatUri = "statistics:file:WiredTigerHS.wt";
+
+    Status status = exportTableToBSON(s, historyStorageStatUri, "statistics=(fast)", &bob);
+    if (!status.isOK()) {
+        bob.append("error", "unable to retrieve statistics");
+        bob.append("code", static_cast<int>(status.code()));
+        bob.append("reason", status.reason());
+    }
+    return true;
+}
+
 Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::string& uri,
                                          const std::string& config,
