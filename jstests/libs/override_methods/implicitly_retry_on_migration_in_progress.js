@@ -135,7 +135,7 @@ function _runCommandWithRetryUponMigration(conn, commandName, commandObj, func, 
 
 function runCommandWithRetryUponMigration(
     conn, dbName, commandName, commandObj, func, makeFuncArgs) {
-    const kQueryCommands = ['find', 'aggregate', 'listIndexes'];
+    const kQueryCommands = ['find', 'aggregate', 'listIndexes', 'count', 'distinct'];
 
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
