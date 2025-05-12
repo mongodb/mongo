@@ -71,7 +71,7 @@ Document appendReshardingId(Document inputDoc, boost::optional<Timestamp> txnCom
 }  // namespace
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingIterateTransaction,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingIterateTransaction::createFromBson,
                                   true);
 

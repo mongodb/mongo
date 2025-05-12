@@ -35,10 +35,10 @@ const char* DocumentSourceInternalReplaceRoot::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-REGISTER_DOCUMENT_SOURCE(_internalReplaceRoot,
-                         LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceInternalReplaceRoot::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReplaceRoot,
+                                  LiteParsedDocumentSourceInternal::parse,
+                                  DocumentSourceInternalReplaceRoot::createFromBson,
+                                  true);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalReplaceRoot::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

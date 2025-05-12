@@ -158,7 +158,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
 using OplogEntry = repl::OplogEntryBase;
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceFindAndModifyImageLookup::createFromBson,
                                   true);
 

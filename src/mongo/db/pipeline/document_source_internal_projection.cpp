@@ -59,10 +59,10 @@ const char* DocumentSourceInternalProjection::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-REGISTER_DOCUMENT_SOURCE(_internalProjection,
-                         LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceInternalProjection::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalProjection,
+                                  LiteParsedDocumentSourceInternal::parse,
+                                  DocumentSourceInternalProjection::createFromBson,
+                                  true);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalProjection::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

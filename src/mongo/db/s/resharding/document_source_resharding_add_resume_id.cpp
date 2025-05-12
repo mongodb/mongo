@@ -75,7 +75,7 @@ Document appendId(Document inputDoc) {
 }  // namespace
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_addReshardingResumeId,
-                                  LiteParsedDocumentSourceDefault::parse,
+                                  LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingAddResumeId::createFromBson,
                                   true);
 

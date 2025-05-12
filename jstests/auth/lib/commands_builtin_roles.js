@@ -97,7 +97,7 @@ function testProperAuthorization(conn, t, testcase, r) {
  * First of two entry points for this test library.
  * To be invoked as an test argument to authCommandsLib.runTests().
  */
-function runOneTest(conn, t) {
+export function runOneTest(conn, t) {
     var failures = [];
 
     // Some tests requires mongot, however, setting this failpoint will make search queries to
@@ -138,7 +138,7 @@ function runOneTest(conn, t) {
  * Second entry point for this test library.
  * To be invoked as an test argument to authCommandsLib.runTests().
  */
-function createUsers(conn) {
+export function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
     adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
 
