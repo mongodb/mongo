@@ -335,8 +335,10 @@ observability:
     slack: server-networking-observability
     jira: Networking & Observability
   files:
+    - src/mongo/db/connection_health_metrics_parameter.idl
     - src/mongo/db/operation_cpu_timer*
     - src/mongo/db/process_health/
+    - src/mongo/executor/split_timer*
     - src/mongo/watchdog/
 
 observability.logging:
@@ -344,6 +346,7 @@ observability.logging:
     slack: server-networking-observability
     jira: Networking & Observability
   files:
+    - src/mongo/db/log_process_details*
     - src/mongo/logv2/
 
 observability.tracing:
@@ -361,12 +364,26 @@ observability.ftdc:
   files:
     - src/mongo/db/ftdc/
 
+observability.commands:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/commands/parse_log_component_settings*
+    - src/mongo/db/commands/xray_commands*
+
 networking:
   meta:
     slack: server-networking-observability
     jira: Networking & Observability
   files:
     - src/mongo/client/
+    - src/mongo/dbtests/clienttests.cpp
+    - src/mongo/dbtests/mock_dbclient_conn_test.cpp
+    - src/mongo/dbtests/mock/mock_conn_registry*
+    - src/mongo/dbtests/mock/mock_dbclient_connection*
+    - src/mongo/dbtests/mock/mock_remote_db_server*
+    - src/mongo/dbtests/socktests.cpp
     - src/mongo/executor/async_rpc*
     - src/mongo/executor/async_client*
     - src/mongo/executor/connection_pool*
@@ -385,11 +402,45 @@ networking.core:
     jira: Networking & Observability
   files:
     - src/mongo/db/dbmessage*
+    - src/mongo/db/max_time.h
     - src/mongo/db/op_msg*
+    - src/mongo/db/operation_id*
+    - src/mongo/db/operation_key_manager*
+    - src/mongo/db/shutdown_in_progress_quiesce_info*
     - src/mongo/db/wire_version*
     - src/mongo/rpc/
     - src/mongo/transport/
     - src/mongo/util/net/
+
+networking.commands:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/commands/command_mirroring_test.cpp
+    - src/mongo/db/commands/conn_pool_stats.cpp
+    - src/mongo/db/commands/conn_pool_sync.cpp
+    - src/mongo/db/commands/drop_connections_command.cpp
+    - src/mongo/db/commands/http_client.cpp
+    - src/mongo/db/commands/http_client.idl
+    - src/mongo/db/commands/traffic_recording_cmds.cpp
+    - src/mongo/db/commands/whats_my_sni_command.cpp
+    - src/mongo/db/commands/whats_my_uri_cmd.cpp
+
+networking.execution:
+  meta:
+    slack: server-networking-observability
+    jira: Networking & Observability
+  files:
+    - src/mongo/db/baton*
+    - src/mongo/db/default_baton*
+    - src/mongo/executor/async_multicaster*
+    - src/mongo/executor/async_request_executor*
+    - src/mongo/executor/async_timer_*
+    - src/mongo/executor/async_transaction_rpc.h
+    - src/mongo/executor/executor_integration_test_*
+    - src/mongo/executor/exhaust_response_reader_*
+    - src/mongo/executor/pinned_connection_task_executor*
 
 networking.mirrored_reads:
   meta:
