@@ -238,7 +238,7 @@ public:
                                    const query_shape::DeferredQueryShape& deferredShape,
                                    const NamespaceString& nss) {
         {
-            initializeForRouter(getServiceContext(), nullptr /* setClusterParameterImplFn */);
+            initializeForRouter(getServiceContext());
             assertQuerySettingsLookupWithoutRejectionCheckForRouter(cmdBSON, deferredShape, nss);
             assertQuerySettingsLookupWithRejectionCheckForRouter(cmdBSON, deferredShape, nss);
         }

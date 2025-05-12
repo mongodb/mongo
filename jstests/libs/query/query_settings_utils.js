@@ -2,6 +2,8 @@
  * Utility class for testing query settings.
  */
 import {getCommandName, getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     getAggPlanStages,
     getEngine,
@@ -216,6 +218,27 @@ export class QuerySettingsUtils {
                 assert.commandWorked(this._db.adminCommand(removeQuerySettingsCmd));
                 assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
             }
+        }
+    }
+
+    withFailpoint(failPointName, data, fn) {
+        // 'coordinator' corresponds to replset primary in replica set or configvr primary in
+        // sharded clusters.
+        const coordinator = (function(db) {
+            const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+            const hasMongosThatForwardsQuerySettingsCmdsToConfigsvr =
+                MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "8.2") >= 0;
+            if (topology.configsvr && hasMongosThatForwardsQuerySettingsCmdsToConfigsvr) {
+                return new Mongo(topology.configsvr.nodes[0]);
+            }
+            return db.getMongo();
+        })(this._db);
+
+        const failpoint = configureFailPoint(coordinator, failPointName, data);
+        try {
+            return fn(failpoint, coordinator.port);
+        } finally {
+            failpoint.off();
         }
     }
 

@@ -14,7 +14,6 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
@@ -26,7 +25,6 @@ if (!FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('s
     quit();
 }
 
-const testConn = db.getMongo();
 // (Re)create the collection - will be sharded if required.
 const collName = jsTestName();
 assertDropAndRecreateCollection(db, collName);
@@ -82,34 +80,35 @@ function runQuerySettingsCommandsConcurrently(
         assert("Unsupported command " + tojson(command));
     }
 
-    // Program a fail-point to block the query settings modification command 'commandToFail'
+    // Configure a fail-point to block the query settings modification command 'commandToFail'
     // processing after it reads query settings cluster-wide parameter for update.
-    const hangPauseAfterReadingQuerySettingsConfigurationParameterFailPoint =
-        configureFailPoint(testConn,
-                           "pauseAfterReadingQuerySettingsConfigurationParameter",
-                           {representativeQueryToBlock: getRepresentativeQuery(commandToFail)});
+    const waitForCommandToFail = qsutils.withFailpoint(
+        "pauseAfterReadingQuerySettingsConfigurationParameter",
+        {representativeQueryToBlock: getRepresentativeQuery(commandToFail)},
+        (failpoint, port) => {
+            // Run 'commandToFail' command in a parallel shell. This command will hang because
+            // of the active fail-point.
+            const waitForCommandToFail = startParallelShell(
+                funWithArgs((command) => {
+                    return assert.commandFailedWithCode(db.adminCommand(command),
+                                                        ErrorCodes.ConflictingOperationInProgress);
+                }, commandToFail), port);
 
-    // Run 'commandToFail' command in a parallel shell. This command will hang because of the active
-    // fail-point.
-    const waitForCommandToFail = startParallelShell(
-        funWithArgs((command) => {
-            return assert.commandFailedWithCode(db.adminCommand(command),
-                                                ErrorCodes.ConflictingOperationInProgress);
-        }, commandToFail), testConn.port);
+            // Wait until the fail-point is hit.
+            failpoint.wait();
 
-    // Wait until the fail-point is hit.
-    hangPauseAfterReadingQuerySettingsConfigurationParameterFailPoint.wait();
+            // Run 'commandToPass' command in a parallel shell. This command will succeed,
+            // because of the fail-point's configuration.
+            const waitForCommandToPass =
+                startParallelShell(funWithArgs((command) => {
+                                       return assert.commandWorked(db.adminCommand(command));
+                                   }, commandToPass), port);
+            waitForCommandToPass();
 
-    // Run 'commandToPass' command in a parallel shell. This command will succeed, because of the
-    // fail-point's configuration.
-    const waitForCommandToPass =
-        startParallelShell(funWithArgs((command) => {
-                               return assert.commandWorked(db.adminCommand(command));
-                           }, commandToPass), testConn.port);
-    waitForCommandToPass();
+            return waitForCommandToFail;
+        });
 
     // Unblock 'commandToFail' command.
-    hangPauseAfterReadingQuerySettingsConfigurationParameterFailPoint.off();
     waitForCommandToFail();
 
     // Verify that query settings state matches 'finalConfiguration'.

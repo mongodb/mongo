@@ -13,7 +13,10 @@ executor:
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
-    shell_options: {}
+    shell_options:
+      global_vars:
+        TestData:
+          mongosBinVersion: last-continuous
   fixture:
     class: ShardedClusterFixture
     mixed_bin_versions: new_old_old_new

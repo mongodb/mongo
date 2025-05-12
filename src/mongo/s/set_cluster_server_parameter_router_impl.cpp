@@ -39,7 +39,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 
 void setClusterParameterImplRouter(OperationContext* opCtx,
@@ -61,17 +60,5 @@ void setClusterParameterImplRouter(OperationContext* opCtx,
 
     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
 }
-
-namespace {
-ServiceContext::ConstructorActionRegisterer setClusterParameterRouterRegisterer(
-    "SetClusterParameterRouter",
-    {},
-    {"QuerySettingsService"},
-    [](ServiceContext* serviceContext) {
-        query_settings::getServiceDependencies(serviceContext).setClusterParameterRouter =
-            setClusterParameterImplRouter;
-    },
-    {});
-}  // namespace
 
 }  // namespace mongo

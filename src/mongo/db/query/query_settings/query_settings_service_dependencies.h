@@ -46,7 +46,6 @@ using SetClusterParameterFn = std::function<void(OperationContext*,
  */
 struct ServiceDependencies {
     SetClusterParameterFn setClusterParameterReplSet;
-    SetClusterParameterFn setClusterParameterRouter;
     SetClusterParameterFn setClusterParameterConfigsvr;
 };
 

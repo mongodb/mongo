@@ -171,3 +171,6 @@ filters:
   - "cluster_netstat_cmd.cpp":
     approvers:
       - 10gen/server-networking-and-observability
+  - "cluster_query_settings_cmds.cpp":
+    approvers:
+      - 10gen/query-execution-query-settings

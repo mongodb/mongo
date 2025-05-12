@@ -17,7 +17,6 @@
 //
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 // Creating the collection.
@@ -69,14 +68,11 @@ for (const query of queries) {
 
     // To be able to conveniently test what happens if reject _is_ set (e.g., in production, by
     // query shape hash), temporarily bypass restrictions on setQuerySettings.
-    const allowAllSetQuerySettingsFailPoint =
-        configureFailPoint(db.getMongo(), "allowAllSetQuerySettings");
-
-    qsutils.withQuerySettings(query, {reject: true}, () => {
-        // Verify the query still works, despite reject=true being set.
-        assert.commandWorked(db.getSiblingDB(dbName).runCommand(qsutils.withoutDollarDB(query)));
+    qsutils.withFailpoint("allowAllSetQuerySettings", {}, () => {
+        qsutils.withQuerySettings(query, {reject: true}, () => {
+            // Verify the query still works, despite reject=true being set.
+            assert.commandWorked(
+                db.getSiblingDB(dbName).runCommand(qsutils.withoutDollarDB(query)));
+        });
     });
-
-    // Clear the failpoint to return to normal validation rules.
-    allowAllSetQuerySettingsFailPoint.off();
 }

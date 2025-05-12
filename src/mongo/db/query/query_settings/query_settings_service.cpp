@@ -43,7 +43,6 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
-#include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
@@ -390,9 +389,6 @@ void sanitizeKeyPatternIndexHints(QueryShapeConfiguration& queryShapeItem) {
 
 class QuerySettingsRouterService : public QuerySettingsService {
 public:
-    explicit QuerySettingsRouterService(SetClusterParameterFn fn)
-        : _setClusterParameterFn(std::move(fn)) {}
-
     QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
         const boost::optional<TenantId>& tenantId) const final {
         return _manager.getAllQueryShapeConfigurations(tenantId);
@@ -464,19 +460,41 @@ public:
         return settings;
     }
 
-    void refreshQueryShapeConfigurations(OperationContext* opCtx) override {
-        // QuerySettingsManager modifies a cluster-wide parameter and thus a refresh of
-        // the parameter after that modification should observe results of preceeding
-        // writes.
-        const bool kEnsureReadYourWritesConsistency = true;
-        auto refreshStatus = ClusterServerParameterRefresher::get(opCtx)->refreshParameters(
-            opCtx, kEnsureReadYourWritesConsistency);
-        if (!refreshStatus.isOK()) {
-            LOGV2_WARNING(8472500,
-                          "Error occurred when fetching the latest version of query settings",
-                          "error_code"_attr = refreshStatus.code(),
-                          "reason"_attr = refreshStatus.reason());
+    void setQuerySettingsClusterParameter(
+        OperationContext* opCtx, const QueryShapeConfigurationsWithTimestamp& config) override {
+        MONGO_UNREACHABLE_TASSERT(10397900);
+    }
+
+private:
+    QuerySettingsManager _manager;
+};
+
+class QuerySettingsShardService : public QuerySettingsRouterService {
+public:
+    explicit QuerySettingsShardService(SetClusterParameterFn setClusterParameterFn)
+        : _setClusterParameterFn(std::move(setClusterParameterFn)) {}
+
+    QuerySettings lookupQuerySettingsWithRejectionCheck(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const query_shape::DeferredQueryShape& queryShape,
+        const NamespaceString& nss,
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
+            boost::none) const override {
+        // No query settings lookup for IDHACK queries.
+        if (expCtx->isIdHackQuery()) {
+            return QuerySettings();
         }
+
+        auto* opCtx = expCtx->getOperationContext();
+        if (requestComesFromRouterOrSentDirectlyToShard(opCtx->getClient()) ||
+            querySettingsFromOriginalCommand.has_value()) {
+            return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
+        }
+
+        // The underlying shard does not belong to a sharded cluster, therefore proceed by
+        // performing the lookup as a router.
+        return QuerySettingsRouterService::lookupQuerySettingsWithRejectionCheck(
+            expCtx, queryShape, nss);
     }
 
     void setQuerySettingsClusterParameter(
@@ -503,41 +521,7 @@ public:
     }
 
 private:
-    QuerySettingsManager _manager;
     SetClusterParameterFn _setClusterParameterFn;
-};
-
-class QuerySettingsShardService : public QuerySettingsRouterService {
-public:
-    explicit QuerySettingsShardService(SetClusterParameterFn fn)
-        : QuerySettingsRouterService(std::move(fn)) {}
-
-    QuerySettings lookupQuerySettingsWithRejectionCheck(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const query_shape::DeferredQueryShape& queryShape,
-        const NamespaceString& nss,
-        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
-            boost::none) const override {
-        // No query settings lookup for IDHACK queries.
-        if (expCtx->isIdHackQuery()) {
-            return QuerySettings();
-        }
-
-        auto* opCtx = expCtx->getOperationContext();
-        if (requestComesFromRouterOrSentDirectlyToShard(opCtx->getClient()) ||
-            querySettingsFromOriginalCommand.has_value()) {
-            return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
-        }
-
-        // The underlying shard does not belong to a sharded cluster, therefore proceed by
-        // performing the lookup as a router.
-        return QuerySettingsRouterService::lookupQuerySettingsWithRejectionCheck(
-            expCtx, queryShape, nss);
-    }
-
-    void refreshQueryShapeConfigurations(OperationContext* opCtx) override {
-        /* no-op */
-    }
 };
 
 QuerySettingsService& QuerySettingsService::get(ServiceContext* service) {
@@ -573,16 +557,14 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
 
-void initializeForRouter(ServiceContext* serviceContext,
-                         SetClusterParameterFn setClusterParameterImplFn) {
-    getQuerySettingsService(serviceContext) =
-        std::make_unique<QuerySettingsRouterService>(setClusterParameterImplFn);
+void initializeForRouter(ServiceContext* serviceContext) {
+    getQuerySettingsService(serviceContext) = std::make_unique<QuerySettingsRouterService>();
 }
 
 void initializeForShard(ServiceContext* serviceContext,
-                        SetClusterParameterFn setClusterParameterImplFn) {
+                        SetClusterParameterFn setClusterParameterFn) {
     getQuerySettingsService(serviceContext) =
-        std::make_unique<QuerySettingsShardService>(setClusterParameterImplFn);
+        std::make_unique<QuerySettingsShardService>(std::move(setClusterParameterFn));
 }
 
 void initializeForTest(ServiceContext* serviceContext) {
@@ -614,10 +596,6 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
 QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
     return QuerySettingsService::get(opCtx).getAllQueryShapeConfigurations(tenantId);
-}
-
-void refreshQueryShapeConfigurations(OperationContext* opCtx) {
-    QuerySettingsService::get(opCtx).refreshQueryShapeConfigurations(opCtx);
 }
 
 std::string getQuerySettingsClusterParameterName() {
@@ -743,7 +721,7 @@ ServiceContext::ConstructorActionRegisterer querySettingsServiceRegisterer(
         auto& dependencies = getServiceDependencies(serviceContext);
         auto role = serverGlobalParams.clusterRole;
         if (role.hasExclusively(ClusterRole::RouterServer)) {
-            initializeForRouter(serviceContext, dependencies.setClusterParameterRouter);
+            initializeForRouter(serviceContext);
         } else {
             initializeForShard(serviceContext,
                                role.has(ClusterRole::ConfigServer)

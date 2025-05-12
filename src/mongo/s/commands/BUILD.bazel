@@ -154,6 +154,7 @@ mongo_cc_library(
         "cluster_multicast_cmd.cpp",
         "cluster_netstat_cmd.cpp",
         "cluster_oplog_note_cmd.cpp",
+        "cluster_query_settings_cmds.cpp",
         "cluster_query_without_shard_key_cmd.cpp",
         "cluster_refine_collection_shard_key_cmd.cpp",
         "cluster_rename_collection_cmd.cpp",

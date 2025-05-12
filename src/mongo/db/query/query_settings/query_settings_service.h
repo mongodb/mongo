@@ -32,19 +32,12 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/util/deferred.h"
 
-namespace mongo {
-class SetClusterParameter;
-
-namespace query_settings {
+namespace mongo::query_settings {
 using QueryInstance = BSONObj;
-
-using SetClusterParameterImplFn = std::function<void(OperationContext*,
-                                                     const SetClusterParameter&,
-                                                     boost::optional<Timestamp>,
-                                                     boost::optional<LogicalTime>)>;
 
 /**
  * All query shape configurations and an associated timestamp.
@@ -152,12 +145,6 @@ public:
         const boost::optional<TenantId>& tenantId) const = 0;
 
     /**
-     * Refreshes the local copy of all QueryShapeConfiguration by fetching the latest version from
-     * the configsvr. Is a no-op when called on shard.
-     */
-    virtual void refreshQueryShapeConfigurations(OperationContext* opCtx) = 0;
-
-    /**
      * Creates the corresponding 'querySettings' cluster parameter value out of the 'config' and
      * issues the setClusterParameter command.
      */
@@ -205,10 +192,9 @@ public:
         std::vector<QueryShapeConfiguration>& queryShapeConfigurations) const;
 };
 
-void initializeForRouter(ServiceContext* serviceContext,
-                         SetClusterParameterImplFn setClusterParameterImplFn);
+void initializeForRouter(ServiceContext* serviceContext);
 void initializeForShard(ServiceContext* serviceContext,
-                        SetClusterParameterImplFn setClusterParameterImplFn);
+                        SetClusterParameterFn setClusterParameterFn);
 void initializeForTest(ServiceContext* serviceContext);
 
 /**
@@ -249,11 +235,6 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
 QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId);
 
-/**
- * Refreshes the local copy of all QueryShapeConfiguration by fetching the latest version from the
- * configsvr. Is a no-op when called on shard.
- */
-void refreshQueryShapeConfigurations(OperationContext* opCtx);
 
 /**
  * Returns the name of the cluster parameter that stores QuerySettings for all QueryShapes.
@@ -276,5 +257,4 @@ bool allowQuerySettingsFromClient(Client* client);
  * Returns true if given QuerySettings instance contains only default values.
  */
 bool isDefault(const QuerySettings& querySettings);
-}  // namespace query_settings
-}  // namespace mongo
+}  // namespace mongo::query_settings

@@ -107,11 +107,6 @@ void readModifyWriteQuerySettingsConfigOption(
     std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
     auto& querySettingsService = QuerySettingsService::get(opCtx);
 
-    // The local copy of the query settings cluster-wide configuration option might not have the
-    // latest value on mongos, therefore we trigger the update of the local copy before reading from
-    // it in order to reduce the probability of update conflicts.
-    querySettingsService.refreshQueryShapeConfigurations(opCtx);
-
     // Read the query shape configurations for the tenant from the local copy of the query settings
     // cluster-wide configuration option.
     auto queryShapeConfigurations =
@@ -142,10 +137,6 @@ void readModifyWriteQuerySettingsConfigOption(
     // Run "setClusterParameter" command with the new value of the 'querySettings' cluster-wide
     // parameter.
     querySettingsService.setQuerySettingsClusterParameter(opCtx, queryShapeConfigurations);
-
-    // Refresh the local copy of the query settings cluster-wide configuration option so the results
-    // of the update step above are visible.
-    querySettingsService.refreshQueryShapeConfigurations(opCtx);
 
     // Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' fail-point is set. Used in
     // tests when setting index filters via query settings interface.
@@ -352,7 +343,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetQuerySettingsCommand).forRouter().forShard();
+MONGO_REGISTER_COMMAND(SetQuerySettingsCommand).forShard();
 
 class RemoveQuerySettingsCommand final : public TypedCommand<RemoveQuerySettingsCommand> {
 public:
@@ -446,6 +437,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(RemoveQuerySettingsCommand).forRouter().forShard();
+MONGO_REGISTER_COMMAND(RemoveQuerySettingsCommand).forShard();
 }  // namespace
 }  // namespace mongo

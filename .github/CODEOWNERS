@@ -2700,6 +2700,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/strategy.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_ftdc_commands.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_netstat_cmd.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/s/commands/**/cluster_query_settings_cmds.cpp @10gen/query-execution-query-settings @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/commands/commit_quorum/OWNERS.yml
 /src/mongo/s/commands/commit_quorum/**/* @10gen/server-index-builds @svc-auto-approve-bot
