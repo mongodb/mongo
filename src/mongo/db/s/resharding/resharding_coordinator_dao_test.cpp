@@ -117,5 +117,44 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
         opCtx, &updater, cloneStartTime, cloneTimestamp, approxCopySize, uuid);
 }
 
+TEST(ReshardingCoordinatorDaoTest, TransitionToApplyingPhase) {
+    ClockSourceMock clock;
+    SpyingDocumentUpdater updater;
+    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
+    ReshardingCoordinatorDao dao;
+    OperationContext* opCtx = nullptr;
+
+    auto uuid = UUID::gen();
+    auto applyStartTime = clock.now();
+    dao.transitionToApplyingPhase(opCtx, &updater, applyStartTime, uuid);
+    const auto& lastRequest = updater.getLastRequest();
+
+    auto expectedUpdates = BSON_ARRAY(BSON(
+        "q" << BSON("_id" << uuid) << "u"
+            << BSON("$set" << BSON("state" << "applying"
+                                           << "metrics.documentCopy.stop" << applyStartTime
+                                           << "metrics.oplogApplication.start" << applyStartTime))
+            << "multi" << false << "upsert" << false));
+
+    ASSERT_EQUALS(lastRequest.getStringField("update"),
+                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
+    auto updates = lastRequest.getObjectField("updates");
+    ASSERT_BSONOBJ_EQ(updates, expectedUpdates);
+}
+
+DEATH_TEST(ReshardingCoordinatorDaoTest,
+           TransitionToApplyingPhasePreviousStateInvariant,
+           "invariant") {
+    ClockSourceMock clock;
+    SpyingDocumentUpdater updater;
+    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
+    ReshardingCoordinatorDao dao;
+    OperationContext* opCtx = nullptr;
+
+    auto uuid = UUID::gen();
+    auto applyStartTime = clock.now();
+    dao.transitionToApplyingPhase(opCtx, &updater, applyStartTime, uuid);
+}
+
 }  // namespace resharding
 }  // namespace mongo

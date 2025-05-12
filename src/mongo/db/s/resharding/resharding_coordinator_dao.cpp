@@ -92,6 +92,7 @@ ReshardingCoordinatorDocument TransactionalDaoStorageClientImpl::readState(
                                                 *result);
 }
 
+using resharding_metrics::getIntervalEndFieldName;
 using resharding_metrics::getIntervalStartFieldName;
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase(
@@ -126,6 +127,40 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase
         // Update cloning metrics.
         setBuilder.append(getIntervalStartFieldName<ReshardingCoordinatorDocument>(
                               ReshardingRecipientMetrics::kDocumentCopyFieldName),
+                          now);
+    }
+
+    auto updateRequest =
+        BatchedCommandRequest::buildUpdateOp(NamespaceString::kConfigReshardingOperationsNamespace,
+                                             BSON("_id" << reshardingUUID),
+                                             updateBuilder.obj(),
+                                             false,  // upsert
+                                             false   // multi
+        );
+    client->alterState(opCtx, updateRequest);
+
+    return client->readState(opCtx, reshardingUUID);
+}
+
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhase(
+    OperationContext* opCtx, DaoStorageClient* client, Date_t now, const UUID& reshardingUUID) {
+    auto doc = client->readState(opCtx, reshardingUUID);
+    invariant(doc.getState() == CoordinatorStateEnum::kCloning);
+
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+        // Always update the state field.
+        setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
+                          CoordinatorState_serializer(CoordinatorStateEnum::kApplying));
+
+        // Update applying metrics.
+        setBuilder.append(getIntervalEndFieldName<ReshardingCoordinatorDocument>(
+                              ReshardingRecipientMetrics::kDocumentCopyFieldName),
+                          now);
+        setBuilder.append(getIntervalStartFieldName<ReshardingCoordinatorDocument>(
+                              ReshardingRecipientMetrics::kOplogApplicationFieldName),
                           now);
     }
 

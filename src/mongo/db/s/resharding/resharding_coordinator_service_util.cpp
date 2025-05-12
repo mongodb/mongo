@@ -191,7 +191,7 @@ void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, Date_t timesta
                timestamp);
 
     bob.append(
-        getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
+        getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
         timestamp);
 }
 

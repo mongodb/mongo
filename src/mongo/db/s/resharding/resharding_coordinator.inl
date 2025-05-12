@@ -1192,12 +1192,18 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                     _ctHolder->getAbortToken(),
                     coordinatorDocChangedOnDisk);
             }
-
-            return coordinatorDocChangedOnDisk;
         })
-        .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
-            this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kApplying,
-                                                              coordinatorDocChangedOnDisk);
+        .then([this] {
+            this->_updateCoordinatorDocStateAndCatalogEntries(
+                [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
+                    auto now = resharding::getCurrentTime();
+                    auto updatedDocument = _coordinatorDao.transitionToApplyingPhase(
+                        opCtx, client, now, _coordinatorDoc.getReshardingUUID());
+
+                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, now);
+                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, now);
+                    return updatedDocument;
+                });
         })
         .then([this] {
             return resharding::waitForMajority(_ctHolder->getAbortToken(),

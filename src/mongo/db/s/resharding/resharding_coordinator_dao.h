@@ -73,6 +73,11 @@ public:
                                                            Timestamp cloneTimestamp,
                                                            ReshardingApproxCopySize approxCopySize,
                                                            const UUID& reshardingUUID);
+
+    ReshardingCoordinatorDocument transitionToApplyingPhase(OperationContext* opCtx,
+                                                            DaoStorageClient* client,
+                                                            Date_t now,
+                                                            const UUID& reshardingUUID);
 };
 
 }  // namespace resharding
