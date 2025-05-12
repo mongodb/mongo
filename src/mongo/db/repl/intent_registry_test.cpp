@@ -47,6 +47,12 @@ auto executePerIntent = [](const std::function<void(IntentRegistry::Intent)>& f,
     }
 };
 
+#ifdef _WIN32
+uint32_t kPostInterruptSleepMs = 1000;
+#else
+uint32_t kPostInterruptSleepMs = 100;
+#endif
+
 TEST_F(IntentRegistryTest, RegisterDeregisterIntent) {
     _intentRegistry.enable();
     std::vector<IntentRegistry::IntentToken> tokens;
@@ -124,7 +130,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepUp) {
 
     // killConflictingOperations with interruptionType StepUp should not kill any operations.
     auto kill = _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::StepUp);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
     kill.get();
     // Assert no operations were killed and no intents were deregistered.
     for (auto& guard : guards) {
@@ -338,7 +344,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsShutdown) {
     // registered.
     auto kill =
         _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::Shutdown);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Shutdown interruption should throw an
     // exception.
@@ -413,7 +419,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsRollback) {
     // registered.
     auto kill =
         _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::Rollback);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Rollback interruption should throw an
     // exception.
@@ -487,7 +493,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
     // while the interruption is ongoing.
     auto kill =
         _intentRegistry.killConflictingOperations(IntentRegistry::InterruptionType::StepDown);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
     {
         auto clientWrite = serviceContext->getService()->makeClient("testClientWrite");
         auto opCtxWrite = clientWrite->makeOperationContext();
