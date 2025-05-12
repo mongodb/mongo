@@ -53,8 +53,6 @@ void wiredTigerPrepareConflictLog(int attempt);
  */
 void wiredTigerPrepareConflictFailPointLog();
 
-void wiredTigerPrepareConflictOplogResourceLog();
-
 /**
  * Runs the argument function f as many times as needed for f to return an error other than
  * WT_PREPARE_CONFLICT. Each time f returns WT_PREPARE_CONFLICT we wait until the current unit of
@@ -77,8 +75,8 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         // choose to abort our transaction and retry instead of blocking. It's possible that we can
         // be blocking on a prepared update that requires replication to make progress, creating a
         // stall in the MDB cluster.
-        wiredTigerPrepareConflictOplogResourceLog();
-        throwWriteConflictException("Holding a resource (oplog slot).");
+        throwWriteConflictException(
+            "Hit a prepare conflict while holding a resource on the oplog slot.");
     }
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
