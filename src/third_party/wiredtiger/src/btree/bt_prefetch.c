@@ -78,26 +78,7 @@ __wti_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
          */
         if (WT_REF_GET_STATE(next_ref) == WT_REF_DISK && F_ISSET(next_ref, WT_REF_FLAG_LEAF) &&
           next_ref->page_del == NULL && !F_ISSET_ATOMIC_8(next_ref, WT_REF_FLAG_PREFETCH)) {
-            /* Encourage races. */
-            __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_3, NULL);
-
-            /*
-             * The page can be read into memory and evicted concurrently. Eviction may split the
-             * page and add the ref to the stash to be freed later before the WT_REF_FLAG_PREFETCH
-             * flag is set. In another case, the page can be fast truncated and become globally
-             * visible concurrently. This may also lead to the ref being added to the stash before
-             * the WT_REF_FLAG_PREFETCH flag is set. Lock the ref to ensure those cases cannot
-             * happen. If we fail to lock the ref, someone else must have started to operate on it.
-             * Ignore this page without waiting.
-             */
-            if (!WT_REF_CAS_STATE(session, next_ref, WT_REF_DISK, WT_REF_LOCKED))
-                continue;
-
             ret = __wt_conn_prefetch_queue_push(session, next_ref);
-
-            /* Unlock the ref. */
-            WT_REF_SET_STATE(next_ref, WT_REF_DISK);
-
             /* If no more entries to prefetch, stop here. */
             if (ret == EBUSY) {
                 ret = 0;

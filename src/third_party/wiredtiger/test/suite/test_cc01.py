@@ -77,12 +77,12 @@ class test_cc_base(wttest.WiredTigerTestCase):
         session.rollback_transaction()
         self.assertEqual(count, nrows)
 
-    def populate(self, uri, start_key, num_keys, value):
+    def populate(self, uri, start_key, num_keys, value, ts = None):
         c = self.session.open_cursor(uri, None)
         for k in range(start_key, num_keys):
             self.session.begin_transaction()
             c[k] = value
-            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(k + 1))
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(ts if ts else k + 1))
         c.close()
 
     # Trigger checkpoint cleanup. The function waits for checkpoint cleanup to make progress before

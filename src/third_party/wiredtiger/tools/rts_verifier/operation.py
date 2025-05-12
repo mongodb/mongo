@@ -531,9 +531,6 @@ class Operation:
         self.type = OpType.PAGE_UNSKIPPED
         self.addr = self.__extract_pointer('ref', line)
 
-        matches = re.search('reconciled info=(\d+)', line)
-        self.reconcile = int(matches.group(1))
-
     def __init_stable_update_found(self, line):
         self.type = OpType.STABLE_UPDATE_FOUND
 

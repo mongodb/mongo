@@ -561,7 +561,7 @@ connection_runtime_config = [
             ''', choices=['none', 'reclaim_space']),
         Config('wait', '300', r'''
             seconds to wait between each checkpoint cleanup''',
-            min='60', max='100000'),
+            min='1', max='100000'),
         ]),
     Config('debug_mode', '', r'''
         control the settings of various extended debugging features''',
@@ -651,6 +651,10 @@ connection_runtime_config = [
             Config('evict_sample_inmem', 'true', r'''
                 If no in-memory ref is found on the root page, attempt to locate a random 
                 in-memory page by examining all entries on the root page.''',
+                type='boolean'),
+            Config('legacy_page_visit_strategy', 'false', r'''
+                Use legacy page visit strategy for eviction. Using this option is highly discouraged
+                as it will re-introduce the bug described in WT-9121.''',
                 type='boolean'),
             ]),
     Config('eviction_checkpoint_target', '1', r'''
