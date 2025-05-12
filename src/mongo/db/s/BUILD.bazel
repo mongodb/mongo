@@ -481,6 +481,16 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "complete_promotion_to_sharded_cluster_coordinator_document_gen",
+    src = "complete_promotion_to_sharded_cluster_coordinator_document.idl",
+    deps = [
+        ":sharding_ddl_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "type_shard_identity_idl",
     srcs = ["type_shard_identity_gen"],
@@ -1373,6 +1383,8 @@ mongo_cc_library(
         "collmod_coordinator_document_gen",
         "compact_structured_encryption_data_coordinator.cpp",
         "compact_structured_encryption_data_coordinator_gen",
+        "complete_promotion_to_sharded_cluster_coordinator.cpp",
+        "complete_promotion_to_sharded_cluster_coordinator_document_gen",
         "configure_query_analyzer_cmd.cpp",
         "convert_to_capped_coordinator.cpp",
         "convert_to_capped_coordinator_document_gen",
@@ -1549,6 +1561,7 @@ mongo_cc_library(
         "clone_authoritative_metadata_coordinator.h",
         "collmod_coordinator.h",
         "compact_structured_encryption_data_coordinator.h",
+        "complete_promotion_to_sharded_cluster_coordinator.h",
         "convert_to_capped_coordinator.h",
         "create_collection_coordinator.h",
         "create_database_coordinator.h",

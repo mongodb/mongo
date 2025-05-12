@@ -63,6 +63,7 @@ enums:
             kRemoveShardCommit: "removeShardCommit"
             kAddShard: "addShard"
             kCloneAuthoritativeMetadata: "cloneAuthoritativeMetadata"
+            kCompletePromotionToShardedCluster: "completePromotionToShardedCluster"
 
     # TODO (SERVER-98118): Remove this enum once v9.0 become last-lts.
     AuthoritativeMetadataAccessLevel:

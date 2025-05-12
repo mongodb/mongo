@@ -323,3 +323,6 @@ filters:
   - "*check_can_connect_to*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "*complete_promotion_to_sharded_cluster*":
+    approvers:
+      - 10gen/server-catalog-and-routing

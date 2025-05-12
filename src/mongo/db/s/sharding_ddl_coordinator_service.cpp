@@ -53,6 +53,7 @@
 #include "mongo/db/s/clone_authoritative_metadata_coordinator.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
+#include "mongo/db/s/complete_promotion_to_sharded_cluster_coordinator.h"
 #include "mongo/db/s/convert_to_capped_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/create_database_coordinator.h"
@@ -136,6 +137,9 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kCloneAuthoritativeMetadata:
             return std::make_shared<CloneAuthoritativeMetadataCoordinator>(service,
                                                                            std::move(initialState));
+        case DDLCoordinatorTypeEnum::kCompletePromotionToShardedCluster:
+            return std::make_shared<CompletePromotionToShardedClusterCoordinator>(
+                service, std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()
