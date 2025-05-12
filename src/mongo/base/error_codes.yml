@@ -594,13 +594,6 @@ error_codes:
     - {code: 50915,name: BackupCursorOpenConflictWithCheckpoint, categories: [RetriableError]}
     - {code: 56846,name: ConfigServerUnreachable}
     - {code: 57986,name: RetryableInternalTransactionNotSupported}
-    - {code: 640570,name: IllegalChangeToExpectedShardVersion}
-    - {code: 640571,name: IllegalChangeToExpectedDatabaseVersion}
-    - {
-        code: 4662500,
-        name: IDLUnknownFieldPossibleMongocryptd,
-        categories: [IDLParseError],
-      }
     # The following is for rewriting errors returned by a remote server while running a retriable
     # command so that the error is not passed through to other servers in a cluster. See SERVER-91331
     # for an example of using this error code.
@@ -609,3 +602,11 @@ error_codes:
         name: RetriableRemoteCommandFailure,
         categories: [Interruption, RetriableError],
       }
+    - {code: 640570,name: IllegalChangeToExpectedShardVersion}
+    - {code: 640571,name: IllegalChangeToExpectedDatabaseVersion}
+    - {
+        code: 4662500,
+        name: IDLUnknownFieldPossibleMongocryptd,
+        categories: [IDLParseError],
+      }
+    - {code: 10171600, name: ReadThroughCacheTimeMonotonicityViolation}
