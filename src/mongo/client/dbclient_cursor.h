@@ -87,7 +87,7 @@ public:
     virtual bool more();
 
     bool hasMoreToCome() const {
-        invariant(_isInitialized);
+        tassert(9279700, "Cursor is not initialized", _isInitialized);
         return _connectionHasPendingReplies;
     }
 
@@ -97,9 +97,10 @@ public:
      * whatever data has been fetched to the client already but then perhaps stop.
      */
     int objsLeftInBatch() const {
-        invariant(_isInitialized);
+        tassert(9279701, "Cursor is not initialized", _isInitialized);
         return _putBack.size() + _batch.objs.size() - _batch.pos;
     }
+
     bool moreInCurrentBatch() {
         return objsLeftInBatch() > 0;
     }
@@ -118,7 +119,7 @@ public:
      * Restores an object previously returned by next() to the cursor.
      */
     void putBack(const BSONObj& o) {
-        invariant(_isInitialized);
+        tassert(9279702, "Cursor is not initialized", _isInitialized);
         _putBack.push(o.getOwned());
     }
 
@@ -163,6 +164,10 @@ public:
      */
     bool isDead() const {
         return _cursorId == 0;
+    }
+
+    bool isInitialized() const {
+        return _isInitialized;
     }
 
     bool tailable() const {
@@ -237,7 +242,7 @@ public:
 
     void setAwaitDataTimeoutMS(Milliseconds timeout) {
         // It only makes sense to set awaitData timeout if the cursor is in tailable awaitData mode.
-        invariant(tailableAwaitData());
+        tassert(9279703, "Cursor is not in tailable awaitData mode", tailableAwaitData());
         _awaitDataTimeout = timeout;
     }
 
@@ -245,7 +250,7 @@ public:
     void setCurrentTermAndLastCommittedOpTime(
         const boost::optional<long long>& term,
         const boost::optional<repl::OpTime>& lastCommittedOpTime) {
-        invariant(tailableAwaitData());
+        tassert(9279704, "Cursor is not in tailable awaitData mode", tailableAwaitData());
         _term = term;
         _lastKnownCommittedOpTime = lastCommittedOpTime;
     }

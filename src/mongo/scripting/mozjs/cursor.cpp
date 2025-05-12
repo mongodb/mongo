@@ -87,6 +87,8 @@ void CursorInfo::Functions::next::call(JSContext* cx, JS::CallArgs args) {
         return;
     }
 
+    uassert(9279715, "Cursor is not initialized", cursor->isInitialized());
+
     ObjectWrapper o(cx, args.thisv());
 
     BSONObj bson = cursor->next();
@@ -105,6 +107,8 @@ void CursorInfo::Functions::hasNext::call(JSContext* cx, JS::CallArgs args) {
         return;
     }
 
+    uassert(9279716, "Cursor is not initialized", cursor->isInitialized());
+
     args.rval().setBoolean(cursor->more());
 }
 
@@ -115,6 +119,8 @@ void CursorInfo::Functions::objsLeftInBatch::call(JSContext* cx, JS::CallArgs ar
         args.rval().setInt32(0);
         return;
     }
+
+    uassert(9279717, "Cursor is not initialized", cursor->isInitialized());
 
     args.rval().setInt32(cursor->objsLeftInBatch());
 }
@@ -163,6 +169,8 @@ void CursorInfo::Functions::hasMoreToCome::call(JSContext* cx, JS::CallArgs args
         args.rval().setBoolean(false);
         return;
     }
+
+    uassert(9279718, "Cursor is not initialized", cursor->isInitialized());
 
     args.rval().setBoolean(cursor->hasMoreToCome());
 }

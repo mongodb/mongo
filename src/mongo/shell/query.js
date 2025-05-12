@@ -258,7 +258,7 @@ DBQuery.prototype.hasNext = function() {
 DBQuery.prototype.next = function() {
     this._exec();
 
-    let o = this._cursor.hasNext();
+    let o = this.hasNext();
     if (o)
         this._cursorSeen++;
     else
