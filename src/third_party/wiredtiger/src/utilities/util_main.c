@@ -24,6 +24,7 @@ static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=s
 #define REC_LOGOFF "log=(enabled=false)"
 #define REC_RECOVER "log=(recover=on)"
 #define SALVAGE "salvage=true"
+#define VERIFY_METADATA "verify_metadata=true"
 
 /*
  * wt_explicit_zero --
@@ -83,8 +84,8 @@ main(int argc, char *argv[])
     size_t len;
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
-    const char *cmd_config, *conn_config, *live_restore_path, *p1, *p2, *p3, *readonly_config,
-      *rec_config, *salvage_config, *session_config;
+    const char *cmd_config, *conn_config, *live_restore_path, *metadata_config, *p1, *p2, *p3,
+      *readonly_config, *rec_config, *salvage_config, *session_config;
     bool backward_compatible, disable_prefetch, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
@@ -106,8 +107,8 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
 
-    cmd_config = conn_config = live_restore_path = readonly_config = salvage_config =
-      session_config = secretkey = NULL;
+    cmd_config = conn_config = live_restore_path = metadata_config = readonly_config =
+      salvage_config = session_config = secretkey = NULL;
     /*
      * We default to returning an error if recovery needs to be run. Generally we expect this to be
      * run after a clean shutdown. The printlog command disables logging entirely. If recovery is
@@ -147,7 +148,7 @@ main(int argc, char *argv[])
             live_restore_path = __wt_optarg;
             break;
         case 'm': /* verify metadata on connection open */
-            cmd_config = "verify_metadata=true";
+            metadata_config = VERIFY_METADATA;
             meta_verify = true;
             break;
         case 'p':
@@ -299,6 +300,8 @@ open:
         len += strlen(live_restore_path) + strlen("true");
     else
         len += strlen("false");
+    if (metadata_config != NULL)
+        len += strlen(metadata_config);
     if (readonly_config != NULL)
         len += strlen(readonly_config);
     if (salvage_config != NULL)
@@ -315,10 +318,12 @@ open:
         goto err;
     }
     if ((ret = __wt_snprintf(p, len,
-           "error_prefix=wt,%s,%s,live_restore=(enabled=%s,threads_max=0,path=%s),%s,%s,%s%s%s%s",
+           "error_prefix=wt,%s,%s,live_restore=(enabled=%s,threads_max=0,path=%s),%s,%s,%s,%s%s%s%"
+           "s",
            conn_config == NULL ? "" : conn_config, cmd_config == NULL ? "" : cmd_config,
            live_restore_path == NULL ? "false" : "true",
            live_restore_path == NULL ? "" : live_restore_path,
+           metadata_config == NULL ? "" : metadata_config,
            readonly_config == NULL ? "" : readonly_config, rec_config,
            salvage_config == NULL ? "" : salvage_config, p1, p2, p3)) != 0) {
         (void)util_err(NULL, ret, NULL);
