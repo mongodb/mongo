@@ -159,7 +159,7 @@ bool containsNegations(const Maxterm& dnf) {
 }
 
 boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
-                                        const ExpressionSimlifierSettings& settings) {
+                                        const ExpressionSimplifierSettings& settings) {
     auto maxterm = boolean_simplification::convertToDNF(tree, settings.maximumNumberOfMinterms);
     if (!maxterm) {
         LOGV2_DEBUG(
@@ -203,7 +203,7 @@ boost::optional<BitsetTreeNode> handleRootedAndCase(Maxterm dnfExpression) {
 }
 
 boost::optional<BitsetTreeNode> simplifyBitsetTree(BitsetTreeNode&& tree,
-                                                   const ExpressionSimlifierSettings& settings) {
+                                                   const ExpressionSimplifierSettings& settings) {
     // Nothing to simplify since the the expression has only one conjunctive or disjunctive term.
     if (tree.internalChildren.empty()) {
         // Since the expression restorer does not accept any BitsetTree nodes with negations,
@@ -227,7 +227,7 @@ boost::optional<BitsetTreeNode> simplifyBitsetTree(BitsetTreeNode&& tree,
 }  // namespace
 
 boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
-    const MatchExpression* root, const ExpressionSimlifierSettings& settings) {
+    const MatchExpression* root, const ExpressionSimplifierSettings& settings) {
     LOGV2_DEBUG(7767000,
                 5,
                 "Converting MatchExpression to corresponding DNF",

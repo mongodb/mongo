@@ -35,24 +35,24 @@ namespace mongo {
 /**
  * Settings to control simplification of boolean expressions.
  */
-struct ExpressionSimlifierSettings {
+struct ExpressionSimplifierSettings {
     /**
-     * Default contructor witn minimum restrictions on boolean expression simplification. Useful
+     * Default contructor with minimum restrictions on boolean expression simplification. Useful
      * for tests and benchmarks.
      */
-    ExpressionSimlifierSettings()
-        : ExpressionSimlifierSettings(
+    ExpressionSimplifierSettings()
+        : ExpressionSimplifierSettings(
               /*maximumNumberOfUniquePredicates*/ std::numeric_limits<size_t>::max(),
               /*maximumNumberOfMinterms*/ std::numeric_limits<size_t>::max(),
               /*maxSizeFactor*/ 1e6,
               /*doNotOpenContainedOrs*/ false,
               /*applyQuineMcCluskey*/ true) {}
 
-    ExpressionSimlifierSettings(size_t maximumNumberOfUniquePredicates,
-                                size_t maximumNumberOfMinterms,
-                                double maxSizeFactor,
-                                bool doNotOpenContainedOrs,
-                                bool applyQuineMcCluskey)
+    ExpressionSimplifierSettings(size_t maximumNumberOfUniquePredicates,
+                                 size_t maximumNumberOfMinterms,
+                                 double maxSizeFactor,
+                                 bool doNotOpenContainedOrs,
+                                 bool applyQuineMcCluskey)
         : maximumNumberOfUniquePredicates(maximumNumberOfUniquePredicates),
           maximumNumberOfMinterms(maximumNumberOfMinterms),
           maxSizeFactor(maxSizeFactor),
@@ -94,5 +94,5 @@ struct ExpressionSimlifierSettings {
  * parameter 'settings'.
  */
 boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
-    const MatchExpression* root, const ExpressionSimlifierSettings& settings);
+    const MatchExpression* root, const ExpressionSimplifierSettings& settings);
 }  // namespace mongo

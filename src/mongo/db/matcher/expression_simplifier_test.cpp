@@ -48,14 +48,14 @@ inline void assertExpr(const MatchExpression* expected, MatchExpression* actual)
 
 inline void assertSimplification(const MatchExpression& expr,
                                  const MatchExpression& expected,
-                                 const ExpressionSimlifierSettings& settings) {
+                                 const ExpressionSimplifierSettings& settings) {
     auto result = simplifyMatchExpression(&expr, settings);
     ASSERT_TRUE(result);
     assertExpr(&expected, result->get());
 }
 
 inline void assertSimplification(const MatchExpression& expr, const MatchExpression& expected) {
-    ExpressionSimlifierSettings settings{};
+    ExpressionSimplifierSettings settings{};
     settings.doNotOpenContainedOrs = true;
     assertSimplification(expr, expected, settings);
 }
@@ -103,7 +103,7 @@ inline void assertSimplification(BSONObj bsonExpr) {
 }
 
 inline void assertDNFTransformation(const MatchExpression& expr, const MatchExpression& expected) {
-    ExpressionSimlifierSettings settings{};
+    ExpressionSimplifierSettings settings{};
     settings.applyQuineMcCluskey = false;
     auto result = simplifyMatchExpression(&expr, settings);
     ASSERT_TRUE(result);
@@ -433,7 +433,7 @@ TEST(ExpressionSimplifierTests, StopOnTooManyPredicates) {
         "]}");
     auto expr = parse(query);
 
-    ExpressionSimlifierSettings settings{};
+    ExpressionSimplifierSettings settings{};
 
     settings.maximumNumberOfUniquePredicates = 10;
     auto result = simplifyMatchExpression(expr.get(), settings);
@@ -450,7 +450,7 @@ TEST(ExpressionSimplifierTests, StopOnTooManyTerms) {
         "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}");
     auto expr = parse(query);
 
-    ExpressionSimlifierSettings settings{};
+    ExpressionSimplifierSettings settings{};
     settings.doNotOpenContainedOrs = false;
 
     settings.maxSizeFactor = 10;
@@ -468,7 +468,7 @@ TEST(ExpressionSimplifierTests, StopOnTooManyMinTerms) {
         "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}");
     auto expr = parse(query);
 
-    ExpressionSimlifierSettings settings{};
+    ExpressionSimplifierSettings settings{};
     settings.doNotOpenContainedOrs = false;
 
     settings.maximumNumberOfMinterms = 1000;

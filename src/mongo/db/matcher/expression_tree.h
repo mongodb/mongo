@@ -47,7 +47,7 @@
 #include "mongo/util/assert_util.h"
 
 /**
- * this contains all Expessions that define the structure of the tree
+ * this contains all Expressions that define the structure of the tree
  * they do not look at the structure of the documents themselves, just combine other things
  */
 namespace mongo {

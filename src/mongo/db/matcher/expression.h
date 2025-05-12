@@ -488,7 +488,7 @@ public:
      * this no longer holds.
      *
      * If 'options.literalPolicy' is set to 'kToDebugTypeString', the result is no longer expected
-     * to re-parse, since we will put strings in places where strings may not be accpeted
+     * to re-parse, since we will put strings in places where strings may not be accepted
      * syntactically (e.g. a number is always expected, as in with the $mod expression).
      *
      * includePath:

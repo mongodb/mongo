@@ -34,7 +34,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -150,7 +149,7 @@ std::unique_ptr<MatchExpression> MatchExpression::optimize(
         auto optimizedExpr = optimizer(std::move(expression));
         if (enableSimplification && !isTriviallySimple(*optimizedExpr) &&
             internalQueryEnableBooleanExpressionsSimplifier.load()) {
-            ExpressionSimlifierSettings settings{
+            ExpressionSimplifierSettings settings{
                 static_cast<size_t>(internalQueryMaximumNumberOfUniquePredicatesToSimplify.load()),
                 static_cast<size_t>(internalQueryMaximumNumberOfMintermsInSimplifier.load()),
                 internalQueryMaxSizeFactorToSimplify.load(),
