@@ -1821,7 +1821,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                     // are pushing $limit after $sort.
                     auto limitPos = itr;
                     std::advance(limitPos, 2);
-                    _triedLimitPushDown = true;
+                    _triedLimitPushDownLocally = true;
                     container->insert(limitPos, DocumentSourceLimit::create(pExpCtx, *limit));
                 }
 
@@ -1923,8 +1923,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // necessary.
     // If _eventFilter is true, a match was present which may impact the number of
     // documents we return from limit, hence we don't want to push limit.
-    // If _triedLimitPushDown is true, we have already done a limit push down and don't want to
-    // push again to avoid an infinite loop.
+    // If _triedLimitPushDownLocally is true, we have already done a limit push down and don't want
+    // to push again to avoid an infinite loop.
     if (!_eventFilter && !_triedLimitPushDownLocally) {
         if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get()); limitPtr) {
             _triedLimitPushDownLocally = true;
