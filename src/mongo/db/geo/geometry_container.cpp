@@ -1095,20 +1095,38 @@ Status GeometryContainer::parseFromStorage(const BSONElement& elem, bool skipVal
 
     _geoElm = elem;
     Status status = Status::OK();
-    if (Array == elem.type() || elem.Obj().firstElement().isNumber()) {
+    if (Object == elem.type()) {
+        // GeoJSON
+        // { location: { type: “Point”, coordinates: [...] } }
+        status = parseFromGeoJSON(skipValidation);
+
+        // It's possible that we are dealing with a legacy point. e.g
+        // { location: {x: 1, y: 2, type: “Point” } }
+        // { location: {x: 1, y: 2} }
+        if (status == ErrorCodes::BadValue) {
+            // We must reset _point each time we attempt to re-parse, since it may retain info from
+            // previous attempts.
+            _point.reset(new PointWithCRS());
+            Status legacyParsingStatus = GeoParser::parseLegacyPoint(elem, _point.get(), true);
+            if (legacyParsingStatus.isOK()) {
+                status = legacyParsingStatus;
+            } else {
+                // Return the original error status, as we may be dealing with an invalid GeoJSON
+                // document. e.g. {type: "Point", coordinates: "hello"}
+                return status;
+            }
+        }
+    } else {
         // Legacy point
         // { location: [1, 2] }
         // { location: [1, 2, 3] }
-        // { location: {x: 1, y: 2} }
-        // { location: {x: 1, y: 2, type: "Point" } }
-        _point.reset(new PointWithCRS());
         // Allow more than two dimensions or extra fields, like [1, 2, 3]
+        // We must reset _point each time we attempt to re-parse, since it may retain info from
+        // previous attempts.
+        _point.reset(new PointWithCRS());
         status = GeoParser::parseLegacyPoint(elem, _point.get(), true);
-    } else {
-        // GeoJSON
-        // { location: { type: "Point", coordinates: [...] } }
-        status = parseFromGeoJSON(skipValidation);
     }
+
     if (!status.isOK())
         return status;
 

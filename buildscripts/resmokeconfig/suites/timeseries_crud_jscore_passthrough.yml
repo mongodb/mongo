@@ -292,6 +292,8 @@ selector:
     - jstests/core/query/bson_size_limit.js
     # Test relying on document ordering that can be different for time-series collections.
     - jstests/core/query/update/update_fail_halts_modifications.js
+    # geoNear requires setup such as a optimizations to be enabled for TS. See timeseries_geonear.js
+    - jstests/core/query/geo/geo_extra_fields.js
 
   exclude_with_any_tags:
     - requires_sharding
