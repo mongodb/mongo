@@ -63,35 +63,77 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
 
     static const BSONObj kAllCollStatsObj =
         fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}");
+
+    // Compute the `numOrphanedDocs` and `numOwnedDocuments` fields.
+    // Note that, for timeseries collections, these fields will report the number of buckets
+    // instead of the number of documents. We've decided to keep the field names as they are to
+    // avoid the downstream impact of having to check different fields depending on the collection
+    // time.
     static const BSONObj kGroupObj = fromjson(R"({
         $group: {
             _id: "$ns",
             shards: {
                 $push: {
-                    $let: {
-                        vars: {
-                            nOwnedDocs: {
-                                $subtract: [
-                                    "$storageStats.count",
-                                    "$storageStats.numOrphanDocs"
-                                ]
-                            }
+                    $cond: {
+                        if: {
+                            $not: {$ifNull:["$storageStats.timeseries",null]}
                         },
-                        in: {
-                            shardName: "$shard",
-                            numOrphanedDocs: "$storageStats.numOrphanDocs",
-                            numOwnedDocuments: "$$nOwnedDocs",
-                            ownedSizeBytes: {
-                                $multiply: [
-                                    "$storageStats.avgObjSize",
-                                    "$$nOwnedDocs"
-                                ]
-                            },
-                            orphanedSizeBytes: {
-                                $multiply: [
-                                    "$storageStats.avgObjSize",
-                                    "$storageStats.numOrphanDocs"
-                                ]
+                        then: {
+                            $let: {
+                                vars: {
+                                    nOwnedDocs: {
+                                        $subtract: [
+                                            "$storageStats.count",
+                                            "$storageStats.numOrphanDocs"
+                                        ]
+                                    }
+                                },
+                                in: {
+                                    shardName: "$shard",
+                                    numOrphanedDocs: "$storageStats.numOrphanDocs",
+                                    numOwnedDocuments: "$$nOwnedDocs",
+                                    ownedSizeBytes: {
+                                        $multiply: [
+                                            "$storageStats.avgObjSize",
+                                            "$$nOwnedDocs"
+                                        ]
+                                    },
+                                    orphanedSizeBytes: {
+                                        $multiply: [
+                                            "$storageStats.avgObjSize",
+                                            "$storageStats.numOrphanDocs"
+                                        ]
+                                    }
+                                }
+                            }
+                        }, 
+                        else: {
+                            $let: {
+                                vars: {
+                                    nOwnedDocs: {
+                                        $subtract: [
+                                            "$storageStats.timeseries.bucketCount",
+                                            "$storageStats.numOrphanDocs"
+                                        ]
+                                    }
+                                },
+                                in: {
+                                    shardName: "$shard",
+                                    numOrphanedDocs: "$storageStats.numOrphanDocs",
+                                    numOwnedDocuments: "$$nOwnedDocs",
+                                    ownedSizeBytes: {
+                                        $multiply: [
+                                            "$storageStats.timeseries.avgBucketSize",
+                                            "$$nOwnedDocs"
+                                        ]
+                                    },
+                                    orphanedSizeBytes: {
+                                        $multiply: [
+                                            "$storageStats.timeseries.avgBucketSize",
+                                            "$storageStats.numOrphanDocs"
+                                        ]
+                                    }
+                                }
                             }
                         }
                     }
