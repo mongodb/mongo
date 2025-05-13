@@ -1,11 +1,22 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
 //
 // @tags: [
-//   requires_fcv_81,
+//   not_allowed_with_signed_security_token,
+//   requires_fcv_82,
 // ]
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+
+function getKnob(knob) {
+    return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
+}
+
+function setKnob(knob, value) {
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+}
 
 var local = db.local;
 var foreign = db.foreign;
@@ -321,21 +332,25 @@ pipeline = {
     };
 assertErrorCode(local, pipeline, [16608, ErrorCodes.BadValue], "division by zero in $expr");
 
-// $graphLookup can only consume at most 100MB of memory.
+// $graphLookup can only consume at most 100MB of memory without spilling.
 foreign.drop();
 
-// Here, the visited set exceeds 100MB.
-var bulk = foreign.initializeUnorderedBulkOp();
+const string7KB = ' '.repeat(7 * 1024);
+const string14KB = string7KB + string7KB;
 
+// Set memory limit to 100 KB to avoid consuming too much memory for the test.
+const memoryLimitKnob = "internalDocumentSourceGraphLookupMaxMemoryBytes";
+const originalMemoryLimitKnobValues = getKnob(memoryLimitKnob);
+setKnob(memoryLimitKnob, 100 * 1024);
+
+// Here, the visited set exceeds 100 KB.
 var initial = [];
 for (var i = 0; i < 8; i++) {
     var obj = {_id: i};
-
-    obj['longString'] = new Array(14 * 1024 * 1024).join('x');
+    obj['longString'] = string14KB;
     initial.push(i);
-    bulk.insert(obj);
+    assert.commandWorked(foreign.insertOne(obj));
 }
-assert.commandWorked(bulk.execute());
 
 pipeline = {
         $graphLookup: {
@@ -346,19 +361,21 @@ pipeline = {
             as: "graph"
         }
     };
-assertErrorCode(local, pipeline, 40099, "maximum memory usage reached");
+assertErrorCode(local,
+                pipeline,
+                ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit and can't spill to disk",
+                {allowDiskUse: false});
 
-// Here, the visited set should grow to approximately 90 MB, and the frontier should push memory
-// usage over 100MB.
+// Here, the visited set should grow to approximately 90 KB, and the queue should push memory
+// usage over 100KB.
 foreign.drop();
 
-bulk = foreign.initializeUnorderedBulkOp();
 for (let i = 0; i < 14; i++) {
     let obj = {from: 0, to: 1};
-    obj['s'] = new Array(7 * 1024 * 1024).join(' ');
-    bulk.insert(obj);
+    obj['s'] = string7KB;
+    assert.commandWorked(foreign.insertOne(obj));
 }
-assert.commandWorked(bulk.execute());
 
 pipeline = {
         $graphLookup: {
@@ -369,18 +386,19 @@ pipeline = {
             as: "out"
         }
     };
-assertErrorCode(local, pipeline, 40099, "maximum memory usage reached");
+assertErrorCode(local,
+                pipeline,
+                ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit and can't spill to disk",
+                {allowDiskUse: false});
 
-// Here, we test that the cache keeps memory usage under 100MB, and does not cause an error.
+// Here, we test that the cache keeps memory usage under 100KB, and does not cause an error.
 foreign.drop();
-
-bulk = foreign.initializeUnorderedBulkOp();
 for (let i = 0; i < 13; i++) {
     let obj = {from: 0, to: 1};
-    obj['s'] = new Array(7 * 1024 * 1024).join(' ');
-    bulk.insert(obj);
+    obj['s'] = string7KB;
+    assert.commandWorked(foreign.insertOne(obj));
 }
-assert.commandWorked(bulk.execute());
 
 var res = local
                 .aggregate({
@@ -396,3 +414,5 @@ var res = local
                 .toArray();
 
 assert.eq(res.length, 13);
+
+setKnob(memoryLimitKnob, originalMemoryLimitKnobValues);

@@ -186,6 +186,36 @@ outputPipelineAndSlowQueryLog(
 students.drop();
 people.drop();
 
+saveParameterToRestore("internalDocumentSourceGraphLookupMaxMemoryBytes");
+
+section("Graph lookup");
+setServerParameter("internalDocumentSourceGraphLookupMaxMemoryBytes", 1);
+
+assert.commandWorked(coll.insertMany([
+    {_id: 1, to: [2, 3]},
+    {_id: 2, to: [4, 5]},
+    {_id: 3, to: [6, 7]},
+    {_id: 4},
+    {_id: 5},
+    {_id: 6},
+    {_id: 7}
+]));
+
+const graphLookupStage = {
+    $graphLookup:
+        { from: "coll", startWith: 1, connectFromField: "to", connectToField: "_id", as: "path", depthField: "depth" }
+};
+
+outputPipelineAndSlowQueryLog(coll, [{$limit: 1}, graphLookupStage], "graph lookup");
+
+section("Graph lookup with unwind and sort");
+outputPipelineAndSlowQueryLog(
+    coll,
+    [{$limit: 1}, graphLookupStage, {$unwind: "$path"}, {$sort: {"path.depth": 1}}],
+    "graph lookup unwind sort");
+
+coll.drop();
+
 section("HashLookupUnwind");
 
 const locations = db[jsTestName() + "_locations"];

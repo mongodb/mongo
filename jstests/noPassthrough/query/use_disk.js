@@ -143,6 +143,43 @@ assert.gt(profileObj.sortSpilledRecords, 0, tojson(profileObj));
 assert.gt(profileObj.sortSpilledDataStorageSize, 0, tojson(profileObj));
 
 //
+// Confirm that usedDisk is correctly detected for the $graphLookup stage.
+//
+coll.drop();
+assert.commandWorked(coll.insertMany([
+    {_id: 1, to: [2, 3]},
+    {_id: 2, to: [4, 5]},
+    {_id: 3, to: [6, 7]},
+    {_id: 4},
+    {_id: 5},
+    {_id: 6},
+    {_id: 7}
+]));
+assert.commandWorked(
+    testDB.adminCommand({setParameter: 1, internalDocumentSourceGraphLookupMaxMemoryBytes: 1}));
+
+const graphLookupStage = {
+        $graphLookup:
+            { from: "coll", startWith: 1, connectFromField: "to", connectToField: "_id", as: "path", depthField: "depth" }
+    };
+
+coll.aggregate([{$limit: 1}, graphLookupStage], {allowDiskUse: true});
+profileObj = getLatestProfilerEntry(testDB);
+assert.eq(profileObj.usedDisk, true, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpills, 0, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpilledBytes, 0, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpilledRecords, 0, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpilledDataStorageSize, 0, tojson(profileObj));
+
+coll.aggregate([{$limit: 1}, graphLookupStage, {$unwind: "$path"}], {allowDiskUse: true});
+profileObj = getLatestProfilerEntry(testDB);
+assert.eq(profileObj.usedDisk, true, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpills, 0, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpilledBytes, 0, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpilledRecords, 0, tojson(profileObj));
+assert.gt(profileObj.graphLookupSpilledDataStorageSize, 0, tojson(profileObj));
+
+//
 // Confirm that usedDisk is correctly detected for the $setWindowFields stage.
 //
 

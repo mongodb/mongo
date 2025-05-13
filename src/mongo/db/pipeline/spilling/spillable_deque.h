@@ -70,13 +70,21 @@ public:
     bool isIdInCache(int id);
     Document getDocumentById(int id);
 
+    Document peekFront() {
+        return getDocumentById(getLowestIndex());
+    }
+
+    void popFront() {
+        freeUpTo(getLowestIndex());
+    }
+
     /**
      * Removes all documents with ids up to but not including 'id' from the cache.
      */
     void freeUpTo(int id);
 
     /**
-     *  Remove all documents from the cache and reset state while preserving the ability to perform
+     * Remove all documents from the cache and reset state while preserving the ability to perform
      * more inserts.
      */
     void clear();
@@ -105,6 +113,10 @@ public:
             return _memCache.size();
         }
         return _memCache.size() + _diskWrittenIndex - _nextFreedIndex;
+    }
+
+    bool empty() const {
+        return getNumDocs() == 0;
     }
 
     bool usedDisk() const {

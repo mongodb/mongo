@@ -42,27 +42,12 @@
 
 namespace mongo {
 
-/**
- * A hash map for documents that uses _id as the key that spills to disk if the contents of the map
- * are larger than the given maximum memory. Contents on disk are in a temporary table that will be
- * cleaned up on startup if the server crashes with data still present.
- *
- * Does not support collation.
- */
-class SpillableDocumentMap {
+class SpillableDocumentMapImpl {
 public:
-    SpillableDocumentMap(ExpressionContext* expCtx, MemoryUsageTracker* tracker)
-        : _memTracker((*tracker)["SpillableValueDocumentHashMap"]), _expCtx(expCtx) {}
-
-    /**
-     * Adds 'document' to the map using _id field as key and spills to disk if the size puts us over
-     * the memory limit and spilling is allowed.
-     *
-     * Inserting multiple documents with the same _id is not supported.
-     *
-     * Invalidates iterators.
-     */
-    void add(Document document);
+    SpillableDocumentMapImpl(ExpressionContext* expCtx,
+                             MemoryUsageTracker* tracker,
+                             StringData memoryTrackerName = "SpillableDocumentMapImpl")
+        : _memTracker((*tracker)[memoryTrackerName]), _expCtx(expCtx) {}
 
     bool contains(const Value& id) const;
 
@@ -143,13 +128,13 @@ public:
 
     private:
         using MapPointer =
-            std::conditional_t<IsConst, const SpillableDocumentMap*, SpillableDocumentMap*>;
+            std::conditional_t<IsConst, const SpillableDocumentMapImpl*, SpillableDocumentMapImpl*>;
         using MemIterator = std::conditional_t<
             IsConst,
             ValueFlatUnorderedMap<MemoryUsageTokenWith<Document>>::const_iterator,
             ValueFlatUnorderedMap<MemoryUsageTokenWith<Document>>::iterator>;
 
-        friend SpillableDocumentMap;
+        friend SpillableDocumentMapImpl;
         struct EndTag {};
 
         IteratorImpl(MapPointer map);
@@ -192,6 +177,23 @@ public:
         return ConstIterator{this, ConstIterator::EndTag{}};
     }
 
+    /**
+     * If the element that it is pointing to is stored in memory, removes it.
+     * Advances the iterator to the next element. Illegal to call on end().
+     */
+    void eraseIfInMemoryAndAdvance(Iterator& it) {
+        if (it.memoryExhausted()) {
+            ++it;
+        } else {
+            auto itToErase = it._memIt;
+            ++it;
+            _memMap.erase(itToErase);
+        }
+    }
+
+protected:
+    void _add(Value id, Document document, size_t size);
+
 private:
     void initDiskMap();
     RecordId computeKey(const Value& id) const;
@@ -210,6 +212,35 @@ private:
     mutable key_string::Builder _builder{key_string::Version::kLatestVersion};
 
     SpillingStats _stats;
+};
+
+
+/**
+ * A hash map for documents that uses _id as the key that spills to disk if the contents of the map
+ * are larger than the given maximum memory. Contents on disk are in a temporary table that will be
+ * cleaned up on startup if the server crashes with data still present.
+ *
+ * Does not support collation.
+ */
+class SpillableDocumentMap : public SpillableDocumentMapImpl {
+public:
+    using SpillableDocumentMapImpl::SpillableDocumentMapImpl;
+
+    void add(Document document);
+};
+
+/**
+ * A hash set for values that spills to disk if the contents of the map
+ * are larger than the given maximum memory. Contents on disk are in a temporary table that will be
+ * cleaned up on startup if the server crashes with data still present.
+ *
+ * Does not support collation.
+ */
+class SpillableValueSet : public SpillableDocumentMapImpl {
+public:
+    using SpillableDocumentMapImpl::SpillableDocumentMapImpl;
+
+    void add(Value id);
 };
 
 }  // namespace mongo

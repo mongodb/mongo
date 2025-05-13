@@ -227,7 +227,75 @@
 { }
 ```
 
-## 11. HashLookupUnwind
+## 11. Graph lookup
+### Pipeline
+```json
+[
+	{
+		"$limit" : 1
+	},
+	{
+		"$graphLookup" : {
+			"from" : "coll",
+			"startWith" : 1,
+			"connectFromField" : "to",
+			"connectToField" : "_id",
+			"as" : "path",
+			"depthField" : "depth"
+		}
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"graphLookupSpilledBytes" : "X",
+	"graphLookupSpilledDataStorageSize" : "X",
+	"graphLookupSpilledRecords" : 2,
+	"graphLookupSpills" : 2,
+	"usedDisk" : true
+}
+```
+
+## 12. Graph lookup with unwind and sort
+### Pipeline
+```json
+[
+	{
+		"$limit" : 1
+	},
+	{
+		"$graphLookup" : {
+			"from" : "coll",
+			"startWith" : 1,
+			"connectFromField" : "to",
+			"connectToField" : "_id",
+			"as" : "path",
+			"depthField" : "depth"
+		}
+	},
+	{
+		"$unwind" : "$path"
+	},
+	{
+		"$sort" : {
+			"path.depth" : 1
+		}
+	}
+]
+```
+### Slow query spilling stats
+```json
+{
+	"graphLookupSpilledBytes" : "X",
+	"graphLookupSpilledDataStorageSize" : "X",
+	"graphLookupSpilledRecords" : 2,
+	"graphLookupSpills" : 2,
+	"usedDisk" : true
+}
+```
+
+## 13. HashLookupUnwind
 ### Pipeline
 ```json
 [
@@ -257,7 +325,7 @@
 { }
 ```
 
-## 12. SetWindowFields
+## 14. SetWindowFields
 ### Pipeline
 ```json
 [
