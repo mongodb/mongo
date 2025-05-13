@@ -810,7 +810,10 @@ def _mongo_cc_binary_and_test(
         "visibility": visibility,
         "testonly": testonly,
         "copts": copts,
-        "data": data + SANITIZER_DATA,
+        "data": data + SANITIZER_DATA + select({
+            "//bazel/platforms:use_mongo_toolchain": ["@gdb"],
+            "//conditions:default": [],
+        }),
         "tags": tags,
         "linkopts": linkopts + rpath_flags + select({
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],

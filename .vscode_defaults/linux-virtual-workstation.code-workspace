@@ -5,12 +5,9 @@
 		}
 	],
 	"settings": {
-		"clangd.arguments": [
-			"--query-driver=/opt/mongodbtoolchain/v4/bin/*",
-			"--header-insertion=never",
-		],
 		"clangd.checkUpdates": true,
-		"clang-format.executable": "/opt/mongodbtoolchain/v5/bin/clang-format",
+		"clangd.path": "${workspaceFolder}/buildscripts/clangd_vscode.sh",
+		"clang-format.executable": "${workspaceRoot}/bazel-mongo/external/mongo_toolchain_v5/v5/bin/clang-format",
 		"clang-tidy.executable": "buildscripts/clang_tidy_vscode.py",
 		"editor.codeActionsOnSave": {
 			"source.fixAll.eslint": "explicit"
@@ -24,11 +21,11 @@
 		"files.insertFinalNewline": true,
 		"js/ts.implicitProjectConfig.target": "ES2020",
 		"python.autoComplete.extraPaths": [
-			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
+			"/opt/mongodbtoolchain/v5/share/gcc-14.2.0/python"
 		],
 		"python.defaultInterpreterPath": "python3-venv/bin/python",
 		"python.analysis.extraPaths": [
-			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
+			"/opt/mongodbtoolchain/v5/share/gcc-14.2.0/python"
 		],
 		"mypy-type-checker.path": [
 			"${interpreter}",
@@ -87,6 +84,24 @@
 			"ms-vscode.cpptools"
 		]
 	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "_install_pymongo",
+				"hide": true,
+				"type": "shell",
+				"command": "pip3 install pymongo",
+			},
+			{
+				"label": "_prelaunch_task",
+				"hide": true,
+				"dependsOn": [
+					"_install_pymongo"
+				]
+			}
+		]
+	},
 	"launch": {
 		"version": "0.2.0",
 		"configurations": [
@@ -101,6 +116,7 @@
 				"environment": [],
 				"externalConsole": false,
 				"MIMode": "gdb",
+				"preLaunchTask": "_prelaunch_task",
 				"setupCommands": [
 					{
 						"text": "set verbose",
@@ -144,7 +160,7 @@
 						"ignoreFailures": false
 					},
 				],
-				"miDebuggerPath": "/opt/mongodbtoolchain/v4/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/bazel-mongo/external/gdb/v5/bin/gdb",
 			},
 			{
 				"name": "attach",
@@ -153,6 +169,7 @@
 				"program": "${workspaceFolder}/${input:runTargets}",
 				"processId": "${command:pickProcess}",
 				"MIMode": "gdb",
+				"preLaunchTask": "_prelaunch_task",
 				"setupCommands": [
 					{
 						"text": "set verbose",
@@ -196,7 +213,7 @@
 						"ignoreFailures": false
 					},
 				],
-				"miDebuggerPath": "/opt/mongodbtoolchain/v4/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/bazel-mongo/external/gdb/v5/bin/gdb",
 			},
 			{
 				"name": "coredump",
@@ -206,7 +223,8 @@
 				"program": "${workspaceFolder}/${input:runTargets}",
 				"args": [],
 				"MIMode": "gdb",
-				"miDebuggerPath": "/opt/mongodbtoolchain/v4/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/bazel-mongo/external/gdb/v5/bin/gdb",
+				"preLaunchTask": "_prelaunch_task",
 				"setupCommands": [
 					{
 						"text": "set verbose",
@@ -271,6 +289,9 @@
 				"args": {
 					"command": "bazel query 'attr(tags, \"mongo_binary\", //...)' union 'attr(tags, \"mongo_unittest\", //...)' | grep mongo | grep -v \"_with_debug\" | grep -v third_party | sed 's;//;bazel-bin/;g' | sed 's;:;/;g'",
 					"cwd": "${workspaceFolder}",
+					"taskId": "runTargets",
+					"rememberPrevious": true,
+					"warnOnStderr": false,
 				}
 			},
 		]
