@@ -1118,17 +1118,17 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
-    {"promoteToTransitionalShardedCluster",
+    {"beginPromotionToShardedCluster",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         opCtx->getServiceContext()->getOpObserver()->onPromoteToTransitionalShardedCluster(opCtx,
-                                                                                            *op);
+         opCtx->getServiceContext()->getOpObserver()->onBeginPromotionToShardedCluster(opCtx, *op);
          return Status::OK();
      }}},
-    {"promoteToFullShardedCluster",
+    {"completePromotionToShardedCluster",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
-         opCtx->getServiceContext()->getOpObserver()->onPromoteToFullyShardedCluster(opCtx, *op);
+         opCtx->getServiceContext()->getOpObserver()->onCompletePromotionToShardedCluster(opCtx,
+                                                                                          *op);
          return Status::OK();
      }}},
 };

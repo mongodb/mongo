@@ -510,8 +510,8 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             case OplogEntry::CommandType::kAbortTransaction:
             case OplogEntry::CommandType::kCreateDatabaseMetadata:
             case OplogEntry::CommandType::kDropDatabaseMetadata:
-            case OplogEntry::CommandType::kPromoteToTransitionalShardedCluster:
-            case OplogEntry::CommandType::kPromoteToFullShardedCluster: {
+            case OplogEntry::CommandType::kBeginPromotionToShardedCluster:
+            case OplogEntry::CommandType::kCompletePromotionToShardedCluster: {
                 // There is no specific namespace to save for these operations.
                 break;
             }

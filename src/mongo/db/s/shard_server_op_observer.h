@@ -141,11 +141,11 @@ public:
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override;
 
-    void onPromoteToTransitionalShardedCluster(OperationContext* opCtx,
-                                               const repl::OplogEntry& op) override {};
+    void onBeginPromotionToShardedCluster(OperationContext* opCtx,
+                                          const repl::OplogEntry& op) override {};
 
-    void onPromoteToFullyShardedCluster(OperationContext* opCtx,
-                                        const repl::OplogEntry& op) override {};
+    void onCompletePromotionToShardedCluster(OperationContext* opCtx,
+                                             const repl::OplogEntry& op) override {};
 };
 
 }  // namespace mongo

@@ -685,15 +685,15 @@ public:
      * Called when the sharded cluster enters the transitional state of the two step replicaset to
      * shard promotion process.
      */
-    virtual void onPromoteToTransitionalShardedCluster(OperationContext* opCtx,
-                                                       const repl::OplogEntry& op) = 0;
+    virtual void onBeginPromotionToShardedCluster(OperationContext* opCtx,
+                                                  const repl::OplogEntry& op) = 0;
 
     /**
      * Called when the sharded cluster leaves the transitional state of the two step replicaset to
      * shard promotion process.
      */
-    virtual void onPromoteToFullyShardedCluster(OperationContext* opCtx,
-                                                const repl::OplogEntry& op) = 0;
+    virtual void onCompletePromotionToShardedCluster(OperationContext* opCtx,
+                                                     const repl::OplogEntry& op) = 0;
 
     struct Times;
 

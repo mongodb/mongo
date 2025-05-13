@@ -246,11 +246,11 @@ public:
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {}
 
-    void onPromoteToTransitionalShardedCluster(OperationContext* opCtx,
-                                               const repl::OplogEntry& op) final {}
+    void onBeginPromotionToShardedCluster(OperationContext* opCtx,
+                                          const repl::OplogEntry& op) final {}
 
-    void onPromoteToFullyShardedCluster(OperationContext* opCtx, const repl::OplogEntry& op) final {
-    }
+    void onCompletePromotionToShardedCluster(OperationContext* opCtx,
+                                             const repl::OplogEntry& op) final {}
 
 private:
     std::unique_ptr<OperationLogger> _operationLogger;

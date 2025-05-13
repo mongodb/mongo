@@ -565,16 +565,16 @@ public:
             o->onDropDatabaseMetadata(opCtx, op);
     }
 
-    void onPromoteToTransitionalShardedCluster(OperationContext* opCtx,
-                                               const repl::OplogEntry& op) override {
+    void onBeginPromotionToShardedCluster(OperationContext* opCtx,
+                                          const repl::OplogEntry& op) override {
         for (auto& o : _observers)
-            o->onPromoteToTransitionalShardedCluster(opCtx, op);
+            o->onBeginPromotionToShardedCluster(opCtx, op);
     }
 
-    void onPromoteToFullyShardedCluster(OperationContext* opCtx,
-                                        const repl::OplogEntry& op) override {
+    void onCompletePromotionToShardedCluster(OperationContext* opCtx,
+                                             const repl::OplogEntry& op) override {
         for (auto& o : _observers)
-            o->onPromoteToFullyShardedCluster(opCtx, op);
+            o->onCompletePromotionToShardedCluster(opCtx, op);
     }
 
 private:
