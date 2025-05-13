@@ -482,6 +482,10 @@ common --define=MONGO_VERSION=8.2.0-alpha
 # Default distmod if not specified.
 common --define=MONGO_DISTMOD=""
 
+# Pin down the Microsoft Visual compiler. If you would like to use
+# the default compiler version installed in this host, comment the line.
+common --action_env=BAZEL_VC_FULL_VERSION=14.31.31103
+
 # Default the Visual C Redistribution to v14.3 for Windows installer.
 common --action_env=MONGO_VC_REDIST_FULL_VERSION=v143
 

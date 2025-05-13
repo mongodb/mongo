@@ -4,6 +4,8 @@ load(
     "find_msvc_tool",
     "find_vc_path",
     "get_tmp_dir",
+    "is_msvc_exists",
+    "is_msvc_version_set",
     "setup_vc_env_vars",
 )
 
@@ -18,7 +20,21 @@ def _impl_gen_windows_toolchain_build_file(ctx):
     ctx.report_progress("Generating the required cc environment variables")
     vc_path = find_vc_path(ctx)
     if vc_path == None:
-        auto_configure_fail("require vc path before continuing")
+        auto_configure_fail("Microsoft Visual Studio (VS) is not installed. Please install VS with VC and ATL support.")
+
+    # Verify that the VC build tools exists.
+    msvc_exists, msvc_version = is_msvc_exists(ctx, vc_path)
+    if msvc_exists:
+        print("Using Microsoft VC version %s" % msvc_version)
+    else:
+        message = "Microsoft Visual C++ build tools %s could not be found.\n" % msvc_version
+        if is_msvc_version_set(ctx):
+            message += "Please make sure that the BAZEL_VC_FULL_VERSION in //.bazelrc is set to a correct version\n"
+            message += "under \"%s\\Tools\\MSVC\" directory\n" % vc_path
+            message += "or unset out the BAZEL_VC_FULL_VERSION variable to use the default installed version."
+        else:
+            message += "Please make sure that Visual C++ is installed on the host along with ATL support."
+        auto_configure_fail(message)
 
     vars = setup_vc_env_vars(ctx, vc_path)
 
