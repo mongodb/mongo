@@ -202,6 +202,8 @@ mongo_cc_unit_test(
         "sort_test.cpp",
         "spool_test.cpp",
         "working_set_test.cpp",
+        "//src/mongo/db/exec/agg:exec_pipeline_test.cpp",
+        "//src/mongo/db/exec/agg:pipeline_builder_test.cpp",
         "//src/mongo/db/exec/document_value:document_comparator_test.cpp",
         "//src/mongo/db/exec/document_value:document_metadata_fields_test.cpp",
         "//src/mongo/db/exec/document_value:document_value_test.cpp",
