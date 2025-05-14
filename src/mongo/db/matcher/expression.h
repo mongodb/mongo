@@ -73,6 +73,9 @@ class CollatorInterface;
 class MatchExpression;
 class TreeMatchExpression;
 
+// TODO(SERVER-105040): Avoid having to fwd declare this.
+struct IndexEntry;
+
 typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
 
 class MatchExpression {
@@ -446,13 +449,8 @@ public:
         virtual void debugString(StringBuilder* builder) const = 0;
         virtual TagData* clone() const = 0;
         virtual Type getType() const = 0;
-
-        template <typename H>
-        friend H AbslHashValue(H state, const TagData& tagData) {
-            tagData.hash(absl::HashState::Create(&state));
-            return state;
-        }
-        virtual void hash(absl::HashState state) const = 0;
+        virtual void hashWithIndexEntry(absl::HashState state,
+                                        const std::vector<IndexEntry>& indexes) const = 0;
     };
 
     /**

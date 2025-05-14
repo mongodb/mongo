@@ -140,8 +140,9 @@ Status tagOrChildAccordingToCache(const SolutionCacheData* branchCacheData,
     return Status::OK();
 }
 
-size_t hashTaggedMatchExpression(MatchExpression* expr) {
-    const MatchExpressionHasher hash{MatchExpressionHashParams{HashValuesOrParams::kHashIndexTags}};
+size_t hashTaggedMatchExpression(MatchExpression* expr, const std::vector<IndexEntry>& indexes) {
+    const MatchExpressionHasher hash{
+        MatchExpressionHashParams{HashValuesOrParams::kHashIndexTags, &indexes}};
     return hash(expr);
 }
 
@@ -778,7 +779,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     // Must be performed before nodes are sorted in prepareForAccessPlanning(). See
     // QueryPlanner::plan() for details.
-    const auto taggedMatchExpressionHash = hashTaggedMatchExpression(clone.get());
+    const auto taggedMatchExpressionHash = hashTaggedMatchExpression(clone.get(), expandedIndexes);
 
     // The MatchExpression tree is in canonical order. We must order the nodes for access
     // planning.
@@ -1266,7 +1267,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             // both comparisons have the same type and are on the same path, {(tag)a: 1, a: 2} and
             // {(tag)a: 2, a: 1} will get the same hash when constants are ignored.
             const size_t taggedMatchExpressionHash =
-                hashTaggedMatchExpression(nextTaggedTree.get());
+                hashTaggedMatchExpression(nextTaggedTree.get(), relevantIndices);
 
             // We have already cached the tree in canonical order, so now we can order the nodes
             // for access planning.
@@ -1940,8 +1941,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
 
     // We must hash the tagged MatchExpression tree before sorting it in
     // 'prepareForAccessPlanning()' to be able to distinguish some plans.
-    const size_t taggedMatchExpressionHash =
-        hashTaggedMatchExpression(planningResult.orExpression.get());
+    const size_t taggedMatchExpressionHash = hashTaggedMatchExpression(
+        planningResult.orExpression.get(), params.mainCollectionInfo.indexes);
 
     // Must do this before using the planner functionality.
     prepareForAccessPlanning(planningResult.orExpression.get());

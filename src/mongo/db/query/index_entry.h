@@ -283,6 +283,11 @@ struct IndexEntry : CoreIndexInfo {
     size_t wildcardFieldPos;
 };
 
+template <typename H>
+H AbslHashValue(H h, const IndexEntry::Identifier& identifier) {
+    return H::combine(std::move(h), identifier.catalogName, identifier.disambiguator);
+}
+
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident);
 StringBuilder& operator<<(StringBuilder& builder, const IndexEntry::Identifier& ident);
 }  // namespace mongo

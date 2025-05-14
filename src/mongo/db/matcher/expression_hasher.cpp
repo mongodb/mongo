@@ -110,6 +110,17 @@ H AbslHashValue(H h, const BSONElement& el) {
     return H::combine_contiguous(std::move(h), el.rawdata(), el.size());
 }
 
+struct TagDataWithIndexEntries {
+    const MatchExpression::TagData& tagData;
+    const std::vector<IndexEntry>& indexes;
+};
+
+template <typename H>
+H AbslHashValue(H h, const TagDataWithIndexEntries& val) {
+    val.tagData.hashWithIndexEntry(absl::HashState::Create(&h), val.indexes);
+    return h;
+}
+
 /**
  * MatchExpression's hasher implementation compatible with absl::Hash.
  */
@@ -121,7 +132,11 @@ public:
           _params(hashParams),
           _hashValues(_params.hashValuesOrParams & HashValuesOrParams::kHashValues),
           _hashParamIds(_params.hashValuesOrParams & HashValuesOrParams::kHashParamIds),
-          _hashTags(_params.hashValuesOrParams & HashValuesOrParams::kHashIndexTags) {}
+          _hashTags(_params.hashValuesOrParams & HashValuesOrParams::kHashIndexTags) {
+        tassert(10192200,
+                "Index list needs to be provided to hash index tags",
+                !_hashTags || _params.indexes != nullptr);
+    }
 
     void visit(const BitsAllClearMatchExpression* expr) final {
         visitBitTest(expr);
@@ -409,7 +424,7 @@ private:
         combine(expr->matchType(), expr->path());
 
         if (_hashTags && expr->getTag()) {
-            combine(*expr->getTag());
+            combine(TagDataWithIndexEntries{*expr->getTag(), *_params.indexes});
         }
     }
 

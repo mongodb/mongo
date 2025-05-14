@@ -46,6 +46,11 @@ enum HashValuesOrParams {
 
 struct MatchExpressionHashParams {
     const HashValuesOrParams hashValuesOrParams;
+    // Required if 'kHashIndexTags' is set. Index tags refer to indexes by their positions in this
+    // list. However we don't want index tags' hashes to change based on this property. For
+    // instance, we don't prune indexes when planning from cache, which could cause the relevant
+    // indexes' positions to be different. Hence we hash the index identifiers instead.
+    const std::vector<IndexEntry>* const indexes = nullptr;
     // 'maxNumberOfInElementsToHash' is the maximum number of equalities or regexes to hash to avoid
     // performance issues related to hashing of large '$in's.
     const size_t maxNumberOfInElementsToHash = 20;

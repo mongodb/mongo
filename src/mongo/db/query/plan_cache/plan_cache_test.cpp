@@ -2163,7 +2163,7 @@ TEST_F(CachePlanSelectionTest, RecoveredSolutionWithMatchExpressionHasTaggedMatc
     // Ensure that the taggedMatchExpressionHash is set. Since the index order can change, we cannot
     // assert that bestSoln->taggedMatchExpressionHash == planSoln->taggedMatchExpressionHash, just
     // that planSoln->taggedMatchExpressionHash is set to something.
-    ASSERT_NE(0, planSoln->taggedMatchExpressionHash);
+    ASSERT_EQ(bestSoln->taggedMatchExpressionHash, planSoln->taggedMatchExpressionHash);
 }
 
 /**
