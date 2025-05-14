@@ -186,7 +186,7 @@ private:
     const size_t _id;
 };
 
-class Reactor : public OutOfLineExecutor {
+class Reactor : public OutOfLineExecutor, public std::enable_shared_from_this<Reactor> {
 public:
     Reactor(const Reactor&) = delete;
     Reactor& operator=(const Reactor&) = delete;
@@ -211,6 +211,11 @@ public:
      * executed in a thread calling run() or runFor().
      */
     virtual std::unique_ptr<ReactorTimer> makeTimer() = 0;
+
+    // sleepFor is implemented so that the reactor is compatible with the AsyncTry exponential
+    // backoff API.
+    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancellationToken& token);
+
     virtual Date_t now() = 0;
 
     virtual void appendStats(BSONObjBuilder& bob) const = 0;

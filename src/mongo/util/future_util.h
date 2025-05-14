@@ -140,13 +140,19 @@ public:
      * The returned ExecutorFuture contains the last result returned by the loop body. If the last
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
+     *
+     * SleepableExecutor must be a shared_ptr to an OutOfLineExecutor that also provides a function:
+     * `ExecutorFuture<void> sleepFor(Milliseconds duration, const CancellationToken& token)`
+     * that readies the returned future when the given duration has elapsed or token cancelled.
      */
-    auto on(std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken)&& {
-        auto loop = std::make_shared<TryUntilLoopWithDelay>(std::move(executor),
-                                                            std::move(_body),
-                                                            std::move(_condition),
-                                                            std::move(_delay),
-                                                            std::move(cancelToken));
+    template <typename SleepableExecutor>
+    auto on(SleepableExecutor executor, CancellationToken cancelToken)&& {
+        auto loop =
+            std::make_shared<TryUntilLoopWithDelay<SleepableExecutor>>(std::move(executor),
+                                                                       std::move(_body),
+                                                                       std::move(_condition),
+                                                                       std::move(_delay),
+                                                                       std::move(cancelToken));
         // Launch the recursive chain using the helper class.
         return loop->run();
     }
@@ -156,8 +162,10 @@ private:
      * Helper class to perform the actual looping logic with a recursive member function run().
      * Mostly needed to clean up lambda captures and make the looping logic more readable.
      */
-    struct TryUntilLoopWithDelay : public std::enable_shared_from_this<TryUntilLoopWithDelay> {
-        TryUntilLoopWithDelay(std::shared_ptr<executor::TaskExecutor> executor,
+    template <typename SleepableExecutor>
+    struct TryUntilLoopWithDelay
+        : public std::enable_shared_from_this<TryUntilLoopWithDelay<SleepableExecutor>> {
+        TryUntilLoopWithDelay(SleepableExecutor executor,
                               BodyCallable executeLoopBody,
                               ConditionCallable shouldStopIteration,
                               Delay delay,
@@ -248,7 +256,7 @@ private:
             });
         }
 
-        std::shared_ptr<executor::TaskExecutor> executor;
+        SleepableExecutor executor;
         BodyCallable executeLoopBody;
         ConditionCallable shouldStopIteration;
         Delay delay;
