@@ -78,6 +78,7 @@
 #include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/transaction_resources.h"
@@ -596,6 +597,11 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rstg.emplace(
+            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown));
+    }
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -906,6 +912,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     auto opCtx = cc().makeOperationContext();
 
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto rsc = _rsConfig.unsafePeek();
@@ -915,6 +922,10 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
         // Primary node will be either unelectable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            rstg.emplace(_killConflictingOperations(
+                rss::consensus::IntentRegistry::InterruptionType::StepDown));
+        }
         arsd.emplace(
             this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
 
@@ -939,6 +950,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             // Update _canAcceptNonLocalWrites.
             _updateWriteAbilityFromTopologyCoordinator(lk, opCtx.get());
         } else {
+            rstg = boost::none;
             // Release the rstl lock as the node might have stepped down due to
             // other unconditional step down code paths like learning new term via heartbeat &
             // liveness timeout. And, no new election can happen as we have already set our

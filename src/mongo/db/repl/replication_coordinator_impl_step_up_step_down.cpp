@@ -30,9 +30,11 @@
 
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dump_lock_manager.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_metrics.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/storage/execution_context.h"
@@ -267,7 +269,12 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     uassert(ErrorCodes::NotWritablePrimary,
             "not primary so can't step down",
             getMemberState().primary());
-
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rstg.emplace(
+            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown));
+    }
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
 
@@ -275,7 +282,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
     // stepDownUntil deadline instead.
     auto deadline = force ? stepDownUntil : waitUntil;
-    AutoGetRstlForStepUpStepDown arsd(
+    arsd.emplace(
         this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
 
     stepdownHangAfterGrabbingRSTL.pauseWhileSet();
@@ -379,7 +386,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
         // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
         // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
-        arsd.rstlRelease();
+        if (arsd) {
+            arsd->rstlRelease();
+        }
+        rstg = boost::none;
+
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
         auto lastAppliedOpTime = _getMyLastAppliedOpTime(lk);
@@ -425,7 +436,13 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // operations that gets sneaked in here will fail as we have updated
             // _canAcceptNonLocalWrites to false after our first successful RSTL lock
             // acquisition. So, we won't get into problems like SERVER-27534.
-            arsd.rstlReacquire();
+            if (arsd) {
+                arsd->rstlReacquire();
+            }
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                rstg.emplace(_killConflictingOperations(
+                    rss::consensus::IntentRegistry::InterruptionType::StepDown));
+            }
             lk.lock();
         } catch (const DBException& ex) {
             // We can get interrupted when reacquiring the RSTL. If that happens, the

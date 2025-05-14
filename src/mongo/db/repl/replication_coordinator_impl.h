@@ -63,6 +63,7 @@
 #include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/initial_sync/initial_syncer_interface.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_data.h"
@@ -1350,6 +1351,9 @@ private:
     void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
                                   const std::string& replSetName);
 
+    rss::consensus::ReplicationStateTransitionGuard _killConflictingOperations(
+        rss::consensus::IntentRegistry::InterruptionType interrupt);
+
     void _trackHeartbeatHandle(WithLock,
                                const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,
                                HeartbeatState hbState,
@@ -2095,6 +2099,7 @@ private:
     // from an unstable checkpoint.
     AtomicWord<bool> _isDataConsistent{false};
 
+    rss::consensus::IntentRegistry& _intentRegistry;
     /**
      * Manages tracking for whether this node is able to serve (non-stale) majority reads with
      * primary read preference.
