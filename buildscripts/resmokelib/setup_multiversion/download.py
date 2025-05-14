@@ -4,6 +4,7 @@ import contextlib
 import errno
 import glob
 import os
+import platform
 import shutil
 import tarfile
 import zipfile
@@ -73,8 +74,11 @@ def download_from_s3(url):
     LOGGER.info("Downloading.", url=url)
     filename = os.path.join(mkdtemp_in_build_dir(), url.split("/")[-1].split("?")[0])
 
-    if is_s3_presigned_url(url):
-        # S3 presigned URL can't be downloaded with boto3 library
+    arch = platform.uname().machine.lower()
+
+    if is_s3_presigned_url(url) or arch.startswith(("s390", "ppc")):
+        # S3 presigned URL can't be downloaded with boto3 library;
+        # S390 and PPC architectures do not have adequate credentials;
         # thus we fall back using standard requests library
         download_from_s3_with_requests(url, filename)
     else:
