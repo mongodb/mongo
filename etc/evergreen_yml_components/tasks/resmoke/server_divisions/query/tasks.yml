@@ -651,6 +651,7 @@ tasks:
   tags: ["assigned_to_jira_team_server_query_integration", "experimental", "incompatible_windows"]
   commands:
     - func: "do setup"
+    - func: "get mongot version"
     - func: "run tests"
       vars:
         resmoke_jobs_max: 1
@@ -661,6 +662,7 @@ tasks:
     ["assigned_to_jira_team_server_query_integration", "experimental", "incompatible_windows"]
   commands:
     - func: "do setup"
+    - func: "get mongot version"
     - func: "run tests"
       vars:
         resmoke_jobs_max: 1
