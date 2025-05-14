@@ -27,6 +27,7 @@ mongo_cc_library(
         "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
         "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:future_util",
         "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
     ],
 )

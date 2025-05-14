@@ -1,5 +1,5 @@
 /**
- *  Verify mongod support proxy protocol connections.
+ * Verify mongod support proxy protocol connections.
  * @tags: [
  *   requires_fcv_81,
  *    grpc_incompatible,
@@ -9,8 +9,14 @@
 if (_isWindows()) {
     quit();
 }
-import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+import {
+    emptyMessageTest,
+    fuzzingTest,
+    loadTest,
+    testProxyProtocolReplicaSet
+} from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
 function sendHelloMaybeLB(node, port, loadBalanced, count) {
     const kLoadBalancerNoOpMessage = 10107800;
@@ -23,8 +29,9 @@ function sendHelloMaybeLB(node, port, loadBalanced, count) {
     assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
 
     if (loadBalanced) {
-        assert(checkLog.checkContainsWithCountJson(node, 10107800, {}, count, undefined, true),
-               `Did not find log id 10107800 ${tojson(count)} times in the log`);
+        assert(checkLog.checkContainsWithCountJson(
+                   node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
+               `Did not find log id ${kLoadBalancerNoOpMessage} ${tojson(count)} times in the log`);
     }
 }
 
@@ -44,15 +51,7 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
 }
 
 // Test that you can connect to the load balancer port over a proxy.
-function testProxyProtocolReplicaSet(ingressPort, egressPort, version) {
-    let proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
-    proxy_server.start();
-
-    let rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProtocolSupport: true}});
-    rs.initiate();
-
-    const node = rs.getPrimary();
+function basicTest(ingressPort, egressPort, node) {
     // Connecting to the to the proxy port succeeds.
     sendHelloMaybeLB(node, ingressPort, undefined, 0);
     sendHelloMaybeLB(node, ingressPort, false, 0);
@@ -73,11 +72,15 @@ function testProxyProtocolReplicaSet(ingressPort, egressPort, version) {
     failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, true, 1);
     failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, false, 2);
     failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, undefined, 3);
+}
 
-    proxy_server.stop();
+function standardPortTest(ingressPort, egressPort, version) {
+    const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
+    rs.startSet({setParameter: {featureFlagMongodProxyProtocolSupport: true}});
+    rs.initiate();
 
-    // Connecting to the standard port with proxy header fails.
-    proxy_server = new ProxyProtocolServer(ingressPort, port, version);
+    const node = rs.getPrimary();
+    const proxy_server = new ProxyProtocolServer(ingressPort, node.port, version);
     proxy_server.start();
     const attrs = {
         "error": {
@@ -90,12 +93,23 @@ function testProxyProtocolReplicaSet(ingressPort, egressPort, version) {
     failInvalidProtocol(node, ingressPort, 22988, attrs, false, 2);
     failInvalidProtocol(node, ingressPort, 22988, attrs, false, 3);
     proxy_server.stop();
-
     rs.stopSet();
 }
 
 const ingressPort = allocatePort();
 const egressPort = allocatePort();
 
-testProxyProtocolReplicaSet(ingressPort, egressPort, 1);
-testProxyProtocolReplicaSet(ingressPort, egressPort, 2);
+testProxyProtocolReplicaSet(ingressPort, egressPort, 1, basicTest);
+testProxyProtocolReplicaSet(ingressPort, egressPort, 2, basicTest);
+
+standardPortTest(ingressPort, egressPort, 1);
+standardPortTest(ingressPort, egressPort, 2);
+
+testProxyProtocolReplicaSet(ingressPort, egressPort, 1, emptyMessageTest);
+testProxyProtocolReplicaSet(ingressPort, egressPort, 2, emptyMessageTest);
+
+testProxyProtocolReplicaSet(ingressPort, egressPort, 1, fuzzingTest);
+testProxyProtocolReplicaSet(ingressPort, egressPort, 2, fuzzingTest);
+
+testProxyProtocolReplicaSet(ingressPort, egressPort, 1, loadTest);
+testProxyProtocolReplicaSet(ingressPort, egressPort, 2, loadTest);

@@ -6,3 +6,6 @@ filters:
   - "*change_stream*":
     approvers:
       - 10gen/query-execution-change-streams
+  - "*proxy_protocol*":
+    approvers:
+      - 10gen/server-networking-and-observability

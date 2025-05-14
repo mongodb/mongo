@@ -57,7 +57,6 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.

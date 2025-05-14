@@ -1644,7 +1644,6 @@ mongo_cc_library(
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
     ],
 )
 

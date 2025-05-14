@@ -173,6 +173,15 @@ StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& sock
  */
 template <typename Stream, typename MutableBufferSequence>
 size_t peekASIOStream(Stream& stream, const MutableBufferSequence& buffers) {
+    // Check that the socket has bytes available to read so that receive does not block.
+    asio::socket_base::bytes_readable command;
+    stream.io_control(command);
+    std::size_t bytes_readable = command.get();
+
+    if (bytes_readable == 0) {
+        return 0;
+    }
+
     std::error_code ec;
     size_t bytesRead;
     do {
