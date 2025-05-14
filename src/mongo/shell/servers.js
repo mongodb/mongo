@@ -215,10 +215,15 @@ var convertVersionStringToArray = function(versionString) {
 
 /**
  * Returns an integer
+ * This function will not work if the minor version is greater than or equal to 10
  */
 var convertVersionStringToInteger = function(versionString) {
     const [major, minor, point] = _convertVersionToIntegerArray(versionString);
-    return major * 100 + minor + 10;
+    assert(
+        minor < 10,
+        `Cannot convert a minor version greater than ten to an integer value since the minor version is in the tens position in the integer. Minor version attempting to convert: ${
+            minor}`);
+    return (major * 100) + (minor * 10);
 };
 
 /**
@@ -1443,6 +1448,29 @@ function appendSetParameterArgs(argArray) {
                                         "storeFindAndModifyImagesInSideCollection") &&
                 !argArrayContainsSetParameterValue("featureFlagRetryableFindAndModify=")) {
                 argArray.push(...['--setParameter', "featureFlagRetryableFindAndModify=true"]);
+            }
+
+            // We are choosing an arbitrary jsTestOptions value to test that we are running as a
+            // part of a test, and not via some other method. We are assuming if someone is running
+            // MongoRunner.runMongod via the command line directly that this value would not be set.
+            if (jsTestOptions().hasOwnProperty('auth') &&
+                (programMajorMinorVersion >= 800 ||
+                 (programMajorMinorVersion >= 700 && programMajorMinorVersion < 710) ||
+                 (programMajorMinorVersion >= 600 && programMajorMinorVersion < 610))) {
+                const parameters = jsTest.options().setParameters;
+                const reshardingDefaults = {
+                    'reshardingDelayBeforeRemainingOperationTimeQueryMillis': 0
+                };
+
+                Object.entries(reshardingDefaults).forEach(([key, value]) => {
+                    const keyIsNotParameter =
+                        (parameters === undefined || parameters[key] === undefined);
+                    const keyIsNotArgument = !argArrayContainsSetParameterValue(`${key}=`);
+
+                    if (keyIsNotParameter && keyIsNotArgument) {
+                        argArray.push('--setParameter', `${key}=${value}`);
+                    }
+                });
             }
 
             // New mongod-specific option in 4.9.x.
