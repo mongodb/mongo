@@ -143,7 +143,7 @@ ReplicationCoordinatorImpl::ElectionState::_startVoteRequester(WithLock lk,
                                                                int primaryIndex) {
     _voteRequester.reset(new VoteRequester);
     return _voteRequester->start(_replExecutor,
-                                 _repl->_rsConfig.getConfig(lk),
+                                 _repl->_rsConfig.unsafePeek(),
                                  _repl->_selfIndex,
                                  term,
                                  dryRun,
@@ -207,7 +207,7 @@ void ReplicationCoordinatorImpl::ElectionState::start(WithLock lk, StartElection
     }
     _electionDryRunFinishedEvent = dryRunFinishedEvent;
 
-    invariant(_repl->_rsConfig.getConfig(lk).getMemberAt(_repl->_selfIndex).isElectable());
+    invariant(_repl->_rsConfig.unsafePeek().getMemberAt(_repl->_selfIndex).isElectable());
     const auto lastWrittenOpTime = _repl->_getMyLastWrittenOpTime_inlock();
     const auto lastAppliedOpTime = _repl->_getMyLastAppliedOpTime_inlock();
 
@@ -300,7 +300,7 @@ void ReplicationCoordinatorImpl::ElectionState::_processDryRunResult(
 void ReplicationCoordinatorImpl::ElectionState::_startRealElection(WithLock lk,
                                                                    long long newTerm,
                                                                    StartElectionReasonEnum reason) {
-    const auto& rsConfig = _repl->_rsConfig.getConfig(lk);
+    const auto& rsConfig = _repl->_rsConfig.unsafePeek();
     const auto selfIndex = _repl->_selfIndex;
 
     const Date_t now = _replExecutor->now();
