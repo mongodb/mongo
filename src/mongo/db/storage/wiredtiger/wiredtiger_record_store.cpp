@@ -641,7 +641,7 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx,
     // If the server was started in read-only mode, skip calculating the oplog truncate markers. The
     // OplogCapMaintainerThread does not get started in this instance.
     if (_isOplog && opCtx->getServiceContext()->userWritesAllowed() &&
-        !storageGlobalParams.repair) {
+        !storageGlobalParams.repair && !repl::ReplSettings::shouldSkipOplogSampling()) {
         _oplogTruncateMarkers = std::make_shared<OplogTruncateMarkers>(
             OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, this, ns));
     }

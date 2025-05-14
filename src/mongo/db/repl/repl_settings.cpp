@@ -74,6 +74,10 @@ bool ReplSettings::shouldRecoverFromOplogAsStandalone() {
     return recoverFromOplogAsStandalone;
 }
 
+bool ReplSettings::shouldSkipOplogSampling() {
+    return skipOplogSampling;
+}
+
 /**
  * Setters
  */
