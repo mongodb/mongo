@@ -23,6 +23,9 @@ include:
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
 - filename: etc/evergreen_yml_components/variants/try_sbe_engine.yml
 
+- filename: etc/evergreen_yml_components/tasks/coverity_tasks.yml
+- filename: etc/evergreen_yml_components/variants/coverity.yml
+
 parameters:
 - key: evergreen_config_file_path
   value: "etc/evergreen_nightly.yml"
