@@ -102,7 +102,6 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/kill_sessions.h"
@@ -485,7 +484,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
           [this](WithLock lk, int64_t limit) { return _nextRandomInt64(lk, limit); }),
       _random(prngSeed),
       _splitSessionManager(InternalSessionPool::get(service)),
-      _intentRegistry(rss::consensus::IntentRegistry::get(service)),
       _primaryMajorityReadsAvailability(PrimaryMajorityReadsAvailability()) {
 
     _termShadow.store(OpTime::kUninitializedTerm);
@@ -1349,10 +1347,7 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
         return Status(ErrorCodes::NotSecondary,
                       "Cannot set follower mode when node is currently the leader");
     }
-    if (newState == MemberState::RS_RECOVERING) {
-        // In recovery state we do not accept any intent registration
-        _intentRegistry.disable();
-    }
+
     if (auto electionFinishedEvent = _cancelElectionIfNeeded(lk)) {
         // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
@@ -1376,11 +1371,7 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-    if (newState == MemberState::RS_SECONDARY) {
-        // If we are transitioning from recovery state intent registry was disabled,
-        // so we must enable it
-        _intentRegistry.enable();
-    }
+
     return Status::OK();
 }
 
@@ -1450,19 +1441,13 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
         LOGV2(4712800, "Hanging due to hangBeforeRSTLOnDrainComplete failpoint");
         hangBeforeRSTLOnDrainComplete.pauseWhileSet(opCtx);
     }
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
-    boost::optional<AutoGetRstlForStepUpStepDown> arsu;
 
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(
-            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepUp));
-    }
     // Kill all user writes and user reads that encounter a prepare conflict. Also kills select
     // internal operations. Although secondaries cannot accept writes, a step up can kill writes
     // that were blocked behind the RSTL lock held by a step down attempt. These writes will be
     // killed with a retryable error code during step up.
-    arsu.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp);
-
+    AutoGetRstlForStepUpStepDown arsu(
+        this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp);
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
@@ -3856,12 +3841,6 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     return Status::OK();
 }
 
-rss::consensus::ReplicationStateTransitionGuard
-ReplicationCoordinatorImpl::_killConflictingOperations(
-    rss::consensus::IntentRegistry::InterruptionType interrupt) {
-    return _intentRegistry.killConflictingOperations(interrupt).get();
-}
-
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
                                                         const ReplSetConfig& newConfig,
                                                         const bool isForceReconfig,
@@ -3883,16 +3862,13 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor->waitForEvent(electionFinishedEvent);
     }
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (isForceReconfig && _shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
-        if (gFeatureFlagIntentRegistration.isEnabled()) {
-            rstg.emplace(_killConflictingOperations(
-                rss::consensus::IntentRegistry::InterruptionType::StepDown));
-        }
+
         // Primary node won't be electable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
         arsd.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
@@ -3924,7 +3900,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             // prevents new elections from happening. So, its safe to release the RSTL lock.
             lk.unlock();
             arsd.reset();
-            rstg.reset();
             lk.lock();
         }
     }
