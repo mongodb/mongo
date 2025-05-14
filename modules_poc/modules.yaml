@@ -227,16 +227,6 @@ catalog:
     - src/mongo/dbtests/indexcatalogtests.cpp
     - src/mongo/util/namespace_string* # needs to be same module as db/namespace_string.h
 
-replication:
-  meta:
-    slack: TODO
-    jira: TODO
-  files:
-    - src/mongo/db/repl/ # excluding ./dbcheck*
-    - src/mongo/db/op_observer/op_observer_impl* # specific files
-    - src/mongo/db/op_observer/fcv_op_observer* # specific files
-    - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
-
 replication_coordinator:
   meta:
     slack: server-replication
@@ -260,6 +250,7 @@ transactions:
     - src/mongo/db/s/*transaction*
     - src/mongo/db/s/*txn*
     - src/mongo/s/*transaction*
+    - src/mongo/db/session/
 
 recovery:
   meta:
@@ -619,3 +610,49 @@ atlas-streams:
 installer:
   files:
     - src/mongo/installer/
+
+initial_sync:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/modules/enterprise/src/fcbis/
+    - src/mongo/db/repl/initial_sync/
+
+oplog:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/op_observer/op_observer*
+    - src/mongo/db/op_observer/operation_logger*
+    - src/mongo/db/catalog/local_oplog_info*
+    - src/mongo/db/commands/oplog*
+    - src/mongo/db/commands/apply_ops*
+    - src/mongo/db/repl/*oplog*
+    - src/mongo/db/repl/*noop_writer*
+    - src/mongo/db/repl/*bgsync*
+    - src/mongo/db/repl/*sync_source*
+
+replication:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/repl/ # excluding ./dbcheck*
+    - src/mongo/db/op_observer/fcv_op_observer* # specific files
+    - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
+    - src/mongo/db/mongod_options_replication*
+    - src/mongo/db/concurrency/replication_state_transition_lock_guard*
+    - src/mongo/dbtests/mock_replica_set_test.cpp
+    - src/mongo/dbtests/replica_set_tests.cpp
+    - src/mongo/dbtests/repltests.cpp
+    - src/mongo/dbtests/mock/mock_replica_set*
+
+rs_aware_service:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/repl/*primary_only_service*
+    - src/mongo/db/repl/*replica_set_aware_service*
