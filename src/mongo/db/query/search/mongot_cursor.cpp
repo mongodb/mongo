@@ -124,7 +124,7 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     invariant(swHostAndPort.getStatus().isOK());
     executor::RemoteCommandRequest rcr(
         executor::RemoteCommandRequest(swHostAndPort.getValue(), nss.dbName(), cmdObj, opCtx));
-    rcr.sslMode = transport::ConnectSSLMode::kDisableSSL;
+    rcr.sslMode = globalMongotParams.sslMode;
     return rcr;
 }
 

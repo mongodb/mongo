@@ -1,6 +1,16 @@
 /**
  * Control mongotmock.
+ * @tags: [
+ *   # Unix domain sockets are not available on windows.
+ *   incompatible_with_windows_tls
+ * ]
  */
+
+import {
+    CA_CERT,
+    CLIENT_CERT,
+    SERVER_CERT,
+} from "jstests/ssl/libs/ssl_helpers.js";
 
 /**
  * Helper to create an expected command for mongot.
@@ -192,6 +202,7 @@ export function mongotCommandForVectorSearchQuery({
     return cmd;
 }
 
+const tlsModeOptions = ["disabled", "allowTLS", "preferTLS", "requireTLS"];
 export class MongotMock {
     /**
      * Create a new mongotmock.
@@ -212,10 +223,16 @@ export class MongotMock {
     /**
      *  Start mongotmock and wait for it to start.
      */
-    start(opts = {bypassAuth: false}) {
+    start(opts = {bypassAuth: false, tlsMode: "disabled"}) {
         print("mongotmock: " + this.port);
+        const tlsEnabled = tlsModeOptions.includes(opts.tlsMode) && opts.tlsMode != "disabled";
 
-        const conn_str = this.dataDir + "/mongocryptd.sock";
+        // The search_ssl suite automatically enables TLS for connections to mongo processes,
+        // including mongotmock. We need to control TLS usage for mongotmock connections to test
+        // scenarios with TLS disabled on mongot but enabled on mongod. Therefore, we use host:port
+        // configurations when enabling TLS on mongot, and use mongocryptd.sock otherwise, as it
+        // doesn't use TLS for mongotmock connections.
+        const conn_str = tlsEnabled ? "localhost:" + this.port : this.dataDir + "/mongocryptd.sock";
         const args = [this.mongotMock];
 
         args.push("--port=" + this.port);
@@ -227,6 +244,16 @@ export class MongotMock {
         args.push("-vvv");
 
         args.push("--pidfilepath=" + this.dataDir + "/cryptd.pid");
+
+        if (tlsEnabled) {
+            args.push("--tlsMode");
+            args.push(opts.tlsMode);
+            args.push("--tlsCertificateKeyFile");
+            args.push(SERVER_CERT);
+            args.push("--tlsCAFile");
+            args.push(CA_CERT);
+            args.push("--tlsAllowConnectionsWithoutCertificates");
+        }
 
         if (TestData && TestData.auth && !opts.bypassAuth) {
             args.push("--clusterAuthMode=keyFile");

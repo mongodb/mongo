@@ -24,6 +24,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/search/search_index_common',
         '$BUILD_DIR/mongo/db/server_options_servers',
         '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/util/net/ssl_options_server',
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

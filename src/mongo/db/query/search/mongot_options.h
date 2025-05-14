@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo {
 
@@ -52,6 +53,7 @@ struct MongotParams {
 
     AtomicWord<int> minConnections;
     AtomicWord<int> maxConnections;
+    transport::ConnectSSLMode sslMode;
 };
 
 extern MongotParams globalMongotParams;
