@@ -333,16 +333,6 @@ void appendExecutionStats(const BucketCatalog& catalog,
                           BSONObjBuilder& builder);
 
 /**
- * Returns a tuple of InsertContext 'insertContext', Date_t 'time', where insertContext contains
- * information needed to insert a measurement into the correct bucket and time refers to the
- * timeField value of the measurement we are inserting.
- */
-StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
-                                                            const UUID& collectionUUID,
-                                                            const TimeseriesOptions& options,
-                                                            const BSONObj& measurementDoc);
-
-/**
  * Determines if 'measurement' will cause rollover to 'bucket'.
  * Returns the rollover reason and marks the bucket with rollover reason if it needs to be rolled
  * over.
@@ -584,4 +574,12 @@ StatusWith<TimeseriesWriteBatches> prepareInsertsToBuckets(
     const std::vector<size_t>& indices,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
+/**
+ * Extracts the information from the input 'doc' that is used to map the document to a bucket.
+ */
+StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
+    tracking::Context&,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& options,
+    const BSONObj& doc);
 }  // namespace mongo::timeseries::bucket_catalog

@@ -90,16 +90,6 @@ StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketKey& key)
 StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucketId);
 
 /**
- * Extracts the information from the input 'doc' that is used to map the document to a bucket.
- */
-StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
-    tracking::Context&,
-    const UUID& collectionUUID,
-    const TimeseriesOptions& options,
-    const BSONObj& doc);
-
-
-/**
  * Retrieve a bucket for read-only use.
  */
 const Bucket* findBucket(BucketStateRegistry& registry,

@@ -183,36 +183,6 @@ determineBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
     return batchesToCommit;
 }
 
-void sortBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
-    std::sort(batches.begin(), batches.end(), [](auto left, auto right) {
-        return left.get()->bucketId.oid < right.get()->bucketId.oid;
-    });
-}
-
-BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
-                           const NamespaceString& nss,
-                           const UUID& collectionUUID,
-                           const TimeseriesOptions& options,
-                           const StringDataComparator* comparator) {
-    tracking::Context trackingContext;
-    auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
-        trackingContext, collectionUUID, options, measurements[0]));
-    auto time = res.second;
-    auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
-    write_ops_utils::BucketDocument bucketDoc =
-        write_ops_utils::makeNewDocumentForWrite(nss,
-                                                 collectionUUID,
-                                                 oid,
-                                                 measurements,
-                                                 res.first.metadata.toBSON(),
-                                                 options,
-                                                 comparator,
-                                                 boost::none);
-
-    invariant(bucketDoc.compressedBucket);
-    return *bucketDoc.compressedBucket;
-}
-
 void getOpTimeAndElectionId(OperationContext* opCtx,
                             boost::optional<repl::OpTime>* opTime,
                             boost::optional<OID>* electionId) {

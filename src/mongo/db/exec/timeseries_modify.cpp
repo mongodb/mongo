@@ -65,6 +65,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -476,11 +477,11 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
     // performing the check needed for a single-update.
     if (isUpdate && _isUserInitiatedUpdate && !modifiedMeasurements.empty()) {
         _checkUpdateChangesShardKeyFields(
-            timeseries::makeBucketDocument({modifiedMeasurements[0]},
-                                           collectionPtr()->ns(),
-                                           collectionPtr()->uuid(),
-                                           *collectionPtr()->getTimeseriesOptions(),
-                                           collectionPtr()->getDefaultCollator()),
+            timeseries::write_ops::makeBucketDocument({modifiedMeasurements[0]},
+                                                      collectionPtr()->ns(),
+                                                      collectionPtr()->uuid(),
+                                                      *collectionPtr()->getTimeseriesOptions(),
+                                                      collectionPtr()->getDefaultCollator()),
             _bucketUnpacker.bucket(),
             modifiedMeasurements[0],
             matchedMeasurements[0]);

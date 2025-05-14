@@ -60,6 +60,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_util.h"
@@ -133,11 +134,12 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
     tassert(7777500,
             "Expected timeseries buckets collection namespace",
             updateRequest.getNamespaceString().isTimeseriesBucketsCollection());
-    auto upsertBucketObj = timeseries::makeBucketDocument(std::vector{upsertDoc},
-                                                          updateRequest.getNamespaceString(),
-                                                          collectionUUID,
-                                                          *timeseriesOptions,
-                                                          comparator);
+    auto upsertBucketObj =
+        timeseries::write_ops::makeBucketDocument(std::vector{upsertDoc},
+                                                  updateRequest.getNamespaceString(),
+                                                  collectionUUID,
+                                                  *timeseriesOptions,
+                                                  comparator);
     return {upsertBucketObj, upsertDoc};
 }
 

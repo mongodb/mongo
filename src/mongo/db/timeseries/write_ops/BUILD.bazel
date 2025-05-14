@@ -86,7 +86,10 @@ mongo_cc_library(
         "timeseries_write_ops_utils.h",
     ],
     deps = [
+        "timeseries_write_ops_utils_internal",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
     ],
 )
 

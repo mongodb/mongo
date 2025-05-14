@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
@@ -261,6 +262,10 @@ protected:
     // Used when _ns1, _ns2, or _nsNoMeta shouldn't be used due to using different collection
     // configurations.
     void _addNsToValidate(const NamespaceString& ns);
+
+    // Stubs for testing, will not be called.
+    bucket_catalog::CompressAndWriteBucketFunc _compressBucketFuncUnused = nullptr;
+    StringDataComparator* _stringDataComparatorUnused = nullptr;
 
     UUID _uuid1 = UUID::gen();
     UUID _uuid2 = UUID::gen();

@@ -28,6 +28,9 @@
  */
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 
 namespace mongo::timeseries::write_ops {
 
@@ -47,6 +50,30 @@ void assertTimeseriesBucketsCollectionNotFound(const mongo::NamespaceString& ns)
     uasserted(ErrorCodes::NamespaceNotFound,
               str::stream() << "Buckets collection not found for time-series collection "
                             << ns.getTimeseriesViewNamespace().toStringForErrorMsg());
+}
+
+BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
+                           const NamespaceString& nss,
+                           const UUID& collectionUUID,
+                           const TimeseriesOptions& options,
+                           const StringDataComparator* comparator) {
+    tracking::Context trackingContext;
+    auto res = uassertStatusOK(bucket_catalog::extractBucketingParameters(
+        trackingContext, collectionUUID, options, measurements[0]));
+    auto time = res.second;
+    auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
+    write_ops_utils::BucketDocument bucketDoc =
+        write_ops_utils::makeNewDocumentForWrite(nss,
+                                                 collectionUUID,
+                                                 oid,
+                                                 measurements,
+                                                 res.first.metadata.toBSON(),
+                                                 options,
+                                                 comparator,
+                                                 boost::none);
+
+    invariant(bucketDoc.compressedBucket);
+    return *bucketDoc.compressedBucket;
 }
 
 }  // namespace mongo::timeseries::write_ops

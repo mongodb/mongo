@@ -320,6 +320,12 @@ void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
     }
 }
 
+void sortBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
+    std::sort(batches.begin(), batches.end(), [](auto left, auto right) {
+        return left.get()->bucketId.oid < right.get()->bucketId.oid;
+    });
+}
+
 bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                        const mongo::write_ops::InsertCommandRequest& request,
                                        bucket_catalog::TimeseriesWriteBatches& batches,
@@ -333,7 +339,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         return true;
     }
 
-    timeseries::sortBatchesToCommit(batches);
+    sortBatchesToCommit(batches);
 
     Status abortStatus = Status::OK();
     ScopeGuard batchGuard{[&] {
