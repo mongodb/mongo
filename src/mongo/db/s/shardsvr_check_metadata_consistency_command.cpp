@@ -440,8 +440,8 @@ public:
                                          const NamespaceString& nss,
                                          std::vector<RemoteCursor>&& cursors) {
 
-            StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-            resolvedNamespaces[nss.coll()] = {nss, std::vector<BSONObj>{}};
+            ResolvedNamespaceMap resolvedNamespaces;
+            resolvedNamespaces[nss] = {nss, std::vector<BSONObj>{}};
 
             auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                             boost::none, /* explain */

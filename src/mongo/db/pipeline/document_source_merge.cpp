@@ -162,7 +162,7 @@ boost::optional<std::set<FieldPath>> convertToFieldPaths(
 }  // namespace
 
 std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     uassert(ErrorCodes::TypeMismatch,
             "{} requires a string or object argument, but found {}"_format(kStageName,
                                                                            typeName(spec.type())),

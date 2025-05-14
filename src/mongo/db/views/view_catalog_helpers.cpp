@@ -89,11 +89,11 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a
     // collection and a pipeline, but in this case we don't need this map to be accurate since
     // we will not be evaluating the pipeline.
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
 
     // Create copy of involved namespaces, as these can be moved into the result.
     for (const auto& nss : liteParsedPipeline.getInvolvedNamespaces()) {
-        resolvedNamespaces[nss.coll()] = {nss, {}};
+        resolvedNamespaces[nss] = {nss, {}};
     }
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,

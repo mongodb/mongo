@@ -48,7 +48,7 @@ class AggregationContextFixture : public ServiceContextTest {
 public:
     AggregationContextFixture()
         : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
-              boost::none, "unittests", "pipeline_test")) {}
+              boost::none, "test", "pipeline_test")) {}
 
     AggregationContextFixture(NamespaceString nss) {
         _opCtx = makeOperationContext();

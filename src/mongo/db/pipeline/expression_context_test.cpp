@@ -223,7 +223,7 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << BSON("a" << 1)));
     AggregateCommandRequest acr({} /*nss*/, pipeline);
-    StringMap<ExpressionContext::ResolvedNamespace> sm;
+    ResolvedNamespaceMap sm;
     auto expCtx = make_intrusive<ExpressionContext>(opCtx.get(),
                                                     acr,
                                                     nullptr /*collator*/,

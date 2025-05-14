@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/move/utility_core.hpp>
@@ -115,6 +116,11 @@ public:
         boost::optional<UUID> uuid = boost::none;
     };
 
+    // "ResolvedNamespaceMap" is used for external references to this type, but it needs
+    // ResolvedNamespace to be defined so it is declared after this class definition.
+    using InternalResolvedNamespaceMapType =
+        absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
+
     /**
      * An RAII type that will temporarily change the ExpressionContext's collator. Resets the
      * collator to the previous value upon destruction.
@@ -179,7 +185,7 @@ public:
                       const AggregateCommandRequest& request,
                       std::unique_ptr<CollatorInterface> collator,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
-                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+                      InternalResolvedNamespaceMapType resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       bool mayDbProfile = true,
                       bool allowDiskUseByDefault = false);
@@ -200,7 +206,7 @@ public:
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
                       std::unique_ptr<CollatorInterface> collator,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
-                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+                      InternalResolvedNamespaceMapType resolvedNamespaces,
                       boost::optional<UUID> collUUID,
                       const boost::optional<BSONObj>& letParameters = boost::none,
                       bool mayDbProfile = true,
@@ -366,7 +372,7 @@ public:
      * namespace not involved in the pipeline.
      */
     const ResolvedNamespace& getResolvedNamespace(const NamespaceString& nss) const {
-        auto it = _resolvedNamespaces.find(nss.coll());
+        auto it = _resolvedNamespaces.find(nss);
         tassert(9453000,
                 str::stream() << "No resolved namespace provided for " << nss.toStringForErrorMsg(),
                 it != _resolvedNamespaces.end());
@@ -407,14 +413,14 @@ public:
         return !explain;
     }
 
-    void setResolvedNamespaces(StringMap<ResolvedNamespace> resolvedNamespaces) {
+    void setResolvedNamespaces(InternalResolvedNamespaceMapType resolvedNamespaces) {
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
     void addResolvedNamespaces(
         const mongo::stdx::unordered_set<mongo::NamespaceString>& resolvedNamespaces) {
         for (const auto& nss : resolvedNamespaces) {
-            _resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+            _resolvedNamespaces.try_emplace(nss, nss, std::vector<BSONObj>{});
         }
     }
 
@@ -681,6 +687,16 @@ public:
         _gotTemporarilyUnavailableException = v;
     }
 
+    bool getAllowGenericForeignDbLookup() const {
+        return _allowGenericForeignDbLookup;
+    }
+
+    // This should only be set right after creating a new expression context and should only be used
+    // in streams code to support their special $lookup syntax.
+    bool setAllowGenericForeignDbLookup(bool allowGenericForeignDbLookup) {
+        return _allowGenericForeignDbLookup = allowGenericForeignDbLookup;
+    }
+
     // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
     // may contain extended-range dates.
     void setRequiresTimeseriesExtendedRangeSupport(bool v) {
@@ -821,7 +837,7 @@ protected:
     ValueComparator _valueComparator;
 
     // A map from namespace to the resolved namespace, in case any views are involved.
-    StringMap<ResolvedNamespace> _resolvedNamespaces;
+    InternalResolvedNamespaceMapType _resolvedNamespaces;
 
     int _interruptCounter = kInterruptCheckPeriod;
 
@@ -840,6 +856,12 @@ private:
 
     std::unique_ptr<ExpressionCounters> _expressionCounters;
     bool _gotTemporarilyUnavailableException = false;
+
+    // Allows the foreign collection of a lookup to be in a different database than the local
+    // collection using "from: {db: ..., coll: ...}" syntax. Currently, this should only be used
+    // for streams since this isn't allowed in MQL beyond some exemptions for internal
+    // collection in the local database.
+    bool _allowGenericForeignDbLookup = false;
 
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).
@@ -877,5 +899,8 @@ private:
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
 };
+
+using ResolvedNamespaceMap =
+    absl::flat_hash_map<NamespaceString, ExpressionContext::ResolvedNamespace>;
 
 }  // namespace mongo

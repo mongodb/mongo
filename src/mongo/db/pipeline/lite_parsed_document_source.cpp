@@ -62,7 +62,7 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
 }
 
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
-    const NamespaceString& nss, const BSONObj& spec) {
+    const NamespaceString& nss, const BSONObj& spec, const LiteParserOptions& options) {
     uassert(40323,
             "A pipeline stage specification object must contain exactly one field.",
             spec.nFields() == 1);
@@ -75,7 +75,7 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    return it->second.parser(nss, specElem);
+    return it->second.parser(nss, specElem, options);
 }
 
 const LiteParsedDocumentSource::LiteParserInfo& LiteParsedDocumentSource::getInfo(

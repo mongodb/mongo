@@ -35,7 +35,7 @@ namespace mongo {
 
 ServerlessAggregationContextFixture::ServerlessAggregationContextFixture()
     : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
-          TenantId(OID::gen()), "unittests", "pipeline_test")) {
+          TenantId(OID::gen()), "test", "pipeline_test")) {
     ShardingState::create(getServiceContext());
 }
 

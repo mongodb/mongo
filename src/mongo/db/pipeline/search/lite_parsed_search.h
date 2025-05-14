@@ -37,7 +37,8 @@ namespace mongo {
 class LiteParsedSearchStage : public LiteParsedDocumentSource {
 public:
     static std::unique_ptr<LiteParsedSearchStage> parse(const NamespaceString& nss,
-                                                        const BSONElement& spec) {
+                                                        const BSONElement& spec,
+                                                        const LiteParserOptions& options) {
         return std::make_unique<LiteParsedSearchStage>(spec.fieldName(), nss);
     }
 

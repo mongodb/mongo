@@ -123,7 +123,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         runtimeConstants,
         std::move(resolvedCollator),
         MongoProcessInterface::create(opCtx),
-        StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces
+        ResolvedNamespaceMap{},  // resolvedNamespaces
         uuid,
         boost::none,                             // let
         CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile

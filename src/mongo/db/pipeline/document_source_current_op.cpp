@@ -71,7 +71,7 @@ REGISTER_DOCUMENT_SOURCE(currentOp,
 constexpr StringData DocumentSourceCurrentOp::kStageName;
 
 std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     // Need to check the value of allUsers; if true then the inprog privilege is returned by
     // requiredPrivileges(), which is called in the auth subsystem.
     if (spec.type() != BSONType::Object) {

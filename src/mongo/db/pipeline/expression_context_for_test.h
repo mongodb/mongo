@@ -212,7 +212,7 @@ public:
      * Sets the resolved definition for an involved namespace.
      */
     void setResolvedNamespace(const NamespaceString& nss, ResolvedNamespace resolvedNamespace) {
-        _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
+        _resolvedNamespaces[nss] = std::move(resolvedNamespace);
     }
 
     ServiceContext* getServiceContext() {

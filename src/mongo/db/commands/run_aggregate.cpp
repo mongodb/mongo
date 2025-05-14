@@ -526,7 +526,7 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
     return boost::none;
 }
 
-StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNamespaces(
+StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
     const NamespaceStringSet& pipelineInvolvedNamespaces) {
@@ -534,7 +534,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
     // If there are no involved namespaces, return before attempting to take any locks. This is
     // important for collectionless aggregations, which may be expected to run without locking.
     if (pipelineInvolvedNamespaces.empty()) {
-        return {StringMap<ExpressionContext::ResolvedNamespace>()};
+        return {ResolvedNamespaceMap()};
     }
 
     // Acquire a single const view of the CollectionCatalog and use it for all view and collection
@@ -546,13 +546,13 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
 
     while (!involvedNamespacesQueue.empty()) {
         auto involvedNs = std::move(involvedNamespacesQueue.front());
         involvedNamespacesQueue.pop_front();
 
-        if (resolvedNamespaces.find(involvedNs.coll()) != resolvedNamespaces.end()) {
+        if (resolvedNamespaces.find(involvedNs) != resolvedNamespaces.end()) {
             continue;
         }
 
@@ -568,8 +568,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             auto&& underlyingNs = resolvedView.getValue().getNamespace();
             // Attempt to acquire UUID of the underlying collection using lock free method.
             auto uuid = catalog->lookupUUIDByNSS(opCtx, underlyingNs);
-            resolvedNamespaces[ns.coll()] = {
-                underlyingNs, resolvedView.getValue().getPipeline(), uuid};
+            resolvedNamespaces[ns] = {underlyingNs, resolvedView.getValue().getPipeline(), uuid};
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
@@ -612,7 +611,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                         return status;
                     }
                 } else {
-                    resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+                    resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}};
                 }
             }
         } else if (catalog->lookupCollectionByNamespace(opCtx, involvedNs)) {
@@ -620,7 +619,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             auto uuid = catalog->lookupUUIDByNSS(opCtx, involvedNs);
             // If 'involvedNs' refers to a collection namespace, then we resolve it as an empty
             // pipeline in order to read directly from the underlying collection.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}, uuid};
+            resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}, uuid};
         } else if (catalog->lookupView(opCtx, involvedNs)) {
             auto status = resolveViewDefinition(involvedNs);
             if (!status.isOK()) {
@@ -629,7 +628,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         } else {
             // 'involvedNs' is neither a view nor a collection, so resolve it as an empty pipeline
             // to treat it as reading from a non-existent collection.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+            resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}};
         }
     }
 

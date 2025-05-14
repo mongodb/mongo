@@ -46,7 +46,8 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
             uassert(7746800,
                     "$querySettings stage expects a document as argument",
                     spec.type() == BSONType::Object);
