@@ -273,6 +273,48 @@ public:
         _hangDuringAccept.setMode(FailPoint::off);
     }
 
+    auto getDiscardedDueToClientDisconnect() {
+        BSONObjBuilder bob;
+        tla().appendStatsForFTDC(bob);
+        return bob.obj()["connsDiscardedDueToClientDisconnect"].Long();
+    }
+
+    void runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        std::function<void(ConnectionThread&)> closeClientFunc,
+        std::function<void(ConnectionThread&)> onConnectFunc = nullptr) {
+        WaitableAtomic<int> sessionsCreated;
+        sessionManager().setOnStartSession([&](auto&&) {
+            sessionsCreated.fetchAndAdd(1);
+            sessionsCreated.notifyAll();
+        });
+
+        // Temporarily enable `pessimisticConnectivityCheckForAcceptedConnections` for this test.
+        const auto oldValue = gPessimisticConnectivityCheckForAcceptedConnections.swap(true);
+        ON_BLOCK_EXIT([&] { gPessimisticConnectivityCheckForAcceptedConnections.store(oldValue); });
+
+        const auto discardedBefore = getDiscardedDueToClientDisconnect();
+
+        LOGV2(6109515, "creating test client connection");
+        auto& fp = asioTransportLayerHangDuringAcceptCallback;
+        auto timesEntered = fp.setMode(FailPoint::alwaysOn);
+        ConnectionThread connectThread(tla().listenerPort(), onConnectFunc);
+        fp.waitForTimesEntered(timesEntered + 1);
+        connectThread.wait();
+
+        LOGV2(6109516, "closing test client connection");
+        closeClientFunc(connectThread);
+        fp.setMode(FailPoint::off);
+
+        // Using a second connection as a means to wait for the server to process the closed
+        // connection and move on to accept the next connection.
+        ConnectionThread dummyConnection(tla().listenerPort(), nullptr);
+        dummyConnection.wait();
+        sessionsCreated.wait(0);
+
+        ASSERT_EQ(getDiscardedDueToClientDisconnect() - discardedBefore, 1);
+        ASSERT_EQ(sessionsCreated.load(), 1);
+    }
+
 private:
     std::unique_ptr<AsioTransportLayer> _tla;
     test::MockSessionManager* _sessionManager;
@@ -310,31 +352,59 @@ void setNoLinger(ConnectionThread& conn) {
     }
 }
 
+#ifdef __linux__
+
 /**
  * Test that the server appropriately handles a client-side socket disconnection, and that the
  * client sends an RST packet when the socket is forcibly closed.
  */
 TEST(AsioTransportLayer, TCPResetAfterConnectionIsSilentlySwallowed) {
     TestFixture tf;
-
-    AtomicWord<int> sessionsCreated{0};
-    tf.sessionManager().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
-
-    LOGV2(6109515, "connecting");
-    auto& fp = asioTransportLayerHangDuringAcceptCallback;
-    auto timesEntered = fp.setMode(FailPoint::alwaysOn);
-    ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
-    fp.waitForTimesEntered(timesEntered + 1);
-    // Test case thread does not close socket until client thread has set options to ensure that an
-    // RST packet will be set on close.
-    connectThread.wait();
-
-    LOGV2(6109516, "closing");
-    connectThread.close();
-    fp.setMode(FailPoint::off);
-
-    ASSERT_EQ(sessionsCreated.load(), 0);
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [](ConnectionThread& client) { client.close(); }, &setNoLinger);
 }
+
+/**
+ * Test that the server doesn't create a session when the client is gracefully closed before
+ * accepting.
+ */
+TEST(AsioTransportLayer, CheckGracefulClientClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [](ConnectionThread& client) { client.close(); });
+}
+
+TEST(AsioTransportLayer, CheckClientWriteThenGracefulClientClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession([&](ConnectionThread& client) {
+        OpMsgRequest request;
+        request.body = BSON("ping" << 1 << "$db"
+                                   << "admin");
+        auto msg = request.serialize();
+        msg.header().setResponseToMsgId(0);
+        client.socket().send(msg.buf(), msg.size(), "writing to the socket before closing it");
+        client.close();
+    });
+}
+
+TEST(AsioTransportLayer, CheckClientCloseWithoutShutdown) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](ConnectionThread& client) { ::close(client.socket().rawFD()); });
+}
+
+TEST(AsioTransportLayer, CheckClientRDWRShutdownWithoutClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](ConnectionThread& client) { shutdown(client.socket().rawFD(), SHUT_RDWR); });
+}
+
+TEST(AsioTransportLayer, CheckClientWRShutdownWithoutClose) {
+    TestFixture tf;
+    tf.runTestWithClientDroppingConnectionBeforeServerCreatesSession(
+        [&](ConnectionThread& client) { shutdown(client.socket().rawFD(), SHUT_WR); });
+}
+#endif  // __linux__
 
 TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
     auto sm = std::make_unique<test::MockSessionManager>();
@@ -361,6 +431,11 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
 
     LOGV2(6400501, "Starting and hanging three connection threads");
     tf.setUpHangDuringAcceptingFirstConnection();
+
+    ON_BLOCK_EXIT([&] {
+        LOGV2(6400503, "Stopping failpoints, shutting down test");
+        tf.stopHangDuringAcceptingConnection();
+    });
 
     ConnectionThread connectThread1(tf.tla().listenerPort());
     ConnectionThread connectThread2(tf.tla().listenerPort());
@@ -394,10 +469,6 @@ TEST(AsioTransportLayer, TCPCheckQueueDepth) {
     const auto& queueDepthObj = queueDepthsArray[0].Obj();
     ASSERT_EQ(HostAndPort(queueDepthObj.firstElementFieldName()).port(), tf.tla().listenerPort());
     ASSERT_EQ(queueDepthObj.firstElement().Int(), 2);
-
-    LOGV2(6400503, "Stopping failpoints, shutting down test");
-
-    tf.stopHangDuringAcceptingConnection();
 }
 #endif
 

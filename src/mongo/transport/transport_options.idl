@@ -119,3 +119,14 @@ server_parameters:
             data: std::int64_t
         default: 0
         redact: false
+
+    pessimisticConnectivityCheckForAcceptedConnections:
+        description: >-
+            Instructs the server to check connectivity of accepted connections before further 
+            processing and discard those that are terminated by the client. This parameter has no 
+            effect on non-Linux platforms.
+        set_at: [startup, runtime]
+        cpp_varname: gPessimisticConnectivityCheckForAcceptedConnections
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
