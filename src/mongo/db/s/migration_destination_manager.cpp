@@ -1176,9 +1176,13 @@ void _cloneCollectionIndexesAndOptions(
 
         // Acquire the exclusive collection lock to eventually create the collection and clone the
         // remaining indexes.
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        AutoGetCollection autoColl(opCtx,
+                                   nss,
+                                   MODE_X,
+                                   AutoGetCollection::Options{}.deadline(
+                                       opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                       Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
+        auto db = autoColl.ensureDbExists(opCtx);
 
         auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (collection) {
