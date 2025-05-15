@@ -278,7 +278,8 @@ Value applyFindElemMatchProjection(const Document& input,
         return {};
     }
 
-    auto val = input[path.fullPath()];
+    const auto& fullPath = path.fullPath();
+    auto val = input[StringData{fullPath}];
     tassert(7241707,
             str::stream()
                 << "$elemMatch projection operator requires an array field, found field of type:"

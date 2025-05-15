@@ -29,6 +29,7 @@
 
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <list>
 #include <string>
@@ -40,7 +41,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
@@ -63,7 +63,6 @@
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -543,7 +542,7 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addAff
         return;
     }
 
-    static const std::vector<std::string> kCollectionField = {"create", "createIndexes"};
+    constexpr std::array<StringData, 2> kCollectionField = {"create"_sd, "createIndexes"_sd};
     const Document& object = doc["o"].getDocument();
     for (const auto& fieldName : kCollectionField) {
         const auto field = object[fieldName];

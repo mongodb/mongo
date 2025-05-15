@@ -290,8 +290,8 @@ void DocumentSourceInternalSearchMongotRemote::tryToSetSearchMetaVar() {
         // Variables on the cursor must be an object.
         auto varsObj = Value(_cursor->getCursorVars().value());
         LOGV2_DEBUG(8569400, 4, "Setting meta vars", "varsObj"_attr = redact(varsObj.toString()));
-        auto metaVal = varsObj.getDocument().getField(
-            Variables::getBuiltinVariableName(Variables::kSearchMetaId));
+        std::string varName = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
+        auto metaVal = varsObj.getDocument().getField(StringData{varName});
         if (!metaVal.missing()) {
             pExpCtx->variables.setReservedValue(Variables::kSearchMetaId, metaVal, true);
             if (metaVal.isObject()) {

@@ -255,7 +255,7 @@ public:
         // ambiguity in the expected behavior of the serialized projection.
         _root->serialize(&output, options);
         auto idFieldName = options.serializeFieldPath("_id");
-        if (output.peek()[idFieldName].missing()) {
+        if (output.peek()[StringData{idFieldName}].missing()) {
             output.addField(idFieldName, Value{false});
         }
 

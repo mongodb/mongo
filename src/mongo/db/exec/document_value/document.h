@@ -38,15 +38,14 @@
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -149,7 +148,7 @@ public:
      * auto document = Document{{"hello", "world"}, {"number", 1}};
      */
     Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList);
-    Document(std::vector<std::pair<StringData, Value>> fields);
+    Document(const std::vector<std::pair<StringData, Value>>& fields);
 
     void swap(Document& rhs) {
         _storage.swap(rhs._storage);
@@ -165,11 +164,11 @@ public:
      * Note that this method does *not* traverse nested documents and arrays, use getNestedField()
      * instead.
      */
-    template <typename T>
+    template <AnyFieldNameTypeButStdString T>
     Value operator[](T key) const {
         return getField(key);
     }
-    template <typename T>
+    template <AnyFieldNameTypeButStdString T>
     Value getField(T key) const {
         return storage().getField(key);
     }

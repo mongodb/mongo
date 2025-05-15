@@ -223,8 +223,9 @@ void ProjectionNode::applyExpressions(const Document& root, MutableDocument* out
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
-            outputDoc->setField(
-                field, childIt->second->applyExpressionsToValue(root, outputDoc->peek()[field]));
+            outputDoc->setField(field,
+                                childIt->second->applyExpressionsToValue(
+                                    root, outputDoc->peek()[StringData{field}]));
         } else {
             auto expressionIt = _expressions.find(field);
             tassert(7241726,

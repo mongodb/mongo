@@ -125,7 +125,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
         auto nextInput = pSource->getNext();
         switch (nextInput.getStatus()) {
             case GetNextResult::ReturnStatus::kAdvanced: {
-                auto idField = nextInput.getDocument()[_idField];
+                auto idField = nextInput.getDocument()[StringData{_idField}];
                 uassert(28793,
                         str::stream()
                             << "The optimized $sample stage requires all documents have a "

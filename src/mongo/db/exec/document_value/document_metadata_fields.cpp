@@ -264,7 +264,7 @@ void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFla
 void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
     if (feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto score = scoreDetails.getDocument().getField(scoreDetailsScoreField);
+        auto score = scoreDetails.getDocument().getField(StringData{scoreDetailsScoreField});
         tassert(9679300,
                 str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
                                  "set the score too, but got "

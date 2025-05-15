@@ -126,7 +126,7 @@ Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* 
         return Value();
     }
 
-    return inputValue.getDocument().getField(fieldValue.getString());
+    return inputValue.getDocument().getField(fieldValue.getStringData());
 }
 
 Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* variables) {

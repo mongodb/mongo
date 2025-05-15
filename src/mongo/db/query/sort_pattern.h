@@ -146,10 +146,17 @@ public:
         return _sortPattern.cend();
     }
 
-    SortPatternPart front() const {
+    /**
+     * Return first sort pattern.
+     */
+    const SortPatternPart& front() const {
         return _sortPattern.front();
     }
-    SortPatternPart back() const {
+
+    /**
+     * Return last sort pattern.
+     */
+    const SortPatternPart& back() const {
         return _sortPattern.back();
     }
 

@@ -578,7 +578,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     SortPattern pat{key.embeddedObject(), expCtx};
 
     {
-        auto timePart = pat.back();
+        const auto& timePart = pat.back();
         uassert(6369901,
                 "$_internalBoundedSort doesn't support an expression in the time field (the last "
                 "component of sortKey)",
@@ -707,7 +707,8 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
 }
 
 std::pair<Date_t, Document> DocumentSourceSort::extractTime(Document&& doc) const {
-    auto time = doc.getField(_sortExecutor->sortPattern().back().fieldPath->fullPath());
+    const auto& fullPath = _sortExecutor->sortPattern().back().fieldPath->fullPath();
+    auto time = doc.getField(StringData{fullPath});
     uassert(6369909, "$_internalBoundedSort only handles Date values", time.getType() == Date);
     auto date = time.getDate();
 
