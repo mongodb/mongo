@@ -55,6 +55,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/encryption_hooks.h"
@@ -634,6 +635,21 @@ protected:
             for (std::size_t i = 0; i < iterators.size(); i += numParallelSpills) {
                 std::vector<std::shared_ptr<Iterator>> spillsToMerge;
                 auto endIndex = std::min(i + numParallelSpills, iterators.size());
+
+                // Since we are merging the spills to a new file, we make sure we have sufficient
+                // available disk space
+                int64_t minRequiredDiskSpace = 0;
+                std::for_each(
+                    iterators.begin() + i, iterators.begin() + endIndex, [&](const auto& it) {
+                        minRequiredDiskSpace +=
+                            it->getRange().getEndOffset() - it->getRange().getStartOffset();
+                    });
+                minRequiredDiskSpace = std::max(
+                    minRequiredDiskSpace,
+                    static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+                uassertStatusOK(ensureSufficientDiskSpaceForSpilling(this->_opts.tempDir,
+                                                                     minRequiredDiskSpace));
+
                 std::move(iterators.begin() + i,
                           iterators.begin() + endIndex,
                           std::back_inserter(spillsToMerge));
@@ -842,6 +858,10 @@ private:
                           << (this->_opts.maxMemoryUsageBytes + this->fileIteratorsMaxBytesSize)
                           << " bytes, but did not opt in to external sorting.");
         }
+
+        // Ensure there is sufficient disk space for spilling
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            this->_opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         sort();
 

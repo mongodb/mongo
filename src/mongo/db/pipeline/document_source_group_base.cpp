@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/destructor_guard.h"
@@ -592,6 +593,10 @@ void DocumentSourceGroupBase::resetReadyGroups() {
 }
 
 void DocumentSourceGroupBase::spill() {
+    // Ensure there is sufficient disk space for spilling
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        pExpCtx->tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+
     _stats.spills++;
     _stats.numBytesSpilledEstimate += _memoryTracker.currentMemoryBytes();
     _stats.spilledRecords += _groups->size();

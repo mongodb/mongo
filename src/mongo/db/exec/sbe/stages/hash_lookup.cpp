@@ -38,6 +38,8 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/query/util/spill_util.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -226,6 +228,9 @@ void HashLookupStage::reset() {
     _buffer.clear();
     _valueId = 0;
     _bufferIt = 0;
+
+    _spilledBytesSinceLastCheck = 0;
+    _totalSpilledBytes = 0;
 }
 
 std::pair<RecordId, KeyString::TypeBits> HashLookupStage::serializeKeyForRecordStore(
@@ -242,6 +247,19 @@ std::tuple<bool, value::TypeTags, value::Value> HashLookupStage::normalizeString
         return {true, tagColl, valColl};
     }
     return {false, tag, val};
+}
+
+bool HashLookupStage::shouldCheckDiskSpace() {
+    _spilledBytesSinceLastCheck += _specificStats.spilledBuffBytesOverAllRecords +
+        _specificStats.spilledHtBytesOverAllRecords - _totalSpilledBytes;
+    _totalSpilledBytes =
+        _specificStats.spilledBuffBytesOverAllRecords + _specificStats.spilledHtBytesOverAllRecords;
+
+    if (_spilledBytesSinceLastCheck > kMaxSpilledBytesForDiskSpaceCheck) {
+        _spilledBytesSinceLastCheck = 0;
+    }
+
+    return _spilledBytesSinceLastCheck == 0;
 }
 
 void HashLookupStage::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t valueIndex) {
@@ -329,6 +347,12 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
                                                SpillingStore* rs,
                                                size_t bufferIdx,
                                                const value::MaterializedRow& val) {
+    // Ensure there is sufficient disk space for spilling
+    if (shouldCheckDiskSpace()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    }
+
     CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
 
     auto rid = getValueRecordId(bufferIdx);
@@ -515,6 +539,12 @@ void HashLookupStage::spillIndicesToRecordStore(SpillingStore* rs,
                                                 value::TypeTags tagKey,
                                                 value::Value valKey,
                                                 const std::vector<size_t>& value) {
+    // Ensure there is sufficient disk space for spilling
+    if (shouldCheckDiskSpace()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    }
+
     CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
 
     auto [owned, tagKeyColl, valKeyColl] = normalizeStringIfCollator(tagKey, valKey);

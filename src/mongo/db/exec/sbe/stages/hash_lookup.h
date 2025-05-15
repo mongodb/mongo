@@ -165,6 +165,10 @@ private:
 
     void makeTemporaryRecordStore();
 
+    // Determines if we should perform the check for sufficient disk space for spilling.
+    // We do the check after every 100MB of spilling.
+    bool shouldCheckDiskSpace();
+
     std::pair<RecordId, KeyString::TypeBits> serializeKeyForRecordStore(
         const value::MaterializedRow& key) const;
 
@@ -241,5 +245,12 @@ private:
     std::unique_ptr<SpillingStore> _recordStoreBuf;
 
     HashLookupStats _specificStats;
+
+    // Amount of bytes spilled since last time we performed the disk space check. We reset this
+    // value and perform the disk space check everytime it crosses 100 MB.
+    long long _spilledBytesSinceLastCheck{0};
+    long long _totalSpilledBytes{0};
+
+    static constexpr long long kMaxSpilledBytesForDiskSpaceCheck = 100ll * 1024 * 1024;
 };
 }  // namespace mongo::sbe
