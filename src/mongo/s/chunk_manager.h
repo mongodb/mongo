@@ -680,6 +680,8 @@ struct ShardEndpoint {
                   boost::optional<ShardVersion> shardVersionParam,
                   boost::optional<DatabaseVersion> dbVersionParam);
 
+    bool operator==(const ShardEndpoint& other) const;
+
     ShardId shardName;
 
     boost::optional<ShardVersion> shardVersion;

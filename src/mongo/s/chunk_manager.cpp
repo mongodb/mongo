@@ -1106,6 +1106,11 @@ ShardEndpoint::ShardEndpoint(const ShardId& shardName,
         invariant(shardName == ShardId::kConfigServerId);
 }
 
+bool ShardEndpoint::operator==(const ShardEndpoint& other) const {
+    return shardName == other.shardName && databaseVersion == other.databaseVersion &&
+        shardVersion == other.shardVersion;
+}
+
 bool EndpointComp::operator()(const ShardEndpoint* endpointA,
                               const ShardEndpoint* endpointB) const {
     const int shardNameDiff = endpointA->shardName.compare(endpointB->shardName);

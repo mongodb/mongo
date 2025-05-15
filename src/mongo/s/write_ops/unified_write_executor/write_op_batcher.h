@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <functional>
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
@@ -38,17 +37,18 @@
 namespace mongo {
 namespace unified_write_executor {
 
-struct SingleShardWriteBatch {
-    ShardEndpoint shard;
-    std::vector<WriteOp> ops;
+struct SimpleWriteBatch {
+    // Given that a write command can target multiple collections,
+    // we store one shard version per namespace to support batching ops which target the same shard,
+    // but target different namespaces.
+    struct ShardRequest {
+        std::map<NamespaceString, ShardEndpoint> versionByNss;
+        std::vector<WriteOp> ops;
+    };
+    std::map<ShardId, ShardRequest> requestByShardId;
 };
 
-struct MultiShardWriteBatch {
-    std::vector<ShardEndpoint> shards;
-    WriteOp op;
-};
-
-using WriteBatch = std::variant<SingleShardWriteBatch, MultiShardWriteBatch>;
+using WriteBatch = std::variant<SimpleWriteBatch>;
 
 /**
  * Based on the analysis of the write ops, this class bundles multiple write ops into batches to be

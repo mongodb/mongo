@@ -47,7 +47,9 @@ boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext
                     "Single shard write type should only target a single shard",
                     analysis.shardsAffected.size() == 1);
             std::vector<WriteOp> writeOps{*writeOp};
-            auto shard = analysis.shardsAffected.front();
+            std::map<NamespaceString, ShardEndpoint> versionByNss{
+                {writeOp->getNss(), analysis.shardsAffected.front()}};
+            auto shardId = analysis.shardsAffected.front().shardName;
 
             while (true) {
                 auto nextWriteOp = _producer.peekNext();
@@ -58,20 +60,38 @@ boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext
                 // Only add consecutive ops targeting the same shard into one batch. The ordered
                 // constraint will be maintained on the shard.
                 if (nextAnalysis.type != kSingleShard ||
-                    nextAnalysis.shardsAffected.front().shardName != shard.shardName) {
+                    nextAnalysis.shardsAffected.front().shardName != shardId) {
                     break;
                 }
                 tassert(10346701,
                         "Single shard write type should only target a single shard",
                         nextAnalysis.shardsAffected.size() == 1);
                 writeOps.push_back(*nextWriteOp);
+                auto versionFound = versionByNss.find(nextWriteOp->getNss());
+                if (versionFound != versionByNss.end()) {
+                    tassert(10483300,
+                            "Shard version for the same namespace need to be the same",
+                            versionFound->second == nextAnalysis.shardsAffected.front());
+                }
+                versionByNss.emplace_hint(
+                    versionFound, nextWriteOp->getNss(), nextAnalysis.shardsAffected.front());
                 _producer.advance();
             }
-            return WriteBatch{SingleShardWriteBatch{shard, std::move(writeOps)}};
+            return WriteBatch{SimpleWriteBatch{
+                {{shardId,
+                  SimpleWriteBatch::ShardRequest{std::move(versionByNss), std::move(writeOps)}}}}};
         } break;
 
         case kMultiShard: {
-            return WriteBatch{MultiShardWriteBatch{std::move(analysis.shardsAffected), *writeOp}};
+            SimpleWriteBatch batch;
+            for (auto& shardVersion : analysis.shardsAffected) {
+                SimpleWriteBatch::ShardRequest shardRequest{
+                    {{writeOp->getNss(), shardVersion}},
+                    {*writeOp},
+                };
+                batch.requestByShardId.emplace(shardVersion.shardName, std::move(shardRequest));
+            }
+            return WriteBatch{batch};
         } break;
 
         default: {
