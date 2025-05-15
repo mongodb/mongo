@@ -7,7 +7,8 @@
  */
 
 /*
- * Tests for the Live Restore file system's fs_file_fs function. [live_restore_fs_size]
+ * Tests for the Live Restore file system's fs_file_fs function.
+ * [live_restore_fs_size]
  */
 
 #include "../utils_live_restore.h"

@@ -100,17 +100,17 @@ TEST_CASE("Test various bitmap filling bit ranges",
 
     REQUIRE(__wt_rwlock_init(session, &lr_fh.lock) == 0);
     for (auto &test : tests) {
+        __wt_writelock(session, &lr_fh.lock);
         lr_fh.allocsize = test.allocsize;
         lr_fh.bitmap = test.bitmap.data();
         lr_fh.nbits = test.nbits;
 
-        __wt_writelock(session, &lr_fh.lock);
         for (const auto &range : test.ranges)
             __ut_live_restore_fh_fill_bit_range(
               &lr_fh, session, (wt_off_t)range.first, (size_t)range.second);
-        __wt_writeunlock(session, &lr_fh.lock);
 
         REQUIRE(is_valid_bitmap(test));
+        __wt_writeunlock(session, &lr_fh.lock);
     }
     __wt_rwlock_destroy(session, &lr_fh.lock);
 }

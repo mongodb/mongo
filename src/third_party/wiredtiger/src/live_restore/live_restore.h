@@ -53,11 +53,17 @@ extern int __wt_os_live_restore_fs(WT_SESSION_IMPL *session, const char *cfg[],
 extern void __wt_live_restore_init_stats(WT_SESSION_IMPL *session);
 
 #ifdef HAVE_UNITTEST
+extern int __ut_live_restore_compute_read_end_bit(WT_SESSION_IMPL *session,
+  WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, wt_off_t buf_size, uint64_t first_clear_bit,
+  uint64_t *end_bitp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __ut_live_restore_decode_bitmap(WT_SESSION_IMPL *session, const char *bitmap_str,
   uint64_t nbits, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __ut_live_restore_encode_bitmap(
   WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_ITEM *buf)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __ut_live_restore_fill_hole(WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION *wt_session,
+  char *buf, wt_off_t buf_size, wt_off_t *read_offsetp, bool *finishedp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __ut_live_restore_fh_fill_bit_range(
   WTI_LIVE_RESTORE_FILE_HANDLE *lr_fh, WT_SESSION_IMPL *session, wt_off_t offset, size_t len);

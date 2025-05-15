@@ -27,11 +27,11 @@ open_lr_fh(const live_restore_test_env &env, const std::string &dest_file,
 
 /* Create a file of the specified length. */
 void
-create_file(const std::string &filepath, int len)
+create_file(const std::string &filepath, int len, char fill_char)
 {
     REQUIRE(!testutil_exists(nullptr, filepath.c_str()));
     std::ofstream file(filepath, std::ios::out);
-    std::string data_str = std::string(len, 'A');
+    std::string data_str = std::string(len, fill_char);
     file << data_str;
     file.close();
 }

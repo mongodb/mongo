@@ -11,9 +11,8 @@ fi
 
 build_variant=$1
 
-# This is tcmalloc upstream revision 093ba93 source patched by the SERVER team.
-# https://github.com/mongodb-forks/tcmalloc/releases/tag/mongo-SERVER-85737
-PATCHED_SRC=mongo-SERVER-85737
+# MongoDB uses a patched version of TCMalloc and WT should use the same one for testing.
+PATCHED_SRC=mongo-20240522
 PATCHED_TGZ="${PATCHED_SRC}.tar.gz"
 PATCHED_TGZ_URL="https://github.com/mongodb-forks/tcmalloc/archive/refs/tags/${PATCHED_TGZ}"
 PATCHED_SRC_DIR="tcmalloc-${PATCHED_SRC}"
@@ -51,10 +50,11 @@ fi
 # Downloading a prebuilt copy failed. Assume it is because it doesn't exist for this build
 # variant. Attempt to create a shared object for this build variant and upload it.
 # From this point onward: any and all errors are fatal, and will cause the build to FAIL.
+echo "Prebuilt tcmalloc doesn't exist, trying to build a new one"
 set -e
 
 # Fetch the operating system and hardware architecture to download bazelisk binaries. The bazelisk
-# binary is used to specifically obtain the bazel 7.5.0 version. Note: We do not spport TCMalloc
+# binary is used to specifically obtain the bazel 7.5.0 version. Note: We do not support TCMalloc
 # with Windows.
 RUN_OS=$(uname -s)
 ARCH=$(uname -m)

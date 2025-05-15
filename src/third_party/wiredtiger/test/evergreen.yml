@@ -69,7 +69,17 @@ functions:
               export TESTUTIL_UBSAN=1
             fi
 
+            if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
+              # The preloaded library should be downloaded/built during "configure wiredtiger" step.
+              # DO NOT MOVE:This variable must be set in the same function(shell) that runs a test,
+              # and as close as possible to the test execution, since it affects all the binaries.
+              export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/libtcmalloc.so
+            fi
+
             ${additional_env_vars}
+
+            echo "Dump Environment"
+            printenv
         # The expansion is used for any task that requires the mongodbtoolchain binaries.
         - key: PREPARE_PATH
           value: |
@@ -341,16 +351,6 @@ functions:
             # Run this script in its own process as it depends on managing
             # shell options.
             /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
-
-            # Preload tcmalloc in the Evergreen environment: this will affect
-            # ALL binaries.
-            # FIXME-WT-14389 v5 toolchain clang Cmake configuration fails with tcmalloc preloading
-            # so it worth doing LD_PRELOAD right before running the tests (in PREPARE_TEST_ENV).
-            # Didn't move it there as part of this patch, since it is very likely that currently
-            # WT is tested without TCMalloc, because Evergreen resets the environment after
-            # execution of "configure wiredtiger" step which is another bug, but it should
-            # be handled in a separate PR.
-            # export LD_PRELOAD=$PWD/TCMALLOC_LIB/libtcmalloc.so
           fi
 
           # Compiling with CMake.
