@@ -30,6 +30,9 @@
 
 import argparse
 import sys
+import warnings
+
+warnings.filterwarnings("ignore", message="\nYou don't have the C version of NameMapper installed")
 
 from Cheetah.Template import Template
 

@@ -1,17 +1,19 @@
-from Cheetah.Template import Template
-import sys
-import os
-import json
 import bisect
+import json
 import logging
-from functools import reduce
+import os
+import sys
+import warnings
+
+warnings.filterwarnings("ignore", message="\nYou don't have the C version of NameMapper installed")
+
+from Cheetah.Template import Template
 
 SBOM_PATH = "../../../sbom.json"
 TEMPLATE_PATH = "README.third_party.md.template"
 README_PATH = "../../../README.third_party.md"
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def main():
@@ -31,7 +33,7 @@ def main():
     template_data = {
         "component_chart": component_chart_string,
         "component_links": component_links_string,
-        "wiredtiger_chart": wiredtiger_chart_string
+        "wiredtiger_chart": wiredtiger_chart_string,
     }
     create_markdown_with_template(template_data)
 
@@ -45,7 +47,7 @@ def test_filepaths() -> None:
 
 def load_sbom() -> dict:
     try:
-        with open(SBOM_PATH, 'r') as file:
+        with open(SBOM_PATH, "r") as file:
             sbom = json.load(file)
             logging.info("%s JSON data loaded.", SBOM_PATH)
             return sbom
@@ -73,26 +75,30 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
             k, v = prop["name"], prop["value"]
             if k == "emits_persisted_data":
                 emits_persisted_data = ("", "✗")[v == "true"]
-        distributed_in_release_binaries = (
-            "", "✗")[component["scope"] == "required"]
+        distributed_in_release_binaries = ("", "✗")[component["scope"] == "required"]
 
         row = [
-            item.replace(
-                "|",
-                "") for item in [
+            item.replace("|", "")
+            for item in [
                 f"[{name}]",
                 license_string,
                 version,
                 emits_persisted_data,
-                distributed_in_release_binaries]]
+                distributed_in_release_binaries,
+            ]
+        ]
         bisect.insort(component_chart, row, key=lambda c: c[0].lower())
 
-    component_chart.insert(0,
-                           ["Name",
-                            "License",
-                            "Vendored Version",
-                            "Emits persisted data",
-                            "Distributed in Release Binaries"])
+    component_chart.insert(
+        0,
+        [
+            "Name",
+            "License",
+            "Vendored Version",
+            "Emits persisted data",
+            "Distributed in Release Binaries",
+        ],
+    )
     return component_chart
 
 
@@ -103,9 +109,7 @@ def sbom_to_component_links_string(sbom: dict) -> list[list[str]]:
     for component in components:
         check_component_validity(component)
         info_link = get_component_info_link(component)
-        bisect.insort(
-            link_list,
-            f"[{component['name'].replace('|','')}]: {info_link}")
+        bisect.insort(link_list, f"[{component['name'].replace('|','')}]: {info_link}")
 
     return "\n".join(link_list)
 
@@ -119,10 +123,7 @@ def sbom_to_wiredtiger_chart(sbom: dict) -> list[list[str]]:
         locations = get_component_locations(component)
         for location in locations:
             if location.startswith("src/third_party/wiredtiger/"):
-                bisect.insort(
-                    wiredtiger_chart, [
-                        component["name"].replace(
-                            "|", "")])
+                bisect.insort(wiredtiger_chart, [component["name"].replace("|", "")])
 
     return wiredtiger_chart
 
@@ -130,9 +131,7 @@ def sbom_to_wiredtiger_chart(sbom: dict) -> list[list[str]]:
 def check_component_validity(component) -> None:
     for required_key in ["name", "version", "licenses"]:
         if required_key not in component:
-            logging.error(
-                "Error: no key %s found in json. Exiting. JSON dump:",
-                required_key)
+            logging.error("Error: no key %s found in json. Exiting. JSON dump:", required_key)
             logging.error(json.dumps(component))
             sys.exit(1)
 
@@ -145,17 +144,12 @@ def get_component_info_link(component) -> str:
         if k == "info_link":
             links.append(v)
     if len(links) != 1:
-        logging.warning(
-            "Warning: Expected 1 info_link for %s. Got %d:",
-            name,
-            len(links))
+        logging.warning("Warning: Expected 1 info_link for %s. Got %d:", name, len(links))
         if len(links) > 1:
             logging.warning(" ".join(links))
             logging.warning("Using first link only.")
         else:
-            logging.warning(
-                "Falling back to `purl` value: %s",
-                component['purl'])
+            logging.warning("Falling back to `purl` value: %s", component["purl"])
             links.append(component["purl"])
     return links[0]
 
@@ -163,8 +157,7 @@ def get_component_info_link(component) -> str:
 def get_component_locations(component) -> list[str]:
     if "evidence" not in component or "occurrences" not in component["evidence"]:
         return []
-    return [occurence["location"]
-            for occurence in component["evidence"]["occurrences"]]
+    return [occurence["location"] for occurence in component["evidence"]["occurrences"]]
 
 
 def right_pad_chart_values(chart: list[list[str]]) -> list[list[str]]:
@@ -187,15 +180,21 @@ def chart_to_string(chart: list[list[str]]) -> str:
 
 
 def create_markdown_with_template(data):
-    output = str(Template.compile(file=TEMPLATE_PATH,
-                                  compilerSettings={
-                                      'commentStartToken': '//',
-                                      'directiveStartToken': '!!',
-                                      'directiveEndToken': '!!',
-                                  })(namespaces=[data]))
+    output = str(
+        Template.compile(
+            file=TEMPLATE_PATH,
+            compilerSettings={
+                "commentStartToken": "//",
+                "directiveStartToken": "!!",
+                "directiveEndToken": "!!",
+            },
+        )(namespaces=[data])
+    )
 
-    with open(README_PATH, 'w') as f:
-        f.write("[DO NOT MODIFY THIS FILE MANUALLY. It is generated by src/third_party/tools/gen_thirdpartyreadme.py]: #\n\n")
+    with open(README_PATH, "w") as f:
+        f.write(
+            "[DO NOT MODIFY THIS FILE MANUALLY. It is generated by src/third_party/tools/gen_thirdpartyreadme.py]: #\n\n"
+        )
         f.write(output)
 
     logging.info("Markdown file created successfully.")
