@@ -72,7 +72,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     auto result = storePossibleCursor(opCtx,
                                       remoteCursor->getShardId().toString(),
                                       remoteCursor->getHostAndPort(),
-                                      remoteCursor->getCursorResponse(),
+                                      std::move(remoteCursor->getCursorResponse()),
                                       requestedNss,
                                       executorPool->getArbitraryExecutor(),
                                       Grid::get(opCtx)->getCursorManager(),
@@ -104,7 +104,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return incomingCursorResponse.getStatus();
     }
 
-    const auto& response = incomingCursorResponse.getValue();
+    auto& response = incomingCursorResponse.getValue();
     if (const auto& cursorMetrics = response.getCursorMetrics()) {
         CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(*cursorMetrics);
     }
@@ -112,7 +112,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     return storePossibleCursor(opCtx,
                                shardId,
                                server,
-                               response,
+                               std::move(response),
                                requestedNss,
                                std::move(executor),
                                cursorManager,
@@ -124,7 +124,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const HostAndPort& server,
-                                        const CursorResponse& incomingCursorResponse,
+                                        CursorResponse&& incomingCursorResponse,
                                         const NamespaceString& requestedNss,
                                         std::shared_ptr<executor::TaskExecutor> executor,
                                         ClusterCursorManager* cursorManager,
@@ -199,7 +199,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     CursorResponse outgoingCursorResponse(requestedNss,
                                           clusterCursorId.getValue(),
-                                          incomingCursorResponse.getBatch(),
+                                          incomingCursorResponse.releaseBatch(),
                                           incomingCursorResponse.getAtClusterTime(),
                                           incomingCursorResponse.getPostBatchResumeToken());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);

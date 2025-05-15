@@ -38,7 +38,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
@@ -106,7 +105,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const HostAndPort& server,
-                                        const CursorResponse& incomingCursorResponse,
+                                        CursorResponse&& incomingCursorResponse,
                                         const NamespaceString& requestedNss,
                                         std::shared_ptr<executor::TaskExecutor> executor,
                                         ClusterCursorManager* cursorManager,
