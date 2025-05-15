@@ -897,7 +897,11 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     std::string existingMetadata;
     {
         auto session = connection->getUninterruptibleSession();
-        existingMetadata = getMetadataCreate(*session, uri).getValue();
+        auto metadata = getMetadataCreate(*session, uri);
+        if (!metadata.isOK()) {
+            return metadata.getStatus();
+        }
+        existingMetadata = std::move(metadata.getValue());
     }
 
     {
