@@ -172,6 +172,9 @@ if (isShardSvrRst) {
     createUser(st.configRS);
     configRstPrimary = st.configRS.getPrimary();
 } else {
+    // Only clean replicasets are allowed as config shard
+    assert.commandWorked(rst.getPrimary().getDB(dbName).dropDatabase());
+
     // Start a sharded cluster and add the configsvr replica set to it.
     if (TestData.mongosBinVersion) {
         // Make sure the configsvr is in the same FCV as the mongos.
