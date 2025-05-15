@@ -45,12 +45,6 @@ runTimeseriesRetryDeleteAndUpdateTest(
                       tojson(transactionsServerStatus));
 
         return statementsRetried;
-    },
-    (db) => {
-        return st.shard0.getDB(db.getName()).serverStatus().transactions.retriedCommandsCount;
-    },
-    (db) => {
-        return st.shard0.getDB(db.getName()).serverStatus().transactions.retriedStatementsCount;
     });
 
 st.stop();

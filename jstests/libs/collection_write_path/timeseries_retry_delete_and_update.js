@@ -12,25 +12,15 @@
  * 'retriedStatementsCount' is a function which checks whether the retriedStatementsCount statistic
  * has the expected value and returns the amount by which that statistic was expected to increment.
  */
-export function runTimeseriesRetryDeleteAndUpdateTest(conn,
-                                                      setUpCollection,
-                                                      checkRetriedCommandsCount,
-                                                      checkRetriedStatementsCount,
-                                                      initialRetriedCommandsCount =
-                                                          (db) => {
-                                                              return 0;
-                                                          },
-                                                      initialRetriedStatementsCount =
-                                                          (db) => {
-                                                              return 0;
-                                                          }) {
+export function runTimeseriesRetryDeleteAndUpdateTest(
+    conn, setUpCollection, checkRetriedCommandsCount, checkRetriedStatementsCount) {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
     const dateTime = ISODate("2021-07-12T16:00:00Z");
     let collCount = 0;
 
-    let retriedCommandsCount = initialRetriedCommandsCount(conn.getDB(jsTestName()));
-    let retriedStatementsCount = initialRetriedStatementsCount(conn.getDB(jsTestName()));
+    let retriedCommandsCount = 0;
+    let retriedStatementsCount = 0;
 
     /**
      * Verifies that a timeseries delete or update command supports retryable writes. The arguments
