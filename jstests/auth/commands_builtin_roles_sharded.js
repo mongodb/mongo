@@ -10,6 +10,15 @@
  */
 
 import {runAllCommandsBuiltinRoles} from "jstests/auth/lib/commands_builtin_roles.js";
+import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+
+let mongotmock;
+let mongotHost = "localhost:27017";
+if (!_isWindows()) {
+    mongotmock = new MongotMock();
+    mongotmock.start();
+    mongotHost = mongotmock.getConnection().host;
+}
 
 const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_sharded/");
 mkdir(dbPath);
@@ -17,8 +26,8 @@ const opts = {
     auth: "",
     setParameter: {
         trafficRecordingDirectory: dbPath,
-        mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
-                                        // $search-related tests to pass configuration checks.
+        mongotHost,   // We have to set the mongotHost parameter for the
+                      // $search-related tests to pass configuration checks.
         syncdelay: 0  // Disable checkpoints as this can cause some commands to fail transiently.
     }
 };
@@ -32,9 +41,12 @@ const conn = new ShardingTest({
         shardOptions: opts,
         // We have to set the mongotHost parameter for the $search-related tests to pass
         // configuration checks.
-        mongosOptions:
-            {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}}
+        mongosOptions: {setParameter: {trafficRecordingDirectory: dbPath, mongotHost}}
     }
 });
 runAllCommandsBuiltinRoles(conn);
 conn.stop();
+
+if (mongotmock) {
+    mongotmock.stop();
+}
