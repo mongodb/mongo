@@ -241,8 +241,6 @@ std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDepend
 }
 
 Document ChangeStreamDefaultEventTransformation::applyTransformation(const Document& input) const {
-    MutableDocument doc;
-
     // Extract the fields we need.
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
     Value ns = input[repl::OplogEntry::kNssFieldName];
@@ -266,6 +264,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // Optional value containing the namespace type for changestream create events. This will be
     // emitted as 'nsType' field.
     Value nsType;
+
+    MutableDocument doc;
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
@@ -509,11 +509,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             "Saw a CRUD op without a UUID",
             !uuid.missing() || kOpsWithoutUUID.contains(operationType));
 
-    // Extract the 'txnOpIndex' and 'applyOpsIndex' fields. These will be missing unless we are
-    // unwinding a transaction.
+    // Extract the 'txnOpIndex' field. This will be missing unless we are unwinding a transaction.
     auto txnOpIndex = input[DocumentSourceChangeStream::kTxnOpIndexField];
-    auto applyOpsIndex = input[DocumentSourceChangeStream::kApplyOpsIndexField];
-    auto applyOpsEntryTs = input[DocumentSourceChangeStream::kApplyOpsTsField];
 
     // Add some additional fields only relevant to transactions.
     if (!txnOpIndex.missing()) {
@@ -529,12 +526,14 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
     // Commit timestamp for CRUD events in prepared transactions.
-    doc.addField(DocumentSourceChangeStream::kCommitTimestampField,
-                 input[DocumentSourceChangeStream::kCommitTimestampField]);
+    auto commitTimestamp = input[DocumentSourceChangeStream::kCommitTimestampField];
+    if (!commitTimestamp.missing()) {
+        doc.addField(DocumentSourceChangeStream::kCommitTimestampField, commitTimestamp);
+    }
 
-    // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
-    // 'addField' will not add anything to the document.
-    doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
+    if (!uuid.missing()) {
+        doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
+    }
 
     const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
     checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
@@ -548,6 +547,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // pre-image is required to compute the post-image.
     if ((_preImageRequested && kPreImageOps.count(operationType)) ||
         (_postImageRequested && kPostImageOps.count(operationType))) {
+        // Extract the 'applyOpsIndex' and 'applyOpsTs' fields. These will be missing unless we are
+        // unwinding a transaction.
+        auto applyOpsIndex = input[DocumentSourceChangeStream::kApplyOpsIndexField];
+        auto applyOpsEntryTs = input[DocumentSourceChangeStream::kApplyOpsTsField];
+
         // Set 'kPreImageIdField' to the 'ChangeStreamPreImageId'. The DSCSAddPreImage stage
         // will use the id in order to fetch the pre-image from the pre-images collection.
         const auto preImageId = ChangeStreamPreImageId(
@@ -565,17 +569,24 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     // The event may have a documentKey OR an operationDescription, but not both. We already
     // validated this while creating the resume token.
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
-    doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
+    if (!operationDescription.missing()) {
+        doc.addField(DocumentSourceChangeStream::kOperationDescriptionField,
+                     std::move(operationDescription));
+    }
 
     // Note that the update description field might be the 'missing' value, in which case it will
     // not be serialized.
-    auto updateDescriptionFieldName = _changeStreamSpec.getShowRawUpdateDescription()
-        ? DocumentSourceChangeStream::kRawUpdateDescriptionField
-        : DocumentSourceChangeStream::kUpdateDescriptionField;
-    doc.addField(updateDescriptionFieldName, std::move(updateDescription));
+    if (!updateDescription.missing()) {
+        auto updateDescriptionFieldName = _changeStreamSpec.getShowRawUpdateDescription()
+            ? DocumentSourceChangeStream::kRawUpdateDescriptionField
+            : DocumentSourceChangeStream::kUpdateDescriptionField;
+        doc.addField(updateDescriptionFieldName, std::move(updateDescription));
+    }
 
     // For a 'modify' event we add the state before modification if appropriate.
-    doc.addField(DocumentSourceChangeStream::kStateBeforeChangeField, stateBeforeChange);
+    if (!stateBeforeChange.missing()) {
+        doc.addField(DocumentSourceChangeStream::kStateBeforeChangeField, stateBeforeChange);
+    }
 
     if (!nsType.missing()) {
         doc.addField(DocumentSourceChangeStream::kNsTypeField, nsType);

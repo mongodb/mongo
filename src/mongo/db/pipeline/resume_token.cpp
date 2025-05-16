@@ -44,15 +44,17 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/optional_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-constexpr StringData ResumeToken::kDataFieldName;
-constexpr StringData ResumeToken::kTypeBitsFieldName;
+namespace {
+// This is our default resume token for the representative query shape.
+const auto kDefaultTokenQueryStats = ResumeToken::makeHighWaterMarkToken(Timestamp(), 1);
+}  // namespace
 
 ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
                                  int versionIn,
@@ -67,7 +69,7 @@ ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
             documentKey.missing() || opDescription.missing());
 
     // For v1 classic change events, the eventIdentifier is always the documentKey, even if missing.
-    if (change_stream::kClassicOperationTypes.count(opType) && version <= 1) {
+    if (MONGO_unlikely(version <= 1 && change_stream::kClassicOperationTypes.count(opType))) {
         eventIdentifier = documentKey;
         return;
     }
@@ -310,9 +312,6 @@ ResumeTokenData ResumeToken::getData() const {
 }
 
 Document ResumeToken::toDocument(const SerializationOptions& options) const {
-    // This is our default resume token for the representative query shape.
-    static const auto kDefaultTokenQueryStats = makeHighWaterMarkToken(Timestamp(), 1);
-
     return Document{
         {kDataFieldName,
          options.serializeLiteral(_hexKeyString, Value(kDefaultTokenQueryStats._hexKeyString))},

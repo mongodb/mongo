@@ -304,7 +304,7 @@ public:
     enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
 
     /**
-     * Helpers for Determining which regex to match a change stream against.
+     * Helpers for determining which regex to match a change stream against.
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
     static std::string regexEscapeNsForChangeStream(StringData source);

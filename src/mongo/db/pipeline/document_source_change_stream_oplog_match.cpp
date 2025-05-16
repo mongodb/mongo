@@ -40,8 +40,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/basic_types.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
@@ -49,7 +47,6 @@
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 
 namespace mongo {
@@ -121,8 +118,8 @@ DocumentSourceChangeStreamOplogMatch::DocumentSourceChangeStreamOplogMatch(
     std::unique_ptr<MatchExpression> opLogMatchFilter,
     std::vector<BSONObj> backingBsonObjs)
     : DocumentSourceInternalChangeStreamMatch(std::move(opLogMatchFilter), expCtx),
+      _clusterTime(clusterTime),
       _backingBsonObjs(std::move(backingBsonObjs)) {
-    _clusterTime = clusterTime;
     expCtx->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 }
 
@@ -216,7 +213,8 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
         return std::prev(itr);
     }
 
-    tassert(5687204, "Attempt to rewrite an interalOplogMatch after deserialization", _clusterTime);
+    tassert(
+        5687204, "Attempt to rewrite an internalOplogMatch after deserialization", _clusterTime);
 
     // Recreate the change stream filter with additional predicates from the user's $match.
     std::vector<BSONObj> backingBsonObjs;

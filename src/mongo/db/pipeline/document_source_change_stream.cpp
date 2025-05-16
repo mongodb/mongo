@@ -35,10 +35,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 #include <string>
-#include <vector>
 
-
-#include "mongo/db/basic_types.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
@@ -62,7 +59,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -83,40 +79,6 @@ REGISTER_DOCUMENT_SOURCE(changeStream,
                          AllowedWithApiStrict::kConditionally);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamStage, DocumentSourceInternalChangeStreamStage::id)
-
-constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
-constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
-constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
-constexpr StringData DocumentSourceChangeStream::kIdField;
-constexpr StringData DocumentSourceChangeStream::kNamespaceField;
-constexpr StringData DocumentSourceChangeStream::kUuidField;
-constexpr StringData DocumentSourceChangeStream::kReshardingUuidField;
-constexpr StringData DocumentSourceChangeStream::kUpdateDescriptionField;
-constexpr StringData DocumentSourceChangeStream::kRawUpdateDescriptionField;
-constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
-constexpr StringData DocumentSourceChangeStream::kStageName;
-constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
-constexpr StringData DocumentSourceChangeStream::kTxnNumberField;
-constexpr StringData DocumentSourceChangeStream::kLsidField;
-constexpr StringData DocumentSourceChangeStream::kRenameTargetNssField;
-constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
-constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
-constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
-constexpr StringData DocumentSourceChangeStream::kInsertOpType;
-constexpr StringData DocumentSourceChangeStream::kDropCollectionOpType;
-constexpr StringData DocumentSourceChangeStream::kRenameCollectionOpType;
-constexpr StringData DocumentSourceChangeStream::kDropDatabaseOpType;
-constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
-constexpr StringData DocumentSourceChangeStream::kReshardBeginOpType;
-constexpr StringData DocumentSourceChangeStream::kReshardBlockingWritesOpType;
-constexpr StringData DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
-constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
-
-constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
-constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents;
-
-constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
-constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
 
 void DocumentSourceChangeStream::checkValueType(const Value v,
                                                 const StringData fieldName,
@@ -210,9 +172,8 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
 
 std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto type = getChangeStreamType(expCtx->getNamespaceString());
     const auto& nss = expCtx->getNamespaceString();
-    switch (type) {
+    switch (getChangeStreamType(nss)) {
         case ChangeStreamType::kSingleCollection:
             // Match the target collection exactly.
             return fmt::format("^{}$", regexEscapeNsForChangeStream(nss.coll()));
@@ -227,9 +188,8 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
 
 std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto type = getChangeStreamType(expCtx->getNamespaceString());
     const auto& nss = expCtx->getNamespaceString();
-    switch (type) {
+    switch (getChangeStreamType(nss)) {
         case ChangeStreamType::kSingleCollection:
         case ChangeStreamType::kSingleDatabase:
             // Match the target database command namespace exactly.
@@ -250,11 +210,11 @@ std::string DocumentSourceChangeStream::regexEscapeNsForChangeStream(StringData 
     result.reserve(source.size());
 
     constexpr StringData escapes = "*+|()^?[]./\\$";
-    for (const char& c : source) {
+    for (char c : source) {
         if (escapes.find(c) != std::string::npos) {
-            result.append("\\");
+            result.push_back('\\');
         }
-        result += c;
+        result.push_back(c);
     }
     return result;
 }
