@@ -2318,7 +2318,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/*catalog_cache* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*catalog*idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*catalog_client* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/*index*catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/README.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/README_balancer.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/README_startup_and_shutdown.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2374,7 +2373,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_commit* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_coordinator* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_create_database_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/config/**/configsvr_drop_index_catalog_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_ensure_chunk_version_is_greater_than_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_get_historical_placement_info.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_merge_all_chunks_on_shard_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot

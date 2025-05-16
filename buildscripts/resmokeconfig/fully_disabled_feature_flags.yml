@@ -26,7 +26,5 @@
 - featureFlagCreateViewlessTimeseriesCollections
 # TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
 - featureFlagSbeFull
-# TODO (SERVER-103771): Delete featureFlagGlobalIndexesShardingCatalog.
-- featureFlagGlobalIndexesShardingCatalog
 # TODO (SERVER-73632): Delete featureFlagRouterPort.
 - featureFlagRouterPort

@@ -70,7 +70,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
@@ -483,120 +482,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                 ShardIdentityType::fromShardIdentityDocument(updatedShardIdentityDoc));
             uassertStatusOK(shardIdentityDoc.validate());
         }
-    }
-}
-
-void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                                   const NamespaceString& nss,
-                                                                   const UUID&,
-                                                                   BSONObj indexDoc) {
-    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
-    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
-        return;
-    }
-    LOGV2_DEBUG(6712303,
-                1,
-                "Updating sharding in-memory state onModifyCollectionShardingIndexCatalog",
-                "indexDoc"_attr = indexDoc);
-    auto indexCatalogOplog = ShardingIndexCatalogOplogEntry::parse(
-        IDLParserContext("onModifyCollectionShardingIndexCatalogCtx"), indexDoc);
-    switch (indexCatalogOplog.getOp()) {
-        case ShardingIndexCatalogOpEnum::insert: {
-            auto indexEntry = ShardingIndexCatalogInsertEntry::parse(
-                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                [nss, indexEntry](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    auto scsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             nss);
-                    scsr->addIndex(
-                        opCtx,
-                        indexEntry.getI(),
-                        {indexEntry.getI().getCollectionUUID(), indexEntry.getI().getLastmod()});
-                });
-            break;
-        }
-        case ShardingIndexCatalogOpEnum::remove: {
-            auto removeEntry = ShardingIndexCatalogRemoveEntry::parse(
-                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                [nss, removeEntry](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    auto scsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             nss);
-                    scsr->removeIndex(opCtx,
-                                      removeEntry.getName().toString(),
-                                      {removeEntry.getUuid(), removeEntry.getLastmod()});
-                });
-            break;
-        }
-        case ShardingIndexCatalogOpEnum::replace: {
-            auto replaceEntry = ShardingIndexCatalogReplaceEntry::parse(
-                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                [nss, replaceEntry](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    auto scsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
-                                                                                             nss);
-                    scsr->replaceIndexes(opCtx,
-                                         replaceEntry.getI(),
-                                         {replaceEntry.getUuid(), replaceEntry.getLastmod()});
-                });
-            break;
-        }
-        case ShardingIndexCatalogOpEnum::clear:
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit([nss](OperationContext* opCtx,
-                                                                       boost::optional<Timestamp>) {
-                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                    opCtx, nss);
-                scsr->clearIndexes(opCtx);
-            });
-
-            break;
-        case ShardingIndexCatalogOpEnum::drop: {
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit([nss](OperationContext* opCtx,
-                                                                       boost::optional<Timestamp>) {
-                auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                    opCtx, nss);
-                scsr->clearIndexes(opCtx);
-            });
-
-            break;
-        }
-        case ShardingIndexCatalogOpEnum::rename: {
-            auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
-                IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit([renameEntry](
-                                                                     OperationContext* opCtx,
-                                                                     boost::optional<Timestamp>) {
-                std::vector<IndexCatalogType> fromIndexes;
-                boost::optional<UUID> uuid;
-                {
-                    auto fromCSR =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, renameEntry.getFromNss());
-                    auto indexCache = fromCSR->getIndexesInCritSec(opCtx);
-                    indexCache->forEachGlobalIndex([&](const auto& index) {
-                        fromIndexes.push_back(index);
-                        return true;
-                    });
-                    uuid.emplace(indexCache->getCollectionIndexes().uuid());
-
-                    fromCSR->clearIndexes(opCtx);
-                }
-                auto toCSR = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                    opCtx, renameEntry.getToNss());
-                uassert(7079505,
-                        fmt::format("The critical section for collection {} must be taken in "
-                                    "order to execute this command",
-                                    renameEntry.getToNss().toStringForErrorMsg()),
-                        toCSR->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-                toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, renameEntry.getLastmod()});
-            });
-            break;
-        }
-        default:
-            MONGO_UNREACHABLE;
     }
 }
 

@@ -56,7 +56,6 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_util.h"
-#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -125,8 +124,6 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             }
         }
     }
-
-    dropCollectionShardingIndexCatalog(opCtx, nss);
 
     // Remove all range deletion task documents present on disk for the collection to drop. This is
     // a best-effort tentative considering that migrations are not blocked, hence some new document

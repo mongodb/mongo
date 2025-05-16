@@ -420,16 +420,6 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     // Return an empty collection
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
-    // Return no global indexes
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-            return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
-                .toBSON(CursorResponse::ResponseType::InitialResponse);
-        });
-    }
-
     auto cri = *future.default_timed_get();
     ASSERT(!cri.isSharded());
     ASSERT(!cri.getChunkManager().isSharded());
@@ -453,16 +443,6 @@ TEST_F(TimeseriesUnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseP
 
     // Return an empty collection
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
-
-    // Return no global indexes
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-        onCommand([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-            return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
-                .toBSON(CursorResponse::ResponseType::InitialResponse);
-        });
-    }
 
     auto cri = *future.default_timed_get();
     ASSERT(!cri.isSharded());

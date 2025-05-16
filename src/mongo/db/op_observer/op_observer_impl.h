@@ -75,11 +75,6 @@ public:
         return {NamespaceFilter::kAll, NamespaceFilter::kAll};
     }
 
-    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& uuid,
-                                                BSONObj indexDoc) final;
-
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,

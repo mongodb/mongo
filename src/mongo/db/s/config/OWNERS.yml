@@ -24,9 +24,6 @@ filters:
   - "configsvr_create_database_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "configsvr_drop_index_catalog_command.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "configsvr_ensure_chunk_version_is_greater_than_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing

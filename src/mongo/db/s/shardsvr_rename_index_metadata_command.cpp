@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -36,43 +34,20 @@
 #include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/sharded_index_catalog_commands_gen.h"
-#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/s/index_version.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
-#include "mongo/s/sharding_state.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
-
-enum class RenameIndexCatalogOperationEnum : std::int32_t {
-    kRename,
-    kClearTo,
-    kNoop,
-};
 
 class ShardsvrRenameIndexMetadataCommand final
     : public TypedCommand<ShardsvrRenameIndexMetadataCommand> {
@@ -85,8 +60,7 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command. Do not call directly. Sets a globlal index version for the "
-               "shard-role catalog.";
+        return "Deprecated command.";
     }
 
     bool adminOnly() const override {
@@ -106,85 +80,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
-            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
-                                                          opCtx->getWriteConcern());
-
-            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            const auto txnParticipant = TransactionParticipant::get(opCtx);
-            uassert(7079501,
-                    fmt::format("{} must be run as a retryable write",
-                                Request::kCommandName.toString()),
-                    txnParticipant);
-
-            RenameIndexCatalogOperationEnum renameOp = RenameIndexCatalogOperationEnum::kNoop;
-            {
-                AutoGetCollection coll(opCtx, ns(), LockMode::MODE_IS);
-                auto scopedCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
-                uassert(
-                    7079502,
-                    fmt::format("The critical section for collection {} must be taken in "
-                                "order to execute this command",
-                                ns().toStringForErrorMsg()),
-                    scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-                if (scopedCsr->getIndexesInCritSec(opCtx)) {
-                    renameOp = RenameIndexCatalogOperationEnum::kRename;
-                }
-            }
-
-            boost::optional<UUID> toUuid;
-            {
-                AutoGetCollection coll(opCtx, request().getToNss(), LockMode::MODE_IS);
-                auto scopedToCsr =
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-                        opCtx, request().getToNss());
-                uassert(7079503,
-                        fmt::format("The critical section for collection {} must be taken in "
-                                    "order to execute this command",
-                                    ns().toStringForErrorMsg()),
-                        scopedToCsr->getCriticalSectionSignal(
-                            ShardingMigrationCriticalSection::kWrite));
-                const auto& indexMetadata = scopedToCsr->getIndexesInCritSec(opCtx);
-                if (indexMetadata &&
-                    indexMetadata->getCollectionIndexes().uuid() ==
-                        request().getIndexVersion().uuid()) {
-                    // Rename operation already executed.
-                    renameOp = RenameIndexCatalogOperationEnum::kNoop;
-                } else if (indexMetadata && renameOp == RenameIndexCatalogOperationEnum::kNoop) {
-                    toUuid.emplace(indexMetadata->getCollectionIndexes().uuid());
-                    renameOp = RenameIndexCatalogOperationEnum::kClearTo;
-                }
-            }
-
-            switch (renameOp) {
-                case RenameIndexCatalogOperationEnum::kRename:
-                    renameCollectionShardingIndexCatalog(
-                        opCtx,
-                        ns(),
-                        request().getToNss(),
-                        request().getIndexVersion().indexVersion());
-                    break;
-                case RenameIndexCatalogOperationEnum::kClearTo:
-                    clearCollectionShardingIndexCatalog(
-                        opCtx, request().getToNss(), toUuid.value());
-                    break;
-                case RenameIndexCatalogOperationEnum::kNoop: {
-                    // Since no write happened on this txnNumber, we need to make a dummy write
-                    // so that secondaries can be aware of this txn.
-                    DBDirectClient client(opCtx);
-                    client.update(NamespaceString::kServerConfigurationNamespace,
-                                  BSON("_id" << "RenameCollectionMetadataStats"),
-                                  BSON("$inc" << BSON("count" << 1)),
-                                  true /* upsert */,
-                                  false /* multi */);
-                    break;
-                }
-                default:
-                    MONGO_UNREACHABLE;
-            }
+            // This command is deprecated. This acts as a noop to support multiversion scenarios.
         }
 
     private:

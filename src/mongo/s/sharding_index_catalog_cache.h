@@ -42,7 +42,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/index_version.h"
 #include "mongo/util/read_through_cache.h"

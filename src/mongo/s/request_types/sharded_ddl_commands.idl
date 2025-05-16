@@ -907,3 +907,14 @@ commands:
         type: namespacestring
         api_version: ""
         reply_type: OkReply
+
+    # TODO (SERVER-105110): Remove this command.
+    _shardsvrRenameIndexMetadata:
+        command_name: _shardsvrRenameIndexMetadata
+        cpp_name: ShardsvrRenameIndexMetadata
+        description: "DEPRECATED command. Supported only for multiversion scenarios."
+        api_version: ""
+        namespace: type
+        type: namespacestring
+        strict: false
+        reply_type: OkReply

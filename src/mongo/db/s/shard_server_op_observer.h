@@ -66,11 +66,6 @@ public:
         return {NamespaceFilter::kConfigAndSystem, NamespaceFilter::kConfigAndSystem};
     }
 
-    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& /*uuid*/,
-                                                BSONObj indexDoc) override;
-
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,

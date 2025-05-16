@@ -201,9 +201,6 @@ filters:
   - "*catalog_client*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*index*catalog*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "README.md":
     approvers:
       - 10gen/server-catalog-and-routing

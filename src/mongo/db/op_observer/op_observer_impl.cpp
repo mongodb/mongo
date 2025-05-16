@@ -76,7 +76,6 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -88,7 +87,6 @@
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -1938,22 +1936,6 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
 
     logCommitOrAbortForPreparedTransaction(
         opCtx, &oplogEntry, DurableTxnStateEnum::kAborted, _operationLogger.get());
-}
-
-void OpObserverImpl::onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const UUID& uuid,
-                                                            BSONObj opDoc) {
-    repl::MutableOplogEntry oplogEntry;
-    auto obj = BSON(kShardingIndexCatalogOplogEntryName
-                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))
-                   .addFields(opDoc);
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry.setNss(nss);
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setObject(obj);
-
-    logOperation(opCtx, &oplogEntry, true, _operationLogger.get());
 }
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,

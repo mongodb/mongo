@@ -169,9 +169,6 @@ public:
 
     // Noop operations below with explanations (don't perform any check).
 
-    // onModifyCollectionShardingIndexCatalog() is unchecked because sharded collection indexes
-    // catalog are modified from internal commands.
-
     // Index builds committing (onCommitIndexBuild()) can be left unchecked since we kill any active
     // index builds before enabling write blocking. This means any index build which gets to the
     // commit phase while write blocking is active was started and hit the onStartIndexBuild hook

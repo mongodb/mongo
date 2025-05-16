@@ -130,15 +130,6 @@ public:
         }
     }
 
-    void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& uuid,
-                                                BSONObj indexDoc) override {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onModifyCollectionShardingIndexCatalog(opCtx, nss, uuid, indexDoc);
-    }
-
     void onCreateIndex(OperationContext* const opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,

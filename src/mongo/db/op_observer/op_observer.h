@@ -197,11 +197,6 @@ public:
     // improve performance. Avoid using 'kAll' as much as possible.
     virtual NamespaceFilters getNamespaceFilters() const = 0;
 
-    virtual void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const UUID& uuid,
-                                                        BSONObj indexDoc) = 0;
-
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& uuid,

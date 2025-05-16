@@ -95,7 +95,6 @@ enums:
             kCommitTransaction: "commitTransaction"
             kAbortTransaction: "abortTransaction"
             kImportCollection: "importCollection"
-            kModifyCollectionShardingIndexCatalog: "modifyCollectionShardingIndexCatalog"
             kCreateDatabaseMetadata: "createDatabaseMetadata"
             kDropDatabaseMetadata: "dropDatabaseMetadata"
             kBeginPromotionToShardedCluster: "beginPromotionToShardedCluster"

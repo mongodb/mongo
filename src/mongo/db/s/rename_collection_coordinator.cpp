@@ -68,7 +68,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
-#include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -282,46 +281,6 @@ void checkCatalogConsistencyAcrossShards(OperationContext* opCtx,
     if (!dropTarget) {
         checkTargetCollectionDoesNotExistInCluster(opCtx, toNss, participants, executor);
     }
-}
-
-void renameIndexMetadataInShards(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const RenameCollectionRequest& request,
-                                 const OperationSessionInfo& osi,
-                                 const std::shared_ptr<executor::TaskExecutor>& executor,
-                                 RenameCollectionCoordinatorDocument* doc,
-                                 const CancellationToken& token) {
-    const auto [configTime, newIndexVersion] = [opCtx]() -> std::pair<LogicalTime, Timestamp> {
-        VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
-        return {vt.configTime(), vt.clusterTime().asTimestamp()};
-    }();
-
-    // Bump the index version only if there are indexes in the source collection.
-    auto optTrackedCollInfo = doc->getOptTrackedCollInfo();
-    if (optTrackedCollInfo && optTrackedCollInfo->getIndexVersion()) {
-        // Bump sharding catalog's index version on the config server if the source collection is
-        // sharded. It will be updated later on.
-        optTrackedCollInfo->setIndexVersion(
-            {doc->getNewTargetCollectionUuid().get_value_or(optTrackedCollInfo->getUuid()),
-             newIndexVersion});
-        doc->setOptTrackedCollInfo(optTrackedCollInfo);
-    }
-
-    // Update global index metadata in shards.
-    auto& toNss = request.getTo();
-
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    ShardsvrRenameIndexMetadata renameIndexCatalogReq(
-        nss,
-        toNss,
-        {doc->getNewTargetCollectionUuid().get_value_or(doc->getSourceUUID().value()),
-         newIndexVersion});
-    renameIndexCatalogReq.setDbName(toNss.dbName());
-    generic_argument_util::setMajorityWriteConcern(renameIndexCatalogReq);
-    generic_argument_util::setOperationSessionInfo(renameIndexCatalogReq, osi);
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrRenameIndexMetadata>>(
-        executor, token, renameIndexCatalogReq);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 }
 
 std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx,
@@ -1093,12 +1052,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getNewSession(opCtx), **executor);
-                }
-
-                {
-                    const auto session = getNewSession(opCtx);
-                    renameIndexMetadataInShards(
-                        opCtx, nss(), _request, session, **executor, &_doc, token);
                 }
 
                 // Update the collection metadata after the rename.

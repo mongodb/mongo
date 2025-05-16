@@ -3778,47 +3778,6 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrCommitIndex",
-          command: {
-            _configsvrCommitIndex: "x.y",
-            keyPattern: {x: 1},
-            name: 'x_1',
-            options: {},
-            collectionUUID: UUID(),
-            collectionIndexUUID: UUID(),
-            lastmod: Timestamp(1, 0),
-          },
-          skipSharded: true,
-          expectFail: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-                expectFail: true
-              },
-          ]
-        },
-        {
-          testname: "_configsvrDropIndexCatalogEntry",
-          command: {
-            _configsvrDropIndexCatalogEntry: "x.y",
-            name: 'x_1',
-            collectionUUID: UUID(),
-            lastmod: Timestamp(1, 0),
-          },
-          skipSharded: true,
-          expectFail: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-                expectFail: true
-              },
-          ]
-        },
-        {
           testname: "create",
           command: {create: "x"},
           teardown: function(db) {

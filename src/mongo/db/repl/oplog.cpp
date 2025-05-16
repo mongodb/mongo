@@ -1100,12 +1100,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           -> Status {
          return applyAbortTransaction(opCtx, op, mode);
      }}},
-    {"modifyCollectionShardingIndexCatalog",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-         // TODO (SERVER-103771): Remove `modifyCollectionShardingIndexCatalog` oplog c entry.
-         return Status::OK();
-     }}},
     {"createDatabaseMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

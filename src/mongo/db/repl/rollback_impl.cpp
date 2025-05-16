@@ -485,7 +485,6 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
                 break;
             }
             case OplogEntry::CommandType::kDbCheck:
-            case OplogEntry::CommandType::kModifyCollectionShardingIndexCatalog:
             case OplogEntry::CommandType::kCreate:
             case OplogEntry::CommandType::kDrop:
             case OplogEntry::CommandType::kImportCollection:
