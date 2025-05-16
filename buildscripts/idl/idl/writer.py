@@ -352,7 +352,7 @@ def _gen_trie(prefix, words, writer, callback):
 
         predicate = (
             f"fieldName.size() == {len(word_to_check)} && "
-            + f'std::char_traits<char>::compare(fieldName.rawData() + {prefix_len}, "{suffix}", {suffix_len}) == 0'
+            + f'std::char_traits<char>::compare(fieldName.data() + {prefix_len}, "{suffix}", {suffix_len}) == 0'
         )
 
         # If there is no trailing text, we just need to check length to validate we matched
@@ -367,7 +367,7 @@ def _gen_trie(prefix, words, writer, callback):
         elif suffix_len % 4 == 3:
             predicate = (
                 f"fieldName.size() == {len(word_to_check)} && "
-                + f' memcmp(fieldName.rawData() + {prefix_len}, "{suffix}\\0", {suffix_len + 1}) == 0'
+                + f' memcmp(fieldName.data() + {prefix_len}, "{suffix}\\0", {suffix_len + 1}) == 0'
             )
 
         with IndentedScopedBlock(writer, f"if ({predicate}) {{", "}"):
@@ -399,7 +399,7 @@ def _gen_trie(prefix, words, writer, callback):
         with IndentedScopedBlock(
             writer,
             f"if (fieldName.size() >= {gcp_len} && "
-            + f'std::char_traits<char>::compare(fieldName.rawData() + {prefix_len}, "{gcp}", {gcp_len}) == 0) {{',
+            + f'std::char_traits<char>::compare(fieldName.data() + {prefix_len}, "{gcp}", {gcp_len}) == 0) {{',
             "}",
         ):
             _gen_trie(prefix + gcp, suffix_words, writer, callback)
