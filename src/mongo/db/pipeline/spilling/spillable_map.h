@@ -87,6 +87,10 @@ public:
      */
     void spillToDisk();
 
+    bool hasInMemoryData() const {
+        return !_memMap.empty();
+    }
+
     const SpillingStats& getSpillingStats() const {
         return _stats;
     }
@@ -124,7 +128,7 @@ public:
          * If reading from disk, resets disk cursor to the first document from the in-memory buffer
          * and removes all other buffered documents.
          */
-        void spill();
+        void releaseMemory();
 
     private:
         using MapPointer =

@@ -221,8 +221,6 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    void spill(int64_t maximumMemoryUsage);
-
     bool usedDisk() override {
         return _visitedDocuments.usedDisk() || _visitedFromValues.usedDisk() || _queue.usedDisk();
     }
@@ -233,6 +231,10 @@ public:
 
     const NamespaceString& getFromNs() const {
         return _from;
+    }
+
+    void doForceSpill() final {
+        spill(0);
     }
 
 protected:
@@ -266,6 +268,10 @@ private:
         // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE_TASSERT(7484306);
     }
+
+    void spill(int64_t maximumMemoryUsage);
+
+    void spillDuringVisitedUnwinding();
 
     /**
      * Prepares the query to execute on the 'from' collection wrapped in a $match by using the
@@ -386,7 +392,7 @@ private:
 
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
-    SpillableDocumentMap::Iterator _unwindIterator = _visitedDocuments.end();
+    boost::optional<SpillableDocumentMap::Iterator> _unwindIterator;
 
     // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
     // field, tracking how many results we've returned so far for the current input document.

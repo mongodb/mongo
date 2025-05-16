@@ -76,6 +76,10 @@ void SpillableDocumentMapImpl::dispose() {
 }
 
 void SpillableDocumentMapImpl::spillToDisk() {
+    if (!hasInMemoryData()) {
+        return;
+    }
+
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
         storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
@@ -154,8 +158,8 @@ bool SpillableDocumentMapImpl::IteratorImpl<IsConst>::operator==(const IteratorI
     }
     if (!this->diskExhausted()) {
         return ValueComparator::kInstance.compare(
-            this->_diskDocuments.front().value().getField("_id"),
-            rhs._diskDocuments.front().value().getField("_id"));
+                   this->_diskDocuments.front().value().getField("_id"),
+                   rhs._diskDocuments.front().value().getField("_id")) == 0;
     }
     return true;
 }
@@ -181,7 +185,7 @@ auto SpillableDocumentMapImpl::IteratorImpl<IsConst>::operator++() -> IteratorIm
 }
 
 template <bool IsConst>
-void SpillableDocumentMapImpl::IteratorImpl<IsConst>::spill() {
+void SpillableDocumentMapImpl::IteratorImpl<IsConst>::releaseMemory() {
     if (!memoryExhausted()) {
         return;
     }

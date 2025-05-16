@@ -179,7 +179,7 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
     // If the unwind is not preserving empty arrays, we might have to process multiple inputs before
     // we get one that will produce an output.
     while (true) {
-        if (_unwindIterator == _visitedDocuments.end()) {
+        if (!_unwindIterator.has_value() || *_unwindIterator == _visitedDocuments.end()) {
             _visitedDocuments.clear();
             // No results are left for the current input, so we should move on to the next one and
             // perform a new search.
@@ -213,12 +213,13 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
                 continue;
             }
         } else {
-            unwound.setNestedField(_as, Value{std::move(*_unwindIterator)});
+            auto& it = *_unwindIterator;
+            unwound.setNestedField(_as, Value{std::move(*it)});
             if (indexPath) {
                 unwound.setNestedField(*indexPath, Value(_outputIndex));
                 ++_outputIndex;
             }
-            _visitedDocuments.eraseIfInMemoryAndAdvance(_unwindIterator);
+            _visitedDocuments.eraseIfInMemoryAndAdvance(it);
         }
 
         return unwound.freeze();
@@ -318,8 +319,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             checkMemoryUsage();
             pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
         }
-        updateSpillingStats();
     }
+    updateSpillingStats();
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceGraphLookUp::makePipeline(
@@ -642,6 +643,11 @@ void DocumentSourceGraphLookUp::spill(int64_t maximumMemoryUsage) {
         return _memoryUsageTracker.currentMemoryBytes() > maximumMemoryUsage;
     };
 
+    if (needToSpill() && _unwindIterator.has_value() &&
+        *_unwindIterator != _visitedDocuments.end()) {
+        return spillDuringVisitedUnwinding();
+    }
+
     if (needToSpill()) {
         _visitedDocuments.spillToDisk();
     }
@@ -655,6 +661,16 @@ void DocumentSourceGraphLookUp::spill(int64_t maximumMemoryUsage) {
     _cache.evictDownTo(
         needToSpill() ? 0 : maximumMemoryUsage - _memoryUsageTracker.currentMemoryBytes());
     updateSpillingStats();
+}
+
+void DocumentSourceGraphLookUp::spillDuringVisitedUnwinding() {
+    if (_visitedDocuments.hasInMemoryData() && _visitedDocuments.begin() == _unwindIterator) {
+        _visitedDocuments.spillToDisk();
+        _unwindIterator = _visitedDocuments.begin();
+        updateSpillingStats();
+    } else {
+        _unwindIterator->releaseMemory();
+    }
 }
 
 void DocumentSourceGraphLookUp::updateSpillingStats() {

@@ -49,10 +49,10 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -60,13 +60,22 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceGraphLookUpTest = AggregationContextFixture;
+
+/**
+ * This fixture also provides storage engine for spilling.
+ */
+class DocumentSourceGraphLookUpSpillingTest : public DocumentSourceGraphLookUpTest {
+public:
+    DocumentSourceGraphLookUpSpillingTest()
+        : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+              MongoDScopedGlobalServiceContextForTest::Options{}, shouldSetupTL)) {}
+};
 
 //
 // Evaluation.
@@ -409,6 +418,196 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     ASSERT_TRUE(graphLookupStage->getNext().isPaused());
 
     ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillVisitedDocuments) {
+    static constexpr long long kMemoryLimit = 100 * 1024;
+    RAIIServerParameterControllerForTest memoryLimitController(
+        "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
+
+    auto expCtx = getExpCtx();
+    auto inputMock = DocumentSourceMock::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    static constexpr long long kPaddingSize = 1024;
+    std::string padding(kPaddingSize, 'a');
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    for (long long i = 0; i < kMemoryLimit / kPaddingSize; ++i) {
+        fromContents.push_back(
+            Document{{{"_id", Value{i}}, {"to", 0}, {"from", 1}, {"padding", padding}}});
+    }
+
+    std::vector<Value> expectedResults;
+    expectedResults.reserve(fromContents.size());
+    for (const auto& doc : fromContents) {
+        expectedResults.emplace_back(doc.getDocument());
+    }
+    std::sort(
+        expectedResults.begin(), expectedResults.end(), expCtx->getValueComparator().getLessThan());
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(fromContents));
+    expCtx->setAllowDiskUse(true);
+
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    auto next = graphLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    std::vector<Value> results = next.getDocument().getField("results").getArray();
+    std::sort(results.begin(), results.end(), expCtx->getValueComparator().getLessThan());
+
+    ASSERT_VALUE_EQ(Value{expectedResults}, Value{results});
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+
+    ASSERT_TRUE(graphLookupStage->usedDisk());
+    auto stats =
+        dynamic_cast<const DocumentSourceGraphLookupStats*>(graphLookupStage->getSpecificStats())
+            ->spillingStats;
+    ASSERT_GTE(stats.getSpills(), 1);
+    ASSERT_GTE(stats.getSpilledRecords(), 70);
+}
+
+TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillSeveralStructures) {
+    static constexpr long long kMemoryLimit = 200 * 1024;
+    RAIIServerParameterControllerForTest memoryLimitController(
+        "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
+
+    auto expCtx = getExpCtx();
+    auto inputMock = DocumentSourceMock::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    static constexpr long long kPaddingSize = 1024;
+    std::string padding(kPaddingSize, 'a');
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    // All documents will fit into memory limit by themselves, but in total with from values set and
+    // queue memory should overflow.
+    for (long long i = 0; i < 100; ++i) {
+        std::string currentPadding = padding + std::to_string(i);
+        fromContents.push_back(Document{{{"_id", Value{i}}, {"to", 0}, {"from", currentPadding}}});
+    }
+
+    std::vector<Value> expectedResults;
+    expectedResults.reserve(fromContents.size());
+    for (const auto& doc : fromContents) {
+        expectedResults.emplace_back(doc.getDocument());
+    }
+    std::sort(
+        expectedResults.begin(), expectedResults.end(), expCtx->getValueComparator().getLessThan());
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(fromContents));
+    expCtx->setAllowDiskUse(true);
+
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    auto next = graphLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    std::vector<Value> results = next.getDocument().getField("results").getArray();
+    std::sort(results.begin(), results.end(), expCtx->getValueComparator().getLessThan());
+
+    ASSERT_VALUE_EQ(Value{expectedResults}, Value{results});
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+
+    ASSERT_TRUE(graphLookupStage->usedDisk());
+    auto stats =
+        dynamic_cast<const DocumentSourceGraphLookupStats*>(graphLookupStage->getSpecificStats())
+            ->spillingStats;
+    ASSERT_GTE(stats.getSpills(), 2);
+    ASSERT_GTE(stats.getSpilledRecords(), 70);
+}
+
+TEST_F(DocumentSourceGraphLookUpSpillingTest, CanForceSpill) {
+    auto expCtx = getExpCtx();
+    auto inputMock = DocumentSourceMock::createForTest({Document{{"startPoint", 0}}}, expCtx);
+
+    static constexpr size_t kResultCount = 100;
+    std::deque<DocumentSource::GetNextResult> fromContents;
+    for (size_t i = 0; i < kResultCount; ++i) {
+        fromContents.push_back(
+            Document{{{"_id", Value{static_cast<long long>(i)}}, {"to", 0}, {"from", 1}}});
+    }
+
+    std::vector<Value> expectedResults;
+    expectedResults.reserve(fromContents.size());
+    for (const auto& doc : fromContents) {
+        expectedResults.emplace_back(doc.getDocument());
+    }
+    std::sort(
+        expectedResults.begin(), expectedResults.end(), expCtx->getValueComparator().getLessThan());
+
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<MockMongoInterface>(fromContents));
+    expCtx->setAllowDiskUse(true);
+
+    auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        unwindStage);
+
+    graphLookupStage->setSource(inputMock.get());
+
+    std::vector<Value> results;
+    results.reserve(kResultCount);
+
+    for (size_t i = 0; i < kResultCount / 10; ++i) {
+        for (size_t j = 0; j < 10; ++j) {
+            results.emplace_back(graphLookupStage->getNext().getDocument().getField("results"));
+        }
+        graphLookupStage->doForceSpill();
+    }
+
+    std::sort(results.begin(), results.end(), expCtx->getValueComparator().getLessThan());
+    ASSERT_EQ(results.size(), expectedResults.size());
+    for (size_t i = 0; i < results.size(); ++i) {
+        ASSERT_VALUE_EQ(results[i], expectedResults[i]);
+    }
+
+    ASSERT_TRUE(graphLookupStage->getNext().isEOF());
+    ASSERT_TRUE(graphLookupStage->usedDisk());
+    auto stats =
+        dynamic_cast<const DocumentSourceGraphLookupStats*>(graphLookupStage->getSpecificStats())
+            ->spillingStats;
+
+    // There is only one actual spill the first time we call doForceSpill(). Following calls just
+    // remove buffered documents, but don't write anything to disk.
+    ASSERT_EQ(stats.getSpills(), 1);
+    ASSERT_EQ(stats.getSpilledRecords(), 90);
 }
 
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) {

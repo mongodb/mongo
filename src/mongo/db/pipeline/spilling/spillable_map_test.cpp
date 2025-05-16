@@ -243,7 +243,7 @@ TEST_F(SpillableDocumentHashMapTest, CanSpillIterator) {
     ASSERT_GT(sizeWithFullBuffer, initialSize);
 
     // Spilling should free up memory
-    it.spill();
+    it.releaseMemory();
     ASSERT_LT(map.getApproximateSize(), sizeWithFullBuffer);
 
     // Spilling should not invalidate the iterator
@@ -251,7 +251,7 @@ TEST_F(SpillableDocumentHashMapTest, CanSpillIterator) {
         iteratedIds.insert(it->getField("_id").coerceToLong());
         ++it;
         if (i % 3 == 0) {
-            it.spill();
+            it.releaseMemory();
         }
     }
 
