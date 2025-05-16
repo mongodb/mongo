@@ -394,8 +394,7 @@ public:
     }
 
     int next(WT_CONFIG_ITEM* key, WT_CONFIG_ITEM* value) {
-        _nextCalled = true;
-        return _next(key, value);
+        return _parser->next(_parser, key, value);
     }
 
     int get(const char* key, WT_CONFIG_ITEM* value) const {
@@ -416,31 +415,8 @@ public:
      */
     boost::optional<bool> isTableLoggingEnabled() const;
 
-    /**
-     * Iterates through keys in config parser for metadata creation string and
-     * returns true if this configuration string has no logging settings that
-     * conflict with each other.
-     *
-     * Since this function has to iterate though all the keys in the configuration scanner,
-     * it is illegal to call this function after we have started iteration through the
-     * keys(), either through next() or a previous call to isTableLoggingSettingValid().
-     */
-    bool isTableLoggingSettingValid();
-
 private:
-    /**
-     * Internal implementation to advance iteration to the next key.
-     * We have both next() and _next() so that we can tell when a caller has
-     * started scanning the configuration through next(). This is important for
-     * isTableLoggingSettingValid() because it has to iterate through all the
-     * top-level keys for correct operation.
-     */
-    int _next(WT_CONFIG_ITEM* key, WT_CONFIG_ITEM* value) {
-        return _parser->next(_parser, key, value);
-    }
-
     WT_CONFIG_PARSER* _parser;
-    bool _nextCalled = false;
 };
 
 // static
