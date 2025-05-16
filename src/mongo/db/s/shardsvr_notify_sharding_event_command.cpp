@@ -70,6 +70,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     bool adminOnly() const override {
         return true;
     }
@@ -99,6 +103,13 @@ public:
                 const auto event = CollectionResharded::parse(
                     IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
                 notifyChangeStreamsOnReshardCollectionComplete(opCtx, event);
+                return;
+            }
+
+            if (request().getEventType() == notify_sharding_event::kNamespacePlacementChanged) {
+                const auto event = NamespacePlacementChanged::parse(
+                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                notifyChangeStreamsOnNamespacePlacementChanged(opCtx, event);
                 return;
             }
 

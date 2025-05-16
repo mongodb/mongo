@@ -119,7 +119,8 @@ private:
                                const CancellationToken& token);
 
     void _commitDropCollection(OperationContext* opCtx,
-                               std::shared_ptr<executor::ScopedTaskExecutor> executor);
+                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                               const CancellationToken& token);
 
     void _exitCriticalSection(OperationContext* opCtx,
                               std::shared_ptr<executor::ScopedTaskExecutor> executor,

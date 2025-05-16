@@ -751,6 +751,7 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
+        "//src/mongo/db/repl:change_stream_oplog_notification",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:replica_set_aware_service",

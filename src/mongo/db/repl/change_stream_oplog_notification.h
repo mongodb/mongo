@@ -79,6 +79,13 @@ void notifyChangeStreamsOnChunkMigrated(OperationContext* opCtx,
                                         bool firstCollectionChunkOnRecipient);
 
 /**
+ * Writes a no-op oplog entry concerning the commit of a generic placement-changing operation
+ * concerning the namespace and the cluster time reported in the notification.
+ */
+void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
+                                                    const NamespacePlacementChanged& notification);
+
+/**
  * Writes a no-op oplog entry on the end of multi shard transaction.
  **/
 void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,

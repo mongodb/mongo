@@ -43,41 +43,28 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/executor/async_rpc.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -214,9 +201,10 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
             _buildPhaseHandler(Phase::kEnterCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()](
                                    auto* opCtx) { _enterCriticalSection(opCtx, executor, token); }))
-        .then(_buildPhaseHandler(Phase::kDropCollection,
-                                 [this, executor = executor, anchor = shared_from_this()](
-                                     auto* opCtx) { _commitDropCollection(opCtx, executor); }))
+        .then(
+            _buildPhaseHandler(Phase::kDropCollection,
+                               [this, token, executor = executor, anchor = shared_from_this()](
+                                   auto* opCtx) { _commitDropCollection(opCtx, executor, token); }))
         .then(
             _buildPhaseHandler(Phase::kReleaseCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()](
@@ -299,7 +287,9 @@ void DropCollectionCoordinator::_enterCriticalSection(
 }
 
 void DropCollectionCoordinator::_commitDropCollection(
-    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     const auto collIsSharded = bool(_doc.getCollInfo());
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
@@ -385,6 +375,11 @@ void DropCollectionCoordinator::_commitDropCollection(
     // 3. Insert the effects of the commit into config.placementHistory, if not already present.
     //    The operation is performed through a transaction to ensure serialization with concurrent
     //    resetPlacementHistory() requests.
+    const auto commitTime = [&]() {
+        const auto currentTime = VectorClock::get(opCtx)->getTime();
+        return currentTime.clusterTime().asTimestamp();
+    }();
+
     if (collIsSharded) {
         const auto insertHistoricalPlacementTxn = [&](const txn_api::TransactionClient& txnClient,
                                                       ExecutorPtr txnExec) {
@@ -410,9 +405,7 @@ void DropCollectionCoordinator::_commitDropCollection(
                         }
                     }
 
-                    const auto currentTime = VectorClock::get(opCtx)->getTime();
-                    const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
-                    NamespacePlacementType placementInfo(nss(), currentTimestamp, {});
+                    NamespacePlacementType placementInfo(nss(), commitTime, {});
                     placementInfo.setUuid(collUuid);
 
                     write_ops::InsertCommandRequest insertPlacementEntry(
@@ -438,11 +431,13 @@ void DropCollectionCoordinator::_commitDropCollection(
     }
 
     // 4. Generate the namespacePlacementChanged op entry to support the post-commit activity of
-    // change
-    //    stream readers.
+    // change stream readers.
     {
-        // TODO SERVER-103869 send notifyShardingEvent to changeStreamsNotifierShardId to trigger
-        // the generation of the op log entry.
+        NamespacePlacementChanged notification(nss(), commitTime);
+        const auto session = getNewSession(opCtx);
+
+        sharding_ddl_util::generatePlacementChangeNotificationOnShard(
+            opCtx, notification, changeStreamsNotifierShardId, session, executor, token);
     }
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());

@@ -76,6 +76,19 @@ structs:
                     the commit of this reshardCollection."
                 optional: true
 
+    NamespacePlacementChanged:
+        description:
+            "Marker event matching the commit of a generic DDL operation that caused
+            a modification of the set of shards serving data for a specific collection or database."
+        strict: false
+        fields:
+            nss:
+                description: "The database or collection name whose placement across shards got changed."
+                type: namespacestring
+            committedAt:
+                description: "The cluster time at which the placement-changing DDL got recorded into the global catalog."
+                type: timestamp
+
 commands:
     _shardsvrNotifyShardingEvent:
         command_name: _shardsvrNotifyShardingEvent

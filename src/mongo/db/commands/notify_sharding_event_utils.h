@@ -35,13 +35,16 @@
 namespace mongo {
 namespace notify_sharding_event {
 
+// List of supported ShardingEvent notification types
 // TODO SERVER-100729 Remove any reference to the deprecated kDatabasesAdded event type
 // once 9.0 becomes LTS.
 static constexpr char kDatabasesAdded[] = "databasesAdded";
 static constexpr char kCollectionResharded[] = "collectionResharded";
+static constexpr char kNamespacePlacementChanged[] = "namespacePlacementChanged";
 
 inline Status validateEventType(const std::string& eventType) {
-    if (eventType == kDatabasesAdded || eventType == kCollectionResharded) {
+    if (eventType == kCollectionResharded || eventType == kNamespacePlacementChanged ||
+        eventType == kDatabasesAdded) {
         return Status::OK();
     }
 

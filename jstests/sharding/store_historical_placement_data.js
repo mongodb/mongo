@@ -13,6 +13,61 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let configDB = null;
 
+let st = new ShardingTest({
+    shards: 3,
+    chunkSize: 1,
+    configOptions:
+        {setParameter:
+             {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000, /* 1 day */}}
+});
+
+configDB = st.s.getDB('config');
+const shard0 = st.shard0.shardName;
+const shard1 = st.shard1.shardName;
+const shard2 = st.shard2.shardName;
+
+const shards = [shard0, shard1, shard2];
+
+const replicaSetByShardId = {
+    [shard0]: st.rs0,
+    [shard1]: st.rs1,
+    [shard2]: st.rs2,
+};
+
+// TODO SERVER-77915 Remove unshardedCollectionAreTrackedUponCreation once 8.0 becomes last LTS.
+// Update the test as this variable is now always "true"
+const unshardedCollectionsAreTrackedUponCreation = FeatureFlagUtil.isPresentAndEnabled(
+    st.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
+
+// Creates a sharded collection with a single chunk located on a random shard.
+function setupShardedCollection(dbName, collName) {
+    const nss = dbName + '.' + collName;
+    const randomShard = () => {
+        const randomIdx = Math.floor(Math.random() * shards.length);
+        return shards[randomIdx];
+    };
+
+    const primaryShard = randomShard();
+    const dataBearingShard = randomShard();
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
+
+    // Ensure that each shard of the cluster owned the chunk at some point in time (so that it also
+    // inserted metadata for the parent collection in its local catalog). This ensures that once the
+    // collection is dropped or renamed, each shard will emit the expected commit op entries.
+    for (let shard of shards) {
+        if (shard !== primaryShard && shard !== dataBearingShard) {
+            assert.commandWorked(
+                st.s.adminCommand({moveChunk: nss, find: {_id: MinKey}, to: shard}));
+        }
+    }
+
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: nss, find: {_id: MinKey}, to: dataBearingShard}));
+    return {primaryShard, dataBearingShard};
+}
+
 function getInfoFromConfigDatabases(dbName) {
     const configDBsQueryResults = configDB.databases.find({_id: dbName}).toArray();
     if (configDBsQueryResults.length === 0) {
@@ -89,30 +144,6 @@ function getValidatedPlacementInfoForCollection(
     return collPlacementInfo;
 }
 
-let st = new ShardingTest({
-    shards: 3,
-    chunkSize: 1,
-    configOptions:
-        {setParameter:
-             {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000, /* 1 day */}}
-});
-
-configDB = st.s.getDB('config');
-const shard0 = st.shard0.shardName;
-const shard1 = st.shard1.shardName;
-const shard2 = st.shard2.shardName;
-
-const replicaSetByShardId = {
-    [shard0]: st.rs0,
-    [shard1]: st.rs1,
-    [shard2]: st.rs2,
-};
-
-// TODO SERVER-77915 Remove unshardedCollectionAreTrackedUponCreation once 8.0 becomes last LTS.
-// Update the test as this variable is now always "true"
-const unshardedCollectionsAreTrackedUponCreation = FeatureFlagUtil.isPresentAndEnabled(
-    st.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-
 function makeMoveChunkEntryTemplate(nss, donor, recipient, noMoreChunksOnDonor) {
     return {
         op: 'n',
@@ -148,11 +179,21 @@ function makeOpEntryOnEmptiedDonor(nss, donor) {
     };
 }
 
+function makePlacementChangedEntryTemplate(commitTime, dbName, collName = null) {
+    const nss = collName ? dbName + '.' + collName : dbName;
+    const o2Value = {namespacePlacementChanged: 1, ns: {db: dbName}, committedAt: commitTime};
+    if (collName) {
+        o2Value.ns.coll = collName;
+    }
+
+    return {op: 'n', ns: nss, o: {msg: {namespacePlacementChanged: nss}}, o2: o2Value};
+};
+
 // Verifies that the expected un/ordered sequence of op entries is generated on each shard
 // at the top of its op log.
 // Each comparison is performed over a subset of op entry fields to remove dependencies on
 // timestamps and active FCV version.
-// The function also retrieves the raw entries retrieved on each shard (in increasing 'ts' order).
+// The function also returns the raw entries retrieved on each shard (in increasing 'ts' order).
 function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderStrict = true) {
     const namespaces = [...new Set(expectedOpEntryTemplates.map(t => t.ns))];
     const foundOpEntriesByShard = {};
@@ -343,14 +384,15 @@ function testDropCollection() {
         };
     }
 
-    // 1. Verify that the drop of a sharded collection generates the expected metadata
-    testShardCollection(dbName, collName);
+    // 1) Verify that the drop of a sharded collection generates the expected metadata
+    let {primaryShard, dataBearingShard} = setupShardedCollection(dbName, collName);
+
     const initialPlacementInfo = getLatestPlacementInfoFor(nss);
     const numHistoryEntriesBeforeFirstDrop = configDB.placementHistory.count({nss: nss});
 
     assert.commandWorked(db.runCommand({drop: collName}));
 
-    // A single config.placementHistory document should be inserted.
+    // 1.a) A single config.placementHistory document has been inserted.
     const numHistoryEntriesAfterFirstDrop = configDB.placementHistory.count({nss: nss});
     assert.eq(numHistoryEntriesBeforeFirstDrop + 1, numHistoryEntriesAfterFirstDrop);
     const collPlacementAfterDrop = getLatestPlacementInfoFor(nss);
@@ -358,29 +400,36 @@ function testDropCollection() {
     assert.eq(initialPlacementInfo.uuid, collPlacementAfterDrop.uuid);
     assert(timestampCmp(initialPlacementInfo.timestamp, collPlacementAfterDrop.timestamp) < 0);
 
-    // Each shard should emit a single commit op entry...
-    // TODO SERVER-103869 adapt test cases to include objectPlacementChanged
-    const generatedOpEntriesByShard = verifyCommitOpEntriesOnShards(
-        [makeDropCollectionEntryTemplate(dbName, collName)], [shard0, shard1, shard2]);
+    // 1.b) The only data-bearing shard has generated a commit op entry, followed by a
+    // namespacePlacementChanged notification.
+    {
+        const expectedEntryTemplates = [
+            makeDropCollectionEntryTemplate(dbName, collName),
+            makePlacementChangedEntryTemplate(collPlacementAfterDrop.timestamp, dbName, collName)
+        ];
 
-    // ... and each op entry should have been created before the related placementHistory
-    // document
-    for (const shardId in generatedOpEntriesByShard) {
-        const opEntryClusterTime = generatedOpEntriesByShard[shardId][0].ts;
-        assert(timestampCmp(opEntryClusterTime, collPlacementAfterDrop.timestamp) < 0);
+        const [commitEntry, placementChangedEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplates, [dataBearingShard])[dataBearingShard];
+        // The commit entry must be visible to the end user.
+        assert(!commitEntry.fromMigrate || commitEntry.fromMigrate === false);
+        // The config.placementHistory doc references a cluster time within the range defined by the
+        // creation of the two entries.
+        assert(timestampCmp(commitEntry.ts, collPlacementAfterDrop.timestamp) < 0);
+        assert(timestampCmp(collPlacementAfterDrop.timestamp, placementChangedEntry.ts) <= 0);
     }
 
-    // ... but only a single data-bearing shard should have emitted the 'user-visible'
-    // version of the op entry.
-    let numVisibleOpEntries = 0;
-    for (const shardId in generatedOpEntriesByShard) {
-        const isVisible = generatedOpEntriesByShard[shardId][0].fromMigrate !== true;
-        const fromDataBearingShard = initialPlacementInfo.shards.includes(shardId);
-        if (isVisible && fromDataBearingShard) {
-            ++numVisibleOpEntries;
+    // 1.c) Non-data bearing shards have only generated a commit op entry, which is not visible to
+    // the end user.
+    {
+        const nonDataBearingShards = shards.filter((shard) => shard !== dataBearingShard);
+        const expectedEntryTemplates = [makeDropCollectionEntryTemplate(dbName, collName)];
+        const retrievedEntriesByShard =
+            verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
+        for (const shardId in retrievedEntriesByShard) {
+            const commitOpEntry = retrievedEntriesByShard[shardId][0];
+            assert.eq(commitOpEntry.fromMigrate, true);
         }
     }
-    assert.eq(1, numVisibleOpEntries);
 
     // 2. Verify that no further placement document gets inserted if the drop is
     // repeated.

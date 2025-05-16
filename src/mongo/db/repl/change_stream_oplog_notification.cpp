@@ -199,6 +199,37 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
     }
 }
 
+void notifyChangeStreamsOnNamespacePlacementChanged(OperationContext* opCtx,
+                                                    const NamespacePlacementChanged& notification) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(notification.getNss());
+    oplogEntry.setTid(notification.getNss().tenantId());
+
+    oplogEntry.setObject(
+        BSON("msg" << BSON("namespacePlacementChanged" << NamespaceStringUtil::serialize(
+                               notification.getNss(), SerializationContext::stateDefault()))));
+
+    const auto buildO2Field = [&] {
+        BSONObjBuilder nsFieldBuilder;
+        nsFieldBuilder.append("db", notification.getNss().dbName().toStringForResourceId());
+        if (!notification.getNss().isDbOnly()) {
+            nsFieldBuilder.append("coll", notification.getNss().coll());
+        }
+
+        return BSON("namespacePlacementChanged" << 1 << "ns" << nsFieldBuilder.obj()
+                                                << "committedAt" << notification.getCommittedAt());
+    };
+
+    oplogEntry.setObject2(buildO2Field());
+
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
+    insertOplogEntry(opCtx, {std::move(oplogEntry)}, "NamespacePlacementChangedWritesOplog");
+}
+
+
 void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
                                           const LogicalSessionId& lsid,
                                           const TxnNumber& txnNumber,
