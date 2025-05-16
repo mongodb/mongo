@@ -57,6 +57,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
@@ -537,6 +538,8 @@ private:
         executor()->yieldIfAppropriate();
     }
 
+    void _waitForEstabilshmentRateLimit();
+
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* _sep;
@@ -544,6 +547,8 @@ private:
 
     AtomicWord<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
+
+    bool _inFirstIteration = true;
 
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
@@ -799,6 +804,13 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         }
 
         try {
+            // If this is the first iteration of the session workflow, we must acquire an
+            // "establishment token" to respect connection establishment rate limits.
+            if (MONGO_unlikely(_inFirstIteration)) {
+                _waitForEstabilshmentRateLimit();
+                _inFirstIteration = false;
+            }
+
             // All available service executors use dedicated threads, so it's okay to
             // run eager futures in an ordinary loop to bypass scheduler overhead. Loop
             // while we have `_nextWork` in case there have been synthetic exhaust
@@ -821,6 +833,22 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                           "Unable to schedule a new loop for the session workflow",
                           "error"_attr = error);
     _onLoopError(error);
+}
+
+void SessionWorkflow::Impl::_waitForEstabilshmentRateLimit() {
+    auto sm = session()->getTransportLayer()->getSessionManager();
+    auto exemptionsList = sm->getSessionEstablishmentRateLimitExemptionList();
+
+    if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabled() &&
+        !(exemptionsList && session()->isExemptedByCIDRList(*exemptionsList))) {
+        // Create an opCtx for interruptibility and to make queued waiters return tokens when the
+        // client has disconnected.
+        auto establishmentOpCtx = client()->makeOperationContext();
+        establishmentOpCtx->markKillOnClientDisconnect();
+        // Acquire a token or block until one becomes available.
+        uassertStatusOK(
+            sm->getSessionEstablishmentRateLimiter().acquireToken(establishmentOpCtx.get()));
+    }
 }
 
 void SessionWorkflow::Impl::terminate() {

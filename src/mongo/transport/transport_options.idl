@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo::transport"
+    cpp_includes:
+        - "mongo/transport/transport_options.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -91,33 +93,38 @@ server_parameters:
     ingressConnectionEstablishmentRatePerSec:
         description: "The number of new connections that will be allowed to establish per second"
         set_at: [startup, runtime]
-        cpp_class:
-            name: "IngressConnectionEstablishmentRatePerSecServerParameter"
-            override_set: true
-            data: double
+        cpp_varname: gIngressConnectionEstablishmentRatePerSec
+        cpp_vartype: Atomic<int32_t>
+        on_update: transport::onUpdateEstablishmentRefreshRate
         default:
-            expr: std::numeric_limits<double>::max()
+            expr: std::numeric_limits<int>::max()
+        validator: {gte: 1}
         redact: false
 
     ingressConnectionEstablishmentBurstSize:
-        description: "The maximum number of  connection establishments that will be admitted before rate-limiting kicks in (ie, the burst size of the bucket)"
+        description: >-
+            The maximum number of connection establishments that will be admitted before rate-limiting 
+            kicks in (ie, the burst size of the bucket)
         set_at: [startup, runtime]
-        cpp_class:
-            name: "IngressConnectionEstablishmentBurstSizeServerParameter"
-            override_set: true
-            data: double
+        cpp_varname: gIngressConnectionEstablishmentBurstSize
+        cpp_vartype: Atomic<int32_t>
+        on_update: transport::onUpdateEstablishmentBurstSize
         default:
-            expr: std::numeric_limits<double>::max()
+            expr: std::numeric_limits<int>::max()
+        validator: {gte: 1}
         redact: false
 
     ingressConnectionEstablishmentMaxQueueDepth:
-        description: "The maximum size of the connection establishment queue, after which the server will begin rejecting new connections"
+        description: >-
+            The maximum size of the connection establishment queue, after which the server will begin 
+            rejecting new connections. A queue size of 0 indicates that connections will be rejected if 
+            they cannot immediately be admitted.
         set_at: [startup, runtime]
-        cpp_class:
-            name: "IngressConnectionEstablishmentMaxQueueDepthServerParameter"
-            override_set: true
-            data: std::int64_t
+        cpp_varname: gIngressConnectionEstablishmentMaxQueueDepth
+        cpp_vartype: Atomic<int32_t>
+        on_update: transport::onUpdateEstablishmentMaxQueueDepth
         default: 0
+        validator: {gte: 0}
         redact: false
 
     pessimisticConnectivityCheckForAcceptedConnections:
