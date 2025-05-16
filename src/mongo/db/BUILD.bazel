@@ -624,6 +624,11 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "mirror_maestro_feature_flag_gen",
+    src = "mirror_maestro_feature_flags.idl",
+)
+
+idl_generator(
     name = "mirror_maestro_gen",
     src = "mirror_maestro.idl",
     deps = [
@@ -1794,6 +1799,7 @@ mongo_cc_library(
         "index_names.cpp",
         "keypattern.cpp",
         "logical_time.cpp",
+        "mirror_maestro_feature_flag_gen",
         "namespace_string.cpp",
         "read_write_concern_provenance.cpp",
         "server_options.cpp",
