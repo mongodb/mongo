@@ -599,7 +599,7 @@ last-continuous:
     ticket: SERVER-94156
   - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
     ticket: SERVER-97044
-  - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
+  - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
   suites: null
 last-lts:
@@ -1250,6 +1250,6 @@ last-lts:
     ticket: SERVER-94156
   - test_file: jstests/sharding/resharding_cleanup_and_change_streams.js
     ticket: SERVER-97044
-  - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
+  - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
   suites: null
