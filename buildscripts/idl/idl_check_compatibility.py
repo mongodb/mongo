@@ -150,6 +150,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'find-param-allowSpeculativeMajorityRead',
     'find-param-$_requestResumeToken',
     'find-param-$_resumeAfter',
+    "find-param-$_startAt",
     'find-param-maxTimeMS',
     'update-param-u',
     'update-param-hint',
@@ -242,6 +243,7 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     'bulkWrite-reply-opTime',
     'hello-reply-opTime',
     'hello-reply-majorityOpTime',
+    'find-param-$_startAt',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable
@@ -1275,7 +1277,8 @@ def check_command_params_or_type_struct_fields(
                     cmd_name, new_field.name, new_idl_file_path, new_struct.name,
                     is_command_parameter)
 
-            if is_unstable(new_field.stability) and not new_field_optional:
+            if (is_unstable(new_field.stability) and not new_field.stability == "internal"
+                    and not new_field_optional):
                 ctxt.add_new_param_or_type_field_added_as_unstable_required_error(
                     cmd_name, new_field.name, new_idl_file_path, is_command_parameter)
 

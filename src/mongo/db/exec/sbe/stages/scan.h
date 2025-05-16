@@ -103,7 +103,8 @@ public:
                    boost::optional<value::SlotId> inMaxRecordIdSlot,
                    bool inForward,
                    ScanCallbacks inScanCallbacks,
-                   bool inUseRandomCursor)
+                   bool inUseRandomCursor,
+                   bool inTolerateKeyNotFound)
         : collUuid(inCollUuid),
           dbName(dbName),
           recordSlot(inRecordSlot),
@@ -120,7 +121,8 @@ public:
           maxRecordIdSlot(inMaxRecordIdSlot),
           forward(inForward),
           scanCallbacks(inScanCallbacks),
-          useRandomCursor(inUseRandomCursor) {
+          useRandomCursor(inUseRandomCursor),
+          tolerateKeyNotFound(inTolerateKeyNotFound) {
         invariant(scanFieldNames.size() == scanFieldSlots.size());
     }
 
@@ -155,6 +157,10 @@ public:
 
     // Used to return a random sample of the collection.
     const bool useRandomCursor;
+
+    // If false, resuming will raise KeyNotFound if RecordId doesn't exist. If true, seeks to next
+    // valid RecordId.
+    const bool tolerateKeyNotFound;
 };  // class ScanStageState
 
 /**
@@ -226,7 +232,8 @@ public:
               bool useRandomCursor = false,
               bool participateInTrialRunTracking = true,
               bool includeScanStartRecordId = true,
-              bool includeScanEndRecordId = true);
+              bool includeScanEndRecordId = true,
+              bool tolerateKeyNotFound = false);
 
     /**
      * Constructor for clone(). Copies '_state' shared_ptr.
@@ -322,6 +329,9 @@ private:
     // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
     value::SlotAccessor* _seekRecordIdAccessor{nullptr};
     RecordId _seekRecordId;
+    // Used when resuming scan with '_seekRecordIdAccessor'. If true, raise a KeyNotFound error,
+    // otherwise, seek to next valid RecordId.
+    bool _tolerateKeyNotFound;
 
     // Only for clustered collection scans, holds the minimum record ID of the scan, if applicable.
     value::SlotAccessor* _minRecordIdAccessor{nullptr};

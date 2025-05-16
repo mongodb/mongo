@@ -424,7 +424,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             !request.getNeedsMerge() && !request.getFromMongos());
     uassert(ErrorCodes::BadValue,
             "Aggregate queries on mongoS may not request or provide a resume token",
-            !request.getRequestResumeToken() && !request.getResumeAfter());
+            !request.getRequestResumeToken() && !request.getResumeAfter() && !request.getStartAt());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         auto criSW = getCollectionRoutingInfoForTxnCmd(opCtx, nss);

@@ -153,7 +153,8 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     std::unique_ptr<sbe::EExpression> seekRecordIdExpression,
     PlanYieldPolicy* yieldPolicy,
     bool isResumingTailableScan,
-    bool resumeAfterRecordId) {
+    bool resumeAfterRecordId,
+    bool tolerateKeyNotFound) {
     invariant(seekRecordIdExpression);
 
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
@@ -171,30 +172,36 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
     // Construct a 'seek' branch of the 'union'. If we're succeeded to reposition the cursor,
     // the branch will output the 'seekSlot' to start the real scan from, otherwise it will
     // produce EOF.
-    auto seekBranch =
-        sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
-                                       sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                                                  collection->ns().dbName(),
-                                                                  boost::none /* recordSlot */,
-                                                                  boost::none /* recordIdSlot*/,
-                                                                  boost::none /* snapshotIdSlot */,
-                                                                  boost::none /* indexIdentSlot */,
-                                                                  boost::none /* indexKeySlot */,
-                                                                  boost::none /* keyPatternSlot */,
-                                                                  boost::none /* oplogTsSlot */,
-                                                                  std::vector<std::string>{},
-                                                                  sbe::makeSV(),
-                                                                  seekSlot,
-                                                                  boost::none /* minRecordIdSlot */,
-                                                                  boost::none /* maxRecordIdSlot */,
-                                                                  forward,
-                                                                  yieldPolicy,
-                                                                  csn->nodeId(),
-                                                                  sbe::ScanCallbacks{}),
-                                       sbe::makeSV(seekSlot),
-                                       sbe::makeSV(seekSlot),
-                                       nullptr,
-                                       csn->nodeId());
+    auto seekBranch = sbe::makeS<sbe::LoopJoinStage>(
+        std::move(projStage),
+        sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                   collection->ns().dbName(),
+                                   boost::none /* recordSlot */,
+                                   boost::none /* recordIdSlot*/,
+                                   boost::none /* snapshotIdSlot */,
+                                   boost::none /* indexIdentSlot */,
+                                   boost::none /* indexKeySlot */,
+                                   boost::none /* keyPatternSlot */,
+                                   boost::none /* oplogTsSlot */,
+                                   std::vector<std::string>{},
+                                   sbe::makeSV(),
+                                   seekSlot,
+                                   boost::none /* minRecordIdSlot */,
+                                   boost::none /* maxRecordIdSlot */,
+                                   forward,
+                                   yieldPolicy,
+                                   csn->nodeId(),
+                                   sbe::ScanCallbacks{},
+                                   false /* lowPriority default */,
+                                   false /* useRandomCursor deafult */,
+                                   true /* participateInTrialRunTracking default */,
+                                   true /* includeScanStartRecordId default */,
+                                   true /* includeScanEndRecordId default */,
+                                   tolerateKeyNotFound),
+        sbe::makeSV(seekSlot),
+        sbe::makeSV(seekSlot),
+        nullptr,
+        csn->nodeId());
 
     // Construct a 'fail' branch of the union. The 'unusedSlot' is needed as each union branch must
     // have the same number of slots, and we use just one in the 'seek' branch above. This branch
@@ -210,7 +217,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
         return {ErrorCodes::ErrorCodes::KeyNotFound,
                 str::stream() << "Failed to resume collection scan: the recordId from which we are "
                                  "attempting to resume no longer exists in the collection: "
-                              << csn->resumeAfterRecordId};
+                              << csn->resumeScanPoint->recordId};
     }();
     auto failBranch = sbe::makeProjectStage(sbe::makeS<sbe::CoScanStage>(csn->nodeId()),
                                             csn->nodeId(),
@@ -276,17 +283,28 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     sbe::RuntimeEnvironment* env = state.env.runtimeEnv;
 
     invariant(csn->doClusteredCollectionScanSbe());
-    invariant(!csn->resumeAfterRecordId || forward);
-    invariant(!csn->resumeAfterRecordId || !csn->tailable);
-    // The minRecord and maxRecord optimizations are not compatible with resumeAfterRecordId.
-    invariant(!(csn->resumeAfterRecordId && (csn->minRecord || csn->maxRecord)));
+
+    tassert(9884900,
+            "Expected forward collection scan with 'resumeScanPoint'",
+            !csn->resumeScanPoint || forward);
+
+    tassert(9884901,
+            "Cannot use resume token with a tailable cursor",
+            !csn->resumeScanPoint || !csn->tailable);
+    // The minRecord and maxRecord optimizations are not compatible with resume tokens.
+    tassert(9884902,
+            "'resumeScanPoint' cannot be used with 'minRecord' or 'maxRecord'",
+            !(csn->resumeScanPoint && (csn->minRecord || csn->maxRecord)));
     // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
-    invariant(!csn->stopApplyingFilterAfterFirstMatch);
+    tassert(9884903,
+            "Cannot use 'stopApplyingFilterAfterFirstMatch' when generating clustered scan",
+            !csn->stopApplyingFilterAfterFirstMatch);
 
     auto scanFieldSlots = state.slotIdGenerator->generateMultiple(scanFieldNames.size());
 
     sbe::value::SlotId resultSlot = state.slotId();
     sbe::value::SlotId recordIdSlot = state.slotId();
+    bool tolerateKeyNotFound = false;
 
     // Iff this is a resume or fetch, set 'seekRecordIdSlot' and 'seekRecordIdExpression' to the
     // RecordId resume point of the scan. If we're building a collection scan for a resume branch of
@@ -298,8 +316,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
         if (isResumingTailableScan) {
             sbe::value::SlotId resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
-        } else if (csn->resumeAfterRecordId) {
-            auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
+        } else if (csn->resumeScanPoint) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(csn->resumeScanPoint->recordId);
+            tolerateKeyNotFound = csn->resumeScanPoint->tolerateKeyNotFound;
             return {state.slotId(), makeConstant(tag, val)};
         }
         return {};
@@ -352,7 +371,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
                                             false /* useRandomCursor default */,
                                             true /* participateInTrialRunTracking default */,
                                             includeScanStartRecordId,
-                                            includeScanEndRecordId);
+                                            includeScanEndRecordId,
+                                            tolerateKeyNotFound);
 
     // Iff this is a resume or fetch, build the subtree to start the scan from the seekRecordId.
     if (seekRecordIdSlot) {
@@ -364,7 +384,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
                                                isResumingTailableScan,
-                                               csn->resumeAfterRecordId.has_value());
+                                               csn->resumeScanPoint.has_value(),
+                                               tolerateKeyNotFound);
     }
 
     PlanStageSlots outputs;
@@ -407,9 +428,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     bool isResumingTailableScan) {
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
-    invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
-    invariant(!csn->resumeAfterRecordId || forward);
-    invariant(!csn->resumeAfterRecordId || !csn->tailable);
+    tassert(9884904,
+            "'shouldTrackLatestOplogTimestamp' can only be used with oplog collections",
+            !csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
+
+    tassert(9884905,
+            "Expected forward collection scan with 'resumeScanPoint'",
+            !csn->resumeScanPoint || forward);
+
+    tassert(9884906,
+            "Cannot use resume token with a tailable cursor",
+            !csn->resumeScanPoint || !csn->tailable);
 
     if (csn->filter) {
         DepsTracker deps;
@@ -426,10 +455,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
 
     auto resultSlot = state.slotId();
     auto recordIdSlot = state.slotId();
+    bool tolerateKeyNotFound = false;
     auto [seekRecordIdSlot, seekRecordIdExpression] =
         [&]() -> std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::EExpression>> {
-        if (csn->resumeAfterRecordId) {
-            auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
+        if (csn->resumeScanPoint) {
+            auto [tag, val] = sbe::value::makeCopyRecordId(csn->resumeScanPoint->recordId);
+            tolerateKeyNotFound = csn->resumeScanPoint->tolerateKeyNotFound;
             return {state.slotId(), makeConstant(tag, val)};
         } else if (isResumingTailableScan) {
             auto resumeRecordIdSlot = state.env->getSlot("resumeRecordId"_sd);
@@ -464,7 +495,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                             yieldPolicy,
                                             csn->nodeId(),
                                             std::move(callbacks),
-                                            csn->lowPriority);
+                                            csn->lowPriority,
+                                            false /* useRandomCursor default */,
+                                            true /* participateInTrialRunTracking default */,
+                                            true /* includeScanStartRecordId default */,
+                                            true /* includeScanEndRecordId default */,
+                                            tolerateKeyNotFound);
 
     if (seekRecordIdSlot) {
         stage = buildResumeFromRecordIdSubtree(state,
@@ -475,7 +511,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                std::move(seekRecordIdExpression),
                                                yieldPolicy,
                                                isResumingTailableScan,
-                                               true /* resumeAfterRecordId  */);
+                                               true /* resumeAfterRecordId  */,
+                                               tolerateKeyNotFound);
     }
 
     PlanStageSlots outputs;

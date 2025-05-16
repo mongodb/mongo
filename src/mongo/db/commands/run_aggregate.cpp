@@ -1435,8 +1435,11 @@ Status _runAggregate(OperationContext* opCtx,
                     !ctx->getView());
             const auto& collection = ctx->getCollection();
             const bool isClusteredCollection = collection && collection->isClustered();
-            uassertStatusOK(query_request_helper::validateResumeAfter(
-                opCtx, *request.getResumeAfter(), isClusteredCollection));
+            uassertStatusOK(query_request_helper::validateResumeInput(
+                opCtx,
+                request.getResumeAfter() ? *request.getResumeAfter() : BSONObj(),
+                request.getStartAt() ? *request.getStartAt() : BSONObj(),
+                isClusteredCollection));
         }
 
         // If collectionUUID was provided, verify the collection exists and has the expected UUID.

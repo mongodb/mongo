@@ -887,7 +887,22 @@ TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStage
 
     const auto* node = solns.front()->root();
     const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(node);
-    ASSERT_EQUALS(RecordId(42LL), csn->resumeAfterRecordId.value());
+    ASSERT_EQUALS(RecordId(42LL), csn->resumeScanPoint->recordId);
+    ASSERT_FALSE(csn->resumeScanPoint->tolerateKeyNotFound);
+}
+
+TEST_F(QueryPlannerTest, DollarStartAtFieldPropagatedFromQueryRequestToStageBuilder) {
+    BSONObj cmdObj = BSON("find" << nss.ns_forTest() << "hint" << BSON("$natural" << 1) << "sort"
+                                 << BSON("$natural" << 1) << "$_requestResumeToken" << true
+                                 << "$_startAt" << BSON("$recordId" << 42LL));
+
+    runQueryAsCommand(cmdObj);
+    assertHasOnlyCollscan();
+
+    const auto* node = solns.front()->root();
+    const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(node);
+    ASSERT_EQUALS(RecordId(42LL), csn->resumeScanPoint->recordId);
+    ASSERT_TRUE(csn->resumeScanPoint->tolerateKeyNotFound);
 }
 
 TEST_F(QueryPlannerTest, PreserveRecordIdOptionPrecludesSimpleSort) {
