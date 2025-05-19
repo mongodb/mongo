@@ -239,8 +239,6 @@ last-continuous:
       ticket: SERVER-91465
     - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
-    - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
-      ticket: SERVER-90017
     - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
       ticket: SERVER-90965
     - test_file: jstests/core/query/query_settings/query_settings_cmds.js
@@ -649,8 +647,6 @@ last-lts:
       ticket: SERVER-91465
     - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
-    - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
-      ticket: SERVER-90017
     - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
       ticket: SERVER-90965
     - test_file: jstests/core/query/query_settings/query_settings_cmds.js

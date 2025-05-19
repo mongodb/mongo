@@ -47,12 +47,6 @@ env.CppUnitTest(
     LIBDEPS=[],
 )
 
-env.CppUnitTest(
-    target="group_with_acc_n_optimization_test",
-    source=[],
-    LIBDEPS=[],
-)
-
 env.Benchmark(
     target="window_function_percentile_bm",
     source=[],

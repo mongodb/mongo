@@ -1517,20 +1517,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_unit_test(
-    name = "group_with_acc_n_optimization_test",
-    srcs = [
-        "group_with_acc_n_optimization_test.cpp",
-    ],
-    tags = ["mongo_unittest_sixth_group"],
-    deps = [
-        ":accumulator",
-        ":aggregation_context_fixture",
-        ":pipeline",
-        "//src/mongo/db/query:query_test_service_context",
-    ],
-)
-
 mongo_cc_benchmark(
     name = "document_source_group_bm",
     srcs = [
