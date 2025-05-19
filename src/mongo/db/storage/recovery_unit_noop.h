@@ -57,17 +57,17 @@ public:
     }
 
 private:
-    void doBeginUnitOfWork() final {}
+    void doBeginUnitOfWork() override {}
 
-    void doCommitUnitOfWork() final {
+    void doAbandonSnapshot() override {}
+
+    void doCommitUnitOfWork() override {
         _executeCommitHandlers(boost::none);
     }
 
-    void doAbortUnitOfWork() final {
+    void doAbortUnitOfWork() override {
         _executeRollbackHandlers();
     }
-
-    virtual void doAbandonSnapshot() {}
 
     std::vector<std::unique_ptr<Change>> _changes;
 };
